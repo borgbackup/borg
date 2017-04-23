@@ -117,6 +117,7 @@ Borg can exit with the following return codes (rc):
 If you use ``--show-rc``, the return code is also logged at the indicated
 level as the last log entry.
 
+.. _env_vars:
 
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~
@@ -139,9 +140,10 @@ General:
         Main usecase for this is to fully automate ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
-    BORG_HOSTNAME_IS_UNIQUE=yes
-        Use this to assert that your hostname is unique.
-        Borg will then automatically remove locks that it could determine to be stale.
+    BORG_HOSTNAME_IS_UNIQUE=no
+        Borg assumes that it can derive a unique hostname / identity (see ``borg debug info``).
+        If this is not the case or you do not want Borg to automatically remove stale locks,
+        set this to *no*.
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
     BORG_RSH

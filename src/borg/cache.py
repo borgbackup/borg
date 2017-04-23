@@ -15,9 +15,10 @@ from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
-from .helpers import bin_to_hex
+from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
 from .helpers import format_file_size
-from .helpers import yes
+from .helpers import safe_ns
+from .helpers import yes, hostname_is_unique
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .item import Item, ArchiveItem, ChunkListEntry
@@ -186,9 +187,6 @@ class Cache:
         self.progress = progress
         self.path = path or os.path.join(get_cache_dir(), repository.id_str)
         self.security_manager = SecurityManager(repository)
-        self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None)
-        if self.hostname_is_unique:
-            logger.info('Enabled removal of stale cache locks')
         self.do_files = do_files
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
@@ -294,7 +292,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def open(self, lock_wait=None):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait, kill_stale_locks=self.hostname_is_unique).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait, kill_stale_locks=hostname_is_unique()).acquire()
         self.rollback()
 
     def close(self):
@@ -353,7 +351,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     # this is to avoid issues with filesystem snapshots and mtime granularity.
                     # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                     entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if entry.age == 0 and entry.mtime < self._newest_mtime or \
+                    if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
         pi.output('Saving cache config')
@@ -423,14 +421,14 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
         def fetch_and_build_idx(archive_id, repository, key, chunk_idx):
             cdata = repository.get(archive_id)
-            _, data = key.decrypt(archive_id, cdata)
+            data = key.decrypt(archive_id, cdata)
             chunk_idx.add(archive_id, 1, len(data), len(cdata))
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
             unpacker = msgpack.Unpacker()
             for item_id, chunk in zip(archive.items, repository.get_many(archive.items)):
-                _, data = key.decrypt(item_id, chunk)
+                data = key.decrypt(item_id, chunk)
                 chunk_idx.add(item_id, 1, len(data), len(chunk))
                 unpacker.feed(data)
                 for item in unpacker:
@@ -523,16 +521,16 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
-    def add_chunk(self, id, chunk, stats, overwrite=False):
+    def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
         if not self.txn_active:
             self.begin_txn()
-        size = len(chunk.data)
+        size = len(chunk)
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)
         data = self.key.encrypt(chunk)
         csize = len(data)
-        self.repository.put(id, data, wait=False)
+        self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
         stats.update(size, csize, not refcount)
         return ChunkListEntry(id, size, csize)
@@ -553,13 +551,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         stats.update(size, csize, False)
         return ChunkListEntry(id, size, csize)
 
-    def chunk_decref(self, id, stats):
+    def chunk_decref(self, id, stats, wait=True):
         if not self.txn_active:
             self.begin_txn()
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
-            self.repository.delete(id, wait=False)
+            self.repository.delete(id, wait=wait)
             stats.update(-size, -csize, True)
         else:
             stats.update(-size, -csize, False)
@@ -573,7 +571,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         if not entry:
             return None
         entry = FileCacheEntry(*msgpack.unpackb(entry))
-        if (entry.size == st.st_size and entry.mtime == st.st_mtime_ns and
+        if (entry.size == st.st_size and bigint_to_int(entry.mtime) == st.st_mtime_ns and
                 (ignore_inode or entry.inode == st.st_ino)):
             # we ignored the inode number in the comparison above or it is still same.
             # if it is still the same, replacing it in the tuple doesn't change it.
@@ -591,6 +589,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def memorize_file(self, path_hash, st, ids):
         if not (self.do_files and stat.S_ISREG(st.st_mode)):
             return
-        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=st.st_mtime_ns, chunk_ids=ids)
+        mtime_ns = safe_ns(st.st_mtime_ns)
+        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, mtime=int_to_bigint(mtime_ns), chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
-        self._newest_mtime = max(self._newest_mtime or 0, st.st_mtime_ns)
+        self._newest_mtime = max(self._newest_mtime or 0, mtime_ns)

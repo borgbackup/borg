@@ -34,7 +34,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import PatternMatcher, parse_pattern, Location, get_security_dir
-from ..helpers import Chunk, Manifest
+from ..helpers import Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..item import Item
@@ -1049,18 +1049,35 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
                                                          'fakeroot')
-    def test_extract_big_xattrs(self):
-        def patched_setxattr(*args, **kwargs):
+    def test_extract_xattrs_errors(self):
+        def patched_setxattr_E2BIG(*args, **kwargs):
             raise OSError(errno.E2BIG, 'E2BIG')
+
+        def patched_setxattr_ENOTSUP(*args, **kwargs):
+            raise OSError(errno.ENOTSUP, 'ENOTSUP')
+
+        def patched_setxattr_EACCES(*args, **kwargs):
+            raise OSError(errno.EACCES, 'EACCES')
+
         self.create_regular_file('file')
         xattr.setxattr('input/file', 'attribute', 'value')
         self.cmd('init', self.repository_location, '-e' 'none')
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
-            with patch.object(xattr, 'setxattr', patched_setxattr):
+            input_abspath = os.path.abspath('input/file')
+            with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (os.path.abspath('input/file') + ': Value or key of extended attribute attribute is too big'
-                                                               'for this filesystem\n')
+                assert out == (input_abspath + ': Value or key of extended attribute attribute is too big for this '
+                                               'filesystem\n')
+            os.remove(input_abspath)
+            with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (input_abspath + ': Extended attributes are not supported on this filesystem\n')
+            os.remove(input_abspath)
+            with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
+                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                assert out == (input_abspath + ': Permission denied when setting extended attribute attribute\n')
+            assert os.path.isfile(input_abspath)
 
     def test_path_normalization(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -1238,7 +1255,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     repository.delete(first_chunk_id)
                     repository.commit()
                     break
-        self.cmd('delete', '--force', self.repository_location + '::test')
+        output = self.cmd('delete', '--force', self.repository_location + '::test')
+        self.assert_in('deleted archive was corrupted', output)
         self.cmd('check', '--repair', self.repository_location)
         output = self.cmd('list', self.repository_location)
         self.assert_not_in('test', output)
@@ -1730,6 +1748,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 out_fn = os.path.join(mountpoint, 'input', 'link1')
                 sti = os.stat(in_fn, follow_symlinks=False)
                 sto = os.stat(out_fn, follow_symlinks=False)
+                assert sti.st_size == len('somewhere')
+                assert sto.st_size == len('somewhere')
                 assert stat.S_ISLNK(sti.st_mode)
                 assert stat.S_ISLNK(sto.st_mode)
                 assert os.readlink(in_fn) == os.readlink(out_fn)
@@ -2029,7 +2049,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                              '--format', '{size} {csize} {sha256}')
         size, csize, sha256_before = file_list.split(' ')
         assert int(csize) >= int(size)  # >= due to metadata overhead
-        self.cmd('recreate', self.repository_location, '-C', 'lz4')
+        self.cmd('recreate', self.repository_location, '-C', 'lz4', '--recompress')
         self.check_cache()
         file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
                              '--format', '{size} {csize} {sha256}')
@@ -2429,7 +2449,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 'version': 1,
             })
             archive_id = key.id_hash(archive)
-            repository.put(archive_id, key.encrypt(Chunk(archive)))
+            repository.put(archive_id, key.encrypt(archive))
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -2517,12 +2537,12 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
     def spoof_manifest(self, repository):
         with repository:
             _, key = Manifest.load(repository)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'config': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
-            }))))
+            })))
             repository.commit()
 
     def test_fresh_init_tam_required(self):
@@ -2530,11 +2550,11 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
-            }))))
+            })))
             repository.commit()
 
         with pytest.raises(TAMRequiredError):
@@ -2550,9 +2570,9 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             key.tam_required = False
             key.change_passphrase(key._passphrase)
 
-            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)).data)
+            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
             del manifest[b'tam']
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(Chunk(msgpack.packb(manifest))))
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest)))
             repository.commit()
         output = self.cmd('list', '--debug', self.repository_location)
         assert 'archive1234' in output
@@ -2821,11 +2841,18 @@ def test_get_args():
                              'borg init --encryption=repokey /')
     assert args.func == archiver.do_serve
 
+    # Check that environment variables in the forced command don't cause issues. If the command
+    # were not forced, environment variables would be interpreted by the shell, but this does not
+    # happen for forced commands - we get the verbatim command line and need to deal with env vars.
+    args = archiver.get_args(['borg', 'serve', ],
+                             'BORG_HOSTNAME_IS_UNIQUE=yes borg serve --info')
+    assert args.func == archiver.do_serve
+
 
 def test_compare_chunk_contents():
     def ccc(a, b):
-        chunks_a = [Chunk(data) for data in a]
-        chunks_b = [Chunk(data) for data in b]
+        chunks_a = [data for data in a]
+        chunks_b = [data for data in b]
         compare1 = Archiver.compare_chunk_contents(iter(chunks_a), iter(chunks_b))
         compare2 = Archiver.compare_chunk_contents(iter(chunks_b), iter(chunks_a))
         assert compare1 == compare2

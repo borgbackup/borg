@@ -13,14 +13,13 @@ from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
-from .compress import Compressor, get_compressor
+from .compress import Compressor
 from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
-from .helpers import Chunk, StableDict
+from .helpers import StableDict
 from .helpers import Error, IntegrityError
 from .helpers import yes
 from .helpers import get_keys_dir, get_security_dir
 from .helpers import bin_to_hex
-from .helpers import CompressionDecider2, CompressionSpec
 from .item import Key, EncryptedKey
 from .platform import SaveFile
 from .nonces import NonceManager
@@ -87,43 +86,36 @@ class TAMUnsupportedSuiteError(IntegrityError):
     traceback = False
 
 
+class KeyBlobStorage:
+    NO_STORAGE = 'no_storage'
+    KEYFILE = 'keyfile'
+    REPO = 'repository'
+
+
 def key_creator(repository, args):
-    if args.encryption == 'keyfile':
-        return KeyfileKey.create(repository, args)
-    elif args.encryption == 'repokey':
-        return RepoKey.create(repository, args)
-    elif args.encryption == 'keyfile-blake2':
-        return Blake2KeyfileKey.create(repository, args)
-    elif args.encryption == 'repokey-blake2':
-        return Blake2RepoKey.create(repository, args)
-    elif args.encryption == 'authenticated':
-        return AuthenticatedKey.create(repository, args)
-    elif args.encryption == 'none':
-        return PlaintextKey.create(repository, args)
+    for key in AVAILABLE_KEY_TYPES:
+        if key.ARG_NAME == args.encryption:
+            return key.create(repository, args)
     else:
         raise ValueError('Invalid encryption mode "%s"' % args.encryption)
 
 
-def key_factory(repository, manifest_data):
+def identify_key(manifest_data):
     key_type = manifest_data[0]
-    if key_type == KeyfileKey.TYPE:
-        return KeyfileKey.detect(repository, manifest_data)
-    elif key_type == RepoKey.TYPE:
-        return RepoKey.detect(repository, manifest_data)
-    elif key_type == PassphraseKey.TYPE:
+    if key_type == PassphraseKey.TYPE:
         # we just dispatch to repokey mode and assume the passphrase was migrated to a repokey.
         # see also comment in PassphraseKey class.
-        return RepoKey.detect(repository, manifest_data)
-    elif key_type == PlaintextKey.TYPE:
-        return PlaintextKey.detect(repository, manifest_data)
-    elif key_type == Blake2KeyfileKey.TYPE:
-        return Blake2KeyfileKey.detect(repository, manifest_data)
-    elif key_type == Blake2RepoKey.TYPE:
-        return Blake2RepoKey.detect(repository, manifest_data)
-    elif key_type == AuthenticatedKey.TYPE:
-        return AuthenticatedKey.detect(repository, manifest_data)
+        return RepoKey
+
+    for key in AVAILABLE_KEY_TYPES:
+        if key.TYPE == key_type:
+            return key
     else:
         raise UnsupportedPayloadError(key_type)
+
+
+def key_factory(repository, manifest_data):
+    return identify_key(manifest_data).detect(repository, manifest_data)
 
 
 def tam_required_file(repository):
@@ -139,24 +131,26 @@ def tam_required(repository):
 class KeyBase:
     TYPE = None  # override in subclasses
 
+    # Human-readable name
+    NAME = 'UNDEFINED'
+    # Name used in command line / API (e.g. borg init --encryption=...)
+    ARG_NAME = 'UNDEFINED'
+    # Storage type (no key blob storage / keyfile / repo)
+    STORAGE = KeyBlobStorage.NO_STORAGE
+
     def __init__(self, repository):
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.compression_decider2 = CompressionDecider2(CompressionSpec('none'))
-        self.compressor = Compressor('none')  # for decompression
+        # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates
+        # the default used by those commands who do take a --compression argument.
+        self.compressor = Compressor('lz4')
+        self.decompress = self.compressor.decompress
         self.tam_required = True
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
-
-    def compress(self, chunk):
-        compr_args, chunk = self.compression_decider2.decide(chunk)
-        compressor = Compressor(**compr_args)
-        meta, data = chunk
-        data = compressor.compress(data)
-        return Chunk(data, **meta)
 
     def encrypt(self, chunk):
         pass
@@ -236,6 +230,8 @@ class KeyBase:
 class PlaintextKey(KeyBase):
     TYPE = 0x02
     NAME = 'plaintext'
+    ARG_NAME = 'none'
+    STORAGE = KeyBlobStorage.NO_STORAGE
 
     chunk_seed = 0
 
@@ -256,8 +252,8 @@ class PlaintextKey(KeyBase):
         return sha256(data).digest()
 
     def encrypt(self, chunk):
-        chunk = self.compress(chunk)
-        return b''.join([self.TYPE_STR, chunk.data])
+        data = self.compressor.compress(chunk)
+        return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
@@ -265,10 +261,10 @@ class PlaintextKey(KeyBase):
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         payload = memoryview(data)[1:]
         if not decompress:
-            return Chunk(payload)
-        data = self.compressor.decompress(payload)
+            return payload
+        data = self.decompress(payload)
         self.assert_id(id, data)
-        return Chunk(data)
+        return data
 
     def _tam_key(self, salt, context):
         return salt + context
@@ -334,10 +330,10 @@ class AESKeyBase(KeyBase):
     MAC = hmac_sha256
 
     def encrypt(self, chunk):
-        chunk = self.compress(chunk)
-        self.nonce_manager.ensure_reservation(num_aes_blocks(len(chunk.data)))
+        data = self.compressor.compress(chunk)
+        self.nonce_manager.ensure_reservation(num_aes_blocks(len(data)))
         self.enc_cipher.reset()
-        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(chunk.data)))
+        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
         assert (self.MAC is blake2b_256 and len(self.enc_hmac_key) == 128 or
                 self.MAC is hmac_sha256 and len(self.enc_hmac_key) == 32)
         hmac = self.MAC(self.enc_hmac_key, data)
@@ -359,10 +355,10 @@ class AESKeyBase(KeyBase):
         self.dec_cipher.reset(iv=PREFIX + data[33:41])
         payload = self.dec_cipher.decrypt(data_view[41:])
         if not decompress:
-            return Chunk(payload)
-        data = self.compressor.decompress(payload)
+            return payload
+        data = self.decompress(payload)
         self.assert_id(id, data)
-        return Chunk(data)
+        return data
 
     def extract_nonce(self, payload):
         if not (payload[0] == self.TYPE or
@@ -466,6 +462,9 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
     # This class is kept for a while to support migration from passphrase to repokey mode.
     TYPE = 0x01
     NAME = 'passphrase'
+    ARG_NAME = None
+    STORAGE = KeyBlobStorage.NO_STORAGE
+
     iterations = 100000  # must not be changed ever!
 
     @classmethod
@@ -623,6 +622,9 @@ class KeyfileKeyBase(AESKeyBase):
 class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     TYPE = 0x00
     NAME = 'key file'
+    ARG_NAME = 'keyfile'
+    STORAGE = KeyBlobStorage.KEYFILE
+
     FILE_ID = 'BORG_KEY'
 
     def sanity_check(self, filename, id):
@@ -683,6 +685,8 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
 class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     TYPE = 0x03
     NAME = 'repokey'
+    ARG_NAME = 'repokey'
+    STORAGE = KeyBlobStorage.REPO
 
     def find_key(self):
         loc = self.repository._location.canonical_path()
@@ -715,6 +719,9 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
 class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
     TYPE = 0x04
     NAME = 'key file BLAKE2b'
+    ARG_NAME = 'keyfile-blake2'
+    STORAGE = KeyBlobStorage.KEYFILE
+
     FILE_ID = 'BORG_KEY'
     MAC = blake2b_256
 
@@ -722,23 +729,36 @@ class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
 class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
     TYPE = 0x05
     NAME = 'repokey BLAKE2b'
+    ARG_NAME = 'repokey-blake2'
+    STORAGE = KeyBlobStorage.REPO
+
     MAC = blake2b_256
 
 
 class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
     TYPE = 0x06
     NAME = 'authenticated BLAKE2b'
+    ARG_NAME = 'authenticated'
+    STORAGE = KeyBlobStorage.REPO
 
     def encrypt(self, chunk):
-        chunk = self.compress(chunk)
-        return b''.join([self.TYPE_STR, chunk.data])
+        data = self.compressor.compress(chunk)
+        return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
             raise IntegrityError('Chunk %s: Invalid envelope' % bin_to_hex(id))
         payload = memoryview(data)[1:]
         if not decompress:
-            return Chunk(payload)
-        data = self.compressor.decompress(payload)
+            return payload
+        data = self.decompress(payload)
         self.assert_id(id, data)
-        return Chunk(data)
+        return data
+
+
+AVAILABLE_KEY_TYPES = (
+    PlaintextKey,
+    PassphraseKey,
+    KeyfileKey, RepoKey,
+    Blake2KeyfileKey, Blake2RepoKey, AuthenticatedKey,
+)

@@ -403,10 +403,16 @@ Examples
 borg serve has special support for ssh forced commands (see ``authorized_keys``
 example below): it will detect that you use such a forced command and extract
 the value of the ``--restrict-to-path`` option(s).
+
 It will then parse the original command that came from the client, makes sure
 that it is also ``borg serve`` and enforce path restriction(s) as given by the
 forced command. That way, other options given by the client (like ``--info`` or
 ``--umask``) are preserved (and are not fixed by the forced command).
+
+Environment variables (such as BORG_HOSTNAME_IS_UNIQUE) contained in the original
+command sent by the client are *not* interpreted, but ignored. If BORG_XXX environment
+variables should be set on the ``borg serve`` side, then these must be set in system-specific
+locations like ``/etc/environment`` or in the forced command itself (example below).
 
 ::
 
@@ -416,6 +422,9 @@ forced command. That way, other options given by the client (like ``--info`` or
     $ cat ~/.ssh/authorized_keys
     command="borg serve --restrict-to-path /path/to/repo",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
 
+    # Set a BORG_XXX environment variable on the "borg serve" side
+    $ cat ~/.ssh/authorized_keys
+    command="export BORG_XXX=value; borg serve [...]",restrict ssh-rsa [...]
 
 .. include:: usage/upgrade.rst.inc
 
@@ -463,7 +472,7 @@ Examples
     $ borg create /mnt/backup::archive /some/files --compression lz4
     # Then compress it - this might take longer, but the backup has already completed, so no inconsistencies
     # from a long-running backup job.
-    $ borg recreate /mnt/backup::archive --compression zlib,9
+    $ borg recreate /mnt/backup::archive --recompress --compression zlib,9
 
     # Remove unwanted files from all archives in a repository
     $ borg recreate /mnt/backup -e /home/icke/Pictures/drunk_photos
@@ -729,3 +738,11 @@ for e.g. regular pruning.
 Further protections can be implemented, but are outside of Borg's scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on
 new data files.
+
+SSH batch mode
+~~~~~~~~~~~~~~
+
+When running |project_name| using an automated script, ``ssh`` might still ask for a password,
+even if there is an SSH key for the target server. Use this to make scripts more robust::
+
+    export BORG_RSH='ssh -oBatchMode=yes'

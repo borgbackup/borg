@@ -1,5 +1,6 @@
 import argparse
 import hashlib
+import io
 import os
 import sys
 from datetime import datetime, timezone, timedelta
@@ -19,16 +20,29 @@ from ..helpers import prune_within, prune_split
 from ..helpers import get_cache_dir, get_keys_dir, get_security_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
-from ..helpers import StableDict, bin_to_hex
-from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
+from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
+from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import load_exclude_file, load_pattern_file
-from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
-from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
+from ..helpers import parse_pattern, PatternMatcher
+from ..helpers import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..helpers import swidth_slice
 from ..helpers import chunkit
+from ..helpers import safe_ns, safe_s
 
 from . import BaseTestCase, FakeInputs
+
+
+class BigIntTestCase(BaseTestCase):
+
+    def test_bigint(self):
+        self.assert_equal(int_to_bigint(0), 0)
+        self.assert_equal(int_to_bigint(2**63-1), 2**63-1)
+        self.assert_equal(int_to_bigint(-2**63+1), -2**63+1)
+        self.assert_equal(int_to_bigint(2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\x00')
+        self.assert_equal(int_to_bigint(-2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\xff')
+        self.assert_equal(bigint_to_int(int_to_bigint(-2**70)), -2**70)
+        self.assert_equal(bigint_to_int(int_to_bigint(2**70)), 2**70)
 
 
 def test_bin_to_hex():
@@ -248,6 +262,35 @@ def check_patterns(files, pattern, expected):
     matched = [f for f in files if pattern.match(f)]
 
     assert matched == (files if expected is None else expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("/", []),
+    ("/home", ["/home"]),
+    ("/home///", ["/home"]),
+    ("/./home", ["/home"]),
+    ("/home/user", ["/home/user"]),
+    ("/home/user2", ["/home/user2"]),
+    ("/home/user/.bashrc", ["/home/user/.bashrc"]),
+    ])
+def test_patterns_full(pattern, expected):
+    files = ["/home", "/home/user", "/home/user2", "/home/user/.bashrc", ]
+
+    check_patterns(files, PathFullPattern(pattern), expected)
+
+
+@pytest.mark.parametrize("pattern, expected", [
+    # "None" means all files, i.e. all match the given pattern
+    ("", []),
+    ("relative", []),
+    ("relative/path/", ["relative/path"]),
+    ("relative/path", ["relative/path"]),
+    ])
+def test_patterns_full_relative(pattern, expected):
+    files = ["relative/path", "relative/path2", ]
+
+    check_patterns(files, PathFullPattern(pattern), expected)
 
 
 @pytest.mark.parametrize("pattern, expected", [
@@ -506,6 +549,32 @@ def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatt
     assert numpatterns == expected_numpatterns
 
 
+def test_switch_patterns_style():
+    patterns = """\
+        +0_initial_default_is_shell
+        p fm
+        +1_fnmatch
+        P re
+        +2_regex
+        +3_more_regex
+        P pp
+        +4_pathprefix
+        p fm
+        p sh
+        +5_shell
+    """
+    pattern_file = io.StringIO(patterns)
+    roots, patterns = [], []
+    load_pattern_file(pattern_file, roots, patterns)
+    assert len(patterns) == 6
+    assert isinstance(patterns[0].pattern, ShellPattern)
+    assert isinstance(patterns[1].pattern, FnmatchPattern)
+    assert isinstance(patterns[2].pattern, RegexPattern)
+    assert isinstance(patterns[3].pattern, RegexPattern)
+    assert isinstance(patterns[4].pattern, PathPrefixPattern)
+    assert isinstance(patterns[5].pattern, ShellPattern)
+
+
 @pytest.mark.parametrize("lines", [
     (["X /data"]),  # illegal pattern type prefix
     (["/data"]),    # need a pattern type prefix
@@ -636,25 +705,6 @@ def test_pattern_matcher():
     assert pm.match("z") == "B"
 
     assert PatternMatcher(fallback="hey!").fallback == "hey!"
-
-
-def test_compression_specs():
-    with pytest.raises(ValueError):
-        CompressionSpec('')
-    assert CompressionSpec('none') == dict(name='none')
-    assert CompressionSpec('lz4') == dict(name='lz4')
-    assert CompressionSpec('zlib') == dict(name='zlib', level=6)
-    assert CompressionSpec('zlib,0') == dict(name='zlib', level=0)
-    assert CompressionSpec('zlib,9') == dict(name='zlib', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('zlib,9,invalid')
-    assert CompressionSpec('lzma') == dict(name='lzma', level=6)
-    assert CompressionSpec('lzma,0') == dict(name='lzma', level=0)
-    assert CompressionSpec('lzma,9') == dict(name='lzma', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('lzma,9,invalid')
-    with pytest.raises(ValueError):
-        CompressionSpec('invalid')
 
 
 def test_chunkerparams():
@@ -1118,7 +1168,7 @@ def test_partial_format():
 
 
 def test_chunk_file_wrapper():
-    cfw = ChunkIteratorFileWrapper(iter([Chunk(b'abc'), Chunk(b'def')]))
+    cfw = ChunkIteratorFileWrapper(iter([b'abc', b'def']))
     assert cfw.read(2) == b'ab'
     assert cfw.read(50) == b'cdef'
     assert cfw.exhausted
@@ -1160,38 +1210,6 @@ data2
     assert list(clean_lines(conf, remove_comments=False)) == ['#comment', 'data1 #data1', 'data2', 'data3', ]
 
 
-def test_compression_decider1():
-    default = CompressionSpec('zlib')
-    conf = """
-# use super-fast lz4 compression on huge VM files in this path:
-lz4:/srv/vm_disks
-
-# jpeg or zip files do not compress:
-none:*.jpeg
-none:*.zip
-""".splitlines()
-
-    cd = CompressionDecider1(default, [])  # no conf, always use default
-    assert cd.decide('/srv/vm_disks/linux')['name'] == 'zlib'
-    assert cd.decide('test.zip')['name'] == 'zlib'
-    assert cd.decide('test')['name'] == 'zlib'
-
-    cd = CompressionDecider1(default, [conf, ])
-    assert cd.decide('/srv/vm_disks/linux')['name'] == 'lz4'
-    assert cd.decide('test.zip')['name'] == 'none'
-    assert cd.decide('test')['name'] == 'zlib'  # no match in conf, use default
-
-
-def test_compression_decider2():
-    default = CompressionSpec('zlib')
-
-    cd = CompressionDecider2(default)
-    compr_spec, chunk = cd.decide(Chunk(None))
-    assert compr_spec['name'] == 'zlib'
-    compr_spec, chunk = cd.decide(Chunk(None, compress=CompressionSpec('lzma')))
-    assert compr_spec['name'] == 'lzma'
-
-
 def test_format_line():
     data = dict(foo='bar baz')
     assert format_line('', data) == ''
@@ -1205,6 +1223,10 @@ def test_format_line_erroneous():
         assert format_line('{invalid}', data)
     with pytest.raises(PlaceholderError):
         assert format_line('{}', data)
+    with pytest.raises(PlaceholderError):
+        assert format_line('{now!r}', data)
+    with pytest.raises(PlaceholderError):
+        assert format_line('{now.__class__.__module__.__builtins__}', data)
 
 
 def test_replace_placeholders():
@@ -1231,3 +1253,18 @@ def test_swidth_slice_mixed_characters():
     string = '나윤a선나윤선나윤선나윤선나윤선'
     assert swidth_slice(string, 5) == '나윤a'
     assert swidth_slice(string, 6) == '나윤a'
+
+
+def test_safe_timestamps():
+    # ns fit into uint64
+    assert safe_ns(2 ** 64) < 2 ** 64
+    assert safe_ns(-1) == 0
+    # s are so that their ns conversion fits into uint64
+    assert safe_s(2 ** 64) * 1000000000 < 2 ** 64
+    assert safe_s(-1) == 0
+    # datetime won't fall over its y10k problem
+    beyond_y10k = 2 ** 100
+    with pytest.raises(OverflowError):
+        datetime.utcfromtimestamp(beyond_y10k)
+    assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2500, 12, 31)
+    assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2500, 12, 31)

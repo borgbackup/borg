@@ -20,7 +20,7 @@ optional arguments
     ``-c``, ``--cache-only``
         | delete only the local cache for the given repository
     ``--force``
-        | force deletion of corrupted archives
+        | force deletion of corrupted archives, use --force --force in case --force does not work.
     ``--save-space``
         | work slower, but using less space
 

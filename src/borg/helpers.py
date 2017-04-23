@@ -44,13 +44,6 @@ from . import hashindex
 from . import shellpattern
 from .constants import *  # NOQA
 
-# meta dict, data bytes
-_Chunk = namedtuple('_Chunk', 'meta data')
-
-
-def Chunk(data, **meta):
-    return _Chunk(meta, data)
-
 
 '''
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
@@ -117,13 +110,17 @@ class PlaceholderError(Error):
     """Formatting Error: "{}".format({}): {}({})"""
 
 
+class InvalidPlaceholder(PlaceholderError):
+    """Invalid placeholder "{}" in string: {}"""
+
+
 def check_extension_modules():
     from . import platform, compress, item
     if hashindex.API_VERSION != '1.1_01':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError
-    if compress.API_VERSION != '1.1_02':
+    if compress.API_VERSION != '1.1_03':
         raise ExtensionModuleError
     if crypto.API_VERSION != '1.1_01':
         raise ExtensionModuleError
@@ -247,7 +244,7 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
-        data = key.decrypt(None, cdata).data
+        data = key.decrypt(None, cdata)
         manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = key.id_hash(data)
@@ -292,7 +289,7 @@ class Manifest:
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(Chunk(data, compression={'name': 'none'})))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
 
 
 def prune_within(archives, within):
@@ -301,9 +298,9 @@ def prune_within(archives, within):
         hours = int(within[:-1]) * multiplier[within[-1]]
     except (KeyError, ValueError):
         # I don't like how this displays the original exception too:
-        raise argparse.ArgumentTypeError('Unable to parse --within option: "%s"' % within)
+        raise argparse.ArgumentTypeError('Unable to parse --keep-within option: "%s"' % within)
     if hours <= 0:
-        raise argparse.ArgumentTypeError('Number specified using --within option must be positive')
+        raise argparse.ArgumentTypeError('Number specified using --keep-within option must be positive')
     target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
     return [a for a in archives if a.ts > target]
 
@@ -391,18 +388,23 @@ def parse_timestamp(timestamp):
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
 
-def parse_add_pattern(patternstr, roots, patterns):
+def parse_add_pattern(patternstr, roots, patterns, fallback):
     """Parse a pattern string and add it to roots or patterns depending on the pattern type."""
-    pattern = parse_inclexcl_pattern(patternstr)
+    pattern = parse_inclexcl_pattern(patternstr, fallback=fallback)
     if pattern.ptype is RootPath:
         roots.append(pattern.pattern)
+    elif pattern.ptype is PatternStyle:
+        fallback = pattern.pattern
     else:
         patterns.append(pattern)
+    return fallback
 
 
-def load_pattern_file(fileobj, roots, patterns):
+def load_pattern_file(fileobj, roots, patterns, fallback=None):
+    if fallback is None:
+        fallback = ShellPattern  # ShellPattern is defined later in this module
     for patternstr in clean_lines(fileobj):
-        parse_add_pattern(patternstr, roots, patterns)
+        fallback = parse_add_pattern(patternstr, roots, patterns, fallback)
 
 
 def load_exclude_file(fileobj, patterns):
@@ -415,7 +417,7 @@ class ArgparsePatternAction(argparse.Action):
         super().__init__(nargs=nargs, **kw)
 
     def __call__(self, parser, args, values, option_string=None):
-        parse_add_pattern(values[0], args.paths, args.patterns)
+        parse_add_pattern(values[0], args.paths, args.patterns, ShellPattern)
 
 
 class ArgparsePatternFileAction(argparse.Action):
@@ -446,45 +448,53 @@ class PatternMatcher:
         # Value to return from match function when none of the patterns match.
         self.fallback = fallback
 
+        # optimizations
+        self._path_full_patterns = {}  # full path -> return value
+
     def empty(self):
-        return not len(self._items)
+        return not len(self._items) and not len(self._path_full_patterns)
+
+    def _add(self, pattern, value):
+        if isinstance(pattern, PathFullPattern):
+            key = pattern.pattern  # full, normalized path
+            self._path_full_patterns[key] = value
+        else:
+            self._items.append((pattern, value))
 
     def add(self, patterns, value):
         """Add list of patterns to internal list. The given value is returned from the match function when one of the
         given patterns matches.
         """
-        self._items.extend((i, value) for i in patterns)
+        for pattern in patterns:
+            self._add(pattern, value)
 
     def add_inclexcl(self, patterns):
         """Add list of patterns (of type InclExclPattern) to internal list. The patterns ptype member is returned from
         the match function when one of the given patterns matches.
         """
-        self._items.extend(patterns)
+        for pattern, pattern_type in patterns:
+            self._add(pattern, pattern_type)
 
     def match(self, path):
+        path = normalize_path(path)
+        # do a fast lookup for full path matches (note: we do not count such matches):
+        non_existent = object()
+        value = self._path_full_patterns.get(path, non_existent)
+        if value is not non_existent:
+            # we have a full path match!
+            return value
+        # this is the slow way, if we have many patterns in self._items:
         for (pattern, value) in self._items:
-            if pattern.match(path):
+            if pattern.match(path, normalize=False):
                 return value
-
         return self.fallback
 
 
-def normalized(func):
-    """ Decorator for the Pattern match methods, returning a wrapper that
-    normalizes OSX paths to match the normalized pattern on OSX, and
-    returning the original method on other platforms"""
-    @wraps(func)
-    def normalize_wrapper(self, path):
-        return func(self, unicodedata.normalize("NFD", path))
-
-    if sys.platform in ('darwin',):
-        # HFS+ converts paths to a canonical form, so users shouldn't be
-        # required to enter an exact match
-        return normalize_wrapper
-    else:
-        # Windows and Unix filesystems allow different forms, so users
-        # always have to enter an exact match
-        return func
+def normalize_path(path):
+    """normalize paths for MacOS (but do nothing on other platforms)"""
+    # HFS+ converts paths to a canonical form, so users shouldn't be required to enter an exact match.
+    # Windows and Unix filesystems allow different forms, so users always have to enter an exact match.
+    return unicodedata.normalize('NFD', path) if sys.platform == 'darwin' else path
 
 
 class PatternBase:
@@ -495,19 +505,20 @@ class PatternBase:
     def __init__(self, pattern):
         self.pattern_orig = pattern
         self.match_count = 0
-
-        if sys.platform in ('darwin',):
-            pattern = unicodedata.normalize("NFD", pattern)
-
+        pattern = normalize_path(pattern)
         self._prepare(pattern)
 
-    @normalized
-    def match(self, path):
-        matches = self._match(path)
+    def match(self, path, normalize=True):
+        """match the given path against this pattern.
 
+        If normalize is True (default), the path will get normalized using normalize_path(),
+        otherwise it is assumed that it already is normalized using that function.
+        """
+        if normalize:
+            path = normalize_path(path)
+        matches = self._match(path)
         if matches:
             self.match_count += 1
-
         return matches
 
     def __repr__(self):
@@ -521,6 +532,17 @@ class PatternBase:
 
     def _match(self, path):
         raise NotImplementedError
+
+
+class PathFullPattern(PatternBase):
+    """Full match of a path."""
+    PREFIX = "pf"
+
+    def _prepare(self, pattern):
+        self.pattern = os.path.normpath(pattern)
+
+    def _match(self, path):
+        return path == self.pattern
 
 
 # For PathPrefixPattern, FnmatchPattern and ShellPattern, we require that the pattern either match the whole path
@@ -605,6 +627,7 @@ class RegexPattern(PatternBase):
 
 _PATTERN_STYLES = set([
     FnmatchPattern,
+    PathFullPattern,
     PathPrefixPattern,
     RegexPattern,
     ShellPattern,
@@ -614,6 +637,14 @@ _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
 InclExclPattern = namedtuple('InclExclPattern', 'pattern ptype')
 RootPath = object()
+PatternStyle = object()
+
+
+def get_pattern_style(prefix):
+    try:
+        return _PATTERN_STYLE_BY_PREFIX[prefix]
+    except KeyError:
+        raise ValueError("Unknown pattern style: {}".format(prefix)) from None
 
 
 def parse_pattern(pattern, fallback=FnmatchPattern):
@@ -621,14 +652,9 @@ def parse_pattern(pattern, fallback=FnmatchPattern):
     """
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
-
-        cls = _PATTERN_STYLE_BY_PREFIX.get(style, None)
-
-        if cls is None:
-            raise ValueError("Unknown pattern style: {}".format(style))
+        cls = get_pattern_style(style)
     else:
         cls = fallback
-
     return cls(pattern)
 
 
@@ -646,6 +672,8 @@ def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
         '+': True,
         'R': RootPath,
         'r': RootPath,
+        'P': PatternStyle,
+        'p': PatternStyle,
     }
     try:
         ptype = type_prefix_map[pattern[0]]
@@ -656,6 +684,11 @@ def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
         raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
     if ptype is RootPath:
         pobj = pattern
+    elif ptype is PatternStyle:
+        try:
+            pobj = get_pattern_style(pattern)
+        except ValueError:
+            raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
     else:
         pobj = parse_pattern(pattern, fallback)
     return InclExclPattern(pobj, ptype)
@@ -665,7 +698,7 @@ def timestamp(s):
     """Convert a --timestamp=s argument to a datetime object"""
     try:
         # is it pointing to a file / directory?
-        ts = os.stat(s).st_mtime
+        ts = safe_s(os.stat(s).st_mtime)
         return datetime.utcfromtimestamp(ts)
     except OSError:
         # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
@@ -688,34 +721,6 @@ def ChunkerParams(s):
     if int(chunk_max) > 23:
         raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
-
-
-def CompressionSpec(s):
-    values = s.split(',')
-    count = len(values)
-    if count < 1:
-        raise ValueError
-    # --compression algo[,level]
-    name = values[0]
-    if name in ('none', 'lz4', ):
-        return dict(name=name)
-    if name in ('zlib', 'lzma', ):
-        if count < 2:
-            level = 6  # default compression level in py stdlib
-        elif count == 2:
-            level = int(values[1])
-            if not 0 <= level <= 9:
-                raise ValueError
-        else:
-            raise ValueError
-        return dict(name=name, level=level)
-    if name == 'auto':
-        if 2 <= count <= 3:
-            compression = ','.join(values[1:])
-        else:
-            raise ValueError
-        return dict(name=name, spec=CompressionSpec(compression))
-    raise ValueError
 
 
 def dir_is_cachedir(path):
@@ -779,8 +784,13 @@ class DatetimeWrapper:
 
 
 def format_line(format, data):
+    for _, key, _, conversion in Formatter().parse(format):
+        if not key:
+            continue
+        if conversion or key not in data:
+            raise InvalidPlaceholder(key, format)
     try:
-        return format.format(**data)
+        return format.format_map(data)
     except Exception as e:
         raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 
@@ -818,12 +828,34 @@ def SortBySpec(text):
     return text.replace('timestamp', 'ts')
 
 
+# Not too rarely, we get crappy timestamps from the fs, that overflow some computations.
+# As they are crap anyway, nothing is lost if we just clamp them to the max valid value.
+# msgpack can only pack uint64. datetime is limited to year 9999.
+MAX_NS = 18446744073000000000  # less than 2**64 - 1 ns. also less than y9999.
+MAX_S = MAX_NS // 1000000000
+
+
+def safe_s(ts):
+    if 0 <= ts <= MAX_S:
+        return ts
+    elif ts < 0:
+        return 0
+    else:
+        return MAX_S
+
+
+def safe_ns(ts):
+    if 0 <= ts <= MAX_NS:
+        return ts
+    elif ts < 0:
+        return 0
+    else:
+        return MAX_NS
+
+
 def safe_timestamp(item_timestamp_ns):
-    try:
-        return datetime.fromtimestamp(item_timestamp_ns / 1e9)
-    except OverflowError:
-        # likely a broken file time and datetime did not want to go beyond year 9999
-        return datetime(9999, 12, 31, 23, 59, 59)
+    t_ns = safe_ns(item_timestamp_ns)
+    return datetime.fromtimestamp(t_ns / 1e9)
 
 
 def format_time(t):
@@ -1299,6 +1331,24 @@ class StableDict(dict):
         return sorted(super().items())
 
 
+def bigint_to_int(mtime):
+    """Convert bytearray to int
+    """
+    if isinstance(mtime, bytes):
+        return int.from_bytes(mtime, 'little', signed=True)
+    return mtime
+
+
+def int_to_bigint(value):
+    """Convert integers larger than 64 bits to bytearray
+
+    Smaller integers are left alone
+    """
+    if value.bit_length() > 63:
+        return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
+    return value
+
+
 def is_slow_msgpack():
     return msgpack.Packer is msgpack.fallback.Packer
 
@@ -1311,7 +1361,8 @@ DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
-        default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True):
+        default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True,
+        msgid=None):
     """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
     If it didn't qualify and retry is False (no retries wanted), return the default [which
@@ -1341,6 +1392,22 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     :param input: input function [input from builtins]
     :return: boolean answer value, True or False
     """
+    def output(msg, msg_type, is_prompt=False, **kwargs):
+        json_output = getattr(logging.getLogger('borg'), 'json', False)
+        if json_output:
+            kwargs.update(dict(
+                type='question_%s' % msg_type,
+                msgid=msgid,
+                message=msg,
+            ))
+            print(json.dumps(kwargs), file=sys.stderr)
+        else:
+            if is_prompt:
+                print(msg, file=ofile, end='', flush=True)
+            else:
+                print(msg, file=ofile)
+
+    msgid = msgid or env_var_override
     # note: we do not assign sys.stderr as default above, so it is
     # really evaluated NOW,  not at function definition time.
     if ofile is None:
@@ -1348,13 +1415,13 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     if default not in (True, False):
         raise ValueError("invalid default value, must be True or False")
     if msg:
-        print(msg, file=ofile, end='', flush=True)
+        output(msg, 'prompt', is_prompt=True)
     while True:
         answer = None
         if env_var_override:
             answer = os.environ.get(env_var_override)
             if answer is not None and env_msg:
-                print(env_msg.format(answer, env_var_override), file=ofile)
+                output(env_msg.format(answer, env_var_override), 'env_answer', env_var=env_var_override)
         if answer is None:
             if not prompt:
                 return default
@@ -1365,25 +1432,29 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
                 answer = truish[0] if default else falsish[0]
         if answer in defaultish:
             if default_msg:
-                print(default_msg, file=ofile)
+                output(default_msg, 'accepted_default')
             return default
         if answer in truish:
             if true_msg:
-                print(true_msg, file=ofile)
+                output(true_msg, 'accepted_true')
             return True
         if answer in falsish:
             if false_msg:
-                print(false_msg, file=ofile)
+                output(false_msg, 'accepted_false')
             return False
         # if we get here, the answer was invalid
         if invalid_msg:
-            print(invalid_msg, file=ofile)
+            output(invalid_msg, 'invalid_answer')
         if not retry:
             return default
         if retry_msg:
-            print(retry_msg, file=ofile, end='', flush=True)
+            output(retry_msg, 'prompt_retry', is_prompt=True)
         # in case we used an environment variable and it gave an invalid answer, do not use it again:
         env_var_override = None
+
+
+def hostname_is_unique():
+    return yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None, default=True)
 
 
 def ellipsis_truncate(msg, space):
@@ -1460,7 +1531,8 @@ class ProgressIndicatorBase:
             operation=self.id,
             msgid=self.msgid,
             type=self.JSON_TYPE,
-            finished=finished
+            finished=finished,
+            time=time.time(),
         ))
         print(json.dumps(kwargs), file=sys.stderr)
 
@@ -1847,7 +1919,7 @@ class ItemFormatter(BaseFormatter):
         if 'chunks' not in item:
             return ""
         hash = hashlib.new(hash_function)
-        for _, data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
+        for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()
 
@@ -1872,7 +1944,7 @@ class ChunkIteratorFileWrapper:
         if not remaining:
             try:
                 chunk = next(self.chunk_iterator)
-                self.chunk = memoryview(chunk.data)
+                self.chunk = memoryview(chunk)
             except StopIteration:
                 self.exhausted = True
                 return 0  # EOF
@@ -1917,6 +1989,11 @@ def file_status(mode):
     elif stat.S_ISFIFO(mode):
         return 'f'
     return '?'
+
+
+def hardlinkable(mode):
+    """return True if we support hardlinked items of this type"""
+    return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
 
 
 def chunkit(it, size):
@@ -2032,73 +2109,6 @@ def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comme
         if remove_comments and line.startswith('#'):
             continue
         yield line
-
-
-class CompressionDecider1:
-    def __init__(self, compression, compression_files):
-        """
-        Initialize a CompressionDecider instance (and read config files, if needed).
-
-        :param compression: default CompressionSpec (e.g. from --compression option)
-        :param compression_files: list of compression config files (e.g. from --compression-from) or
-                                  a list of other line iterators
-        """
-        self.compression = compression
-        if not compression_files:
-            self.matcher = None
-        else:
-            self.matcher = PatternMatcher(fallback=compression)
-            for file in compression_files:
-                try:
-                    for line in clean_lines(file):
-                        try:
-                            compr_spec, fn_pattern = line.split(':', 1)
-                        except:
-                            continue
-                        self.matcher.add([parse_pattern(fn_pattern)], CompressionSpec(compr_spec))
-                finally:
-                    if hasattr(file, 'close'):
-                        file.close()
-
-    def decide(self, path):
-        if self.matcher is not None:
-            return self.matcher.match(path)
-        return self.compression
-
-
-class CompressionDecider2:
-    logger = create_logger('borg.debug.file-compression')
-
-    def __init__(self, compression):
-        self.compression = compression
-
-    def decide(self, chunk):
-        # nothing fancy here yet: we either use what the metadata says or the default
-        # later, we can decide based on the chunk data also.
-        # if we compress the data here to decide, we can even update the chunk data
-        # and modify the metadata as desired.
-        compr_spec = chunk.meta.get('compress', self.compression)
-        if compr_spec['name'] == 'auto':
-            # we did not decide yet, use heuristic:
-            compr_spec, chunk = self.heuristic_lz4(compr_spec, chunk)
-        return compr_spec, chunk
-
-    def heuristic_lz4(self, compr_args, chunk):
-        from .compress import get_compressor
-        meta, data = chunk
-        lz4 = get_compressor('lz4')
-        cdata = lz4.compress(data)
-        data_len = len(data)
-        cdata_len = len(cdata)
-        if cdata_len < data_len:
-            compr_spec = compr_args['spec']
-        else:
-            # uncompressible - we could have a special "uncompressible compressor"
-            # that marks such data as uncompressible via compression-type metadata.
-            compr_spec = CompressionSpec('none')
-        compr_args.update(compr_spec)
-        self.logger.debug("len(data) == %d, len(lz4(data)) == %d, choosing %s", data_len, cdata_len, compr_spec)
-        return compr_args, Chunk(data, **meta)
 
 
 class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
@@ -2242,3 +2252,13 @@ def json_dump(obj):
 
 def json_print(obj):
     print(json_dump(obj))
+
+
+def secure_erase(path):
+    """Attempt to securely erase a file by writing random data over it before deleting it."""
+    with open(path, 'r+b') as fd:
+        length = os.stat(fd.fileno()).st_size
+        fd.write(os.urandom(length))
+        fd.flush()
+        os.fsync(fd.fileno())
+    os.unlink(path)

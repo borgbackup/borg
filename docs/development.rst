@@ -81,8 +81,20 @@ were collected:
 2. Branch a backporting branch off the maintenance branch.
 3. Cherry pick and backport the changes from each labelled PR, remove
    the label for each PR you've backported.
+
+   To preserve authorship metadata, do not follow the ``git cherry-pick``
+   instructions to use ``git commit`` after resolving conflicts. Instead,
+   stage conflict resolutions and run ``git cherry-pick --continue``,
+   much like using ``git rebase``.
+
+   To avoid merge issues (a cherry pick is a form of merge), use
+   these options (similar to the ``git merge`` options used previously,
+   the ``-x`` option adds a reference to the original commit)::
+
+     git cherry-pick --strategy recursive -X rename-threshold=5% -x
+
 4. Make a PR of the backporting branch against the maintenance branch
-   for backport review. Mention the backported PRs in this PR, eg:
+   for backport review. Mention the backported PRs in this PR, e.g.:
 
        Includes changes from #2055 #2057 #2381
 
@@ -205,12 +217,6 @@ However, we prefer to do this as part of our :ref:`releasing`
 preparations, so it is generally not necessary to update these when
 submitting patches that change something about the command line.
 
-The code documentation (which is currently not part of the released
-docs) also uses a generated file (``docs/api.rst``), that needs to be
-updated when a module is added or removed::
-
-  python setup.py build_api
-
 Building the docs with Sphinx
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -274,15 +280,6 @@ If you encounter issues, see also our `Vagrantfile` for details.
           without external dependencies.
 
 
-Merging maintenance branches
-----------------------------
-
-As mentioned above bug fixes will usually be merged into a maintenance branch (x.y-maint) and then
-merged back into the master branch. Large diffs between these branches can make automatic merges troublesome,
-therefore we recommend to use these merge parameters::
-
-  git merge 1.0-maint -s recursive -X rename-threshold=20%
-
 .. _releasing:
 
 Creating a new release
@@ -297,7 +294,10 @@ Checklist:
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
-- ``python setup.py build_api ; python setup.py build_usage ; python setup.py build_man`` and commit
+- ``python setup.py build_usage ; python setup.py build_man`` and
+  commit (be sure to build with Python 3.4 or 3.5 as Python 3.6 added `more
+  guaranteed hashing algorithms
+  <https://github.com/borgbackup/borg/issues/2123>`_)
 - tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z

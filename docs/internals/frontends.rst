@@ -39,6 +39,8 @@ archive_progress
         Number of (regular) files processed so far
     path
         Current path
+    time
+        Unix timestamp (float)
 
 progress_message
     A message-based progress information with no concrete progress information, just a message
@@ -47,12 +49,14 @@ progress_message
     operation
         unique, opaque integer ID of the operation
     :ref:`msgid <msgid>`
-        Message ID of the operation (may be *none*)
+        Message ID of the operation (may be *null*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
         can have this property set to *true*.
     message
         current progress message (may be empty/absent)
+    time
+        Unix timestamp (float)
 
 progress_percent
     Absolute progress information with defined end/total and current value.
@@ -60,7 +64,7 @@ progress_percent
     operation
         unique, opaque integer ID of the operation
     :ref:`msgid <msgid>`
-        Message ID of the operation (may be *none*)
+        Message ID of the operation (may be *null*)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
         can have this property set to *true*.
@@ -69,9 +73,11 @@ progress_percent
     current
         Current value (always less-or-equal to *total*)
     info
-        Array that describes the current item, may be *none*, contents depend on *msgid*
+        Array that describes the current item, may be *null*, contents depend on *msgid*
     total
         Total value
+    time
+        Unix timestamp (float)
 
 file_status
     This is only output by :ref:`borg_create` and :ref:`borg_recreate` if ``--list`` is specified. The usual
@@ -85,7 +91,7 @@ file_status
 log_message
     Any regular log output invokes this type. Regular log options and filtering applies to these as well.
 
-    created
+    time
         Unix timestamp (float)
     levelname
         Upper-case log level name (also called severity). Defined levels are: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -94,7 +100,9 @@ log_message
     message
         Formatted log message
     :ref:`msgid <msgid>`
-        Message ID, may be *none* or absent
+        Message ID, may be *null* or absent
+
+See Prompts_ for the types used by prompts.
 
 .. rubric:: Examples (reformatted, each object would be on exactly one line)
 
@@ -129,10 +137,76 @@ A debug log message::
     {"message": "35 self tests completed in 0.08 seconds",
      "type": "log_message", "created": 1488278449.5575905, "levelname": "DEBUG", "name": "borg.archiver"}
 
+Prompts
+-------
+
+Prompts assume a JSON form as well when the ``--log-json`` option is specified. Responses
+are still read verbatim from *stdin*, while prompts are JSON messages printed to *stderr*,
+just like log messages.
+
+Prompts use the *question_prompt* and *question_prompt_retry* types for the prompt itself,
+and *question_invalid_answer*, *question_accepted_default*, *question_accepted_true*,
+*question_accepted_false* and *question_env_answer* types for information about
+prompt processing.
+
+The *message* property contains the same string displayed regularly in the same situation,
+while the *msgid* property may contain a msgid_, typically the name of the
+environment variable that can be used to override the prompt. It is the same for all JSON
+messages pertaining to the same prompt.
+
+.. rubric:: Examples (reformatted, each object would be on exactly one line)
+
+Providing an invalid answer::
+
+    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "... Type 'YES' if you understand this and want to continue: "}
+    incorrect answer  # input on stdin
+    {"type": "question_invalid_answer", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING", "is_prompt": false,
+     "message": "Invalid answer, aborting."}
+
+Providing a false (negative) answer::
+
+    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "... Type 'YES' if you understand this and want to continue: "}
+    NO  # input on stdin
+    {"type": "question_accepted_false", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "Aborting.", "is_prompt": false}
+
+Providing a true (affirmative) answer::
+
+    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "... Type 'YES' if you understand this and want to continue: "}
+    YES  # input on stdin
+    # no further output, just like the prompt without --log-json
+
+Passphrase prompts
+------------------
+
+Passphrase prompts should be handled differently. Use the environment variables *BORG_PASSPHRASE*
+and *BORG_NEW_PASSPHRASE* (see :ref:`env_vars` for reference) to pass passphrases to Borg, don't
+use the interactive passphrase prompts.
+
+When setting a new passphrase (:ref:`borg_init`, :ref:`borg_key_change-passphrase`) normally
+Borg prompts whether it should display the passphrase. This can be suppressed by setting
+the environment variable *BORG_DISPLAY_PASSPHRASE* to *no*.
+
+When "confronted" with an unknown repository, where the application does not know whether
+the repository is encrypted, the following algorithm can be followed to detect encryption:
+
+1. Set *BORG_PASSPHRASE* to gibberish (for example a freshly generated UUID4, which cannot
+   possibly be the passphrase)
+2. Invoke ``borg list repository ...``
+3. If this fails, due the repository being encrypted and the passphrase obviously being
+   wrong, you'll get an error with the *PassphraseWrong* msgid.
+
+   The repository is encrypted, for further access the application will need the passphrase.
+
+4. If this does not fail, then the repository is not encrypted.
+
 Standard output
 ---------------
 
-*stdout* is different and more command-dependent. Commands like :ref:`borg_info`, :ref:`borg_create`
+*stdout* is different and more command-dependent than logging. Commands like :ref:`borg_info`, :ref:`borg_create`
 and :ref:`borg_list` implement a ``--json`` option which turns their regular output into a single JSON object.
 
 Dates are formatted according to ISO-8601 with the strftime format string '%a, %Y-%m-%d %H:%M:%S',
@@ -461,3 +535,15 @@ Operations
       *info* is one string element, the name of the path currently extracted.
     - extract.permissions
     - archive.delete
+
+Prompts
+    BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
+        For "Warning: Attempting to access a previously unknown unencrypted repository"
+    BORG_RELOCATED_REPO_ACCESS_IS_OK
+        For "Warning: The repository at location ... was previously located at ..."
+    BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
+        For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+    BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
+        For "You requested to completely DELETE the repository *including* all archives it contains:"
+    BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING
+        For "recreate is an experimental feature."

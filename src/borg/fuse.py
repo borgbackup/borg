@@ -16,7 +16,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .archive import Archive
-from .helpers import daemonize
+from .helpers import daemonize, hardlinkable
 from .item import Item
 from .lrucache import LRUCache
 
@@ -144,7 +144,7 @@ class FuseOperations(llfuse.Operations):
         self.file_versions = {}  # for versions mode: original path -> version
         unpacker = msgpack.Unpacker()
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
-            _, data = self.key.decrypt(key, chunk)
+            data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
             for item in unpacker:
                 item = Item(internal_dict=item)
@@ -193,7 +193,7 @@ class FuseOperations(llfuse.Operations):
 
         path = item.path
         del item.path  # safe some space
-        if 'source' in item and stat.S_ISREG(item.mode):
+        if 'source' in item and hardlinkable(item.mode):
             # a hardlink, no contents, <source> is the hardlink master
             source = os.fsencode(os.path.normpath(item.source))
             if self.versions:
@@ -340,7 +340,7 @@ class FuseOperations(llfuse.Operations):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                _, data = self.key.decrypt(id, self.repository.get(id))
+                data = self.key.decrypt(id, self.repository.get(id))
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

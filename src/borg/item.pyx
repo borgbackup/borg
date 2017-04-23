@@ -1,7 +1,9 @@
+import stat
 from collections import namedtuple
 
 from .constants import ITEM_KEYS
 from .helpers import safe_encode, safe_decode
+from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 
 API_VERSION = '1.1_02'
@@ -156,9 +158,10 @@ class Item(PropDict):
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 
-    atime = PropDict._make_property('atime', int)
-    ctime = PropDict._make_property('ctime', int)
-    mtime = PropDict._make_property('mtime', int)
+    # note: we need to keep the bigint conversion for compatibility with borg 1.0 archives.
+    atime = PropDict._make_property('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    ctime = PropDict._make_property('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    mtime = PropDict._make_property('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
 
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
     # compatibility note: this is a new feature, in old archives size will be missing.
@@ -191,6 +194,10 @@ class Item(PropDict):
                 raise AttributeError
             size = getattr(self, attr)
         except AttributeError:
+            if stat.S_ISLNK(self.mode):
+                # get out of here quickly. symlinks have no own chunks, their fs size is the length of the target name.
+                # also, there is the dual-use issue of .source (#2343), so don't confuse it with a hardlink slave.
+                return len(self.source)
             # no precomputed (c)size value available, compute it:
             try:
                 chunks = getattr(self, 'chunks')

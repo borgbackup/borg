@@ -4,6 +4,7 @@ import faulthandler
 import functools
 import hashlib
 import inspect
+import itertools
 import json
 import logging
 import os
@@ -34,10 +35,11 @@ from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_s
 from .archive import BackupOSError, backup_io
 from .cache import Cache
 from .constants import *  # NOQA
+from .compress import CompressionSpec
 from .crc32 import crc32
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
-from .helpers import location_validator, archivename_validator, ChunkerParams, CompressionSpec
+from .helpers import location_validator, archivename_validator, ChunkerParams
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_time, format_timedelta, format_file_size, format_archive
@@ -46,6 +48,7 @@ from .helpers import prune_within, prune_split
 from .helpers import to_localtime, timestamp
 from .helpers import get_cache_dir
 from .helpers import Manifest
+from .helpers import hardlinkable
 from .helpers import StableDict
 from .helpers import check_extension_modules
 from .helpers import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
@@ -56,6 +59,7 @@ from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
 from .helpers import basic_json_data, json_print
+from .helpers import replace_placeholders
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager
@@ -107,6 +111,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
+                    if 'compression' in args:
+                        kwargs['key'].compressor = args.compression.compressor
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
@@ -167,14 +173,14 @@ class Archiver:
                 a = next(chunks1, end)
                 if a is end:
                     return not blen - bi and next(chunks2, end) is end
-                a = memoryview(a.data)
+                a = memoryview(a)
                 alen = len(a)
                 ai = 0
             if not blen - bi:
                 b = next(chunks2, end)
                 if b is end:
                     return not alen - ai and next(chunks1, end) is end
-                b = memoryview(b.data)
+                b = memoryview(b)
                 blen = len(b)
                 bi = 0
             slicelen = min(alen - ai, blen - bi)
@@ -325,6 +331,7 @@ class Archiver:
         return EXIT_SUCCESS
 
     def do_benchmark_crud(self, args):
+        """Benchmark Create, Read, Update, Delete for archives."""
         def measurement_run(repo, path):
             archive = repo + '::borg-benchmark-crud'
             compression = '--compression=none'
@@ -470,7 +477,6 @@ class Archiver:
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
-                                  compression=args.compression, compression_files=args.compression_files,
                                   log_json=args.log_json)
                 create_inner(archive, cache)
         else:
@@ -551,10 +557,16 @@ class Archiver:
                         status = archive.process_fifo(path, st)
                     else:
                         status = archive.process_file(path, st, cache)
-            elif stat.S_ISCHR(st.st_mode) or stat.S_ISBLK(st.st_mode):
+            elif stat.S_ISCHR(st.st_mode):
                 if not dry_run:
                     if not read_special:
-                        status = archive.process_dev(path, st)
+                        status = archive.process_dev(path, st, 'c')
+                    else:
+                        status = archive.process_file(path, st, cache)
+            elif stat.S_ISBLK(st.st_mode):
+                if not dry_run:
+                    if not read_special:
+                        status = archive.process_dev(path, st, 'b')
                     else:
                         status = archive.process_file(path, st, cache)
             elif stat.S_ISSOCK(st.st_mode):
@@ -617,7 +629,7 @@ class Archiver:
         hardlink_masters = {} if partial_extract else None
 
         def peek_and_store_hardlink_masters(item, matched):
-            if (partial_extract and not matched and stat.S_ISREG(item.mode) and
+            if (partial_extract and not matched and hardlinkable(item.mode) and
                     item.get('hardlink_master', True) and 'source' not in item):
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
@@ -709,7 +721,7 @@ class Archiver:
                 return [None]
 
         def has_hardlink_master(item, hardlink_masters):
-            return stat.S_ISREG(item.mode) and item.get('source') in hardlink_masters
+            return hardlinkable(item.mode) and item.get('source') in hardlink_masters
 
         def compare_link(item1, item2):
             # These are the simple link cases. For special cases, e.g. if a
@@ -805,7 +817,7 @@ class Archiver:
 
         def compare_archives(archive1, archive2, matcher):
             def hardlink_master_seen(item):
-                return 'source' not in item or not stat.S_ISREG(item.mode) or item.source in hardlink_masters
+                return 'source' not in item or not hardlinkable(item.mode) or item.source in hardlink_masters
 
             def is_hardlink_master(item):
                 return item.get('hardlink_master', True) and 'source' not in item
@@ -894,7 +906,8 @@ class Archiver:
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        archive.rename(args.name)
+        name = replace_placeholders(args.name)
+        archive.rename(name)
         manifest.write()
         repository.commit()
         cache.commit()
@@ -1320,12 +1333,13 @@ class Archiver:
         matcher, include_patterns = self.build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
+        recompress = args.recompress != 'never'
+        always_recompress = args.recompress == 'always'
 
         recreater = ArchiveRecreater(repository, manifest, key, cache, matcher,
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_exclude_tags=args.keep_exclude_tags, chunker_params=args.chunker_params,
-                                     compression=args.compression, compression_files=args.compression_files,
-                                     always_recompress=args.always_recompress,
+                                     compression=args.compression, recompress=recompress, always_recompress=always_recompress,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      checkpoint_interval=args.checkpoint_interval,
@@ -1333,10 +1347,11 @@ class Archiver:
 
         if args.location.archive:
             name = args.location.archive
+            target = replace_placeholders(args.target) if args.target else None
             if recreater.is_temporary_archive(name):
                 self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                 return self.exit_code
-            recreater.recreate(name, args.comment, args.target)
+            recreater.recreate(name, args.comment, target)
         else:
             if args.target is not None:
                 self.print_error('--target: Need to specify single archive')
@@ -1386,7 +1401,7 @@ class Archiver:
         archive = Archive(repository, key, manifest, args.location.archive,
                           consider_part_files=args.consider_part_files)
         for i, item_id in enumerate(archive.metadata.items):
-            _, data = key.decrypt(item_id, repository.get(item_id))
+            data = key.decrypt(item_id, repository.get(item_id))
             filename = '%06d_%s.items' % (i, bin_to_hex(item_id))
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
@@ -1416,7 +1431,7 @@ class Archiver:
             fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
             fd.write(',\n')
 
-            _, data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
+            data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
             archive_org_dict = msgpack.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
 
             fd.write('    "_meta":\n')
@@ -1427,7 +1442,7 @@ class Archiver:
             unpacker = msgpack.Unpacker(use_list=False, object_hook=StableDict)
             first = True
             for item_id in archive_org_dict[b'items']:
-                _, data = key.decrypt(item_id, repository.get(item_id))
+                data = key.decrypt(item_id, repository.get(item_id))
                 unpacker.feed(data)
                 for item in unpacker:
                     item = prepare_dump_dict(item)
@@ -1451,7 +1466,7 @@ class Archiver:
     def do_debug_dump_manifest(self, args, repository, manifest, key):
         """dump decoded repository manifest"""
 
-        _, data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
+        data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
 
         meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
 
@@ -1475,7 +1490,7 @@ class Archiver:
             for id in result:
                 cdata = repository.get(id)
                 give_id = id if id != Manifest.MANIFEST_ID else None
-                _, data = key.decrypt(give_id, cdata)
+                data = key.decrypt(give_id, cdata)
                 filename = '%06d_%s.obj' % (i, bin_to_hex(id))
                 print('Dumping', filename)
                 with open(filename, 'wb') as fd:
@@ -1561,8 +1576,8 @@ class Archiver:
 
     helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
-        File patterns support four separate styles: fnmatch, shell, regular
-        expressions and path prefixes. By default, fnmatch is used for
+        File patterns support these styles: fnmatch, shell, regular expressions,
+        path prefixes and path full-matches. By default, fnmatch is used for
         `--exclude` patterns and shell-style is used for `--pattern`. If followed
         by a colon (':') the first two characters of a pattern are used as a
         style selector. Explicit style selection is necessary when a
@@ -1604,10 +1619,26 @@ class Archiver:
             regular expression syntax is described in the `Python documentation for
             the re module <https://docs.python.org/3/library/re.html>`_.
 
-        Prefix path, selector `pp:`
+        Path prefix, selector `pp:`
 
             This pattern style is useful to match whole sub-directories. The pattern
             `pp:/data/bar` matches `/data/bar` and everything therein.
+
+        Path full-match, selector `pf:`
+
+            This pattern style is useful to match whole paths.
+            This is kind of a pseudo pattern as it can not have any variable or
+            unspecified parts - the full, precise path must be given.
+            `pf:/data/foo.txt` matches `/data/foo.txt` only.
+
+            Implementation note: this is implemented via very time-efficient O(1)
+            hashtable lookups (this means you can have huge amounts of such patterns
+            without impacting performance much).
+            Due to that, this kind of pattern does not respect any context or order.
+            If you use such a pattern to include a file, it will always be included
+            (if the directory recursion encounters it).
+            Other include/exclude patterns that would normally match will be ignored.
+            Same logic applies for exclude.
 
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from
@@ -1663,7 +1694,7 @@ class Archiver:
 
         Note that the default pattern style for `--pattern` and `--patterns-from` is
         shell style (`sh:`), so those patterns behave similar to rsync include/exclude
-        patterns.
+        patterns. The pattern style can be set via the `P` prefix.
 
         Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
         considered first (in the order of appearance). Then patterns from `--patterns-from`
@@ -1671,6 +1702,8 @@ class Archiver:
 
         An example `--patterns-from` file could look like that::
 
+            # "sh:" pattern style is the default, so the following line is not needed:
+            P sh
             R /
             # can be rebuild
             - /home/*/.cache
@@ -1727,6 +1760,10 @@ class Archiver:
 
             The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
+        If literal curly braces need to be used, double them for escaping::
+
+            borg create /path/to/repo::{{literal_text}}
+
         Examples::
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
@@ -1770,43 +1807,13 @@ class Archiver:
             For compressible data, it uses the given C[,L] compression - with C[,L]
             being any valid compression specifier.
 
-        The decision about which compression to use is done by borg like this:
-
-        1. find a compression specifier (per file):
-           match the path/filename against all patterns in all --compression-from
-           files (if any). If a pattern matches, use the compression spec given for
-           that pattern. If no pattern matches (and also if you do not give any
-           --compression-from option), default to the compression spec given by
-           --compression. See docs/misc/compression.conf for an example config.
-
-        2. if the found compression spec is not "auto", the decision is taken:
-           use the found compression spec.
-
-        3. if the found compression spec is "auto", test compressibility of each
-           chunk using lz4.
-           If it is compressible, use the C,[L] compression spec given within the
-           "auto" specifier. If it is not compressible, use no compression.
-
         Examples::
 
             borg create --compression lz4 REPO::ARCHIVE data
             borg create --compression zlib REPO::ARCHIVE data
             borg create --compression zlib,1 REPO::ARCHIVE data
             borg create --compression auto,lzma,6 REPO::ARCHIVE data
-            borg create --compression-from compression.conf --compression auto,lzma ...
-
-        compression.conf has entries like::
-
-            # example config file for --compression-from option
-            #
-            # Format of non-comment / non-empty lines:
-            # <compression-spec>:<path/filename pattern>
-            # compression-spec is same format as for --compression option
-            # path/filename pattern is same format as for --exclude option
-            none:*.gz
-            none:*.zip
-            none:*.mp3
-            none:*.ogg
+            borg create --compression auto,lzma ...
 
         General remarks:
 
@@ -2254,6 +2261,15 @@ class Archiver:
         '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
         more information.
 
+        In addition to using ``--exclude`` patterns, it is possible to use
+        ``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file
+        or folder name) which, when contained within another folder, will prevent the
+        containing folder from being backed up.  By default, the containing folder and
+        all of its contents will be omitted from the backup.  If, however, you wish to
+        only include the objects specified by ``--exclude-if-present`` in your backup,
+        and not include any other contents of the containing folder, this can be enabled
+        through using the ``--keep-exclude-tags`` option.
+
         Item flags
         ++++++++++
 
@@ -2337,8 +2353,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')
@@ -2383,13 +2399,8 @@ class Archiver:
                                    help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
         archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=dict(name='lz4'), metavar='COMPRESSION',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
-                                        '"borg help compression" command for details.')
-        archive_group.add_argument('--compression-from', dest='compression_files',
-                                   type=argparse.FileType('r'), action='append',
-                                   metavar='COMPRESSIONCONFIG',
-                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
                                         '"borg help compression" command for details.')
 
         subparser.add_argument('location', metavar='ARCHIVE',
@@ -2510,8 +2521,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')
@@ -2626,8 +2637,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')
@@ -2921,14 +2932,14 @@ class Archiver:
 
         This is an *experimental* feature. Do *not* use this on your only backup.
 
-        --exclude, --exclude-from and PATH have the exact same semantics
-        as in "borg create". If PATHs are specified the resulting archive
-        will only contain files from these PATHs.
+        --exclude, --exclude-from, --exclude-if-present, --keep-exclude-tags, and PATH
+        have the exact same semantics as in "borg create". If PATHs are specified the
+        resulting archive will only contain files from these PATHs.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
-        will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
+        will *not* match (--exclude, --exclude-from, PATHs).
 
-        --compression: all chunks seen will be stored using the given method.
+        --recompress allows to change the compression of existing data in archives.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.
@@ -2991,8 +3002,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise '
-                                        'excluded caches/directories')
+                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                        'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='include/exclude paths matching PATTERN')
@@ -3015,17 +3026,15 @@ class Archiver:
                                    help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
                                         'alternatively, give a reference file/directory.')
         archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=None, metavar='COMPRESSION',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'), metavar='COMPRESSION',
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
-        archive_group.add_argument('--always-recompress', dest='always_recompress', action='store_true',
-                                   help='always recompress chunks, don\'t skip chunks already compressed with the same '
-                                        'algorithm.')
-        archive_group.add_argument('--compression-from', dest='compression_files',
-                                   type=argparse.FileType('r'), action='append',
-                                   metavar='COMPRESSIONCONFIG',
-                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
-                                        '"borg help compression" command for details.')
+        archive_group.add_argument('--recompress', dest='recompress', nargs='?', default='never', const='if-different',
+                                   choices=('never', 'if-different', 'always'),
+                                   help='recompress data chunks according to --compression if "if-different". '
+                                        'When "always", chunks that are already compressed that way are not skipped, '
+                                        'but compressed again. Only the algorithm is considered for "if-different", '
+                                        'not the compression level (if any).')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',
@@ -3310,6 +3319,9 @@ class Archiver:
         if cmd is not None and result.func == self.do_serve:
             forced_result = result
             argv = shlex.split(cmd)
+            # Drop environment variables (do *not* interpret them) before trying to parse
+            # the borg command line.
+            argv = list(itertools.dropwhile(lambda arg: '=' in arg, argv))
             result = self.parse_args(argv[1:])
             if result.func != forced_result.func:
                 # someone is trying to execute a different borg subcommand, don't do that!
@@ -3325,10 +3337,11 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser()
         args = parser.parse_args(args or ['-h'])
-        if args.func == self.do_create:
+        # This works around http://bugs.python.org/issue9351
+        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        if func == self.do_create and not args.paths:
             # need at least 1 path but args.paths may also be populated from patterns
-            if not args.paths:
-                parser.error('Need at least one PATH argument.')
+            parser.error('Need at least one PATH argument.')
         return args
 
     def prerun_checks(self, logger):

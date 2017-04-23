@@ -25,6 +25,8 @@ optional arguments
         | output verbose list of items (files, dirs, ...)
     ``--filter STATUSCHARS``
         | only display items with the given status characters
+    ``--json``
+        | output stats as JSON (implies --stats)
 
 `Common options`_
     |
@@ -39,11 +41,15 @@ Exclusion options
     ``--exclude-if-present NAME``
         | exclude directories that are tagged by containing a filesystem object with the given NAME
     ``--keep-exclude-tags``, ``--keep-tag-files``
-        | keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise excluded caches/directories
+        | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
+    ``--pattern PATTERN``
+        | include/exclude paths matching PATTERN
+    ``--patterns-from PATTERNFILE``
+        | read include/exclude patterns from PATTERNFILE, one per line
 
 Filesystem options
     ``-x``, ``--one-file-system``
-        | stay in same file system, do not cross mount points
+        | stay in the same file system and do not store mount points of other file systems
     ``--numeric-owner``
         | only store numeric user and group identifiers
     ``--noatime``
@@ -73,9 +79,12 @@ Description
 ~~~~~~~~~~~
 
 This command creates a backup archive containing all files found while recursively
-traversing all paths specified. When giving '-' as path, borg will read data
-from standard input and create a file 'stdin' in the created archive from that
-data.
+traversing all paths specified. Paths are added to the archive as they are given,
+that means if relative paths are desired, the command has to be run from the correct
+directory.
+
+When giving '-' as path, borg will read data from standard input and create a
+file 'stdin' in the created archive from that data.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -92,6 +101,11 @@ not provide correct inode information the --ignore-inode flag can be used. This
 potentially decreases reliability of change detection, while avoiding always reading
 all files on these file systems.
 
+The mount points of filesystems or filesystem snapshots should be the same for every
+creation of a new archive to ensure fast operation. This is because the file cache that
+is used to determine changed files quickly uses absolute filenames.
+If this is not possible, consider creating a bind mount to a stable location.
+
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
 
@@ -101,6 +115,15 @@ The --exclude patterns are not like tar. In tar --exclude .bundler/gems will
 exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
 '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
 more information.
+
+In addition to using ``--exclude`` patterns, it is possible to use
+``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file
+or folder name) which, when contained within another folder, will prevent the
+containing folder from being backed up.  By default, the containing folder and
+all of its contents will be omitted from the backup.  If, however, you wish to
+only include the objects specified by ``--exclude-if-present`` in your backup,
+and not include any other contents of the containing folder, this can be enabled
+through using the ``--keep-exclude-tags`` option.
 
 Item flags
 ++++++++++

@@ -204,7 +204,6 @@ def create_logger(name=None):
 
 class JsonFormatter(logging.Formatter):
     RECORD_ATTRIBUTES = (
-        'created',
         'levelname',
         'name',
         'message',
@@ -224,6 +223,7 @@ class JsonFormatter(logging.Formatter):
         super().format(record)
         data = {
             'type': 'log_message',
+            'time': record.created,
         }
         for attr in self.RECORD_ATTRIBUTES:
             value = getattr(record, attr, None)

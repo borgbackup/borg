@@ -6,8 +6,9 @@ borg help patterns
 ~~~~~~~~~~~~~~~~~~
 
 
-Exclusion patterns support four separate styles, fnmatch, shell, regular
-expressions and path prefixes. By default, fnmatch is used. If followed
+File patterns support these styles: fnmatch, shell, regular expressions,
+path prefixes and path full-matches. By default, fnmatch is used for
+`--exclude` patterns and shell-style is used for `--pattern`. If followed
 by a colon (':') the first two characters of a pattern are used as a
 style selector. Explicit style selection is necessary when a
 non-default style is desired or when the desired pattern starts with
@@ -15,12 +16,12 @@ two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
 
 `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
 
-    This is the default style.  These patterns use a variant of shell
-    pattern syntax, with '*' matching any number of characters, '?'
-    matching any single character, '[...]' matching any single
-    character specified, including ranges, and '[!...]' matching any
-    character not specified. For the purpose of these patterns, the
-    path separator ('\' for Windows and '/' on other systems) is not
+    This is the default style for --exclude and --exclude-from.
+    These patterns use a variant of shell pattern syntax, with '*' matching
+    any number of characters, '?' matching any single character, '[...]'
+    matching any single character specified, including ranges, and '[!...]'
+    matching any character not specified. For the purpose of these patterns,
+    the path separator ('\' for Windows and '/' on other systems) is not
     treated specially. Wrap meta-characters in brackets for a literal
     match (i.e. `[?]` to match the literal character `?`). For a path
     to match a pattern, it must completely match from start to end, or
@@ -31,6 +32,7 @@ two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
 
 Shell-style patterns, selector `sh:`
 
+    This is the default style for --pattern and --patterns-from.
     Like fnmatch patterns these are similar to shell patterns. The difference
     is that the pattern may include `**/` for matching zero or more directory
     levels, `*` for matching zero or more arbitrary characters with the
@@ -47,10 +49,26 @@ Regular expressions, selector `re:`
     regular expression syntax is described in the `Python documentation for
     the re module <https://docs.python.org/3/library/re.html>`_.
 
-Prefix path, selector `pp:`
+Path prefix, selector `pp:`
 
     This pattern style is useful to match whole sub-directories. The pattern
     `pp:/data/bar` matches `/data/bar` and everything therein.
+
+Path full-match, selector `pf:`
+
+    This pattern style is useful to match whole paths.
+    This is kind of a pseudo pattern as it can not have any variable or
+    unspecified parts - the full, precise path must be given.
+    `pf:/data/foo.txt` matches `/data/foo.txt` only.
+
+    Implementation note: this is implemented via very time-efficient O(1)
+    hashtable lookups (this means you can have huge amounts of such patterns
+    without impacting performance much).
+    Due to that, this kind of pattern does not respect any context or order.
+    If you use such a pattern to include a file, it will always be included
+    (if the directory recursion encounters it).
+    Other include/exclude patterns that would normally match will be ignored.
+    Same logic applies for exclude.
 
 Exclusions can be passed via the command line option `--exclude`. When used
 from within a shell the patterns should be quoted to protect them from
@@ -92,6 +110,40 @@ Examples::
     sh:/home/*/.thumbnails
     EOF
     $ borg create --exclude-from exclude.txt backup /
+
+
+A more general and easier to use way to define filename matching patterns exists
+with the `--pattern` and `--patterns-from` options. Using these, you may specify
+the backup roots (starting points) and patterns for inclusion/exclusion. A
+root path starts with the prefix `R`, followed by a path (a plain path, not a
+file pattern). An include rule starts with the prefix +, an exclude rule starts
+with the prefix -, both followed by a pattern.
+Inclusion patterns are useful to include pathes that are contained in an excluded
+path. The first matching pattern is used so if an include pattern matches before
+an exclude pattern, the file is backed up.
+
+Note that the default pattern style for `--pattern` and `--patterns-from` is
+shell style (`sh:`), so those patterns behave similar to rsync include/exclude
+patterns. The pattern style can be set via the `P` prefix.
+
+Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
+considered first (in the order of appearance). Then patterns from `--patterns-from`
+are added. Exclusion patterns from `--exclude-from` files are appended last.
+
+An example `--patterns-from` file could look like that::
+
+    # "sh:" pattern style is the default, so the following line is not needed:
+    P sh
+    R /
+    # can be rebuild
+    - /home/*/.cache
+    # they're downloads for a reason
+    - /home/*/Downloads
+    # susan is a nice person
+    # include susans home
+    + /home/susan
+    # don't backup the other home directories
+    - /home/*
 
 .. _borg_placeholders:
 
@@ -156,17 +208,17 @@ borg help compression
 ~~~~~~~~~~~~~~~~~~~~~
 
 
-Compression is off by default, if you want some, you have to specify what you want.
+Compression is lz4 by default. If you want something else, you have to specify what you want.
 
 Valid compression specifiers are:
 
 none
 
-    Do not compress. (default)
+    Do not compress.
 
 lz4
 
-    Use lz4 compression. High speed, low compression.
+    Use lz4 compression. High speed, low compression. (default)
 
 zlib[,L]
 

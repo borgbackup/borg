@@ -353,6 +353,14 @@ How can I restore huge file(s) over a unstable connection?
 If you can not manage to extract the whole big file in one go, you can extract
 all the part files (see above) and manually concatenate them together.
 
+Can I backup my root partition (/) with Borg?
+---------------------------------------------
+
+Backing up your entire root partition works just fine, but remember to
+exclude directories that make no sense to backup, such as /dev, /proc,
+/sys, /tmp and /run, and to use --one-file-system if you only want to
+backup the root partition (and not any mounted devices e.g.).
+
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------
 
@@ -441,8 +449,12 @@ If the directory where you mount a filesystem is different every time,
 Is there a way to limit bandwidth with |project_name|?
 ------------------------------------------------------
 
-There is no command line option to limit bandwidth with |project_name|, but
-bandwidth limiting can be accomplished with pipeviewer_:
+To limit upload (i.e. :ref:`borg_create`) bandwidth, use the
+``--remote-ratelimit`` option.
+
+There is no built-in way to limit *download*
+(i.e. :ref:`borg_extract`) bandwidth, but limiting download bandwidth
+can be accomplished with pipeviewer_:
 
 Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
 

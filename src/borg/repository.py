@@ -17,7 +17,8 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
-from .helpers import yes
+from .helpers import hostname_is_unique
+from .helpers import secure_erase
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -123,9 +124,6 @@ class Repository:
         self.created = False
         self.exclusive = exclusive
         self.append_only = append_only
-        self.hostname_is_unique = yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False)
-        if self.hostname_is_unique:
-            logger.info('Enabled removal of stale repository locks')
 
     def __del__(self):
         if self.lock:
@@ -182,8 +180,26 @@ class Repository:
 
     def save_config(self, path, config):
         config_path = os.path.join(path, 'config')
+        old_config_path = os.path.join(path, 'config.old')
+
+        if os.path.isfile(old_config_path):
+            logger.warning("Old config file not securely erased on previous config update")
+            secure_erase(old_config_path)
+
+        if os.path.isfile(config_path):
+            try:
+                os.link(config_path, old_config_path)
+            except OSError as e:
+                if e.errno in (errno.EMLINK, errno.ENOSYS, errno.EPERM):
+                    logger.warning("Hardlink failed, cannot securely erase old config file")
+                else:
+                    raise
+
         with SaveFile(config_path) as fd:
             config.write(fd)
+
+        if os.path.isfile(old_config_path):
+            secure_erase(old_config_path)
 
     def save_key(self, keydata):
         assert self.config
@@ -260,7 +276,7 @@ class Repository:
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
         if lock:
-            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait, kill_stale_locks=self.hostname_is_unique).acquire()
+            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait, kill_stale_locks=hostname_is_unique()).acquire()
         else:
             self.lock = None
         self.config = ConfigParser(interpolation=None)
@@ -766,6 +782,7 @@ class Repository:
         self._active_txn = False
 
     def rollback(self):
+        # note: when used in remote mode, this is time limited, see RemoteRepository.shutdown_time.
         self._rollback(cleanup=False)
 
     def __len__(self):
@@ -843,6 +860,11 @@ class Repository:
             yield self.get(id_)
 
     def put(self, id, data, wait=True):
+        """put a repo object
+
+        Note: when doing calls with wait=False this gets async and caller must
+              deal with async results / exceptions later.
+        """
         if not self._active_txn:
             self.prepare_txn(self.get_transaction_id())
         try:
@@ -862,6 +884,11 @@ class Repository:
         self.index[id] = segment, offset
 
     def delete(self, id, wait=True):
+        """delete a repo object
+
+        Note: when doing calls with wait=False this gets async and caller must
+              deal with async results / exceptions later.
+        """
         if not self._active_txn:
             self.prepare_txn(self.get_transaction_id())
         try:
@@ -875,6 +902,17 @@ class Repository:
         segment, size = self.io.write_delete(id)
         self.compact[segment] += size
         self.segments.setdefault(segment, 0)
+
+    def async_response(self, wait=True):
+        """Get one async result (only applies to remote repositories).
+
+        async commands (== calls with wait=False, e.g. delete and put) have no results,
+        but may raise exceptions. These async exceptions must get collected later via
+        async_response() calls. Repeat the call until it returns None.
+        The previous calls might either return one (non-None) result or raise an exception.
+        If wait=True is given and there are outstanding responses, it will wait for them
+        to arrive. With wait=False, it will only return already received responses.
+        """
 
     def preload(self, ids):
         """Preload objects (only applies to remote repositories)

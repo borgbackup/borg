@@ -65,6 +65,24 @@ class TestLocationWithoutEnv:
             "Location(proto='ssh', user='user', host='::', port=1234, path='/some/path', archive=None)"
         assert repr(Location('ssh://user@[::]/some/path')) == \
             "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[2001:db8::]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=1234, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::c0:ffee]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[2001:db8::c0:ffee]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=1234, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::c0:ffee]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::192.0.2.1]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[2001:db8::192.0.2.1]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=1234, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::192.0.2.1]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -83,6 +101,18 @@ class TestLocationWithoutEnv:
             "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive='archive')"
         assert repr(Location('user@[::]:/some/path')) == \
             "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[2001:db8::]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[2001:db8::]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[2001:db8::c0:ffee]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[2001:db8::c0:ffee]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
 
     def test_smb(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)

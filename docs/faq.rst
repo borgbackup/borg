@@ -347,7 +347,7 @@ How can I backup huge file(s) over a unstable connection?
 
 This is not a problem any more, see previous FAQ item.
 
-How can I restore huge file(s) over a unstable connection?
+How can I restore huge file(s) over an unstable connection?
 ----------------------------------------------------------
 
 If you can not manage to extract the whole big file in one go, you can extract
@@ -382,7 +382,7 @@ If you run into that, try this:
 
 .. _a_status_oddity:
 
-I am seeing 'A' (added) status for a unchanged file!?
+I am seeing 'A' (added) status for an unchanged file!?
 -----------------------------------------------------
 
 The files cache is used to determine whether |project_name| already
@@ -493,6 +493,28 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
+
+
+Why does running 'borg check --repair' warn about data loss?
+------------------------------------------------------------
+
+Repair usually works for recovering data in a corrupted archive. However,
+it's impossible to predict all modes of corruption. In some very rare
+instances, such as malfunctioning storage hardware, additional repo
+corruption may occur. If you can't afford to lose the repo, it's strongly
+recommended that you perform repair on a copy of the repo.
+
+In other words, the warning is there to emphasize that |project_name|:
+  - Will perform automated routines that modify your backup repository
+  - Might not actually fix the problem you are experiencing
+  - Might, in very rare cases, further corrupt your repository
+
+In the case of malfunctioning hardware, such as a drive or USB hub
+corrupting data when read or written, it's best to diagnose and fix the
+cause of the initial corruption before attempting to repair the repo. If
+the corruption is caused by a one time event such as a power outage,
+running `borg check --repair` will fix most problems.
+
 
 Miscellaneous
 #############

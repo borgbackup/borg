@@ -557,12 +557,12 @@ def test_switch_patterns_style():
     roots, patterns = [], []
     load_pattern_file(pattern_file, roots, patterns)
     assert len(patterns) == 6
-    assert isinstance(patterns[0].pattern, ShellPattern)
-    assert isinstance(patterns[1].pattern, FnmatchPattern)
-    assert isinstance(patterns[2].pattern, RegexPattern)
-    assert isinstance(patterns[3].pattern, RegexPattern)
-    assert isinstance(patterns[4].pattern, PathPrefixPattern)
-    assert isinstance(patterns[5].pattern, ShellPattern)
+    assert isinstance(patterns[0].val, ShellPattern)
+    assert isinstance(patterns[1].val, FnmatchPattern)
+    assert isinstance(patterns[2].val, RegexPattern)
+    assert isinstance(patterns[3].val, RegexPattern)
+    assert isinstance(patterns[4].val, PathPrefixPattern)
+    assert isinstance(patterns[5].val, ShellPattern)
 
 
 @pytest.mark.parametrize("lines", [
@@ -681,6 +681,10 @@ def test_pattern_matcher():
 
     for i in ["", "foo", "bar"]:
         assert pm.match(i) is None
+
+    # add extra entries to aid in testing
+    for target in ["A", "B", "Empty", "FileNotFound"]:
+        pm.is_include_cmd[target] = target
 
     pm.add([RegexPattern("^a")], "A")
     pm.add([RegexPattern("^b"), RegexPattern("^z")], "B")

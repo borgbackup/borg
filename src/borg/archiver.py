@@ -54,7 +54,7 @@ from .helpers import check_extension_modules
 from .helpers import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
-from .helpers import parse_pattern, PatternMatcher, PathPrefixPattern
+from .helpers import PatternMatcher
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
@@ -190,16 +190,11 @@ class Archiver:
             bi += slicelen
 
     @staticmethod
-    def build_matcher(inclexcl_patterns, paths):
+    def build_matcher(inclexcl_patterns, include_paths):
         matcher = PatternMatcher()
-        if inclexcl_patterns:
-            matcher.add_inclexcl(inclexcl_patterns)
-        include_patterns = []
-        if paths:
-            include_patterns.extend(parse_pattern(i, PathPrefixPattern) for i in paths)
-            matcher.add(include_patterns, True)
-        matcher.fallback = not include_patterns
-        return matcher, include_patterns
+        matcher.add_inclexcl(inclexcl_patterns)
+        matcher.add_includepaths(include_paths)
+        return matcher
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually."""
@@ -493,13 +488,20 @@ class Archiver:
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
+        if st is None:
+            with backup_io('stat'):
+                st = os.lstat(path)
+
+        recurse_excluded_dir = False
         if not matcher.match(path):
             self.print_file_status('x', path)
-            return
+
+            if stat.S_ISDIR(st.st_mode) and matcher.recurse_dir:
+                recurse_excluded_dir = True
+            else:
+                return
+
         try:
-            if st is None:
-                with backup_io('stat'):
-                    st = os.lstat(path)
             if (st.st_ino, st.st_dev) in skip_inodes:
                 return
             # if restrict_dev is given, we do not want to recurse into a new filesystem,
@@ -527,7 +529,8 @@ class Archiver:
                                               read_special=read_special, dry_run=dry_run)
                         return
                 if not dry_run:
-                    status = archive.process_dir(path, st)
+                    if not recurse_excluded_dir:
+                        status = archive.process_dir(path, st)
                 if recurse:
                     with backup_io('scandir'):
                         entries = helpers.scandir_inorder(path)
@@ -590,7 +593,9 @@ class Archiver:
                 status = '?'  # need to add a status code somewhere
             else:
                 status = '-'  # dry run, item was not backed up
-        self.print_file_status(status, path)
+
+        if not recurse_excluded_dir:
+            self.print_file_status(status, path)
 
     @staticmethod
     def build_filter(matcher, peek_and_store_hardlink_masters, strip_components):
@@ -616,7 +621,7 @@ class Archiver:
             if sys.platform.startswith(('linux', 'freebsd', 'netbsd', 'openbsd', 'darwin', )):
                 logger.warning('Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8')
 
-        matcher, include_patterns = self.build_matcher(args.patterns, args.paths)
+        matcher = self.build_matcher(args.patterns, args.paths)
 
         progress = args.progress
         output_list = args.output_list
@@ -681,9 +686,8 @@ class Archiver:
                     archive.extract_item(dir_item)
                 except BackupOSError as e:
                     self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
-        for pattern in include_patterns:
-            if pattern.match_count == 0:
-                self.print_warning("Include pattern '%s' never matched.", pattern)
+        for pattern in matcher.get_unmatched_include_patterns():
+            self.print_warning("Include pattern '%s' never matched.", pattern)
         if pi:
             # clear progress output
             pi.finish()
@@ -893,13 +897,13 @@ class Archiver:
                                'If you know for certain that they are the same, pass --same-chunker-params '
                                'to override this check.')
 
-        matcher, include_patterns = self.build_matcher(args.patterns, args.paths)
+        matcher = self.build_matcher(args.patterns, args.paths)
 
         compare_archives(archive1, archive2, matcher)
 
-        for pattern in include_patterns:
-            if pattern.match_count == 0:
-                self.print_warning("Include pattern '%s' never matched.", pattern)
+        for pattern in matcher.get_unmatched_include_patterns():
+            self.print_warning("Include pattern '%s' never matched.", pattern)
+
         return self.exit_code
 
     @with_repository(exclusive=True, cache=True)
@@ -1048,7 +1052,7 @@ class Archiver:
             return self._list_repository(args, manifest, write)
 
     def _list_archive(self, args, repository, manifest, key, write):
-        matcher, _ = self.build_matcher(args.patterns, args.paths)
+        matcher = self.build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -1330,7 +1334,7 @@ class Archiver:
                    env_var_override='BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING'):
             return EXIT_ERROR
 
-        matcher, include_patterns = self.build_matcher(args.patterns, args.paths)
+        matcher = self.build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
         recompress = args.recompress != 'never'

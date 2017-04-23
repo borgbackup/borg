@@ -23,6 +23,7 @@ import uuid
 from binascii import hexlify
 from collections import namedtuple, deque, abc, Counter
 from datetime import datetime, timezone, timedelta
+from enum import Enum
 from fnmatch import translate
 from functools import wraps, partial, lru_cache
 from itertools import islice
@@ -388,23 +389,24 @@ def parse_timestamp(timestamp):
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
 
-def parse_add_pattern(patternstr, roots, patterns, fallback):
-    """Parse a pattern string and add it to roots or patterns depending on the pattern type."""
-    pattern = parse_inclexcl_pattern(patternstr, fallback=fallback)
-    if pattern.ptype is RootPath:
-        roots.append(pattern.pattern)
-    elif pattern.ptype is PatternStyle:
-        fallback = pattern.pattern
+def parse_patternfile_line(line, roots, ie_commands, fallback):
+    """Parse a pattern-file line and act depending on which command it represents."""
+    ie_command = parse_inclexcl_command(line, fallback=fallback)
+    if ie_command.cmd is IECommand.RootPath:
+        roots.append(ie_command.val)
+    elif ie_command.cmd is IECommand.PatternStyle:
+        fallback = ie_command.val
     else:
-        patterns.append(pattern)
+        # it is some kind of include/exclude command
+        ie_commands.append(ie_command)
     return fallback
 
 
-def load_pattern_file(fileobj, roots, patterns, fallback=None):
+def load_pattern_file(fileobj, roots, ie_commands, fallback=None):
     if fallback is None:
         fallback = ShellPattern  # ShellPattern is defined later in this module
-    for patternstr in clean_lines(fileobj):
-        fallback = parse_add_pattern(patternstr, roots, patterns, fallback)
+    for line in clean_lines(fileobj):
+        fallback = parse_patternfile_line(line, roots, ie_commands, fallback)
 
 
 def load_exclude_file(fileobj, patterns):
@@ -417,7 +419,7 @@ class ArgparsePatternAction(argparse.Action):
         super().__init__(nargs=nargs, **kw)
 
     def __call__(self, parser, args, values, option_string=None):
-        parse_add_pattern(values[0], args.paths, args.patterns, ShellPattern)
+        parse_patternfile_line(values[0], args.paths, args.patterns, ShellPattern)
 
 
 class ArgparsePatternFileAction(argparse.Action):
@@ -442,6 +444,11 @@ class ArgparseExcludeFileAction(ArgparsePatternFileAction):
 
 
 class PatternMatcher:
+    """Represents a collection of pattern objects to match paths against.
+
+    *fallback* is a boolean value that *match()* returns if no matching patterns are found.
+
+    """
     def __init__(self, fallback=None):
         self._items = []
 
@@ -451,42 +458,88 @@ class PatternMatcher:
         # optimizations
         self._path_full_patterns = {}  # full path -> return value
 
+        # indicates whether the last match() call ended on a pattern for which
+        # we should recurse into any matching folder.  Will be set to True or
+        # False when calling match().
+        self.recurse_dir = None
+
+        # whether to recurse into directories when no match is found
+        # TODO: allow modification as a config option?
+        self.recurse_dir_default = True
+
+        self.include_patterns = []
+
+        # TODO: move this info to parse_inclexcl_command and store in PatternBase subclass?
+        self.is_include_cmd = {
+            IECommand.Exclude: False,
+            IECommand.ExcludeNoRecurse: False,
+            IECommand.Include: True
+        }
+
     def empty(self):
         return not len(self._items) and not len(self._path_full_patterns)
 
-    def _add(self, pattern, value):
+    def _add(self, pattern, cmd):
+        """*cmd* is an IECommand value.
+        """
         if isinstance(pattern, PathFullPattern):
             key = pattern.pattern  # full, normalized path
-            self._path_full_patterns[key] = value
+            self._path_full_patterns[key] = cmd
         else:
-            self._items.append((pattern, value))
+            self._items.append((pattern, cmd))
 
-    def add(self, patterns, value):
-        """Add list of patterns to internal list. The given value is returned from the match function when one of the
-        given patterns matches.
+    def add(self, patterns, cmd):
+        """Add list of patterns to internal list. *cmd* indicates whether the
+        pattern is an include/exclude pattern, and whether recursion should be
+        done on excluded folders.
         """
         for pattern in patterns:
-            self._add(pattern, value)
+            self._add(pattern, cmd)
+
+    def add_includepaths(self, include_paths):
+        """Used to add inclusion-paths from args.paths (from commandline).
+        """
+        include_patterns = [parse_pattern(p, PathPrefixPattern) for p in include_paths]
+        self.add(include_patterns, IECommand.Include)
+        self.fallback = not include_patterns
+        self.include_patterns = include_patterns
+
+    def get_unmatched_include_patterns(self):
+        "Note that this only returns patterns added via *add_includepaths*."
+        return [p for p in self.include_patterns if p.match_count == 0]
 
     def add_inclexcl(self, patterns):
-        """Add list of patterns (of type InclExclPattern) to internal list. The patterns ptype member is returned from
-        the match function when one of the given patterns matches.
+        """Add list of patterns (of type CmdTuple) to internal list.
         """
-        for pattern, pattern_type in patterns:
-            self._add(pattern, pattern_type)
+        for pattern, cmd in patterns:
+            self._add(pattern, cmd)
 
     def match(self, path):
+        """Return True or False depending on whether *path* is matched.
+
+        If no match is found among the patterns in this matcher, then the value
+        in self.fallback is returned (defaults to None).
+
+        """
         path = normalize_path(path)
         # do a fast lookup for full path matches (note: we do not count such matches):
         non_existent = object()
         value = self._path_full_patterns.get(path, non_existent)
+
         if value is not non_existent:
             # we have a full path match!
+            # TODO: get from pattern; don't hard-code
+            self.recurse_dir = True
             return value
+
         # this is the slow way, if we have many patterns in self._items:
-        for (pattern, value) in self._items:
+        for (pattern, cmd) in self._items:
             if pattern.match(path, normalize=False):
-                return value
+                self.recurse_dir = pattern.recurse_dir
+                return self.is_include_cmd[cmd]
+
+        # by default we will recurse if there is no match
+        self.recurse_dir = self.recurse_dir_default
         return self.fallback
 
 
@@ -502,14 +555,15 @@ class PatternBase:
     """
     PREFIX = NotImplemented
 
-    def __init__(self, pattern):
+    def __init__(self, pattern, recurse_dir=False):
         self.pattern_orig = pattern
         self.match_count = 0
         pattern = normalize_path(pattern)
         self._prepare(pattern)
+        self.recurse_dir = recurse_dir
 
     def match(self, path, normalize=True):
-        """match the given path against this pattern.
+        """Return a boolean indicating whether *path* is matched by this pattern.
 
         If normalize is True (default), the path will get normalized using normalize_path(),
         otherwise it is assumed that it already is normalized using that function.
@@ -528,6 +582,7 @@ class PatternBase:
         return self.pattern_orig
 
     def _prepare(self, pattern):
+        "Should set the value of self.pattern"
         raise NotImplementedError
 
     def _match(self, path):
@@ -625,7 +680,7 @@ class RegexPattern(PatternBase):
         return (self.regex.search(path) is not None)
 
 
-_PATTERN_STYLES = set([
+_PATTERN_CLASSES = set([
     FnmatchPattern,
     PathFullPattern,
     PathPrefixPattern,
@@ -633,65 +688,86 @@ _PATTERN_STYLES = set([
     ShellPattern,
 ])
 
-_PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
+_PATTERN_CLASS_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_CLASSES)
 
-InclExclPattern = namedtuple('InclExclPattern', 'pattern ptype')
-RootPath = object()
-PatternStyle = object()
+CmdTuple = namedtuple('CmdTuple', 'val cmd')
 
 
-def get_pattern_style(prefix):
+class IECommand(Enum):
+    """A command that an InclExcl file line can represent.
+    """
+    RootPath = 1
+    PatternStyle = 2
+    Include = 3
+    Exclude = 4
+    ExcludeNoRecurse = 5
+
+
+def get_pattern_class(prefix):
     try:
-        return _PATTERN_STYLE_BY_PREFIX[prefix]
+        return _PATTERN_CLASS_BY_PREFIX[prefix]
     except KeyError:
         raise ValueError("Unknown pattern style: {}".format(prefix)) from None
 
 
-def parse_pattern(pattern, fallback=FnmatchPattern):
+def parse_pattern(pattern, fallback=FnmatchPattern, recurse_dir=True):
     """Read pattern from string and return an instance of the appropriate implementation class.
+
     """
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
-        cls = get_pattern_style(style)
+        cls = get_pattern_class(style)
     else:
         cls = fallback
-    return cls(pattern)
+    return cls(pattern, recurse_dir)
 
 
-def parse_exclude_pattern(pattern, fallback=FnmatchPattern):
+def parse_exclude_pattern(pattern_str, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
     """
-    epattern = parse_pattern(pattern, fallback)
-    return InclExclPattern(epattern, False)
+    epattern_obj = parse_pattern(pattern_str, fallback)
+    return CmdTuple(epattern_obj, IECommand.Exclude)
 
 
-def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
-    """Read pattern from string and return a InclExclPattern object."""
-    type_prefix_map = {
-        '-': False,
-        '+': True,
-        'R': RootPath,
-        'r': RootPath,
-        'P': PatternStyle,
-        'p': PatternStyle,
+def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
+    """Read a --patterns-from command from string and return a CmdTuple object."""
+
+    cmd_prefix_map = {
+        '-': IECommand.Exclude,
+        '!': IECommand.ExcludeNoRecurse,
+        '+': IECommand.Include,
+        'R': IECommand.RootPath,
+        'r': IECommand.RootPath,
+        'P': IECommand.PatternStyle,
+        'p': IECommand.PatternStyle,
     }
+
     try:
-        ptype = type_prefix_map[pattern[0]]
-        pattern = pattern[1:].lstrip()
-        if not pattern:
-            raise ValueError("Missing pattern!")
+        cmd = cmd_prefix_map[cmd_line_str[0]]
+
+        # remaining text on command-line following the command character
+        remainder_str = cmd_line_str[1:].lstrip()
+
+        if not remainder_str:
+            raise ValueError("Missing pattern/information!")
     except (IndexError, KeyError, ValueError):
-        raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
-    if ptype is RootPath:
-        pobj = pattern
-    elif ptype is PatternStyle:
+        raise argparse.ArgumentTypeError("Unable to parse pattern/command: {}".format(cmd_line_str))
+
+    if cmd is IECommand.RootPath:
+        # TODO: validate string?
+        val = remainder_str
+    elif cmd is IECommand.PatternStyle:
+        # then remainder_str is something like 're' or 'sh'
         try:
-            pobj = get_pattern_style(pattern)
+            val = get_pattern_class(remainder_str)
         except ValueError:
-            raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
+            raise argparse.ArgumentTypeError("Invalid pattern style: {}".format(remainder_str))
     else:
-        pobj = parse_pattern(pattern, fallback)
-    return InclExclPattern(pobj, ptype)
+        # determine recurse_dir based on command type
+        recurse_dir = cmd not in [IECommand.ExcludeNoRecurse]
+        val = parse_pattern(remainder_str, fallback, recurse_dir)
+
+    return CmdTuple(val, cmd)
 
 
 def timestamp(s):

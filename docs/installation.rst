@@ -34,7 +34,9 @@ Repository File System
 - |project_name| stores backup metadata and data into so-called segment files. The 
   target size of these files and also the count of these files per directory is set 
   in the :ref:config-file.
-- |project_name| uses Mkdir based `file locking<https://en.wikipedia.org/wiki/File_locking#Lock_files`_.
+- |project_name| uses a generic and very portable mkdir-based `locking<https://en.wikipedia.org/wiki/File_locking#Lock_files`_ mechanism.
+  POSIX locks, NFS locks, windows file locks, lockf(), flock() and hardlinks are
+  **not** used.
 - Hardlinks are only required when performing an in-place upgrade of an Attic
   repository. 
 - A journaling file system is strongly recommended. More information can be

@@ -1254,8 +1254,8 @@ class ArchiveChecker:
                     # local repo (fs): as chunks.iteritems loop usually pumps a lot of data through,
                     # a defect chunk is likely not in the fs cache any more and really gets re-read
                     # from the underlying media.
-                    encrypted_data = self.repository.get(defect_chunk)
                     try:
+                        encrypted_data = self.repository.get(defect_chunk)
                         _chunk_id = None if defect_chunk == Manifest.MANIFEST_ID else defect_chunk
                         self.key.decrypt(_chunk_id, encrypted_data)
                     except IntegrityError:

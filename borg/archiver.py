@@ -1764,7 +1764,20 @@ class Archiver:
                                help='repository to prune')
 
         upgrade_epilog = textwrap.dedent("""
-        Upgrade an existing Borg repository.
+        Upgrade an existing, local Borg repository.
+
+        When you do not need borg upgrade
+        +++++++++++++++++++++++++++++++++
+
+        Not every change requires that you run ``borg upgrade``.
+
+        You do **not** need to run it when:
+
+        - moving your repository to a different place
+        - upgrading to another point release (like 1.0.x to 1.0.y),
+          except when noted otherwise in the changelog
+        - upgrading from 1.0.x to 1.1.x,
+          except when noted otherwise in the changelog
 
         Borg 1.x.y upgrades
         +++++++++++++++++++

@@ -2887,8 +2887,13 @@ class Archiver:
 
         Currently, only LOCAL repositories can be upgraded (issue #465).
 
-        It will change the magic strings in the repository's segments
-        to match the new Borg magic strings. The keyfiles found in
+        Please note that ``borg create`` (since 1.0.0) uses bigger chunks by
+        default than old borg or attic did, so the new chunks won't deduplicate
+        with the old chunks in the upgraded repository.
+        See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.
+
+        ``borg upgrade`` will change the magic strings in the repository's
+        segments to match the new Borg magic strings. The keyfiles found in
         $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
         copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 

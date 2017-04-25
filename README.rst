@@ -27,6 +27,10 @@ Main features
   of bytes stored: each file is split into a number of variable length chunks
   and only chunks that have never been seen before are added to the repository.
 
+  A chunk is considered duplicate if its id_hash value is identical.
+  A cryptographically strong hash or MAC function is used as id_hash, e.g.
+  (hmac-)sha256.
+
   To deduplicate, all the chunks in the same repository are considered, no
   matter whether they come from different machines, from previous backups,
   from the same backup or even from the same single file.

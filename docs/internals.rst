@@ -96,6 +96,8 @@ The id_hash function is:
 * sha256 (no encryption keys available)
 * hmac-sha256 (encryption keys available)
 
+As the id / key is used for deduplication, id_hash must be a cryptographically
+strong hash or MAC.
 
 Segments and archives
 ---------------------
@@ -232,6 +234,11 @@ Chunks
 The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorithm.
 It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
 producing chunks of 2^HASH_MASK_BITS Bytes on average.
+
+Buzhash is **only** used for cutting the chunks at places defined by the
+content, the buzhash value is **not** used as the deduplication criteria (we
+use a cryptographically strong hash/MAC over the chunk contents for this, the
+id_hash).
 
 ``borg create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
 can be used to tune the chunker parameters, the default is:

@@ -925,6 +925,11 @@ in ``.ssh/authorized_keys`` ::
     command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustable backup clients>
     command="borg serve ..." ssh-rsa <key used for backup management>
 
+Please note that if you run ``borg init`` via a ``borg serve --append-only``
+server, the repository config will be created with a ``append_only=1`` entry.
+This behaviour is subject to change in a later borg version. So, be aware of
+it for now, but do not rely on it.
+
 Example
 +++++++
 

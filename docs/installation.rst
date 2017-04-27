@@ -27,14 +27,14 @@ Pre-Installation Considerations
 
 Repository File System
 ~~~~~~~~~~~~~~~~~~~~~~
-:ref:data-structures-and-file-formats
+:ref:`data-structures-and-file-formats`
 - |project_name| stores data only 3 directory levels deep and uses short file and
   directory names.
 - |project_name| requires read and write permissions on the repository file system.
 - |project_name| stores backup metadata and data into so-called segment files. The 
   target size of these files and also the count of these files per directory is set 
-  in the :ref:config-file.
-- |project_name| uses a generic and very portable mkdir-based `locking<https://en.wikipedia.org/wiki/File_locking#Lock_files`_ mechanism.
+  in the :ref:`config-file`.
+- |project_name| uses a generic and very portable mkdir-based `locking`_ mechanism.
   POSIX locks, NFS locks, windows file locks, lockf(), flock() and hardlinks are
   **not** used.
 - Hardlinks are only required when performing an in-place upgrade of an Attic
@@ -48,8 +48,10 @@ Repository File System
   - posix_fadvise - to not flood the operating system's cache
   - sync on files and directories to ensure data is written onto storage media
 
-:ref:data-structures-and-file-formats contains additional information about how |project_name|
+:ref:`data-structures-and-file-formats` contains additional information about how |project_name|
 manages data.
+
+.. _locking: https://en.wikipedia.org/wiki/File_locking#Lock_files
 
 .. _distribution-package:
 

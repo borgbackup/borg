@@ -27,7 +27,7 @@ Pre-Installation Considerations
 
 Repository File System
 ~~~~~~~~~~~~~~~~~~~~~~
-:ref:`data-structures-and-file-formats`
+
 - |project_name| stores data only 3 directory levels deep and uses short file and
   directory names.
 - |project_name| requires read and write permissions on the repository file system.
@@ -42,13 +42,14 @@ Repository File System
 - A journaling file system is strongly recommended. More information can be
   found in :ref:`file-systems`.
 - |project_name| requires the following file system operations:
+
   - create, open, read, write, seek, close, rename, delete
   - link - when upgrading an Attic repo in-place
   - listdir, stat
-  - posix_fadvise - to not flood the operating system's cache
-  - sync on files and directories to ensure data is written onto storage media
+  - fsync on files and directories to ensure data is written onto storage media
+    (some file systems do not support fsync on directories, which Borg accomodates for)
 
-:ref:`data-structures-and-file-formats` contains additional information about how |project_name|
+:ref:`data-structures` contains additional information about how |project_name|
 manages data.
 
 .. _locking: https://en.wikipedia.org/wiki/File_locking#Lock_files

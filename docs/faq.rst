@@ -348,7 +348,7 @@ How can I backup huge file(s) over a unstable connection?
 This is not a problem any more, see previous FAQ item.
 
 How can I restore huge file(s) over an unstable connection?
-----------------------------------------------------------
+-----------------------------------------------------------
 
 If you can not manage to extract the whole big file in one go, you can extract
 all the part files (see above) and manually concatenate them together.
@@ -383,7 +383,7 @@ If you run into that, try this:
 .. _a_status_oddity:
 
 I am seeing 'A' (added) status for an unchanged file!?
------------------------------------------------------
+------------------------------------------------------
 
 The files cache is used to determine whether |project_name| already
 "knows" / has backed up a file and if so, to skip the file from

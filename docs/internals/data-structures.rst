@@ -1,6 +1,8 @@
 .. include:: ../global.rst.inc
 .. highlight:: none
 
+.. _data-structures:
+
 Data structures and file formats
 ================================
 
@@ -39,6 +41,8 @@ Transactionality is achieved by using a log (aka journal) to record changes. The
 called segments_. Each segment is a series of log entries. The segment number together with the offset of each
 entry relative to its segment start establishes an ordering of the log entries. This is the "definition" of
 time for the purposes of the log.
+
+.. _config-file:
 
 Config file
 ~~~~~~~~~~~

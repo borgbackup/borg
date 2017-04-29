@@ -25,7 +25,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex, \
-    get_security_dir
+    get_security_dir, MAX_S
 from ..key import RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
@@ -272,12 +272,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         """
         # File
         self.create_regular_file('empty', size=0)
-        # next code line raises OverflowError on 32bit cpu (raspberry pi 2):
-        # 2600-01-01 > 2**64 ns
-        # os.utime('input/empty', (19880895600, 19880895600))
-        # thus, we better test with something not that far in future:
-        # 2038-01-19 (1970 + 2^31 - 1 seconds) is the 32bit "deadline":
-        os.utime('input/empty', (2**31 - 1, 2**31 - 1))
+        os.utime('input/empty', (MAX_S, MAX_S))
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('flagfile', size=1024)
         # Directory

@@ -72,8 +72,6 @@ Archive options
         | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm, see the output of the "borg help compression" command for details.
-    ``--compression-from COMPRESSIONCONFIG``
-        | read compression patterns from COMPRESSIONCONFIG, see the output of the "borg help compression" command for details.
 
 Description
 ~~~~~~~~~~~

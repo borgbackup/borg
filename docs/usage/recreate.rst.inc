@@ -56,10 +56,8 @@ Archive options
         | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.
     ``-C COMPRESSION``, ``--compression COMPRESSION``
         | select compression algorithm, see the output of the "borg help compression" command for details.
-    ``--always-recompress``
-        | always recompress chunks, don't skip chunks already compressed with the same algorithm.
-    ``--compression-from COMPRESSIONCONFIG``
-        | read compression patterns from COMPRESSIONCONFIG, see the output of the "borg help compression" command for details.
+    ``--recompress``
+        | recompress data chunks according to --compression if "if-different". When "always", chunks that are already compressed that way are not skipped, but compressed again. Only the algorithm is considered for "if-different", not the compression level (if any).
     ``--chunker-params PARAMS``
         | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or "default" to use the current defaults. default: 19,23,21,4095
 
@@ -75,9 +73,9 @@ have the exact same semantics as in "borg create". If PATHs are specified the
 resulting archive will only contain files from these PATHs.
 
 Note that all paths in an archive are relative, therefore absolute patterns/paths
-will *not* match (--exclude, --exclude-from, --compression-from, PATHs).
+will *not* match (--exclude, --exclude-from, PATHs).
 
---compression: all chunks seen will be stored using the given method.
+--recompress allows to change the compression of existing data in archives.
 Due to how Borg stores compressed size information this might display
 incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.

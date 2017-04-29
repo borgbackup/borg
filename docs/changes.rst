@@ -134,18 +134,22 @@ Version 1.1.0b5 (not released)
 Compatibility notes:
 
 - BORG_HOSTNAME_IS_UNIQUE is now on by default.
-- remove --compression-from feature
+- removed --compression-from feature
 - recreate: add --recompress flag, unify --always-recompress and
   --recompress
 
 Fixes:
 
-- catch exception for os.link when hardlinks are not supported
-- borg rename / recreate: expand placeholders, fixes #2386
-- generic support for hardlinks (files, devices, FIFOs)
-- extract: also create parent dir for device files, if needed.
+- catch exception for os.link when hardlinks are not supported, #2405
+- borg rename / recreate: expand placeholders, #2386
+- generic support for hardlinks (files, devices, FIFOs), #2324
+- extract: also create parent dir for device files, if needed, #2358
 - extract: if a hardlink master is not in the to-be-extracted subset,
-  the "x" status was not displayed for it.
+  the "x" status was not displayed for it, #2351
+- embrace y2038 issue to support 32bit platforms: clamp timestamps to int32,
+  #2347
+- verify_data: fix IntegrityError handling for defect chunks, #2442
+- allow excluding parent and including child, #2314
 
 Other changes:
 
@@ -154,6 +158,9 @@ Other changes:
   with --compression defaults.
 - placeholders: deny access to internals and other unspecified stuff
 - clearer error message for unrecognized placeholder
+- more clear exception if borg check does not help, #2427
+- vagrant: upgrade FUSE for macOS to 3.5.8, #2346
+- linux binary builds: get rid of glibc 2.13 dependency, #2430
 - docs:
 
   - placeholders: document escaping
@@ -162,10 +169,19 @@ Other changes:
   - more docs about compression
   - LICENSE: use canonical formulation
     ("copyright holders and contributors" instead of "author")
+  - document borg init behaviour via append-only borg serve, #2440
+  - be clear about what buzhash is used for, #2390
+  - add hint about chunker params, #2421
+  - clarify borg upgrade docs, #2436
+  - FAQ to explain warning when running borg check --repair, #2341
+  - repository file system requirements, #2080
+  - pre-install considerations
+  - misc. formatting / crossref fixes
 - tests:
 
   - enhance travis setuptools_scm situation
   - add extra test for the hashindex
+  - fix invalid param issue in benchmarks
 
 These belong to 1.1.0b4 release, but did not make it into changelog by then:
 

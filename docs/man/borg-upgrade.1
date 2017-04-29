@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-UPGRADE 1 "2017-03-26" "" "borg backup tool"
+.TH BORG-UPGRADE 1 "2017-04-29" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .
@@ -35,7 +35,22 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 borg upgrade <options> REPOSITORY
 .SH DESCRIPTION
 .sp
-Upgrade an existing Borg repository.
+Upgrade an existing, local Borg repository.
+.SS When you do not need borg upgrade
+.sp
+Not every change requires that you run \fBborg upgrade\fP\&.
+.sp
+You do \fBnot\fP need to run it when:
+.INDENT 0.0
+.IP \(bu 2
+moving your repository to a different place
+.IP \(bu 2
+upgrading to another point release (like 1.0.x to 1.0.y),
+except when noted otherwise in the changelog
+.IP \(bu 2
+upgrading from 1.0.x to 1.1.x,
+except when noted otherwise in the changelog
+.UNINDENT
 .SS Borg 1.x.y upgrades
 .sp
 Use \fBborg upgrade \-\-tam REPO\fP to require manifest authentication
@@ -63,8 +78,13 @@ helps with converting Borg 0.xx to 1.0.
 .sp
 Currently, only LOCAL repositories can be upgraded (issue #465).
 .sp
-It will change the magic strings in the repository\(aqs segments
-to match the new Borg magic strings. The keyfiles found in
+Please note that \fBborg create\fP (since 1.0.0) uses bigger chunks by
+default than old borg or attic did, so the new chunks won\(aqt deduplicate
+with the old chunks in the upgraded repository.
+See \fB\-\-chunker\-params\fP option of \fBborg create\fP and \fBborg recreate\fP\&.
+.sp
+\fBborg upgrade\fP will change the magic strings in the repository\(aqs
+segments to match the new Borg magic strings. The keyfiles found in
 $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
 copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 .sp

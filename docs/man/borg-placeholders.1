@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PLACEHOLDERS 1 "2017-03-26" "" "borg backup tool"
+.TH BORG-PLACEHOLDERS 1 "2017-04-29" "" "borg backup tool"
 .SH NAME
 borg-placeholders \- Details regarding placeholders
 .
@@ -104,6 +104,18 @@ The version of borg, only major and minor version, e.g.: 1.0
 .INDENT 0.0
 .INDENT 3.5
 The version of borg, only major, minor and patch version, e.g.: 1.0.8
+.UNINDENT
+.UNINDENT
+.sp
+If literal curly braces need to be used, double them for escaping:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg create /path/to/repo::{{literal_text}}
+.ft P
+.fi
 .UNINDENT
 .UNINDENT
 .sp

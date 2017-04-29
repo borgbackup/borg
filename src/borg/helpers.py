@@ -905,10 +905,30 @@ def SortBySpec(text):
 
 
 # Not too rarely, we get crappy timestamps from the fs, that overflow some computations.
-# As they are crap anyway, nothing is lost if we just clamp them to the max valid value.
-# msgpack can only pack uint64. datetime is limited to year 9999.
-MAX_NS = 18446744073000000000  # less than 2**64 - 1 ns. also less than y9999.
-MAX_S = MAX_NS // 1000000000
+# As they are crap anyway (valid filesystem timestamps always refer to the past up to
+# the present, but never to the future), nothing is lost if we just clamp them to the
+# maximum value we can support.
+# As long as people are using borg on 32bit platforms to access borg archives, we must
+# keep this value True. But we can expect that we can stop supporting 32bit platforms
+# well before coming close to the year 2038, so this will never be a practical problem.
+SUPPORT_32BIT_PLATFORMS = True  # set this to False before y2038.
+
+if SUPPORT_32BIT_PLATFORMS:
+    # second timestamps will fit into a signed int32 (platform time_t limit).
+    # nanosecond timestamps thus will naturally fit into a signed int64.
+    # subtract last 48h to avoid any issues that could be caused by tz calculations.
+    # this is in the year 2038, so it is also less than y9999 (which is a datetime internal limit).
+    # msgpack can pack up to uint64.
+    MAX_S = 2**31-1 - 48*3600
+    MAX_NS = MAX_S * 1000000000
+else:
+    # nanosecond timestamps will fit into a signed int64.
+    # subtract last 48h to avoid any issues that could be caused by tz calculations.
+    # this is in the year 2262, so it is also less than y9999 (which is a datetime internal limit).
+    # round down to 1e9 multiple, so MAX_NS corresponds precisely to a integer MAX_S.
+    # msgpack can pack up to uint64.
+    MAX_NS = (2**63-1 - 48*3600*1000000000) // 1000000000 * 1000000000
+    MAX_S = MAX_NS // 1000000000
 
 
 def safe_s(ts):

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMPRESSION 1 "2017-03-26" "" "borg backup tool"
+.TH BORG-COMPRESSION 1 "2017-04-29" "" "borg backup tool"
 .SH NAME
 borg-compression \- Details regarding compression
 .
@@ -84,25 +84,6 @@ being any valid compression specifier.
 .UNINDENT
 .UNINDENT
 .sp
-The decision about which compression to use is done by borg like this:
-.INDENT 0.0
-.IP 1. 3
-find a compression specifier (per file):
-match the path/filename against all patterns in all \-\-compression\-from
-files (if any). If a pattern matches, use the compression spec given for
-that pattern. If no pattern matches (and also if you do not give any
-\-\-compression\-from option), default to the compression spec given by
-\-\-compression. See docs/misc/compression.conf for an example config.
-.IP 2. 3
-if the found compression spec is not "auto", the decision is taken:
-use the found compression spec.
-.IP 3. 3
-if the found compression spec is "auto", test compressibility of each
-chunk using lz4.
-If it is compressible, use the C,[L] compression spec given within the
-"auto" specifier. If it is not compressible, use no compression.
-.UNINDENT
-.sp
 Examples:
 .INDENT 0.0
 .INDENT 3.5
@@ -113,28 +94,7 @@ borg create \-\-compression lz4 REPO::ARCHIVE data
 borg create \-\-compression zlib REPO::ARCHIVE data
 borg create \-\-compression zlib,1 REPO::ARCHIVE data
 borg create \-\-compression auto,lzma,6 REPO::ARCHIVE data
-borg create \-\-compression\-from compression.conf \-\-compression auto,lzma ...
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
-compression.conf has entries like:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-# example config file for \-\-compression\-from option
-#
-# Format of non\-comment / non\-empty lines:
-# <compression\-spec>:<path/filename pattern>
-# compression\-spec is same format as for \-\-compression option
-# path/filename pattern is same format as for \-\-exclude option
-none:*.gz
-none:*.zip
-none:*.mp3
-none:*.ogg
+borg create \-\-compression auto,lzma ...
 .ft P
 .fi
 .UNINDENT

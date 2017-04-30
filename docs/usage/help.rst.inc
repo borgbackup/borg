@@ -196,6 +196,10 @@ placeholders:
 
     The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
+If literal curly braces need to be used, double them for escaping::
+
+    borg create /path/to/repo::{{literal_text}}
+
 Examples::
 
     borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
@@ -245,43 +249,13 @@ auto,C[,L]
     For compressible data, it uses the given C[,L] compression - with C[,L]
     being any valid compression specifier.
 
-The decision about which compression to use is done by borg like this:
-
-1. find a compression specifier (per file):
-   match the path/filename against all patterns in all --compression-from
-   files (if any). If a pattern matches, use the compression spec given for
-   that pattern. If no pattern matches (and also if you do not give any
-   --compression-from option), default to the compression spec given by
-   --compression. See docs/misc/compression.conf for an example config.
-
-2. if the found compression spec is not "auto", the decision is taken:
-   use the found compression spec.
-
-3. if the found compression spec is "auto", test compressibility of each
-   chunk using lz4.
-   If it is compressible, use the C,[L] compression spec given within the
-   "auto" specifier. If it is not compressible, use no compression.
-
 Examples::
 
     borg create --compression lz4 REPO::ARCHIVE data
     borg create --compression zlib REPO::ARCHIVE data
     borg create --compression zlib,1 REPO::ARCHIVE data
     borg create --compression auto,lzma,6 REPO::ARCHIVE data
-    borg create --compression-from compression.conf --compression auto,lzma ...
-
-compression.conf has entries like::
-
-    # example config file for --compression-from option
-    #
-    # Format of non-comment / non-empty lines:
-    # <compression-spec>:<path/filename pattern>
-    # compression-spec is same format as for --compression option
-    # path/filename pattern is same format as for --exclude option
-    none:*.gz
-    none:*.zip
-    none:*.mp3
-    none:*.ogg
+    borg create --compression auto,lzma ...
 
 General remarks:
 

@@ -302,13 +302,13 @@ class RegexPattern(PatternBase):
         return (self.regex.search(path) is not None)
 
 
-_PATTERN_CLASSES = set([
+_PATTERN_CLASSES = {
     FnmatchPattern,
     PathFullPattern,
     PathPrefixPattern,
     RegexPattern,
     ShellPattern,
-])
+}
 
 _PATTERN_CLASS_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_CLASSES)
 

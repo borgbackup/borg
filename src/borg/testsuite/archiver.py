@@ -33,12 +33,12 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto import bytes_to_long, num_aes_blocks
-from ..helpers import PatternMatcher, parse_pattern, Location, get_security_dir
+from ..helpers import Location, get_security_dir
 from ..helpers import Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
-from ..helpers import IECommand
 from ..helpers import MAX_S
+from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item
 from ..key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile

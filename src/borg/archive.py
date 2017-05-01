@@ -36,7 +36,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
-from .helpers import PathPrefixPattern, FnmatchPattern, IECommand
+from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem
 from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth

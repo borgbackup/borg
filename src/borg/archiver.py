@@ -51,15 +51,15 @@ from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import StableDict
 from .helpers import check_extension_modules
-from .helpers import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
-from .helpers import PatternMatcher
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
 from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
+from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
+from .patterns import PatternMatcher
 from .item import Item
 from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .keymanager import KeyManager

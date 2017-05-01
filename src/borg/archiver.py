@@ -15,6 +15,7 @@ import signal
 import stat
 import subprocess
 import sys
+import tarfile
 import textwrap
 import time
 import traceback
@@ -32,7 +33,7 @@ import borg
 from . import __version__
 from . import helpers
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
-from .archive import BackupOSError, backup_io
+from .archive import BackupOSError, backup_io, backup_io_iter
 from .cache import Cache
 from .constants import *  # NOQA
 from .compress import CompressionSpec
@@ -52,7 +53,7 @@ from .helpers import hardlinkable
 from .helpers import StableDict
 from .helpers import check_extension_modules
 from .helpers import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
-from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
+from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo, make_path_safe
 from .helpers import log_multi
 from .helpers import PatternMatcher
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
@@ -1371,6 +1372,126 @@ class Archiver:
             repository.commit()
             cache.commit()
         return self.exit_code
+
+    @with_repository(cache=True, exclusive=True)
+    def do_create_from_tar(self, args, repository, manifest, key, cache):
+        self.output_filter = args.output_filter
+        self.output_list = args.output_list
+
+        filter = None
+        if args.tar_filter == 'auto' and args.tarfile != '-':
+            if args.tarfile.endswith('.tar.gz'):
+                filter = 'gunzip'
+            elif args.tarfile.endswith('.tar.bz2'):
+                filter = 'bunzip2'
+            elif args.tarfile.endswith('.tar.xz'):
+                filter = 'unxz'
+            logger.debug('Automatically determined tar filter: %s', filter)
+        else:
+            filter = args.tar_filter
+
+        if args.tarfile == '-':
+            tarstream, tarstream_close = sys.stdin, False
+        else:
+            tarstream, tarstream_close = open(args.tarfile, 'rb'), True
+
+        if filter:
+            filterin = tarstream
+            filterin_close = tarstream_close
+            filterproc = subprocess.Popen(shlex.split(filter), stdin=filterin.fileno(), stdout=subprocess.PIPE)
+            # We can't deadlock. Why? Because we just give the FD of the stream to the filter process,
+            # it can read as much data as it wants!
+            tarstream = filterproc.stdout
+            tarstream_close = False
+
+        tar = tarfile.open(fileobj=tarstream, mode='r|')
+
+        self._create_from_tar(args, repository, manifest, key, cache, tar)
+
+        if filter:
+            logger.debug('Done creating archive, waiting for filter to die...')
+            rc = filterproc.wait()
+            logger.debug('filter exited with code %d', rc)
+            self.exit_code = max(self.exit_code, rc)
+
+            if filterin_close:
+                filterin.close()
+
+        if tarstream_close:
+            tarstream.close()
+
+    def _create_from_tar(self, args, repository, manifest, key, cache, tar):
+        def tarinfo_to_item(tarinfo, type=0):
+            return Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
+                        uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname, group=tarinfo.gname,
+                        mtime=tarinfo.mtime * 1000**3)
+
+        t0 = datetime.utcnow()
+        t0_monotonic = time.monotonic()
+
+        archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                          create=True, checkpoint_interval=args.checkpoint_interval,
+                          progress=args.progress,
+                          chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
+                          compression=args.compression, compression_files=args.compression_files,
+                          log_json=args.log_json)
+
+        while True:
+            tarinfo = tar.next()
+            status = '?'
+            if not tarinfo:
+                break
+            if tarinfo.isreg():
+                status = 'A'
+                fd = tar.extractfile(tarinfo)
+                item = tarinfo_to_item(tarinfo, stat.S_IFREG)
+                compress = archive.compression_decider1.decide(tarinfo.name)
+                archive.file_compression_logger.debug('%s -> compression %s', tarinfo.name, compress['name'])
+                archive.chunk_file(item, cache, archive.stats, backup_io_iter(archive.chunker.chunkify(fd)), compress=compress)
+                item.get_size(memorize=True)
+                archive.stats.nfiles += 1
+            elif tarinfo.isdir():
+                status = 'd'
+                item = tarinfo_to_item(tarinfo, stat.S_IFDIR)
+                archive.add_item(item)
+            elif tarinfo.issym():
+                status = 's'
+                item = tarinfo_to_item(tarinfo, stat.S_IFLNK)
+                item.source = tarinfo.linkname
+            elif tarinfo.islnk():
+                # tar uses the same hardlink model as borg (rather vice versa); the first instance of a hardlink
+                # is stored as a regular file, later instances are special entries referencing back to the
+                # first instance.
+                status = 'h'
+                item = tarinfo_to_item(tarinfo, stat.S_IFREG)
+                item.source = tarinfo.linkname
+            else:
+                self.print_warning('%s: Unsupported tar type %s', tarinfo.name, tarinfo.type)
+                self.print_file_status('E', tarinfo.name)
+                continue
+            self.print_file_status(status, tarinfo.name)
+            archive.add_item(item)
+
+        self._cft_save_archive(args, archive)
+
+    def _cft_save_archive(self, args, archive):
+        archive.save(comment=args.comment, timestamp=args.timestamp)
+        if args.progress:
+            archive.stats.show_progress(final=True)
+        args.stats |= args.json
+        if args.stats:
+            if args.json:
+                json_print(basic_json_data(archive.manifest, cache=archive.cache, extra={
+                    'archive': archive,
+                }))
+            else:
+                log_multi(DASHES,
+                          str(archive),
+                          DASHES,
+                          STATS_HEADER,
+                          str(archive.stats),
+                          str(archive.cache),
+                          DASHES, logger=logging.getLogger('borg.output.stats'))
 
     @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):
@@ -3068,6 +3189,84 @@ class Archiver:
                                type=location_validator(),
                                help='repository/archive to recreate')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to recreate; patterns are supported')
+
+        create_from_tar_epilog = process_epilog("""
+        This command creates a backup archive from a tarball.
+
+        When giving '-' as path, Borg will read a tar stream from standard input.
+
+        By default (--tar-filter=auto) Borg will detect whether the file is compressed
+        based on it's file extension and pipe the file through an appropriate filter:
+
+        - .tar.gz: gunzip
+        - .tar.bz2: bunzip2
+        - .tar.xz: unxz
+
+        Alternatively a --tar-filter program may be explicitly specified. It should
+        read compressed data from stdin and output an uncompressed tar stream on
+        stdout.
+
+        Most documentation of borg create applies. Note that this command does not
+        support excluding files.
+
+        create-from-tar reads POSIX.1-1988 (ustar), POSIX.1-2001 (pax), GNU tar,
+        UNIX V7 tar and SunOS tar with extended attributes.
+        """)
+        subparser = subparsers.add_parser('create-from-tar', parents=[common_parser], add_help=False,
+                                          description=self.do_create_from_tar.__doc__,
+                                          epilog=create_from_tar_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help=self.do_create_from_tar.__doc__)
+        subparser.set_defaults(func=self.do_create_from_tar)
+        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
+                               help='filter program to pipe data through')
+        subparser.add_argument('-s', '--stats', dest='stats',
+                               action='store_true', default=False,
+                               help='print statistics for the created archive')
+        subparser.add_argument('-p', '--progress', dest='progress',
+                               action='store_true', default=False,
+                               help='show progress display while creating the archive, showing Original, '
+                                    'Compressed and Deduplicated sizes, followed by the Number of files seen '
+                                    'and the path being processed, default: %(default)s')
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
+                               help='only display items with the given status characters')
+        subparser.add_argument('--json', action='store_true',
+                               help='output stats as JSON (implies --stats)')
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   metavar='TIMESTAMP',
+                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
+                                        'alternatively, give a reference file/directory.')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=1800, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
+        archive_group.add_argument('--chunker-params', dest='chunker_params',
+                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   metavar='PARAMS',
+                                   help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+        archive_group.add_argument('-C', '--compression', dest='compression',
+                                   type=CompressionSpec, default=dict(name='lz4'), metavar='COMPRESSION',
+                                   help='select compression algorithm, see the output of the '
+                                        '"borg help compression" command for details.')
+        archive_group.add_argument('--compression-from', dest='compression_files',
+                                   type=argparse.FileType('r'), action='append',
+                                   metavar='COMPRESSIONCONFIG',
+                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
+                                        '"borg help compression" command for details.')
+
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='name of archive to create (must be also a valid directory name)')
+        subparser.add_argument('tarfile', metavar='TARFILE',
                                help='paths to recreate; patterns are supported')
 
         with_lock_epilog = process_epilog("""

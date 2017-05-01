@@ -1,11 +1,11 @@
 import argparse
+import fnmatch
 import os.path
 import re
 import sys
 import unicodedata
 from collections import namedtuple
 from enum import Enum
-from fnmatch import translate
 
 from . import shellpattern
 from .helpers import clean_lines
@@ -258,7 +258,7 @@ class FnmatchPattern(PatternBase):
 
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
-        self.regex = re.compile(translate(self.pattern))
+        self.regex = re.compile(fnmatch.translate(self.pattern))
 
     def _match(self, path):
         return (self.regex.match(path + os.path.sep) is not None)

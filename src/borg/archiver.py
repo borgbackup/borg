@@ -31,12 +31,12 @@ import msgpack
 import borg
 from . import __version__
 from . import helpers
+from .algorithms.crc32 import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
 from .cache import Cache
 from .constants import *  # NOQA
 from .compress import CompressionSpec
-from .crc32 import crc32
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
 from .helpers import location_validator, archivename_validator, ChunkerParams

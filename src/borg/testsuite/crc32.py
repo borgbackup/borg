@@ -3,7 +3,7 @@ import zlib
 
 import pytest
 
-from .. import crc32
+from ..algorithms import crc32
 
 crc32_implementations = [crc32.crc32_slice_by_8]
 if crc32.have_clmul:

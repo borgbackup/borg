@@ -54,7 +54,7 @@ crypto_source = 'src/borg/crypto.pyx'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
-crc32_source = 'src/borg/crc32.pyx'
+crc32_source = 'src/borg/algorithms/crc32.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
@@ -91,8 +91,8 @@ try:
                 'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
                 'src/borg/item.c',
-                'src/borg/crc32.c',
-                'src/borg/_crc32/crc32.c', 'src/borg/_crc32/clmul.c', 'src/borg/_crc32/slice_by_8.c',
+                'src/borg/algorithms/crc32.c',
+                'src/borg/algorithms/crc32_dispatch.c', 'src/borg/algorithms/crc32_clmul.c', 'src/borg/algorithms/crc32_slice_by_8.c',
                 'src/borg/platform/posix.c',
                 'src/borg/platform/linux.c',
                 'src/borg/platform/freebsd.c',
@@ -582,7 +582,7 @@ if not on_rtd:
     Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),
-    Extension('borg.crc32', [crc32_source]),
+    Extension('borg.algorithms.crc32', [crc32_source]),
 ]
     if not sys.platform.startswith(('win32', )):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))

@@ -1,11 +1,11 @@
 import argparse
-import contextlib
 import collections
+import contextlib
 import grp
 import hashlib
-import logging
 import io
 import json
+import logging
 import os
 import os.path
 import platform
@@ -25,20 +25,21 @@ from datetime import datetime, timezone, timedelta
 from functools import partial, lru_cache
 from itertools import islice
 from operator import attrgetter
-from string import Formatter
 from shutil import get_terminal_size
+from string import Formatter
 
 import msgpack
 import msgpack.fallback
 
 from .logger import create_logger
+
 logger = create_logger()
 
 from . import __version__ as borg_version
 from . import __version_tuple__ as borg_version_tuple
-from . import chunker
 from . import crypto
 from . import hashindex
+from .algorithms import chunker
 from .constants import *  # NOQA
 
 

@@ -16,11 +16,12 @@ from shutil import get_terminal_size
 import msgpack
 
 from .logger import create_logger
+
 logger = create_logger()
 
 from . import xattr
 from .cache import ChunkListEntry
-from .chunker import Chunker
+from .algorithms.chunker import Chunker
 from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry

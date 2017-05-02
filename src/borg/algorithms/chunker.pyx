@@ -4,7 +4,7 @@ API_VERSION = '1.1_01'
 
 from libc.stdlib cimport free
 
-cdef extern from "_chunker.c":
+cdef extern from "buzhash.c":
     ctypedef int uint32_t
     ctypedef struct _Chunker "Chunker":
         pass

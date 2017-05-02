@@ -51,7 +51,7 @@ from setuptools.command.sdist import sdist
 
 compress_source = 'src/borg/compress.pyx'
 crypto_source = 'src/borg/crypto.pyx'
-chunker_source = 'src/borg/chunker.pyx'
+chunker_source = 'src/borg/algorithms/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
 crc32_source = 'src/borg/algorithms/crc32.pyx'
@@ -88,7 +88,7 @@ try:
             self.filelist.extend([
                 'src/borg/compress.c',
                 'src/borg/crypto.c',
-                'src/borg/chunker.c', 'src/borg/_chunker.c',
+                'src/borg/algorithms/chunker.c', 'src/borg/algorithms/buzhash.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
                 'src/borg/item.c',
                 'src/borg/algorithms/crc32.c',
@@ -579,9 +579,9 @@ if not on_rtd:
     ext_modules += [
     Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.crypto', [crypto_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
-    Extension('borg.chunker', [chunker_source]),
     Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),
+    Extension('borg.algorithms.chunker', [chunker_source]),
     Extension('borg.algorithms.crc32', [crc32_source]),
 ]
     if not sys.platform.startswith(('win32', )):

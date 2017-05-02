@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from ..chunker import Chunker, buzhash, buzhash_update
+from ..algorithms.chunker import Chunker, buzhash, buzhash_update
 from ..constants import *  # NOQA
 from . import BaseTestCase
 

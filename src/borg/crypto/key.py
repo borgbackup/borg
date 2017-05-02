@@ -3,27 +3,27 @@ import getpass
 import os
 import sys
 import textwrap
-from binascii import a2b_base64, b2a_base64, hexlify, unhexlify
+from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, sha512, pbkdf2_hmac
 from hmac import HMAC, compare_digest
 
 import msgpack
 
-from .logger import create_logger
+from borg.logger import create_logger
+
 logger = create_logger()
 
-from .constants import *  # NOQA
-from .compress import Compressor
-from .crypto import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
-from .helpers import StableDict
-from .helpers import Error, IntegrityError
-from .helpers import yes
-from .helpers import get_keys_dir, get_security_dir
-from .helpers import bin_to_hex
-from .item import Key, EncryptedKey
-from .platform import SaveFile
+from ..constants import *  # NOQA
+from ..compress import Compressor
+from ..helpers import StableDict
+from ..helpers import Error, IntegrityError
+from ..helpers import yes
+from ..helpers import get_keys_dir, get_security_dir
+from ..helpers import bin_to_hex
+from ..item import Key, EncryptedKey
+from ..platform import SaveFile
 from .nonces import NonceManager
-
+from .low_level import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 
 PREFIX = b'\0' * 8
 

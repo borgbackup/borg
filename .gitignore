@@ -7,7 +7,7 @@ borg-env
 hashindex.c
 chunker.c
 compress.c
-crypto.c
+low_level.c
 item.c
 src/borg/algorithms/crc32.c
 src/borg/platform/darwin.c

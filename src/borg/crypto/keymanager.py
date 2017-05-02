@@ -1,12 +1,13 @@
-from binascii import unhexlify, a2b_base64, b2a_base64
 import binascii
-import textwrap
-from hashlib import sha256
 import pkgutil
+import textwrap
+from binascii import unhexlify, a2b_base64, b2a_base64
+from hashlib import sha256
+
+from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex
+from ..repository import Repository
 
 from .key import KeyfileKey, KeyfileNotFoundError, KeyBlobStorage, identify_key
-from .helpers import Manifest, NoManifestError, Error, yes, bin_to_hex
-from .repository import Repository
 
 
 class UnencryptedRepo(Error):

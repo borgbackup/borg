@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from itertools import zip_longest
 
 from .logger import create_logger, setup_logging
+
 logger = create_logger()
 
 import msgpack
@@ -37,15 +38,17 @@ from .archive import BackupOSError, backup_io
 from .cache import Cache
 from .constants import *  # NOQA
 from .compress import CompressionSpec
+from .crypto.key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
+from .crypto.keymanager import KeyManager
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
 from .helpers import location_validator, archivename_validator, ChunkerParams
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
-from .helpers import format_time, format_timedelta, format_file_size, format_archive
+from .helpers import format_timedelta, format_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
 from .helpers import prune_within, prune_split
-from .helpers import to_localtime, timestamp
+from .helpers import timestamp
 from .helpers import get_cache_dir
 from .helpers import Manifest
 from .helpers import hardlinkable
@@ -61,8 +64,6 @@ from .helpers import replace_placeholders
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
 from .item import Item
-from .key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
-from .keymanager import KeyManager
 from .platform import get_flags, umount, get_process_id, SyncFile
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT

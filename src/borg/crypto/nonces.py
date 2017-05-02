@@ -2,12 +2,12 @@ import os
 import sys
 from binascii import unhexlify
 
-from .crypto import bytes_to_long, long_to_bytes
-from .helpers import get_security_dir
-from .helpers import bin_to_hex
-from .platform import SaveFile
-from .remote import InvalidRPCMethod
+from ..helpers import get_security_dir
+from ..helpers import bin_to_hex
+from ..platform import SaveFile
+from ..remote import InvalidRPCMethod
 
+from .low_level import bytes_to_long, long_to_bytes
 
 MAX_REPRESENTABLE_NONCE = 2**64 - 1
 NONCE_SPACE_RESERVATION = 2**28  # This in units of AES blocksize (16 bytes)

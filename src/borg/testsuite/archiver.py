@@ -1,38 +1,40 @@
-from binascii import unhexlify, b2a_base64
-from configparser import ConfigParser
 import errno
-import os
-import inspect
 import json
-from datetime import datetime
-from datetime import timedelta
-from io import StringIO
 import logging
+import os
 import random
+import shutil
 import socket
 import stat
 import subprocess
 import sys
-import shutil
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from binascii import unhexlify, b2a_base64
+from configparser import ConfigParser
+from datetime import datetime
+from datetime import timedelta
 from hashlib import sha256
+from io import StringIO
+from unittest.mock import patch
 
 import msgpack
 import pytest
+
 try:
     import llfuse
 except ImportError:
     pass
 
 from .. import xattr, helpers, platform
-from ..archive import Archive, ChunkBuffer, ArchiveRecreater, flags_noatime, flags_normal
+from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
 from ..archiver import Archiver
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..crypto import bytes_to_long, num_aes_blocks
+from ..crypto.low_level import bytes_to_long, num_aes_blocks
+from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
+from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..helpers import Location, get_security_dir
 from ..helpers import Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -40,8 +42,6 @@ from ..helpers import bin_to_hex
 from ..helpers import MAX_S
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item
-from ..key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
-from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse

@@ -1,20 +1,21 @@
 import getpass
+import os.path
 import re
 import tempfile
-import os.path
 from binascii import hexlify, unhexlify
 
-import pytest
 import msgpack
+import pytest
 
-from ..crypto import bytes_to_long, num_aes_blocks
+from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
+from ..crypto.key import PlaintextKey, PassphraseKey, KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, \
+    AuthenticatedKey
+from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError
+from ..crypto.low_level import bytes_to_long, num_aes_blocks
+from ..helpers import IntegrityError
 from ..helpers import Location
 from ..helpers import StableDict
-from ..helpers import IntegrityError
 from ..helpers import get_security_dir
-from ..key import PlaintextKey, PassphraseKey, KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, AuthenticatedKey
-from ..key import Passphrase, PasswordRetriesExceeded, bin_to_hex
-from ..key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError
 
 
 class TestKey:

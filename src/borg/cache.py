@@ -1,13 +1,14 @@
 import configparser
 import os
-import stat
 import shutil
+import stat
 from binascii import unhexlify
 from collections import namedtuple
 
 import msgpack
 
 from .logger import create_logger
+
 logger = create_logger()
 
 from .constants import CACHE_README
@@ -21,8 +22,8 @@ from .helpers import safe_ns
 from .helpers import yes, hostname_is_unique
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
-from .item import Item, ArchiveItem, ChunkListEntry
-from .key import PlaintextKey
+from .item import ArchiveItem, ChunkListEntry
+from .crypto.key import PlaintextKey
 from .locking import Lock
 from .platform import SaveFile
 from .remote import cache_if_remote

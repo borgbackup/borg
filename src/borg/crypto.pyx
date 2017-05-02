@@ -10,7 +10,7 @@ from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 API_VERSION = '1.1_01'
 
 
-cdef extern from "blake2-libselect.h":
+cdef extern from "algorithms/blake2-libselect.h":
     ctypedef struct blake2b_state:
         pass
 

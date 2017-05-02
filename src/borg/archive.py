@@ -20,7 +20,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .algorithms.chunker import Chunker
+from .chunker import Chunker
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec

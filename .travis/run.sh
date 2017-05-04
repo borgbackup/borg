@@ -19,5 +19,5 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     # no fakeroot on OS X
     sudo tox -e $TOXENV -r
 else
-    fakeroot -u tox -r
+    fakeroot -f scripts/faked-debug.sh -u tox -r
 fi

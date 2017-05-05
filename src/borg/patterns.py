@@ -347,8 +347,8 @@ def parse_pattern(pattern, fallback=FnmatchPattern, recurse_dir=True):
 def parse_exclude_pattern(pattern_str, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
     """
-    epattern_obj = parse_pattern(pattern_str, fallback)
-    return CmdTuple(epattern_obj, IECommand.Exclude)
+    epattern_obj = parse_pattern(pattern_str, fallback, recurse_dir=False)
+    return CmdTuple(epattern_obj, IECommand.ExcludeNoRecurse)
 
 
 def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):

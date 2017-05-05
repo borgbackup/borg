@@ -23,7 +23,7 @@ from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
-from .crc32 import crc32
+from .algorithms.crc32 import crc32
 
 logger = create_logger(__name__)
 

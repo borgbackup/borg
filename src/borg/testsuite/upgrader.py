@@ -10,9 +10,9 @@ except ImportError:
     attic = None
 
 from ..constants import *  # NOQA
+from ..crypto.key import KeyfileKey
 from ..upgrader import AtticRepositoryUpgrader, AtticKeyfileKey
 from ..helpers import get_keys_dir
-from ..key import KeyfileKey
 from ..repository import Repository
 from . import are_hardlinks_supported
 

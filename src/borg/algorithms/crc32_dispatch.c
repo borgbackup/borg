@@ -1,6 +1,6 @@
 
 /* always compile slice by 8 as a runtime fallback */
-#include "slice_by_8.c"
+#include "crc32_slice_by_8.c"
 
 #ifdef __GNUC__
 /*
@@ -69,7 +69,7 @@
 #endif /* ifdef __GNUC__ */
 
 #ifdef FOLDING_CRC
-#include "clmul.c"
+#include "crc32_clmul.c"
 #else
 
 static uint32_t

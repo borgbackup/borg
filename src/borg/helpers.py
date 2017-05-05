@@ -1,11 +1,11 @@
 import argparse
-import contextlib
 import collections
+import contextlib
 import grp
 import hashlib
-import logging
 import io
 import json
+import logging
 import os
 import os.path
 import platform
@@ -25,20 +25,21 @@ from datetime import datetime, timezone, timedelta
 from functools import partial, lru_cache
 from itertools import islice
 from operator import attrgetter
-from string import Formatter
 from shutil import get_terminal_size
+from string import Formatter
 
 import msgpack
 import msgpack.fallback
 
 from .logger import create_logger
+
 logger = create_logger()
 
+import borg.crypto.low_level
 from . import __version__ as borg_version
 from . import __version_tuple__ as borg_version_tuple
-from . import chunker
-from . import crypto
 from . import hashindex
+from .algorithms import chunker
 from .constants import *  # NOQA
 
 
@@ -119,7 +120,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if compress.API_VERSION != '1.1_03':
         raise ExtensionModuleError
-    if crypto.API_VERSION != '1.1_01':
+    if borg.crypto.low_level.API_VERSION != '1.1_01':
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != '1.1_01':
         raise ExtensionModuleError
@@ -232,7 +233,7 @@ class Manifest:
     @classmethod
     def load(cls, repository, key=None, force_tam_not_required=False):
         from .item import ManifestItem
-        from .key import key_factory, tam_required_file, tam_required
+        from .crypto.key import key_factory, tam_required_file, tam_required
         from .repository import Repository
         try:
             cdata = repository.get(cls.MANIFEST_ID)

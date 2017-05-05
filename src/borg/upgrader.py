@@ -3,13 +3,13 @@ import os
 import shutil
 import time
 
+from .crypto.key import KeyfileKey, KeyfileNotFoundError
 from .constants import REPOSITORY_README
-from .helpers import get_home_dir, get_keys_dir, get_cache_dir
 from .helpers import ProgressIndicatorPercent
-from .key import KeyfileKey, KeyfileNotFoundError
+from .helpers import get_home_dir, get_keys_dir, get_cache_dir
 from .locking import Lock
-from .repository import Repository, MAGIC
 from .logger import create_logger
+from .repository import Repository, MAGIC
 
 logger = create_logger(__name__)
 

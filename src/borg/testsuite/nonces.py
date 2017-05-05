@@ -2,12 +2,11 @@ import os.path
 
 import pytest
 
+from ..crypto import nonces
+from ..crypto.nonces import NonceManager
+from ..crypto.key import bin_to_hex
 from ..helpers import get_security_dir
-from ..key import bin_to_hex
-from ..nonces import NonceManager
 from ..remote import InvalidRPCMethod
-
-from .. import nonces  # for monkey patching NONCE_SPACE_RESERVATION
 
 
 class TestNonceManager:

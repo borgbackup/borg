@@ -16,11 +16,13 @@ from shutil import get_terminal_size
 import msgpack
 
 from .logger import create_logger
+
 logger = create_logger()
 
 from . import xattr
+from .algorithms.chunker import Chunker
 from .cache import ChunkListEntry
-from .chunker import Chunker
+from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
@@ -38,7 +40,6 @@ from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem
-from .key import key_factory
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT

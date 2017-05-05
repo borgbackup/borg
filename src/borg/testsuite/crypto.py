@@ -1,8 +1,8 @@
 from binascii import hexlify, unhexlify
 
-from ..crypto import AES, bytes_to_long, bytes_to_int, long_to_bytes, hmac_sha256, blake2b_256
-from ..crypto import increment_iv, bytes16_to_int, int_to_bytes16
-from ..crypto import hkdf_hmac_sha512
+from ..crypto.low_level import AES, bytes_to_long, bytes_to_int, long_to_bytes, hmac_sha256, blake2b_256
+from ..crypto.low_level import increment_iv, bytes16_to_int, int_to_bytes16
+from ..crypto.low_level import hkdf_hmac_sha512
 from . import BaseTestCase
 
 # Note: these tests are part of the self test, do not use or import py.test functionality here.

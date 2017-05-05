@@ -607,6 +607,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with pytest.raises(Cache.RepositoryAccessAborted):
                 self.cmd('create', self.repository_location + '_encrypted::test.2', 'input')
 
+    def test_repository_swap_detection_repokey_blank_passphrase(self):
+        # Check that a repokey repo with a blank passphrase is considered like a plaintext repo.
+        self.create_test_files()
+        # User initializes her repository with her passphrase
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # Attacker replaces it with her own repository, which is encrypted but has no passphrase set
+        shutil.rmtree(self.repository_path)
+        with environment_variable(BORG_PASSPHRASE=''):
+            self.cmd('init', '--encryption=repokey', self.repository_location)
+            # Delete cache & security database, AKA switch to user perspective
+            self.cmd('delete', '--cache-only', self.repository_location)
+            repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+            shutil.rmtree(get_security_dir(repository_id))
+        with environment_variable(BORG_PASSPHRASE=None):
+            # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
+            # is set, while it isn't. Previously this raised no warning,
+            # since the repository is, technically, encrypted.
+            if self.FORK_DEFAULT:
+                self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+            else:
+                self.assert_raises(Cache.CacheInitAbortedError, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
+
     def test_repository_move(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))

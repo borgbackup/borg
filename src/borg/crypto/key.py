@@ -234,6 +234,7 @@ class PlaintextKey(KeyBase):
     STORAGE = KeyBlobStorage.NO_STORAGE
 
     chunk_seed = 0
+    passphrase_protected = False
 
     def __init__(self, repository):
         super().__init__(repository)
@@ -328,6 +329,8 @@ class AESKeyBase(KeyBase):
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
     MAC = hmac_sha256
+
+    passphrase_protected = True
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
@@ -700,6 +703,10 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         return self.repository
 
     def load(self, target, passphrase):
+        # While the repository is encrypted, we consider a repokey repository with a blank
+        # passphrase an unencrypted repository.
+        self.passphrase_protected = passphrase != ''
+
         # what we get in target is just a repo location, but we already have the repo obj:
         target = self.repository
         key_data = target.load_key()
@@ -710,6 +717,7 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         return success
 
     def save(self, target, passphrase):
+        self.passphrase_protected = passphrase != ''
         key_data = self._save(passphrase)
         key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
         target.save_key(key_data)

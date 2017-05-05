@@ -1900,6 +1900,8 @@ class Archiver:
                                   action='append', metavar='TOPIC', default=[],
                                   help='enable TOPIC debugging (can be specified multiple times). '
                                        'The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.')
+        common_group.add_argument('-p', '--progress', dest='progress', action='store_true',
+                                  help='show progress information')
         common_group.add_argument('--log-json', dest='log_json', action='store_true',
                                   help='Output one JSON object per log line instead of formatted text.')
         common_group.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
@@ -2105,9 +2107,6 @@ class Archiver:
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help="""show progress display while checking""")
         self.add_archives_filters_args(subparser)
 
         subparser = subparsers.add_parser('key', parents=[common_parser], add_help=False,
@@ -2256,6 +2255,10 @@ class Archiver:
         is used to determine changed files quickly uses absolute filenames.
         If this is not possible, consider creating a bind mount to a stable location.
 
+        The --progress option shows (from left to right) Original, Compressed and Deduplicated
+        (O, C and D, respectively), then the Number of files (N) processed so far, followed by
+        the currently processed path.
+
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.
 
@@ -2329,11 +2332,6 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help='show progress display while creating the archive, showing Original, '
-                                    'Compressed and Deduplicated sizes, followed by the Number of files seen '
-                                    'and the path being processed, default: %(default)s')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')
@@ -2425,6 +2423,9 @@ class Archiver:
         By using ``--dry-run``, you can do all extraction steps except actually writing the
         output data: reading metadata and data chunks from the repo, checking the hash/hmac,
         decrypting, decompressing.
+
+        ``--progress`` can be slower than no progress display, since it makes one additional
+        pass over the archive metadata.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,
@@ -2432,9 +2433,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help='show progress while extracting (may be slower)')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')
@@ -2563,9 +2561,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='delete archive')
         subparser.set_defaults(func=self.do_delete)
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help="""show progress display while deleting a single archive""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
@@ -2808,9 +2803,6 @@ class Archiver:
         subparser.add_argument('--force', dest='forced',
                                action='store_true', default=False,
                                help='force pruning of corrupted archives')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help='show progress display while deleting archives')
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the deleted archive')
@@ -2930,9 +2922,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='upgrade repository format')
         subparser.set_defaults(func=self.do_upgrade)
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help="""show progress display while upgrading the repository""")
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
@@ -2999,9 +2988,6 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help='show progress display while recreating archives')
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                action='store_true', default=False,
                                help='do not change anything')

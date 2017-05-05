@@ -1048,8 +1048,14 @@ class Archiver:
             write = sys.stdout.buffer.write
 
         if args.location.archive:
+            if args.json:
+                self.print_error('The --json option is only valid for listing archives, not archive contents.')
+                return self.exit_code
             return self._list_archive(args, repository, manifest, key, write)
         else:
+            if args.json_lines:
+                self.print_error('The --json-lines option is only valid for listing archive contents, not archives.')
+                return self.exit_code
             return self._list_repository(args, manifest, write)
 
     def _list_archive(self, args, repository, manifest, key, write):
@@ -1065,11 +1071,9 @@ class Archiver:
             archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                               consider_part_files=args.consider_part_files)
 
-            formatter = ItemFormatter(archive, format, json=args.json)
-            write(safe_encode(formatter.begin()))
+            formatter = ItemFormatter(archive, format, json_lines=args.json_lines)
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
                 write(safe_encode(formatter.format_item(item)))
-            write(safe_encode(formatter.end()))
 
         # Only load the cache if it will be used
         if ItemFormatter.format_needs_cache(format):
@@ -2616,9 +2620,17 @@ class Archiver:
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('--json', action='store_true',
-                               help='format output as JSON. The form of --format is ignored, but keys used in it '
-                                    'are added to the JSON output. Some keys are always present. Note: JSON can only '
-                                    'represent text. A "bpath" key is therefore not available.')
+                               help='Only valid for listing archives. Format output as JSON. '
+                                    'The form of --format is ignored, '
+                                    'but keys used in it are added to the JSON output. '
+                                    'Some keys are always present. Note: JSON can only represent text. '
+                                    'A "barchive" key is therefore not available.')
+        subparser.add_argument('--json-lines', action='store_true',
+                               help='Only valid for listing archive contents. Format output as JSON Lines. '
+                                    'The form of --format is ignored, '
+                                    'but keys used in it are added to the JSON output. '
+                                    'Some keys are always present. Note: JSON can only represent text. '
+                                    'A "bpath" key is therefore not available.')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository/archive to list contents of')

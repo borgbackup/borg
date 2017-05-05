@@ -1615,17 +1615,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert list_repo['encryption']['mode'] == 'repokey'
         assert 'keyfile' not in list_repo['encryption']
 
-        list_archive = json.loads(self.cmd('list', '--json', self.repository_location + '::test'))
-        assert list_repo['repository'] == list_archive['repository']
-        items = list_archive['items']
+        list_archive = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['size'] == 81920
 
-        list_archive = json.loads(self.cmd('list', '--json', '--format={sha256}', self.repository_location + '::test'))
-        assert list_repo['repository'] == list_archive['repository']
-        items = list_archive['items']
+        list_archive = self.cmd('list', '--json-lines', '--format={sha256}', self.repository_location + '::test')
+        items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
         assert file1['path'] == 'input/file1'

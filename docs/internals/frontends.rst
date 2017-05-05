@@ -392,39 +392,18 @@ The same archive with more information (``borg info --last 1 --json``)::
 
 .. rubric:: File listings
 
-Listing the contents of an archive can produce *a lot* of JSON. Each item (file, directory, ...) is described
-by one object in the *items* array of the :ref:`borg_list` output. Refer to the *borg list* documentation for
-the available keys and their meaning.
+Listing the contents of an archive can produce *a lot* of JSON. Since many JSON implementations
+don't support a streaming mode of operation, which is pretty much required to deal with this amount of
+JSON, output is generated in the `JSON lines <http://jsonlines.org/>`_ format, which is simply
+a number of JSON objects separated by new lines.
+
+Each item (file, directory, ...) is described by one object in the :ref:`borg_list` output.
+Refer to the *borg list* documentation for the available keys and their meaning.
 
 Example (excerpt)::
 
-    {
-        "encryption": {
-            "mode": "repokey"
-        },
-        "repository": {
-            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "last_modified": "Mon, 2017-02-27 21:21:58",
-            "location": "/home/user/repository"
-        },
-        "items": [
-            {
-                "type": "d",
-                "mode": "drwxr-xr-x",
-                "user": "user",
-                "group": "user",
-                "uid": 1000,
-                "gid": 1000,
-                "path": "linux",
-                "healthy": true,
-                "source": "",
-                "linktarget": "",
-                "flags": null,
-                "isomtime": "Sat, 2016-05-07 19:46:01",
-                "size": 0
-            }
-        ]
-    }
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "source": "", "linktarget": "", "flags": null, "isomtime": "Sat, 2016-05-07 19:46:01", "size": 0}
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "source": "", "linktarget": "", "flags": null, "isomtime": "Sat, 2016-05-07 19:46:01", "size": 0}
 
 .. _msgid:
 

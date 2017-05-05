@@ -1942,7 +1942,7 @@ def basic_json_data(manifest, *, cache=None, extra=None):
     data.update({
         'repository': BorgJsonEncoder().default(manifest.repository),
         'encryption': {
-            'mode': key.NAME,
+            'mode': key.ARG_NAME,
         },
     })
     data['repository']['last_modified'] = format_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))

@@ -1629,11 +1629,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert file1['path'] == 'input/file1'
         assert file1['sha256'] == 'b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b'
 
+    def test_list_json_args(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('list', '--json-lines', self.repository_location, exit_code=2)
+        self.cmd('list', '--json', self.repository_location + '::archive', exit_code=2)
+
     def test_log_json(self):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
         log = self.cmd('create', '--log-json', self.repository_location + '::test', 'input', '--list', '--debug')
-        print(log)
         messages = {}  # type -> message, one of each kind
         for line in log.splitlines():
             msg = json.loads(line)

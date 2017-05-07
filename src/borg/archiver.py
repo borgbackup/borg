@@ -2620,7 +2620,7 @@ class Archiver:
                                help="""specify format for file listing
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('--json', action='store_true',
-                               help='Only valid for listing archives. Format output as JSON. '
+                               help='Only valid for listing repository contents. Format output as JSON. '
                                     'The form of --format is ignored, '
                                     'but keys used in it are added to the JSON output. '
                                     'Some keys are always present. Note: JSON can only represent text. '

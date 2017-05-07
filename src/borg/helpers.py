@@ -1505,9 +1505,9 @@ class ItemFormatter(BaseFormatter):
         format_keys = {f[1] for f in Formatter().parse(format)}
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
-    def __init__(self, archive, format, *, json=False):
+    def __init__(self, archive, format, *, json_lines=False):
         self.archive = archive
-        self.json = json
+        self.json_lines = json_lines
         static_keys = {
             'archivename': archive.name,
             'archiveid': archive.fpr,
@@ -1532,33 +1532,14 @@ class ItemFormatter(BaseFormatter):
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        if self.json:
+        if self.json_lines:
             self.item_data = {}
             self.format_item = self.format_item_json
-            self.first = True
         else:
             self.item_data = static_keys
 
-    def begin(self):
-        if not self.json:
-            return ''
-        begin = json_dump(basic_json_data(self.archive.manifest))
-        begin, _, _ = begin.rpartition('\n}')  # remove last closing brace, we want to extend the object
-        begin += ',\n'
-        begin += '    "items": [\n'
-        return begin
-
-    def end(self):
-        if not self.json:
-            return ''
-        return "]}"
-
     def format_item_json(self, item):
-        if self.first:
-            self.first = False
-            return json.dumps(self.get_item_data(item))
-        else:
-            return ',' + json.dumps(self.get_item_data(item))
+        return json.dumps(self.get_item_data(item)) + '\n'
 
     def add_key(self, key, callable_with_item):
         self.call_keys[key] = callable_with_item
@@ -1585,7 +1566,7 @@ class ItemFormatter(BaseFormatter):
         item_data['uid'] = item.uid
         item_data['gid'] = item.gid
         item_data['path'] = remove_surrogates(item.path)
-        if self.json:
+        if self.json_lines:
             item_data['healthy'] = 'chunks_healthy' not in item
         else:
             item_data['bpath'] = item.path

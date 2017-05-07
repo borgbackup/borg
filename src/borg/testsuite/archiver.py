@@ -1615,21 +1615,43 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert list_repo['encryption']['mode'] == 'repokey'
         assert 'keyfile' not in list_repo['encryption']
 
-        list_archive = json.loads(self.cmd('list', '--json', self.repository_location + '::test'))
-        assert list_repo['repository'] == list_archive['repository']
-        items = list_archive['items']
+        list_archive = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['size'] == 81920
 
-        list_archive = json.loads(self.cmd('list', '--json', '--format={sha256}', self.repository_location + '::test'))
-        assert list_repo['repository'] == list_archive['repository']
-        items = list_archive['items']
+        list_archive = self.cmd('list', '--json-lines', '--format={sha256}', self.repository_location + '::test')
+        items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['sha256'] == 'b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b'
+
+    def test_list_json_args(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('list', '--json-lines', self.repository_location, exit_code=2)
+        self.cmd('list', '--json', self.repository_location + '::archive', exit_code=2)
+
+    def test_log_json(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        log = self.cmd('create', '--log-json', self.repository_location + '::test', 'input', '--list', '--debug')
+        messages = {}  # type -> message, one of each kind
+        for line in log.splitlines():
+            msg = json.loads(line)
+            messages[msg['type']] = msg
+
+        file_status = messages['file_status']
+        assert 'status' in file_status
+        assert file_status['path'].startswith('input')
+
+        log_message = messages['log_message']
+        assert isinstance(log_message['time'], float)
+        assert log_message['levelname'] == 'DEBUG'  # there should only be DEBUG messages
+        assert log_message['name'].startswith('borg.')
+        assert isinstance(log_message['message'], str)
 
     def _get_sizes(self, compression, compressible, size=10000):
         if compressible:

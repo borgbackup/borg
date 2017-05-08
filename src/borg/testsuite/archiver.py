@@ -560,7 +560,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if self.FORK_DEFAULT:
             self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
         else:
-            self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
+            with pytest.raises(Cache.EncryptionMethodMismatch):
+                self.cmd('create', self.repository_location + '::test.2', 'input')
 
     def test_repository_swap_detection2(self):
         self.create_test_files()
@@ -573,7 +574,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if self.FORK_DEFAULT:
             self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
         else:
-            self.assert_raises(Cache.RepositoryAccessAborted, lambda: self.cmd('create', self.repository_location + '_encrypted::test.2', 'input'))
+            with pytest.raises(Cache.RepositoryAccessAborted):
+                self.cmd('create', self.repository_location + '_encrypted::test.2', 'input')
 
     def test_repository_swap_detection_no_cache(self):
         self.create_test_files()
@@ -589,7 +591,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if self.FORK_DEFAULT:
             self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
         else:
-            self.assert_raises(Cache.EncryptionMethodMismatch, lambda: self.cmd('create', self.repository_location + '::test.2', 'input'))
+            with pytest.raises(Cache.EncryptionMethodMismatch):
+                self.cmd('create', self.repository_location + '::test.2', 'input')
 
     def test_repository_swap_detection2_no_cache(self):
         self.create_test_files()
@@ -606,6 +609,30 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         else:
             with pytest.raises(Cache.RepositoryAccessAborted):
                 self.cmd('create', self.repository_location + '_encrypted::test.2', 'input')
+
+    def test_repository_swap_detection_repokey_blank_passphrase(self):
+        # Check that a repokey repo with a blank passphrase is considered like a plaintext repo.
+        self.create_test_files()
+        # User initializes her repository with her passphrase
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # Attacker replaces it with her own repository, which is encrypted but has no passphrase set
+        shutil.rmtree(self.repository_path)
+        with environment_variable(BORG_PASSPHRASE=''):
+            self.cmd('init', '--encryption=repokey', self.repository_location)
+            # Delete cache & security database, AKA switch to user perspective
+            self.cmd('delete', '--cache-only', self.repository_location)
+            repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+            shutil.rmtree(get_security_dir(repository_id))
+        with environment_variable(BORG_PASSPHRASE=None):
+            # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
+            # is set, while it isn't. Previously this raised no warning,
+            # since the repository is, technically, encrypted.
+            if self.FORK_DEFAULT:
+                self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises(Cache.CacheInitAbortedError):
+                    self.cmd('create', self.repository_location + '::test.2', 'input')
 
     def test_repository_move(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -2254,7 +2281,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if self.FORK_DEFAULT:
             self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
         else:
-            self.assert_raises(NotABorgKeyFile, lambda: self.cmd('key', 'import', self.repository_location, export_file))
+            with pytest.raises(NotABorgKeyFile):
+                self.cmd('key', 'import', self.repository_location, export_file)
 
         with open(export_file, 'w') as fd:
             fd.write('BORG_KEY a0a0a0\n')
@@ -2262,7 +2290,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if self.FORK_DEFAULT:
             self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
         else:
-            self.assert_raises(RepoIdMismatch, lambda: self.cmd('key', 'import', self.repository_location, export_file))
+            with pytest.raises(RepoIdMismatch):
+                self.cmd('key', 'import', self.repository_location, export_file)
 
     def test_key_export_paperkey(self):
         repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'
@@ -2675,13 +2704,13 @@ class RemoteArchiverTestCase(ArchiverTestCase):
             self.cmd('init', '--encryption=repokey', self.repository_location)
         # restricted to repo directory itself, fail for other directories with same prefix:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
-            self.assert_raises(PathNotAllowed,
-                               lambda: self.cmd('init', '--encryption=repokey', self.repository_location + '_0'))
+            with pytest.raises(PathNotAllowed):
+                self.cmd('init', '--encryption=repokey', self.repository_location + '_0')
 
         # restricted to a completely different path:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
-            self.assert_raises(PathNotAllowed,
-                               lambda: self.cmd('init', '--encryption=repokey', self.repository_location + '_1'))
+            with pytest.raises(PathNotAllowed):
+                self.cmd('init', '--encryption=repokey', self.repository_location + '_1')
         path_prefix = os.path.dirname(self.repository_path)
         # restrict to repo directory's parent directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):

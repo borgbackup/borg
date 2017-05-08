@@ -128,6 +128,15 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.0b6 (unreleased)
+----------------------------
+
+Compatibility notes:
+
+- Repositories in a repokey mode with a blank passphrase are now treated
+  as unencrypted repositories for security checks
+  (e.g. BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
+
 Version 1.1.0b5 (2017-04-30)
 ----------------------------
 

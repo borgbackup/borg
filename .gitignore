@@ -27,3 +27,4 @@ borg.exe
 .coverage.*
 .vagrant
 .eggs
+test-wrapper/target

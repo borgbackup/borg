@@ -39,7 +39,7 @@ _acls_working = None
 
 
 def fakeroot_detected():
-    return 'FAKEROOTKEY' in os.environ
+    return 'FAKEROOTKEY' in os.environ or 'TEST_WRAPPER_SOCKET' in os.environ
 
 
 def user_exists(username):

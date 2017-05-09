@@ -82,10 +82,13 @@ if libc_name is None:
 # the 'test_extract_capabilities' test, but also allows xattrs to work with fakeroot on Linux in normal use.
 # TODO: Check whether fakeroot supports xattrs on all platforms supported below.
 # TODO: If that's the case then we can make Borg fakeroot-xattr-compatible on these as well.
+TESTWRAPPER = False
+# Actually not fakeroot specific.
+# True if anything is replacing xattr functions.
 XATTR_FAKEROOT = False
+LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
+preloads = re.split("[ :]", LD_PRELOAD)
 if sys.platform.startswith('linux'):
-    LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
-    preloads = re.split("[ :]", LD_PRELOAD)
     for preload in preloads:
         if preload.startswith("libfakeroot"):
             env = prepare_subprocess_env(system=True)
@@ -97,6 +100,14 @@ if sys.platform.startswith('linux'):
                 # Versions in-between are unknown
                 libc_name = preload
                 XATTR_FAKEROOT = True
+            break
+
+if sys.platform.startswith(('linux', 'darwin')):
+    for preload in preloads:
+        if preload.endswith(('libtestwrapper.so', 'libtestwrapper.dylib')):
+            libc_name = preload
+            TESTWRAPPER = True
+            XATTR_FAKEROOT = True
             break
 
 try:

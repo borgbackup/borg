@@ -274,7 +274,7 @@ hashindex_read(PyObject *file_py)
 
     header_bytes = PyObject_CallMethod(file_py, "read", "n", (Py_ssize_t)sizeof(HashHeader));
     if(!header_bytes) {
-        /* Python exception occurred */
+        assert(PyErr_Occurred());
         goto fail;
     }
 
@@ -351,7 +351,7 @@ hashindex_read(PyObject *file_py)
      */
     bucket_bytes = PyObject_CallMethod(file_py, "read", "n", buckets_length);
     if(!bucket_bytes) {
-        /* Python exception occurred; clean up and return */
+        assert(PyErr_Occurred());
         goto fail_release_header_buffer;
     }
     bytes_read = PyBytes_Size(bucket_bytes);
@@ -377,6 +377,7 @@ hashindex_read(PyObject *file_py)
         /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
         if(!hashindex_resize(index, index->num_buckets)) {
             PyErr_Format(PyExc_ValueError, "Failed to rebuild table");
+            goto fail_free_buckets;
         }
     }
 
@@ -385,6 +386,7 @@ hashindex_read(PyObject *file_py)
      * Also note that the buffer in index->buckets_buffer holds a reference to buckets_bytes.
      */
 
+fail_free_buckets:
     if(PyErr_Occurred()) {
         hashindex_free_buckets(index);
     }
@@ -446,7 +448,7 @@ hashindex_free(HashIndex *index)
 static void
 hashindex_write(HashIndex *index, PyObject *file_py)
 {
-    PyObject *length_object, *header_view, *buckets_view;
+    PyObject *length_object, *buckets_view;
     Py_ssize_t length;
     Py_ssize_t buckets_length = (Py_ssize_t)index->num_buckets * index->bucket_size;
     HashHeader header = {
@@ -457,14 +459,7 @@ hashindex_write(HashIndex *index, PyObject *file_py)
         .value_size = index->value_size
     };
 
-    /* Note: explicitly construct view; BuildValue can convert (pointer, length) to Python objects, but copies them for doing so */
-    header_view = PyMemoryView_FromMemory((char*)&header, sizeof(HashHeader), PyBUF_READ);
-    if(!header_view) {
-        /* Exception raised */
-        return;
-    }
-    length_object = PyObject_CallMethod(file_py, "write", "O", header_view);
-    Py_DECREF(header_view);
+    length_object = PyObject_CallMethod(file_py, "write", "y#", &header, (int)sizeof(HashHeader));
     if(PyErr_Occurred()) {
         return;
     }
@@ -478,8 +473,10 @@ hashindex_write(HashIndex *index, PyObject *file_py)
         return;
     }
 
+    /* Note: explicitly construct view; BuildValue can convert (pointer, length) to Python objects, but copies them for doing so */
     buckets_view = PyMemoryView_FromMemory((char*)index->buckets, buckets_length, PyBUF_READ);
     if(!buckets_view) {
+        assert(PyErr_Occurred());
         return;
     }
     length_object = PyObject_CallMethod(file_py, "write", "O", buckets_view);

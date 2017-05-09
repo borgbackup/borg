@@ -15,12 +15,12 @@ cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
 
-    HashIndex *hashindex_read(char *path)
+    HashIndex *hashindex_read(object file_py) except *
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
     int hashindex_len(HashIndex *index)
     int hashindex_size(HashIndex *index)
-    int hashindex_write(HashIndex *index, char *path)
+    void hashindex_write(HashIndex *index, object file_py) except *
     void *hashindex_get(HashIndex *index, void *key)
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
@@ -67,13 +67,9 @@ cdef class IndexBase:
     def __cinit__(self, capacity=0, path=None, key_size=32):
         self.key_size = key_size
         if path:
-            path = os.fsencode(path)
-            self.index = hashindex_read(path)
-            if not self.index:
-                if errno:
-                    PyErr_SetFromErrnoWithFilename(OSError, path)
-                    return
-                raise RuntimeError('hashindex_read failed')
+            with open(path, 'rb') as fd:
+                self.index = hashindex_read(fd)
+            assert self.index, 'hashindex_read() returned NULL with no exception set'
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
             if not self.index:
@@ -88,9 +84,8 @@ cdef class IndexBase:
         return cls(path=path)
 
     def write(self, path):
-        path = os.fsencode(path)
-        if not hashindex_write(self.index, path):
-            raise Exception('hashindex_write failed')
+        with open(path, 'wb') as fd:
+            hashindex_write(self.index, fd)
 
     def clear(self):
         hashindex_free(self.index)

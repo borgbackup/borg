@@ -324,9 +324,8 @@ class Repository:
         index_path = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
         try:
             return NSIndex.read(index_path)
-        except RuntimeError as error:
-            assert str(error) == 'hashindex_read failed'  # everything else means we're in *deep* trouble
-            logger.warning('Repository index missing or corrupted, trying to recover')
+        except (ValueError, OSError) as exc:
+            logger.warning('Repository index missing or corrupted, trying to recover from: %s', exc)
             os.unlink(index_path)
             if not auto_recover:
                 raise
@@ -357,7 +356,8 @@ class Repository:
         if not self.index or transaction_id is None:
             try:
                 self.index = self.open_index(transaction_id, False)
-            except RuntimeError:
+            except (ValueError, OSError) as exc:
+                logger.warning('Checking repository transaction due to previous error: %s', exc)
                 self.check_transaction()
                 self.index = self.open_index(transaction_id, False)
         if transaction_id is None:

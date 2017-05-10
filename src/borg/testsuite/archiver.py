@@ -1709,7 +1709,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
         log = self.cmd('--debug', 'create', self.repository_location + '::test', 'input')
-        assert 'security: read previous_location' in log
+        assert 'security: read previous location' in log
 
     def _get_sizes(self, compression, compressible, size=10000):
         if compressible:

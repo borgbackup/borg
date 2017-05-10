@@ -32,6 +32,25 @@ FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 
 
 class SecurityManager:
+    """
+    Tracks repositories. Ensures that nothing bad happens (repository swaps,
+    replay attacks, unknown repositories etc.).
+
+    This is complicated by the Cache being initially used for this, while
+    only some commands actually use the Cache, which meant that other commands
+    did not perform these checks.
+
+    Further complications were created by the Cache being a cache, so it
+    could be legitimately deleted, which is annoying because Borg didn't
+    recognize repositories after that.
+
+    Therefore a second location, the security database (see get_security_dir),
+    was introduced which stores this information. However, this means that
+    the code has to deal with a cache existing but no security DB entry,
+    or inconsistencies between the security DB and the cache which have to
+    be reconciled, and also with no cache existing but a security DB entry.
+    """
+
     def __init__(self, repository):
         self.repository = repository
         self.dir = get_security_dir(repository.id_str)
@@ -66,19 +85,19 @@ class SecurityManager:
         with open(self.manifest_ts_file, 'w') as fd:
             fd.write(manifest.timestamp)
 
-    def assert_location_matches(self, cache_config):
+    def assert_location_matches(self, cache_config=None):
         # Warn user before sending data to a relocated repository
         try:
             with open(self.location_file) as fd:
                 previous_location = fd.read()
-            logger.debug('security: read previous_location %r', previous_location)
+            logger.debug('security: read previous location %r', previous_location)
         except FileNotFoundError:
-            logger.debug('security: previous_location file %s not found', self.location_file)
+            logger.debug('security: previous location file %s not found', self.location_file)
             previous_location = None
         except OSError as exc:
             logger.warning('Could not read previous location file: %s', exc)
             previous_location = None
-        if cache_config.previous_location and previous_location != cache_config.previous_location:
+        if cache_config and cache_config.previous_location and previous_location != cache_config.previous_location:
             # Reconcile cache and security dir; we take the cache location.
             previous_location = cache_config.previous_location
             logger.debug('security: using previous_location of cache: %r', previous_location)
@@ -95,9 +114,10 @@ class SecurityManager:
             logger.debug('security: updating location stored in cache and security dir')
             with open(self.location_file, 'w') as fd:
                 fd.write(repository_location)
-            cache_config.save()
+            if cache_config:
+                cache_config.save()
 
-    def assert_no_manifest_replay(self, manifest, key, cache_config):
+    def assert_no_manifest_replay(self, manifest, key, cache_config=None):
         try:
             with open(self.manifest_ts_file) as fd:
                 timestamp = fd.read()
@@ -108,7 +128,8 @@ class SecurityManager:
         except OSError as exc:
             logger.warning('Could not read previous location file: %s', exc)
             timestamp = ''
-        timestamp = max(timestamp, cache_config.timestamp or '')
+        if cache_config:
+            timestamp = max(timestamp, cache_config.timestamp or '')
         logger.debug('security: determined newest manifest timestamp as %s', timestamp)
         # If repository is older than the cache or security dir something fishy is going on
         if timestamp and timestamp > manifest.timestamp:
@@ -117,30 +138,39 @@ class SecurityManager:
             else:
                 raise Cache.RepositoryReplay()
 
-    def assert_key_type(self, key, cache):
+    def assert_key_type(self, key, cache_config=None):
         # Make sure an encrypted repository has not been swapped for an unencrypted repository
-        if cache.key_type is not None and cache.key_type != str(key.TYPE):
+        if cache_config and cache_config.key_type is not None and cache_config.key_type != str(key.TYPE):
             raise Cache.EncryptionMethodMismatch()
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
     def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True):
+        # warn_if_unencrypted=False is only used for initializing a new repository.
+        # Thus, avoiding asking about a repository that's currently initializing.
         self.assert_access_unknown(warn_if_unencrypted, manifest, key)
         if cache_config:
             self._assert_secure(manifest, key, cache_config)
         else:
-            with CacheConfig(self.repository):
-                self._assert_secure(manifest, key, cache_config)
+            cache_config = CacheConfig(self.repository)
+            if cache_config.exists():
+                with cache_config:
+                    self._assert_secure(manifest, key, cache_config)
+            else:
+                self._assert_secure(manifest, key)
+        logger.debug('security: repository checks ok, allowing access')
 
-    def _assert_secure(self, manifest, key, cache_config):
+    def _assert_secure(self, manifest, key, cache_config=None):
         self.assert_location_matches(cache_config)
         self.assert_key_type(key, cache_config)
         self.assert_no_manifest_replay(manifest, key, cache_config)
         if not self.known():
-            logger.debug('security: saving state for previously unknown repository')
+            logger.debug('security: remembering previously unknown repository')
             self.save(manifest, key)
 
     def assert_access_unknown(self, warn_if_unencrypted, manifest, key):
+        # warn_if_unencrypted=False is only used for initializing a new repository.
+        # Thus, avoiding asking about a repository that's currently initializing.
         if not key.logically_encrypted and not self.known():
             msg = ("Warning: Attempting to access a previously unknown unencrypted repository!\n" +
                    "Do you want to continue? [yN] ")
@@ -149,9 +179,9 @@ class SecurityManager:
                 retry=False, env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK')
             if allow_access:
                 if warn_if_unencrypted:
-                    logger.debug('security: saving state for unknown unencrypted repository (explicitly granted)')
+                    logger.debug('security: remembering unknown unencrypted repository (explicitly allowed)')
                 else:
-                    logger.debug('security: saving state for unknown unencrypted repository')
+                    logger.debug('security: initializing unencrypted repository')
                 self.save(manifest, key)
             else:
                 raise Cache.CacheInitAbortedError()
@@ -196,6 +226,9 @@ class CacheConfig:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def exists(self):
+        return os.path.exists(self.config_path)
 
     def create(self):
         assert not self.exists()

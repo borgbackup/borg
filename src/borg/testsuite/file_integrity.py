@@ -8,7 +8,7 @@ class TestReadIntegrityFile:
     def test_no_integrity(self, tmpdir):
         protected_file = tmpdir.join('file')
         protected_file.write('1234')
-        assert not IntegrityCheckedFile.read_integrity_file(str(protected_file), None)
+        assert IntegrityCheckedFile.read_integrity_file(str(protected_file), None) is None
 
     def test_truncated_integrity(self, tmpdir):
         protected_file = tmpdir.join('file')
@@ -24,7 +24,7 @@ class TestReadIntegrityFile:
         protected_file = tmpdir.join('file')
         protected_file.write('1234')
         tmpdir.join('file.integrity').write('{"algorithm": "HMAC_SERIOUSHASH", "digests": "1234"}')
-        assert not IntegrityCheckedFile.read_integrity_file(str(protected_file), SomeHasher())
+        assert IntegrityCheckedFile.read_integrity_file(str(protected_file), SomeHasher()) is None
 
     @pytest.mark.parametrize('json', (
         '{"ALGORITHM": "HMAC_SERIOUSHASH", "digests": "1234"}',
@@ -145,7 +145,7 @@ class TestIntegrityCheckedFileParts:
                 try:
                     assert fd.read(len(data1)) == data1
                     fd.hash_part('foopart')
-                except:
+                except FileIntegrityError:
                     assert False, 'This part must not raise, since this part is still valid.'
                 if not partial_read:
                     fd.read()

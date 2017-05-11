@@ -54,12 +54,12 @@ class SHA512FileHashingWrapper(FileLikeWrapper):
     are illegal.
     """
 
-    ALGORITHM = 'SHA-512'
+    ALGORITHM = 'SHA512'
 
     def __init__(self, backing_fd, write):
         self.fd = backing_fd
         self.writing = write
-        self.hash = hashlib.sha512()
+        self.hash = hashlib.new(self.ALGORITHM)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
@@ -70,7 +70,7 @@ class SHA512FileHashingWrapper(FileLikeWrapper):
         """
         Write *data* to backing file and update internal state.
         """
-        n = self.fd.write(data)
+        n = super().write(data)
         self.hash.update(data)
         return n
 
@@ -78,17 +78,17 @@ class SHA512FileHashingWrapper(FileLikeWrapper):
         """
         Read *data* from backing file (*n* has the usual meaning) and update internal state.
         """
-        data = self.fd.read(n)
+        data = super().read(n)
         self.hash.update(data)
         return data
 
-    def digest(self):
+    def hexdigest(self):
         """
-        Return current digest bytes.
+        Return current digest bytes as hex-string.
 
         Note: this can be called multiple times.
         """
-        return self.hash.digest()
+        return self.hash.hexdigest()
 
     def update(self, data: bytes):
         self.hash.update(data)
@@ -160,7 +160,7 @@ class IntegrityCheckedFile(FileLikeWrapper):
             return
         self.hasher.update(partname.encode())
         self.hasher.hash_length(seek_to_end=is_final)
-        digest = bin_to_hex(self.hasher.digest())
+        digest = self.hasher.hexdigest()
         if self.writing:
             self.digests[partname] = digest
         elif self.digests and not compare_digest(self.digests.get(partname, ''), digest):

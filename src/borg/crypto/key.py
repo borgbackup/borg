@@ -749,6 +749,18 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
     ARG_NAME = 'authenticated'
     STORAGE = KeyBlobStorage.REPO
 
+    # It's only authenticated, not encrypted.
+    passphrase_protected = False
+
+    def load(self, target, passphrase):
+        success = super().load(target, passphrase)
+        self.passphrase_protected = False
+        return success
+
+    def save(self, target, passphrase):
+        super().save(target, passphrase)
+        self.passphrase_protected = False
+
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
         return b''.join([self.TYPE_STR, data])

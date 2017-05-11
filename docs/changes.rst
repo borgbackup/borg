@@ -136,6 +136,9 @@ Compatibility notes:
 - Repositories in a repokey mode with a blank passphrase are now treated
   as unencrypted repositories for security checks
   (e.g. BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
+- Running "borg init" via a "borg serve --append-only" server will *not* create
+  an append-only repository anymore. Use "borg init --append-only" to initialize
+  an append-only repository.
 
 Version 1.1.0b5 (2017-04-30)
 ----------------------------

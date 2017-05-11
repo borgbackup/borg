@@ -5,7 +5,6 @@ import os
 from hmac import compare_digest
 
 from ..helpers import IntegrityError
-from ..helpers import bin_to_hex
 from ..logger import create_logger
 
 logger = create_logger()

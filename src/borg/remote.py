@@ -180,6 +180,10 @@ class RepositoryServer:  # pragma: no cover
     def __init__(self, restrict_to_paths, append_only):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
+        # This flag is parsed from the serve command line via Archiver.do_serve,
+        # i.e. it reflects local system policy and generally ranks higher than
+        # whatever the client wants, except when initializing a new repository
+        # (see RepositoryServer.open below).
         self.append_only = append_only
         self.client_version = parse_version('1.0.8')  # fallback version if client is too old to send version information
 
@@ -345,8 +349,12 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
+        # "borg init" on "borg serve --append-only" (=self.append_only) does not create an append only repo,
+        # while "borg init --append-only" (=append_only) does, regardless of the --append-only (self.append_only)
+        # flag for serve.
+        append_only = (not create and self.append_only) or append_only
         self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock,
-                                     append_only=self.append_only or append_only,
+                                     append_only=append_only,
                                      exclusive=exclusive)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id

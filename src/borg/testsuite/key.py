@@ -11,6 +11,7 @@ from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
 from ..crypto.key import PlaintextKey, PassphraseKey, KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, \
     AuthenticatedKey
 from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError
+from ..crypto.key import identify_key
 from ..crypto.low_level import bytes_to_long, num_aes_blocks
 from ..helpers import IntegrityError
 from ..helpers import Location
@@ -223,6 +224,16 @@ class TestKey:
             id = bytearray(key.id_hash(data))  # corrupt chunk id
             id[12] = 0
             key.decrypt(id, data)
+
+    def test_roundtrip(self, key):
+        repository = key.repository
+        plaintext = b'foo'
+        encrypted = key.encrypt(plaintext)
+        identified_key_class = identify_key(encrypted)
+        assert identified_key_class == key.__class__
+        loaded_key = identified_key_class.detect(repository, encrypted)
+        decrypted = loaded_key.decrypt(None, encrypted)
+        assert decrypted == plaintext
 
     def test_decrypt_decompress(self, key):
         plaintext = b'123456789'

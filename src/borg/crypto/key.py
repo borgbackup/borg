@@ -129,14 +129,30 @@ def tam_required(repository):
 
 
 class KeyBase:
+    # Numeric key type ID, must fit in one byte.
     TYPE = None  # override in subclasses
 
     # Human-readable name
     NAME = 'UNDEFINED'
+
     # Name used in command line / API (e.g. borg init --encryption=...)
     ARG_NAME = 'UNDEFINED'
+
     # Storage type (no key blob storage / keyfile / repo)
     STORAGE = KeyBlobStorage.NO_STORAGE
+
+    # Seed for the buzhash chunker (borg.algorithms.chunker.Chunker)
+    # type: int
+    chunk_seed = None
+
+    # Whether this *particular instance* is encrypted from a practical point of view,
+    # i.e. when it's using encryption with a empty passphrase, then
+    # that may be *technically* called encryption, but for all intents and purposes
+    # that's as good as not encrypting in the first place, and this member should be False.
+    #
+    # The empty passphrase is also special because Borg tries it first when no passphrase
+    # was supplied, and if an empty passphrase works, then Borg won't ask for one.
+    logically_encrypted = False
 
     def __init__(self, repository):
         self.TYPE_STR = bytes([self.TYPE])
@@ -234,7 +250,7 @@ class PlaintextKey(KeyBase):
     STORAGE = KeyBlobStorage.NO_STORAGE
 
     chunk_seed = 0
-    passphrase_protected = False
+    logically_encrypted = False
 
     def __init__(self, repository):
         super().__init__(repository)
@@ -314,7 +330,8 @@ class ID_HMAC_SHA_256:
 
 
 class AESKeyBase(KeyBase):
-    """Common base class shared by KeyfileKey and PassphraseKey
+    """
+    Common base class shared by KeyfileKey and PassphraseKey
 
     Chunks are encrypted using 256bit AES in Counter Mode (CTR)
 
@@ -330,7 +347,7 @@ class AESKeyBase(KeyBase):
 
     MAC = hmac_sha256
 
-    passphrase_protected = True
+    logically_encrypted = True
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
@@ -705,7 +722,7 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     def load(self, target, passphrase):
         # While the repository is encrypted, we consider a repokey repository with a blank
         # passphrase an unencrypted repository.
-        self.passphrase_protected = passphrase != ''
+        self.logically_encrypted = passphrase != ''
 
         # what we get in target is just a repo location, but we already have the repo obj:
         target = self.repository
@@ -717,7 +734,7 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         return success
 
     def save(self, target, passphrase):
-        self.passphrase_protected = passphrase != ''
+        self.logically_encrypted = passphrase != ''
         key_data = self._save(passphrase)
         key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
         target.save_key(key_data)
@@ -748,6 +765,29 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
     NAME = 'authenticated BLAKE2b'
     ARG_NAME = 'authenticated'
     STORAGE = KeyBlobStorage.REPO
+
+    # It's only authenticated, not encrypted.
+    logically_encrypted = False
+
+    def load(self, target, passphrase):
+        success = super().load(target, passphrase)
+        self.logically_encrypted = False
+        return success
+
+    def save(self, target, passphrase):
+        super().save(target, passphrase)
+        self.logically_encrypted = False
+
+    def extract_nonce(self, payload):
+        # This is called during set-up of the AES ciphers we're not actually using for this
+        # key. Therefore the return value of this method doesn't matter; it's just around
+        # to not have it crash should key identification be run against a very small chunk
+        # by "borg check" when the manifest is lost. (The manifest is always large enough
+        # to have the original method read some garbage from bytes 33-41). (Also, the return
+        # value must be larger than the 41 byte bloat of the original format).
+        if payload[0] != self.TYPE:
+            raise IntegrityError('Manifest: Invalid encryption envelope')
+        return 42
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)

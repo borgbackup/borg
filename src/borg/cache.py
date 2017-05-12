@@ -130,7 +130,7 @@ class SecurityManager:
             self.save(manifest, key, cache)
 
     def assert_access_unknown(self, warn_if_unencrypted, key):
-        if warn_if_unencrypted and not key.passphrase_protected and not self.known():
+        if warn_if_unencrypted and not key.logically_encrypted and not self.known():
             msg = ("Warning: Attempting to access a previously unknown unencrypted repository!\n" +
                    "Do you want to continue? [yN] ")
             if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",

@@ -778,6 +778,17 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
         super().save(target, passphrase)
         self.logically_encrypted = False
 
+    def extract_nonce(self, payload):
+        # This is called during set-up of the AES ciphers we're not actually using for this
+        # key. Therefore the return value of this method doesn't matter; it's just around
+        # to not have it crash should key identification be run against a very small chunk
+        # by "borg check" when the manifest is lost. (The manifest is always large enough
+        # to have the original method read some garbage from bytes 33-41). (Also, the return
+        # value must be larger than the 41 byte bloat of the original format).
+        if payload[0] != self.TYPE:
+            raise IntegrityError('Manifest: Invalid encryption envelope')
+        return 42
+
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
         return b''.join([self.TYPE_STR, data])

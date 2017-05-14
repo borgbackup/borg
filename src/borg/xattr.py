@@ -86,8 +86,11 @@ TESTWRAPPER = False
 # Actually not fakeroot specific.
 # True if anything is replacing xattr functions.
 XATTR_FAKEROOT = False
-LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
-preloads = re.split("[ :]", LD_PRELOAD)
+if sys.platform.startswith('darwin'):
+    LD_PRELOAD = os.environ.get('DYLD_INSERT_LIBRARIES', '')
+else:
+    LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
+preloads = re.split('[ :]', LD_PRELOAD)
 if sys.platform.startswith('linux'):
     for preload in preloads:
         if preload.startswith("libfakeroot"):

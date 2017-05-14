@@ -1,3 +1,7 @@
+/// Contains the library which gets injected. Wrapper functions use a custom macro which
+/// automatically loads the original function with the right signature. Communicates with the
+/// daemon through a Unix socket specified in the environment variable `TEST_WRAPPER_SOCKET`.
+
 #[macro_use]
 extern crate lazy_static;
 

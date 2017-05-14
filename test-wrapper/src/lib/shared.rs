@@ -1,7 +1,3 @@
-/// Contains the library which gets `LD_PRELOAD`ed. Wrapper functions use a custom macro which
-/// automatically loads the original function with the right signature. Communicates with the
-/// daemon through a Unix socket specified in the environment variable `TEST_WRAPPER_SOCKET`.
-
 use std::env;
 use std::fs;
 use std::path::Path;

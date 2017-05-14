@@ -95,9 +95,13 @@ const XATTR_REPLACE: c_int = 0;
 
 #[cfg(target_os = "macos")]
 const LIB_NAME: &'static str = "libtestwrapper.dylib";
-
 #[cfg(not(target_os = "macos"))]
 const LIB_NAME: &'static str = "libtestwrapper.so";
+
+#[cfg(target_os = "macos")]
+const LIB_INJECT_ENV: &'static str = "DYLD_INSERT_LIBRARIES";
+#[cfg(not(target_os = "macos"))]
+const LIB_INJECT_ENV: &'static str = "LD_PRELOAD";
 
 fn reply<T: Serialize>(writer: &mut BufWriter<UnixStream>, obj: &T) {
     serialize_into(writer, obj, bincode::Infinite)
@@ -119,9 +123,9 @@ fn main() {
     }
     let lib_path = our_path.join(LIB_NAME);
     if !lib_path.exists() {
-        panic!("Failed to find library to LD_PRELOAD");
+        panic!("Failed to find library to inject");
     }
-    let ld_preload = match env::var_os("LD_PRELOAD") {
+    let inject_path = match env::var_os(LIB_INJECT_ENV) {
         Some(var) => {
             let mut res = lib_path.into_os_string();
             res.push(OsStr::new(":"));
@@ -132,7 +136,7 @@ fn main() {
     };
     let mut command = Command::new(args.next().unwrap_or_else(|| "sh".to_string()))
         .args(args)
-        .env("LD_PRELOAD", ld_preload)
+        .env(LIB_INJECT_ENV, inject_path)
         .env("TEST_WRAPPER_SOCKET", &socket_path)
         .spawn().expect("Failed to execute child process");
     thread::spawn(move || {

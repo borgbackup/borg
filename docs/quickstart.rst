@@ -257,7 +257,7 @@ use of the SSH keypair by prepending a forced command to the SSH public key in
 the remote server's `authorized_keys` file. This example will start |project_name|
 in server mode and limit it to a specific filesystem path::
 
-  command="borg serve --restrict-to-path /path/to/repo",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
+  command="borg serve --restrict-to-path /path/to/repo",restrict ssh-rsa AAAAB3[...]
 
 If it is not possible to install |project_name| on the remote host,
 it is still possible to use the remote host to store a repository by

@@ -19,7 +19,7 @@ In case you are interested in more details (like formulas), please see
 :ref:`json_output`.
 
 Common options
-++++++++++++++
+~~~~~~~~~~~~~~
 
 All |project_name| commands share these options:
 

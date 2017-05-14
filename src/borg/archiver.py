@@ -1904,7 +1904,7 @@ class Archiver:
             # From lowest precedence to highest precedence:
             # An option specified on the parser belonging to index 0 is overridden if the
             # same option is specified on any parser with a higher index.
-            SUFFIX_PRECEDENCE = ('_maincommand', '_subcommand')
+            SUFFIX_PRECEDENCE = ('_maincommand', '_midcommand', '_subcommand')
 
             def __init__(self):
                 from collections import defaultdict
@@ -2039,6 +2039,10 @@ class Archiver:
         # some empty defaults for all subparsers
         common_parser.set_defaults(paths=[], patterns=[])
         parser.common_options.add_common_group(common_parser, '_subcommand')
+
+        mid_common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
+        mid_common_parser.set_defaults(paths=[], patterns=[])
+        parser.common_options.add_common_group(mid_common_parser, '_midcommand')
 
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
@@ -2221,7 +2225,7 @@ class Archiver:
                                help='work slower, but using less space')
         self.add_archives_filters_args(subparser)
 
-        subparser = subparsers.add_parser('key', parents=[common_parser], add_help=False,
+        subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3221,7 +3225,7 @@ class Archiver:
         in case you ever run into some severe malfunction. Use them only if you know
         what you are doing or if a trusted developer tells you what to do.""")
 
-        subparser = subparsers.add_parser('debug', parents=[common_parser], add_help=False,
+        subparser = subparsers.add_parser('debug', parents=[mid_common_parser], add_help=False,
                                           description='debugging command (not intended for normal use)',
                                           epilog=debug_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3362,7 +3366,7 @@ class Archiver:
 
         benchmark_epilog = process_epilog("These commands do various benchmarks.")
 
-        subparser = subparsers.add_parser('benchmark', parents=[common_parser], add_help=False,
+        subparser = subparsers.add_parser('benchmark', parents=[mid_common_parser], add_help=False,
                                           description='benchmark command',
                                           epilog=benchmark_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -151,7 +151,7 @@ fn main() {
                 let message: Message = match deserialize_from(&mut reader, bincode::Infinite) {
                     Ok(m) => m,
                     Err(err) => {
-                        if let &bincode::internal::ErrorKind::IoError(ref io_err) = err.borrow() {
+                        if let bincode::internal::ErrorKind::IoError(ref io_err) = *err.borrow() {
                             if io_err.kind() == ErrorKind::UnexpectedEof {
                                 break;
                             }
@@ -191,11 +191,9 @@ fn main() {
                                 reply(&mut writer, &libc::EEXIST);
                                 continue;
                             }
-                        } else {
-                            if (flags & XATTR_REPLACE) != 0 {
-                                reply(&mut writer, &libc::ENODATA);
-                                continue;
-                            }
+                        } else if (flags & XATTR_REPLACE) != 0 {
+                            reply(&mut writer, &libc::ENODATA);
+                            continue;
                         }
                         file.xattrs.insert(attr, value);
                         reply(&mut writer, &0);

@@ -80,7 +80,7 @@ fn chmod_base<F: Fn(mode_t) -> c_int>(path: &Path, mut mode: mode_t, orig_chmod:
         Ok(meta) => meta,
         Err(err) => return Err(err.raw_os_error().unwrap()),
     };
-    mode = mode & 0o777;
+    mode &= 0o777;
     // On OSX mode_t is u16, but fs::metadata gives us a u32 (so we cast it).
     let old_mode = file_meta.mode() as mode_t & 0o777;
     // Since we aren't root, don't downgrade permissions.
@@ -126,7 +126,7 @@ wrap! {
     }
 
     unsafe fn fchmod:ORIG_FCHMOD(fd: c_int, mode: mode_t) -> c_int {
-        chmod_base(&get_fd_path!(fd)?, mode, |mode| ORIG_FCHMOD(fd, mode))
+        chmod_base(get_fd_path!(fd)?, mode, |mode| ORIG_FCHMOD(fd, mode))
     }
 
     unsafe fn fchmodat:ORIG_FCHMODAT(dfd: c_int, path: *const c_char, mode: mode_t, flags: c_int) -> c_int {
@@ -210,7 +210,7 @@ wrap! {
     unsafe fn __xstat:ORIG_SXTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_SXTAT(ver, path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(&CStr::from_ptr(path), true) {
+            if let Ok(path) = cpath(CStr::from_ptr(path), true) {
                 stat_base(&path, &mut *statbuf);
             }
         }
@@ -220,7 +220,7 @@ wrap! {
     unsafe fn __lxstat:ORIG_LXSTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_LXSTAT(ver, path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(&CStr::from_ptr(path), false) {
+            if let Ok(path) = cpath(CStr::from_ptr(path), false) {
                 stat_base(&path, &mut *statbuf);
             }
         }
@@ -231,7 +231,7 @@ wrap! {
         let ret = ORIG_FXSTAT(ver, fd, statbuf);
         if ret == 0 {
             if let Ok(path) = get_fd_path!(fd) {
-                stat_base(&path, &mut *statbuf);
+                stat_base(path, &mut *statbuf);
             }
         }
         Ok(ret)
@@ -240,7 +240,7 @@ wrap! {
     unsafe fn __fxstatat:ORIG_FXSTATAT(ver: c_int, dfd: c_int, path: *const c_char, statbuf: *mut libc::stat, flags: c_int) -> c_int {
         let ret = ORIG_FXSTATAT(ver, dfd, path, statbuf, flags);
         if ret == 0 {
-            if let Ok(path) = cpath_at(dfd, &CStr::from_ptr(path), (flags & libc::AT_SYMLINK_NOFOLLOW) == 0) {
+            if let Ok(path) = cpath_at(dfd, CStr::from_ptr(path), (flags & libc::AT_SYMLINK_NOFOLLOW) == 0) {
                 stat_base(&path, &mut *statbuf);
             }
         }
@@ -271,7 +271,7 @@ wrap! {
         let ret = ORIG_FXSTAT64(ver, fd, statbuf);
         if ret == 0 {
             if let Ok(path) = get_fd_path!(fd) {
-                stat_base(&path, &mut *statbuf);
+                stat_base(path, &mut *statbuf);
             }
         }
         Ok(ret)
@@ -280,7 +280,7 @@ wrap! {
     unsafe fn __fxstatat64:ORIG_FXSTATAT64(ver: c_int, dfd: c_int, path: *const c_char, statbuf: *mut libc::stat64, flags: c_int) -> c_int {
         let ret = ORIG_FXSTATAT64(ver, dfd, path, statbuf, flags);
         if ret == 0 {
-            if let Ok(path) = cpath_at(dfd, &CStr::from_ptr(path), (flags & libc::AT_SYMLINK_NOFOLLOW) == 0) {
+            if let Ok(path) = cpath_at(dfd, CStr::from_ptr(path), (flags & libc::AT_SYMLINK_NOFOLLOW) == 0) {
                 stat_base(&path, &mut *statbuf);
             }
         }

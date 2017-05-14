@@ -1,6 +1,6 @@
-/// Contains the library which gets LD_PRELOADed. Wrapper functions use a custom macro which
+/// Contains the library which gets `LD_PRELOAD`ed. Wrapper functions use a custom macro which
 /// automatically loads the original function with the right signature. Communicates with the
-/// daemon through a Unix socket specified in the environment variable TEST_WRAPPER_SOCKET.
+/// daemon through a Unix socket specified in the environment variable `TEST_WRAPPER_SOCKET`.
 
 use std::env;
 use std::fs;
@@ -12,6 +12,7 @@ use std::io::{BufReader, BufWriter};
 use std::sync::{RwLock, Mutex};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::borrow::Borrow;
 
 use std::os::unix::net::UnixStream;
 use std::os::unix::ffi::OsStrExt;
@@ -102,15 +103,15 @@ lazy_static! {
     };
 }
 
-pub fn send(message: Message) {
-    let ref mut writer = DAEMON_STREAM.lock().unwrap().1;
-    serialize_into(writer, &message, bincode::Infinite)
+pub fn send<'a, M: Borrow<Message<'a>>>(message: M) {
+    let writer = &mut DAEMON_STREAM.lock().unwrap().1;
+    serialize_into(writer, message.borrow(), bincode::Infinite)
         .expect("Failed to send message to daemon");
     writer.flush().expect("IO Error flushing Unix socket");
 }
 
 pub fn receive<T: DeserializeOwned>() -> T {
-    let ref mut reader = DAEMON_STREAM.lock().unwrap().0;
+    let reader = &mut DAEMON_STREAM.lock().unwrap().0;
     deserialize_from(reader, bincode::Infinite)
         .expect("Failed to receive message from daemon")
 }

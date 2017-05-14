@@ -2082,7 +2082,7 @@ class Archiver:
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
 
-        Encryption can be enabled at repository init time.
+        Encryption can be enabled at repository init time. It cannot be changed later.
 
         It is not recommended to work without encryption. Repository encryption protects
         you e.g. against the case that an attacker has access to your backup repository.
@@ -2137,8 +2137,8 @@ class Archiver:
 
         `authenticated` mode uses no encryption, but authenticates repository contents
         through the same keyed BLAKE2b-256 hash as the other blake2 modes (it uses it
-        as chunk ID hash). The key is stored like repokey.
-        This mode is new and not compatible with borg 1.0.x.
+        as the chunk ID hash). The key is stored like repokey.
+        This mode is new and *not* compatible with borg 1.0.x.
 
         `none` mode uses no encryption and no authentication. It uses sha256 as chunk
         ID hash. Not recommended, rather consider using an authenticated or
@@ -2164,7 +2164,7 @@ class Archiver:
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption', required=True,
                                choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
-                               help='select encryption key mode')
+                               help='select encryption key mode **(required)**')
         subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
 

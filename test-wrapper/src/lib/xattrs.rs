@@ -121,32 +121,28 @@ wrap! {
 wrap! {
     unsafe fn setxattr:_(path: *const c_char, name: *const c_char, value: *const c_void, size: usize, position: u32, flags: c_int) -> c_int {
         if position != 0 {
-            set_errno(Errno(libc::EINVAL));
-            return -1;
+            return Err(libc::EINVAL);
         }
         setxattr_base(&cpath(CStr::from_ptr(path), (flags & libc::XATTR_NOFOLLOW) == 0)?, name, value, size, flags)
     }
 
     unsafe fn fsetxattr:_(fd: c_int, name: *const c_char, value: *const c_void, size: usize, position: u32, flags: c_int) -> c_int {
         if position != 0 {
-            set_errno(Errno(libc::EINVAL));
-            return -1;
+            return Err(libc::EINVAL);
         }
         setxattr_base(get_fd_path!(fd)?, name, value, size, flags)
     }
 
     unsafe fn getxattr:_(path: *const c_char, name: *const c_char, dest: *mut c_void, size: usize, position: u32, flags: c_int) -> isize {
         if position != 0 {
-            set_errno(Errno(libc::EINVAL));
-            return -1;
+            return Err(libc::EINVAL);
         }
         getxattr_base(&cpath(CStr::from_ptr(path), (flags & libc::XATTR_NOFOLLOW) == 0)?, name, dest, size)
     }
 
     unsafe fn fgetxattr:_(fd: c_int, name: *const c_char, dest: *mut c_void, size: usize, position: u32, _: c_int) -> isize {
         if position != 0 {
-            set_errno(Errno(libc::EINVAL));
-            return -1;
+            return Err(libc::EINVAL);
         }
         getxattr_base(get_fd_path!(fd)?, name, dest, size)
     }

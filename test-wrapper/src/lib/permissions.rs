@@ -81,8 +81,10 @@ fn chmod_base<F: Fn(mode_t) -> c_int>(path: &Path, mut mode: mode_t, orig_chmod:
         Err(err) => return Err(err.raw_os_error().unwrap()),
     };
     mode = mode & 0o777;
-    let old_mode = file_meta.mode() & 0o777;
-    let fs_mode = old_mode | mode; // Since we aren't root, don't downgrade permissions
+    // On OSX mode_t is u16, but fs::metadata gives us a u32 (so we cast it).
+    let old_mode = file_meta.mode() as mode_t & 0o777;
+    // Since we aren't root, don't downgrade permissions.
+    let fs_mode = (old_mode as mode_t) | mode;
     let mut override_mode = fs_mode != mode;
     let old_errno = errno();
     if fs_mode != old_mode {

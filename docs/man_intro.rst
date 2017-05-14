@@ -14,7 +14,7 @@ deduplicating and encrypting backup tool
 SYNOPSIS
 --------
 
-borg <command> [options] [arguments]
+borg [common options] <command> [options] [arguments]
 
 DESCRIPTION
 -----------

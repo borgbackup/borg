@@ -6,6 +6,7 @@ version = "0.1.0"
 [lib]
 crate-type = ["dylib"]
 name = "testwrapper"
+path = "src/lib/mod.rs"
 
 [[bin]]
 name = "test-wrapper"

@@ -1,7 +1,6 @@
 /// Wraps various libc functions for Borg's tests.
-/// Currently just overrides xattr functions so that tests can run even when the FS doesn't support
-/// xattrs. Originally fakeroot was used for this, but it caused other problems because it wrapped
-/// a much bigger surface area than necessary for our use.
+/// Currently overrides permissions/modes and xattrs. Previously fakeroot was used, but it caused
+/// other problems.
 ///
 /// This file contains the binary, which functions as both a daemon and a launcher for whatever's
 /// being run through this wrapper.
@@ -10,7 +9,7 @@ use std::env;
 use std::fs;
 use std::thread;
 use std::borrow::Borrow;
-use std::sync::RwLock;
+use std::sync::{Mutex, Arc};
 use std::collections::HashMap;
 use std::process::{self, Command};
 use std::ffi::OsStr;
@@ -18,6 +17,7 @@ use std::os::raw::*;
 use std::path::PathBuf;
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, ErrorKind};
+use std::collections::hash_map;
 
 use std::os::unix::net::{UnixListener, UnixStream};
 
@@ -35,6 +35,7 @@ extern crate serde;
 use serde::ser::Serialize;
 
 extern crate libc;
+use libc::{mode_t, uid_t, gid_t, dev_t};
 
 #[macro_use]
 extern crate serde_derive;
@@ -45,7 +46,15 @@ use bincode::{deserialize_from, serialize_into};
 pub struct ReplyXattrsGet<'a>(Option<&'a [u8]>);
 
 #[derive(Debug, Serialize)]
-pub struct ReplyXattrsList<'a>(Vec<&'a Vec<u8>>);
+pub struct ReplyXattrsList<'a>(&'a [&'a Vec<u8>]);
+
+#[derive(Debug, Serialize)]
+pub struct ReplyGetPermissions {
+    mode_and_mask: Option<(mode_t, mode_t)>,
+    owner: Option<uid_t>,
+    group: Option<gid_t>,
+    dev: Option<dev_t>,
+}
 
 #[derive(Debug, Deserialize)]
 pub enum Message {
@@ -54,16 +63,23 @@ pub enum Message {
     XattrsGet(Vec<u8>, Vec<u8>),
     XattrsSet(Vec<u8>, Vec<u8>, Vec<u8>, c_int),
     XattrsList(Vec<u8>),
-    XattrsReset(Vec<u8>),
+    OverrideMode(Vec<u8>, mode_t, mode_t, Option<dev_t>),
+    OverrideOwner(Vec<u8>, Option<uid_t>, Option<gid_t>),
+    GetPermissions(Vec<u8>),
+    Link(Vec<u8>, Vec<u8>),
 }
 
 #[derive(Default)]
 struct FileEntry {
     xattrs: HashMap<Vec<u8>, Vec<u8>>,
+    mode_and_mask: Option<(mode_t, mode_t)>,
+    owner: Option<uid_t>,
+    group: Option<gid_t>,
+    dev: Option<dev_t>,
 }
 
 lazy_static! {
-    static ref DATABASE: RwLock<HashMap<Vec<u8>, FileEntry>> = RwLock::new(HashMap::new());
+    static ref DATABASE: Mutex<HashMap<Vec<u8>, Arc<Mutex<FileEntry>>>> = Mutex::new(HashMap::new());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -145,12 +161,12 @@ fn main() {
                     }
                 };
                 debug!("{:?}", message);
+                let mut database = DATABASE.lock().unwrap();
                 match message {
                     Message::Remove(path) => {
-                        DATABASE.write().unwrap().remove(&path);
+                        database.remove(&path);
                     }
                     Message::Rename(old, new) => {
-                        let mut database = DATABASE.write().unwrap();
                         let old_val = match database.remove(&old) {
                             Some(x) => x,
                             None => continue,
@@ -158,13 +174,18 @@ fn main() {
                         database.insert(new, old_val);
                     }
                     Message::XattrsGet(path, attr) => {
-                        let database = DATABASE.read().unwrap();
-                        let res = database.get(&path).and_then(|file| file.xattrs.get(&attr));
-                        reply(&mut writer, &ReplyXattrsGet(res.map(Borrow::borrow)));
+                        if let Some(file) = database.get(&path) {
+                            let file = file.lock().unwrap();
+                            if let Some(vec) = file.xattrs.get(&attr) {
+                                reply(&mut writer, &ReplyXattrsGet(Some(vec.as_slice())));
+                                continue;
+                            }
+                        }
+                        reply(&mut writer, &ReplyXattrsGet(None));
                     }
                     Message::XattrsSet(path, attr, value, flags) => {
-                        let mut database = DATABASE.write().unwrap();
-                        let file = database.entry(path).or_insert_with(FileEntry::default);
+                        let file = database.entry(path).or_insert_with(|| Arc::new(Mutex::new(FileEntry::default())));
+                        let mut file = file.lock().unwrap();
                         if file.xattrs.contains_key(&attr) {
                             if (flags & XATTR_CREATE) != 0 {
                                 reply(&mut writer, &libc::EEXIST);
@@ -180,12 +201,80 @@ fn main() {
                         reply(&mut writer, &0);
                     }
                     Message::XattrsList(path) => {
-                        let database = DATABASE.read().unwrap();
-                        let list = database.get(&path).map(|file| file.xattrs.keys().collect::<Vec<_>>()).unwrap_or_else(Vec::new);
-                        reply(&mut writer, &ReplyXattrsList(list));
+                        if let Some(file) = database.get(&path) {
+                            let file = file.lock().unwrap();
+                            let list = file.xattrs.keys().collect::<Vec<_>>();
+                            reply(&mut writer, &ReplyXattrsList(list.as_slice()));
+                        } else {
+                            reply(&mut writer, &ReplyXattrsList(&[]));
+                        }
                     }
-                    Message::XattrsReset(path) => {
-                        DATABASE.write().unwrap().remove(&path);
+                    Message::OverrideMode(path, mode, mask, dev) => {
+                        debug_assert_eq!(mode & !mask, 0);
+                        let file = database.entry(path);
+                        match file {
+                            hash_map::Entry::Occupied(entry) => {
+                                let mut file = entry.get().lock().unwrap();
+                                file.xattrs.clear();
+                                if let Some((old_mode, old_mask)) = file.mode_and_mask {
+                                    file.mode_and_mask = Some((mode | (old_mode & !mask), mask | old_mask));
+                                } else {
+                                    file.mode_and_mask = Some((mode, mask));
+                                }
+                                file.dev = dev.or(file.dev);
+                            }
+                            hash_map::Entry::Vacant(entry) => {
+                                let mut file_entry = FileEntry::default();
+                                file_entry.mode_and_mask = Some((mode, mask));
+                                file_entry.dev = dev;
+                                entry.insert(Arc::new(Mutex::new(file_entry)));
+                            }
+                        }
+                    }
+                    Message::OverrideOwner(path, uid, gid) => {
+                        let file = database.entry(path);
+                        match file {
+                            hash_map::Entry::Occupied(entry) => {
+                                let mut file = entry.get().lock().unwrap();
+                                if let Some(uid) = uid {
+                                    file.owner = Some(uid);
+                                }
+                                if let Some(gid) = gid {
+                                    file.group = Some(gid);
+                                }
+                            }
+                            hash_map::Entry::Vacant(entry) => {
+                                let mut file_entry = FileEntry::default();
+                                file_entry.owner = uid;
+                                file_entry.group = gid;
+                                entry.insert(Arc::new(Mutex::new(file_entry)));
+                            }
+                        }
+                    }
+                    Message::GetPermissions(path) => {
+                        let file = database.get(&path).map(|file| file.lock().unwrap());
+                        let file = file.as_ref();
+                        let response = ReplyGetPermissions {
+                            mode_and_mask: file.and_then(|file| file.mode_and_mask),
+                            owner: file.and_then(|file| file.owner),
+                            group: file.and_then(|file| file.group),
+                            dev: file.and_then(|file| file.dev),
+                        };
+                        reply(&mut writer, &response);
+                    }
+                    Message::Link(oldpath, newpath) => {
+                        let file = match database.entry(oldpath) {
+                            hash_map::Entry::Occupied(entry) => {
+                                entry.get().clone() // entry is an Rc, so this is cloning a reference
+                            }
+                            hash_map::Entry::Vacant(entry) => {
+                                let newfile = FileEntry::default();
+                                let arc = Arc::new(Mutex::new(newfile));
+                                entry.insert(arc.clone());
+                                arc
+                            }
+                        };
+                        database.insert(newpath, file);
                     }
                 }
             }

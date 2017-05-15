@@ -9,6 +9,7 @@ use std::sync::{RwLock, Mutex};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::borrow::Borrow;
+use std::fmt::Debug;
 
 use std::os::unix::net::UnixStream;
 use std::os::unix::ffi::OsStrExt;
@@ -33,6 +34,16 @@ pub struct ReplyGetPermissions{
     pub dev: Option<dev_t>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Serialize)]
+pub enum NetworkLogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
 #[derive(Debug, Serialize)]
 pub enum Message<'a> {
     Remove(&'a [u8]),
@@ -44,50 +55,10 @@ pub enum Message<'a> {
     OverrideOwner(&'a [u8], Option<uid_t>, Option<gid_t>),
     GetPermissions(&'a [u8]),
     Link(&'a [u8], &'a [u8]),
+    Log(NetworkLogLevel, &'a str),
 }
 
 pub type Result<T> = ::std::result::Result<T, c_int>;
-
-macro_rules! define_dlsym_fn {
-    ($name:ident, _; $( $arg_t:ty ),*; $ret_t:ty) => {};
-
-    ($name:ident, $orig_name:ident; $( $arg_t:ty ),*; $ret_t:ty) => {
-        lazy_static! {
-            static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
-                ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
-            };
-        }
-    };
-}
-
-macro_rules! wrap {
-    {
-        $(
-            unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block
-        )*
-    } => {
-        $(
-            #[no_mangle]
-            pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
-                define_dlsym_fn!($name, $orig_name; $( $arg_t ),*; $ret_t);
-
-                let old_errno = ::errno::errno();
-                match (move || -> Result<$ret_t> { $code })() {
-                    Ok(r) => {
-                        if r != -1 {
-                            ::errno::set_errno(old_errno);
-                        }
-                        r
-                    },
-                    Err(e) => {
-                        ::errno::set_errno(::errno::Errno(e));
-                        -1
-                    }
-                }
-            }
-        )*
-    };
-}
 
 lazy_static! {
     static ref DAEMON_STREAM: Mutex<(BufReader<UnixStream>, BufWriter<UnixStream>)> = {
@@ -117,6 +88,103 @@ pub fn request<T: DeserializeOwned>(message: Message) -> T {
     receive()
 }
 
+macro_rules! error {
+    ($( $x:tt )*) => {
+        send(Message::Log(NetworkLogLevel::Error, format!($( $x )*).as_str()));
+    }
+}
+
+macro_rules! warn {
+    ($( $x:tt )*) => {
+        send(Message::Log(NetworkLogLevel::Warn, format!($( $x )*).as_str()));
+    }
+}
+
+macro_rules! info {
+    ($( $x:tt )*) => {
+        send(Message::Log(NetworkLogLevel::Info, format!($( $x )*).as_str()));
+    }
+}
+
+macro_rules! debug {
+    ($( $x:tt )*) => {
+        if cfg!(debug_assertions) {
+            send(Message::Log(NetworkLogLevel::Error, format!($( $x )*).as_str()));
+        }
+    }
+}
+
+macro_rules! trace {
+    ($( $x:tt )*) => {
+        if cfg!(debug_assertions) {
+            send(Message::Log(NetworkLogLevel::Trace, format!($( $x )*).as_str()));
+        }
+    }
+}
+
+macro_rules! define_dlsym_fn {
+    ($name:ident, _; $( $arg_t:ty ),*; $ret_t:ty) => {};
+
+    ($name:ident, $orig_name:ident; $( $arg_t:ty ),*; $ret_t:ty) => {
+        lazy_static! {
+            static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
+                trace!("Finding original {}", stringify!($name));
+                ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
+            };
+        }
+    };
+}
+
+macro_rules! __wrap_arg_string {
+    ( _ ) => { ", _{}" };
+
+    ( $arg_n: ident ) => {
+        concat!(", ", stringify!($arg_n), ": {:?}")
+    };
+}
+
+macro_rules! __wrap_maybe_ident {
+    ( _ ) => { "" };
+
+    ( $arg_n: ident ) => {
+        $arg_n
+    };
+}
+
+macro_rules! wrap {
+    {
+        $(
+            unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block
+        )*
+    } => {
+        $(
+            #[no_mangle]
+            pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
+                trace!(concat!(stringify!($name), $( __wrap_arg_string!($arg_n) ),*), $( __wrap_maybe_ident!($arg_n) ),*);
+                define_dlsym_fn!($name, $orig_name; $( $arg_t ),*; $ret_t);
+
+                let old_errno = ::errno::errno();
+                match (move || -> Result<$ret_t> { $code })() {
+                    Ok(r) => {
+                        if r != -1 {
+                            trace!(concat!(stringify!($name), " -> Ok({})"), r);
+                            ::errno::set_errno(old_errno);
+                        } else {
+                            trace!(concat!(stringify!($name), " -> Ok(-1) errno {:?}"), ::errno::errno());
+                        }
+                        r
+                    },
+                    Err(e) => {
+                        trace!(concat!(stringify!($name), " -> Err({})"), e);
+                        ::errno::set_errno(::errno::Errno(e));
+                        -1
+                    }
+                }
+            }
+        )*
+    };
+}
+
 lazy_static! {
     pub static ref FD_PATHS: RwLock<HashMap<c_int, PathBuf>> = RwLock::new(HashMap::new());
 }
@@ -131,7 +199,8 @@ macro_rules! get_fd_path {
     };
 }
 
-pub fn cpath_relative<P: AsRef<Path>>(root: P, path: &CStr, follow_symlinks: bool) -> Result<PathBuf> {
+pub fn cpath_relative<P: AsRef<Path> + Debug>(root: P, path: &CStr, follow_symlinks: bool) -> Result<PathBuf> {
+    let orig_path = path;
     let pathbuf;
     let mut path = OsStr::from_bytes(path.to_bytes());
     if follow_symlinks {
@@ -141,6 +210,7 @@ pub fn cpath_relative<P: AsRef<Path>>(root: P, path: &CStr, follow_symlinks: boo
         }
     }
     let path = root.as_ref().join(path);
+    trace!("Rooting path: {:?} + {:?} => {:?} (follow symlinks: {})", root, orig_path, path, follow_symlinks);
     Ok(path)
 }
 

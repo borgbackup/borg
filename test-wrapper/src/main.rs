@@ -56,6 +56,28 @@ pub struct ReplyGetPermissions {
     dev: Option<dev_t>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub enum NetworkLogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl Into<log::LogLevel> for NetworkLogLevel {
+    fn into(self) -> log::LogLevel {
+        match self {
+            NetworkLogLevel::Error => log::LogLevel::Error,
+            NetworkLogLevel::Warn => log::LogLevel::Warn,
+            NetworkLogLevel::Info => log::LogLevel::Info,
+            NetworkLogLevel::Debug => log::LogLevel::Debug,
+            NetworkLogLevel::Trace => log::LogLevel::Trace,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub enum Message {
     Remove(Vec<u8>),
@@ -67,6 +89,7 @@ pub enum Message {
     OverrideOwner(Vec<u8>, Option<uid_t>, Option<gid_t>),
     GetPermissions(Vec<u8>),
     Link(Vec<u8>, Vec<u8>),
+    Log(NetworkLogLevel, String),
 }
 
 #[derive(Default)]
@@ -144,11 +167,14 @@ fn main() {
         fs::remove_file(socket_path).expect("Failed to clean up Unix socket");
         process::exit(exit_code.code().unwrap_or(0));
     });
+    let mut conn_num = 0;
     info!("Listening for connections");
     for conn in socket.incoming() {
         let conn = conn.expect("Failed to open incoming Unix socket connection");
+        conn_num += 1;
+        let conn_num = conn_num.clone();
         thread::spawn(move || {
-            info!("Socket opened");
+            info!("Client {} connected", conn_num);
             let mut reader = BufReader::new(conn.try_clone().unwrap());
             let mut writer = BufWriter::new(conn);
             loop {
@@ -157,6 +183,7 @@ fn main() {
                     Err(err) => {
                         if let bincode::internal::ErrorKind::IoError(ref io_err) = *err.borrow() {
                             if io_err.kind() == ErrorKind::UnexpectedEof {
+                                info!("Client {} disconnected", conn_num);
                                 break;
                             }
                         }
@@ -164,7 +191,10 @@ fn main() {
                         break;
                     }
                 };
-                debug!("{:?}", message);
+                match message {
+                    Message::Log(_, _) => {},
+                    _ => debug!("{:?}", message),
+                }
                 let mut database = DATABASE.lock().unwrap();
                 match message {
                     Message::Remove(path) => {
@@ -277,6 +307,9 @@ fn main() {
                             }
                         };
                         database.insert(newpath, file);
+                    }
+                    Message::Log(log_level, message) => {
+                        log!(log_level.into(), "Client {}: {}", conn_num, message);
                     }
                 }
             }

@@ -346,52 +346,22 @@ def parse_timestamp(timestamp):
         return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
 
-def parse_add_pattern(patternstr, roots, patterns):
-    """Parse a pattern string and add it to roots or patterns depending on the pattern type."""
-    pattern = parse_inclexcl_pattern(patternstr)
-    if pattern.ptype is RootPath:
-        roots.append(pattern.pattern)
-    else:
-        patterns.append(pattern)
+def load_excludes(fh):
+    """Load and parse exclude patterns from file object. Lines empty or starting with '#' after stripping whitespace on
+    both line ends are ignored.
+    """
+    patterns = (line for line in (i.strip() for i in fh) if not line.startswith('#'))
+    return [parse_pattern(pattern) for pattern in patterns if pattern]
 
 
-def load_pattern_file(fileobj, roots, patterns):
-    for patternstr in clean_lines(fileobj):
-        parse_add_pattern(patternstr, roots, patterns)
-
-
-def load_exclude_file(fileobj, patterns):
-    for patternstr in clean_lines(fileobj):
-        patterns.append(parse_exclude_pattern(patternstr))
-
-
-class ArgparsePatternAction(argparse.Action):
-    def __init__(self, nargs=1, **kw):
-        super().__init__(nargs=nargs, **kw)
-
-    def __call__(self, parser, args, values, option_string=None):
-        parse_add_pattern(values[0], args.paths, args.patterns)
-
-
-class ArgparsePatternFileAction(argparse.Action):
-    def __init__(self, nargs=1, **kw):
-        super().__init__(nargs=nargs, **kw)
-
-    def __call__(self, parser, args, values, option_string=None):
-        """Load and parse patterns from a file.
-        Lines empty or starting with '#' after stripping whitespace on both line ends are ignored.
-        """
-        filename = values[0]
-        with open(filename) as f:
-            self.parse(f, args)
-
-    def parse(self, fobj, args):
-        load_pattern_file(fobj, args.roots, args.patterns)
-
-
-class ArgparseExcludeFileAction(ArgparsePatternFileAction):
-    def parse(self, fobj, args):
-        load_exclude_file(fobj, args.patterns)
+def update_excludes(args):
+    """Merge exclude patterns from files with those on command line."""
+    if hasattr(args, 'exclude_files') and args.exclude_files:
+        if not hasattr(args, 'excludes') or args.excludes is None:
+            args.excludes = []
+        for file in args.exclude_files:
+            args.excludes += load_excludes(file)
+            file.close()
 
 
 class PatternMatcher:
@@ -406,12 +376,6 @@ class PatternMatcher:
         given patterns matches.
         """
         self._items.extend((i, value) for i in patterns)
-
-    def add_inclexcl(self, patterns):
-        """Add list of patterns (of type InclExclPattern) to internal list. The patterns ptype member is returned from
-        the match function when one of the given patterns matches.
-        """
-        self._items.extend(patterns)
 
     def match(self, path):
         for (pattern, value) in self._items:
@@ -564,9 +528,6 @@ _PATTERN_STYLES = set([
 
 _PATTERN_STYLE_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_STYLES)
 
-InclExclPattern = namedtuple('InclExclPattern', 'pattern ptype')
-RootPath = object()
-
 
 def parse_pattern(pattern, fallback=FnmatchPattern):
     """Read pattern from string and return an instance of the appropriate implementation class.
@@ -582,35 +543,6 @@ def parse_pattern(pattern, fallback=FnmatchPattern):
         cls = fallback
 
     return cls(pattern)
-
-
-def parse_exclude_pattern(pattern, fallback=FnmatchPattern):
-    """Read pattern from string and return an instance of the appropriate implementation class.
-    """
-    epattern = parse_pattern(pattern, fallback)
-    return InclExclPattern(epattern, False)
-
-
-def parse_inclexcl_pattern(pattern, fallback=ShellPattern):
-    """Read pattern from string and return a InclExclPattern object."""
-    type_prefix_map = {
-        '-': False,
-        '+': True,
-        'R': RootPath,
-        'r': RootPath,
-    }
-    try:
-        ptype = type_prefix_map[pattern[0]]
-        pattern = pattern[1:].lstrip()
-        if not pattern:
-            raise ValueError("Missing pattern!")
-    except (IndexError, KeyError, ValueError):
-        raise argparse.ArgumentTypeError("Unable to parse pattern: {}".format(pattern))
-    if ptype is RootPath:
-        pobj = pattern
-    else:
-        pobj = parse_pattern(pattern, fallback)
-    return InclExclPattern(pobj, ptype)
 
 
 def timestamp(s):
@@ -1445,30 +1377,6 @@ def signal_handler(sig, handler):
     finally:
         if sig is not None:
             signal.signal(sig, orig_handler)
-
-
-def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comments=True):
-    """
-    clean lines (usually read from a config file):
-    1. strip whitespace (left and right), 2. remove empty lines, 3. remove comments.
-    note: only "pure comment lines" are supported, no support for "trailing comments".
-    :param lines: input line iterator (e.g. list or open text file) that gives unclean input lines
-    :param lstrip: lstrip call arguments or False, if lstripping is not desired
-    :param rstrip: rstrip call arguments or False, if rstripping is not desired
-    :param remove_comments: remove comment lines (lines starting with "#")
-    :param remove_empty: remove empty lines
-    :return: yields processed lines
-    """
-    for line in lines:
-        if lstrip is not False:
-            line = line.lstrip(lstrip)
-        if rstrip is not False:
-            line = line.rstrip(rstrip)
-        if remove_empty and not line:
-            continue
-        if remove_comments and line.startswith('#'):
-            continue
-        yield line
 
 
 def raising_signal_handler(exc_cls):

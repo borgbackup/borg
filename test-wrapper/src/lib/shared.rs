@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::borrow::Borrow;
 use std::fmt::Debug;
+use std::hash::BuildHasherDefault;
 
 use std::os::unix::net::UnixStream;
 use std::os::unix::ffi::OsStrExt;
@@ -19,6 +20,8 @@ use libc::{self, mode_t, uid_t, gid_t, dev_t};
 use serde::de::DeserializeOwned;
 
 use bincode::{self, deserialize_from, serialize_into};
+
+use twox_hash::XxHash;
 
 #[derive(Debug, Deserialize)]
 pub struct ReplyXattrsGet(pub Option<Vec<u8>>);
@@ -194,7 +197,7 @@ macro_rules! wrap {
 }
 
 lazy_static! {
-    pub static ref FD_PATHS: RwLock<HashMap<c_int, PathBuf>> = RwLock::new(HashMap::new());
+    pub static ref FD_PATHS: RwLock<HashMap<c_int, PathBuf, BuildHasherDefault<XxHash>>> = RwLock::new(Default::default());
 }
 
 macro_rules! get_fd_path {

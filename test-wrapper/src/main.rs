@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, ErrorKind};
 use std::collections::hash_map;
+use std::hash::BuildHasherDefault;
 
 use std::os::unix::net::{UnixListener, UnixStream};
 
@@ -36,6 +37,9 @@ use serde::ser::Serialize;
 
 extern crate libc;
 use libc::{mode_t, uid_t, gid_t, dev_t};
+
+extern crate twox_hash;
+use twox_hash::XxHash;
 
 #[macro_use]
 extern crate serde_derive;
@@ -94,7 +98,7 @@ pub enum Message {
 
 #[derive(Default)]
 struct FileEntry {
-    xattrs: HashMap<Vec<u8>, Vec<u8>>,
+    xattrs: HashMap<Vec<u8>, Vec<u8>, BuildHasherDefault<XxHash>>,
     mode_and_mask: Option<(mode_t, mode_t)>,
     owner: Option<uid_t>,
     group: Option<gid_t>,
@@ -102,7 +106,7 @@ struct FileEntry {
 }
 
 lazy_static! {
-    static ref DATABASE: Mutex<HashMap<Vec<u8>, Arc<Mutex<FileEntry>>>> = Mutex::new(HashMap::new());
+    static ref DATABASE: Mutex<HashMap<Vec<u8>, Arc<Mutex<FileEntry>>, BuildHasherDefault<XxHash>>> = Mutex::new(Default::default());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

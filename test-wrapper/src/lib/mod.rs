@@ -14,6 +14,8 @@ extern crate bincode;
 
 extern crate errno;
 
+extern crate twox_hash;
+
 #[macro_use]
 mod shared;
 mod xattrs;

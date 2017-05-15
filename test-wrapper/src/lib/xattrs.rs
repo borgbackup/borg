@@ -48,7 +48,7 @@ unsafe fn getxattr_base(path: &Path, name: *const c_char, dest: *mut c_void, siz
         ptr::copy_nonoverlapping(value.as_ptr(), dest as *mut u8, value.len());
         Ok(value.len() as isize)
     } else {
-        Err(libc::ENODATA)
+        Err(libc::ENOATTR)
     }
 }
 

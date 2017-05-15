@@ -230,7 +230,7 @@ fn main() {
                                 continue;
                             }
                         } else if (flags & XATTR_REPLACE) != 0 {
-                            reply(&mut writer, &libc::ENODATA);
+                            reply(&mut writer, &libc::ENOATTR);
                             continue;
                         }
                         file.xattrs.insert(attr, value);

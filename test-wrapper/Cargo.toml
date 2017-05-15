@@ -17,8 +17,8 @@ bincode = "0.8.0"
 env_logger = "0.4.2"
 errno = "0.2.3"
 lazy_static = "0.2.8"
-# waiting for next release
-libc = { git = "https://github.com/rust-lang/libc.git" }
+# waiting for merge then next release
+libc = { git = "https://github.com/PlasmaPower/libc.git", branch = "all-changes" }
 log = "0.3.7"
 rand = "0.3.15"
 serde = "1.0.2"

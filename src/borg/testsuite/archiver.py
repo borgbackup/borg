@@ -3,6 +3,7 @@ import errno
 import json
 import logging
 import os
+import pstats
 import random
 import shutil
 import socket
@@ -1680,6 +1681,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert log_message['levelname'] == 'DEBUG'  # there should only be DEBUG messages
         assert log_message['name'].startswith('borg.')
         assert isinstance(log_message['message'], str)
+
+    def test_debug_profile(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input', '--debug-profile=create.prof')
+        stats = pstats.Stats('create.prof')
+        stats.strip_dirs()
+        stats.sort_stats('cumtime')
+        # Ok, stats can be loaded, good enough.
 
     def test_common_options(self):
         self.create_test_files()

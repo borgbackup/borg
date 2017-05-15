@@ -2049,6 +2049,8 @@ class Archiver:
             add_common_option('--consider-part-files', dest='consider_part_files',
                               action='store_true', default=False,
                               help='treat part files like normal files (e.g. to list/extract them)')
+            add_common_option('--debug-profile', dest='debug_profile', default=None, metavar='FILE',
+                              help='Store a Python profile at FILE')
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
@@ -3542,7 +3544,22 @@ class Archiver:
         self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
-        return set_ec(func(args))
+        if args.debug_profile:
+            # Import these only when needed - avoids a further increase in startup time
+            import cProfile
+            import marshal
+            logger.debug('Writing execution profile to %s', args.debug_profile)
+            # Open the file early, before running the main program, to avoid
+            # a very late crash in case the specified path is invalid
+            with open(args.debug_profile, 'wb') as fd:
+                profiler = cProfile.Profile()
+                variables = dict(locals())
+                profiler.runctx('rc = set_ec(func(args))', globals(), variables)
+                profiler.snapshot_stats()
+                marshal.dump(profiler.stats, fd)
+            return variables['rc']
+        else:
+            return set_ec(func(args))
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

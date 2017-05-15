@@ -272,6 +272,7 @@ fn main() {
                         match file {
                             hash_map::Entry::Occupied(entry) => {
                                 let mut file = entry.get().lock().unwrap();
+                                file.xattrs.clear();
                                 if let Some(uid) = uid {
                                     file.owner = Some(uid);
                                 }

@@ -214,7 +214,6 @@ class ArchiverTestCaseBase(BaseTestCase):
         self.keys_path = os.path.join(self.tmpdir, 'keys')
         self.cache_path = os.path.join(self.tmpdir, 'cache')
         self.exclude_file_path = os.path.join(self.tmpdir, 'excludes')
-        self.patterns_file_path = os.path.join(self.tmpdir, 'patterns')
         os.environ['BORG_KEYS_DIR'] = self.keys_path
         os.environ['BORG_CACHE_DIR'] = self.cache_path
         os.mkdir(self.input_path)
@@ -224,8 +223,6 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.mkdir(self.cache_path)
         with open(self.exclude_file_path, 'wb') as fd:
             fd.write(b'input/file2\n# A comment line, then a blank line\n\n')
-        with open(self.patterns_file_path, 'wb') as fd:
-            fd.write(b'+input/file_important\n- input/file*\n# A comment line, then a blank line\n\n')
         self._old_wd = os.getcwd()
         os.chdir(self.tmpdir)
 
@@ -679,23 +676,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                           '--pattern=+input/file_important', '--pattern=-input/file*',
                           self.repository_location + '::test', 'input')
         self.assert_in("A input/file_important", output)
-        self.assert_not_in('file1', output)
-        self.assert_not_in('file2', output)
-
-    def test_create_pattern_file(self):
-        """test file patterns during create"""
-        self.cmd('init', self.repository_location)
-        self.create_regular_file('file1', size=1024 * 80)
-        self.create_regular_file('file2', size=1024 * 80)
-        self.create_regular_file('otherfile', size=1024 * 80)
-        self.create_regular_file('file_important', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list',
-                          '--pattern=-input/otherfile', '--patterns-from=' + self.patterns_file_path,
-                          self.repository_location + '::test', 'input')
         self.assert_in("A input/file_important", output)
         self.assert_not_in('file1', output)
         self.assert_not_in('file2', output)
-        self.assert_not_in('otherfile', output)
 
     def test_extract_pattern_opt(self):
         self.cmd('init', self.repository_location)

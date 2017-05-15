@@ -70,6 +70,12 @@ lazy_static! {
     };
 }
 
+/// On some platforms, opening a Unix stream results in a `open` call, which can then lead to a
+/// deadlock. This function exists to open the stream ahead of time, avoiding the deadlock.
+pub fn open_comms() {
+    let _ = DAEMON_STREAM;
+}
+
 pub fn send<'a, M: Borrow<Message<'a>>>(message: M) {
     let writer = &mut DAEMON_STREAM.lock().unwrap().1;
     serialize_into(writer, message.borrow(), bincode::Infinite)

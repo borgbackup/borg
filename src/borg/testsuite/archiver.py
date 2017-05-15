@@ -1686,10 +1686,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input', '--debug-profile=create.prof')
-        stats = pstats.Stats('create.prof')
+        stats = pstats.Stats()
+        with open('create.prof', 'rb') as fd:
+            stats.stats = msgpack.unpack(fd, use_list=False, encoding='utf-8')
         stats.strip_dirs()
         stats.sort_stats('cumtime')
-        # Ok, stats can be loaded, good enough.
+
+        self.cmd('create', self.repository_location + '::test2', 'input', '--debug-profile=create.pyprof')
+        stats = pstats.Stats('create.pyprof')  # Only do this on trusted data!
+        stats.strip_dirs()
+        stats.sort_stats('cumtime')
 
     def test_common_options(self):
         self.create_test_files()

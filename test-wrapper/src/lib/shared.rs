@@ -83,15 +83,17 @@ pub fn send<'a, M: Borrow<Message<'a>>>(message: M) {
     writer.flush().expect("IO Error flushing Unix socket");
 }
 
-pub fn receive<T: DeserializeOwned>() -> T {
-    let reader = &mut DAEMON_STREAM.lock().unwrap().0;
+pub fn request<T: DeserializeOwned>(message: Message) -> T {
+    let stream = &mut DAEMON_STREAM.lock().unwrap();
+    {
+        let writer = &mut stream.1;
+        serialize_into(writer, message.borrow(), bincode::Infinite)
+            .expect("Failed to send message to daemon");
+        writer.flush().expect("IO Error flushing Unix socket");
+    }
+    let reader = &mut stream.0;
     deserialize_from(reader, bincode::Infinite)
         .expect("Failed to receive message from daemon")
-}
-
-pub fn request<T: DeserializeOwned>(message: Message) -> T {
-    send(message);
-    receive()
 }
 
 macro_rules! error {

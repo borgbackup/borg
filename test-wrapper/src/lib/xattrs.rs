@@ -89,7 +89,6 @@ wrap! {
     }
 
     unsafe fn fsetxattr:_(fd: c_int, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> c_int {
-        open_comms();
         setxattr_base(get_fd_path!(fd)?, name, value, size, flags)
     }
 
@@ -102,7 +101,6 @@ wrap! {
     }
 
     unsafe fn fgetxattr:_(fd: c_int, name: *const c_char, dest: *mut c_void, size: usize) -> isize {
-        open_comms();
         getxattr_base(get_fd_path!(fd)?, name, dest, size)
     }
 
@@ -115,7 +113,6 @@ wrap! {
     }
 
     unsafe fn flistxattr:_(fd: c_int, dest: *mut c_char, size: usize) -> isize {
-        open_comms();
         listxattr_base(get_fd_path!(fd)?, dest, size)
     }
 }
@@ -133,7 +130,6 @@ wrap! {
         if position != 0 {
             return Err(libc::EINVAL);
         }
-        open_comms();
         setxattr_base(get_fd_path!(fd)?, name, value, size, flags)
     }
 
@@ -148,7 +144,6 @@ wrap! {
         if position != 0 {
             return Err(libc::EINVAL);
         }
-        open_comms();
         getxattr_base(get_fd_path!(fd)?, name, dest, size)
     }
 
@@ -157,7 +152,6 @@ wrap! {
     }
 
     unsafe fn flistxattr:_(fd: c_int, dest: *mut c_char, size: usize, _: c_int) -> isize {
-        open_comms();
         listxattr_base(get_fd_path!(fd)?, dest, size)
     }
 }

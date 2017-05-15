@@ -80,7 +80,6 @@ wrap! {
             let holder2;
             let oldpath = if (flags & AT_EMPTY_PATH) != 0 {
                 holder1 = FD_PATHS.read().unwrap();
-                open_comms();
                 get_fd_path!(holder1, olddfd).map_err(|_| ())
             } else {
                 holder2 = cpath_at(olddfd, CStr::from_ptr(oldpath), (flags & libc::AT_SYMLINK_FOLLOW) != 0);

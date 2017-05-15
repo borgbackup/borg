@@ -126,7 +126,6 @@ wrap! {
     }
 
     unsafe fn fchmod:ORIG_FCHMOD(fd: c_int, mode: mode_t) -> c_int {
-        open_comms();
         chmod_base(get_fd_path!(fd)?, mode, |mode| ORIG_FCHMOD(fd, mode))
     }
 
@@ -143,7 +142,6 @@ wrap! {
     }
 
     unsafe fn fchown:_(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
-        open_comms();
         chown_base(get_fd_path!(fd)?, owner, group)
     }
 
@@ -177,7 +175,6 @@ wrap! {
     unsafe fn fstat:ORIG_FSTAT(fd: c_int, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_FSTAT(fd, statbuf);
         if ret == 0 {
-            open_comms();
             if let Ok(path) = get_fd_path!(fd) {
                 stat_base(&path, &mut *statbuf);
             }
@@ -233,7 +230,6 @@ wrap! {
     unsafe fn __fxstat:ORIG_FXSTAT(ver: c_int, fd: c_int, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_FXSTAT(ver, fd, statbuf);
         if ret == 0 {
-            open_comms();
             if let Ok(path) = get_fd_path!(fd) {
                 stat_base(path, &mut *statbuf);
             }
@@ -274,7 +270,6 @@ wrap! {
     unsafe fn __fxstat64:ORIG_FXSTAT64(ver: c_int, fd: c_int, statbuf: *mut libc::stat64) -> c_int {
         let ret = ORIG_FXSTAT64(ver, fd, statbuf);
         if ret == 0 {
-            open_comms();
             if let Ok(path) = get_fd_path!(fd) {
                 stat_base(path, &mut *statbuf);
             }

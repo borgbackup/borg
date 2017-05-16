@@ -1678,7 +1678,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         log_message = messages['log_message']
         assert isinstance(log_message['time'], float)
         assert log_message['levelname'] == 'DEBUG'  # there should only be DEBUG messages
-        assert log_message['name'].startswith('borg.')
         assert isinstance(log_message['message'], str)
 
     def test_common_options(self):

@@ -2,20 +2,14 @@ use std::slice;
 use std::ptr;
 use std::ffi::CStr;
 use std::os::raw::*;
-use std::path::Path;
-
-use std::os::unix::ffi::OsStrExt;
 
 use libc;
 
 use shared::*;
 
-unsafe fn setxattr_base(path: &Path, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> Result<c_int> {
-    if !path.exists() {
-        return Err(libc::ENOENT);
-    }
+unsafe fn setxattr_base(path: CPath, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> Result<c_int> {
     let err = request::<c_int>(Message::XattrsSet(
-            path.as_os_str().as_bytes(),
+            path.get_ino()?,
             CStr::from_ptr(name).to_bytes(),
             slice::from_raw_parts(value as *const u8, size),
             flags));
@@ -26,11 +20,8 @@ unsafe fn setxattr_base(path: &Path, name: *const c_char, value: *const c_void, 
     }
 }
 
-unsafe fn getxattr_base(path: &Path, name: *const c_char, dest: *mut c_void, size: usize) -> Result<isize> {
-    if !path.exists() {
-        return Err(libc::ENOENT);
-    }
-    let res = request::<ReplyXattrsGet>(Message::XattrsGet(path.as_os_str().as_bytes(),
+unsafe fn getxattr_base(path: CPath, name: *const c_char, dest: *mut c_void, size: usize) -> Result<isize> {
+    let res = request::<ReplyXattrsGet>(Message::XattrsGet(path.get_ino()?,
         CStr::from_ptr(name).to_bytes()));
     if let Some(value) = res.0 {
         if value.len() > (c_int::max_value() as usize) {
@@ -43,7 +34,7 @@ unsafe fn getxattr_base(path: &Path, name: *const c_char, dest: *mut c_void, siz
         if value.len() > size {
             return Err(libc::ERANGE);
         }
-        // TODO: deserialize directly into pointer to avoid copy
+        // TODO deserialize directly into pointer to avoid copy
         // (custom deserialize impl? not sure that'd be possible)
         ptr::copy_nonoverlapping(value.as_ptr(), dest as *mut u8, value.len());
         Ok(value.len() as isize)
@@ -52,11 +43,8 @@ unsafe fn getxattr_base(path: &Path, name: *const c_char, dest: *mut c_void, siz
     }
 }
 
-unsafe fn listxattr_base(path: &Path, dest: *mut c_char, size: usize) -> Result<isize> {
-    if !path.exists() {
-        return Err(libc::ENOENT);
-    }
-    let res = request::<ReplyXattrsList>(Message::XattrsList(path.as_os_str().as_bytes())).0;
+unsafe fn listxattr_base(path: CPath, dest: *mut c_char, size: usize) -> Result<isize> {
+    let res = request::<ReplyXattrsList>(Message::XattrsList(path.get_ino()?)).0;
     let total_size = res.len() + res.iter().map(|i| i.len()).sum::<usize>();
     if total_size > (c_int::max_value() as usize) {
         return Err(libc::E2BIG);
@@ -81,39 +69,39 @@ unsafe fn listxattr_base(path: &Path, dest: *mut c_char, size: usize) -> Result<
 #[cfg(target_os = "linux")]
 wrap! {
     unsafe fn setxattr:_(path: *const c_char, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> c_int {
-        setxattr_base(&cpath(CStr::from_ptr(path), true)?, name, value, size, flags)
+        setxattr_base(CPath::from_path(path, true), name, value, size, flags)
     }
 
     unsafe fn lsetxattr:_(path: *const c_char, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> c_int {
-        setxattr_base(&cpath(CStr::from_ptr(path), false)?, name, value, size, flags)
+        setxattr_base(CPath::from_path(path, false), name, value, size, flags)
     }
 
     unsafe fn fsetxattr:_(fd: c_int, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> c_int {
-        setxattr_base(get_fd_path!(fd)?, name, value, size, flags)
+        setxattr_base(CPath::from_fd(fd), name, value, size, flags)
     }
 
     unsafe fn getxattr:_(path: *const c_char, name: *const c_char, dest: *mut c_void, size: usize) -> isize {
-        getxattr_base(&cpath(CStr::from_ptr(path), true)?, name, dest, size)
+        getxattr_base(CPath::from_path(path, true), name, dest, size)
     }
 
     unsafe fn lgetxattr:_(path: *const c_char, name: *const c_char, dest: *mut c_void, size: usize) -> isize {
-        getxattr_base(&cpath(CStr::from_ptr(path), false)?, name, dest, size)
+        getxattr_base(CPath::from_path(path, false), name, dest, size)
     }
 
     unsafe fn fgetxattr:_(fd: c_int, name: *const c_char, dest: *mut c_void, size: usize) -> isize {
-        getxattr_base(get_fd_path!(fd)?, name, dest, size)
+        getxattr_base(CPath::from_fd(fd), name, dest, size)
     }
 
     unsafe fn listxattr:_(path: *const c_char, dest: *mut c_char, size: usize) -> isize {
-        listxattr_base(&cpath(CStr::from_ptr(path), true)?, dest, size)
+        listxattr_base(CPath::from_path(path, true), dest, size)
     }
 
     unsafe fn llistxattr:_(path: *const c_char, dest: *mut c_char, size: usize) -> isize {
-        listxattr_base(&cpath(CStr::from_ptr(path), false)?, dest, size)
+        listxattr_base(CPath::from_path(path, false), dest, size)
     }
 
     unsafe fn flistxattr:_(fd: c_int, dest: *mut c_char, size: usize) -> isize {
-        listxattr_base(get_fd_path!(fd)?, dest, size)
+        listxattr_base(CPath::from_fd(fd), dest, size)
     }
 }
 
@@ -123,35 +111,35 @@ wrap! {
         if position != 0 {
             return Err(libc::EINVAL);
         }
-        setxattr_base(&cpath(CStr::from_ptr(path), (flags & libc::XATTR_NOFOLLOW) == 0)?, name, value, size, flags)
+        setxattr_base(CPath::from_path(path, flags & libc::XATTR_NOFOLLOW != libc::XATTR_NOFOLLOW), name, value, size, flags)
     }
 
     unsafe fn fsetxattr:_(fd: c_int, name: *const c_char, value: *const c_void, size: usize, position: u32, flags: c_int) -> c_int {
         if position != 0 {
             return Err(libc::EINVAL);
         }
-        setxattr_base(get_fd_path!(fd)?, name, value, size, flags)
+        setxattr_base(CPath::from_fd(fd), name, value, size, flags)
     }
 
     unsafe fn getxattr:_(path: *const c_char, name: *const c_char, dest: *mut c_void, size: usize, position: u32, flags: c_int) -> isize {
         if position != 0 {
             return Err(libc::EINVAL);
         }
-        getxattr_base(&cpath(CStr::from_ptr(path), (flags & libc::XATTR_NOFOLLOW) == 0)?, name, dest, size)
+        getxattr_base(CPath::from_path(path, flags & libc::XATTR_NOFOLLOW != libc::XATTR_NOFOLLOW), name, dest, size)
     }
 
     unsafe fn fgetxattr:_(fd: c_int, name: *const c_char, dest: *mut c_void, size: usize, position: u32, _: c_int) -> isize {
         if position != 0 {
             return Err(libc::EINVAL);
         }
-        getxattr_base(get_fd_path!(fd)?, name, dest, size)
+        getxattr_base(CPath::from_fd(fd), name, dest, size)
     }
 
     unsafe fn listxattr:_(path: *const c_char, dest: *mut c_char, size: usize, flags: c_int) -> isize {
-        listxattr_base(&cpath(CStr::from_ptr(path), (flags & libc::XATTR_NOFOLLOW) == 0)?, dest, size)
+        listxattr_base(CPath::from_path(path, flags & libc::XATTR_NOFOLLOW != libc::XATTR_NOFOLLOW), dest, size)
     }
 
     unsafe fn flistxattr:_(fd: c_int, dest: *mut c_char, size: usize, _: c_int) -> isize {
-        listxattr_base(get_fd_path!(fd)?, dest, size)
+        listxattr_base(CPath::from_fd(fd), dest, size)
     }
 }

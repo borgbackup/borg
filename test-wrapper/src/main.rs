@@ -9,7 +9,7 @@ use std::env;
 use std::fs;
 use std::thread;
 use std::borrow::Borrow;
-use std::sync::{Mutex, Arc};
+use std::sync::RwLock;
 use std::collections::HashMap;
 use std::process::{self, Command};
 use std::ffi::OsStr;
@@ -82,17 +82,24 @@ impl Into<log::LogLevel> for NetworkLogLevel {
     }
 }
 
+#[allow(non_camel_case_types)]
+#[cfg(any(not(target_os = "linux"), not(target_pointer_width = "64")))]
+type ino_t = libc::ino_t;
+
+#[allow(non_camel_case_types)]
+#[cfg(target_os = "linux")]
+#[cfg(target_pointer_width = "64")]
+type ino_t = libc::ino64_t;
+
 #[derive(Debug, Deserialize)]
 pub enum Message {
-    Remove(Vec<u8>),
-    Rename(Vec<u8>, Vec<u8>),
-    XattrsGet(Vec<u8>, Vec<u8>),
-    XattrsSet(Vec<u8>, Vec<u8>, Vec<u8>, c_int),
-    XattrsList(Vec<u8>),
-    OverrideMode(Vec<u8>, mode_t, mode_t, Option<dev_t>),
-    OverrideOwner(Vec<u8>, Option<uid_t>, Option<gid_t>),
-    GetPermissions(Vec<u8>),
-    Link(Vec<u8>, Vec<u8>),
+    Remove(ino_t),
+    XattrsGet(ino_t, Vec<u8>),
+    XattrsSet(ino_t, Vec<u8>, Vec<u8>, c_int),
+    XattrsList(ino_t),
+    OverrideMode(ino_t, mode_t, mode_t, Option<dev_t>),
+    OverrideOwner(ino_t, Option<uid_t>, Option<gid_t>),
+    GetPermissions(ino_t),
     Log(NetworkLogLevel, String),
 }
 
@@ -106,7 +113,7 @@ struct FileEntry {
 }
 
 lazy_static! {
-    static ref DATABASE: Mutex<HashMap<Vec<u8>, Arc<Mutex<FileEntry>>, BuildHasherDefault<XxHash>>> = Mutex::new(Default::default());
+    static ref DATABASE: RwLock<HashMap<ino_t, FileEntry, BuildHasherDefault<XxHash>>> = RwLock::new(Default::default());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -132,8 +139,8 @@ const LIB_INJECT_ENV: &'static str = "LD_PRELOAD";
 
 fn reply<T: Serialize>(writer: &mut BufWriter<UnixStream>, obj: &T) {
     serialize_into(writer, obj, bincode::Infinite)
-        .expect("Failed to write reply to Unix socket");
-    writer.flush().expect("IO Error flushing Unix socket");
+        .expect("Failed to write reply to client socket");
+    writer.flush().expect("IO Error flushing client socket");
 }
 
 fn main() {
@@ -199,21 +206,13 @@ fn main() {
                     Message::Log(_, _) => {},
                     _ => debug!("{:?}", message),
                 }
-                let mut database = DATABASE.lock().unwrap();
                 match message {
                     Message::Remove(path) => {
-                        database.remove(&path);
-                    }
-                    Message::Rename(old, new) => {
-                        let old_val = match database.remove(&old) {
-                            Some(x) => x,
-                            None => continue,
-                        };
-                        database.insert(new, old_val);
+                        DATABASE.write().unwrap().remove(&path);
                     }
                     Message::XattrsGet(path, attr) => {
+                        let database = DATABASE.read().unwrap();
                         if let Some(file) = database.get(&path) {
-                            let file = file.lock().unwrap();
                             if let Some(vec) = file.xattrs.get(&attr) {
                                 reply(&mut writer, &ReplyXattrsGet(Some(vec.as_slice())));
                                 continue;
@@ -222,14 +221,14 @@ fn main() {
                         reply(&mut writer, &ReplyXattrsGet(None));
                     }
                     Message::XattrsSet(path, attr, value, flags) => {
-                        let file = database.entry(path).or_insert_with(|| Arc::new(Mutex::new(FileEntry::default())));
-                        let mut file = file.lock().unwrap();
+                        let mut database = DATABASE.write().unwrap();
+                        let file = database.entry(path).or_insert_with(FileEntry::default);
                         if file.xattrs.contains_key(&attr) {
-                            if (flags & XATTR_CREATE) != 0 {
+                            if flags & XATTR_CREATE == XATTR_CREATE {
                                 reply(&mut writer, &libc::EEXIST);
                                 continue;
                             }
-                        } else if (flags & XATTR_REPLACE) != 0 {
+                        } else if flags & XATTR_REPLACE == XATTR_REPLACE {
                             reply(&mut writer, &libc::ENOATTR);
                             continue;
                         }
@@ -237,8 +236,8 @@ fn main() {
                         reply(&mut writer, &0);
                     }
                     Message::XattrsList(path) => {
+                        let database = DATABASE.read().unwrap();
                         if let Some(file) = database.get(&path) {
-                            let file = file.lock().unwrap();
                             let list = file.xattrs.keys().collect::<Vec<_>>();
                             reply(&mut writer, &ReplyXattrsList(list.as_slice()));
                         } else {
@@ -247,10 +246,11 @@ fn main() {
                     }
                     Message::OverrideMode(path, mode, mask, dev) => {
                         debug_assert_eq!(mode & !mask, 0);
+                        let mut database = DATABASE.write().unwrap();
                         let file = database.entry(path);
                         match file {
-                            hash_map::Entry::Occupied(entry) => {
-                                let mut file = entry.get().lock().unwrap();
+                            hash_map::Entry::Occupied(mut entry) => {
+                                let file = entry.get_mut();
                                 file.xattrs.clear();
                                 if let Some((old_mode, old_mask)) = file.mode_and_mask {
                                     file.mode_and_mask = Some((mode | (old_mode & !mask), mask | old_mask));
@@ -263,15 +263,16 @@ fn main() {
                                 let mut file_entry = FileEntry::default();
                                 file_entry.mode_and_mask = Some((mode, mask));
                                 file_entry.dev = dev;
-                                entry.insert(Arc::new(Mutex::new(file_entry)));
+                                entry.insert(file_entry);
                             }
                         }
                     }
                     Message::OverrideOwner(path, uid, gid) => {
+                        let mut database = DATABASE.write().unwrap();
                         let file = database.entry(path);
                         match file {
-                            hash_map::Entry::Occupied(entry) => {
-                                let mut file = entry.get().lock().unwrap();
+                            hash_map::Entry::Occupied(mut entry) => {
+                                let file = entry.get_mut();
                                 file.xattrs.clear();
                                 if let Some(uid) = uid {
                                     file.owner = Some(uid);
@@ -284,12 +285,13 @@ fn main() {
                                 let mut file_entry = FileEntry::default();
                                 file_entry.owner = uid;
                                 file_entry.group = gid;
-                                entry.insert(Arc::new(Mutex::new(file_entry)));
+                                entry.insert(file_entry);
                             }
                         }
                     }
                     Message::GetPermissions(path) => {
-                        let file = database.get(&path).map(|file| file.lock().unwrap());
+                        let database = DATABASE.read().unwrap();
+                        let file = database.get(&path);
                         let file = file.as_ref();
                         let response = ReplyGetPermissions {
                             mode_and_mask: file.and_then(|file| file.mode_and_mask),
@@ -298,20 +300,6 @@ fn main() {
                             dev: file.and_then(|file| file.dev),
                         };
                         reply(&mut writer, &response);
-                    }
-                    Message::Link(oldpath, newpath) => {
-                        let file = match database.entry(oldpath) {
-                            hash_map::Entry::Occupied(entry) => {
-                                entry.get().clone() // entry is an Rc, so this is cloning a reference
-                            }
-                            hash_map::Entry::Vacant(entry) => {
-                                let newfile = FileEntry::default();
-                                let arc = Arc::new(Mutex::new(newfile));
-                                entry.insert(arc.clone());
-                                arc
-                            }
-                        };
-                        database.insert(newpath, file);
                     }
                     Message::Log(log_level, message) => {
                         log!(log_level.into(), "Client {}: {}", conn_num, message);

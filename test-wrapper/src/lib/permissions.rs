@@ -1,12 +1,6 @@
-use std::fs;
-use std::ffi::CStr;
 use std::os::raw::*;
-use std::path::{Path, PathBuf};
 
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::MetadataExt;
-
-use errno::{errno, set_errno};
+use errno::errno;
 
 use libc::{self, mode_t, uid_t, gid_t, dev_t};
 
@@ -59,8 +53,13 @@ impl StatBase for libc::stat64 {
     }
 }
 
-fn stat_base(path: &Path, statbuf: &mut StatBase) {
-    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(path.as_os_str().as_bytes()));
+fn stat_base(path: CPath, statbuf: &mut StatBase) {
+    let ino = if let Ok(ino) = path.get_ino() {
+        ino
+    } else {
+        return;
+    };
+    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(ino));
     if let Some((mode, mask)) = overrides.mode_and_mask {
         statbuf.set_mode(mode, mask);
     }
@@ -75,78 +74,76 @@ fn stat_base(path: &Path, statbuf: &mut StatBase) {
     }
 }
 
-fn chmod_base<F: Fn(mode_t) -> c_int>(path: &Path, mut mode: mode_t, orig_chmod: F) -> Result<c_int> {
-    let file_meta = match fs::metadata(path) {
-        Ok(meta) => meta,
-        Err(err) => return Err(err.raw_os_error().unwrap()),
-    };
+fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mut mode: mode_t, orig_chmod: F) -> Result<c_int> {
     mode &= 0o777;
-    // On OSX mode_t is u16, but fs::metadata gives us a u32 (so we cast it).
-    let old_mode = file_meta.mode() as mode_t & 0o777;
+    let stat = path.get_stat()?;
+    let old_mode = stat.st_mode & 0o777;
     // Since we aren't root, don't downgrade permissions.
     let fs_mode = (old_mode as mode_t) | mode;
     let mut override_mode = fs_mode != mode;
-    let old_errno = errno();
     if fs_mode != old_mode {
         if orig_chmod(fs_mode) == -1 {
             if errno().0 == libc::EPERM {
                 override_mode = true;
-                set_errno(old_errno);
             } else {
-                return Ok(-1);
+                return Err(0);
             }
         }
-    } else if !path.exists() {
-        return Err(libc::ENOENT);
     }
     if override_mode {
-        send(Message::OverrideMode(path.as_os_str().as_bytes(), mode, 0o777, None));
+        send(Message::OverrideMode(stat.st_ino, mode, 0o777, None));
     }
     Ok(0)
 }
 
-fn chown_base(path: &Path, owner: uid_t, group: gid_t) -> Result<c_int> {
+fn chown_base(path: CPath, owner: uid_t, group: gid_t) -> Result<c_int> {
     let owner = if (owner as i32) == -1 { None } else { Some(owner) };
     let group = if (group as i32) == -1 { None } else { Some(group) };
-    send(Message::OverrideOwner(path.as_os_str().as_bytes(), owner, group));
+    send(Message::OverrideOwner(path.get_ino()?, owner, group));
     Ok(0)
 }
 
-fn mknod_base<F: Fn() -> Result<PathBuf>>(get_path: F, mode: &mut mode_t, dev: dev_t) -> Result<()> {
-    if (*mode & libc::S_IFCHR) != 0 || (*mode & libc::S_IFBLK) != 0 {
-        send(Message::OverrideMode(get_path()?.as_os_str().as_bytes(), *mode, mode_t::max_value(), Some(dev)));
-        *mode = 0o600 | *mode & 0o777;
+fn mknod_base<'a, F: Fn() -> CPath, M: Fn(mode_t) -> c_int>(get_path: F, mode: mode_t, dev: dev_t, mknod: M) -> Result<c_int> {
+    let override_mode = mode & libc::S_IFCHR == libc::S_IFCHR || mode & libc::S_IFBLK == libc::S_IFBLK;
+    let base_mode = if override_mode {
+        0o600 | mode & 0o777
+    } else {
+        mode
+    };
+    let ret = mknod(base_mode);
+    if ret == 0 && override_mode {
+        send(Message::OverrideMode(get_path().get_ino()?, mode, mode_t::max_value(), Some(dev)));
     }
-    Ok(())
+    Ok(ret)
 }
 
 wrap! {
     unsafe fn chmod:ORIG_CHMOD(path: *const c_char, mode: mode_t) -> c_int {
-        chmod_base(&cpath(CStr::from_ptr(path), true)?, mode, |mode| ORIG_CHMOD(path, mode))
+        chmod_base(CPath::from_path(path, true), mode, |mode| ORIG_CHMOD(path, mode))
     }
 
     unsafe fn fchmod:ORIG_FCHMOD(fd: c_int, mode: mode_t) -> c_int {
-        chmod_base(get_fd_path!(fd)?, mode, |mode| ORIG_FCHMOD(fd, mode))
+        chmod_base(CPath::from_fd(fd), mode, |mode| ORIG_FCHMOD(fd, mode))
     }
 
     unsafe fn fchmodat:ORIG_FCHMODAT(dfd: c_int, path: *const c_char, mode: mode_t, flags: c_int) -> c_int {
-        chmod_base(&cpath_at(dfd, CStr::from_ptr(path), true)?, mode, |mode| ORIG_FCHMODAT(dfd, path, mode, flags))
+        chmod_base(CPath::from_path_at(dfd, path, flags), mode, |mode| ORIG_FCHMODAT(dfd, path, mode, flags))
     }
 
     unsafe fn chown:_(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-        chown_base(&cpath(CStr::from_ptr(path), true)?, owner, group)
+        chown_base(CPath::from_path(path, true), owner, group)
     }
 
     unsafe fn lchown:_(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-        chown_base(&cpath(CStr::from_ptr(path), false)?, owner, group)
+        chown_base(CPath::from_path(path, false), owner, group)
     }
 
     unsafe fn fchown:_(fd: c_int, owner: uid_t, group: gid_t) -> c_int {
-        chown_base(get_fd_path!(fd)?, owner, group)
+        chown_base(CPath::from_fd(fd), owner, group)
     }
 
-    unsafe fn fchownat:_(dfd: c_int, path: *const c_char, owner: uid_t, group: gid_t) -> c_int {
-        chown_base(&cpath_at(dfd, CStr::from_ptr(path), true)?, owner, group)
+    unsafe fn fchownat:_(dfd: c_int, path: *const c_char, owner: uid_t, group: gid_t, flags: c_int) -> c_int {
+        chown_base(CPath::from_path_at(dfd, path, flags), owner, group)
     }
 }
 
@@ -155,9 +152,7 @@ wrap! {
     unsafe fn stat:ORIG_STAT(path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_STAT(path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(&CStr::from_ptr(path), true) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path(path, true), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -165,9 +160,7 @@ wrap! {
     unsafe fn lstat:ORIG_LSTAT(path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_LSTAT(path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(&CStr::from_ptr(path), false) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path(path, false), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -175,9 +168,7 @@ wrap! {
     unsafe fn fstat:ORIG_FSTAT(fd: c_int, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_FSTAT(fd, statbuf);
         if ret == 0 {
-            if let Ok(path) = get_fd_path!(fd) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_fd(fd), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -185,23 +176,17 @@ wrap! {
     unsafe fn fstatat:ORIG_FSTATAT(dfd: c_int, path: *const c_char, statbuf: *mut libc::stat, flags: c_int) -> c_int {
         let ret = ORIG_FSTATAT(dfd, path, statbuf, flags);
         if ret == 0 {
-            if let Ok(path) = cpath_at(dfd, &CStr::from_ptr(path), (flags & libc::AT_SYMLINK_NOFOLLOW) == 0) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path_at(dfd, path, flags), &mut *statbuf);
         }
         Ok(ret)
     }
 
     unsafe fn mknod:ORIG_MKNOD(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
-        let mut mode = mode;
-        mknod_base(|| cpath(CStr::from_ptr(path), false), &mut mode, dev)?;
-        Ok(ORIG_MKNOD(path, mode, dev))
+        mknod_base(|| CPath::from_path(path, false), mode, dev, |mode| ORIG_MKNOD(path, mode, dev))
     }
 
     unsafe fn mknodat:ORIG_MKNODAT(dfd: c_int, path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
-        let mut mode = mode;
-        mknod_base(|| cpath_at(dfd, CStr::from_ptr(path), false), &mut mode, dev)?;
-        Ok(ORIG_MKNODAT(dfd, path, mode, dev))
+        mknod_base(|| CPath::from_path_at(dfd, path, 0), mode, dev, |mode| ORIG_MKNODAT(dfd, path, mode, dev))
     }
 }
 
@@ -210,9 +195,7 @@ wrap! {
     unsafe fn __xstat:ORIG_SXTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_SXTAT(ver, path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(CStr::from_ptr(path), true) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path(path, true), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -220,9 +203,7 @@ wrap! {
     unsafe fn __lxstat:ORIG_LXSTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_LXSTAT(ver, path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(CStr::from_ptr(path), false) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path(path, false), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -230,9 +211,7 @@ wrap! {
     unsafe fn __fxstat:ORIG_FXSTAT(ver: c_int, fd: c_int, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_FXSTAT(ver, fd, statbuf);
         if ret == 0 {
-            if let Ok(path) = get_fd_path!(fd) {
-                stat_base(path, &mut *statbuf);
-            }
+            stat_base(CPath::from_fd(fd), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -240,9 +219,7 @@ wrap! {
     unsafe fn __fxstatat:ORIG_FXSTATAT(ver: c_int, dfd: c_int, path: *const c_char, statbuf: *mut libc::stat, flags: c_int) -> c_int {
         let ret = ORIG_FXSTATAT(ver, dfd, path, statbuf, flags);
         if ret == 0 {
-            if let Ok(path) = cpath_at(dfd, CStr::from_ptr(path), (flags & libc::AT_SYMLINK_NOFOLLOW) == 0) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path_at(dfd, path, flags), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -250,9 +227,7 @@ wrap! {
     unsafe fn __xstat64:ORIG_XSTAT64(ver: c_int, path: *const c_char, statbuf: *mut libc::stat64) -> c_int {
         let ret = ORIG_XSTAT64(ver, path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(CStr::from_ptr(path), true) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path(path, true), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -260,9 +235,7 @@ wrap! {
     unsafe fn __lxstat64:ORIG_LXSTAT64(ver: c_int, path: *const c_char, statbuf: *mut libc::stat64) -> c_int {
         let ret = ORIG_LXSTAT64(ver, path, statbuf);
         if ret == 0 {
-            if let Ok(path) = cpath(CStr::from_ptr(path), false) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path(path, false), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -270,9 +243,7 @@ wrap! {
     unsafe fn __fxstat64:ORIG_FXSTAT64(ver: c_int, fd: c_int, statbuf: *mut libc::stat64) -> c_int {
         let ret = ORIG_FXSTAT64(ver, fd, statbuf);
         if ret == 0 {
-            if let Ok(path) = get_fd_path!(fd) {
-                stat_base(path, &mut *statbuf);
-            }
+            stat_base(CPath::from_fd(fd), &mut *statbuf);
         }
         Ok(ret)
     }
@@ -280,22 +251,16 @@ wrap! {
     unsafe fn __fxstatat64:ORIG_FXSTATAT64(ver: c_int, dfd: c_int, path: *const c_char, statbuf: *mut libc::stat64, flags: c_int) -> c_int {
         let ret = ORIG_FXSTATAT64(ver, dfd, path, statbuf, flags);
         if ret == 0 {
-            if let Ok(path) = cpath_at(dfd, CStr::from_ptr(path), (flags & libc::AT_SYMLINK_NOFOLLOW) == 0) {
-                stat_base(&path, &mut *statbuf);
-            }
+            stat_base(CPath::from_path_at(dfd, path, flags), &mut *statbuf);
         }
         Ok(ret)
     }
 
-    unsafe fn __xmknod:ORIG_MKNOD(ver: c_int, path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
-        let mut mode = mode;
-        mknod_base(|| cpath(CStr::from_ptr(path), false), &mut mode, dev)?;
-        Ok(ORIG_MKNOD(ver, path, mode, dev))
+    unsafe fn __xmknod:ORIG_XMKNOD(ver: c_int, path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
+        mknod_base(|| CPath::from_path(path, false), mode, dev, |mode| ORIG_XMKNOD(ver, path, mode, dev))
     }
 
-    unsafe fn __xmknodat:ORIG_MKNODAT(ver: c_int, dfd: c_int, path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
-        let mut mode = mode;
-        mknod_base(|| cpath_at(dfd, CStr::from_ptr(path), false), &mut mode, dev)?;
-        Ok(ORIG_MKNODAT(ver, dfd, path, mode, dev))
+    unsafe fn __xmknodat:ORIG_XMKNODAT(ver: c_int, dfd: c_int, path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
+        mknod_base(|| CPath::from_path_at(dfd, path, 0), mode, dev, |mode| ORIG_XMKNODAT(ver, dfd, path, mode, dev))
     }
 }

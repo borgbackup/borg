@@ -16,6 +16,7 @@ extern crate errno;
 
 extern crate twox_hash;
 
+mod internal_stat;
 #[macro_use]
 mod shared;
 mod xattrs;
@@ -24,5 +25,3 @@ mod permissions;
 pub use permissions::*;
 mod files;
 pub use files::*;
-mod file_descriptors;
-pub use file_descriptors::*;

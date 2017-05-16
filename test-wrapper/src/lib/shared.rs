@@ -263,8 +263,12 @@ impl CPath {
                 }
                 CPath::Path(path, follow_symlinks) => {
                     let mut statbuf: NativeStat = mem::uninitialized();
-                    let stat = if follow_symlinks { INTERNAL_STAT } else { INTERNAL_LSTAT };
-                    if stat(path, &mut statbuf as *mut _) == 0 {
+                    let ret = if follow_symlinks {
+                        INTERNAL_STAT(path, &mut statbuf as *mut _)
+                    } else {
+                        INTERNAL_LSTAT(path, &mut statbuf as *mut _)
+                    };
+                    if ret == 0 {
                         trace!("get_stat path {:?} -> ino {}", CStr::from_ptr(path), statbuf.st_ino);
                         Ok(statbuf)
                     } else {

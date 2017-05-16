@@ -71,16 +71,16 @@ pub unsafe fn INTERNAL_FSTATAT(dfd: c_int, path: *const c_char, buf: *mut Native
 
 #[cfg(not(target_os = "linux"))]
 lazy_static! {
-    pub static ref INTERNAL_STAT: unsafe extern fn(ver: c_int, path: *const c_char, buf: *mut libc::stat) -> c_int = unsafe {
+    pub static ref INTERNAL_STAT: unsafe extern fn(path: *const c_char, buf: *mut libc::stat) -> c_int = unsafe {
         transmute(dlsym(RTLD_NEXT, CString::new("stat").unwrap().as_ptr()))
     };
-    pub static ref INTERNAL_LSTAT: unsafe extern fn(ver: c_int, path: *const c_char, buf: *mut libc::stat) -> c_int = unsafe {
+    pub static ref INTERNAL_LSTAT: unsafe extern fn(path: *const c_char, buf: *mut libc::stat) -> c_int = unsafe {
         transmute(dlsym(RTLD_NEXT, CString::new("lstat").unwrap().as_ptr()))
     };
-    pub static ref INTERNAL_FSTAT: unsafe extern fn(ver: c_int, fd: c_int, buf: *mut libc::stat) -> c_int = unsafe {
+    pub static ref INTERNAL_FSTAT: unsafe extern fn(fd: c_int, buf: *mut libc::stat) -> c_int = unsafe {
         transmute(dlsym(RTLD_NEXT, CString::new("fstat").unwrap().as_ptr()))
     };
-    pub static ref INTERNAL_FSTATAT: unsafe extern fn(ver: c_int, dfd: c_int, path: *const c_char, buf: *mut libc::stat, flags: c_int) -> c_int = unsafe {
+    pub static ref INTERNAL_FSTATAT: unsafe extern fn(dfd: c_int, path: *const c_char, buf: *mut libc::stat, flags: c_int) -> c_int = unsafe {
         transmute(dlsym(RTLD_NEXT, CString::new("fstatat").unwrap().as_ptr()))
     };
 }

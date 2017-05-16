@@ -1870,6 +1870,132 @@ class Archiver:
                     print(warning, file=sys.stderr)
         return args
 
+    class CommonOptions:
+        """
+        Support class to allow specifying common options directly after the top-level command.
+
+        Normally options can only be specified on the parser defining them, which means
+        that generally speaking *all* options go after all sub-commands. This is annoying
+        for common options in scripts, e.g. --remote-path or logging options.
+
+        This class allows adding the same set of options to both the top-level parser
+        and the final sub-command parsers (but not intermediary sub-commands, at least for now).
+
+        It does so by giving every option's target name ("dest") a suffix indicating its level
+        -- no two options in the parser hierarchy can have the same target --
+        then, after parsing the command line, multiple definitions are resolved.
+
+        Defaults are handled by only setting them on the top-level parser and setting
+        a sentinel object in all sub-parsers, which then allows to discern which parser
+        supplied the option.
+        """
+
+        def __init__(self, define_common_options, suffix_precedence):
+            """
+            *define_common_options* should be a callable taking one argument, which
+            will be a argparse.Parser.add_argument-like function.
+
+            *define_common_options* will be called multiple times, and should call
+            the passed function to define common options exactly the same way each time.
+
+            *suffix_precedence* should be a tuple of the suffixes that will be used.
+            It is ordered from lowest precedence to highest precedence:
+            An option specified on the parser belonging to index 0 is overridden if the
+            same option is specified on any parser with a higher index.
+            """
+            self.define_common_options = define_common_options
+            self.suffix_precedence = suffix_precedence
+
+            # Maps suffixes to sets of target names.
+            # E.g. common_options["_subcommand"] = {..., "log_level", ...}
+            self.common_options = dict()
+            # Set of options with the 'append' action.
+            self.append_options = set()
+            # This is the sentinel object that replaces all default values in parsers
+            # below the top-level parser.
+            self.default_sentinel = object()
+
+        def add_common_group(self, parser, suffix, provide_defaults=False):
+            """
+            Add common options to *parser*.
+
+            *provide_defaults* must only be True exactly once in a parser hierarchy,
+            at the top level, and False on all lower levels. The default is chosen
+            accordingly.
+
+            *suffix* indicates the suffix to use internally. It also indicates
+            which precedence the *parser* has for common options. See *suffix_precedence*
+            of __init__.
+            """
+            assert suffix in self.suffix_precedence
+
+            def add_argument(*args, **kwargs):
+                if 'dest' in kwargs:
+                    kwargs.setdefault('action', 'store')
+                    assert kwargs['action'] in ('help', 'store_const', 'store_true', 'store_false', 'store', 'append')
+                    is_append = kwargs['action'] == 'append'
+                    if is_append:
+                        self.append_options.add(kwargs['dest'])
+                        assert kwargs['default'] == [], 'The default is explicitly constructed as an empty list in resolve()'
+                    else:
+                        self.common_options.setdefault(suffix, set()).add(kwargs['dest'])
+                    kwargs['dest'] += suffix
+                    if not provide_defaults:
+                        # Interpolate help now, in case the %(default)d (or so) is mentioned,
+                        # to avoid producing incorrect help output.
+                        # Assumption: Interpolated output can safely be interpolated again,
+                        # which should always be the case.
+                        # Note: We control all inputs.
+                        kwargs['help'] = kwargs['help'] % kwargs
+                        if not is_append:
+                            kwargs['default'] = self.default_sentinel
+
+                common_group.add_argument(*args, **kwargs)
+
+            common_group = parser.add_argument_group('Common options')
+            self.define_common_options(add_argument)
+
+        def resolve(self, args: argparse.Namespace):  # Namespace has "in" but otherwise is not like a dict.
+            """
+            Resolve the multiple definitions of each common option to the final value.
+            """
+            for suffix in self.suffix_precedence:
+                # From highest level to lowest level, so the "most-specific" option wins, e.g.
+                # "borg --debug create --info" shall result in --info being effective.
+                for dest in self.common_options.get(suffix, []):
+                    # map_from is this suffix' option name, e.g. log_level_subcommand
+                    # map_to is the target name, e.g. log_level
+                    map_from = dest + suffix
+                    map_to = dest
+                    # Retrieve value; depending on the action it may not exist, but usually does
+                    # (store_const/store_true/store_false), either because the action implied a default
+                    # or a default is explicitly supplied.
+                    # Note that defaults on lower levels are replaced with default_sentinel.
+                    # Only the top level has defaults.
+                    value = getattr(args, map_from, self.default_sentinel)
+                    if value is not self.default_sentinel:
+                        # value was indeed specified on this level. Transfer value to target,
+                        # and un-clobber the args (for tidiness - you *cannot* use the suffixed
+                        # names for other purposes, obviously).
+                        setattr(args, map_to, value)
+                    try:
+                        delattr(args, map_from)
+                    except AttributeError:
+                        pass
+
+            # Options with an "append" action need some special treatment. Instead of
+            # overriding values, all specified values are merged together.
+            for dest in self.append_options:
+                option_value = []
+                for suffix in self.suffix_precedence:
+                    # Find values of this suffix, if any, and add them to the final list
+                    extend_from = dest + suffix
+                    if extend_from in args:
+                        values = getattr(args, extend_from)
+                        delattr(args, extend_from)
+                        option_value.extend(values)
+                setattr(args, dest, option_value)
+
     def build_parser(self):
         def process_epilog(epilog):
             epilog = textwrap.dedent(epilog).splitlines()
@@ -1881,58 +2007,67 @@ class Archiver:
                 epilog = [line for line in epilog if not line.startswith('.. man')]
             return '\n'.join(epilog)
 
-        common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
+        def define_common_options(add_common_option):
+            add_common_option('-h', '--help', action='help', help='show this help message and exit')
+            add_common_option('--critical', dest='log_level',
+                              action='store_const', const='critical', default='warning',
+                              help='work on log level CRITICAL')
+            add_common_option('--error', dest='log_level',
+                              action='store_const', const='error', default='warning',
+                              help='work on log level ERROR')
+            add_common_option('--warning', dest='log_level',
+                              action='store_const', const='warning', default='warning',
+                              help='work on log level WARNING (default)')
+            add_common_option('--info', '-v', '--verbose', dest='log_level',
+                              action='store_const', const='info', default='warning',
+                              help='work on log level INFO')
+            add_common_option('--debug', dest='log_level',
+                              action='store_const', const='debug', default='warning',
+                              help='enable debug output, work on log level DEBUG')
+            add_common_option('--debug-topic', dest='debug_topics',
+                              action='append', metavar='TOPIC', default=[],
+                              help='enable TOPIC debugging (can be specified multiple times). '
+                                   'The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.')
+            add_common_option('-p', '--progress', dest='progress', action='store_true',
+                              help='show progress information')
+            add_common_option('--log-json', dest='log_json', action='store_true',
+                              help='Output one JSON object per log line instead of formatted text.')
+            add_common_option('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
+                              help='wait for the lock, but max. N seconds (default: %(default)d).')
+            add_common_option('--show-version', dest='show_version', action='store_true', default=False,
+                              help='show/log the borg version')
+            add_common_option('--show-rc', dest='show_rc', action='store_true', default=False,
+                              help='show/log the return code (rc)')
+            add_common_option('--no-files-cache', dest='cache_files', action='store_false',
+                              help='do not load/update the file metadata cache used to detect unchanged files')
+            add_common_option('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
+                              help='set umask to M (local and remote, default: %(default)04o)')
+            add_common_option('--remote-path', dest='remote_path', metavar='PATH',
+                              help='use PATH as borg executable on the remote (default: "borg")')
+            add_common_option('--remote-ratelimit', dest='remote_ratelimit', type=int, metavar='rate',
+                              help='set remote network upload rate limit in kiByte/s (default: 0=unlimited)')
+            add_common_option('--consider-part-files', dest='consider_part_files',
+                              action='store_true', default=False,
+                              help='treat part files like normal files (e.g. to list/extract them)')
 
-        common_group = common_parser.add_argument_group('Common options')
-        common_group.add_argument('-h', '--help', action='help', help='show this help message and exit')
-        common_group.add_argument('--critical', dest='log_level',
-                                  action='store_const', const='critical', default='warning',
-                                  help='work on log level CRITICAL')
-        common_group.add_argument('--error', dest='log_level',
-                                  action='store_const', const='error', default='warning',
-                                  help='work on log level ERROR')
-        common_group.add_argument('--warning', dest='log_level',
-                                  action='store_const', const='warning', default='warning',
-                                  help='work on log level WARNING (default)')
-        common_group.add_argument('--info', '-v', '--verbose', dest='log_level',
-                                  action='store_const', const='info', default='warning',
-                                  help='work on log level INFO')
-        common_group.add_argument('--debug', dest='log_level',
-                                  action='store_const', const='debug', default='warning',
-                                  help='enable debug output, work on log level DEBUG')
-        common_group.add_argument('--debug-topic', dest='debug_topics',
-                                  action='append', metavar='TOPIC', default=[],
-                                  help='enable TOPIC debugging (can be specified multiple times). '
-                                       'The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.')
-        common_group.add_argument('-p', '--progress', dest='progress', action='store_true',
-                                  help='show progress information')
-        common_group.add_argument('--log-json', dest='log_json', action='store_true',
-                                  help='Output one JSON object per log line instead of formatted text.')
-        common_group.add_argument('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
-                                  help='wait for the lock, but max. N seconds (default: %(default)d).')
-        common_group.add_argument('--show-version', dest='show_version', action='store_true', default=False,
-                                  help='show/log the borg version')
-        common_group.add_argument('--show-rc', dest='show_rc', action='store_true', default=False,
-                                  help='show/log the return code (rc)')
-        common_group.add_argument('--no-files-cache', dest='cache_files', action='store_false',
-                                  help='do not load/update the file metadata cache used to detect unchanged files')
-        common_group.add_argument('--umask', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT, metavar='M',
-                                  help='set umask to M (local and remote, default: %(default)04o)')
-        common_group.add_argument('--remote-path', dest='remote_path', metavar='PATH',
-                                  help='use PATH as borg executable on the remote (default: "borg")')
-        common_group.add_argument('--remote-ratelimit', dest='remote_ratelimit', type=int, metavar='rate',
-                                  help='set remote network upload rate limit in kiByte/s (default: 0=unlimited)')
-        common_group.add_argument('--consider-part-files', dest='consider_part_files',
-                                  action='store_true', default=False,
-                                  help='treat part files like normal files (e.g. to list/extract them)')
-
-        parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups')
+        parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
+                                         add_help=False)
+        parser.common_options = self.CommonOptions(define_common_options,
+                                                   suffix_precedence=('_maincommand', '_midcommand', '_subcommand'))
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
                             help='show version number and exit')
-        subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
+        parser.common_options.add_common_group(parser, '_maincommand', provide_defaults=True)
 
+        common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
         # some empty defaults for all subparsers
         common_parser.set_defaults(paths=[], patterns=[])
+        parser.common_options.add_common_group(common_parser, '_subcommand')
+
+        mid_common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
+        mid_common_parser.set_defaults(paths=[], patterns=[])
+        parser.common_options.add_common_group(mid_common_parser, '_midcommand')
+
+        subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         serve_epilog = process_epilog("""
         This command starts a repository server process. This command is usually not used manually.
@@ -1953,7 +2088,7 @@ class Archiver:
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
 
-        Encryption can be enabled at repository init time.
+        Encryption can be enabled at repository init time. It cannot be changed later.
 
         It is not recommended to work without encryption. Repository encryption protects
         you e.g. against the case that an attacker has access to your backup repository.
@@ -2008,8 +2143,8 @@ class Archiver:
 
         `authenticated` mode uses no encryption, but authenticates repository contents
         through the same keyed BLAKE2b-256 hash as the other blake2 modes (it uses it
-        as chunk ID hash). The key is stored like repokey.
-        This mode is new and not compatible with borg 1.0.x.
+        as the chunk ID hash). The key is stored like repokey.
+        This mode is new and *not* compatible with borg 1.0.x.
 
         `none` mode uses no encryption and no authentication. It uses sha256 as chunk
         ID hash. Not recommended, rather consider using an authenticated or
@@ -2035,7 +2170,7 @@ class Archiver:
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', dest='encryption', required=True,
                                choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
-                               help='select encryption key mode')
+                               help='select encryption key mode **(required)**')
         subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
 
@@ -2113,7 +2248,7 @@ class Archiver:
                                help='work slower, but using less space')
         self.add_archives_filters_args(subparser)
 
-        subparser = subparsers.add_parser('key', parents=[common_parser], add_help=False,
+        subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3113,7 +3248,7 @@ class Archiver:
         in case you ever run into some severe malfunction. Use them only if you know
         what you are doing or if a trusted developer tells you what to do.""")
 
-        subparser = subparsers.add_parser('debug', parents=[common_parser], add_help=False,
+        subparser = subparsers.add_parser('debug', parents=[mid_common_parser], add_help=False,
                                           description='debugging command (not intended for normal use)',
                                           epilog=debug_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3254,7 +3389,7 @@ class Archiver:
 
         benchmark_epilog = process_epilog("These commands do various benchmarks.")
 
-        subparser = subparsers.add_parser('benchmark', parents=[common_parser], add_help=False,
+        subparser = subparsers.add_parser('benchmark', parents=[mid_common_parser], add_help=False,
                                           description='benchmark command',
                                           epilog=benchmark_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3358,6 +3493,7 @@ class Archiver:
             args = self.preprocess_args(args)
         parser = self.build_parser()
         args = parser.parse_args(args or ['-h'])
+        parser.common_options.resolve(args)
         # This works around http://bugs.python.org/issue9351
         func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
         if func == self.do_create and not args.paths:

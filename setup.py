@@ -259,7 +259,7 @@ class build_usage(Command):
                               "command_": command.replace(' ', '_'),
                               "underline": '-' * len('borg ' + command)}
                     doc.write(".. _borg_{command_}:\n\n".format(**params))
-                    doc.write("borg {command}\n{underline}\n::\n\n    borg {command}".format(**params))
+                    doc.write("borg {command}\n{underline}\n::\n\n    borg [common options] {command}".format(**params))
                     self.write_usage(parser, doc)
                     epilog = parser.epilog
                     parser.epilog = None
@@ -402,10 +402,10 @@ class build_man(Command):
             if is_intermediary:
                 subparsers = [action for action in parser._actions if 'SubParsersAction' in str(action.__class__)][0]
                 for subcommand in subparsers.choices:
-                    write('| borg', command, subcommand, '...')
+                    write('| borg', '[common options]', command, subcommand, '...')
                     self.see_also.setdefault(command, []).append('%s-%s' % (command, subcommand))
             else:
-                write('borg', command, end='')
+                write('borg', '[common options]', command, end='')
                 self.write_usage(write, parser)
             write('\n')
 

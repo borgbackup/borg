@@ -106,7 +106,7 @@ fn chown_base(path: CPath, owner: uid_t, group: gid_t) -> Result<c_int> {
 fn mknod_base<'a, F: Fn() -> CPath, M: Fn(mode_t) -> c_int>(get_path: F, mode: mode_t, dev: dev_t, mknod: M) -> Result<c_int> {
     let override_mode = mode & libc::S_IFCHR == libc::S_IFCHR || mode & libc::S_IFBLK == libc::S_IFBLK;
     let base_mode = if override_mode {
-        0o600 | mode & 0o777
+        libc::S_IFREG | 0o600 | (mode & 0o777)
     } else {
         mode
     };

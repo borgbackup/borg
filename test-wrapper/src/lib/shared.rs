@@ -53,13 +53,13 @@ pub enum NetworkLogLevel {
 
 #[derive(Debug, Serialize)]
 pub enum Message<'a> {
-    Remove(u64),
-    XattrsGet(u64, &'a [u8]),
-    XattrsSet(u64, &'a [u8], &'a [u8], c_int),
-    XattrsList(u64),
-    OverrideMode(u64, mode_t, mode_t, Option<dev_t>),
-    OverrideOwner(u64, Option<uid_t>, Option<gid_t>),
-    GetPermissions(u64),
+    Remove(ino_t),
+    XattrsGet(ino_t, &'a [u8]),
+    XattrsSet(ino_t, &'a [u8], &'a [u8], c_int),
+    XattrsList(ino_t),
+    OverrideMode(ino_t, mode_t, mode_t, Option<dev_t>),
+    OverrideOwner(ino_t, Option<uid_t>, Option<gid_t>),
+    GetPermissions(ino_t),
     Log(NetworkLogLevel, &'a str),
 }
 

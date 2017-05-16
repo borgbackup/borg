@@ -1940,7 +1940,7 @@ class Archiver:
                     else:
                         self.common_options.setdefault(suffix, set()).add(kwargs['dest'])
                     kwargs['dest'] += suffix
-                    if not provide_defaults and 'default' in kwargs:
+                    if not provide_defaults:
                         # Interpolate help now, in case the %(default)d (or so) is mentioned,
                         # to avoid producing incorrect help output.
                         # Assumption: Interpolated output can safely be interpolated again,
@@ -1978,7 +1978,10 @@ class Archiver:
                         # and un-clobber the args (for tidiness - you *cannot* use the suffixed
                         # names for other purposes, obviously).
                         setattr(args, map_to, value)
+                    try:
                         delattr(args, map_from)
+                    except AttributeError:
+                        pass
 
             # Options with an "append" action need some special treatment. Instead of
             # overriding values, all specified values are merged together.
@@ -1986,8 +1989,11 @@ class Archiver:
                 option_value = []
                 for suffix in self.suffix_precedence:
                     # Find values of this suffix, if any, and add them to the final list
-                    values = getattr(args, dest + suffix, [])
-                    option_value.extend(values)
+                    extend_from = dest + suffix
+                    if extend_from in args:
+                        values = getattr(args, extend_from)
+                        delattr(args, extend_from)
+                        option_value.extend(values)
                 setattr(args, dest, option_value)
 
     def build_parser(self):

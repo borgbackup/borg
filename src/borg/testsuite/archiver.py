@@ -96,6 +96,14 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
 
+def have_gnutar():
+    if not shutil.which('tar'):
+        return False
+    popen = subprocess.Popen(['tar', '--version'], stdout=subprocess.PIPE)
+    stdout, stderr = popen.communicate()
+    return b'GNU tar' in stdout
+
+
 # check if the binary "borg.exe" is available (for local testing a symlink to virtualenv/bin/borg should do)
 try:
     exec_cmd('help', exe='borg.exe', fork=True)
@@ -2353,6 +2361,35 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert '_manifest_entry' in result
         assert '_meta' in result
         assert '_items' in result
+
+    requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
+    requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
+
+    @requires_gnutar
+    def test_export_tar(self):
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar')
+        with changedir('output'):
+            # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
+            subprocess.check_output(['tar', 'xpf', '../simple.tar'])
+        self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
+
+    @requires_gnutar
+    @requires_gzip
+    def test_export_tar_gz(self):
+        if not shutil.which('gzip'):
+            pytest.skip('gzip is not installed')
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz')
+        with changedir('output'):
+            subprocess.check_output(['tar', 'xpf', '../simple.tar.gz'])
+        self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

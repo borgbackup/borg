@@ -150,7 +150,7 @@ class BaseTestCase(unittest.TestCase):
         diff = filecmp.dircmp(dir1, dir2)
         self._assert_dirs_equal_cmp(diff, **kwargs)
 
-    def _assert_dirs_equal_cmp(self, diff, ignore_bsdflags=False, ignore_xattrs=False):
+    def _assert_dirs_equal_cmp(self, diff, ignore_bsdflags=False, ignore_xattrs=False, ignore_ns=False):
         self.assert_equal(diff.left_only, [])
         self.assert_equal(diff.right_only, [])
         self.assert_equal(diff.diff_files, [])
@@ -162,25 +162,30 @@ class BaseTestCase(unittest.TestCase):
             s2 = os.lstat(path2)
             # Assume path2 is on FUSE if st_dev is different
             fuse = s1.st_dev != s2.st_dev
-            attrs = ['st_mode', 'st_uid', 'st_gid', 'st_rdev']
+            attrs = ['st_uid', 'st_gid', 'st_rdev']
             if not fuse or not os.path.isdir(path1):
                 # dir nlink is always 1 on our fuse filesystem
                 attrs.append('st_nlink')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
+            d1.insert(1, oct(s1.st_mode))
+            d2.insert(1, oct(s2.st_mode))
             if not ignore_bsdflags:
                 d1.append(get_flags(path1, s1))
                 d2.append(get_flags(path2, s2))
             # ignore st_rdev if file is not a block/char device, fixes #203
-            if not stat.S_ISCHR(d1[1]) and not stat.S_ISBLK(d1[1]):
+            if not stat.S_ISCHR(s1.st_mode) and not stat.S_ISBLK(s1.st_mode):
                 d1[4] = None
-            if not stat.S_ISCHR(d2[1]) and not stat.S_ISBLK(d2[1]):
+            if not stat.S_ISCHR(s2.st_mode) and not stat.S_ISBLK(s2.st_mode):
                 d2[4] = None
             # If utime isn't fully supported, borg can't set mtime.
             # Therefore, we shouldn't test it in that case.
             if is_utime_fully_supported():
                 # Older versions of llfuse do not support ns precision properly
-                if fuse and not have_fuse_mtime_ns:
+                if ignore_ns:
+                    d1.append(int(s1.st_mtime_ns / 1e9))
+                    d2.append(int(s2.st_mtime_ns / 1e9))
+                elif fuse and not have_fuse_mtime_ns:
                     d1.append(round(s1.st_mtime_ns, -4))
                     d2.append(round(s2.st_mtime_ns, -4))
                 else:
@@ -191,7 +196,7 @@ class BaseTestCase(unittest.TestCase):
                 d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
-            self._assert_dirs_equal_cmp(sub_diff, ignore_bsdflags=ignore_bsdflags, ignore_xattrs=ignore_xattrs)
+            self._assert_dirs_equal_cmp(sub_diff, ignore_bsdflags=ignore_bsdflags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)
 
     @contextmanager
     def fuse_mount(self, location, mountpoint, *options):

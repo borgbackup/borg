@@ -1622,11 +1622,20 @@ class ItemFormatter(BaseFormatter):
 class ChunkIteratorFileWrapper:
     """File-like wrapper for chunk iterators"""
 
-    def __init__(self, chunk_iterator):
+    def __init__(self, chunk_iterator, read_callback=None):
+        """
+        *chunk_iterator* should be an iterator yielding bytes. These will be buffered
+        internally as necessary to satisfy .read() calls.
+
+        *read_callback* will be called with one argument, some byte string that has
+        just been read and will be subsequently returned to a caller of .read().
+        It can be used to update a progress display.
+        """
         self.chunk_iterator = chunk_iterator
         self.chunk_offset = 0
         self.chunk = b''
         self.exhausted = False
+        self.read_callback = read_callback
 
     def _refill(self):
         remaining = len(self.chunk) - self.chunk_offset
@@ -1655,6 +1664,8 @@ class ChunkIteratorFileWrapper:
             read_data = self._read(nbytes)
             nbytes -= len(read_data)
             parts.append(read_data)
+            if self.read_callback:
+                self.read_callback(read_data)
         return b''.join(parts)
 
 

@@ -16,7 +16,7 @@ from subprocess import Popen, PIPE
 import msgpack
 
 from . import __version__
-from .helpers import Error, IntegrityError
+from .helpers import Error, IntegrityError, AtticDataError
 from .helpers import get_home_dir
 from .helpers import sysinfo
 from .helpers import bin_to_hex
@@ -706,6 +706,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise IntegrityError('(not available)')
                 else:
                     raise IntegrityError(args[0].decode())
+            elif error == 'AtticDataError':
+                raise AtticDataError(args[0].decode())
             elif error == 'PathNotAllowed':
                 raise PathNotAllowed()
             elif error == 'ObjectNotFound':

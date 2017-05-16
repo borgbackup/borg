@@ -88,12 +88,20 @@ class ErrorWithTraceback(Error):
     traceback = True
 
 
-class IntegrityError(ErrorWithTraceback):
+class IntegrityErrorBase(Exception):
+    """Base class to avoid MRO problems"""
+
+
+class IntegrityError(IntegrityErrorBase, ErrorWithTraceback):
     """Data integrity error: {}"""
 
 
 class DecompressionError(IntegrityError):
     """Decompression error: {}"""
+
+
+class AtticDataError(IntegrityErrorBase, Error):
+    """Attic (not: Borg) data found: {}"""
 
 
 class ExtensionModuleError(Error):

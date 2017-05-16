@@ -13,7 +13,8 @@ import msgpack
 
 from .constants import *  # NOQA
 from .hashindex import NSIndex
-from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
+from .helpers import Error, ErrorWithTraceback, IntegrityErrorBase, IntegrityError, AtticDataError
+from .helpers import format_file_size, parse_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
@@ -1010,7 +1011,7 @@ class LoggedIO:
         """
         try:
             iterator = self.iter_objects(segment)
-        except IntegrityError:
+        except IntegrityErrorBase:
             return False
         with open(self.segment_filename(segment), 'rb') as fd:
             try:
@@ -1026,7 +1027,7 @@ class LoggedIO:
         while True:
             try:
                 tag, key, offset, _ = next(iterator)
-            except IntegrityError:
+            except IntegrityErrorBase:
                 return False
             except StopIteration:
                 break
@@ -1101,8 +1102,12 @@ class LoggedIO:
             # we are touching this segment for the first time, check the MAGIC.
             # Repository.scan() calls us with segment > 0 when it continues an ongoing iteration
             # from a marker position - but then we have checked the magic before already.
-            if fd.read(MAGIC_LEN) != MAGIC:
-                raise IntegrityError('Invalid segment magic [segment {}, offset {}]'.format(segment, 0))
+            magic = fd.read(MAGIC_LEN)
+            if magic != MAGIC:
+                if magic == b'ATTICSEG':
+                    raise AtticDataError('Attic segment [segment {}, offset {}]'.format(segment, 0))
+                else:
+                    raise IntegrityError('Invalid segment magic [segment {}, offset {}]'.format(segment, 0))
             offset = MAGIC_LEN
         header = fd.read(self.header_fmt.size)
         while header:

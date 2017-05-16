@@ -2354,6 +2354,12 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert '_meta' in result
         assert '_items' in result
 
+    def test_nice_fail_attic_repo(self):
+        from .upgrader import attic_repo
+        attic_repo(self.repository_path)
+        output = self.cmd('list', self.repository_location, fork=True, exit_code=2)
+        assert 'Attic (not: Borg) data found' in output
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

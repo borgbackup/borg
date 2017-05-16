@@ -15,6 +15,7 @@ import signal
 import stat
 import subprocess
 import sys
+import tarfile
 import textwrap
 import time
 import traceback
@@ -61,6 +62,7 @@ from .helpers import ErrorIgnoringTextIOWrapper
 from .helpers import ProgressIndicatorPercent
 from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
+from .helpers import ChunkIteratorFileWrapper
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
 from .item import Item
@@ -692,6 +694,219 @@ class Archiver:
         if pi:
             # clear progress output
             pi.finish()
+        return self.exit_code
+
+    @with_repository()
+    @with_archive
+    def do_export_tar(self, args, repository, manifest, key, archive):
+        """Export archive contents as a tarball"""
+        self.output_list = args.output_list
+
+        # A quick note about the general design of tar_filter and tarfile;
+        # The tarfile module of Python can provide some compression mechanisms
+        # by itself, using the builtin gzip, bz2 and lzma modules (and "tarmodes"
+        # such as "w:xz").
+        #
+        # Doing so would have three major drawbacks:
+        # For one the compressor runs on the same thread as the program using the
+        # tarfile, stealing valuable CPU time from Borg and thus reducing throughput.
+        # Then this limits the available options - what about lz4? Brotli? zstd?
+        # The third issue is that systems can ship more optimized versions than those
+        # built into Python, e.g. pigz or pxz, which can use more than one thread for
+        # compression.
+        #
+        # Therefore we externalize compression by using a filter program, which has
+        # none of these drawbacks. The only issue of using an external filter is
+        # that it has to be installed -- hardly a problem, considering that
+        # the decompressor must be installed as well to make use of the exported tarball!
+
+        filter = None
+        if args.tar_filter == 'auto':
+            # Note that filter remains None if tarfile is '-'.
+            if args.tarfile.endswith('.tar.gz'):
+                filter = 'gzip'
+            elif args.tarfile.endswith('.tar.bz2'):
+                filter = 'bzip2'
+            elif args.tarfile.endswith('.tar.xz'):
+                filter = 'xz'
+            logger.debug('Automatically determined tar filter: %s', filter)
+        else:
+            filter = args.tar_filter
+
+        if args.tarfile == '-':
+            tarstream, tarstream_close = sys.stdout.buffer, False
+        else:
+            tarstream, tarstream_close = open(args.tarfile, 'wb'), True
+
+        if filter:
+            # When we put a filter between us and the final destination,
+            # the selected output (tarstream until now) becomes the output of the filter (=filterout).
+            # The decision whether to close that or not remains the same.
+            filterout = tarstream
+            filterout_close = tarstream_close
+            # There is no deadlock potential here (the subprocess docs warn about this), because
+            # communication with the process is a one-way road, i.e. the process can never block
+            # for us to do something while we block on the process for something different.
+            filtercmd = shlex.split(filter)
+            logger.debug('--tar-filter command line: %s', filtercmd)
+            filterproc = subprocess.Popen(filtercmd, stdin=subprocess.PIPE, stdout=filterout)
+            # Always close the pipe, otherwise the filter process would not notice when we are done.
+            tarstream = filterproc.stdin
+            tarstream_close = True
+
+        # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
+        # where it never seeks on the passed fileobj.
+        tar = tarfile.open(fileobj=tarstream, mode='w|')
+
+        self._export_tar(args, archive, tar)
+
+        # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
+        tar.close()
+
+        if tarstream_close:
+            tarstream.close()
+
+        if filter:
+            logger.debug('Done creating tar, waiting for filter to die...')
+            rc = filterproc.wait()
+            if rc:
+                logger.error('--tar-filter exited with code %d, output file is likely unusable!', rc)
+                self.exit_code = set_ec(EXIT_ERROR)
+            else:
+                logger.debug('filter exited with code %d', rc)
+
+            if filterout_close:
+                filterout.close()
+
+        return self.exit_code
+
+    def _export_tar(self, args, archive, tar):
+        matcher = self.build_matcher(args.patterns, args.paths)
+
+        progress = args.progress
+        output_list = args.output_list
+        strip_components = args.strip_components
+        partial_extract = not matcher.empty() or strip_components
+        hardlink_masters = {} if partial_extract else None
+
+        def peek_and_store_hardlink_masters(item, matched):
+            if (partial_extract and not matched and hardlinkable(item.mode) and
+                    item.get('hardlink_master', True) and 'source' not in item):
+                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
+
+        filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
+
+        if progress:
+            pi = ProgressIndicatorPercent(msg='%5.1f%% Processing: %s', step=0.1, msgid='extract')
+            pi.output('Calculating size')
+            extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
+            pi.total = extracted_size
+        else:
+            pi = None
+
+        def item_content_stream(item):
+            """
+            Return a file-like object that reads from the chunks of *item*.
+            """
+            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks])
+            if pi:
+                info = [remove_surrogates(item.path)]
+                return ChunkIteratorFileWrapper(chunk_iterator,
+                                                lambda read_bytes: pi.show(increase=len(read_bytes), info=info))
+            else:
+                return ChunkIteratorFileWrapper(chunk_iterator)
+
+        def item_to_tarinfo(item, original_path):
+            """
+            Transform a Borg *item* into a tarfile.TarInfo object.
+
+            Return a tuple (tarinfo, stream), where stream may be a file-like object that represents
+            the file contents, if any, and is None otherwise. When *tarinfo* is None, the *item*
+            cannot be represented as a TarInfo object and should be skipped.
+            """
+
+            # If we would use the PAX (POSIX) format (which we currently don't),
+            # we can support most things that aren't possible with classic tar
+            # formats, including GNU tar, such as:
+            # atime, ctime, possibly Linux capabilities (security.* xattrs)
+            # and various additions supported by GNU tar in POSIX mode.
+
+            stream = None
+            tarinfo = tarfile.TarInfo()
+            tarinfo.name = item.path
+            tarinfo.mtime = item.mtime / 1e9
+            tarinfo.mode = stat.S_IMODE(item.mode)
+            tarinfo.uid = item.uid
+            tarinfo.gid = item.gid
+            tarinfo.uname = item.user or ''
+            tarinfo.gname = item.group or ''
+            # The linkname in tar has the same dual use the 'source' attribute of Borg items,
+            # i.e. for symlinks it means the destination, while for hardlinks it refers to the
+            # file.
+            # Since hardlinks in tar have a different type code (LNKTYPE) the format might
+            # support hardlinking arbitrary objects (including symlinks and directories), but
+            # whether implementations actually support that is a whole different question...
+            tarinfo.linkname = ""
+
+            modebits = stat.S_IFMT(item.mode)
+            if modebits == stat.S_IFREG:
+                tarinfo.type = tarfile.REGTYPE
+                if 'source' in item:
+                    source = os.sep.join(item.source.split(os.sep)[strip_components:])
+                    if hardlink_masters is None:
+                        linkname = source
+                    else:
+                        chunks, linkname = hardlink_masters.get(item.source, (None, source))
+                    if linkname:
+                        # Master was already added to the archive, add a hardlink reference to it.
+                        tarinfo.type = tarfile.LNKTYPE
+                        tarinfo.linkname = linkname
+                    elif chunks is not None:
+                        # The item which has the chunks was not put into the tar, therefore
+                        # we do that now and update hardlink_masters to reflect that.
+                        item.chunks = chunks
+                        tarinfo.size = item.get_size()
+                        stream = item_content_stream(item)
+                        hardlink_masters[item.get('source') or original_path] = (None, item.path)
+                else:
+                    tarinfo.size = item.get_size()
+                    stream = item_content_stream(item)
+            elif modebits == stat.S_IFDIR:
+                tarinfo.type = tarfile.DIRTYPE
+            elif modebits == stat.S_IFLNK:
+                tarinfo.type = tarfile.SYMTYPE
+                tarinfo.linkname = item.source
+            elif modebits == stat.S_IFBLK:
+                tarinfo.type = tarfile.BLKTYPE
+                tarinfo.devmajor = os.major(item.rdev)
+                tarinfo.devminor = os.minor(item.rdev)
+            elif modebits == stat.S_IFCHR:
+                tarinfo.type = tarfile.CHRTYPE
+                tarinfo.devmajor = os.major(item.rdev)
+                tarinfo.devminor = os.minor(item.rdev)
+            elif modebits == stat.S_IFIFO:
+                tarinfo.type = tarfile.FIFOTYPE
+            else:
+                self.print_warning('%s: unsupported file type %o for tar export', remove_surrogates(item.path), modebits)
+                set_ec(EXIT_WARNING)
+                return None, stream
+            return tarinfo, stream
+
+        for item in archive.iter_items(filter, preload=True):
+            orig_path = item.path
+            if strip_components:
+                item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
+            tarinfo, stream = item_to_tarinfo(item, orig_path)
+            if tarinfo:
+                if output_list:
+                    logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
+                tar.addfile(tarinfo, stream)
+
+        if pi:
+            pi.finish()
+
+        for pattern in matcher.get_unmatched_include_patterns():
+            self.print_warning("Include pattern '%s' never matched.", pattern)
         return self.exit_code
 
     @with_repository()
@@ -2602,6 +2817,72 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+
+        export_tar_epilog = process_epilog("""
+        This command creates a tarball from an archive.
+
+        When giving '-' as the output FILE, Borg will write a tar stream to standard output.
+
+        By default (--tar-filter=auto) Borg will detect whether the FILE should be compressed
+        based on its file extension and pipe the tarball through an appropriate filter
+        before writing it to FILE:
+
+        - .tar.gz: gzip
+        - .tar.bz2: bzip2
+        - .tar.xz: xz
+
+        Alternatively a --tar-filter program may be explicitly specified. It should
+        read the uncompressed tar stream from stdin and write a compressed/filtered
+        tar stream to stdout.
+
+        The generated tarball uses the GNU tar format.
+
+        export-tar is a lossy conversion:
+        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
+        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
+        otherwise supported by Borg.
+
+        A --sparse option (as found in borg extract) is not supported.
+
+        By default the entire archive is extracted but a subset of files and directories
+        can be selected by passing a list of ``PATHs`` as arguments.
+        The file selection can further be restricted by using the ``--exclude`` option.
+
+        See the output of the "borg help patterns" command for more help on exclude patterns.
+
+        ``--progress`` can be slower than no progress display, since it makes one additional
+        pass over the archive metadata.
+        """)
+        subparser = subparsers.add_parser('export-tar', parents=[common_parser], add_help=False,
+                                          description=self.do_export_tar.__doc__,
+                                          epilog=export_tar_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create tarball from archive')
+        subparser.set_defaults(func=self.do_export_tar)
+        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
+                               help='filter program to pipe data through')
+        subparser.add_argument('--list', dest='output_list',
+                               action='store_true', default=False,
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('-e', '--exclude', dest='patterns',
+                               type=parse_exclude_pattern, action='append',
+                               metavar="PATTERN", help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
+                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--pattern', action=ArgparsePatternAction,
+                               metavar="PATTERN", help='include/exclude paths matching PATTERN')
+        subparser.add_argument('--patterns-from', action=ArgparsePatternFileAction,
+                               metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
+        subparser.add_argument('--strip-components', dest='strip_components',
+                               type=int, default=0, metavar='NUMBER',
+                               help='Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.')
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to export')
+        subparser.add_argument('tarfile', metavar='FILE',
+                               help='output tar file. "-" to write to stdout instead.')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
 

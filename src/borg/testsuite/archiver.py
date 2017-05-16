@@ -1686,9 +1686,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input', '--debug-profile=create.prof')
-        stats = pstats.Stats()
-        with open('create.prof', 'rb') as fd:
-            stats.stats = msgpack.unpack(fd, use_list=False, encoding='utf-8')
+        self.cmd('debug', 'convert-profile', 'create.prof', 'create.pyprof')
+        stats = pstats.Stats('create.pyprof')
         stats.strip_dirs()
         stats.sort_stats('cumtime')
 

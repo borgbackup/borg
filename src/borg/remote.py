@@ -654,6 +654,23 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 opts.append('--critical')
             else:
                 raise ValueError('log level missing, fix this code')
+
+            # Tell the remote server about debug topics it may need to consider.
+            # Note that debug topics are usable for "spew" or "trace" logs which would
+            # be too plentiful to transfer for normal use, so the server doesn't send
+            # them unless explicitly enabled.
+            #
+            # Needless to say, if you do --debug-topic=repository.compaction, for example,
+            # with a 1.0.x server it won't work, because the server does not recognize the
+            # option.
+            #
+            # This is not considered a problem, since this is a debugging feature that
+            # should not be used for regular use.
+            for topic in args.debug_topics:
+                if '.' not in topic:
+                    topic = 'borg.debug.' + topic
+                if 'repository' in topic:
+                    opts.append('--debug-topic=%s' % topic)
         env_vars = []
         if not hostname_is_unique():
             env_vars.append('BORG_HOSTNAME_IS_UNIQUE=no')

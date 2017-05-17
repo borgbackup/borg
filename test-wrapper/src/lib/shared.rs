@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use std::collections::{hash_map, HashMap};
 use std::borrow::Borrow;
 use std::hash::BuildHasherDefault;
+use std::fmt::{self, Debug};
 
 use std::os::unix::net::UnixStream;
 
@@ -15,7 +16,6 @@ use libc::{self, mode_t, uid_t, gid_t, dev_t};
 use serde::de::DeserializeOwned;
 use bincode::{self, deserialize_from, serialize_into};
 use twox_hash::XxHash;
-use errno::errno;
 use internal_stat::*;
 
 #[allow(non_camel_case_types)]
@@ -259,14 +259,12 @@ impl CPath {
 
     pub fn get_stat(&self) -> Result<NativeStat> {
         unsafe {
-            match *self {
+            let ret = match *self {
                 CPath::FileDescriptor(fd) => {
                     let mut statbuf: NativeStat = mem::uninitialized();
                     if INTERNAL_FSTAT(fd, &mut statbuf as *mut _) == 0 {
-                        trace!("get_stat fd {} -> ino {}", fd, statbuf.st_ino);
                         Ok(statbuf)
                     } else {
-                        trace!("get_stat fd {} -> {}", fd, errno());
                         Err(0)
                     }
                 }
@@ -278,24 +276,22 @@ impl CPath {
                         INTERNAL_LSTAT(path, &mut statbuf as *mut _)
                     };
                     if ret == 0 {
-                        trace!("get_stat path {:?} -> dev {} ino {}", CStr::from_ptr(path), statbuf.st_dev, statbuf.st_ino);
                         Ok(statbuf)
                     } else {
-                        trace!("get_stat path {:?} -> {}", CStr::from_ptr(path), errno());
                         Err(0)
                     }
                 }
                 CPath::PathAt(dfd, path, flags) => {
                     let mut statbuf: NativeStat = mem::uninitialized();
                     if INTERNAL_FSTATAT(dfd, path, &mut statbuf as *mut _, flags) == 0 {
-                        trace!("get_stat dfd {} path {:?} -> dev {} ino {}", dfd, CStr::from_ptr(path), statbuf.st_dev, statbuf.st_ino);
                         Ok(statbuf)
                     } else {
-                        trace!("get_stat dfd {} path {:?} -> {}", dfd, CStr::from_ptr(path), errno());
                         Err(0)
                     }
                 }
-            }
+            };
+            trace!("get_stat {:?} -> {:?}", self, ret.map(|stat| (stat.st_dev, stat.st_ino)));
+            ret
         }
     }
 
@@ -312,7 +308,7 @@ impl CPath {
                     }
                     hash_map::Entry::Occupied(entry) => {
                         let id = entry.get();
-                        trace!("get_id fd {} -> cached {:?}", fd, id);
+                        trace!("get_id FD {} -> cached {:?}", fd, id);
                         Ok(id.clone())
                     }
                 }
@@ -320,6 +316,20 @@ impl CPath {
             _ => {
                 self.get_stat().map(|stat| FileId(stat.st_dev, stat.st_ino))
             }
+        }
+    }
+}
+
+impl Debug for CPath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CPath::FileDescriptor(fd) => write!(f, "FD {}", fd),
+            CPath::Path(path, follow_symlinks) => unsafe {
+                write!(f, "{:?} (follow_symlinks: {})", CStr::from_ptr(path), follow_symlinks)
+            },
+            CPath::PathAt(dfd, path, follow_symlinks) => unsafe {
+                write!(f, "DFD {} + {:?} (follow_symlinks: {})", dfd, CStr::from_ptr(path), follow_symlinks)
+            },
         }
     }
 }

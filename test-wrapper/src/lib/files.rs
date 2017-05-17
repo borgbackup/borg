@@ -15,8 +15,11 @@ wrap! {
     unsafe fn unlink:ORIG_UNLINK(path: *const c_char) -> c_int {
         let ret = ORIG_UNLINK(path);
         if ret == 0 {
-            if let Ok(id) = CPath::from_path(path, false).get_id() {
+            let path = CPath::from_path(path, false);
+            if let Ok(id) = path.get_id() {
                 send(Message::Remove(id));
+            } else {
+                warn!("Failed to get unlink path: {:?}", path);
             }
         }
         Ok(ret)
@@ -25,8 +28,11 @@ wrap! {
     unsafe fn unlinkat:ORIG_UNLINKAT(dfd: c_int, path: *const c_char, flags: c_int) -> c_int {
         let ret = ORIG_UNLINKAT(dfd, path, flags);
         if ret == 0 {
-            if let Ok(id) = CPath::from_path_at(dfd, path, flags).get_id() {
+            let path = CPath::from_path_at(dfd, path, flags);
+            if let Ok(id) = path.get_id() {
                 send(Message::Remove(id));
+            } else {
+                warn!("Failed to get unlink path: {:?}", path);
             }
         }
         Ok(ret)

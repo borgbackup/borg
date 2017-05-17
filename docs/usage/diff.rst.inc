@@ -6,7 +6,7 @@ borg diff
 ---------
 ::
 
-    borg diff <options> REPO_ARCHIVE1 ARCHIVE2 PATH
+    borg [common options] diff <options> REPO_ARCHIVE1 ARCHIVE2 PATH
 
 positional arguments
     REPO_ARCHIVE1

@@ -6,7 +6,7 @@ borg with-lock
 --------------
 ::
 
-    borg with-lock <options> REPOSITORY COMMAND ARGS
+    borg [common options] with-lock <options> REPOSITORY COMMAND ARGS
 
 positional arguments
     REPOSITORY

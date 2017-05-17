@@ -6,7 +6,7 @@ borg check
 ----------
 ::
 
-    borg check <options> REPOSITORY_OR_ARCHIVE
+    borg [common options] check <options> REPOSITORY_OR_ARCHIVE
 
 positional arguments
     REPOSITORY_OR_ARCHIVE
@@ -23,8 +23,6 @@ optional arguments
         | attempt to repair any inconsistencies found
     ``--save-space``
         | work slower, but using less space
-    ``-p``, ``--progress``
-        | show progress display while checking
 
 `Common options`_
     |

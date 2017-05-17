@@ -6,7 +6,7 @@ borg key import
 ---------------
 ::
 
-    borg key import <options> REPOSITORY PATH
+    borg [common options] key import <options> REPOSITORY PATH
 
 positional arguments
     REPOSITORY

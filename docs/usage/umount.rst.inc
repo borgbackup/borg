@@ -6,7 +6,7 @@ borg umount
 -----------
 ::
 
-    borg umount <options> MOUNTPOINT
+    borg [common options] umount <options> MOUNTPOINT
 
 positional arguments
     MOUNTPOINT

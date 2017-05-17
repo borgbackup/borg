@@ -6,7 +6,7 @@ borg extract
 ------------
 ::
 
-    borg extract <options> ARCHIVE PATH
+    borg [common options] extract <options> ARCHIVE PATH
 
 positional arguments
     ARCHIVE
@@ -15,8 +15,6 @@ positional arguments
         paths to extract; patterns are supported
 
 optional arguments
-    ``-p``, ``--progress``
-        | show progress while extracting (may be slower)
     ``--list``
         | output verbose list of items (files, dirs, ...)
     ``-n``, ``--dry-run``
@@ -54,3 +52,6 @@ See the output of the "borg help patterns" command for more help on exclude patt
 By using ``--dry-run``, you can do all extraction steps except actually writing the
 output data: reading metadata and data chunks from the repo, checking the hash/hmac,
 decrypting, decompressing.
+
+``--progress`` can be slower than no progress display, since it makes one additional
+pass over the archive metadata.

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXTRACT 1 "2017-04-29" "" "borg backup tool"
+.TH BORG-EXTRACT 1 "2017-05-17" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg extract <options> ARCHIVE PATH
+borg [common options] extract <options> ARCHIVE PATH
 .SH DESCRIPTION
 .sp
 This command extracts the contents of an archive. By default the entire
@@ -45,6 +45,9 @@ See the output of the "borg help patterns" command for more help on exclude patt
 By using \fB\-\-dry\-run\fP, you can do all extraction steps except actually writing the
 output data: reading metadata and data chunks from the repo, checking the hash/hmac,
 decrypting, decompressing.
+.sp
+\fB\-\-progress\fP can be slower than no progress display, since it makes one additional
+pass over the archive metadata.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -59,9 +62,6 @@ paths to extract; patterns are supported
 .UNINDENT
 .SS optional arguments
 .INDENT 0.0
-.TP
-.B \-p\fP,\fB  \-\-progress
-show progress while extracting (may be slower)
 .TP
 .B \-\-list
 output verbose list of items (files, dirs, ...)

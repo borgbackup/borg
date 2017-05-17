@@ -6,15 +6,13 @@ borg delete
 -----------
 ::
 
-    borg delete <options> TARGET
+    borg [common options] delete <options> TARGET
 
 positional arguments
     TARGET
         archive or repository to delete
 
 optional arguments
-    ``-p``, ``--progress``
-        | show progress display while deleting a single archive
     ``-s``, ``--stats``
         | print statistics for the deleted archive
     ``-c``, ``--cache-only``

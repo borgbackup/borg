@@ -6,7 +6,7 @@ borg list
 ---------
 ::
 
-    borg list <options> REPOSITORY_OR_ARCHIVE PATH
+    borg [common options] list <options> REPOSITORY_OR_ARCHIVE PATH
 
 positional arguments
     REPOSITORY_OR_ARCHIVE
@@ -21,7 +21,9 @@ optional arguments
         | specify format for file listing
         |                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
     ``--json``
-        | format output as JSON. The form of --format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+        | Only valid for listing repository contents. Format output as JSON. The form of --format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
+    ``--json-lines``
+        | Only valid for listing archive contents. Format output as JSON Lines. The form of --format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 
 `Common options`_
     |

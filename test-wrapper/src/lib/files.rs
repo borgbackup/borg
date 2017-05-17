@@ -2,6 +2,7 @@ use std::os::raw::*;
 
 use shared::*;
 
+use libc;
 use errno::errno;
 
 wrap! {
@@ -15,26 +16,28 @@ wrap! {
     }
 
     unsafe fn unlink:ORIG_UNLINK(path: *const c_char) -> c_int {
+        let cpath = CPath::from_path(path, false);
+        let id = cpath.get_id(); // needs to be done before ORIG_UNLINK
         let ret = ORIG_UNLINK(path);
         if ret == 0 {
-            let path = CPath::from_path(path, false);
-            if let Ok(id) = path.get_id() {
+            if let Ok(id) = id {
                 send(Message::Remove(id));
             } else {
-                warn!("Failed to get unlink path: {:?} errno {}", path, errno());
+                warn!("Failed to get unlink path: {:?} errno {}", cpath, errno());
             }
         }
         Ok(ret)
     }
 
     unsafe fn unlinkat:ORIG_UNLINKAT(dfd: c_int, path: *const c_char, flags: c_int) -> c_int {
-        let ret = ORIG_UNLINKAT(dfd, path, flags);
+        let cpath = CPath::from_path_at(dfd, path, flags);
+        let id = cpath.get_id();
+        let ret = ORIG_UNLINKAT(dfd, path, flags & !libc::AT_REMOVEDIR);
         if ret == 0 {
-            let path = CPath::from_path_at(dfd, path, flags);
-            if let Ok(id) = path.get_id() {
+            if let Ok(id) = id {
                 send(Message::Remove(id));
             } else {
-                warn!("Failed to get unlink path: {:?} errno {}", path, errno());
+                warn!("Failed to get unlink path: {:?} errno {}", cpath, errno());
             }
         }
         Ok(ret)

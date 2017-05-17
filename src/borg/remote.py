@@ -252,7 +252,7 @@ class RepositoryServer:  # pragma: no cover
                             ex_short = traceback.format_exception_only(e.__class__, e)
                             ex_full = traceback.format_exception(*sys.exc_info())
                             if isinstance(e, Error):
-                                ex_short = e.get_message()
+                                ex_short = [e.get_message()]
                             if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
                                 # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
                                 # and will be handled just like locally raised exceptions. Suppress the remote traceback

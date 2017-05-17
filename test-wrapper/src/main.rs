@@ -60,7 +60,6 @@ pub struct ReplyGetPermissions {
     dev: Option<dev_t>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub enum NetworkLogLevel {
     Error,
@@ -207,7 +206,7 @@ fn main() {
                 };
                 match message {
                     Message::Log(_, _) => {},
-                    _ => debug!("{:?}", message),
+                    _ => trace!("{:?}", message),
                 }
                 match message {
                     Message::Remove(id) => {

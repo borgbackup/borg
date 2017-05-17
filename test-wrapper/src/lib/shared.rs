@@ -125,7 +125,7 @@ macro_rules! info {
 macro_rules! debug {
     ($( $x:tt )*) => {
         if cfg!(debug_assertions) {
-            send(Message::Log(NetworkLogLevel::Error, format!($( $x )*).as_str()));
+            send(Message::Log(NetworkLogLevel::Debug, format!($( $x )*).as_str()));
         }
     }
 }
@@ -178,7 +178,7 @@ macro_rules! __wrap_fn {
             match (move || -> Result<$ret_t> { $code })() {
                 Ok(r) => {
                     if r == -1 {
-                        trace!(concat!(stringify!($name), " -> Ok(-1) errno {:?}"), ::errno::errno());
+                        debug!(concat!(stringify!($name), " -> Ok(-1) {:?}"), ::errno::errno());
                     } else {
                         trace!(concat!(stringify!($name), " -> Ok({})"), r);
                         ::errno::set_errno(old_errno);
@@ -187,9 +187,9 @@ macro_rules! __wrap_fn {
                 },
                 Err(e) => {
                     if e == 0 {
-                        trace!(concat!(stringify!($name), " -> Err(0) errno {}"), ::errno::errno().0);
+                        debug!(concat!(stringify!($name), " -> Err(0) {:?}"), ::errno::errno());
                     } else {
-                        trace!(concat!(stringify!($name), " -> Err({})"), e);
+                        debug!(concat!(stringify!($name), " -> Err({})"), e);
                         ::errno::set_errno(::errno::Errno(e));
                     }
                     -1

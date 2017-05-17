@@ -15,8 +15,10 @@ trait StatBase {
 
 impl StatBase for libc::stat {
     fn set_mode(&mut self, mode: mode_t, mask: mode_t) {
-        debug_assert_eq!(mode & !mask, 0);
-        self.st_mode = mode | (self.st_mode & !mask);
+        assert_eq!(mode & !mask, 0);
+        let new_mode = mode | (self.st_mode & !mask);
+        trace!("Faking mode 0o{:o} with 0o{:o} & 0o{:o} -> 0o{:o}", self.st_mode, mode, mask, new_mode);
+        self.st_mode = new_mode;
     }
 
     fn set_owner(&mut self, owner: uid_t) {
@@ -36,8 +38,10 @@ impl StatBase for libc::stat {
 #[cfg(target_pointer_width = "64")]
 impl StatBase for libc::stat64 {
     fn set_mode(&mut self, mode: mode_t, mask: mode_t) {
-        debug_assert_eq!(mode & !mask, 0);
-        self.st_mode = mode | (self.st_mode & !mask);
+        assert_eq!(mode & !mask, 0);
+        let new_mode = mode | (self.st_mode & !mask);
+        trace!("Faking mode 0o{:o} with 0o{:o} & 0o{:o} -> 0o{:o}", self.st_mode, mode, mask, new_mode);
+        self.st_mode = new_mode;
     }
 
     fn set_owner(&mut self, owner: uid_t) {
@@ -70,7 +74,7 @@ fn stat_base(path: CPath, statbuf: &mut StatBase) {
     if let Some(group) = overrides.group {
         statbuf.set_group(group);
     }
-    // TODO: this breaks stuff
+    // TODO this breaks stuff
     //if let Some(dev) = overrides.dev {
     //    statbuf.set_rdev(dev);
     //}

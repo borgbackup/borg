@@ -6,7 +6,7 @@ borg recreate
 -------------
 ::
 
-    borg recreate <options> REPOSITORY_OR_ARCHIVE PATH
+    borg [common options] recreate <options> REPOSITORY_OR_ARCHIVE PATH
 
 positional arguments
     REPOSITORY_OR_ARCHIVE
@@ -19,8 +19,6 @@ optional arguments
         | output verbose list of items (files, dirs, ...)
     ``--filter STATUSCHARS``
         | only display items with the given status characters
-    ``-p``, ``--progress``
-        | show progress display while recreating archives
     ``-n``, ``--dry-run``
         | do not change anything
     ``-s``, ``--stats``

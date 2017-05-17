@@ -6,7 +6,7 @@ borg export-tar
 ---------------
 ::
 
-    borg export-tar <options> ARCHIVE FILE PATH
+    borg [common options] export-tar <options> ARCHIVE FILE PATH
 
 positional arguments
     ARCHIVE

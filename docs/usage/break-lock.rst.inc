@@ -6,7 +6,7 @@ borg break-lock
 ---------------
 ::
 
-    borg break-lock <options> REPOSITORY
+    borg [common options] break-lock <options> REPOSITORY
 
 positional arguments
     REPOSITORY

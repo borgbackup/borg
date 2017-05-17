@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CHECK 1 "2017-04-29" "" "borg backup tool"
+.TH BORG-CHECK 1 "2017-05-17" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg check <options> REPOSITORY_OR_ARCHIVE
+borg [common options] check <options> REPOSITORY_OR_ARCHIVE
 .SH DESCRIPTION
 .sp
 The check command verifies the consistency of a repository and the corresponding archives.
@@ -120,9 +120,6 @@ attempt to repair any inconsistencies found
 .TP
 .B \-\-save\-space
 work slower, but using less space
-.TP
-.B \-p\fP,\fB  \-\-progress
-show progress display while checking
 .UNINDENT
 .SS filters
 .INDENT 0.0

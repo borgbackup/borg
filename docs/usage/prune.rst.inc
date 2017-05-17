@@ -6,7 +6,7 @@ borg prune
 ----------
 ::
 
-    borg prune <options> REPOSITORY
+    borg [common options] prune <options> REPOSITORY
 
 positional arguments
     REPOSITORY
@@ -17,8 +17,6 @@ optional arguments
         | do not change repository
     ``--force``
         | force pruning of corrupted archives
-    ``-p``, ``--progress``
-        | show progress display while deleting archives
     ``-s``, ``--stats``
         | print statistics for the deleted archive
     ``--list``

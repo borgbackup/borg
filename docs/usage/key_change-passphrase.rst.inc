@@ -6,7 +6,7 @@ borg key change-passphrase
 --------------------------
 ::
 
-    borg key change-passphrase <options> REPOSITORY
+    borg [common options] key change-passphrase <options> REPOSITORY
 
 positional arguments
     REPOSITORY

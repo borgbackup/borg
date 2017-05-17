@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2017-04-29" "" "borg backup tool"
+.TH BORG-LIST 1 "2017-05-17" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg list <options> REPOSITORY_OR_ARCHIVE PATH
+borg [common options] list <options> REPOSITORY_OR_ARCHIVE PATH
 .SH DESCRIPTION
 .sp
 This command lists the contents of a repository or an archive.
@@ -61,7 +61,10 @@ specify format for file listing
 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
 .TP
 .B \-\-json
-format output as JSON. The form of \-\-format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+Only valid for listing repository contents. Format output as JSON. The form of \-\-format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
+.TP
+.B \-\-json\-lines
+Only valid for listing archive contents. Format output as JSON Lines. The form of \-\-format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 .UNINDENT
 .SS filters
 .INDENT 0.0

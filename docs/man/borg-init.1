@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-INIT 1 "2017-04-29" "" "borg backup tool"
+.TH BORG-INIT 1 "2017-05-17" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .
@@ -32,13 +32,13 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg init <options> REPOSITORY
+borg [common options] init <options> REPOSITORY
 .SH DESCRIPTION
 .sp
 This command initializes an empty repository. A repository is a filesystem
 directory containing the deduplicated data from zero or more archives.
 .sp
-Encryption can be enabled at repository init time.
+Encryption can be enabled at repository init time. It cannot be changed later.
 .sp
 It is not recommended to work without encryption. Repository encryption protects
 you e.g. against the case that an attacker has access to your backup repository.
@@ -94,8 +94,8 @@ These modes are new and \fInot\fP compatible with borg 1.0.x.
 .sp
 \fIauthenticated\fP mode uses no encryption, but authenticates repository contents
 through the same keyed BLAKE2b\-256 hash as the other blake2 modes (it uses it
-as chunk ID hash). The key is stored like repokey.
-This mode is new and not compatible with borg 1.0.x.
+as the chunk ID hash). The key is stored like repokey.
+This mode is new and \fInot\fP compatible with borg 1.0.x.
 .sp
 \fInone\fP mode uses no encryption and no authentication. It uses sha256 as chunk
 ID hash. Not recommended, rather consider using an authenticated or
@@ -123,7 +123,7 @@ repository to create
 .INDENT 0.0
 .TP
 .B \-e\fP,\fB  \-\-encryption
-select encryption key mode
+select encryption key mode \fB(required)\fP
 .TP
 .B \-a\fP,\fB  \-\-append\-only
 create an append\-only mode repository

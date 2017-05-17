@@ -6,7 +6,7 @@ borg info
 ---------
 ::
 
-    borg info <options> REPOSITORY_OR_ARCHIVE
+    borg [common options] info <options> REPOSITORY_OR_ARCHIVE
 
 positional arguments
     REPOSITORY_OR_ARCHIVE

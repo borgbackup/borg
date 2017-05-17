@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-04-29" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-05-17" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg create <options> ARCHIVE PATH
+borg [common options] create <options> ARCHIVE PATH
 .SH DESCRIPTION
 .sp
 This command creates a backup archive containing all files found while recursively
@@ -63,6 +63,10 @@ creation of a new archive to ensure fast operation. This is because the file cac
 is used to determine changed files quickly uses absolute filenames.
 If this is not possible, consider creating a bind mount to a stable location.
 .sp
+The \-\-progress option shows (from left to right) Original, Compressed and Deduplicated
+(O, C and D, respectively), then the Number of files (N) processed so far, followed by
+the currently processed path.
+.sp
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
 .SH OPTIONS
@@ -85,9 +89,6 @@ do not create a backup archive
 .TP
 .B \-s\fP,\fB  \-\-stats
 print statistics for the created archive
-.TP
-.B \-p\fP,\fB  \-\-progress
-show progress display while creating the archive, showing Original, Compressed and Deduplicated sizes, followed by the Number of files seen and the path being processed, default: False
 .TP
 .B \-\-list
 output verbose list of items (files, dirs, ...)

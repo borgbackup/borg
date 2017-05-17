@@ -6,7 +6,7 @@ borg key migrate-to-repokey
 ---------------------------
 ::
 
-    borg key migrate-to-repokey <options> REPOSITORY
+    borg [common options] key migrate-to-repokey <options> REPOSITORY
 
 positional arguments
     REPOSITORY

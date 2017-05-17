@@ -6,7 +6,7 @@ borg serve
 ----------
 ::
 
-    borg serve <options>
+    borg [common options] serve <options>
 
 optional arguments
     ``--restrict-to-path PATH``

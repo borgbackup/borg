@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PRUNE 1 "2017-04-29" "" "borg backup tool"
+.TH BORG-PRUNE 1 "2017-05-17" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg prune <options> REPOSITORY
+borg [common options] prune <options> REPOSITORY
 .SH DESCRIPTION
 .sp
 The prune command prunes a repository by deleting all archives not matching
@@ -90,9 +90,6 @@ do not change repository
 .TP
 .B \-\-force
 force pruning of corrupted archives
-.TP
-.B \-p\fP,\fB  \-\-progress
-show progress display while deleting archives
 .TP
 .B \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive

@@ -6,7 +6,7 @@ borg rename
 -----------
 ::
 
-    borg rename <options> ARCHIVE NEWNAME
+    borg [common options] rename <options> ARCHIVE NEWNAME
 
 positional arguments
     ARCHIVE

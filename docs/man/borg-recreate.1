@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2017-04-29" "" "borg backup tool"
+.TH BORG-RECREATE 1 "2017-05-17" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg recreate <options> REPOSITORY_OR_ARCHIVE PATH
+borg [common options] recreate <options> REPOSITORY_OR_ARCHIVE PATH
 .SH DESCRIPTION
 .sp
 Recreate the contents of existing archives.
@@ -91,9 +91,6 @@ output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters
-.TP
-.B \-p\fP,\fB  \-\-progress
-show progress display while recreating archives
 .TP
 .B \-n\fP,\fB  \-\-dry\-run
 do not change anything

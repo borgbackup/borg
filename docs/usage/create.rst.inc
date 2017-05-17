@@ -6,7 +6,7 @@ borg create
 -----------
 ::
 
-    borg create <options> ARCHIVE PATH
+    borg [common options] create <options> ARCHIVE PATH
 
 positional arguments
     ARCHIVE
@@ -19,8 +19,6 @@ optional arguments
         | do not create a backup archive
     ``-s``, ``--stats``
         | print statistics for the created archive
-    ``-p``, ``--progress``
-        | show progress display while creating the archive, showing Original, Compressed and Deduplicated sizes, followed by the Number of files seen and the path being processed, default: False
     ``--list``
         | output verbose list of items (files, dirs, ...)
     ``--filter STATUSCHARS``
@@ -103,6 +101,10 @@ The mount points of filesystems or filesystem snapshots should be the same for e
 creation of a new archive to ensure fast operation. This is because the file cache that
 is used to determine changed files quickly uses absolute filenames.
 If this is not possible, consider creating a bind mount to a stable location.
+
+The --progress option shows (from left to right) Original, Compressed and Deduplicated
+(O, C and D, respectively), then the Number of files (N) processed so far, followed by
+the currently processed path.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.

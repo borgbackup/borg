@@ -6,15 +6,13 @@ borg upgrade
 ------------
 ::
 
-    borg upgrade <options> REPOSITORY
+    borg [common options] upgrade <options> REPOSITORY
 
 positional arguments
     REPOSITORY
         path to the repository to be upgraded
 
 optional arguments
-    ``-p``, ``--progress``
-        | show progress display while upgrading the repository
     ``-n``, ``--dry-run``
         | do not change repository
     ``-i``, ``--inplace``

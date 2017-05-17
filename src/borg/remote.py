@@ -313,9 +313,10 @@ class RepositoryServer:  # pragma: no cover
         # clients since 1.1.0b3 use a dict as client_data
         if isinstance(client_data, dict):
             self.client_version = client_data[b'client_version']
-            level = logging.getLevelName(logging.getLogger('').level)
-            setup_logging(is_serve=True, json=True, level=level)
-            logger.debug('Initialized loggin system for new protocol')
+            if client_data.get(b'client_supports_log_v3', False):
+                level = logging.getLevelName(logging.getLogger('').level)
+                setup_logging(is_serve=True, json=True, level=level)
+                logger.debug('Initialized logging system for new (v3) protocol')
         else:
             self.client_version = BORG_VERSION  # seems to be newer than current version (no known old format)
 
@@ -559,7 +560,10 @@ class RemoteRepository:
 
         try:
             try:
-                version = self.call('negotiate', {'client_data': {b'client_version': BORG_VERSION}})
+                version = self.call('negotiate', {'client_data': {
+                    b'client_version': BORG_VERSION,
+                    b'client_supports_log_v3': True,
+                }})
             except ConnectionClosed:
                 raise ConnectionClosedWithHint('Is borg working on the server?') from None
             if version == RPC_PROTOCOL_VERSION:

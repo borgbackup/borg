@@ -11,9 +11,11 @@ import os.path
 import platform
 import pwd
 import re
+import shlex
 import signal
 import socket
 import stat
+import subprocess
 import sys
 import textwrap
 import threading
@@ -1962,3 +1964,34 @@ def secure_erase(path):
         fd.flush()
         os.fsync(fd.fileno())
     os.unlink(path)
+
+
+def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
+    """
+    Handle typical errors raised by subprocess.Popen. Return None if an error occurred,
+    otherwise return the Popen object.
+
+    *cmd_line* is split using shlex (e.g. 'gzip -9' => ['gzip', '-9']).
+
+    Log messages will be prefixed with *log_prefix*; if set, it should end with a space
+    (e.g. log_prefix='--some-option: ').
+
+    Does not change the exit code.
+    """
+    assert not kwargs.get('shell'), 'Sorry pal, shell mode is a no-no'
+    try:
+        command = shlex.split(cmd_line)
+        if not command:
+            raise ValueError('an empty command line is not permitted')
+    except ValueError as ve:
+        logger.error('%s%s', log_prefix, ve)
+        return
+    logger.debug('%scommand line: %s', log_prefix, command)
+    try:
+        return subprocess.Popen(command, **kwargs)
+    except FileNotFoundError:
+        logger.error('%sexecutable not found: %s', log_prefix, command[0])
+        return
+    except PermissionError:
+        logger.error('%spermission denied: %s', log_prefix, command[0])
+        return

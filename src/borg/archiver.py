@@ -772,7 +772,7 @@ class Archiver:
             rc = filterproc.wait()
             if rc:
                 logger.error('--tar-filter exited with code %d, output file is likely unusable!', rc)
-                self.exit_code = set_ec(EXIT_ERROR)
+                self.exit_code = EXIT_ERROR
             else:
                 logger.debug('filter exited with code %d', rc)
 

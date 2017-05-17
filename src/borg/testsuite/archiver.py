@@ -728,7 +728,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
 
-    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+    requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+
+    @requires_hardlinks
     def test_strip_components_links(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
@@ -741,7 +743,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.stat('input/dir1/hardlink').st_nlink == 4
 
-    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+    @requires_hardlinks
     def test_extract_hardlinks(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
@@ -2386,10 +2388,10 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar')
+        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--progress')
         with changedir('output'):
             # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
-            subprocess.check_output(['tar', 'xpf', '../simple.tar'])
+            subprocess.check_call(['tar', 'xpf', '../simple.tar'])
         self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
 
     @requires_gnutar
@@ -2401,10 +2403,52 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz')
+        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz', '--list')
+        assert 'input/file1\n' in list
+        assert 'input/dir2\n' in list
         with changedir('output'):
-            subprocess.check_output(['tar', 'xpf', '../simple.tar.gz'])
+            subprocess.check_call(['tar', 'xpf', '../simple.tar.gz'])
         self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
+
+    @requires_gnutar
+    def test_export_tar_strip_components(self):
+        if not shutil.which('gzip'):
+            pytest.skip('gzip is not installed')
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--strip-components=1', '--list')
+        # --list's path are those before processing with --strip-components
+        assert 'input/file1\n' in list
+        assert 'input/dir2\n' in list
+        with changedir('output'):
+            subprocess.check_call(['tar', 'xpf', '../simple.tar'])
+        self.assert_dirs_equal('input', 'output/', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
+
+    @requires_hardlinks
+    @requires_gnutar
+    def test_export_tar_strip_components_links(self):
+        self._extract_hardlinks_setup()
+        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', '--strip-components=2')
+        with changedir('output'):
+            subprocess.check_call(['tar', 'xpf', '../output.tar'])
+            assert os.stat('hardlink').st_nlink == 2
+            assert os.stat('subdir/hardlink').st_nlink == 2
+            assert os.stat('aaaa').st_nlink == 2
+            assert os.stat('source2').st_nlink == 2
+
+    @requires_hardlinks
+    @requires_gnutar
+    def test_extract_hardlinks(self):
+        self._extract_hardlinks_setup()
+        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1')
+        with changedir('output'):
+            subprocess.check_call(['tar', 'xpf', '../output.tar'])
+            assert os.stat('input/dir1/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/aaaa').st_nlink == 2
+            assert os.stat('input/dir1/source2').st_nlink == 2
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

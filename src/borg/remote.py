@@ -2,29 +2,30 @@ import errno
 import fcntl
 import functools
 import inspect
+import json
 import logging
 import os
 import select
 import shlex
 import sys
 import tempfile
-import traceback
 import textwrap
 import time
+import traceback
 from subprocess import Popen, PIPE
 
 import msgpack
 
 from . import __version__
 from .helpers import Error, IntegrityError
-from .helpers import get_home_dir
-from .helpers import sysinfo
 from .helpers import bin_to_hex
-from .helpers import replace_placeholders
+from .helpers import get_home_dir
 from .helpers import hostname_is_unique
+from .helpers import replace_placeholders
+from .helpers import sysinfo
+from .logger import create_logger, setup_logging
 from .repository import Repository, MAX_OBJECT_SIZE, LIST_SCAN_LIMIT
 from .version import parse_version, format_version
-from .logger import create_logger
 
 logger = create_logger(__name__)
 
@@ -312,6 +313,9 @@ class RepositoryServer:  # pragma: no cover
         # clients since 1.1.0b3 use a dict as client_data
         if isinstance(client_data, dict):
             self.client_version = client_data[b'client_version']
+            level = logging.getLevelName(logging.getLogger('').level)
+            setup_logging(is_serve=True, json=True, level=level)
+            logger.debug('Initialized loggin system for new protocol')
         else:
             self.client_version = BORG_VERSION  # seems to be newer than current version (no known old format)
 
@@ -646,12 +650,6 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 opts.append('--critical')
             else:
                 raise ValueError('log level missing, fix this code')
-            try:
-                borg_logger = logging.getLogger('borg')
-                if borg_logger.json:
-                    opts.append('--log-json')
-            except AttributeError:
-                pass
         env_vars = []
         if not hostname_is_unique():
             env_vars.append('BORG_HOSTNAME_IS_UNIQUE=no')
@@ -930,7 +928,58 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
 
 def handle_remote_line(line):
-    if line.startswith('$LOG '):
+    """
+    Handle a remote log line.
+
+    This function is remarkably complex because it handles three different wire formats.
+    """
+    if line.startswith('{'):
+        # This format is used by Borg since 1.1.0b6 for new-protocol clients.
+        # It is the same format that is exposed by --log-json.
+        msg = json.loads(line)
+
+        if msg['type'] not in ('progress_message', 'progress_percent', 'log_message'):
+            logger.warning('Dropped remote log message with unknown type %r: %s', msg['type'], line)
+            return
+
+        if msg['type'] == 'log_message':
+            # Re-emit log messages on the same level as the remote to get correct log suppression and verbosity.
+            level = getattr(logging, msg['levelname'], logging.CRITICAL)
+            assert isinstance(level, int)
+            target_logger = logging.getLogger(msg['name'])
+            # We manually check whether the log message should be propagated
+            if level >= target_logger.getEffectiveLevel() and logging.getLogger('borg').json:
+                sys.stderr.write(line)
+            else:
+                target_logger.log(level, '%s', msg['message'])
+        elif msg['type'].startswith('progress_') and not msg.get('finished'):
+            # Progress messages are a bit more complex.
+            # First of all, we check whether progress output is enabled. This is signalled
+            # through the effective level of the borg.output.progress logger
+            # (also see ProgressIndicatorBase in borg.helpers).
+            progress_logger = logging.getLogger('borg.output.progress')
+            if progress_logger.getEffectiveLevel() == logging.INFO:
+                # When progress output is enabled, then we check whether the client is in
+                # --log-json mode, as signalled by the "json" attribute on the "borg" logger.
+                if logging.getLogger('borg').json:
+                    # In --log-json mode we directly re-emit the progress line as sent by the server.
+                    sys.stderr.write(line)
+                else:
+                    # In text log mode we write only the message to stderr and terminate with \r
+                    # (carriage return, i.e. move the write cursor back to the beginning of the line)
+                    # so that the next message, progress or not, overwrites it. This mirrors the behaviour
+                    # of local progress displays.
+                    sys.stderr.write(msg['message'] + '\r')
+    elif line.startswith('$LOG '):
+        # This format is used by Borg since 1.1.0b1.
+        # It prefixed log lines with $LOG as a marker, followed by the log level
+        # and optionally a logger name, then "Remote:" as a separator followed by the original
+        # message.
+        #
+        # It is the oldest format supported by these servers, so it was important to make
+        # it readable with older (1.0.x) clients.
+        #
+        # TODO: Remove this block (so it'll be handled by the "else:" below) with a Borg 1.1 RC.
         _, level, msg = line.split(' ', 2)
         level = getattr(logging, level, logging.CRITICAL)  # str -> int
         if msg.startswith('Remote:'):
@@ -941,7 +990,15 @@ def handle_remote_line(line):
             logname, msg = msg.split(' ', 1)
             logging.getLogger(logname).log(level, msg.rstrip())
     else:
-        sys.stderr.write('Remote: ' + line)
+        # Plain 1.0.x and older format - re-emit to stderr (mirroring what the 1.0.x
+        # client did) or as a generic log message.
+        # We don't know what priority the line had.
+        if logging.getLogger('borg').json:
+            logging.getLogger('').warning('Remote: ' + line.strip())
+        else:
+            # In non-JSON mode we circumvent logging to preserve carriage returns (\r)
+            # which are generated by remote progress displays.
+            sys.stderr.write('Remote: ' + line)
 
 
 class RepositoryNoCache:

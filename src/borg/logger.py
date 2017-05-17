@@ -88,15 +88,21 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
     # if we did not / not successfully load a logging configuration, fallback to this:
     logger = logging.getLogger('')
     handler = logging.StreamHandler(stream)
-    if is_serve:
+    if is_serve and not json:
         fmt = '$LOG %(levelname)s %(name)s Remote: %(message)s'
     else:
         fmt = '%(message)s'
-    formatter = JsonFormatter(fmt) if json and not is_serve else logging.Formatter(fmt)
+    formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
     handler.setFormatter(formatter)
     borg_logger = logging.getLogger('borg')
     borg_logger.formatter = formatter
     borg_logger.json = json
+    if configured and logger.handlers:
+        # The RepositoryServer can call setup_logging a second time to adjust the output
+        # mode from text-ish is_serve to json is_serve.
+        # Thus, remove the previously installed handler, if any.
+        logger.handlers[0].close()
+        logger.handlers.clear()
     logger.addHandler(handler)
     logger.setLevel(level.upper())
     configured = True
@@ -224,6 +230,8 @@ class JsonFormatter(logging.Formatter):
         data = {
             'type': 'log_message',
             'time': record.created,
+            'message': '',
+            'levelname': 'CRITICAL',
         }
         for attr in self.RECORD_ATTRIBUTES:
             value = getattr(record, attr, None)

@@ -714,6 +714,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         class MockArgs:
             remote_path = 'borg'
             umask = 0o077
+            debug_topics = []
 
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
         args = MockArgs()

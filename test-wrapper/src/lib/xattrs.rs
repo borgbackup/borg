@@ -9,7 +9,7 @@ use shared::*;
 
 unsafe fn setxattr_base(path: CPath, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> Result<c_int> {
     let err = request::<c_int>(Message::XattrsSet(
-            path.get_ino()?,
+            path.get_id()?,
             CStr::from_ptr(name).to_bytes(),
             slice::from_raw_parts(value as *const u8, size),
             flags));
@@ -21,7 +21,7 @@ unsafe fn setxattr_base(path: CPath, name: *const c_char, value: *const c_void, 
 }
 
 unsafe fn getxattr_base(path: CPath, name: *const c_char, dest: *mut c_void, size: usize) -> Result<isize> {
-    let res = request::<ReplyXattrsGet>(Message::XattrsGet(path.get_ino()?,
+    let res = request::<ReplyXattrsGet>(Message::XattrsGet(path.get_id()?,
         CStr::from_ptr(name).to_bytes()));
     if let Some(value) = res.0 {
         if value.len() > (c_int::max_value() as usize) {
@@ -44,7 +44,7 @@ unsafe fn getxattr_base(path: CPath, name: *const c_char, dest: *mut c_void, siz
 }
 
 unsafe fn listxattr_base(path: CPath, dest: *mut c_char, size: usize) -> Result<isize> {
-    let res = request::<ReplyXattrsList>(Message::XattrsList(path.get_ino()?)).0;
+    let res = request::<ReplyXattrsList>(Message::XattrsList(path.get_id()?)).0;
     let total_size = res.len() + res.iter().map(|i| i.len()).sum::<usize>();
     if total_size > (c_int::max_value() as usize) {
         return Err(libc::E2BIG);

@@ -51,15 +51,24 @@ pub enum NetworkLogLevel {
     Trace,
 }
 
+#[derive(Debug, Serialize, Hash, PartialEq, Eq, Clone, Copy)]
+pub struct FileId(dev_t, ino_t);
+
+impl From<NativeStat> for FileId {
+    fn from(stat: NativeStat) -> FileId {
+        FileId(stat.st_dev, stat.st_ino)
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub enum Message<'a> {
-    Remove(ino_t),
-    XattrsGet(ino_t, &'a [u8]),
-    XattrsSet(ino_t, &'a [u8], &'a [u8], c_int),
-    XattrsList(ino_t),
-    OverrideMode(ino_t, mode_t, mode_t, Option<dev_t>),
-    OverrideOwner(ino_t, Option<uid_t>, Option<gid_t>),
-    GetPermissions(ino_t),
+    Remove(FileId),
+    XattrsGet(FileId, &'a [u8]),
+    XattrsSet(FileId, &'a [u8], &'a [u8], c_int),
+    XattrsList(FileId),
+    OverrideMode(FileId, mode_t, mode_t, Option<dev_t>),
+    OverrideOwner(FileId, Option<uid_t>, Option<gid_t>),
+    GetPermissions(FileId),
     Log(NetworkLogLevel, &'a str),
 }
 
@@ -226,7 +235,7 @@ macro_rules! wrap {
 }
 
 lazy_static! {
-    pub static ref FD_INOS: Mutex<HashMap<c_int, ino_t, BuildHasherDefault<XxHash>>> = Mutex::new(Default::default());
+    pub static ref FD_ID_CACHE: Mutex<HashMap<c_int, FileId, BuildHasherDefault<XxHash>>> = Mutex::new(Default::default());
 }
 
 pub enum CPath {
@@ -269,7 +278,7 @@ impl CPath {
                         INTERNAL_LSTAT(path, &mut statbuf as *mut _)
                     };
                     if ret == 0 {
-                        trace!("get_stat path {:?} -> ino {}", CStr::from_ptr(path), statbuf.st_ino);
+                        trace!("get_stat path {:?} -> dev {} ino {}", CStr::from_ptr(path), statbuf.st_dev, statbuf.st_ino);
                         Ok(statbuf)
                     } else {
                         trace!("get_stat path {:?} -> {}", CStr::from_ptr(path), errno());
@@ -279,7 +288,7 @@ impl CPath {
                 CPath::PathAt(dfd, path, flags) => {
                     let mut statbuf: NativeStat = mem::uninitialized();
                     if INTERNAL_FSTATAT(dfd, path, &mut statbuf as *mut _, flags) == 0 {
-                        trace!("get_stat dfd {} path {:?} -> ino {}", dfd, CStr::from_ptr(path), statbuf.st_ino);
+                        trace!("get_stat dfd {} path {:?} -> dev {} ino {}", dfd, CStr::from_ptr(path), statbuf.st_dev, statbuf.st_ino);
                         Ok(statbuf)
                     } else {
                         trace!("get_stat dfd {} path {:?} -> {}", dfd, CStr::from_ptr(path), errno());
@@ -290,25 +299,26 @@ impl CPath {
         }
     }
 
-    pub fn get_ino(&self) -> Result<ino_t> {
+    pub fn get_id(&self) -> Result<FileId> {
         match *self {
             CPath::FileDescriptor(fd) => {
-                let fd_inos = &mut FD_INOS.lock().unwrap();
-                match fd_inos.entry(fd) {
+                let fd_id_cache = &mut FD_ID_CACHE.lock().unwrap();
+                match fd_id_cache.entry(fd) {
                     hash_map::Entry::Vacant(entry) => {
-                        let ino = self.get_stat()?.st_ino;
-                        entry.insert(ino);
-                        Ok(ino)
+                        let stat = self.get_stat()?;
+                        let id = FileId(stat.st_dev, stat.st_ino);
+                        entry.insert(id);
+                        Ok(id)
                     }
                     hash_map::Entry::Occupied(entry) => {
-                        let ino = entry.get().clone();
-                        trace!("get_ino fd {} -> cached {}", fd, ino);
-                        Ok(ino)
+                        let id = entry.get();
+                        trace!("get_id fd {} -> cached {:?}", fd, id);
+                        Ok(id.clone())
                     }
                 }
             }
             _ => {
-                self.get_stat().map(|stat| stat.st_ino)
+                self.get_stat().map(|stat| FileId(stat.st_dev, stat.st_ino))
             }
         }
     }

@@ -10,7 +10,7 @@ trait StatBase {
     fn set_mode(&mut self, mode: mode_t, mask: mode_t);
     fn set_owner(&mut self, owner: uid_t);
     fn set_group(&mut self, group: gid_t);
-    fn set_dev(&mut self, dev: dev_t);
+    fn set_rdev(&mut self, dev: dev_t);
 }
 
 impl StatBase for libc::stat {
@@ -27,8 +27,8 @@ impl StatBase for libc::stat {
         self.st_gid = group;
     }
 
-    fn set_dev(&mut self, dev: dev_t) {
-        self.st_dev = dev;
+    fn set_rdev(&mut self, dev: dev_t) {
+        self.st_rdev = dev;
     }
 }
 
@@ -48,18 +48,18 @@ impl StatBase for libc::stat64 {
         self.st_gid = group;
     }
 
-    fn set_dev(&mut self, dev: dev_t) {
-        self.st_dev = dev;
+    fn set_rdev(&mut self, dev: dev_t) {
+        self.st_rdev = dev;
     }
 }
 
 fn stat_base(path: CPath, statbuf: &mut StatBase) {
-    let ino = if let Ok(ino) = path.get_ino() {
-        ino
+    let id = if let Ok(id) = path.get_id() {
+        id
     } else {
         return;
     };
-    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(ino));
+    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(id));
     if let Some((mode, mask)) = overrides.mode_and_mask {
         statbuf.set_mode(mode, mask);
     }
@@ -69,9 +69,10 @@ fn stat_base(path: CPath, statbuf: &mut StatBase) {
     if let Some(group) = overrides.group {
         statbuf.set_group(group);
     }
-    if let Some(dev) = overrides.dev {
-        statbuf.set_dev(dev);
-    }
+    // TODO: this breaks stuff
+    //if let Some(dev) = overrides.dev {
+    //    statbuf.set_rdev(dev);
+    //}
 }
 
 fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mut mode: mode_t, orig_chmod: F) -> Result<c_int> {
@@ -91,7 +92,7 @@ fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mut mode: mode_t, orig_ch
         }
     }
     if override_mode {
-        send(Message::OverrideMode(stat.st_ino, mode, 0o777, None));
+        send(Message::OverrideMode(stat.into(), mode, 0o777, None));
     }
     Ok(0)
 }
@@ -99,7 +100,7 @@ fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mut mode: mode_t, orig_ch
 fn chown_base(path: CPath, owner: uid_t, group: gid_t) -> Result<c_int> {
     let owner = if (owner as i32) == -1 { None } else { Some(owner) };
     let group = if (group as i32) == -1 { None } else { Some(group) };
-    send(Message::OverrideOwner(path.get_ino()?, owner, group));
+    send(Message::OverrideOwner(path.get_id()?, owner, group));
     Ok(0)
 }
 
@@ -112,7 +113,7 @@ fn mknod_base<'a, F: Fn() -> CPath, M: Fn(mode_t) -> c_int>(get_path: F, mode: m
     };
     let ret = mknod(base_mode);
     if ret == 0 && override_mode {
-        send(Message::OverrideMode(get_path().get_ino()?, mode, mode_t::max_value(), Some(dev)));
+        send(Message::OverrideMode(get_path().get_id()?, mode, mode_t::max_value(), Some(dev)));
     }
     Ok(ret)
 }

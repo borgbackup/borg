@@ -91,15 +91,18 @@ type ino_t = libc::ino_t;
 #[cfg(target_pointer_width = "64")]
 type ino_t = libc::ino64_t;
 
+#[derive(Debug, Deserialize, Hash, PartialEq, Eq, Clone, Copy)]
+struct FileId(dev_t, ino_t);
+
 #[derive(Debug, Deserialize)]
-pub enum Message {
-    Remove(ino_t),
-    XattrsGet(ino_t, Vec<u8>),
-    XattrsSet(ino_t, Vec<u8>, Vec<u8>, c_int),
-    XattrsList(ino_t),
-    OverrideMode(ino_t, mode_t, mode_t, Option<dev_t>),
-    OverrideOwner(ino_t, Option<uid_t>, Option<gid_t>),
-    GetPermissions(ino_t),
+enum Message {
+    Remove(FileId),
+    XattrsGet(FileId, Vec<u8>),
+    XattrsSet(FileId, Vec<u8>, Vec<u8>, c_int),
+    XattrsList(FileId),
+    OverrideMode(FileId, mode_t, mode_t, Option<dev_t>),
+    OverrideOwner(FileId, Option<uid_t>, Option<gid_t>),
+    GetPermissions(FileId),
     Log(NetworkLogLevel, String),
 }
 
@@ -113,7 +116,7 @@ struct FileEntry {
 }
 
 lazy_static! {
-    static ref DATABASE: RwLock<HashMap<ino_t, FileEntry, BuildHasherDefault<XxHash>>> = RwLock::new(Default::default());
+    static ref DATABASE: RwLock<HashMap<FileId, FileEntry, BuildHasherDefault<XxHash>>> = RwLock::new(Default::default());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -207,12 +210,12 @@ fn main() {
                     _ => debug!("{:?}", message),
                 }
                 match message {
-                    Message::Remove(path) => {
-                        DATABASE.write().unwrap().remove(&path);
+                    Message::Remove(id) => {
+                        DATABASE.write().unwrap().remove(&id);
                     }
-                    Message::XattrsGet(path, attr) => {
+                    Message::XattrsGet(id, attr) => {
                         let database = DATABASE.read().unwrap();
-                        if let Some(file) = database.get(&path) {
+                        if let Some(file) = database.get(&id) {
                             if let Some(vec) = file.xattrs.get(&attr) {
                                 reply(&mut writer, &ReplyXattrsGet(Some(vec.as_slice())));
                                 continue;
@@ -220,9 +223,9 @@ fn main() {
                         }
                         reply(&mut writer, &ReplyXattrsGet(None));
                     }
-                    Message::XattrsSet(path, attr, value, flags) => {
+                    Message::XattrsSet(id, attr, value, flags) => {
                         let mut database = DATABASE.write().unwrap();
-                        let file = database.entry(path).or_insert_with(FileEntry::default);
+                        let file = database.entry(id).or_insert_with(FileEntry::default);
                         if file.xattrs.contains_key(&attr) {
                             if flags & XATTR_CREATE == XATTR_CREATE {
                                 reply(&mut writer, &libc::EEXIST);
@@ -235,19 +238,19 @@ fn main() {
                         file.xattrs.insert(attr, value);
                         reply(&mut writer, &0);
                     }
-                    Message::XattrsList(path) => {
+                    Message::XattrsList(id) => {
                         let database = DATABASE.read().unwrap();
-                        if let Some(file) = database.get(&path) {
+                        if let Some(file) = database.get(&id) {
                             let list = file.xattrs.keys().collect::<Vec<_>>();
                             reply(&mut writer, &ReplyXattrsList(list.as_slice()));
                         } else {
                             reply(&mut writer, &ReplyXattrsList(&[]));
                         }
                     }
-                    Message::OverrideMode(path, mode, mask, dev) => {
+                    Message::OverrideMode(id, mode, mask, dev) => {
                         debug_assert_eq!(mode & !mask, 0);
                         let mut database = DATABASE.write().unwrap();
-                        let file = database.entry(path);
+                        let file = database.entry(id);
                         match file {
                             hash_map::Entry::Occupied(mut entry) => {
                                 let file = entry.get_mut();
@@ -267,9 +270,9 @@ fn main() {
                             }
                         }
                     }
-                    Message::OverrideOwner(path, uid, gid) => {
+                    Message::OverrideOwner(id, uid, gid) => {
                         let mut database = DATABASE.write().unwrap();
-                        let file = database.entry(path);
+                        let file = database.entry(id);
                         match file {
                             hash_map::Entry::Occupied(mut entry) => {
                                 let file = entry.get_mut();
@@ -289,9 +292,9 @@ fn main() {
                             }
                         }
                     }
-                    Message::GetPermissions(path) => {
+                    Message::GetPermissions(id) => {
                         let database = DATABASE.read().unwrap();
-                        let file = database.get(&path);
+                        let file = database.get(&id);
                         let file = file.as_ref();
                         let response = ReplyGetPermissions {
                             mode_and_mask: file.and_then(|file| file.mode_and_mask),

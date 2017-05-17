@@ -2,6 +2,8 @@ use std::os::raw::*;
 
 use shared::*;
 
+use errno::errno;
+
 wrap! {
     // TODO figure out why tracing here causes an EBADF error in Rust's Unix socket code
     !notrace unsafe fn close:ORIG_CLOSE(fd: c_int) -> c_int {
@@ -19,7 +21,7 @@ wrap! {
             if let Ok(id) = path.get_id() {
                 send(Message::Remove(id));
             } else {
-                warn!("Failed to get unlink path: {:?}", path);
+                warn!("Failed to get unlink path: {:?} errno {}", path, errno());
             }
         }
         Ok(ret)
@@ -32,7 +34,7 @@ wrap! {
             if let Ok(id) = path.get_id() {
                 send(Message::Remove(id));
             } else {
-                warn!("Failed to get unlink path: {:?}", path);
+                warn!("Failed to get unlink path: {:?} errno {}", path, errno());
             }
         }
         Ok(ret)

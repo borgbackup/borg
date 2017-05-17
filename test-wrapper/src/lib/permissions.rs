@@ -57,7 +57,7 @@ fn stat_base(path: CPath, statbuf: &mut StatBase) {
     let id = if let Ok(id) = path.get_id() {
         id
     } else {
-        warn!("Failed to get stat path: {:?}", path);
+        warn!("Failed to get stat path: {:?} errno {}", path, errno());
         return;
     };
     let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(id));

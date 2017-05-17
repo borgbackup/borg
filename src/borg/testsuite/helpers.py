@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import io
 import os
+import shutil
 import sys
 from datetime import datetime, timezone, timedelta
 from time import mktime, strptime, sleep
@@ -26,6 +27,7 @@ from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import swidth_slice
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
+from ..helpers import popen_with_error_handling
 
 from . import BaseTestCase, FakeInputs
 
@@ -816,3 +818,28 @@ def test_safe_timestamps():
             datetime.utcfromtimestamp(beyond_y10k)
         assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2262, 1, 1)
         assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2262, 1, 1)
+
+
+class TestPopenWithErrorHandling:
+    @pytest.mark.skipif(not shutil.which('test'), reason='"test" binary is needed')
+    def test_simple(self):
+        proc = popen_with_error_handling('test 1')
+        assert proc.wait() == 0
+
+    @pytest.mark.skipif(shutil.which('borg-foobar-test-notexist'), reason='"borg-foobar-test-notexist" binary exists (somehow?)')
+    def test_not_found(self):
+        proc = popen_with_error_handling('borg-foobar-test-notexist 1234')
+        assert proc is None
+
+    @pytest.mark.parametrize('cmd', (
+            'mismatched "quote',
+            'foo --bar="baz',
+            ''
+    ))
+    def test_bad_syntax(self, cmd):
+        proc = popen_with_error_handling(cmd)
+        assert proc is None
+
+    def test_shell(self):
+        with pytest.raises(AssertionError):
+            popen_with_error_handling('', shell=True)

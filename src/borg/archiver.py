@@ -63,6 +63,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
 from .helpers import ChunkIteratorFileWrapper
+from .helpers import popen_with_error_handling
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
 from .item import Item
@@ -747,9 +748,9 @@ class Archiver:
             # There is no deadlock potential here (the subprocess docs warn about this), because
             # communication with the process is a one-way road, i.e. the process can never block
             # for us to do something while we block on the process for something different.
-            filtercmd = shlex.split(filter)
-            logger.debug('--tar-filter command line: %s', filtercmd)
-            filterproc = subprocess.Popen(filtercmd, stdin=subprocess.PIPE, stdout=filterout)
+            filterproc = popen_with_error_handling(filter, stdin=subprocess.PIPE, stdout=filterout, log_prefix='--tar-filter: ')
+            if not filterproc:
+                return EXIT_ERROR
             # Always close the pipe, otherwise the filter process would not notice when we are done.
             tarstream = filterproc.stdin
             tarstream_close = True
@@ -771,7 +772,7 @@ class Archiver:
             rc = filterproc.wait()
             if rc:
                 logger.error('--tar-filter exited with code %d, output file is likely unusable!', rc)
-                self.exit_code = set_ec(EXIT_ERROR)
+                self.exit_code = EXIT_ERROR
             else:
                 logger.debug('filter exited with code %d', rc)
 

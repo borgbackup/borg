@@ -270,3 +270,25 @@ wrap! {
         mknod_base(|| CPath::from_path_at(dfd, path, 0), mode, dev, |mode| ORIG_XMKNODAT(ver, dfd, path, mode, dev))
     }
 }
+
+// Defined raw as these functions don't follow normal return code pattern
+
+#[no_mangle]
+pub unsafe extern "C" fn getuid() -> uid_t {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn geteuid() -> uid_t {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn getgid() -> gid_t {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn getegid() -> gid_t {
+    0
+}

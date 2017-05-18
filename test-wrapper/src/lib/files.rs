@@ -30,9 +30,9 @@ wrap! {
     }
 
     unsafe fn unlinkat:ORIG_UNLINKAT(dfd: c_int, path: *const c_char, flags: c_int) -> c_int {
-        let cpath = CPath::from_path_at(dfd, path, flags);
+        let cpath = CPath::from_path_at(dfd, path, libc::AT_SYMLINK_NOFOLLOW);
         let id = cpath.get_id();
-        let ret = ORIG_UNLINKAT(dfd, path, flags & !libc::AT_REMOVEDIR);
+        let ret = ORIG_UNLINKAT(dfd, path, flags);
         if ret == 0 {
             if let Ok(id) = id {
                 send(Message::Remove(id));

@@ -293,7 +293,7 @@ class Archiver:
                 path = os.path.normpath(path)
                 if args.one_file_system:
                     try:
-                        restrict_dev = os.lstat(path).st_dev
+                        restrict_dev = os.stat(path, follow_symlinks=False).st_dev
                     except OSError as e:
                         self.print_warning('%s: %s', path, e)
                         continue
@@ -346,7 +346,7 @@ class Archiver:
 
         try:
             with backup_io():
-                st = os.lstat(path)
+                st = os.stat(path, follow_symlinks=False)
             if (st.st_ino, st.st_dev) in skip_inodes:
                 return
             # Entering a new filesystem?

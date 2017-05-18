@@ -472,7 +472,7 @@ Number of files: {0.stats.nfiles}'''.format(
             if fd:
                 os.fchown(fd, uid, gid)
             else:
-                os.lchown(path, uid, gid)
+                os.chown(path, uid, gid, follow_symlinks=False)
         except OSError:
             pass
         if fd:

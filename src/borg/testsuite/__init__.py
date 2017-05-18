@@ -30,13 +30,11 @@ except ImportError:
     raises = None
 
 has_lchflags = hasattr(os, 'lchflags') or sys.platform.startswith('linux')
-no_lchlfags_because = '' if has_lchflags else '(not supported on this platform)'
 try:
     with tempfile.NamedTemporaryFile() as file:
         platform.set_flags(file.name, stat.UF_NODUMP)
 except OSError:
     has_lchflags = False
-    no_lchlfags_because = '(the file system at %s does not support flags)' % tempfile.gettempdir()
 
 try:
     import llfuse

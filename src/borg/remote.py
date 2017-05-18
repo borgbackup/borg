@@ -952,28 +952,32 @@ def handle_remote_line(line):
             assert isinstance(level, int)
             target_logger = logging.getLogger(msg['name'])
             # We manually check whether the log message should be propagated
+            msg['message'] = 'Remote: ' + msg['message']
             if level >= target_logger.getEffectiveLevel() and logging.getLogger('borg').json:
-                sys.stderr.write(line)
+                sys.stderr.write(json.dumps(msg) + '\n')
             else:
                 target_logger.log(level, '%s', msg['message'])
-        elif msg['type'].startswith('progress_') and not msg.get('finished'):
+        elif msg['type'].startswith('progress_'):
             # Progress messages are a bit more complex.
             # First of all, we check whether progress output is enabled. This is signalled
             # through the effective level of the borg.output.progress logger
             # (also see ProgressIndicatorBase in borg.helpers).
             progress_logger = logging.getLogger('borg.output.progress')
             if progress_logger.getEffectiveLevel() == logging.INFO:
-                # When progress output is enabled, then we check whether the client is in
+                # When progress output is enabled, we check whether the client is in
                 # --log-json mode, as signalled by the "json" attribute on the "borg" logger.
                 if logging.getLogger('borg').json:
-                    # In --log-json mode we directly re-emit the progress line as sent by the server.
-                    sys.stderr.write(line)
-                else:
+                    # In --log-json mode we re-emit the progress JSON line as sent by the server, prefixed
+                    # with "Remote: " when it contains a message.
+                    if 'message' in msg:
+                        msg['message'] = 'Remote: ' + msg['message']
+                    sys.stderr.write(json.dumps(msg) + '\n')
+                elif 'message' in msg:
                     # In text log mode we write only the message to stderr and terminate with \r
                     # (carriage return, i.e. move the write cursor back to the beginning of the line)
                     # so that the next message, progress or not, overwrites it. This mirrors the behaviour
                     # of local progress displays.
-                    sys.stderr.write(msg['message'] + '\r')
+                    sys.stderr.write('Remote: ' + msg['message'] + '\r')
     elif line.startswith('$LOG '):
         # This format is used by Borg since 1.1.0b1.
         # It prefixed log lines with $LOG as a marker, followed by the log level

@@ -67,7 +67,7 @@ def are_symlinks_supported():
     with unopened_tempfile() as filepath:
         try:
             os.symlink('somewhere', filepath)
-            if os.lstat(filepath) and os.readlink(filepath) == 'somewhere':
+            if os.stat(filepath, follow_symlinks=False) and os.readlink(filepath) == 'somewhere':
                 return True
         except OSError:
             pass
@@ -109,7 +109,7 @@ def is_utime_fully_supported():
             open(filepath, 'w').close()
         try:
             os.utime(filepath, (1000, 2000), follow_symlinks=False)
-            new_stats = os.lstat(filepath)
+            new_stats = os.stat(filepath, follow_symlinks=False)
             if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
                 return True
         except OSError as err:
@@ -158,8 +158,8 @@ class BaseTestCase(unittest.TestCase):
         for filename in diff.common:
             path1 = os.path.join(diff.left, filename)
             path2 = os.path.join(diff.right, filename)
-            s1 = os.lstat(path1)
-            s2 = os.lstat(path2)
+            s1 = os.stat(path1, follow_symlinks=False)
+            s2 = os.stat(path2, follow_symlinks=False)
             # Assume path2 is on FUSE if st_dev is different
             fuse = s1.st_dev != s2.st_dev
             attrs = ['st_uid', 'st_gid', 'st_rdev']

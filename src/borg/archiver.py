@@ -436,7 +436,7 @@ class Archiver:
                     continue
                 path = os.path.normpath(path)
                 try:
-                    st = os.lstat(path)
+                    st = os.stat(path, follow_symlinks=False)
                 except OSError as e:
                     self.print_warning('%s: %s', path, e)
                     continue
@@ -498,7 +498,7 @@ class Archiver:
         """
         if st is None:
             with backup_io('stat'):
-                st = os.lstat(path)
+                st = os.stat(path, follow_symlinks=False)
 
         recurse_excluded_dir = False
         if not matcher.match(path):

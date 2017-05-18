@@ -1758,7 +1758,7 @@ class GenericDirEntry:
 
     def stat(self, follow_symlinks=True):
         assert not follow_symlinks
-        return os.lstat(self.path)
+        return os.stat(self.path, follow_symlinks=follow_symlinks)
 
     def _check_type(self, type):
         st = self.stat(False)

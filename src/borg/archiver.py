@@ -54,7 +54,7 @@ from .helpers import get_cache_dir
 from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import StableDict
-from .helpers import check_extension_modules
+from .helpers import check_python, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
@@ -3829,6 +3829,7 @@ class Archiver:
         return args
 
     def prerun_checks(self, logger):
+        check_python()
         check_extension_modules()
         selftest(logger)
 

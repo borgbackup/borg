@@ -114,6 +114,16 @@ class InvalidPlaceholder(PlaceholderError):
     """Invalid placeholder "{}" in string: {}"""
 
 
+class PythonLibcTooOld(Error):
+    """FATAL: this Python was compiled for a too old (g)libc and misses required functionality."""
+
+
+def check_python():
+    required_funcs = {os.stat, os.utime}
+    if not os.supports_follow_symlinks.issuperset(required_funcs):
+        raise PythonLibcTooOld
+
+
 def check_extension_modules():
     from . import platform, compress, item
     if hashindex.API_VERSION != '1.1_01':

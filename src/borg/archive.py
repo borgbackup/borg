@@ -674,7 +674,7 @@ Utilization of max. archive size: {csize_max:.0%}
             if fd:
                 os.fchown(fd, uid, gid)
             else:
-                os.lchown(path, uid, gid)
+                os.chown(path, uid, gid, follow_symlinks=False)
         except OSError:
             pass
         if fd:

@@ -119,7 +119,7 @@ class PythonLibcTooOld(Error):
 
 
 def check_python():
-    required_funcs = {os.stat, os.utime}
+    required_funcs = {os.stat, os.utime, os.chown}
     if not os.supports_follow_symlinks.issuperset(required_funcs):
         raise PythonLibcTooOld
 

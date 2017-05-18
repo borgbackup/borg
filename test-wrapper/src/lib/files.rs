@@ -23,7 +23,7 @@ wrap! {
             if let Ok(id) = id {
                 send(Message::Remove(id));
             } else {
-                warn!("Failed to get unlink path: {:?} errno {}", cpath, errno());
+                warn!("Failed to get unlink path: {:?} {:?}", cpath, errno());
             }
         }
         Ok(ret)
@@ -37,7 +37,7 @@ wrap! {
             if let Ok(id) = id {
                 send(Message::Remove(id));
             } else {
-                warn!("Failed to get unlink path: {:?} errno {}", cpath, errno());
+                warn!("Failed to get unlink path: {:?} {:?}", cpath, errno());
             }
         }
         Ok(ret)

@@ -563,6 +563,8 @@ Additional Notes
 
 Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
 
+.. _chunker-params:
+
 --chunker-params
 ~~~~~~~~~~~~~~~~
 

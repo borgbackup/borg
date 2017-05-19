@@ -194,41 +194,80 @@ repo. It will then be able to check using CRCs and HMACs.
 I get an IntegrityError or similar - what now?
 ----------------------------------------------
 
-The first step should be to check whether it's a problem with the disk drive,
-IntegrityErrors can be a sign of drive failure or other hardware issues.
+A single error does not necessarily indicate bad hardware or a Borg
+bug. All hardware exhibits a bit error rate (BER). Hard drives are typically
+specified as exhibiting less than one error every 12 to 120 TB
+(one bit error in 10e14 to 10e15 bits). The specification is often called
+*unrecoverable read error rate* (URE rate).
 
-Using the smartmontools one can retrieve self-diagnostics of the drive in question
-(where the repository is located, use *findmnt*, *mount* or *lsblk* to find the
-*/dev/...* path of the drive)::
+Apart from these very rare errors there are two main causes of errors:
 
-    # smartctl -a /dev/sdSomething
+(i) Defective hardware: described below.
+(ii) Bugs in software (Borg, operating system, libraries):
+     Ensure software is up to date.
+     Check whether the issue is caused by any fixed bugs described in :ref:`important_notes`.
 
-Attributes that are a typical cause of data corruption are *Offline_Uncorrectable*,
-*Current_Pending_Sector*, *Reported_Uncorrect*. A high *UDMA_CRC_Error_Count* usually
-indicates a bad cable. If the *entire drive* is failing, then all data should be copied
-off it as soon as possible.
 
-Some drives log IO errors, which are also logged by the system (refer to the journal/dmesg).
-IO errors that impact only the filesystem can go unnoticed, since they are not reported
-to applications (e.g. Borg), but can still corrupt data.
+.. rubric:: Finding defective hardware
 
-If any of these are suspicious, a self-test is recommended::
+.. note::
 
-    # smartctl -t long /dev/sdSomething
+   Hardware diagnostics are operating system dependent and do not
+   apply universally. The commands shown apply for popular Unix-like
+   systems. Refer to your operating system's manual.
 
-Running ``fsck`` if not done already might yield further insights.
+Checking hard drives
+  Find the drive containing the repository and use *findmnt*, *mount* or *lsblk*
+  to learn the device path (typically */dev/...*) of the drive.
+  Then, smartmontools can retrieve self-diagnostics of the drive in question::
+
+      # smartctl -a /dev/sdSomething
+
+  The *Offline_Uncorrectable*, *Current_Pending_Sector* and *Reported_Uncorrect*
+  attributes indicate data corruption. A high *UDMA_CRC_Error_Count* usually
+  indicates a bad cable.
+
+  I/O errors logged by the system (refer to the system journal or
+  dmesg) can point to issues as well. I/O errors only affecting the
+  file system easily go unnoticed, since they are not reported to
+  applications (e.g. Borg), while these errors can still corrupt data.
+
+  Drives can corrupt some sectors in one event, while remaining
+  reliable otherwise. Conversely, drives can fail completely with no
+  advance warning. If in doubt, copy all data from the drive in
+  question to another drive -- just in case it fails completely.
+
+  If any of these are suspicious, a self-test is recommended::
+
+      # smartctl -t long /dev/sdSomething
+
+  Running ``fsck`` if not done already might yield further insights.
+
+Checking memory
+  Intermittent issues, such as ``borg check`` finding errors
+  inconsistently between runs, are frequently caused by bad memory.
+
+  Run memtest86+ (or an equivalent memory tester) to verify that
+  the memory subsystem is operating correctly.
+
+Checking processors
+  Processors rarely cause errors. If they do, they are usually overclocked
+  or otherwise operated outside their specifications. We do not recommend to
+  operate hardware outside its specifications for productive use.
+
+  Tools to verify correct processor operation include Prime95 (mprime), linpack,
+  and the `Intel Processor Diagnostic Tool
+  <https://downloadcenter.intel.com/download/19792/Intel-Processor-Diagnostic-Tool>`_
+  (applies only to Intel processors).
+
+.. rubric:: Repairing a damaged repository
+
+With any defective hardware found and replaced, the damage done to the repository
+needs to be ascertained and fixed.
 
 :ref:`borg_check` provides diagnostics and ``--repair`` options for repositories with
-issues. We recommend to first run without ``--repair`` to assess the situation and
-if the found issues / proposed repairs sound right re-run it with ``--repair`` enabled.
-
-When errors are intermittent the cause might be bad memory, running memtest86+ or a similar
-test is recommended.
-
-A single error does not indicate bad hardware or a Borg bug -- all hardware has a certain
-bit error rate (BER), for hard drives this is typically specified as less than one error
-every 12 to 120 TB (one bit error in 10e14 to 10e15 bits) and often called
-*unrecoverable read error rate* (URE rate).
+issues. We recommend to first run without ``--repair`` to assess the situation.
+If the found issues and proposed repairs seem right, re-run "check" with ``--repair`` enabled.
 
 Security
 ########

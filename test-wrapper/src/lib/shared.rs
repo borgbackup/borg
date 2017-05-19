@@ -1,14 +1,17 @@
 use std::env;
 use std::mem;
+use std::process;
+use std::result;
 use std::os::raw::*;
 use std::ffi::CStr;
 use std::io::prelude::*;
-use std::io::{BufReader, BufWriter};
+use std::io::{self, BufReader, BufWriter};
 use std::sync::Mutex;
 use std::collections::{hash_map, HashMap};
 use std::borrow::Borrow;
 use std::hash::BuildHasherDefault;
 use std::fmt::{self, Debug};
+use std::ops::Deref;
 
 use std::os::unix::net::UnixStream;
 
@@ -84,24 +87,52 @@ lazy_static! {
     };
 }
 
+pub fn daemon_error(err: &io::Error) -> ! {
+    if err.kind() == io::ErrorKind::ConnectionReset {
+        if cfg!(debug_assertions) {
+            let _ = writeln!(io::stderr(), "Daemon process exited, exiting");
+        }
+        process::exit(0)
+    } else {
+        panic!("Error messaging daemon: {:?}", err)
+    }
+}
+
+pub fn daemon_result<T>(result: result::Result<T, io::Error>) -> T {
+    match result {
+        Ok(x) => x,
+        Err(e) => daemon_error(&e),
+    }
+}
+
+pub fn bincode_result<T>(result: result::Result<T, Box<bincode::ErrorKind>>) -> T {
+    match result {
+        Ok(x) => x,
+        Err(err) => {
+            if let &bincode::ErrorKind::IoError(ref err) = err.deref() {
+                daemon_error(&err);
+            } else {
+                panic!("Error messaging daemon: {:?}", err);
+            }
+        }
+    }
+}
+
 pub fn send<'a, M: Borrow<Message<'a>>>(message: M) {
     let writer = &mut DAEMON_STREAM.lock().unwrap().1;
-    serialize_into(writer, message.borrow(), bincode::Infinite)
-        .expect("Failed to send message to daemon");
-    writer.flush().expect("IO Error flushing Unix socket");
+    bincode_result(serialize_into(writer, message.borrow(), bincode::Infinite));
+    daemon_result(writer.flush());
 }
 
 pub fn request<T: DeserializeOwned>(message: Message) -> T {
     let stream = &mut DAEMON_STREAM.lock().unwrap();
     {
         let writer = &mut stream.1;
-        serialize_into(writer, message.borrow(), bincode::Infinite)
-            .expect("Failed to send message to daemon");
-        writer.flush().expect("IO Error flushing Unix socket");
+        bincode_result(serialize_into(writer, message.borrow(), bincode::Infinite));
+        daemon_result(writer.flush());
     }
     let reader = &mut stream.0;
-    deserialize_from(reader, bincode::Infinite)
-        .expect("Failed to receive message from daemon")
+    bincode_result(deserialize_from(reader, bincode::Infinite))
 }
 
 macro_rules! error {

@@ -80,24 +80,18 @@ fn stat_base(path: CPath, statbuf: &mut StatBase) {
     //}
 }
 
-fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mut mode: mode_t, orig_chmod: F) -> Result<c_int> {
-    mode &= 0o7777;
-    let stat = path.get_stat()?;
-    let old_mode = stat.st_mode & 0o7777;
-    // Since we aren't root, don't downgrade permissions.
-    let fs_mode = (old_mode as mode_t) | mode;
+fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mode: mode_t, orig_chmod: F) -> Result<c_int> {
+    let fs_mode = mode | 0o600;
     let mut override_mode = fs_mode != mode;
-    if fs_mode != old_mode {
-        if orig_chmod(fs_mode) == -1 {
-            if errno().0 == libc::EPERM {
-                override_mode = true;
-            } else {
-                return Err(0);
-            }
+    if orig_chmod(fs_mode) == -1 {
+        if errno().0 == libc::EPERM {
+            override_mode = true;
+        } else {
+            return Err(0);
         }
     }
     if override_mode {
-        send(Message::OverrideMode(stat.into(), mode, 0o7777, None));
+        send(Message::OverrideMode(path.get_id()?, mode & 0o7777, 0o7777, None));
     }
     Ok(0)
 }

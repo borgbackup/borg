@@ -8,11 +8,8 @@ use errno::errno;
 wrap! {
     // TODO figure out why tracing here causes an EBADF error in Rust's Unix socket code
     !notrace unsafe fn close:ORIG_CLOSE(fd: c_int) -> c_int {
-        let ret = ORIG_CLOSE(fd);
-        if ret == 0 {
-            FD_ID_CACHE.lock().unwrap().remove(&fd);
-        }
-        Ok(ret)
+        FD_ID_CACHE.lock().unwrap().remove(&fd);
+        return Ok(ORIG_CLOSE(fd))
     }
 
     unsafe fn unlink:ORIG_UNLINK(path: *const c_char) -> c_int {

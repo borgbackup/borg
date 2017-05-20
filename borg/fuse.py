@@ -245,7 +245,7 @@ class FuseOperations(llfuse.Operations):
     def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
         try:
-            return item.get(b'xattrs', {})[name]
+            return item.get(b'xattrs', {})[name] or b''
         except KeyError:
             raise llfuse.FUSEError(llfuse.ENOATTR) from None
 

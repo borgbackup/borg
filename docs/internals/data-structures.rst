@@ -122,11 +122,49 @@ such obsolete entries is called sparse, while a segment containing no such entri
 
 Since writing a ``DELETE`` tag does not actually delete any data and
 thus does not free disk space any log-based data store will need a
-compaction strategy.
+compaction strategy (somewhat analogous to a garbage collector).
+Borg uses a simple forward compacting algorithm,
+which avoids modifying existing segments.
+Compaction runs when a commit is issued (unless the :ref:`append_only_mode` is active).
+One client transaction can manifest as multiple physical transactions,
+since compaction is transacted, too, and Borg does not distinguish between the two::
 
-Borg tracks which segments are sparse and does a forward compaction
-when a commit is issued (unless the :ref:`append_only_mode` is
-active).
+  Perspective| Time -->
+  -----------+--------------
+  Client     | Begin transaction - Modify Data - Commit | <client waits for repository> (done)
+  Repository | Begin transaction - Modify Data - Commit | Compact segments - Commit   | (done)
+
+The compaction algorithm requires two inputs in addition to the segments themselves:
+
+(i) Which segments are sparse, to avoid scanning all segments (impractical).
+    Further, Borg uses a conditional compaction strategy: Only those
+    segments that exceed a threshold sparsity are compacted.
+
+    To implement the threshold condition efficiently, the sparsity has
+    to be stored as well. Therefore, Borg stores a mapping ``(segment
+    id,) -> (number of sparse bytes,)``.
+
+    The 1.0.x series used a simpler non-conditional algorithm,
+    which only required the list of sparse segments. Thus,
+    it only stored a list, not the mapping described above.
+(ii) Each segment's reference count, which indicates how many live objects are in a segment.
+     This is not strictly required to perform the algorithm. Rather, it is used to validate
+     that a segment is unused before deleting it. If the algorithm is incorrect, or the reference
+     count was not accounted correctly, then an assertion failure occurs.
+
+These two pieces of information are stored in the hints file (`hints.N`)
+next to the index (`index.N`).
+
+When loading a hints file, Borg checks the version contained in the file.
+The 1.0.x series writes version 1 of the format (with the segments list instead
+of the mapping, mentioned above). Since Borg 1.0.4, version 2 is read as well.
+The 1.1.x series writes version 2 of the format and reads either version.
+When reading a version 1 hints file, Borg 1.1.x will
+read all sparse segments to determine their sparsity.
+
+This process may take some time if a repository is kept in the append-only mode,
+which causes the number of sparse segments to grow. Repositories not in append-only
+mode have no sparse segments in 1.0.x, since compaction is unconditional.
 
 Compaction processes sparse segments from oldest to newest; sparse segments
 which don't contain enough deleted data to justify compaction are skipped. This
@@ -135,8 +173,8 @@ a couple kB were deleted in a segment.
 
 Segments that are compacted are read in entirety. Current entries are written to
 a new segment, while superseded entries are omitted. After each segment an intermediary
-commit is written to the new segment, data is synced and the old segment is deleted --
-freeing disk space.
+commit is written to the new segment. Then, the old segment is deleted
+(asserting that the reference count diminished to zero), freeing disk space.
 
 (The actual algorithm is more complex to avoid various consistency issues, refer to
 the ``borg.repository`` module for more comments and documentation on these issues.)

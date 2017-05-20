@@ -137,6 +137,9 @@ pub fn message(message: Message) -> Result<()> {
     }
 }
 
+// TODO pass on line numbers and file to daemon
+// Maybe configure lib and daemon separately too
+
 macro_rules! error {
     ($( $x:tt )*) => {
         let _ = message(Message::Log(NetworkLogLevel::Error, format!($( $x )*).as_str()));

@@ -44,6 +44,7 @@ from ..helpers import bin_to_hex
 from ..helpers import MAX_S
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item
+from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
@@ -265,6 +266,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
         # destroy logging configuration
         logging.Logger.manager.loggerDict.clear()
+        setup_logging()
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)

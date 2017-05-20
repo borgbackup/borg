@@ -118,12 +118,6 @@ pub fn bincode_result<T>(result: result::Result<T, Box<bincode::ErrorKind>>) -> 
     }
 }
 
-pub fn send<'a, M: Borrow<Message<'a>>>(message: M) {
-    let writer = &mut DAEMON_STREAM.lock().unwrap().1;
-    bincode_result(serialize_into(writer, message.borrow(), bincode::Infinite));
-    daemon_result(writer.flush());
-}
-
 pub fn request<T: DeserializeOwned>(message: Message) -> T {
     let stream = &mut DAEMON_STREAM.lock().unwrap();
     {
@@ -135,28 +129,36 @@ pub fn request<T: DeserializeOwned>(message: Message) -> T {
     bincode_result(deserialize_from(reader, bincode::Infinite))
 }
 
+// The reply is important, as it ensures the operation is finished serverside
+pub fn message(message: Message) -> Result<()> {
+    match request(message) {
+        0 => Ok(()),
+        e => Err(e),
+    }
+}
+
 macro_rules! error {
     ($( $x:tt )*) => {
-        send(Message::Log(NetworkLogLevel::Error, format!($( $x )*).as_str()));
+        let _ = message(Message::Log(NetworkLogLevel::Error, format!($( $x )*).as_str()));
     }
 }
 
 macro_rules! warn {
     ($( $x:tt )*) => {
-        send(Message::Log(NetworkLogLevel::Warn, format!($( $x )*).as_str()));
+        let _ = message(Message::Log(NetworkLogLevel::Warn, format!($( $x )*).as_str()));
     }
 }
 
 macro_rules! info {
     ($( $x:tt )*) => {
-        send(Message::Log(NetworkLogLevel::Info, format!($( $x )*).as_str()));
+        let _ = message(Message::Log(NetworkLogLevel::Info, format!($( $x )*).as_str()));
     }
 }
 
 macro_rules! debug {
     ($( $x:tt )*) => {
         if cfg!(debug_assertions) {
-            send(Message::Log(NetworkLogLevel::Debug, format!($( $x )*).as_str()));
+            let _ = message(Message::Log(NetworkLogLevel::Debug, format!($( $x )*).as_str()));
         }
     }
 }
@@ -164,7 +166,7 @@ macro_rules! debug {
 macro_rules! trace {
     ($( $x:tt )*) => {
         if cfg!(debug_assertions) {
-            send(Message::Log(NetworkLogLevel::Trace, format!($( $x )*).as_str()));
+            let _ = message(Message::Log(NetworkLogLevel::Trace, format!($( $x )*).as_str()));
         }
     }
 }

@@ -211,6 +211,7 @@ fn main() {
                 match message {
                     Message::Remove(id) => {
                         DATABASE.write().unwrap().remove(&id);
+                        reply(&mut writer, &0);
                     }
                     Message::XattrsGet(id, attr) => {
                         let database = DATABASE.read().unwrap();
@@ -268,6 +269,7 @@ fn main() {
                                 entry.insert(file_entry);
                             }
                         }
+                        reply(&mut writer, &0);
                     }
                     Message::OverrideOwner(id, uid, gid) => {
                         let mut database = DATABASE.write().unwrap();
@@ -290,6 +292,7 @@ fn main() {
                                 entry.insert(file_entry);
                             }
                         }
+                        reply(&mut writer, &0);
                     }
                     Message::GetPermissions(id) => {
                         let database = DATABASE.read().unwrap();
@@ -305,6 +308,7 @@ fn main() {
                     }
                     Message::Log(log_level, message) => {
                         log!(log_level.into(), "Client {}: {}", conn_num, message);
+                        reply(&mut writer, &0);
                     }
                 }
             }

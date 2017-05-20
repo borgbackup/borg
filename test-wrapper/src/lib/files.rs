@@ -18,7 +18,7 @@ wrap! {
         let ret = ORIG_UNLINK(path);
         if ret == 0 {
             if let Ok(id) = id {
-                send(Message::Remove(id));
+                let _ = message(Message::Remove(id));
             } else {
                 warn!("Failed to get unlink path: {:?} {:?}", cpath, errno());
             }
@@ -32,7 +32,7 @@ wrap! {
         let ret = ORIG_UNLINKAT(dfd, path, flags);
         if ret == 0 {
             if let Ok(id) = id {
-                send(Message::Remove(id));
+                let _ = message(Message::Remove(id));
             } else {
                 warn!("Failed to get unlink path: {:?} {:?}", cpath, errno());
             }

@@ -91,7 +91,7 @@ fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mode: mode_t, orig_chmod:
         }
     }
     if override_mode {
-        send(Message::OverrideMode(path.get_id()?, mode & 0o7777, 0o7777, None));
+        message(Message::OverrideMode(path.get_id()?, mode & 0o7777, 0o7777, None))?;
     }
     Ok(0)
 }
@@ -99,7 +99,7 @@ fn chmod_base<'a, F: Fn(mode_t) -> c_int>(path: CPath, mode: mode_t, orig_chmod:
 fn chown_base(path: CPath, owner: uid_t, group: gid_t) -> Result<c_int> {
     let owner = if (owner as i32) == -1 { None } else { Some(owner) };
     let group = if (group as i32) == -1 { None } else { Some(group) };
-    send(Message::OverrideOwner(path.get_id()?, owner, group));
+    message(Message::OverrideOwner(path.get_id()?, owner, group))?;
     Ok(0)
 }
 
@@ -112,22 +112,22 @@ fn mknod_base<'a, F: Fn() -> CPath, M: Fn(mode_t) -> c_int>(get_path: F, mode: m
     };
     let ret = mknod(base_mode);
     if ret == 0 && override_mode {
-        send(Message::OverrideMode(get_path().get_id()?, mode, mode_t::max_value(), Some(dev)));
+        let _ = message(Message::OverrideMode(get_path().get_id()?, mode, mode_t::max_value(), Some(dev)));
     }
     Ok(ret)
 }
 
 wrap! {
     unsafe fn chmod:ORIG_CHMOD(path: *const c_char, mode: mode_t) -> c_int {
-        chmod_base(CPath::from_path(path, true), mode, |mode| ORIG_CHMOD(path, mode))
+        chmod_base(CPath::from_path(path, true), mode, |fs_mode| ORIG_CHMOD(path, fs_mode))
     }
 
     unsafe fn fchmod:ORIG_FCHMOD(fd: c_int, mode: mode_t) -> c_int {
-        chmod_base(CPath::from_fd(fd), mode, |mode| ORIG_FCHMOD(fd, mode))
+        chmod_base(CPath::from_fd(fd), mode, |fs_mode| ORIG_FCHMOD(fd, fs_mode))
     }
 
     unsafe fn fchmodat:ORIG_FCHMODAT(dfd: c_int, path: *const c_char, mode: mode_t, flags: c_int) -> c_int {
-        chmod_base(CPath::from_path_at(dfd, path, flags), mode, |mode| ORIG_FCHMODAT(dfd, path, mode, flags))
+        chmod_base(CPath::from_path_at(dfd, path, flags), mode, |fs_mode| ORIG_FCHMODAT(dfd, path, fs_mode, flags))
     }
 
     unsafe fn chown:_(path: *const c_char, owner: uid_t, group: gid_t) -> c_int {

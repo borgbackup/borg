@@ -363,8 +363,8 @@ impl Debug for CPath {
             CPath::Path(path, follow_symlinks) => unsafe {
                 write!(f, "{:?} (follow_symlinks: {})", CStr::from_ptr(path), follow_symlinks)
             },
-            CPath::PathAt(dfd, path, follow_symlinks) => unsafe {
-                write!(f, "DFD {} + {:?} (follow_symlinks: {})", dfd, CStr::from_ptr(path), follow_symlinks)
+            CPath::PathAt(dfd, path, flags) => unsafe {
+                write!(f, "DFD {} + {:?} (flags: 0x{:x})", dfd, CStr::from_ptr(path), flags)
             },
         }
     }

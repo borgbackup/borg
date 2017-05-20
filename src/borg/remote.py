@@ -935,7 +935,7 @@ def handle_remote_line(line):
     """
     Handle a remote log line.
 
-    This function is remarkably complex because it handles three different wire formats.
+    This function is remarkably complex because it handles multiple wire formats.
     """
     if line.startswith('{'):
         # This format is used by Borg since 1.1.0b6 for new-protocol clients.
@@ -951,9 +951,9 @@ def handle_remote_line(line):
             level = getattr(logging, msg['levelname'], logging.CRITICAL)
             assert isinstance(level, int)
             target_logger = logging.getLogger(msg['name'])
-            # We manually check whether the log message should be propagated
             msg['message'] = 'Remote: ' + msg['message']
-            if level >= target_logger.getEffectiveLevel() and logging.getLogger('borg').json:
+            # In JSON mode, we manually check whether the log message should be propagated.
+            if logging.getLogger('borg').json and level >= target_logger.getEffectiveLevel():
                 sys.stderr.write(json.dumps(msg) + '\n')
             else:
                 target_logger.log(level, '%s', msg['message'])
@@ -967,8 +967,8 @@ def handle_remote_line(line):
                 # When progress output is enabled, we check whether the client is in
                 # --log-json mode, as signalled by the "json" attribute on the "borg" logger.
                 if logging.getLogger('borg').json:
-                    # In --log-json mode we re-emit the progress JSON line as sent by the server, prefixed
-                    # with "Remote: " when it contains a message.
+                    # In --log-json mode we re-emit the progress JSON line as sent by the server,
+                    # with the message, if any, prefixed with "Remote: ".
                     if 'message' in msg:
                         msg['message'] = 'Remote: ' + msg['message']
                     sys.stderr.write(json.dumps(msg) + '\n')
@@ -988,6 +988,7 @@ def handle_remote_line(line):
         # it readable with older (1.0.x) clients.
         #
         # TODO: Remove this block (so it'll be handled by the "else:" below) with a Borg 1.1 RC.
+        #       Also check whether client_supports_log_v3 should be removed.
         _, level, msg = line.split(' ', 2)
         level = getattr(logging, level, logging.CRITICAL)  # str -> int
         if msg.startswith('Remote:'):

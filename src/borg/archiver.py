@@ -36,7 +36,7 @@ from . import helpers
 from .algorithms.crc32 import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
-from .cache import Cache
+from .cache import Cache, assert_secure
 from .constants import *  # NOQA
 from .compress import CompressionSpec
 from .crypto.key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
@@ -86,7 +86,8 @@ def argument(args, str_or_bool):
     return str_or_bool
 
 
-def with_repository(fake=False, invert_fake=False, create=False, lock=True, exclusive=False, manifest=True, cache=False):
+def with_repository(fake=False, invert_fake=False, create=False, lock=True, exclusive=False, manifest=True, cache=False,
+                    secure=True):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
@@ -97,6 +98,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
     :param exclusive: (str or bool) lock repository exclusively (for writing)
     :param manifest: load manifest and key, pass them as keyword arguments
     :param cache: open cache, pass it as keyword argument (implies manifest)
+    :param secure: do assert_secure after loading manifest
     """
     def decorator(method):
         @functools.wraps(method)
@@ -117,6 +119,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True, excl
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository)
                     if 'compression' in args:
                         kwargs['key'].compressor = args.compression.compressor
+                    if secure:
+                        assert_secure(repository, kwargs['manifest'])
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),

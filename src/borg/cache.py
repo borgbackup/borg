@@ -32,9 +32,29 @@ FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size mtime chunk_ids')
 
 
 class SecurityManager:
+    """
+    Tracks repositories. Ensures that nothing bad happens (repository swaps,
+    replay attacks, unknown repositories etc.).
+
+    This is complicated by the Cache being initially used for this, while
+    only some commands actually use the Cache, which meant that other commands
+    did not perform these checks.
+
+    Further complications were created by the Cache being a cache, so it
+    could be legitimately deleted, which is annoying because Borg didn't
+    recognize repositories after that.
+
+    Therefore a second location, the security database (see get_security_dir),
+    was introduced which stores this information. However, this means that
+    the code has to deal with a cache existing but no security DB entry,
+    or inconsistencies between the security DB and the cache which have to
+    be reconciled, and also with no cache existing but a security DB entry.
+    """
+
     def __init__(self, repository):
         self.repository = repository
         self.dir = get_security_dir(repository.id_str)
+        self.cache_dir = cache_dir(repository)
         self.key_type_file = os.path.join(self.dir, 'key-type')
         self.location_file = os.path.join(self.dir, 'location')
         self.manifest_ts_file = os.path.join(self.dir, 'manifest-timestamp')
@@ -52,9 +72,9 @@ class SecurityManager:
         except OSError as exc:
             logger.warning('Could not read/parse key type file: %s', exc)
 
-    def save(self, manifest, key, cache):
+    def save(self, manifest, key):
         logger.debug('security: saving state for %s to %s', self.repository.id_str, self.dir)
-        current_location = cache.repository._location.canonical_path()
+        current_location = self.repository._location.canonical_path()
         logger.debug('security: current location   %s', current_location)
         logger.debug('security: key type           %s', str(key.TYPE))
         logger.debug('security: manifest timestamp %s', manifest.timestamp)
@@ -65,25 +85,27 @@ class SecurityManager:
         with open(self.manifest_ts_file, 'w') as fd:
             fd.write(manifest.timestamp)
 
-    def assert_location_matches(self, cache):
+    def assert_location_matches(self, cache_config=None):
         # Warn user before sending data to a relocated repository
         try:
             with open(self.location_file) as fd:
                 previous_location = fd.read()
-            logger.debug('security: read previous_location %r', previous_location)
+            logger.debug('security: read previous location %r', previous_location)
         except FileNotFoundError:
-            logger.debug('security: previous_location file %s not found', self.location_file)
+            logger.debug('security: previous location file %s not found', self.location_file)
             previous_location = None
         except OSError as exc:
             logger.warning('Could not read previous location file: %s', exc)
             previous_location = None
-        if cache.previous_location and previous_location != cache.previous_location:
+        if cache_config and cache_config.previous_location and previous_location != cache_config.previous_location:
             # Reconcile cache and security dir; we take the cache location.
-            previous_location = cache.previous_location
+            previous_location = cache_config.previous_location
             logger.debug('security: using previous_location of cache: %r', previous_location)
-        if previous_location and previous_location != self.repository._location.canonical_path():
+
+        repository_location = self.repository._location.canonical_path()
+        if previous_location and previous_location != repository_location:
             msg = ("Warning: The repository at location {} was previously located at {}\n".format(
-                self.repository._location.canonical_path(), previous_location) +
+                repository_location, previous_location) +
                 "Do you want to continue? [yN] ")
             if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
                        retry=False, env_var_override='BORG_RELOCATED_REPO_ACCESS_IS_OK'):
@@ -91,11 +113,11 @@ class SecurityManager:
             # adapt on-disk config immediately if the new location was accepted
             logger.debug('security: updating location stored in cache and security dir')
             with open(self.location_file, 'w') as fd:
-                fd.write(cache.repository._location.canonical_path())
-            cache.begin_txn()
-            cache.commit()
+                fd.write(repository_location)
+            if cache_config:
+                cache_config.save()
 
-    def assert_no_manifest_replay(self, manifest, key, cache):
+    def assert_no_manifest_replay(self, manifest, key, cache_config=None):
         try:
             with open(self.manifest_ts_file) as fd:
                 timestamp = fd.read()
@@ -106,7 +128,8 @@ class SecurityManager:
         except OSError as exc:
             logger.warning('Could not read previous location file: %s', exc)
             timestamp = ''
-        timestamp = max(timestamp, cache.timestamp or '')
+        if cache_config:
+            timestamp = max(timestamp, cache_config.timestamp or '')
         logger.debug('security: determined newest manifest timestamp as %s', timestamp)
         # If repository is older than the cache or security dir something fishy is going on
         if timestamp and timestamp > manifest.timestamp:
@@ -115,27 +138,153 @@ class SecurityManager:
             else:
                 raise Cache.RepositoryReplay()
 
-    def assert_key_type(self, key, cache):
+    def assert_key_type(self, key, cache_config=None):
         # Make sure an encrypted repository has not been swapped for an unencrypted repository
-        if cache.key_type is not None and cache.key_type != str(key.TYPE):
+        if cache_config and cache_config.key_type is not None and cache_config.key_type != str(key.TYPE):
             raise Cache.EncryptionMethodMismatch()
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, cache):
-        self.assert_location_matches(cache)
-        self.assert_key_type(key, cache)
-        self.assert_no_manifest_replay(manifest, key, cache)
-        if not self.known():
-            self.save(manifest, key, cache)
+    def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True):
+        # warn_if_unencrypted=False is only used for initializing a new repository.
+        # Thus, avoiding asking about a repository that's currently initializing.
+        self.assert_access_unknown(warn_if_unencrypted, manifest, key)
+        if cache_config:
+            self._assert_secure(manifest, key, cache_config)
+        else:
+            cache_config = CacheConfig(self.repository)
+            if cache_config.exists():
+                with cache_config:
+                    self._assert_secure(manifest, key, cache_config)
+            else:
+                self._assert_secure(manifest, key)
+        logger.debug('security: repository checks ok, allowing access')
 
-    def assert_access_unknown(self, warn_if_unencrypted, key):
-        if warn_if_unencrypted and not key.logically_encrypted and not self.known():
+    def _assert_secure(self, manifest, key, cache_config=None):
+        self.assert_location_matches(cache_config)
+        self.assert_key_type(key, cache_config)
+        self.assert_no_manifest_replay(manifest, key, cache_config)
+        if not self.known():
+            logger.debug('security: remembering previously unknown repository')
+            self.save(manifest, key)
+
+    def assert_access_unknown(self, warn_if_unencrypted, manifest, key):
+        # warn_if_unencrypted=False is only used for initializing a new repository.
+        # Thus, avoiding asking about a repository that's currently initializing.
+        if not key.logically_encrypted and not self.known():
             msg = ("Warning: Attempting to access a previously unknown unencrypted repository!\n" +
                    "Do you want to continue? [yN] ")
-            if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
-                       retry=False, env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'):
+            allow_access = not warn_if_unencrypted or yes(msg, false_msg="Aborting.",
+                invalid_msg="Invalid answer, aborting.",
+                retry=False, env_var_override='BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK')
+            if allow_access:
+                if warn_if_unencrypted:
+                    logger.debug('security: remembering unknown unencrypted repository (explicitly allowed)')
+                else:
+                    logger.debug('security: initializing unencrypted repository')
+                self.save(manifest, key)
+            else:
                 raise Cache.CacheInitAbortedError()
+
+
+def assert_secure(repository, manifest):
+    sm = SecurityManager(repository)
+    sm.assert_secure(manifest, manifest.key)
+
+
+def recanonicalize_relative_location(cache_location, repository):
+    # borg < 1.0.8rc1 had different canonicalization for the repo location (see #1655 and #1741).
+    repo_location = repository._location.canonical_path()
+    rl = Location(repo_location)
+    cl = Location(cache_location)
+    if cl.proto == rl.proto and cl.user == rl.user and cl.host == rl.host and cl.port == rl.port \
+            and \
+            cl.path and rl.path and \
+            cl.path.startswith('/~/') and rl.path.startswith('/./') and cl.path[3:] == rl.path[3:]:
+        # everything is same except the expected change in relative path canonicalization,
+        # update previous_location to avoid warning / user query about changed location:
+        return repo_location
+    else:
+        return cache_location
+
+
+def cache_dir(repository, path=None):
+    return path or os.path.join(get_cache_dir(), repository.id_str)
+
+
+class CacheConfig:
+    def __init__(self, repository, path=None, lock_wait=None):
+        self.repository = repository
+        self.path = cache_dir(repository, path)
+        self.config_path = os.path.join(self.path, 'config')
+        self.lock = None
+        self.lock_wait = lock_wait
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def exists(self):
+        return os.path.exists(self.config_path)
+
+    def create(self):
+        assert not self.exists()
+        config = configparser.ConfigParser(interpolation=None)
+        config.add_section('cache')
+        config.set('cache', 'version', '1')
+        config.set('cache', 'repository', self.repository.id_str)
+        config.set('cache', 'manifest', '')
+        with SaveFile(self.config_path) as fd:
+            config.write(fd)
+
+    def open(self):
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=self.lock_wait,
+                         kill_stale_locks=hostname_is_unique()).acquire()
+        self.load()
+
+    def load(self):
+        self._config = configparser.ConfigParser(interpolation=None)
+        self._config.read(self.config_path)
+        self._check_upgrade(self.config_path)
+        self.id = self._config.get('cache', 'repository')
+        self.manifest_id = unhexlify(self._config.get('cache', 'manifest'))
+        self.timestamp = self._config.get('cache', 'timestamp', fallback=None)
+        self.key_type = self._config.get('cache', 'key_type', fallback=None)
+        previous_location = self._config.get('cache', 'previous_location', fallback=None)
+        if previous_location:
+            self.previous_location = recanonicalize_relative_location(previous_location, self.repository)
+        else:
+            self.previous_location = None
+
+    def save(self, manifest=None, key=None):
+        if manifest:
+            self._config.set('cache', 'manifest', manifest.id_str)
+            self._config.set('cache', 'timestamp', manifest.timestamp)
+        if key:
+            self._config.set('cache', 'key_type', str(key.TYPE))
+        self._config.set('cache', 'previous_location', self.repository._location.canonical_path())
+        with SaveFile(self.config_path) as fd:
+            self._config.write(fd)
+
+    def close(self):
+        if self.lock is not None:
+            self.lock.release()
+            self.lock = None
+
+    def _check_upgrade(self, config_path):
+        try:
+            cache_version = self._config.getint('cache', 'version')
+            wanted_version = 1
+            if cache_version != wanted_version:
+                self.close()
+                raise Exception('%s has unexpected cache version %d (wanted: %d).' %
+                                (config_path, cache_version, wanted_version))
+        except configparser.NoSectionError:
+            self.close()
+            raise Exception('%s does not look like a Borg cache.' % config_path) from None
 
 
 class Cache:
@@ -158,7 +307,7 @@ class Cache:
 
     @staticmethod
     def break_lock(repository, path=None):
-        path = path or os.path.join(get_cache_dir(), repository.id_str)
+        path = cache_dir(repository, path)
         Lock(os.path.join(path, 'lock'), exclusive=True).break_lock()
 
     @staticmethod
@@ -178,25 +327,27 @@ class Cache:
         :param lock_wait: timeout for lock acquisition (None: return immediately if lock unavailable)
         :param sync: do :meth:`.sync`
         """
-        self.lock = None
-        self.timestamp = None
-        self.lock = None
-        self.txn_active = False
         self.repository = repository
         self.key = key
         self.manifest = manifest
         self.progress = progress
-        self.path = path or os.path.join(get_cache_dir(), repository.id_str)
-        self.security_manager = SecurityManager(repository)
         self.do_files = do_files
+        self.timestamp = None
+        self.txn_active = False
+
+        self.path = cache_dir(repository, path)
+        self.security_manager = SecurityManager(repository)
+        self.cache_config = CacheConfig(self.repository, self.path, lock_wait)
+
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
-            self.security_manager.assert_access_unknown(warn_if_unencrypted, key)
+            self.security_manager.assert_access_unknown(warn_if_unencrypted, manifest, key)
             self.create()
-        self.open(lock_wait=lock_wait)
+
+        self.open()
         try:
-            self.security_manager.assert_secure(manifest, key, self)
-            if sync and self.manifest.id != self.manifest_id:
+            self.security_manager.assert_secure(manifest, key, cache_config=self.cache_config)
+            if sync and self.manifest.id != self.cache_config.manifest_id:
                 self.sync()
                 self.commit()
         except:
@@ -240,66 +391,27 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         os.makedirs(self.path)
         with open(os.path.join(self.path, 'README'), 'w') as fd:
             fd.write(CACHE_README)
-        config = configparser.ConfigParser(interpolation=None)
-        config.add_section('cache')
-        config.set('cache', 'version', '1')
-        config.set('cache', 'repository', self.repository.id_str)
-        config.set('cache', 'manifest', '')
-        with SaveFile(os.path.join(self.path, 'config')) as fd:
-            config.write(fd)
+        self.cache_config.create()
         ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
             pass  # empty file
 
-    def _check_upgrade(self, config_path):
-        try:
-            cache_version = self.config.getint('cache', 'version')
-            wanted_version = 1
-            if cache_version != wanted_version:
-                self.close()
-                raise Exception('%s has unexpected cache version %d (wanted: %d).' % (
-                    config_path, cache_version, wanted_version))
-        except configparser.NoSectionError:
-            self.close()
-            raise Exception('%s does not look like a Borg cache.' % config_path) from None
-        # borg < 1.0.8rc1 had different canonicalization for the repo location (see #1655 and #1741).
-        cache_loc = self.config.get('cache', 'previous_location', fallback=None)
-        if cache_loc:
-            repo_loc = self.repository._location.canonical_path()
-            rl = Location(repo_loc)
-            cl = Location(cache_loc)
-            if cl.proto == rl.proto and cl.user == rl.user and cl.host == rl.host and cl.port == rl.port \
-                    and \
-                    cl.path and rl.path and \
-                    cl.path.startswith('/~/') and rl.path.startswith('/./') and cl.path[3:] == rl.path[3:]:
-                # everything is same except the expected change in relative path canonicalization,
-                # update previous_location to avoid warning / user query about changed location:
-                self.config.set('cache', 'previous_location', repo_loc)
-
     def _do_open(self):
-        self.config = configparser.ConfigParser(interpolation=None)
-        config_path = os.path.join(self.path, 'config')
-        self.config.read(config_path)
-        self._check_upgrade(config_path)
-        self.id = self.config.get('cache', 'repository')
-        self.manifest_id = unhexlify(self.config.get('cache', 'manifest'))
-        self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
-        self.key_type = self.config.get('cache', 'key_type', fallback=None)
-        self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
+        self.cache_config.load()
         self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
-    def open(self, lock_wait=None):
+    def open(self):
         if not os.path.isdir(self.path):
             raise Exception('%s Does not look like a Borg cache' % self.path)
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=lock_wait, kill_stale_locks=hostname_is_unique()).acquire()
+        self.cache_config.open()
         self.rollback()
 
     def close(self):
-        if self.lock is not None:
-            self.lock.release()
-            self.lock = None
+        if self.cache_config is not None:
+            self.cache_config.close()
+            self.cache_config = None
 
     def _read_files(self):
         self.files = {}
@@ -338,7 +450,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         """
         if not self.txn_active:
             return
-        self.security_manager.save(self.manifest, self.key, self)
+        self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid='cache.commit')
         if self.files is not None:
             if self._newest_mtime is None:
@@ -356,12 +468,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
         pi.output('Saving cache config')
-        self.config.set('cache', 'manifest', self.manifest.id_str)
-        self.config.set('cache', 'timestamp', self.manifest.timestamp)
-        self.config.set('cache', 'key_type', str(self.key.TYPE))
-        self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
-        with SaveFile(os.path.join(self.path, 'config')) as fd:
-            self.config.write(fd)
+        self.cache_config.save(self.manifest, self.key)
         pi.output('Saving chunks cache')
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),

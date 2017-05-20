@@ -326,6 +326,7 @@ class ArchiverTestCaseBase(BaseTestCase):
             # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file
             # (from fakeroots point of view) they are invisible to the test process inside the fakeroot.
             xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), 'user.foo', b'bar')
+            xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), 'user.empty', b'')
             # XXX this always fails for me
             # ubuntu 14.04, on a TMP dir filesystem with user_xattr, using fakeroot
             # same for newer ubuntu and centos.
@@ -1874,8 +1875,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 in_fn = 'input/fusexattr'
                 out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
                 if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                    assert no_selinux(xattr.listxattr(out_fn)) == ['user.foo', ]
+                    assert sorted(no_selinux(xattr.listxattr(out_fn))) == ['user.empty', 'user.foo', ]
                     assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
+                    # Special case: getxattr returns None (not b'') when reading an empty xattr.
+                    assert xattr.getxattr(out_fn, 'user.empty') is None
                 else:
                     assert xattr.listxattr(out_fn) == []
                     try:

@@ -35,6 +35,16 @@ def is_enabled(path=None):
 
 
 def get_all(path, follow_symlinks=True):
+    """
+    Return all extended attributes on *path* as a mapping.
+
+    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *follow_symlinks* indicates whether symlinks should be followed
+    and only applies when *path* is not an open file descriptor.
+
+    The returned mapping maps xattr names (str) to values (bytes or None).
+    None indicates, as a xattr value, an empty value, i.e. a value of length zero.
+    """
     try:
         result = {}
         names = listxattr(path, follow_symlinks=follow_symlinks)
@@ -111,7 +121,7 @@ def split_lstring(buf):
 
 
 class BufferTooSmallError(Exception):
-    """the buffer given to an xattr function was too small for the result."""
+    """the buffer given to a xattr function was too small for the result."""
 
 
 def _check(rv, path=None, detect_buffer_too_small=False):
@@ -346,10 +356,33 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
 
 else:  # pragma: unknown platform only
     def listxattr(path, *, follow_symlinks=True):
+        """
+        Return list of xattr names on a file.
+
+        *path* can either be a path (str or bytes) or an open file descriptor (int).
+        *follow_symlinks* indicates whether symlinks should be followed
+        and only applies when *path* is not an open file descriptor.
+        """
         return []
 
     def getxattr(path, name, *, follow_symlinks=True):
-        pass
+        """
+        Read xattr and return its value (as bytes) or None if its empty.
+
+        *path* can either be a path (str or bytes) or an open file descriptor (int).
+        *name* is the name of the xattr to read (str).
+        *follow_symlinks* indicates whether symlinks should be followed
+        and only applies when *path* is not an open file descriptor.
+        """
 
     def setxattr(path, name, value, *, follow_symlinks=True):
-        pass
+        """
+        Write xattr on *path*.
+
+        *path* can either be a path (str or bytes) or an open file descriptor (int).
+        *name* is the name of the xattr to read (str).
+        *value* is the value to write. It is either bytes or None. The latter
+        signals that the value shall be empty (size equals zero).
+        *follow_symlinks* indicates whether symlinks should be followed
+        and only applies when *path* is not an open file descriptor.
+        """

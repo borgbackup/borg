@@ -24,7 +24,7 @@ unsafe fn getxattr_base(path: CPath, name: *const c_char, dest: *mut c_void, siz
     let res = request::<ReplyXattrsGet>(Message::XattrsGet(path.get_id()?,
         CStr::from_ptr(name).to_bytes()));
     if let Some(value) = res.0 {
-        if value.len() > (c_int::max_value() as usize) {
+        if value.len() > (isize::max_value() as usize) {
             return Err(libc::E2BIG);
         }
         if size == 0 {
@@ -46,7 +46,7 @@ unsafe fn getxattr_base(path: CPath, name: *const c_char, dest: *mut c_void, siz
 unsafe fn listxattr_base(path: CPath, dest: *mut c_char, size: usize) -> Result<isize> {
     let res = request::<ReplyXattrsList>(Message::XattrsList(path.get_id()?)).0;
     let total_size = res.len() + res.iter().map(|i| i.len()).sum::<usize>();
-    if total_size > (c_int::max_value() as usize) {
+    if total_size > (isize::max_value() as usize) {
         return Err(libc::E2BIG);
     }
     if size == 0 {

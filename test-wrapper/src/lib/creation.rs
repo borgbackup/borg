@@ -2,7 +2,7 @@ use std::os::raw::*;
 
 use shared::*;
 
-use libc::{self, mode_t};
+use libc::{self, mode_t, dev_t};
 use errno::errno;
 
 fn override_base(path: CPath, mode: mode_t, mask: mode_t) {
@@ -11,6 +11,20 @@ fn override_base(path: CPath, mode: mode_t, mask: mode_t) {
     } else {
         warn!("Failed to get creation path: {:?} {:?}", path, errno());
     }
+}
+
+fn mknod_base<'a, F: Fn() -> CPath, M: Fn(mode_t) -> c_int>(get_path: F, mode: mode_t, dev: dev_t, mknod: M) -> Result<c_int> {
+    let override_mode = mode & libc::S_IFCHR == libc::S_IFCHR || mode & libc::S_IFBLK == libc::S_IFBLK;
+    let base_mode = if override_mode {
+        libc::S_IFREG | 0o600 | (mode & 0o777)
+    } else {
+        mode
+    };
+    let ret = mknod(base_mode);
+    if ret == 0 && override_mode {
+        let _ = message(Message::OverrideMode(get_path().get_id()?, mode, mode_t::max_value(), Some(dev)));
+    }
+    Ok(ret)
 }
 
 const MKDIR_MASK: mode_t = 0o777 | (libc::S_ISVTX as mode_t);
@@ -67,5 +81,27 @@ wrap! {
             override_base(CPath::from_path(path, false), mode & 0o7777, 0o7777);
         }
         Ok(ret)
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+wrap! {
+    unsafe fn mknod:ORIG_MKNOD(path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
+        mknod_base(|| CPath::from_path(path, false), mode, dev, |mode| ORIG_MKNOD(path, mode, dev))
+    }
+
+    unsafe fn mknodat:ORIG_MKNODAT(dfd: c_int, path: *const c_char, mode: mode_t, dev: dev_t) -> c_int {
+        mknod_base(|| CPath::from_path_at(dfd, path, 0), mode, dev, |mode| ORIG_MKNODAT(dfd, path, mode, dev))
+    }
+}
+
+#[cfg(target_os = "linux")]
+wrap! {
+    unsafe fn __xmknod:ORIG_XMKNOD(ver: c_int, path: *const c_char, mode: mode_t, dev: *const dev_t) -> c_int {
+        mknod_base(|| CPath::from_path(path, false), mode, *dev, |mode| ORIG_XMKNOD(ver, path, mode, dev))
+    }
+
+    unsafe fn __xmknodat:ORIG_XMKNODAT(ver: c_int, dfd: c_int, path: *const c_char, mode: mode_t, dev: *const dev_t) -> c_int {
+        mknod_base(|| CPath::from_path_at(dfd, path, 0), mode, *dev, |mode| ORIG_XMKNODAT(ver, dfd, path, mode, dev))
     }
 }

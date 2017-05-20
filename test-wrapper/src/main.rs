@@ -57,7 +57,7 @@ pub struct ReplyGetPermissions {
     mode_and_mask: Option<(mode_t, mode_t)>,
     owner: Option<uid_t>,
     group: Option<gid_t>,
-    dev: Option<dev_t>,
+    rdev: Option<dev_t>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -111,7 +111,7 @@ struct FileEntry {
     mode_and_mask: Option<(mode_t, mode_t)>,
     owner: Option<uid_t>,
     group: Option<gid_t>,
-    dev: Option<dev_t>,
+    rdev: Option<dev_t>,
 }
 
 lazy_static! {
@@ -247,7 +247,7 @@ fn main() {
                             reply(&mut writer, &ReplyXattrsList(&[]));
                         }
                     }
-                    Message::OverrideMode(id, mode, mask, dev) => {
+                    Message::OverrideMode(id, mode, mask, rdev) => {
                         debug_assert_eq!(mode & !mask, 0);
                         let mut database = DATABASE.write().unwrap();
                         let file = database.entry(id);
@@ -260,12 +260,12 @@ fn main() {
                                 } else {
                                     file.mode_and_mask = Some((mode, mask));
                                 }
-                                file.dev = dev.or(file.dev);
+                                file.rdev = rdev.or(file.rdev);
                             }
                             hash_map::Entry::Vacant(entry) => {
                                 let mut file_entry = FileEntry::default();
                                 file_entry.mode_and_mask = Some((mode, mask));
-                                file_entry.dev = dev;
+                                file_entry.rdev = rdev;
                                 entry.insert(file_entry);
                             }
                         }
@@ -302,7 +302,7 @@ fn main() {
                             mode_and_mask: file.and_then(|file| file.mode_and_mask),
                             owner: file.and_then(|file| file.owner),
                             group: file.and_then(|file| file.group),
-                            dev: file.and_then(|file| file.dev),
+                            rdev: file.and_then(|file| file.rdev),
                         };
                         reply(&mut writer, &response);
                     }

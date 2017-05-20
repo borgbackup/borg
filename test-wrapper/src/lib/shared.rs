@@ -41,7 +41,7 @@ pub struct ReplyGetPermissions {
     pub mode_and_mask: Option<(mode_t, mode_t)>,
     pub owner: Option<uid_t>,
     pub group: Option<gid_t>,
-    pub dev: Option<dev_t>,
+    pub rdev: Option<dev_t>,
 }
 
 #[allow(dead_code)]

@@ -20,7 +20,7 @@ wrap! {
         let fs_mode = mode | 0o600;
         let ret = ORIG_MKDIR(path, fs_mode);
         if ret == 0 && fs_mode != mode {
-            override_base(CPath::from_path(path, true), mode & MKDIR_MASK, MKDIR_MASK);
+            override_base(CPath::from_path(path, false), mode & MKDIR_MASK, MKDIR_MASK);
         }
         Ok(ret)
     }
@@ -29,7 +29,7 @@ wrap! {
         let fs_mode = mode | 0o600;
         let ret = ORIG_MKDIRAT(dfd, path, fs_mode);
         if ret == 0 && fs_mode != mode {
-            override_base(CPath::from_path_at(dfd, path, 0), mode & MKDIR_MASK, MKDIR_MASK);
+            override_base(CPath::from_path_at(dfd, path, libc::AT_SYMLINK_NOFOLLOW), mode & MKDIR_MASK, MKDIR_MASK);
         }
         Ok(ret)
     }
@@ -42,7 +42,7 @@ wrap! {
         };
         let ret = ORIG_OPEN(path, flags, fs_mode);
         if ret == 0 && fs_mode != mode {
-            override_base(CPath::from_path(path, true), mode & 0o7777, 0o7777);
+            override_base(CPath::from_path(path, false), mode & 0o7777, 0o7777);
         }
         Ok(ret)
     }
@@ -55,7 +55,7 @@ wrap! {
         };
         let ret = ORIG_OPENAT(dfd, path, flags, fs_mode);
         if ret == 0 && fs_mode != mode {
-            override_base(CPath::from_path_at(dfd, path, 0), mode & 0o7777, 0o7777);
+            override_base(CPath::from_path_at(dfd, path, libc::AT_SYMLINK_NOFOLLOW), mode & 0o7777, 0o7777);
         }
         Ok(ret)
     }
@@ -64,7 +64,7 @@ wrap! {
         let fs_mode = mode | 0o600;
         let ret = ORIG_CREAT(path, fs_mode);
         if ret == 0 && fs_mode != mode {
-            override_base(CPath::from_path(path, true), mode & 0o7777, 0o7777);
+            override_base(CPath::from_path(path, false), mode & 0o7777, 0o7777);
         }
         Ok(ret)
     }

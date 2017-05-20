@@ -714,6 +714,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         class MockArgs:
             remote_path = 'borg'
             umask = 0o077
+            debug_topics = []
 
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
         args = MockArgs()
@@ -723,6 +724,9 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
         args.remote_path = 'borg-0.28.2'
         assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']
+        args.debug_topics = ['something_client_side', 'repository_compaction']
+        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info',
+                                                                 '--debug-topic=borg.debug.repository_compaction']
 
 
 class RemoteLegacyFree(RepositoryTestCaseBase):

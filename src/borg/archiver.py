@@ -3815,15 +3815,15 @@ class Archiver:
         """ turn on INFO level logging for args that imply that they will produce output """
         # map of option name to name of logger for that option
         option_logger = {
-                'output_list': 'borg.output.list',
-                'show_version': 'borg.output.show-version',
-                'show_rc': 'borg.output.show-rc',
-                'stats': 'borg.output.stats',
-                'progress': 'borg.output.progress',
-                }
+            'output_list': 'borg.output.list',
+            'show_version': 'borg.output.show-version',
+            'show_rc': 'borg.output.show-rc',
+            'stats': 'borg.output.stats',
+            'progress': 'borg.output.progress',
+        }
         for option, logger_name in option_logger.items():
-            if args.get(option, False):
-                logging.getLogger(logger_name).setLevel('INFO')
+            option_set = args.get(option, False)
+            logging.getLogger(logger_name).setLevel('INFO' if option_set else 'WARN')
 
     def _setup_topic_debugging(self, args):
         """Turn on DEBUG level logging for specified --debug-topics."""
@@ -3839,8 +3839,10 @@ class Archiver:
         # This works around http://bugs.python.org/issue9351
         func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
         # do not use loggers before this!
-        setup_logging(level=args.log_level, is_serve=func == self.do_serve, json=args.log_json)
+        is_serve = func == self.do_serve
+        setup_logging(level=args.log_level, is_serve=is_serve, json=args.log_json)
         self.log_json = args.log_json
+        args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
         if args.show_version:

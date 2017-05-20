@@ -1226,6 +1226,14 @@ class ProgressIndicatorBase:
             if self.logger.level == logging.NOTSET:
                 self.logger.setLevel(logging.WARN)
             self.logger.propagate = False
+
+        # If --progress is not set then the progress logger level will be WARN
+        # due to setup_implied_logging (it may be NOTSET with a logging config file,
+        # but the interactions there are generally unclear), so self.emit becomes
+        # False, which is correct.
+        # If --progress is set then the level will be INFO as per setup_implied_logging;
+        # note that this is always the case for serve processes due to a "args.progress |= is_serve".
+        # In this case self.emit is True.
         self.emit = self.logger.getEffectiveLevel() == logging.INFO
 
     def __del__(self):

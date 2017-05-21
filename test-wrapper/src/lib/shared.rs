@@ -204,7 +204,8 @@ macro_rules! __wrap_maybe_ident {
 }
 
 macro_rules! __wrap_fn {
-    ( unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
+    ( $( [ $attr:meta ] ),* ; unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
+        $( #[ $attr ] )*
         #[no_mangle]
         pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
             trace!(concat!(stringify!($name), $( __wrap_arg_string!($arg_n) ),*), $( __wrap_maybe_ident!($arg_n) ),*);
@@ -234,7 +235,8 @@ macro_rules! __wrap_fn {
         }
     };
 
-    ( !notrace unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
+    ( $( [ $attr:meta ] ),* ; !notrace unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
+        $( #[ $attr ] )*
         #[no_mangle]
         pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
             define_dlsym_fn!($name, $orig_name; $( $arg_t ),*; $ret_t);
@@ -261,11 +263,12 @@ macro_rules! __wrap_fn {
 macro_rules! wrap {
     {
         $(
+            $( #[ $attr:meta ] )*
             $( ! $modifier:ident )* unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block
         )*
     } => {
         $(
-            __wrap_fn!( $( ! $modifier )* unsafe fn $name : $orig_name( $( $arg_n : $arg_t ),*) -> $ret_t $code );
+            __wrap_fn!( $( [ $attr ] ),* ; $( ! $modifier )* unsafe fn $name : $orig_name( $( $arg_n : $arg_t ),*) -> $ret_t $code );
         )*
     };
 }

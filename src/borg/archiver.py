@@ -1229,14 +1229,19 @@ class Archiver:
         logger.info("Cache deleted.")
         return self.exit_code
 
-    @with_repository()
-    def do_mount(self, args, repository, manifest, key):
+    def do_mount(self, args):
         """Mount archive or an entire repository as a FUSE filesystem"""
         try:
-            from .fuse import FuseOperations
+            import borg.fuse
         except ImportError as e:
-            self.print_error('Loading fuse support failed [ImportError: %s]' % str(e))
+            self.print_error('borg mount not available: loading fuse support failed [ImportError: %s]' % str(e))
             return self.exit_code
+
+        return self._do_mount(args)
+
+    @with_repository()
+    def _do_mount(self, args, repository, manifest, key):
+        from .fuse import FuseOperations
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
             self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)

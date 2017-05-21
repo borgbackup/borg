@@ -1371,7 +1371,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_create)
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
-                               help='print statistics for the created archive')
+                               help='print statistics for the created archive. Requires -v/--verbose.')
         subparser.add_argument('-p', '--progress', dest='progress',
                                action='store_true', default=False,
                                help="""show progress display while creating the archive, showing Original,
@@ -1379,7 +1379,7 @@ class Archiver:
                                and the path being processed, default: %(default)s""")
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
-                               help='output verbose list of items (files, dirs, ...)')
+                               help='output verbose list of items (files, dirs, ...). Requires -v/--verbose.')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
         subparser.add_argument('-e', '--exclude', dest='excludes',
@@ -1462,7 +1462,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
-                               help='output verbose list of items (files, dirs, ...)')
+                               help='output verbose list of items (files, dirs, ...). Requires -v/--verbose.')
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not actually change any files')
@@ -1522,7 +1522,7 @@ class Archiver:
                                help="""show progress display while deleting a single archive""")
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
-                               help='print statistics for the deleted archive')
+                               help='print statistics for the deleted archive. Requires -v/--verbose.')
         subparser.add_argument('-c', '--cache-only', dest='cache_only',
                                action='store_true', default=False,
                                help='delete only the local cache for the given repository')
@@ -1692,10 +1692,10 @@ class Archiver:
                                help='force pruning of corrupted archives')
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
-                               help='print statistics for the deleted archive')
+                               help='print statistics for the deleted archive. Requires -v/--verbose.')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
-                               help='output verbose list of archives it keeps/prunes')
+                               help='output verbose list of archives it keeps/prunes. Requires -v/--verbose.')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,

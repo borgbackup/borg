@@ -451,9 +451,10 @@ Encryption
 
 AES_-256 is used in CTR mode (so no need for padding). A 64 bit initialization
 vector is used, a MAC is computed on the encrypted chunk
-and both are stored in the chunk.
-The header of each chunk is: ``TYPE(1)`` + ``MAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``.
-Encryption and MAC use two different keys.
+and both are stored in the chunk. Encryption and MAC use two different keys.
+Each chunk consists of ``TYPE(1)`` + ``MAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``:
+
+.. figure:: encryption.png
 
 In AES-CTR mode you can think of the IV as the start value for the counter.
 The counter itself is incremented by one after each 16 byte block.

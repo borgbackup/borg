@@ -1002,6 +1002,31 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('input/x/a', output)
         self.assert_in('A input/y/foo_y', output)
 
+    def test_create_pattern_intermediate_folders_first(self):
+        """test that intermediate folders appear first when patterns exclude a parent folder but include a child"""
+        self.patterns_file_path2 = os.path.join(self.tmpdir, 'patterns2')
+        with open(self.patterns_file_path2, 'wb') as fd:
+            fd.write(b'+ input/x/a\n+ input/x/b\n- input/x*\n')
+
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        self.create_regular_file('x/a/foo_a', size=1024 * 80)
+        self.create_regular_file('x/b/foo_b', size=1024 * 80)
+        with changedir('input'):
+            self.cmd('create', '--patterns-from=' + self.patterns_file_path2,
+                     self.repository_location + '::test', '.')
+
+        # list the archive and verify that the "intermediate" folders appear before
+        # their contents
+        out = self.cmd('list', '--format', '{type} {path}{NL}', self.repository_location + '::test')
+        out_list = out.splitlines()
+
+        self.assert_in('d x/a', out_list)
+        self.assert_in('d x/b', out_list)
+
+        assert out_list.index('d x/a') < out_list.index('- x/a/foo_a')
+        assert out_list.index('d x/b') < out_list.index('- x/b/foo_b')
+
     def test_extract_pattern_opt(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

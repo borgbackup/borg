@@ -2009,7 +2009,17 @@ class Archiver:
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
-            borg prune --prefix '{hostname}-' ...\n\n''')
+            borg prune --prefix '{hostname}-' ...
+
+        .. note::
+            systemd uses a difficult, non-standard syntax for command lines in unit files (refer to
+            the `systemd.unit(5)` manual page).
+
+            When invoking borg from unit files, pay particular attention to escaping,
+            especially when using the now/utcnow placeholders, since systemd performs its own
+            %-based variable replacement even in quoted text. To avoid interference from systemd,
+            double all percent signs (``{hostname}-{now:%Y-%m-%d_%H:%M:%S}``
+            becomes ``{hostname}-{now:%%Y-%%m-%%d_%%H:%%M:%%S}``).\n\n''')
     helptext['compression'] = textwrap.dedent('''
         Compression is lz4 by default. If you want something else, you have to specify what you want.
 

@@ -1,7 +1,5 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. borg:command:: borg umount
-
 .. _borg_umount:
 
 borg umount

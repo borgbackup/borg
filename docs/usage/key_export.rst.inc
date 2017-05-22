@@ -1,7 +1,5 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. borg:command:: borg key export
-
 .. _borg_key_export:
 
 borg key export

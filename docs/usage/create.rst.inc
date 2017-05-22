@@ -1,7 +1,5 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. borg:command:: borg create
-
 .. _borg_create:
 
 borg create

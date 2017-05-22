@@ -1,7 +1,5 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. borg:command:: borg key migrate-to-repokey
-
 .. _borg_key_migrate-to-repokey:
 
 borg key migrate-to-repokey

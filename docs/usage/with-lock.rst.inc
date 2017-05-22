@@ -1,5 +1,7 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
+.. borg:command:: borg with-lock
+
 .. _borg_with-lock:
 
 borg with-lock

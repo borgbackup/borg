@@ -16,6 +16,7 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 import sys, os
 sys.path.insert(0, os.path.abspath('../src'))
+sys.path.insert(0, os.path.abspath('.'))
 
 from borg import __version__ as sw_version
 
@@ -26,9 +27,7 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 # If your documentation needs a minimal Sphinx version, state it here.
 #needs_sphinx = '1.0'
 
-# Add any Sphinx extension module names here, as strings. They can be extensions
-# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = []
+# Extensions are defined at the end of this file.
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -241,7 +240,14 @@ man_pages = [
          1),
 ]
 
-extensions = ['sphinx.ext.extlinks', 'sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.viewcode']
+extensions = [
+    'sphinx.ext.extlinks',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    'sphinx.ext.viewcode',
+    'borg_domain',
+]
 
 extlinks = {
     'issue': ('https://github.com/borgbackup/borg/issues/%s', '#'),

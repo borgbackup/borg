@@ -1,5 +1,7 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
+.. borg:command:: borg key change-passphrase
+
 .. _borg_key_change-passphrase:
 
 borg key change-passphrase

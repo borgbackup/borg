@@ -1,5 +1,7 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
+.. borg:command:: borg export-tar
+
 .. _borg_export-tar:
 
 borg export-tar

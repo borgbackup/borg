@@ -1,6 +1,5 @@
 |screencast|
 
-.. highlight:: bash
 
 What is BorgBackup?
 -------------------

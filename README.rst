@@ -116,6 +116,16 @@ Now doing another backup, just to show off the great deduplication::
 
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
+Helping, Donations and Bounties
+-------------------------------
+
+Your help is always welcome!
+Spread the word, give feedback, help with documentation, testing or development.
+
+You can also give monetary support to the project, see there for details:
+
+https://borgbackup.readthedocs.io/en/stable/support.html#bounties-and-fundraisers
+
 Links
 -----
 
@@ -123,9 +133,8 @@ Links
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
   `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
   `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
-* `GitHub <https://github.com/borgbackup/borg>`_,
-  `Issue Tracker <https://github.com/borgbackup/borg/issues>`_ and
-  `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
+* `GitHub <https://github.com/borgbackup/borg>`_ and
+  `Issue Tracker <https://github.com/borgbackup/borg/issues>`_.
 * `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_

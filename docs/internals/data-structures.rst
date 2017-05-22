@@ -176,6 +176,12 @@ a new segment, while superseded entries are omitted. After each segment an inter
 commit is written to the new segment. Then, the old segment is deleted
 (asserting that the reference count diminished to zero), freeing disk space.
 
+A simplified example (excluding conditional compaction and with simpler
+commit logic) showing the principal operation of compaction:
+
+.. figure::
+    compaction.png
+
 (The actual algorithm is more complex to avoid various consistency issues, refer to
 the ``borg.repository`` module for more comments and documentation on these issues.)
 

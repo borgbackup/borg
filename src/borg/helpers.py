@@ -814,7 +814,7 @@ class Location:
     ssh_re = re.compile(r"""
         (?P<proto>ssh)://                                   # ssh://
         """ + optional_user_re + r"""                       # user@  (optional)
-        (?P<host>[^:/]+)(?::(?P<port>\d+))?                 # host or host:port
+        (?P<host>([^:/]+|\[[0-9a-fA-F:.]+\]))(?::(?P<port>\d+))?  # host or host:port or [ipv6] or [ipv6]:port
         """ + abs_path_re + optional_archive_re, re.VERBOSE)  # path or path::archive
 
     file_re = re.compile(r"""
@@ -825,7 +825,7 @@ class Location:
     scp_re = re.compile(r"""
         (
             """ + optional_user_re + r"""                   # user@  (optional)
-            (?P<host>[^:/]+):                               # host: (don't match / in host to disambiguate from file:)
+            (?P<host>([^:/]+|\[[0-9a-fA-F:.]+\])):          # host: (don't match / or [ipv6] in host to disambiguate from file:)
         )?                                                  # user@host: part is optional
         """ + scp_path_re + optional_archive_re, re.VERBOSE)  # path with optional archive
 
@@ -872,6 +872,8 @@ class Location:
             self.proto = m.group('proto')
             self.user = m.group('user')
             self.host = m.group('host')
+            if self.host is not None:
+                self.host = self.host.lstrip('[').rstrip(']')
             self.port = m.group('port') and int(m.group('port')) or None
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
@@ -886,6 +888,8 @@ class Location:
         if m:
             self.user = m.group('user')
             self.host = m.group('host')
+            if isinstance(self.host, str):
+                self.host = self.host.lstrip('[').rstrip(']')
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             self.proto = self.host and 'ssh' or 'file'

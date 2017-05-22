@@ -559,10 +559,16 @@ class Archiver:
 
     def do_mount(self, args):
         """Mount archive or an entire repository as a FUSE filesystem"""
+        # Perform these checks before opening the repository and asking for a passphrase.
+
         try:
             import borg.fuse
         except ImportError as e:
             self.print_error('borg mount not available: loading fuse support failed [ImportError: %s]' % str(e))
+            return self.exit_code
+
+        if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
+            self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
             return self.exit_code
 
         return self._do_mount(args)
@@ -570,10 +576,6 @@ class Archiver:
     @with_repository()
     def _do_mount(self, args, repository, manifest, key):
         from .fuse import FuseOperations
-
-        if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
-            self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
-            return self.exit_code
 
         with cache_if_remote(repository) as cached_repo:
             if args.location.archive:

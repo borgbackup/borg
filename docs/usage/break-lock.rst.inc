@@ -1,7 +1,5 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. borg:command:: borg break-lock
-
 .. _borg_break-lock:
 
 borg break-lock

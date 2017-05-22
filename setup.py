@@ -258,7 +258,6 @@ class build_usage(Command):
                     params = {"command": command,
                               "command_": command.replace(' ', '_'),
                               "underline": '-' * len('borg ' + command)}
-                    doc.write(".. borg:command:: borg {command}\n\n".format(**params))
                     doc.write(".. _borg_{command_}:\n\n".format(**params))
                     doc.write("borg {command}\n{underline}\n::\n\n    borg [common options] {command}".format(**params))
                     self.write_usage(parser, doc)

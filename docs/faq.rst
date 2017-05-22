@@ -108,6 +108,9 @@ Are there other known limitations?
   An easy workaround is to create multiple archives with less items each.
   See also the :ref:`archive_limitation` and :issue:`1452`.
 
+  :ref:`borg_info` shows how large (relative to the maximum size) existing
+  archives are.
+
 Why is my backup bigger than with attic?
 ----------------------------------------
 
@@ -186,6 +189,85 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
+.. _faq-integrityerror:
+
+I get an IntegrityError or similar - what now?
+----------------------------------------------
+
+A single error does not necessarily indicate bad hardware or a Borg
+bug. All hardware exhibits a bit error rate (BER). Hard drives are typically
+specified as exhibiting less than one error every 12 to 120 TB
+(one bit error in 10e14 to 10e15 bits). The specification is often called
+*unrecoverable read error rate* (URE rate).
+
+Apart from these very rare errors there are two main causes of errors:
+
+(i) Defective hardware: described below.
+(ii) Bugs in software (Borg, operating system, libraries):
+     Ensure software is up to date.
+     Check whether the issue is caused by any fixed bugs described in :ref:`important_notes`.
+
+
+.. rubric:: Finding defective hardware
+
+.. note::
+
+   Hardware diagnostics are operating system dependent and do not
+   apply universally. The commands shown apply for popular Unix-like
+   systems. Refer to your operating system's manual.
+
+Checking hard drives
+  Find the drive containing the repository and use *findmnt*, *mount* or *lsblk*
+  to learn the device path (typically */dev/...*) of the drive.
+  Then, smartmontools can retrieve self-diagnostics of the drive in question::
+
+      # smartctl -a /dev/sdSomething
+
+  The *Offline_Uncorrectable*, *Current_Pending_Sector* and *Reported_Uncorrect*
+  attributes indicate data corruption. A high *UDMA_CRC_Error_Count* usually
+  indicates a bad cable.
+
+  I/O errors logged by the system (refer to the system journal or
+  dmesg) can point to issues as well. I/O errors only affecting the
+  file system easily go unnoticed, since they are not reported to
+  applications (e.g. Borg), while these errors can still corrupt data.
+
+  Drives can corrupt some sectors in one event, while remaining
+  reliable otherwise. Conversely, drives can fail completely with no
+  advance warning. If in doubt, copy all data from the drive in
+  question to another drive -- just in case it fails completely.
+
+  If any of these are suspicious, a self-test is recommended::
+
+      # smartctl -t long /dev/sdSomething
+
+  Running ``fsck`` if not done already might yield further insights.
+
+Checking memory
+  Intermittent issues, such as ``borg check`` finding errors
+  inconsistently between runs, are frequently caused by bad memory.
+
+  Run memtest86+ (or an equivalent memory tester) to verify that
+  the memory subsystem is operating correctly.
+
+Checking processors
+  Processors rarely cause errors. If they do, they are usually overclocked
+  or otherwise operated outside their specifications. We do not recommend to
+  operate hardware outside its specifications for productive use.
+
+  Tools to verify correct processor operation include Prime95 (mprime), linpack,
+  and the `Intel Processor Diagnostic Tool
+  <https://downloadcenter.intel.com/download/19792/Intel-Processor-Diagnostic-Tool>`_
+  (applies only to Intel processors).
+
+.. rubric:: Repairing a damaged repository
+
+With any defective hardware found and replaced, the damage done to the repository
+needs to be ascertained and fixed.
+
+:ref:`borg_check` provides diagnostics and ``--repair`` options for repositories with
+issues. We recommend to first run without ``--repair`` to assess the situation.
+If the found issues and proposed repairs seem right, re-run "check" with ``--repair`` enabled.
 
 Security
 ########

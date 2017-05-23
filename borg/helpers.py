@@ -884,7 +884,7 @@ def bin_to_hex(binary):
 class Location:
     """Object representing a repository / archive location
     """
-    proto = user = host = port = path = archive = None
+    proto = user = _host = port = path = archive = None
 
     # user must not contain "@", ":" or "/".
     # Quoting adduser error message:
@@ -986,9 +986,7 @@ class Location:
         if m:
             self.proto = m.group('proto')
             self.user = m.group('user')
-            self.host = m.group('host')
-            if self.host is not None:
-                self.host = self.host.lstrip('[').rstrip(']')
+            self._host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
@@ -1002,12 +1000,10 @@ class Location:
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
-            self.host = m.group('host')
-            if isinstance(self.host, str):
-                self.host = self.host.lstrip('[').rstrip(']')
+            self._host = m.group('host')
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
-            self.proto = self.host and 'ssh' or 'file'
+            self.proto = self._host and 'ssh' or 'file'
             return True
         return False
 
@@ -1031,6 +1027,12 @@ class Location:
     def __repr__(self):
         return "Location(%s)" % self
 
+    @property
+    def host(self):
+        # strip square brackets used for IPv6 addrs
+        if self._host is not None:
+            return self._host.lstrip('[').rstrip(']')
+
     def canonical_path(self):
         if self.proto == 'file':
             return self.path
@@ -1042,7 +1044,7 @@ class Location:
             else:
                 path = self.path
             return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
-                                           self.host,
+                                           self._host,  # needed for ipv6 addrs
                                            ':{}'.format(self.port) if self.port else '',
                                            path)
 

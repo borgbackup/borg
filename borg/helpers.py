@@ -884,7 +884,7 @@ def bin_to_hex(binary):
 class Location:
     """Object representing a repository / archive location
     """
-    proto = user = host = port = path = archive = None
+    proto = user = _host = port = path = archive = None
 
     # user must not contain "@", ":" or "/".
     # Quoting adduser error message:
@@ -929,7 +929,7 @@ class Location:
     ssh_re = re.compile(r"""
         (?P<proto>ssh)://                                   # ssh://
         """ + optional_user_re + r"""                       # user@  (optional)
-        (?P<host>[^:/]+)(?::(?P<port>\d+))?                 # host or host:port
+        (?P<host>([^:/]+|\[[0-9a-fA-F:.]+\]))(?::(?P<port>\d+))?  # host or host:port or [ipv6] or [ipv6]:port
         """ + abs_path_re + optional_archive_re, re.VERBOSE)  # path or path::archive
 
     file_re = re.compile(r"""
@@ -940,7 +940,7 @@ class Location:
     scp_re = re.compile(r"""
         (
             """ + optional_user_re + r"""                   # user@  (optional)
-            (?P<host>[^:/]+):                               # host: (don't match / in host to disambiguate from file:)
+            (?P<host>([^:/]+|\[[0-9a-fA-F:.]+\])):          # host: (don't match / or [ipv6] in host to disambiguate from file:)
         )?                                                  # user@host: part is optional
         """ + scp_path_re + optional_archive_re, re.VERBOSE)  # path with optional archive
 
@@ -956,7 +956,7 @@ class Location:
     def __init__(self, text=''):
         self.orig = text
         if not self.parse(self.orig):
-            raise ValueError
+            raise ValueError('Location: parse failed: %s' % self.orig)
 
     def parse(self, text):
         text = replace_placeholders(text)
@@ -986,7 +986,7 @@ class Location:
         if m:
             self.proto = m.group('proto')
             self.user = m.group('user')
-            self.host = m.group('host')
+            self._host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
@@ -1000,10 +1000,10 @@ class Location:
         m = self.scp_re.match(text)
         if m:
             self.user = m.group('user')
-            self.host = m.group('host')
+            self._host = m.group('host')
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
-            self.proto = self.host and 'ssh' or 'file'
+            self.proto = self._host and 'ssh' or 'file'
             return True
         return False
 
@@ -1027,6 +1027,12 @@ class Location:
     def __repr__(self):
         return "Location(%s)" % self
 
+    @property
+    def host(self):
+        # strip square brackets used for IPv6 addrs
+        if self._host is not None:
+            return self._host.lstrip('[').rstrip(']')
+
     def canonical_path(self):
         if self.proto == 'file':
             return self.path
@@ -1038,7 +1044,7 @@ class Location:
             else:
                 path = self.path
             return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
-                                           self.host,
+                                           self._host,  # needed for ipv6 addrs
                                            ':{}'.format(self.port) if self.port else '',
                                            path)
 

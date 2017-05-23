@@ -193,12 +193,6 @@ htmlhelp_basename = 'borgdoc'
 
 # -- Options for LaTeX output --------------------------------------------------
 
-# The paper size ('letter' or 'a4').
-#latex_paper_size = 'letter'
-
-# The font size ('10pt', '11pt' or '12pt').
-#latex_font_size = '12pt'
-
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
@@ -209,6 +203,11 @@ latex_documents = [
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
 latex_logo = '_static/logo.pdf'
+
+latex_elements = {
+    'papersize': 'a4paper',
+    'pointsize': '10pt',
+}
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
@@ -224,7 +223,12 @@ latex_show_urls = 'footnote'
 #latex_preamble = ''
 
 # Documents to append as an appendix to all manuals.
-#latex_appendices = []
+latex_appendices = [
+    'support',
+    'resources',
+    'changes',
+    'authors',
+]
 
 # If false, no module index is generated.
 #latex_domain_indices = True

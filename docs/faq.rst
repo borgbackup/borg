@@ -111,24 +111,6 @@ Are there other known limitations?
   :ref:`borg_info` shows how large (relative to the maximum size) existing
   archives are.
 
-Why is my backup bigger than with attic?
-----------------------------------------
-
-Attic was rather unflexible when it comes to compression, it always
-compressed using zlib level 6 (no way to switch compression off or
-adjust the level or algorithm).
-
-The default in Borg is lz4, which is fast enough to not use significant CPU time
-in most cases, but can only achieve modest compression. It still compresses
-easily compressed data fairly well.
-
-zlib compression with all levels (1-9) as well as LZMA (1-6) are available
-as well, for cases where they are worth it.
-
-Which choice is the best option depends on a number of factors, like
-bandwidth to the repository, how well the data compresses, available CPU
-power and so on.
-
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
 
@@ -649,6 +631,9 @@ Borg intends to be:
     or without warning. allow compatibility breaking for other cases.
   * if major version number changes, it may have incompatible changes
 
+Migrating from Attic
+####################
+
 What are the differences between Attic and Borg?
 ------------------------------------------------
 
@@ -659,8 +644,9 @@ Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
 Here's a (incomplete) list of some major changes:
 
+* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_),
+  including critical data corruption bugs and security issues.
 * more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
-* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
 * less chunk management overhead (less memory and disk usage for chunks index)
 * faster remote cache resync (useful when backing up multiple machines into same repo)
 * compression: no, lz4, zlib or lzma compression, adjustable compression levels
@@ -676,4 +662,48 @@ Here's a (incomplete) list of some major changes:
 Please read the :ref:`changelog` (or ``docs/changes.rst`` in the source distribution) for more
 information.
 
-Borg is not compatible with original attic (but there is a one-way conversion).
+Borg is not compatible with original Attic (but there is a one-way conversion).
+
+How do I migrate from Attic to Borg?
+------------------------------------
+
+Use :ref:`borg_upgrade`. This is a one-way process that cannot be reversed.
+
+There are some caveats:
+
+- The upgrade can only be performed on local repositories.
+  It cannot be performed on remote repositories.
+
+- If the repository is in "keyfile" encryption mode, the keyfile must
+  exist locally or it must be manually moved after performing the upgrade:
+
+  1. Locate the repository ID, contained in the ``config`` file in the repository.
+  2. Locate the attic key file at ``~/.attic/keys/``. The correct key for the
+     repository starts with the line ``ATTIC_KEY <repository id>``.
+  3. Copy the attic key file to ``~/.config/borg/keys/``
+  4. Change the first line from ``ATTIC_KEY ...`` to ``BORG_KEY ...``.
+  5. Verify that the repository is now accessible (e.g. ``borg list <repository>``).
+- Attic and Borg use different :ref:`"chunker params" <chunker-params>`.
+  This means that data added by Borg won't deduplicate with the existing data
+  stored by Attic. The effect is lessened if the files cache is used with Borg.
+- Repositories in "passphrase" mode *must* be migrated to "repokey" mode using
+  :ref:`borg_key_migrate-to-repokey`. Borg does not support the "passphrase" mode
+  any other way.
+
+Why is my backup bigger than with attic?
+----------------------------------------
+
+Attic was rather unflexible when it comes to compression, it always
+compressed using zlib level 6 (no way to switch compression off or
+adjust the level or algorithm).
+
+The default in Borg is lz4, which is fast enough to not use significant CPU time
+in most cases, but can only achieve modest compression. It still compresses
+easily compressed data fairly well.
+
+zlib compression with all levels (1-9) as well as LZMA (1-6) are available
+as well, for cases where they are worth it.
+
+Which choice is the best option depends on a number of factors, like
+bandwidth to the repository, how well the data compresses, available CPU
+power and so on.

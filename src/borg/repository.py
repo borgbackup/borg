@@ -88,7 +88,7 @@ class Repository:
         """Repository {} does not exist."""
 
     class AlreadyExists(Error):
-        """Repository {} already exists."""
+        """A repository already exists at {}."""
 
     class InvalidRepository(Error):
         """{} is not a valid repository. Check repo config."""
@@ -158,11 +158,46 @@ class Repository:
     def id_str(self):
         return bin_to_hex(self.id)
 
-    def create(self, path):
-        """Create a new empty repository at `path`
+    def check_can_create_repository(self, path):
+        """
+        Raise self.AlreadyExists if a repository already exists at *path* or any parent directory.
+
+        Checking parent directories is done for two reasons:
+        (1) It's just a weird thing to do, and usually not intended. A Borg using the "parent" repository
+            may be confused, or we may accidentally put stuff into the "data/" or "data/<n>/" directories.
+        (2) When implementing repository quotas (which we currently don't), it's important to prohibit
+            folks from creating quota-free repositories. Since no one can create a repository within another
+            repository, user's can only use the quota'd repository, when their --restrict-to-path points
+            at the user's repository.
         """
         if os.path.exists(path) and (not os.path.isdir(path) or os.listdir(path)):
             raise self.AlreadyExists(path)
+
+        while True:
+            # Check all parent directories for Borg's repository README
+            previous_path = path
+            # Thus, path = previous_path/..
+            path = os.path.abspath(os.path.join(previous_path, os.pardir))
+            if path == previous_path:
+                # We reached the root of the directory hierarchy (/.. = / and C:\.. = C:\).
+                break
+            try:
+                # Use binary mode to avoid troubles if a README contains some stuff not in our locale
+                with open(os.path.join(path, 'README'), 'rb') as fd:
+                    # Read only the first ~100 bytes (if any), in case some README file we stumble upon is large.
+                    readme_head = fd.read(100)
+                    # The first comparison captures our current variant (REPOSITORY_README), the second comparison
+                    # is an older variant of the README file (used by 1.0.x).
+                    if b'Borg Backup repository' in readme_head or b'Borg repository' in readme_head:
+                        raise self.AlreadyExists(path)
+            except OSError:
+                # Ignore FileNotFound, PermissionError, ...
+                pass
+
+    def create(self, path):
+        """Create a new empty repository at `path`
+        """
+        self.check_can_create_repository(path)
         if not os.path.exists(path):
             os.mkdir(path)
         with open(os.path.join(path, 'README'), 'w') as fd:
@@ -434,7 +469,7 @@ class Repository:
         # At this point the index may only be updated by compaction, which won't resize it.
         # We still apply a factor of four so that a later, separate invocation can free space
         # (journaling all deletes for all chunks is one index size) or still make minor additions
-        # (which may grow the index up to twice it's current size).
+        # (which may grow the index up to twice its current size).
         # Note that in a subsequent operation the committed index is still on-disk, therefore we
         # arrive at index_size * (1 + 2 + 1).
         # In that order: journaled deletes (1), hashtable growth (2), persisted index (1).

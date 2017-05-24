@@ -107,10 +107,14 @@ class Repository:
     class InsufficientFreeSpaceError(Error):
         """Insufficient free space to complete transaction (required: {}, available: {})."""
 
-    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False):
+    class StorageQuotaExceeded(Error):
+        """The storage quota ({}) has been exceeded ({}). Try deleting some archives."""
+
+    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True,
+                 append_only=False, storage_quota=None):
         self.path = os.path.abspath(path)
         self._location = Location('file://%s' % self.path)
-        self.io = None
+        self.io = None  # type: LoggedIO
         self.lock = None
         self.index = None
         # This is an index of shadowed log entries during this transaction. Consider the following sequence:
@@ -124,6 +128,9 @@ class Repository:
         self.created = False
         self.exclusive = exclusive
         self.append_only = append_only
+        self.storage_quota = storage_quota
+        self.storage_quota_use = 0
+        self.transaction_doomed = None
 
     def __del__(self):
         if self.lock:
@@ -209,6 +216,10 @@ class Repository:
         config.set('repository', 'segments_per_dir', str(DEFAULT_SEGMENTS_PER_DIR))
         config.set('repository', 'max_segment_size', str(DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'append_only', str(int(self.append_only)))
+        if self.storage_quota:
+            config.set('repository', 'storage_quota', str(self.storage_quota))
+        else:
+            config.set('repository', 'storage_quota', '0')
         config.set('repository', 'additional_free_space', '0')
         config.set('repository', 'id', bin_to_hex(os.urandom(32)))
         self.save_config(path, config)
@@ -331,6 +342,9 @@ class Repository:
         # append_only can be set in the constructor
         # it shouldn't be overridden (True -> False) here
         self.append_only = self.append_only or self.config.getboolean('repository', 'append_only', fallback=False)
+        if self.storage_quota is None:
+            # self.storage_quota is None => no explicit storage_quota was specified, use repository setting.
+            self.storage_quota = self.config.getint('repository', 'storage_quota', fallback=0)
         self.id = unhexlify(self.config.get('repository', 'id').strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
@@ -346,7 +360,12 @@ class Repository:
         """Commit transaction
         """
         # save_space is not used anymore, but stays for RPC/API compatibility.
+        if self.transaction_doomed:
+            exception = self.transaction_doomed
+            self.rollback()
+            raise exception
         self.check_free_space()
+        self.log_storage_quota()
         self.io.write_commit()
         if not self.append_only:
             self.compact_segments()
@@ -398,6 +417,7 @@ class Repository:
         if transaction_id is None:
             self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
             self.compact = FreeSpace()  # XXX bad name: freeable_space_of_segment_x = self.compact[x]
+            self.storage_quota_use = 0
             self.shadow_index.clear()
         else:
             if do_cleanup:
@@ -420,6 +440,7 @@ class Repository:
                 logger.debug('Upgrading from v1 hints.%d', transaction_id)
                 self.segments = hints[b'segments']
                 self.compact = FreeSpace()
+                self.storage_quota_use = 0
                 for segment in sorted(hints[b'compact']):
                     logger.debug('Rebuilding sparse info for segment %d', segment)
                     self._rebuild_sparse(segment)
@@ -429,6 +450,8 @@ class Repository:
             else:
                 self.segments = hints[b'segments']
                 self.compact = FreeSpace(hints[b'compact'])
+                self.storage_quota_use = hints.get(b'storage_quota_use', 0)
+            self.log_storage_quota()
             # Drop uncommitted segments in the shadow index
             for key, shadowed_segments in self.shadow_index.items():
                 for segment in list(shadowed_segments):
@@ -438,7 +461,8 @@ class Repository:
     def write_index(self):
         hints = {b'version': 2,
                  b'segments': self.segments,
-                 b'compact': self.compact}
+                 b'compact': self.compact,
+                 b'storage_quota_use': self.storage_quota_use, }
         transaction_id = self.io.get_segments_transaction_id()
         assert transaction_id is not None
         hints_file = os.path.join(self.path, 'hints.%d' % transaction_id)
@@ -514,6 +538,11 @@ class Repository:
             formatted_required = format_file_size(required_free_space)
             formatted_free = format_file_size(free_space)
             raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
+
+    def log_storage_quota(self):
+        if self.storage_quota:
+            logger.info('Storage quota: %s out of %s used.',
+                        format_file_size(self.storage_quota_use), format_file_size(self.storage_quota))
 
     def compact_segments(self):
         """Compact sparse segments by copying data into new segments
@@ -672,6 +701,7 @@ class Repository:
                     pass
                 self.index[key] = segment, offset
                 self.segments[segment] += 1
+                self.storage_quota_use += size
             elif tag == TAG_DELETE:
                 try:
                     # if the deleted PUT is not in the index, there is nothing to clean up
@@ -684,6 +714,7 @@ class Repository:
                         # is already gone, then it was already compacted.
                         self.segments[s] -= 1
                         size = self.io.read(s, offset, key, read_data=False)
+                        self.storage_quota_use -= size
                         self.compact[s] += size
             elif tag == TAG_COMMIT:
                 continue
@@ -821,6 +852,7 @@ class Repository:
             self.io.cleanup(self.io.get_segments_transaction_id())
         self.index = None
         self._active_txn = False
+        self.transaction_doomed = None
 
     def rollback(self):
         # note: when used in remote mode, this is time limited, see RemoteRepository.shutdown_time.
@@ -915,14 +947,20 @@ class Repository:
         else:
             self.segments[segment] -= 1
             size = self.io.read(segment, offset, id, read_data=False)
+            self.storage_quota_use -= size
             self.compact[segment] += size
             segment, size = self.io.write_delete(id)
             self.compact[segment] += size
             self.segments.setdefault(segment, 0)
         segment, offset = self.io.write_put(id, data)
+        self.storage_quota_use += len(data) + self.io.put_header_fmt.size
         self.segments.setdefault(segment, 0)
         self.segments[segment] += 1
         self.index[id] = segment, offset
+        if self.storage_quota and self.storage_quota_use > self.storage_quota:
+            self.transaction_doomed = self.StorageQuotaExceeded(
+                format_file_size(self.storage_quota), format_file_size(self.storage_quota_use))
+            raise self.transaction_doomed
 
     def delete(self, id, wait=True):
         """delete a repo object
@@ -939,6 +977,7 @@ class Repository:
         self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         size = self.io.read(segment, offset, id, read_data=False)
+        self.storage_quota_use -= size
         self.compact[segment] += size
         segment, size = self.io.write_delete(id)
         self.compact[segment] += size

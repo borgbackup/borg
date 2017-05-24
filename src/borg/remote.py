@@ -178,7 +178,7 @@ class RepositoryServer:  # pragma: no cover
         'inject_exception',
     )
 
-    def __init__(self, restrict_to_paths, append_only):
+    def __init__(self, restrict_to_paths, append_only, storage_quota):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
         # This flag is parsed from the serve command line via Archiver.do_serve,
@@ -186,6 +186,7 @@ class RepositoryServer:  # pragma: no cover
         # whatever the client wants, except when initializing a new repository
         # (see RepositoryServer.open below).
         self.append_only = append_only
+        self.storage_quota = storage_quota
         self.client_version = parse_version('1.0.8')  # fallback version if client is too old to send version information
 
     def positional_to_named(self, method, argv):
@@ -360,6 +361,7 @@ class RepositoryServer:  # pragma: no cover
         append_only = (not create and self.append_only) or append_only
         self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock,
                                      append_only=append_only,
+                                     storage_quota=self.storage_quota,
                                      exclusive=exclusive)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
@@ -671,6 +673,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     topic = 'borg.debug.' + topic
                 if 'repository' in topic:
                     opts.append('--debug-topic=%s' % topic)
+
+            if 'storage_quota' in args and args.storage_quota:
+                opts.append('--storage-quota=%s' % args.storage_quota)
         env_vars = []
         if not hostname_is_unique():
             env_vars.append('BORG_HOSTNAME_IS_UNIQUE=no')

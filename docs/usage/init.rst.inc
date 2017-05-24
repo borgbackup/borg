@@ -17,6 +17,8 @@ optional arguments
         | select encryption key mode **(required)**
     ``-a``, ``--append-only``
         | create an append-only mode repository
+    ``--storage-quota``
+        | Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 
 `Common options`_
     |

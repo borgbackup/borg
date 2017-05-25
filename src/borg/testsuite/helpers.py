@@ -141,6 +141,10 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
         assert Location('path').to_key_filename() == keys_dir + 'path'
 
+    def test_long_path(self, monkeypatch, keys_dir):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert Location(os.path.join(*(40 * ['path']))).to_key_filename() == keys_dir + '_'.join(20 * ['path']) + '_'
+
     def test_abspath(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('/some/absolute/path::archive')) == \

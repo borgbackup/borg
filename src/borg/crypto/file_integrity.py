@@ -182,6 +182,9 @@ class IntegrityCheckedFile(FileLikeWrapper):
 class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
     def __init__(self, path, write, filename=None, override_fd=None):
         super().__init__(path, write, filename, override_fd)
+        filename = filename or os.path.basename(path)
+        output_dir = os.path.dirname(path)
+        self.output_integrity_file = self.integrity_file_path(os.path.join(output_dir, filename))
         if not write:
             self.digests = self.read_integrity_file(self.path, self.hasher)
 
@@ -201,5 +204,5 @@ class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
             raise FileIntegrityError(path)
 
     def store_integrity_data(self, data: str):
-        with open(self.integrity_file_path(self.path), 'w') as fd:
+        with open(self.output_integrity_file, 'w') as fd:
             fd.write(data)

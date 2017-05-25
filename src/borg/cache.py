@@ -527,7 +527,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         def mkpath(id, suffix=''):
             id_hex = bin_to_hex(id)
             path = os.path.join(archive_path, id_hex + suffix)
-            return path.encode('utf-8')
+            return path
 
         def cached_archives():
             if self.do_cache:
@@ -543,6 +543,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         def cleanup_outdated(ids):
             for id in ids:
                 os.unlink(mkpath(id))
+                try:
+                    os.unlink(mkpath(id) + '.integrity')
+                except FileNotFoundError:
+                    pass
 
         def fetch_and_build_idx(archive_id, repository, key, chunk_idx):
             cdata = repository.get(archive_id)
@@ -565,12 +569,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             if self.do_cache:
                 fn = mkpath(archive_id)
                 fn_tmp = mkpath(archive_id, suffix='.tmp')
-                try:
-                    chunk_idx.write(fn_tmp)
-                except Exception:
-                    os.unlink(fn_tmp)
-                else:
-                    os.rename(fn_tmp, fn)
+                with DetachedIntegrityCheckedFile(path=fn_tmp, write=True, filename=bin_to_hex(archive_id)) as fd:
+                    try:
+                        chunk_idx.write(fd)
+                    except Exception:
+                        os.unlink(fn_tmp)
+                    else:
+                        os.rename(fn_tmp, fn)
 
         def lookup_name(archive_id):
             for info in self.manifest.archives.list():
@@ -601,7 +606,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         if archive_id in cached_ids:
                             archive_chunk_idx_path = mkpath(archive_id)
                             logger.info("Reading cached archive chunk index for %s ..." % archive_name)
-                            archive_chunk_idx = ChunkIndex.read(archive_chunk_idx_path)
+                            with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
+                                archive_chunk_idx = ChunkIndex.read(fd)
                         else:
                             logger.info('Fetching and building archive index for %s ...' % archive_name)
                             archive_chunk_idx = ChunkIndex()

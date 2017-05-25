@@ -67,8 +67,11 @@ cdef class IndexBase:
     def __cinit__(self, capacity=0, path=None, key_size=32):
         self.key_size = key_size
         if path:
-            with open(path, 'rb') as fd:
-                self.index = hashindex_read(fd)
+            if isinstance(path, (str, bytes)):
+                with open(path, 'rb') as fd:
+                    self.index = hashindex_read(fd)
+            else:
+                self.index = hashindex_read(path)
             assert self.index, 'hashindex_read() returned NULL with no exception set'
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
@@ -84,8 +87,11 @@ cdef class IndexBase:
         return cls(path=path)
 
     def write(self, path):
-        with open(path, 'wb') as fd:
-            hashindex_write(self.index, fd)
+        if isinstance(path, (str, bytes)):
+            with open(path, 'wb') as fd:
+                hashindex_write(self.index, fd)
+        else:
+            hashindex_write(self.index, path)
 
     def clear(self):
         hashindex_free(self.index)

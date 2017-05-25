@@ -2074,6 +2074,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_init_requires_encryption_option(self):
         self.cmd('init', self.repository_location, exit_code=2)
 
+    def test_init_nested_repositories(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        if self.FORK_DEFAULT:
+            self.cmd('init', '--encryption=repokey', self.repository_location + '/nested', exit_code=2)
+        else:
+            with pytest.raises(Repository.AlreadyExists):
+                self.cmd('init', '--encryption=repokey', self.repository_location + '/nested')
+
     def check_cache(self):
         # First run a regular borg check
         self.cmd('check', self.repository_location)

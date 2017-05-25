@@ -24,6 +24,7 @@ from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
+from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile
 from .locking import Lock
 from .platform import SaveFile
 from .remote import cache_if_remote
@@ -237,6 +238,7 @@ class CacheConfig:
         config.set('cache', 'version', '1')
         config.set('cache', 'repository', self.repository.id_str)
         config.set('cache', 'manifest', '')
+        config.add_section('integrity')
         with SaveFile(self.config_path) as fd:
             config.write(fd)
 
@@ -253,6 +255,12 @@ class CacheConfig:
         self.manifest_id = unhexlify(self._config.get('cache', 'manifest'))
         self.timestamp = self._config.get('cache', 'timestamp', fallback=None)
         self.key_type = self._config.get('cache', 'key_type', fallback=None)
+        if not self._config.has_section('integrity'):
+            self._config.add_section('integrity')
+        try:
+            self.integrity = dict(self._config.items('integrity'))
+        except configparser.NoSectionError:
+            self.integrity = {}
         previous_location = self._config.get('cache', 'previous_location', fallback=None)
         if previous_location:
             self.previous_location = recanonicalize_relative_location(previous_location, self.repository)
@@ -266,6 +274,8 @@ class CacheConfig:
         if key:
             self._config.set('cache', 'key_type', str(key.TYPE))
         self._config.set('cache', 'previous_location', self.repository._location.canonical_path())
+        for file, integrity_data in self.integrity.items():
+            self._config.set('integrity', file, integrity_data)
         with SaveFile(self.config_path) as fd:
             self._config.write(fd)
 
@@ -392,14 +402,16 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         with open(os.path.join(self.path, 'README'), 'w') as fd:
             fd.write(CACHE_README)
         self.cache_config.create()
-        ChunkIndex().write(os.path.join(self.path, 'chunks').encode('utf-8'))
+        ChunkIndex().write(os.path.join(self.path, 'chunks'))
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
             pass  # empty file
 
     def _do_open(self):
         self.cache_config.load()
-        self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
+        with IntegrityCheckedFile(path=os.path.join(self.path, 'chunks'), write=False,
+                                  integrity_data=self.cache_config.integrity.get('chunks')) as fd:
+            self.chunks = ChunkIndex.read(fd)
         self.files = None
 
     def open(self):
@@ -417,7 +429,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.files = {}
         self._newest_mtime = None
         logger.debug('Reading files cache ...')
-        with open(os.path.join(self.path, 'files'), 'rb') as fd:
+
+        with IntegrityCheckedFile(path=os.path.join(self.path, 'files'), write=False,
+                                  integrity_data=self.cache_config.integrity.get('files')) as fd:
             u = msgpack.Unpacker(use_list=True)
             while True:
                 data = fd.read(64 * 1024)
@@ -458,7 +472,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 self._newest_mtime = 2 ** 63 - 1  # nanoseconds, good until y2262
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             pi.output('Saving files cache')
-            with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
+            with IntegrityCheckedFile(path=os.path.join(self.path, 'files'), write=True) as fd:
                 for path_hash, item in self.files.items():
                     # Only keep files seen in this backup that are older than newest mtime seen in this backup -
                     # this is to avoid issues with filesystem snapshots and mtime granularity.
@@ -467,10 +481,13 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if entry.age == 0 and bigint_to_int(entry.mtime) < self._newest_mtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
+            self.cache_config.integrity['files'] = fd.integrity_data
+        pi.output('Saving chunks cache')
+        with IntegrityCheckedFile(path=os.path.join(self.path, 'chunks'), write=True) as fd:
+            self.chunks.write(fd)
+        self.cache_config.integrity['chunks'] = fd.integrity_data
         pi.output('Saving cache config')
         self.cache_config.save(self.manifest, self.key)
-        pi.output('Saving chunks cache')
-        self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
         os.rename(os.path.join(self.path, 'txn.active'),
                   os.path.join(self.path, 'txn.tmp'))
         shutil.rmtree(os.path.join(self.path, 'txn.tmp'))

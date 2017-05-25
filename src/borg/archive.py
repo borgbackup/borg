@@ -569,7 +569,7 @@ Utilization of max. archive size: {csize_max:.0%}
         path = os.path.join(dest, item.path)
         # Attempt to remove existing files, ignore errors on failure
         try:
-            st = os.lstat(path)
+            st = os.stat(path, follow_symlinks=False)
             if stat.S_ISDIR(st.st_mode):
                 os.rmdir(path)
             else:
@@ -674,7 +674,7 @@ Utilization of max. archive size: {csize_max:.0%}
             if fd:
                 os.fchown(fd, uid, gid)
             else:
-                os.lchown(path, uid, gid)
+                os.chown(path, uid, gid, follow_symlinks=False)
         except OSError:
             pass
         if fd:

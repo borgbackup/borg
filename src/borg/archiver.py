@@ -54,7 +54,7 @@ from .helpers import get_cache_dir
 from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import StableDict
-from .helpers import check_extension_modules
+from .helpers import check_python, check_extension_modules
 from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
@@ -436,7 +436,7 @@ class Archiver:
                     continue
                 path = os.path.normpath(path)
                 try:
-                    st = os.lstat(path)
+                    st = os.stat(path, follow_symlinks=False)
                 except OSError as e:
                     self.print_warning('%s: %s', path, e)
                     continue
@@ -498,7 +498,7 @@ class Archiver:
         """
         if st is None:
             with backup_io('stat'):
-                st = os.lstat(path)
+                st = os.stat(path, follow_symlinks=False)
 
         recurse_excluded_dir = False
         if not matcher.match(path):
@@ -3829,6 +3829,7 @@ class Archiver:
         return args
 
     def prerun_checks(self, logger):
+        check_python()
         check_extension_modules()
         selftest(logger)
 

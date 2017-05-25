@@ -54,6 +54,21 @@ manages data.
 
 .. _locking: https://en.wikipedia.org/wiki/File_locking#Lock_files
 
+(G)LIBC requirements
+--------------------
+
+Borg uses some filesytem functions from Python's `os` standard library module
+with `follow_symlinks=False`. These are implemented since quite a while with
+the non-symlink-following (g)libc functions like e.g. `lstat` or `lutimes`
+(not: `stat` or `utimes`).
+
+Some stoneage systems (like RHEL/CentOS 5) and also Python interpreter binaries
+compiled to be able to run on such systems (like Python installed via Anaconda)
+might miss these functions and Borg won't be able to work correctly.
+This issue will be detected early and Borg will abort with a fatal error.
+
+For the Borg binaries, there are additional (g)libc requirements, see below.
+
 .. _distribution-package:
 
 Distribution Package

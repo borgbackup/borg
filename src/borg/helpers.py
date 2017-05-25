@@ -916,7 +916,7 @@ class Location:
     def to_key_filename(self):
         name = re.sub('[^\w]', '_', self.path).strip('_')
         if self.proto != 'file':
-            name = self.host + '__' + name
+            name = re.sub('[^\w]', '_', self.host) + '__' + name
         return os.path.join(get_keys_dir(), name)
 
     def __repr__(self):

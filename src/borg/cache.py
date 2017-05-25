@@ -24,7 +24,7 @@ from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
-from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile
+from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError
 from .locking import Lock
 from .platform import SaveFile
 from .remote import cache_if_remote
@@ -542,11 +542,14 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
         def cleanup_outdated(ids):
             for id in ids:
-                os.unlink(mkpath(id))
-                try:
-                    os.unlink(mkpath(id) + '.integrity')
-                except FileNotFoundError:
-                    pass
+                cleanup_cached_archive(id)
+
+        def cleanup_cached_archive(id):
+            os.unlink(mkpath(id))
+            try:
+                os.unlink(mkpath(id) + '.integrity')
+            except FileNotFoundError:
+                pass
 
         def fetch_and_build_idx(archive_id, repository, key, chunk_idx):
             cdata = repository.get(archive_id)
@@ -606,9 +609,17 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         if archive_id in cached_ids:
                             archive_chunk_idx_path = mkpath(archive_id)
                             logger.info("Reading cached archive chunk index for %s ..." % archive_name)
-                            with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
-                                archive_chunk_idx = ChunkIndex.read(fd)
-                        else:
+                            try:
+                                with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
+                                    archive_chunk_idx = ChunkIndex.read(fd)
+                            except FileIntegrityError as fie:
+                                logger.error('Cached archive chunk index of %s is corrupted: %s', archive_name, fie)
+                                # Delete it and fetch a new index
+                                cleanup_cached_archive(archive_id)
+                                cached_ids.remove(archive_id)
+                        if archive_id not in cached_ids:
+                            # Do not make this an else branch; the FileIntegrityError exception handler
+                            # above can remove *archive_id* from *cached_ids*.
                             logger.info('Fetching and building archive index for %s ...' % archive_name)
                             archive_chunk_idx = ChunkIndex()
                             fetch_and_build_idx(archive_id, repository, self.key, archive_chunk_idx)

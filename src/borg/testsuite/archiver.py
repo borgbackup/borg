@@ -1,5 +1,6 @@
 import argparse
 import errno
+import io
 import json
 import logging
 import os
@@ -37,6 +38,7 @@ from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_aes_blocks
 from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
+from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
 from ..helpers import Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -2884,6 +2886,68 @@ class RemoteArchiverTestCase(ArchiverTestCase):
             with self.assert_creates_file('input/dir/file'):
                 res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
                 self.assert_true(marker not in res)
+
+
+class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
+    def corrupt(self, file):
+        with open(file, 'r+b') as fd:
+            fd.seek(-1, io.SEEK_END)
+            fd.write(b'1')
+
+    def test_cache_chunks(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        cache_path = json.loads(self.cmd('info', self.repository_location, '--json'))['cache']['path']
+        self.corrupt(os.path.join(cache_path, 'chunks'))
+
+        if self.FORK_DEFAULT:
+            out = self.cmd('info', self.repository_location, exit_code=2)
+            assert 'failed integrity check' in out
+        else:
+            with pytest.raises(FileIntegrityError):
+                self.cmd('info', self.repository_location)
+
+    def test_cache_files(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        cache_path = json.loads(self.cmd('info', self.repository_location, '--json'))['cache']['path']
+        self.corrupt(os.path.join(cache_path, 'files'))
+
+        if self.FORK_DEFAULT:
+            out = self.cmd('create', self.repository_location + '::test1', 'input', exit_code=2)
+            assert 'failed integrity check' in out
+        else:
+            with pytest.raises(FileIntegrityError):
+                self.cmd('create', self.repository_location + '::test1', 'input')
+
+    def test_chunks_archive(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', 'input')
+        # Find ID of test1 so we can corrupt it later :)
+        target_id = self.cmd('list', self.repository_location, '--format={id}{LF}').strip()
+        self.cmd('create', self.repository_location + '::test2', 'input')
+        self.cmd('delete', '--cache-only', self.repository_location)
+
+        cache_path = json.loads(self.cmd('info', self.repository_location, '--json'))['cache']['path']
+        chunks_archive = os.path.join(cache_path, 'chunks.archive.d')
+        assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
+
+        self.corrupt(os.path.join(chunks_archive, target_id))
+
+        # Trigger cache sync by changing the manifest ID in the cache config
+        config_path = os.path.join(cache_path, 'config')
+        config = ConfigParser(interpolation=None)
+        config.read(config_path)
+        config.set('cache', 'manifest', bin_to_hex(bytes(32)))
+        with open(config_path, 'w') as fd:
+            config.write(fd)
+
+        # Cache sync will notice corrupted archive chunks, but automatically recover.
+        out = self.cmd('create', '-v', self.repository_location + '::test3', 'input', exit_code=1)
+        assert 'Reading cached archive chunk index for test1' in out
+        assert 'Cached archive chunk index of test1 is corrupted' in out
+        assert 'Fetching and building archive index for test1' in out
 
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):

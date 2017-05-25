@@ -22,6 +22,7 @@ from .helpers import safe_ns
 from .helpers import yes, hostname_is_unique
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
+from .helpers import set_ec, EXIT_WARNING
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError
@@ -617,6 +618,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                                 # Delete it and fetch a new index
                                 cleanup_cached_archive(archive_id)
                                 cached_ids.remove(archive_id)
+                                set_ec(EXIT_WARNING)
                         if archive_id not in cached_ids:
                             # Do not make this an else branch; the FileIntegrityError exception handler
                             # above can remove *archive_id* from *cached_ids*.

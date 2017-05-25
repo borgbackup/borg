@@ -48,6 +48,7 @@ if sys.platform.startswith('freebsd'):
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
+from distutils.command.clean import clean
 
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
@@ -567,11 +568,30 @@ class build_man(Command):
             write(option.ljust(padding), desc)
 
 
+class Clean(clean):
+    def run(self):
+        super().run()
+        for source in cython_sources:
+            genc = source.replace('.pyx', '.c')
+            try:
+                os.unlink(genc)
+                print('rm', genc)
+            except FileNotFoundError:
+                pass
+            compiled_glob = source.replace('.pyx', '.cpython*')
+            for compiled in glob(compiled_glob):
+                try:
+                    os.unlink(compiled)
+                    print('rm', compiled)
+                except FileNotFoundError:
+                    pass
+
 cmdclass = {
     'build_ext': build_ext,
     'build_usage': build_usage,
     'build_man': build_man,
-    'sdist': Sdist
+    'sdist': Sdist,
+    'clean': Clean,
 }
 
 ext_modules = []

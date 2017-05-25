@@ -152,6 +152,7 @@ class IntegrityCheckedFile(FileLikeWrapper):
     def hash_part(self, partname, is_final=False):
         if not self.writing and not self.digests:
             return
+        self.hasher.update(('%10d' % len(partname)).encode())
         self.hasher.update(partname.encode())
         self.hasher.hash_length(seek_to_end=is_final)
         digest = self.hasher.hexdigest()

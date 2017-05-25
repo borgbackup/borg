@@ -240,6 +240,7 @@ class CacheConfig:
         config.set('cache', 'repository', self.repository.id_str)
         config.set('cache', 'manifest', '')
         config.add_section('integrity')
+        config.set('integrity', 'manifest', '')
         with SaveFile(self.config_path) as fd:
             config.write(fd)
 
@@ -256,11 +257,19 @@ class CacheConfig:
         self.manifest_id = unhexlify(self._config.get('cache', 'manifest'))
         self.timestamp = self._config.get('cache', 'timestamp', fallback=None)
         self.key_type = self._config.get('cache', 'key_type', fallback=None)
-        if not self._config.has_section('integrity'):
-            self._config.add_section('integrity')
         try:
             self.integrity = dict(self._config.items('integrity'))
+            if self._config.get('cache', 'manifest') != self.integrity.pop('manifest'):
+                # The cache config file is updated (parsed with ConfigParser, the state of the ConfigParser
+                # is modified and then written out.), not re-created.
+                # Thus, older versions will leave our [integrity] section alone, making the section's data invalid.
+                # Therefore, we also add the manifest ID to this section and
+                # can discern whether an older version interfere by comparing the manifest IDs of this section
+                # and the main [cache] section.
+                self.integrity = {}
+                logger.warning('Cache integrity data lost: old Borg version modified the cache.')
         except configparser.NoSectionError:
+            logger.debug('Cache integrity: No integrity data found (files, chunks). Cache is from old version.')
             self.integrity = {}
         previous_location = self._config.get('cache', 'previous_location', fallback=None)
         if previous_location:
@@ -272,11 +281,14 @@ class CacheConfig:
         if manifest:
             self._config.set('cache', 'manifest', manifest.id_str)
             self._config.set('cache', 'timestamp', manifest.timestamp)
+            if not self._config.has_section('integrity'):
+                self._config.add_section('integrity')
+            for file, integrity_data in self.integrity.items():
+                self._config.set('integrity', file, integrity_data)
+            self._config.set('integrity', 'manifest', manifest.id_str)
         if key:
             self._config.set('cache', 'key_type', str(key.TYPE))
         self._config.set('cache', 'previous_location', self.repository._location.canonical_path())
-        for file, integrity_data in self.integrity.items():
-            self._config.set('integrity', file, integrity_data)
         with SaveFile(self.config_path) as fd:
             self._config.write(fd)
 

@@ -2949,6 +2949,23 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         assert 'Cached archive chunk index of test1 is corrupted' in out
         assert 'Fetching and building archive index for test1' in out
 
+    def test_old_version_intefered(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        cache_path = json.loads(self.cmd('info', self.repository_location, '--json'))['cache']['path']
+
+        # Modify the main manifest ID without touching the manifest ID in the integrity section.
+        # This happens if a version without integrity checking modifies the cache.
+        config_path = os.path.join(cache_path, 'config')
+        config = ConfigParser(interpolation=None)
+        config.read(config_path)
+        config.set('cache', 'manifest', bin_to_hex(bytes(32)))
+        with open(config_path, 'w') as fd:
+            config.write(fd)
+
+        out = self.cmd('info', self.repository_location)
+        assert 'Cache integrity data lost: old Borg version modified the cache.' in out
+
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):
     def test_basic_functionality(self):

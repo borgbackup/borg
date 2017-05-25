@@ -104,7 +104,7 @@ class FileIntegrityError(IntegrityError):
 
 
 class IntegrityCheckedFile(FileLikeWrapper):
-    def __init__(self, path, write, filename=None, override_fd=None):
+    def __init__(self, path, write, filename=None, override_fd=None, integrity_data=None):
         self.path = path
         self.writing = write
         mode = 'wb' if write else 'rb'
@@ -114,10 +114,10 @@ class IntegrityCheckedFile(FileLikeWrapper):
 
         self.hash_filename(filename)
 
-        if write:
+        if write or not integrity_data:
             self.digests = {}
         else:
-            self.digests = self.read_integrity_file(path, self.hasher)
+            self.digests = self.parse_integrity_data(path, integrity_data, self.hasher)
             # TODO: When we're reading but don't have any digests, i.e. no integrity file existed,
             # TODO: then we could just short-circuit.
 
@@ -126,32 +126,27 @@ class IntegrityCheckedFile(FileLikeWrapper):
         # In Borg the name itself encodes the context (eg. index.N, cache, files),
         # while the path doesn't matter, and moving e.g. a repository or cache directory is supported.
         # Changing the name however imbues a change of context that is not permissible.
+        # While Borg does not use anything except ASCII in these file names, it's important to use
+        # the same encoding everywhere for portability. Using os.fsencode() would be wrong.
         filename = os.path.basename(filename or self.path)
         self.hasher.update(('%10d' % len(filename)).encode())
         self.hasher.update(filename.encode())
 
-    @staticmethod
-    def integrity_file_path(path):
-        return path + '.integrity'
-
     @classmethod
-    def read_integrity_file(cls, path, hasher):
+    def parse_integrity_data(cls, path: str, data: str, hasher: SHA512FileHashingWrapper):
         try:
-            with open(cls.integrity_file_path(path), 'r') as fd:
-                integrity_file = json.load(fd)
-                # Provisions for agility now, implementation later, but make sure the on-disk joint is oiled.
-                algorithm = integrity_file['algorithm']
-                if algorithm != hasher.ALGORITHM:
-                    logger.warning('Cannot verify integrity of %s: Unknown algorithm %r', path, algorithm)
-                    return
-                digests = integrity_file['digests']
-                # Require at least presence of the final digest
-                digests['final']
-                return digests
-        except FileNotFoundError:
-            logger.info('No integrity file found for %s', path)
-        except (OSError, ValueError, TypeError, KeyError) as e:
-            logger.warning('Could not read integrity file for %s: %s', path, e)
+            integrity_file = json.loads(data)
+            # Provisions for agility now, implementation later, but make sure the on-disk joint is oiled.
+            algorithm = integrity_file['algorithm']
+            if algorithm != hasher.ALGORITHM:
+                logger.warning('Cannot verify integrity of %s: Unknown algorithm %r', path, algorithm)
+                return
+            digests = integrity_file['digests']
+            # Require at least presence of the final digest
+            digests['final']
+            return digests
+        except (ValueError, TypeError, KeyError) as e:
+            logger.warning('Could not parse integrity data for %s: %s', path, e)
             raise FileIntegrityError(path)
 
     def hash_part(self, partname, is_final=False):
@@ -173,10 +168,38 @@ class IntegrityCheckedFile(FileLikeWrapper):
         if exception:
             return
         if self.writing:
-            with open(self.integrity_file_path(self.path), 'w') as fd:
-                json.dump({
-                    'algorithm': self.hasher.ALGORITHM,
-                    'digests': self.digests,
-                }, fd)
+            self.store_integrity_data(json.dumps({
+                'algorithm': self.hasher.ALGORITHM,
+                'digests': self.digests,
+            }))
         elif self.digests:
             logger.debug('Verified integrity of %s', self.path)
+
+    def store_integrity_data(self, data: str):
+        self.integrity_data = data
+
+
+class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
+    def __init__(self, path, write, filename=None, override_fd=None):
+        super().__init__(path, write, filename, override_fd)
+        if not write:
+            self.digests = self.read_integrity_file(self.path, self.hasher)
+
+    @staticmethod
+    def integrity_file_path(path):
+        return path + '.integrity'
+
+    @classmethod
+    def read_integrity_file(cls, path, hasher):
+        try:
+            with open(cls.integrity_file_path(path), 'r') as fd:
+                return cls.parse_integrity_data(path, fd.read(), hasher)
+        except FileNotFoundError:
+            logger.info('No integrity file found for %s', path)
+        except OSError as e:
+            logger.warning('Could not read integrity file for %s: %s', path, e)
+            raise FileIntegrityError(path)
+
+    def store_integrity_data(self, data: str):
+        with open(self.integrity_file_path(self.path), 'w') as fd:
+            fd.write(data)

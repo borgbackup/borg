@@ -566,7 +566,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 for item in unpacker:
                     if not isinstance(item, dict):
                         logger.error('Error: Did not get expected metadata dict - archive corrupted!')
-                        continue
+                        continue   # XXX: continue?!
                     for chunk_id, size, csize in item.get(b'chunks', []):
                         chunk_idx.add(chunk_id, 1, size, csize)
             if self.do_cache:
@@ -589,9 +589,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             logger.info('Synchronizing chunks cache...')
             cached_ids = cached_archives()
             archive_ids = repo_archives()
-            logger.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.' % (
+            logger.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.',
                 len(archive_ids), len(cached_ids),
-                len(cached_ids - archive_ids), len(archive_ids - cached_ids), ))
+                len(cached_ids - archive_ids), len(archive_ids - cached_ids))
             # deallocates old hashindex, creates empty hashindex:
             chunk_idx.clear()
             cleanup_outdated(cached_ids - archive_ids)
@@ -608,7 +608,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     if self.do_cache:
                         if archive_id in cached_ids:
                             archive_chunk_idx_path = mkpath(archive_id)
-                            logger.info("Reading cached archive chunk index for %s ..." % archive_name)
+                            logger.info("Reading cached archive chunk index for %s ...", archive_name)
                             try:
                                 with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
                                     archive_chunk_idx = ChunkIndex.read(fd)
@@ -620,7 +620,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         if archive_id not in cached_ids:
                             # Do not make this an else branch; the FileIntegrityError exception handler
                             # above can remove *archive_id* from *cached_ids*.
-                            logger.info('Fetching and building archive index for %s ...' % archive_name)
+                            logger.info('Fetching and building archive index for %s ...', archive_name)
                             archive_chunk_idx = ChunkIndex()
                             fetch_and_build_idx(archive_id, repository, self.key, archive_chunk_idx)
                         logger.info("Merging into master chunks index ...")
@@ -633,7 +633,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             chunk_idx.merge(archive_chunk_idx)
                     else:
                         chunk_idx = chunk_idx or ChunkIndex()
-                        logger.info('Fetching archive index for %s ...' % archive_name)
+                        logger.info('Fetching archive index for %s ...', archive_name)
                         fetch_and_build_idx(archive_id, repository, self.key, chunk_idx)
                 if self.progress:
                     pi.finish()

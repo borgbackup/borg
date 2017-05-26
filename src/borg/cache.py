@@ -603,6 +603,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             # deallocates old hashindex, creates empty hashindex:
             chunk_idx.clear()
             cleanup_outdated(cached_ids - archive_ids)
+            # Explicitly set the initial hash table capacity to avoid performance issues
+            # due to hash table "resonance".
+            master_index_capacity = int(len(self.repository) / ChunkIndex.MAX_LOAD_FACTOR)
             if archive_ids:
                 chunk_idx = None
                 if self.progress:
@@ -630,7 +633,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             # Do not make this an else branch; the FileIntegrityError exception handler
                             # above can remove *archive_id* from *cached_ids*.
                             logger.info('Fetching and building archive index for %s ...', archive_name)
-                            archive_chunk_idx = ChunkIndex()
+                            archive_chunk_idx = ChunkIndex(master_index_capacity)
                             fetch_and_build_idx(archive_id, repository, self.key, archive_chunk_idx)
                         logger.info("Merging into master chunks index ...")
                         if chunk_idx is None:
@@ -641,7 +644,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                         else:
                             chunk_idx.merge(archive_chunk_idx)
                     else:
-                        chunk_idx = chunk_idx or ChunkIndex()
+                        chunk_idx = chunk_idx or ChunkIndex(master_index_capacity)
                         logger.info('Fetching archive index for %s ...', archive_name)
                         fetch_and_build_idx(archive_id, repository, self.key, chunk_idx)
                 if self.progress:

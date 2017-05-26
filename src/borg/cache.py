@@ -588,10 +588,16 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 else:
                     os.rename(fn_tmp, fn)
 
-        def lookup_name(archive_id):
+        def get_archive_ids_to_names(archive_ids):
+            # Pass once over all archives and build a mapping from ids to names.
+            # The easier approach, doing a similar loop for each archive, has
+            # square complexity and does about a dozen million functions calls
+            # with 1100 archives (which takes 30s CPU seconds _alone_).
+            archive_names = {}
             for info in self.manifest.archives.list():
-                if info.id == archive_id:
-                    return info.name
+                if info.id in archive_ids:
+                    archive_names[info.id] = info.name
+            return archive_names
 
         def create_master_idx(chunk_idx):
             logger.info('Synchronizing chunks cache...')
@@ -612,8 +618,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
                                                   msg='%3.0f%% Syncing chunks cache. Processing archive %s',
                                                   msgid='cache.sync')
+                archive_ids_to_names = get_archive_ids_to_names(archive_ids)
                 for archive_id in archive_ids:
-                    archive_name = lookup_name(archive_id)
+                    archive_name = archive_ids_to_names.pop(archive_id)
                     if self.progress:
                         pi.show(info=[remove_surrogates(archive_name)])
                     if self.do_cache:

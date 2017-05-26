@@ -91,6 +91,8 @@ try:
                 'src/borg/crypto/low_level.c',
                 'src/borg/algorithms/chunker.c', 'src/borg/algorithms/buzhash.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
+                'src/borg/cache_sync/cache_sync.c', 'src/borg/cache_sync/sysdep.h', 'src/borg/cache_sync/unpack.h',
+                'src/borg/cache_sync/unpack_define.h', 'src/borg/cache_sync/unpack_template.h',
                 'src/borg/item.c',
                 'src/borg/algorithms/checksums.c',
                 'src/borg/algorithms/crc32_dispatch.c', 'src/borg/algorithms/crc32_clmul.c', 'src/borg/algorithms/crc32_slice_by_8.c',
@@ -600,7 +602,7 @@ if not on_rtd:
     ext_modules += [
     Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.crypto.low_level', [crypto_ll_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
-    Extension('borg.hashindex', [hashindex_source], libraries=['msgpackc']),
+    Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),
     Extension('borg.algorithms.chunker', [chunker_source]),
     Extension('borg.algorithms.checksums', [checksums_source]),

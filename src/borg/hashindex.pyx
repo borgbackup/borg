@@ -31,7 +31,7 @@ cdef extern from "_hashindex.c":
     double HASH_MAX_LOAD
 
 
-cdef extern from "_cache.c":
+cdef extern from "cache_sync/cache_sync.c":
     ctypedef struct CacheSyncCtx:
         pass
 
@@ -403,5 +403,5 @@ cdef class CacheSynchronizer:
     def feed(self, chunk):
         if not cache_sync_feed(self.sync, <char *>chunk, len(chunk)):
             error = cache_sync_error(self.sync)
-            if error is not None:
-                raise Exception('cache_sync_feed failed: ' + error.decode('ascii'))
+            if error != NULL:
+                raise ValueError('cache_sync_feed failed: ' + error.decode('ascii'))

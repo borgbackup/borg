@@ -640,7 +640,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             # Do not make this an else branch; the FileIntegrityError exception handler
                             # above can remove *archive_id* from *cached_ids*.
                             logger.info('Fetching and building archive index for %s ...', archive_name)
-                            archive_chunk_idx = ChunkIndex(master_index_capacity)
+                            archive_chunk_idx = ChunkIndex()
                             fetch_and_build_idx(archive_id, repository, self.key, archive_chunk_idx)
                         logger.info("Merging into master chunks index ...")
                         if chunk_idx is None:

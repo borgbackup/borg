@@ -1,0 +1,10 @@
+- Install AFL and the requirements for LLVM mode (see docs)
+- Compile the fuzzing target, e.g.
+
+  AFL_HARDEN=1 afl-clang-fast main.c -o fuzz-target -O3
+
+  (other options, like using ASan or MSan are possible as well)
+- Add additional test cases to testcase_dir
+- Run afl, easiest (but inefficient) way;
+
+  afl-fuzz -i testcase_dir -o findings_dir ./fuzz-target

@@ -536,6 +536,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         archive indexes.
         """
         archive_path = os.path.join(self.path, 'chunks.archive.d')
+        # Instrumentation
+        processed_item_metadata_bytes = 0
+        processed_item_metadata_chunks = 0
+        compact_chunks_archive_saved_space = 0
 
         def mkpath(id, suffix=''):
             id_hex = bin_to_hex(id)
@@ -545,8 +549,10 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         def cached_archives():
             if self.do_cache:
                 fns = os.listdir(archive_path)
-                # filenames with 64 hex digits == 256bit
-                return set(unhexlify(fn) for fn in fns if len(fn) == 64)
+                # filenames with 64 hex digits == 256bit,
+                # or compact indices which are 64 hex digits + ".compact"
+                return set(unhexlify(fn) for fn in fns if len(fn) == 64) | \
+                       set(unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith('.compact'))
             else:
                 return set()
 
@@ -558,13 +564,21 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 cleanup_cached_archive(id)
 
         def cleanup_cached_archive(id):
-            os.unlink(mkpath(id))
             try:
+                os.unlink(mkpath(id))
                 os.unlink(mkpath(id) + '.integrity')
+            except FileNotFoundError:
+                pass
+            try:
+                os.unlink(mkpath(id, suffix='.compact'))
+                os.unlink(mkpath(id, suffix='.compact') + '.integrity')
             except FileNotFoundError:
                 pass
 
         def fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx):
+            nonlocal processed_item_metadata_bytes
+            nonlocal processed_item_metadata_chunks
+            nonlocal compact_chunks_archive_saved_space
             csize, data = decrypted_repository.get(archive_id)
             chunk_idx.add(archive_id, 1, len(data), csize)
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
@@ -573,9 +587,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             sync = CacheSynchronizer(chunk_idx)
             for item_id, (csize, data) in zip(archive.items, decrypted_repository.get_many(archive.items)):
                 chunk_idx.add(item_id, 1, len(data), csize)
+                processed_item_metadata_bytes += len(data)
+                processed_item_metadata_chunks += 1
                 sync.feed(data)
             if self.do_cache:
-                fn = mkpath(archive_id)
+                compact_chunks_archive_saved_space += chunk_idx.compact()
+                fn = mkpath(archive_id, suffix='.compact')
                 fn_tmp = mkpath(archive_id, suffix='.tmp')
                 try:
                     with DetachedIntegrityCheckedFile(path=fn_tmp, write=True,
@@ -612,7 +629,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             # due to hash table "resonance".
             master_index_capacity = int(len(self.repository) / ChunkIndex.MAX_LOAD_FACTOR)
             if archive_ids:
-                chunk_idx = None
+                chunk_idx = None if not self.do_cache else ChunkIndex(master_index_capacity)
                 pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
                                               msg='%3.0f%% Syncing chunks cache. Processing archive %s',
                                               msgid='cache.sync')
@@ -624,8 +641,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             archive_chunk_idx_path = mkpath(archive_id)
                             logger.info("Reading cached archive chunk index for %s ...", archive_name)
                             try:
-                                with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
-                                    archive_chunk_idx = ChunkIndex.read(fd)
+                                try:
+                                    with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path + '.compact', write=False) as fd:
+                                        archive_chunk_idx = ChunkIndex.read(fd, permit_compact=True)
+                                except FileNotFoundError:
+                                    with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
+                                        archive_chunk_idx = ChunkIndex.read(fd)
                             except FileIntegrityError as fie:
                                 logger.error('Cached archive chunk index of %s is corrupted: %s', archive_name, fie)
                                 # Delete it and fetch a new index
@@ -639,18 +660,16 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             archive_chunk_idx = ChunkIndex()
                             fetch_and_build_idx(archive_id, decrypted_repository, archive_chunk_idx)
                         logger.info("Merging into master chunks index ...")
-                        if chunk_idx is None:
-                            # we just use the first archive's idx as starting point,
-                            # to avoid growing the hash table from 0 size and also
-                            # to save 1 merge call.
-                            chunk_idx = archive_chunk_idx
-                        else:
-                            chunk_idx.merge(archive_chunk_idx)
+                        chunk_idx.merge(archive_chunk_idx)
                     else:
                         chunk_idx = chunk_idx or ChunkIndex(master_index_capacity)
                         logger.info('Fetching archive index for %s ...', archive_name)
                         fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
                 pi.finish()
+                logger.debug('Cache sync: processed %s bytes (%d chunks) of metadata',
+                             format_file_size(processed_item_metadata_bytes), processed_item_metadata_chunks)
+                logger.debug('Cache sync: compact chunks.archive.d storage saved %s bytes',
+                             format_file_size(compact_chunks_archive_saved_space))
             logger.info('Done.')
             return chunk_idx
 

@@ -642,8 +642,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             # in any case, we want to cleanly close the repo, even if the
             # rollback can not succeed (e.g. because the connection was
             # already closed) and raised another exception:
-            logger.debug('RemoteRepository: %d bytes sent, %d bytes received, %d messages sent',
-                         self.tx_bytes, self.rx_bytes, self.msgid)
+            logger.debug('RemoteRepository: %s bytes sent, %s bytes received, %d messages sent',
+                         format_file_size(self.tx_bytes), format_file_size(self.rx_bytes), self.msgid)
             self.close()
 
     @property

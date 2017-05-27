@@ -109,10 +109,11 @@ static int hash_sizes[] = {
 #define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg " (%s)\n", path, ##__VA_ARGS__, strerror(errno))
 
 #ifdef Py_PYTHON_H
-static HashIndex *hashindex_read(PyObject *file_py);
+static HashIndex *hashindex_read(PyObject *file_py, int permit_compact);
 static void hashindex_write(HashIndex *index, PyObject *file_py);
 #endif
 
+static uint64_t hashindex_compact(HashIndex *index);
 static HashIndex *hashindex_init(int capacity, int key_size, int value_size);
 static const void *hashindex_get(HashIndex *index, const void *key);
 static int hashindex_set(HashIndex *index, const void *key, const void *value);
@@ -273,7 +274,7 @@ count_empty(HashIndex *index)
 
 #ifdef Py_PYTHON_H
 static HashIndex *
-hashindex_read(PyObject *file_py)
+hashindex_read(PyObject *file_py, int permit_compact)
 {
     Py_ssize_t length, buckets_length, bytes_read;
     Py_buffer header_buffer;
@@ -393,14 +394,16 @@ hashindex_read(PyObject *file_py)
     }
     index->buckets = index->buckets_buffer.buf;
 
-    index->min_empty = get_min_empty(index->num_buckets);
-    index->num_empty = count_empty(index);
+    if(!permit_compact) {
+        index->min_empty = get_min_empty(index->num_buckets);
+        index->num_empty = count_empty(index);
 
-    if(index->num_empty < index->min_empty) {
-        /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
-        if(!hashindex_resize(index, index->num_buckets)) {
-            PyErr_Format(PyExc_ValueError, "Failed to rebuild table");
-            goto fail_free_buckets;
+        if(index->num_empty < index->min_empty) {
+            /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
+            if(!hashindex_resize(index, index->num_buckets)) {
+                PyErr_Format(PyExc_ValueError, "Failed to rebuild table");
+                goto fail_free_buckets;
+            }
         }
     }
 
@@ -618,6 +621,61 @@ hashindex_next_key(HashIndex *index, const void *key)
         }
     }
     return BUCKET_ADDR(index, idx);
+}
+
+static uint64_t
+hashindex_compact(HashIndex *index)
+{
+    int idx = 0;
+    int start_idx;
+    int begin_used_idx;
+    int empty_slot_count, count, buckets_to_copy;
+    int compact_tail_idx = 0;
+    uint64_t saved_size = (index->num_buckets - index->num_entries) * (uint64_t)index->bucket_size;
+
+    if(index->num_buckets - index->num_entries == 0) {
+        /* already compact */
+        return 0;
+    }
+
+    while(idx < index->num_buckets) {
+        /* Phase 1: Find some empty slots */
+        start_idx = idx;
+        while((BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx)) && idx < index->num_buckets) {
+            idx++;
+        }
+
+        /* everything from start_idx to idx is empty or deleted */
+        count = empty_slot_count = idx - start_idx;
+        begin_used_idx = idx;
+
+        if(!empty_slot_count) {
+            memcpy(BUCKET_ADDR(index, compact_tail_idx), BUCKET_ADDR(index, idx), index->bucket_size);
+            idx++;
+            compact_tail_idx++;
+            continue;
+        }
+
+        /* Phase 2: Find some non-empty/non-deleted slots we can move to the compact tail */
+
+        while(!(BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx)) && empty_slot_count && idx < index->num_buckets) {
+            idx++;
+            empty_slot_count--;
+        }
+
+        buckets_to_copy = count - empty_slot_count;
+
+        if(!buckets_to_copy) {
+            /* Nothing to move, reached end of the buckets array with no used buckets. */
+            break;
+        }
+
+        memcpy(BUCKET_ADDR(index, compact_tail_idx), BUCKET_ADDR(index, begin_used_idx), buckets_to_copy * index->bucket_size);
+        compact_tail_idx += buckets_to_copy;
+    }
+
+    index->num_buckets = index->num_entries;
+    return saved_size;
 }
 
 static int

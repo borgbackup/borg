@@ -8,14 +8,14 @@ from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 
-API_VERSION = '1.1_02'
+API_VERSION = '1.1_03'
 
 
 cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
 
-    HashIndex *hashindex_read(object file_py) except *
+    HashIndex *hashindex_read(object file_py, int permit_compact) except *
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
     int hashindex_len(HashIndex *index)
@@ -25,6 +25,7 @@ cdef extern from "_hashindex.c":
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
     int hashindex_set(HashIndex *index, void *key, void *value)
+    uint64_t hashindex_compact(HashIndex *index)
     uint32_t _htole32(uint32_t v)
     uint32_t _le32toh(uint32_t v)
 
@@ -73,14 +74,14 @@ cdef class IndexBase:
     MAX_LOAD_FACTOR = HASH_MAX_LOAD
     MAX_VALUE = _MAX_VALUE
 
-    def __cinit__(self, capacity=0, path=None, key_size=32):
+    def __cinit__(self, capacity=0, path=None, key_size=32, permit_compact=False):
         self.key_size = key_size
         if path:
             if isinstance(path, (str, bytes)):
                 with open(path, 'rb') as fd:
-                    self.index = hashindex_read(fd)
+                    self.index = hashindex_read(fd, permit_compact)
             else:
-                self.index = hashindex_read(path)
+                self.index = hashindex_read(path, permit_compact)
             assert self.index, 'hashindex_read() returned NULL with no exception set'
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
@@ -92,8 +93,8 @@ cdef class IndexBase:
             hashindex_free(self.index)
 
     @classmethod
-    def read(cls, path):
-        return cls(path=path)
+    def read(cls, path, permit_compact=False):
+        return cls(path=path, permit_compact=permit_compact)
 
     def write(self, path):
         if isinstance(path, (str, bytes)):
@@ -139,6 +140,9 @@ cdef class IndexBase:
     def size(self):
         """Return size (bytes) of hash table."""
         return hashindex_size(self.index)
+
+    def compact(self):
+        return hashindex_compact(self.index)
 
 
 cdef class NSIndex(IndexBase):

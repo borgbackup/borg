@@ -4,7 +4,7 @@ import os
 import tempfile
 import zlib
 
-from ..hashindex import NSIndex, ChunkIndex
+from ..hashindex import NSIndex, ChunkIndex, ChunkIndexEntry
 from .. import hashindex
 from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from . import BaseTestCase
@@ -155,6 +155,22 @@ class HashIndexExtraTestCase(BaseTestCase):
             del index[key]
         # the index should now be empty
         assert list(index.iteritems()) == []
+
+    def test_vacuum(self):
+        idx1 = ChunkIndex()
+        idx1[H(1)] = 1, 100, 100
+        idx1[H(2)] = 2, 200, 200
+        idx1[H(3)] = 3, 300, 300
+        idx1.compact()
+        assert idx1.size() == 18 + 3 * (32 + 3 * 4)
+        #with self.assert_raises(KeyError):
+        #    idx1[H(1)]
+        data = list(idx1.iteritems())
+        print(data)
+        assert (H(1), ChunkIndexEntry(1, 100, 100)) in data
+        assert (H(2), ChunkIndexEntry(2, 200, 200)) in data
+        assert (H(3), ChunkIndexEntry(3, 300, 300)) in data
+
 
 
 class HashIndexSizeTestCase(BaseTestCase):

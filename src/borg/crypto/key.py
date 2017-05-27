@@ -30,7 +30,10 @@ PREFIX = b'\0' * 8
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE or by BORG_PASSCOMMAND is incorrect"""
+    """passphrase supplied in BORG_PASSPHRASE is incorrect."""
+
+class PasscommandFailure(Error):
+    """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
 
 
 class PasswordRetriesExceeded(Error):
@@ -425,8 +428,11 @@ class Passphrase(str):
     def env_passcommand(cls, default=None):
         passcommand = cls._get_env('BORG_PASSCOMMAND', default)
         if passcommand is not None:
-            passphrase = Passphrase(subprocess.check_output(passcommand, shell=True).decode().rstrip())
-            return passphrase
+            try:
+                passphrase = subprocess.check_output(passcommand, shell=True, universal_newlines=True)
+            except subprocess.CalledProcessError as e:
+                raise PasscommandFailure(e)
+            return Passphrase(passphrase.rstrip('\n'))
 
     @classmethod
     def env_new_passphrase(cls, default=None):

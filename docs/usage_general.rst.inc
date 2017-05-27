@@ -134,9 +134,16 @@ General:
         It is used when a passphrase is needed to access a encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         See also BORG_NEW_PASSPHRASE.
+    BORG_PASSCOMMAND
+        When set, use the command to answer the passphrase question for encrypted repositories.
+        It is used when a passphrase is needed to access a encrypted repo as well as when a new
+        passphrase should be initially set when initializing an encrypted repo.
+        If BORG_PASSPHRASE is also set, it takes precedence.
+        See also BORG_NEW_PASSPHRASE.
     BORG_NEW_PASSPHRASE
         When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
-        This variable is checked first. If it is not set, BORG_PASSPHRASE will be checked also.
+        This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will be
+        checked also.
         Main usecase for this is to fully automate ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.

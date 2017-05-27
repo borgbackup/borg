@@ -30,7 +30,7 @@ PREFIX = b'\0' * 8
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE is incorrect."""
+    """passphrase supplied in BORG_PASSPHRASE or by BORG_PASSCOMMAND is incorrect."""
 
 class PasscommandFailure(Error):
     """passcommand supplied in BORG_PASSCOMMAND failed: {}"""

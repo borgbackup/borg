@@ -131,12 +131,12 @@ General:
         can either leave it away or abbreviate as `::`, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
-        It is used when a passphrase is needed to access a encrypted repo as well as when a new
+        It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         See also BORG_NEW_PASSPHRASE.
     BORG_PASSCOMMAND
         When set, use the command to answer the passphrase question for encrypted repositories.
-        It is used when a passphrase is needed to access a encrypted repo as well as when a new
+        It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         If BORG_PASSPHRASE is also set, it takes precedence.
         See also BORG_NEW_PASSPHRASE.

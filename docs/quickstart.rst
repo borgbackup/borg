@@ -86,7 +86,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 
     # Setting this, so you won't be asked for your repository passphrase:
     export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
-    # or this
+    # or this to ask an external program to supply the passphrase:
     export BORG_PASSCOMMAND='pass show backup'
 
     # some helpers and error handling:

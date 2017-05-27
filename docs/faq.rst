@@ -257,8 +257,8 @@ Security
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
 
-The encryption passphrase or a command to retrieve a the passphrase can be
-specified programmatically using the `BORG_PASSPHRASE` and `BORG_PASSCOMMAND`
+The encryption passphrase or a command to retrieve the passphrase can be
+specified programmatically using the `BORG_PASSPHRASE` or `BORG_PASSCOMMAND`
 environment variables. This is convenient when setting up automated encrypted
 backups. Another option is to use key file based encryption with a blank passphrase.
 See :ref:`encrypted_repos` for more details.

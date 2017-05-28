@@ -9,8 +9,8 @@ import shutil
 from .key import PlaintextKey
 from .logger import create_logger
 logger = create_logger()
-from .helpers import Error, get_cache_dir, decode_dict, int_to_bigint, \
-    bigint_to_int, format_file_size, yes, bin_to_hex, Location, safe_ns
+from .helpers import Error, Manifest, get_cache_dir, decode_dict, int_to_bigint, \
+    bigint_to_int, format_file_size, yes, bin_to_hex, Location, safe_ns, parse_stringified_list
 from .locking import Lock
 from .hashindex import ChunkIndex
 
@@ -84,6 +84,11 @@ class Cache:
                 self.begin_txn()
                 self.commit()
 
+            if not self.check_cache_compatibility():
+                self.wipe_cache()
+
+            self.update_compatibility()
+
             if sync and self.manifest.id != self.manifest_id:
                 # If repository is older than the cache something fishy is going on
                 if self.timestamp and self.timestamp > manifest.timestamp:
@@ -94,6 +99,7 @@ class Cache:
                 # Make sure an encrypted repository has not been swapped for an unencrypted repository
                 if self.key_type is not None and self.key_type != str(key.TYPE):
                     raise self.EncryptionMethodMismatch()
+
                 self.sync()
                 self.commit()
         except:
@@ -175,6 +181,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.timestamp = self.config.get('cache', 'timestamp', fallback=None)
         self.key_type = self.config.get('cache', 'key_type', fallback=None)
         self.previous_location = self.config.get('cache', 'previous_location', fallback=None)
+        self.ignored_features = set(parse_stringified_list(self.config.get('cache', 'ignored_features', fallback='')))
+        self.mandatory_features = set(parse_stringified_list(self.config.get('cache', 'mandatory_features', fallback='')))
         self.chunks = ChunkIndex.read(os.path.join(self.path, 'chunks').encode('utf-8'))
         self.files = None
 
@@ -240,6 +248,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         self.config.set('cache', 'timestamp', self.manifest.timestamp)
         self.config.set('cache', 'key_type', str(self.key.TYPE))
         self.config.set('cache', 'previous_location', self.repository._location.canonical_path())
+        self.config.set('cache', 'ignored_features', ','.join(self.ignored_features))
+        self.config.set('cache', 'mandatory_features', ','.join(self.mandatory_features))
         with open(os.path.join(self.path, 'config'), 'w') as fd:
             self.config.write(fd)
         self.chunks.write(os.path.join(self.path, 'chunks').encode('utf-8'))
@@ -389,6 +399,43 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
+
+    def check_cache_compatibility(self):
+        my_features = Manifest.SUPPORTED_REPO_FEATURES
+        if self.ignored_features & my_features:
+            # The cache might not contain references of chunks that need a feature that is mandatory for some operation
+            # and which this version supports. To avoid corruption while executing that operation force rebuild.
+            return False
+        if not self.mandatory_features <= my_features:
+            # The cache was build with consideration to at least one feature that this version does not understand.
+            # This client might misinterpret the cache. Thus force a rebuild.
+            return False
+        return True
+
+    def wipe_cache(self):
+        logger.warning("Discarding incompatible cache and forcing a cache rebuild")
+        archive_path = os.path.join(self.path, 'chunks.archive.d')
+        if os.path.isdir(archive_path):
+            shutil.rmtree(os.path.join(self.path, 'chunks.archive.d'))
+            os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
+        self.chunks = ChunkIndex()
+        with open(os.path.join(self.path, 'files'), 'wb'):
+            pass  # empty file
+        self.manifest_id = ''
+        self.config.set('cache', 'manifest', '')
+
+        self.ignored_features = set()
+        self.mandatory_features = set()
+
+    def update_compatibility(self):
+        operation_to_features_map = self.manifest.get_all_mandatory_features()
+        my_features = Manifest.SUPPORTED_REPO_FEATURES
+        repo_features = set()
+        for operation, features in operation_to_features_map.items():
+            repo_features.update(features)
+
+        self.ignored_features.update(repo_features - my_features)
+        self.mandatory_features.update(repo_features & my_features)
 
     def add_chunk(self, id, data, stats):
         if not self.txn_active:

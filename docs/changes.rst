@@ -4,7 +4,7 @@
 Important notes
 ===============
 
-This section is used for infos about security and corruption issues.
+This section provides information about security and corruption issues.
 
 .. _tam_vuln:
 

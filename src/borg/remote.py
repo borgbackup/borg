@@ -8,6 +8,7 @@ import os
 import select
 import shlex
 import shutil
+import struct
 import sys
 import tempfile
 import textwrap
@@ -18,6 +19,7 @@ from subprocess import Popen, PIPE
 import msgpack
 
 from . import __version__
+from .compress import LZ4
 from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
 from .helpers import get_home_dir
@@ -1046,9 +1048,14 @@ class RepositoryNoCache:
     """A not caching Repository wrapper, passes through to repository.
 
     Just to have same API (including the context manager) as RepositoryCache.
+
+    *transform* is a callable taking two arguments, key and raw repository data.
+    The return value is returned from get()/get_many(). By default, the raw
+    repository data is returned.
     """
-    def __init__(self, repository):
+    def __init__(self, repository, transform=None):
         self.repository = repository
+        self.transform = transform or (lambda key, data: data)
 
     def close(self):
         pass
@@ -1063,8 +1070,8 @@ class RepositoryNoCache:
         return next(self.get_many([key], cache=False))
 
     def get_many(self, keys, cache=True):
-        for data in self.repository.get_many(keys):
-            yield data
+        for key, data in zip(keys, self.repository.get_many(keys)):
+            yield self.transform(key, data)
 
 
 class RepositoryCache(RepositoryNoCache):
@@ -1072,10 +1079,17 @@ class RepositoryCache(RepositoryNoCache):
     A caching Repository wrapper.
 
     Caches Repository GET operations locally.
+
+    *pack* and *unpack* complement *transform* of the base class.
+    *pack* receives the output of *transform* and should return bytes,
+    which are stored in the cache. *unpack* receives these bytes and
+    should return the initial data (as returned by *transform*).
     """
 
-    def __init__(self, repository):
-        super().__init__(repository)
+    def __init__(self, repository, pack=None, unpack=None, transform=None):
+        super().__init__(repository, transform)
+        self.pack = pack or (lambda data: data)
+        self.unpack = unpack or (lambda data: data)
         self.cache = set()
         self.basedir = tempfile.mkdtemp(prefix='borg-cache-')
         self.query_size_limit()
@@ -1106,11 +1120,15 @@ class RepositoryCache(RepositoryNoCache):
             os.unlink(file)
             self.evictions += 1
 
-    def add_entry(self, key, data):
+    def add_entry(self, key, data, cache):
+        transformed = self.transform(key, data)
+        if not cache:
+            return transformed
+        packed = self.pack(transformed)
         file = self.key_filename(key)
         try:
             with open(file, 'wb') as fd:
-                fd.write(data)
+                fd.write(packed)
         except OSError as os_error:
             if os_error.errno == errno.ENOSPC:
                 self.enospc += 1
@@ -1118,11 +1136,11 @@ class RepositoryCache(RepositoryNoCache):
             else:
                 raise
         else:
-            self.size += len(data)
+            self.size += len(packed)
             self.cache.add(key)
             if self.size > self.size_limit:
                 self.backoff()
-        return data
+        return transformed
 
     def close(self):
         logger.debug('RepositoryCache: current items %d, size %s / %s, %d hits, %d misses, %d slow misses (+%.1fs), '
@@ -1141,31 +1159,56 @@ class RepositoryCache(RepositoryNoCache):
                 file = self.key_filename(key)
                 with open(file, 'rb') as fd:
                     self.hits += 1
-                    yield fd.read()
+                    yield self.unpack(fd.read())
             else:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        if cache:
-                            self.add_entry(key, data)
+                        transformed = self.add_entry(key, data, cache)
                         self.misses += 1
-                        yield data
+                        yield transformed
                         break
                 else:
                     # slow path: eviction during this get_many removed this key from the cache
                     t0 = time.perf_counter()
                     data = self.repository.get(key)
                     self.slow_lat += time.perf_counter() - t0
-                    if cache:
-                        self.add_entry(key, data)
+                    transformed = self.add_entry(key, data, cache)
                     self.slow_misses += 1
-                    yield data
+                    yield transformed
         # Consume any pending requests
         for _ in repository_iterator:
             pass
 
 
-def cache_if_remote(repository):
+def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None, transform=None):
+    """
+    Return a Repository(No)Cache for *repository*.
+
+    If *decrypted_cache* is a key object, then get and get_many will return a tuple
+    (csize, plaintext) instead of the actual data in the repository. The cache will
+    store decrypted data, which increases CPU efficiency (by avoiding repeatedly decrypting
+    and more importantly MAC and ID checking cached objects).
+    Internally, objects are compressed with LZ4.
+    """
+    if decrypted_cache and (pack or unpack or transform):
+        raise ValueError('decrypted_cache and pack/unpack/transform are incompatible')
+    elif decrypted_cache:
+        key = decrypted_cache
+        cache_struct = struct.Struct('=I')
+        compressor = LZ4()
+
+        def pack(data):
+            return cache_struct.pack(data[0]) + compressor.compress(data[1])
+
+        def unpack(data):
+            return cache_struct.unpack(data[:cache_struct.size])[0], compressor.decompress(data[cache_struct.size:])
+
+        def transform(id_, data):
+            csize = len(data)
+            decrypted = key.decrypt(id_, data)
+            return csize, decrypted
+
     if isinstance(repository, RemoteRepository):
-        return RepositoryCache(repository)
+        return RepositoryCache(repository, pack, unpack, transform)
     else:
-        return RepositoryNoCache(repository)
+        return RepositoryNoCache(repository, transform)

@@ -564,17 +564,15 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             except FileNotFoundError:
                 pass
 
-        def fetch_and_build_idx(archive_id, repository, key, chunk_idx):
-            cdata = repository.get(archive_id)
-            data = key.decrypt(archive_id, cdata)
-            chunk_idx.add(archive_id, 1, len(data), len(cdata))
+        def fetch_and_build_idx(archive_id, decrypted_repository, key, chunk_idx):
+            csize, data = decrypted_repository.get(archive_id)
+            chunk_idx.add(archive_id, 1, len(data), csize)
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
             sync = CacheSynchronizer(chunk_idx)
-            for item_id, chunk in zip(archive.items, repository.get_many(archive.items)):
-                data = key.decrypt(item_id, chunk)
-                chunk_idx.add(item_id, 1, len(data), len(chunk))
+            for item_id, (csize, data) in zip(archive.items, decrypted_repository.get_many(archive.items)):
+                chunk_idx.add(item_id, 1, len(data), csize)
                 sync.feed(data)
             if self.do_cache:
                 fn = mkpath(archive_id)
@@ -641,7 +639,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             # above can remove *archive_id* from *cached_ids*.
                             logger.info('Fetching and building archive index for %s ...', archive_name)
                             archive_chunk_idx = ChunkIndex()
-                            fetch_and_build_idx(archive_id, repository, self.key, archive_chunk_idx)
+                            fetch_and_build_idx(archive_id, decrypted_repository, self.key, archive_chunk_idx)
                         logger.info("Merging into master chunks index ...")
                         if chunk_idx is None:
                             # we just use the first archive's idx as starting point,
@@ -653,7 +651,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     else:
                         chunk_idx = chunk_idx or ChunkIndex(master_index_capacity)
                         logger.info('Fetching archive index for %s ...', archive_name)
-                        fetch_and_build_idx(archive_id, repository, self.key, chunk_idx)
+                        fetch_and_build_idx(archive_id, decrypted_repository, self.key, chunk_idx)
                 if self.progress:
                     pi.finish()
             logger.info('Done.')
@@ -675,7 +673,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 pass
 
         self.begin_txn()
-        with cache_if_remote(self.repository) as repository:
+        with cache_if_remote(self.repository, decrypted_cache=self.key) as decrypted_repository:
             legacy_cleanup()
             # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
             # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)

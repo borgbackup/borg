@@ -325,6 +325,17 @@ class Manifest:
                 if unsupported:
                     raise MandatoryFeatureUnsupported([f.decode() for f in unsupported])
 
+    def get_all_mandatory_features(self):
+        result = {}
+        feature_flags = self.config.get(b'feature_flags', None)
+        if feature_flags is None:
+            return result
+
+        for operation, requirements in feature_flags.items():
+            if b'mandatory' in requirements:
+                result[operation.decode()] = set([feature.decode() for feature in requirements[b'mandatory']])
+        return result
+
     def write(self):
         from .item import ManifestItem
         if self.key.tam_required:
@@ -821,6 +832,11 @@ def safe_encode(s, coding='utf-8', errors='surrogateescape'):
 
 def bin_to_hex(binary):
     return hexlify(binary).decode('ascii')
+
+
+def parse_stringified_list(s):
+    l = re.split(" *, *", s)
+    return [item for item in l if item != '']
 
 
 class Location:

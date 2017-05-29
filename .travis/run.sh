@@ -16,8 +16,9 @@ fi
 source ~/.venv/bin/activate
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    # test-wrapper can't intercept unlink on OS X
-    sudo tox -e $TOXENV -r
+    # currently test-wrapper doesn't work on OSX
+    # this will be fixed if we can figure out how to intercept unlink
+    sudo tox -r -e "$TOXENV"
 else
     test-wrapper/target/release/test-wrapper tox -r
 fi

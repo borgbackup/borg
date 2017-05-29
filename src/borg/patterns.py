@@ -150,9 +150,8 @@ class PatternMatcher:
 
         if value is not non_existent:
             # we have a full path match!
-            # TODO: get from pattern; don't hard-code
-            self.recurse_dir = True
-            return value
+            self.recurse_dir = command_recurses_dir(value)
+            return self.is_include_cmd[value]
 
         # this is the slow way, if we have many patterns in self._items:
         for (pattern, cmd) in self._items:
@@ -325,6 +324,11 @@ class IECommand(Enum):
     ExcludeNoRecurse = 5
 
 
+def command_recurses_dir(cmd):
+    # TODO?: raise error or return None if *cmd* is RootPath or PatternStyle
+    return cmd not in [IECommand.ExcludeNoRecurse]
+
+
 def get_pattern_class(prefix):
     try:
         return _PATTERN_CLASS_BY_PREFIX[prefix]
@@ -386,7 +390,7 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
             raise argparse.ArgumentTypeError("Invalid pattern style: {}".format(remainder_str))
     else:
         # determine recurse_dir based on command type
-        recurse_dir = cmd not in [IECommand.ExcludeNoRecurse]
+        recurse_dir = command_recurses_dir(cmd)
         val = parse_pattern(remainder_str, fallback, recurse_dir)
 
     return CmdTuple(val, cmd)

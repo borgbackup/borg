@@ -135,7 +135,8 @@ General:
         passphrase should be initially set when initializing an encrypted repo.
         See also BORG_NEW_PASSPHRASE.
     BORG_PASSCOMMAND
-        When set, use the command to answer the passphrase question for encrypted repositories.
+        When set, use the standard output of the command (trailing newlines are stripped) to answer the
+        passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         If BORG_PASSPHRASE is also set, it takes precedence.

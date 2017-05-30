@@ -32,6 +32,7 @@ PREFIX = b'\0' * 8
 class PassphraseWrong(Error):
     """passphrase supplied in BORG_PASSPHRASE or by BORG_PASSCOMMAND is incorrect."""
 
+
 class PasscommandFailure(Error):
     """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
 
@@ -410,14 +411,14 @@ class AESKeyBase(KeyBase):
 
 class Passphrase(str):
     @classmethod
-    def _get_env(cls, env_var, default=None):
+    def _env_passphrase(cls, env_var, default=None):
         passphrase = os.environ.get(env_var, default)
         if passphrase is not None:
             return cls(passphrase)
 
     @classmethod
     def env_passphrase(cls, default=None):
-        passphrase = cls._get_env('BORG_PASSPHRASE', default)
+        passphrase = cls._env_passphrase('BORG_PASSPHRASE', default)
         if passphrase is not None:
             return passphrase
         passphrase = cls.env_passcommand()
@@ -426,17 +427,17 @@ class Passphrase(str):
 
     @classmethod
     def env_passcommand(cls, default=None):
-        passcommand = cls._get_env('BORG_PASSCOMMAND', default)
+        passcommand = os.environ.get('BORG_PASSCOMMAND', None)
         if passcommand is not None:
             try:
-                passphrase = subprocess.check_output(passcommand, shell=True, universal_newlines=True)
-            except subprocess.CalledProcessError as e:
+                passphrase = subprocess.check_output(passcommand.split(), universal_newlines=True)
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
-            return Passphrase(passphrase.rstrip('\n'))
+            return cls(passphrase.rstrip('\n'))
 
     @classmethod
     def env_new_passphrase(cls, default=None):
-        return cls._get_env('BORG_NEW_PASSPHRASE', default)
+        return cls._env_passphrase('BORG_NEW_PASSPHRASE', default)
 
     @classmethod
     def getpass(cls, prompt):

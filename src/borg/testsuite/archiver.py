@@ -31,7 +31,7 @@ except ImportError:
 
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
-from ..archiver import Archiver
+from ..archiver import Archiver, parse_storage_quota
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_aes_blocks
@@ -3242,3 +3242,9 @@ class TestCommonOptions:
         result[args_key] = args_value
 
         assert parse_vars_from_line(*line) == result
+
+
+def test_parse_storage_quota():
+    assert parse_storage_quota('50M') == 50 * 1000**2
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_storage_quota('5M')

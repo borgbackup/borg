@@ -3,6 +3,7 @@ import getpass
 import os
 import sys
 import textwrap
+import subprocess
 from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, sha512, pbkdf2_hmac
 from hmac import HMAC, compare_digest
@@ -29,7 +30,11 @@ PREFIX = b'\0' * 8
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE is incorrect"""
+    """passphrase supplied in BORG_PASSPHRASE or by BORG_PASSCOMMAND is incorrect."""
+
+
+class PasscommandFailure(Error):
+    """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
 
 
 class PasswordRetriesExceeded(Error):
@@ -413,7 +418,22 @@ class Passphrase(str):
 
     @classmethod
     def env_passphrase(cls, default=None):
-        return cls._env_passphrase('BORG_PASSPHRASE', default)
+        passphrase = cls._env_passphrase('BORG_PASSPHRASE', default)
+        if passphrase is not None:
+            return passphrase
+        passphrase = cls.env_passcommand()
+        if passphrase is not None:
+            return passphrase
+
+    @classmethod
+    def env_passcommand(cls, default=None):
+        passcommand = os.environ.get('BORG_PASSCOMMAND', None)
+        if passcommand is not None:
+            try:
+                passphrase = subprocess.check_output(passcommand.split(), universal_newlines=True)
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                raise PasscommandFailure(e)
+            return cls(passphrase.rstrip('\n'))
 
     @classmethod
     def env_new_passphrase(cls, default=None):

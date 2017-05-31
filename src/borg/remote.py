@@ -253,8 +253,10 @@ class RepositoryServer:  # pragma: no cover
                         if dictFormat:
                             ex_short = traceback.format_exception_only(e.__class__, e)
                             ex_full = traceback.format_exception(*sys.exc_info())
+                            ex_trace = True
                             if isinstance(e, Error):
                                 ex_short = [e.get_message()]
+                                ex_trace = e.traceback
                             if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
                                 # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
                                 # and will be handled just like locally raised exceptions. Suppress the remote traceback
@@ -269,6 +271,7 @@ class RepositoryServer:  # pragma: no cover
                                                     b'exception_args': e.args,
                                                     b'exception_full': ex_full,
                                                     b'exception_short': ex_short,
+                                                    b'exception_trace': ex_trace,
                                                     b'sysinfo': sysinfo()})
                             except TypeError:
                                 msg = msgpack.packb({MSGID: msgid,
@@ -277,6 +280,7 @@ class RepositoryServer:  # pragma: no cover
                                                                         for x in e.args],
                                                     b'exception_full': ex_full,
                                                     b'exception_short': ex_short,
+                                                    b'exception_trace': ex_trace,
                                                     b'sysinfo': sysinfo()})
 
                             os_write(stdout_fd, msg)
@@ -484,6 +488,10 @@ class RemoteRepository:
                 return b'\n'.join(self.unpacked[b'exception_short']).decode()
             else:
                 return self.exception_class
+
+        @property
+        def traceback(self):
+            return self.unpacked.get(b'exception_trace', True)
 
         @property
         def exception_class(self):

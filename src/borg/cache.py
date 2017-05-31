@@ -585,13 +585,14 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             if self.do_cache:
                 fn = mkpath(archive_id)
                 fn_tmp = mkpath(archive_id, suffix='.tmp')
-                with DetachedIntegrityCheckedFile(path=fn_tmp, write=True, filename=bin_to_hex(archive_id)) as fd:
-                    try:
+                try:
+                    with DetachedIntegrityCheckedFile(path=fn_tmp, write=True,
+                                                      filename=bin_to_hex(archive_id)) as fd:
                         chunk_idx.write(fd)
-                    except Exception:
-                        os.unlink(fn_tmp)
-                    else:
-                        os.rename(fn_tmp, fn)
+                except Exception:
+                    os.unlink(fn_tmp)
+                else:
+                    os.rename(fn_tmp, fn)
 
         def lookup_name(archive_id):
             for info in self.manifest.archives.list():

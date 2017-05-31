@@ -33,7 +33,7 @@ import msgpack
 import borg
 from . import __version__
 from . import helpers
-from .algorithms.crc32 import crc32
+from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
 from .cache import Cache, assert_secure

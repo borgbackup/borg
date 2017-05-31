@@ -25,11 +25,11 @@ cdef extern from "xxh64/xxhash.c":
         XXH_OK,
         XXH_ERROR
 
-    XXH64_hash_t XXH64 (const void* input, size_t length, unsigned long long seed);
+    XXH64_hash_t XXH64(const void* input, size_t length, unsigned long long seed);
 
-    XXH_errorcode XXH64_reset  (XXH64_state_t* statePtr, unsigned long long seed);
-    XXH_errorcode XXH64_update (XXH64_state_t* statePtr, const void* input, size_t length);
-    XXH64_hash_t  XXH64_digest (const XXH64_state_t* statePtr);
+    XXH_errorcode XXH64_reset(XXH64_state_t* statePtr, unsigned long long seed);
+    XXH_errorcode XXH64_update(XXH64_state_t* statePtr, const void* input, size_t length);
+    XXH64_hash_t XXH64_digest(const XXH64_state_t* statePtr);
 
     void XXH64_canonicalFromHash(XXH64_canonical_t* dst, XXH64_hash_t hash);
     XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src);

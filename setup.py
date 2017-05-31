@@ -55,7 +55,7 @@ crypto_ll_source = 'src/borg/crypto/low_level.pyx'
 chunker_source = 'src/borg/algorithms/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
-crc32_source = 'src/borg/algorithms/crc32.pyx'
+checksums_source = 'src/borg/algorithms/checksums.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
@@ -67,7 +67,7 @@ cython_sources = [
     chunker_source,
     hashindex_source,
     item_source,
-    crc32_source,
+    checksums_source,
 
     platform_posix_source,
     platform_linux_source,
@@ -92,8 +92,9 @@ try:
                 'src/borg/algorithms/chunker.c', 'src/borg/algorithms/buzhash.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
                 'src/borg/item.c',
-                'src/borg/algorithms/crc32.c',
+                'src/borg/algorithms/checksums.c',
                 'src/borg/algorithms/crc32_dispatch.c', 'src/borg/algorithms/crc32_clmul.c', 'src/borg/algorithms/crc32_slice_by_8.c',
+                'src/borg/algorithms/xxh64/xxhash.h', 'src/borg/algorithms/xxh64/xxhash.c',
                 'src/borg/platform/posix.c',
                 'src/borg/platform/linux.c',
                 'src/borg/platform/freebsd.c',
@@ -111,14 +112,14 @@ except ImportError:
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
     item_source = item_source.replace('.pyx', '.c')
-    crc32_source = crc32_source.replace('.pyx', '.c')
+    checksums_source = checksums_source.replace('.pyx', '.c')
     platform_posix_source = platform_posix_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
-        compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, crc32_source,
+        compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, checksums_source,
         platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
@@ -568,23 +569,23 @@ class build_man(Command):
             write(option.ljust(padding), desc)
 
 
+def rm(file):
+    try:
+        os.unlink(file)
+        print('rm', file)
+    except FileNotFoundError:
+        pass
+
+
 class Clean(clean):
     def run(self):
         super().run()
         for source in cython_sources:
             genc = source.replace('.pyx', '.c')
-            try:
-                os.unlink(genc)
-                print('rm', genc)
-            except FileNotFoundError:
-                pass
+            rm(genc)
             compiled_glob = source.replace('.pyx', '.cpython*')
-            for compiled in glob(compiled_glob):
-                try:
-                    os.unlink(compiled)
-                    print('rm', compiled)
-                except FileNotFoundError:
-                    pass
+            for compiled in sorted(glob(compiled_glob)):
+                rm(compiled)
 
 cmdclass = {
     'build_ext': build_ext,
@@ -602,7 +603,7 @@ if not on_rtd:
     Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),
     Extension('borg.algorithms.chunker', [chunker_source]),
-    Extension('borg.algorithms.crc32', [crc32_source]),
+    Extension('borg.algorithms.checksums', [checksums_source]),
 ]
     if not sys.platform.startswith(('win32', )):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))

@@ -291,6 +291,20 @@ hashindex_read(PyObject *file_py)
         goto fail_decref_header;
     }
 
+    /*
+     * Hash the header
+     * If the header is corrupted this bails before doing something stupid (like allocating 3.8 TB of memory)
+     */
+    Py_XDECREF(PyObject_CallMethod(file_py, "hash_part", "s", "HashHeader"));
+    if(PyErr_Occurred()) {
+        if(PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            /* Be able to work with regular file objects which do not have a hash_part method. */
+            PyErr_Clear();
+        } else {
+            goto fail_decref_header;
+        }
+    }
+
     /* Find length of file */
     length_object = PyObject_CallMethod(file_py, "seek", "ni", (Py_ssize_t)0, SEEK_END);
     if(PyErr_Occurred()) {
@@ -471,6 +485,19 @@ hashindex_write(HashIndex *index, PyObject *file_py)
     if(length != sizeof(HashHeader)) {
         PyErr_SetString(PyExc_ValueError, "Failed to write header");
         return;
+    }
+
+    /*
+     * Hash the header
+     */
+    Py_XDECREF(PyObject_CallMethod(file_py, "hash_part", "s", "HashHeader"));
+    if(PyErr_Occurred()) {
+        if(PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            /* Be able to work with regular file objects which do not have a hash_part method. */
+            PyErr_Clear();
+        } else {
+            return;
+        }
     }
 
     /* Note: explicitly construct view; BuildValue can convert (pointer, length) to Python objects, but copies them for doing so */

@@ -2,6 +2,7 @@ from binascii import hexlify, a2b_base64, b2a_base64
 import configparser
 import getpass
 import os
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -327,7 +328,7 @@ class Passphrase(str):
         passcommand = os.environ.get('BORG_PASSCOMMAND', None)
         if passcommand is not None:
             try:
-                passphrase = subprocess.check_output(passcommand.split(), universal_newlines=True)
+                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
             return cls(passphrase.rstrip('\n'))

@@ -112,6 +112,11 @@ certain number of old archives::
     #!/bin/sh
     REPOSITORY=username@remoteserver.com:backup
 
+    # Setting this, so you won't be asked for your repository passphrase:
+    export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
+    # or this to ask an external program to supply the passphrase:
+    export BORG_PASSCOMMAND='pass show backup'
+
     # Backup all of /home and /var/www except a few
     # excluded directories
     borg create -v --stats                          \

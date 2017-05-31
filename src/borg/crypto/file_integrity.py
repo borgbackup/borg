@@ -135,13 +135,13 @@ class IntegrityCheckedFile(FileLikeWrapper):
     @classmethod
     def parse_integrity_data(cls, path: str, data: str, hasher: SHA512FileHashingWrapper):
         try:
-            integrity_file = json.loads(data)
+            integrity_data = json.loads(data)
             # Provisions for agility now, implementation later, but make sure the on-disk joint is oiled.
-            algorithm = integrity_file['algorithm']
+            algorithm = integrity_data['algorithm']
             if algorithm != hasher.ALGORITHM:
                 logger.warning('Cannot verify integrity of %s: Unknown algorithm %r', path, algorithm)
                 return
-            digests = integrity_file['digests']
+            digests = integrity_data['digests']
             # Require at least presence of the final digest
             digests['final']
             return digests

@@ -264,10 +264,10 @@ class CacheConfig:
                 # is modified and then written out.), not re-created.
                 # Thus, older versions will leave our [integrity] section alone, making the section's data invalid.
                 # Therefore, we also add the manifest ID to this section and
-                # can discern whether an older version interfere by comparing the manifest IDs of this section
+                # can discern whether an older version interfered by comparing the manifest IDs of this section
                 # and the main [cache] section.
                 self.integrity = {}
-                logger.warning('Cache integrity data lost: old Borg version modified the cache.')
+                logger.warning('Cache integrity data not available: old Borg version modified the cache.')
         except configparser.NoSectionError:
             logger.debug('Cache integrity: No integrity data found (files, chunks). Cache is from old version.')
             self.integrity = {}

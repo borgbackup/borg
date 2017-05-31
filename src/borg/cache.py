@@ -564,7 +564,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             except FileNotFoundError:
                 pass
 
-        def fetch_and_build_idx(archive_id, decrypted_repository, key, chunk_idx):
+        def fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx):
             csize, data = decrypted_repository.get(archive_id)
             chunk_idx.add(archive_id, 1, len(data), csize)
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
@@ -595,6 +595,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             for info in self.manifest.archives.list():
                 if info.id in archive_ids:
                     archive_names[info.id] = info.name
+            assert len(archive_names) == len(archive_ids)
             return archive_names
 
         def create_master_idx(chunk_idx):
@@ -612,15 +613,12 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             master_index_capacity = int(len(self.repository) / ChunkIndex.MAX_LOAD_FACTOR)
             if archive_ids:
                 chunk_idx = None
-                if self.progress:
-                    pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
-                                                  msg='%3.0f%% Syncing chunks cache. Processing archive %s',
-                                                  msgid='cache.sync')
+                pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
+                                              msg='%3.0f%% Syncing chunks cache. Processing archive %s',
+                                              msgid='cache.sync')
                 archive_ids_to_names = get_archive_ids_to_names(archive_ids)
-                for archive_id in archive_ids:
-                    archive_name = archive_ids_to_names.pop(archive_id)
-                    if self.progress:
-                        pi.show(info=[remove_surrogates(archive_name)])
+                for archive_id, archive_name in archive_ids_to_names.items():
+                    pi.show(info=[remove_surrogates(archive_name)])
                     if self.do_cache:
                         if archive_id in cached_ids:
                             archive_chunk_idx_path = mkpath(archive_id)
@@ -639,7 +637,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             # above can remove *archive_id* from *cached_ids*.
                             logger.info('Fetching and building archive index for %s ...', archive_name)
                             archive_chunk_idx = ChunkIndex()
-                            fetch_and_build_idx(archive_id, decrypted_repository, self.key, archive_chunk_idx)
+                            fetch_and_build_idx(archive_id, decrypted_repository, archive_chunk_idx)
                         logger.info("Merging into master chunks index ...")
                         if chunk_idx is None:
                             # we just use the first archive's idx as starting point,
@@ -651,9 +649,8 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     else:
                         chunk_idx = chunk_idx or ChunkIndex(master_index_capacity)
                         logger.info('Fetching archive index for %s ...', archive_name)
-                        fetch_and_build_idx(archive_id, decrypted_repository, self.key, chunk_idx)
-                if self.progress:
-                    pi.finish()
+                        fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
+                pi.finish()
             logger.info('Done.')
             return chunk_idx
 

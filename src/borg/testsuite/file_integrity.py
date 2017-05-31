@@ -8,23 +8,20 @@ class TestReadIntegrityFile:
     def test_no_integrity(self, tmpdir):
         protected_file = tmpdir.join('file')
         protected_file.write('1234')
-        assert DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file), None) is None
+        assert DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file)) is None
 
     def test_truncated_integrity(self, tmpdir):
         protected_file = tmpdir.join('file')
         protected_file.write('1234')
         tmpdir.join('file.integrity').write('')
         with pytest.raises(FileIntegrityError):
-            DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file), None)
+            DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file))
 
     def test_unknown_algorithm(self, tmpdir):
-        class SomeHasher:
-            ALGORITHM = 'HMAC_FOOHASH9000'
-
         protected_file = tmpdir.join('file')
         protected_file.write('1234')
         tmpdir.join('file.integrity').write('{"algorithm": "HMAC_SERIOUSHASH", "digests": "1234"}')
-        assert DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file), SomeHasher()) is None
+        assert DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file)) is None
 
     @pytest.mark.parametrize('json', (
         '{"ALGORITHM": "HMAC_SERIOUSHASH", "digests": "1234"}',
@@ -38,16 +35,7 @@ class TestReadIntegrityFile:
         protected_file.write('1234')
         tmpdir.join('file.integrity').write(json)
         with pytest.raises(FileIntegrityError):
-            DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file), None)
-
-    def test_valid(self, tmpdir):
-        class SomeHasher:
-            ALGORITHM = 'HMAC_FOO1'
-
-        protected_file = tmpdir.join('file')
-        protected_file.write('1234')
-        tmpdir.join('file.integrity').write('{"algorithm": "HMAC_FOO1", "digests": {"final": "1234"}}')
-        assert DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file), SomeHasher()) == {'final': '1234'}
+            DetachedIntegrityCheckedFile.read_integrity_file(str(protected_file))
 
 
 class TestDetachedIntegrityCheckedFile:

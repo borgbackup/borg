@@ -1,4 +1,4 @@
-isudo: required
+sudo: required
 
 language: python
 

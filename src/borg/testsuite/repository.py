@@ -415,6 +415,43 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
         assert not os.path.exists(self.repository.path)
 
 
+class QuotaTestCase(RepositoryTestCaseBase):
+    def test_tracking(self):
+        assert self.repository.storage_quota_use == 0
+        self.repository.put(H(1), bytes(1234))
+        assert self.repository.storage_quota_use == 1234 + 41
+        self.repository.put(H(2), bytes(5678))
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41
+        self.repository.delete(H(1))
+        assert self.repository.storage_quota_use == 5678 + 41
+        self.repository.commit()
+        self.reopen()
+        with self.repository:
+            # Open new transaction; hints and thus quota data is not loaded unless needed.
+            self.repository.put(H(3), b'')
+            self.repository.delete(H(3))
+            assert self.repository.storage_quota_use == 5678 + 41
+
+    def test_exceed_quota(self):
+        assert self.repository.storage_quota_use == 0
+        self.repository.storage_quota = 50
+        self.repository.put(H(1), b'')
+        assert self.repository.storage_quota_use == 41
+        self.repository.commit()
+        with pytest.raises(Repository.StorageQuotaExceeded):
+            self.repository.put(H(2), b'')
+        assert self.repository.storage_quota_use == 82
+        with pytest.raises(Repository.StorageQuotaExceeded):
+            self.repository.commit()
+        assert self.repository.storage_quota_use == 82
+        self.reopen()
+        with self.repository:
+            self.repository.storage_quota = 50
+            # Open new transaction; hints and thus quota data is not loaded unless needed.
+            self.repository.put(H(1), b'')
+            assert self.repository.storage_quota_use == 41
+
+
 class NonceReservation(RepositoryTestCaseBase):
     def test_get_free_nonce_asserts(self):
         self.reopen(exclusive=False)
@@ -641,6 +678,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
 @pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryTestCase(RepositoryTestCase):
+    repository = None  # type: RemoteRepository
 
     def open(self, create=False):
         return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
@@ -716,6 +754,10 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
             umask = 0o077
             debug_topics = []
 
+            def __contains__(self, item):
+                # To behave like argparse.Namespace
+                return hasattr(self, item)
+
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
         args = MockArgs()
         # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
@@ -727,6 +769,12 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         args.debug_topics = ['something_client_side', 'repository_compaction']
         assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info',
                                                                  '--debug-topic=borg.debug.repository_compaction']
+        args = MockArgs()
+        args.storage_quota = 0
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
+        args.storage_quota = 314159265
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info',
+                                                                 '--storage-quota=314159265']
 
 
 class RemoteLegacyFree(RepositoryTestCaseBase):

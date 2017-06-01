@@ -46,7 +46,7 @@ from .helpers import Error, NoManifestError, set_ec
 from .helpers import location_validator, archivename_validator, ChunkerParams
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
-from .helpers import format_timedelta, format_file_size, format_archive
+from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
 from .helpers import prune_within, prune_split
 from .helpers import timestamp
@@ -142,6 +142,13 @@ def with_archive(method):
     return wrapper
 
 
+def parse_storage_quota(storage_quota):
+    parsed = parse_file_size(storage_quota)
+    if parsed < parse_file_size('10M'):
+        raise argparse.ArgumentTypeError('quota is too small (%s). At least 10M are required.' % storage_quota)
+    return parsed
+
+
 class Archiver:
 
     def __init__(self, lock_wait=None, prog=None):
@@ -206,7 +213,11 @@ class Archiver:
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually."""
-        return RepositoryServer(restrict_to_paths=args.restrict_to_paths, append_only=args.append_only).serve()
+        return RepositoryServer(
+            restrict_to_paths=args.restrict_to_paths,
+            append_only=args.append_only,
+            storage_quota=args.storage_quota,
+        ).serve()
 
     @with_repository(create=True, exclusive=True, manifest=False)
     def do_init(self, args, repository):
@@ -2330,6 +2341,11 @@ class Archiver:
                                                     'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='only allow appending to repository segment files')
+        subparser.add_argument('--storage-quota', dest='storage_quota', default=None,
+                               type=parse_storage_quota,
+                               help='Override storage quota of the repository (e.g. 5G, 1.5T). '
+                                    'When a new repository is initialized, sets the storage quota on the new '
+                                    'repository as well. Default: no quota.')
 
         init_epilog = process_epilog("""
         This command initializes an empty repository. A repository is a filesystem
@@ -2420,6 +2436,9 @@ class Archiver:
                                help='select encryption key mode **(required)**')
         subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
+        subparser.add_argument('--storage-quota', dest='storage_quota', default=None,
+                               type=parse_storage_quota,
+                               help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
 
         check_epilog = process_epilog("""
         The check command verifies the consistency of a repository and the corresponding archives.
@@ -3981,7 +4000,7 @@ def main():  # pragma: no cover
             tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
-            important = e.exception_class not in ('LockTimeout', )
+            important = e.exception_class not in ('LockTimeout', ) and e.traceback
             msgid = e.exception_class
             tb_log_level = logging.ERROR if important else logging.DEBUG
             if important:

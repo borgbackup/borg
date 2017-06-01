@@ -185,6 +185,67 @@ commit logic) showing the principal operation of compaction:
 (The actual algorithm is more complex to avoid various consistency issues, refer to
 the ``borg.repository`` module for more comments and documentation on these issues.)
 
+.. _internals_storage_quota:
+
+Storage quotas
+~~~~~~~~~~~~~~
+
+Quotas are implemented at the Repository level. The active quota of a repository
+is determined by the ``storage_quota`` `config` entry or a run-time override (via :ref:`borg_serve`).
+The currently used quota is stored in the hints file. Operations (PUT and DELETE) during
+a transaction modify the currently used quota:
+
+- A PUT adds the size of the *log entry* to the quota,
+  i.e. the length of the data plus the 41 byte header.
+- A DELETE subtracts the size of the deleted log entry from the quota,
+  which includes the header.
+
+Thus, PUT and DELETE are symmetric and cancel each other out precisely.
+
+The quota does not track on-disk size overheads (due to conditional compaction
+or append-only mode). In normal operation the inclusion of the log entry headers
+in the quota act as a faithful proxy for index and hints overheads.
+
+By tracking effective content size, the client can *always* recover from a full quota
+by deleting archives. This would not be possible if the quota tracked on-disk size,
+since journaling DELETEs requires extra disk space before space is freed.
+Tracking effective size on the other hand accounts DELETEs immediately as freeing quota.
+
+.. rubric:: Enforcing the quota
+
+The storage quota is meant as a robust mechanism for service providers, therefore
+:ref:`borg_serve` has to enforce it without loopholes (e.g. modified clients).
+
+The quota is enforcible only if *all* :ref:`borg_serve` versions
+accessible to clients support quotas (see next section). Further, quota is
+per repository. Therefore, ensure clients can only access a defined set of repositories
+with their quotas set, using ``--restrict-to-path``.
+
+If the client exceeds the storage quota the ``StorageQuotaExceeded`` exception is
+raised. Normally a client could ignore such an exception and just send a ``commit()``
+command anyway, circumventing the quota. However, when ``StorageQuotaExceeded`` is raised,
+it is stored in the ``transaction_doomed`` attribute of the repository.
+If the transaction is doomed, then commit will re-raise this exception, aborting the commit.
+
+The transaction_doomed indicator is reset on a rollback (which erases the quota-exceeding
+state).
+
+.. rubric:: Compatibility with older servers and enabling quota after-the-fact
+
+If no quota data is stored in the hints file, Borg assumes zero quota is used.
+Thus, if a repository with an enabled quota is written to with an older version
+that does not understand quotas, then the quota usage will be erased.
+
+A similar situation arises when upgrading from a Borg release that did not have quotas.
+Borg will start tracking quota use from the time of the upgrade, starting at zero.
+
+If the quota shall be enforced accurately in these cases, either
+
+- delete the ``index.N`` and ``hints.N`` files, forcing Borg to rebuild both,
+  re-acquiring quota data in the process, or
+- edit the msgpacked ``hints.N`` file (not recommended and thus not
+  documented further).
+
 .. _manifest:
 
 The manifest

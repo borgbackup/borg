@@ -155,7 +155,11 @@ see ``docs/suppport.rst`` in the source distribution).
 
 .. start-badges
 
-|doc| |build| |coverage| |bestpractices|
+|doc| |build| |coverage| |bestpractices| |bounties|
+
+.. |bounties| image:: https://api.bountysource.com/badge/team?team_id=78284&style=bounties_posted
+        :alt: Bounty Source
+        :target: https://www.bountysource.com/teams/borgbackup
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
         :alt: Documentation

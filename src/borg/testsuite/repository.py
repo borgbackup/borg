@@ -501,6 +501,11 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         self.repository.commit()
         self.repository.close()
 
+    def corrupt(self, file):
+        with open(file, 'r+b') as fd:
+            fd.seek(-1, io.SEEK_END)
+            fd.write(b'1')
+
     def do_commit(self):
         with self.repository:
             self.repository.put(H(0), b'fox')
@@ -536,6 +541,12 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             fd.write(b'123456789')
         with self.repository:
             assert len(self.repository) == 1
+
+    def test_index_corrupted(self):
+        self.corrupt(os.path.join(self.repository.path, 'index.1'))
+        with self.repository:
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
 
     def test_unreadable_index(self):
         index = os.path.join(self.repository.path, 'index.1')

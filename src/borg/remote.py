@@ -87,7 +87,7 @@ class ConnectionClosedWithHint(ConnectionClosed):
 
 
 class PathNotAllowed(Error):
-    """Repository path not allowed"""
+    """Repository path not allowed: {}"""
 
 
 class InvalidRPCMethod(Error):
@@ -391,7 +391,7 @@ class RepositoryServer:  # pragma: no cover
         elif kind == 'IntegrityError':
             raise IntegrityError(s1)
         elif kind == 'PathNotAllowed':
-            raise PathNotAllowed()
+            raise PathNotAllowed('foo')
         elif kind == 'ObjectNotFound':
             raise Repository.ObjectNotFound(s1, s2)
         elif kind == 'InvalidRPCMethod':
@@ -747,7 +747,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 else:
                     raise IntegrityError(args[0].decode())
             elif error == 'PathNotAllowed':
-                raise PathNotAllowed()
+                if old_server:
+                    raise PathNotAllowed('(unknown)')
+                else:
+                    raise PathNotAllowed(args[0].decode())
             elif error == 'ObjectNotFound':
                 if old_server:
                     raise Repository.ObjectNotFound('(not available)', self.location.orig)

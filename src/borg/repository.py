@@ -490,6 +490,8 @@ class Repository:
             b'storage_quota_use': self.storage_quota_use,
         }
         integrity = {
+            # Integrity version started at 2, the current hints version.
+            # Thus, integrity version == hints version, for now.
             b'version': 2,
         }
         transaction_id = self.io.get_segments_transaction_id()

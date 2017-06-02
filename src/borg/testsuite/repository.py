@@ -503,11 +503,6 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         self.repository.commit()
         self.repository.close()
 
-    def corrupt(self, file):
-        with open(file, 'r+b') as fd:
-            fd.seek(-1, io.SEEK_END)
-            fd.write(b'1')
-
     def do_commit(self):
         with self.repository:
             self.repository.put(H(0), b'fox')
@@ -544,11 +539,41 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         with self.repository:
             assert len(self.repository) == 1
 
+    def _corrupt_index(self):
+        # HashIndex is able to detect incorrect headers and file lengths,
+        # but on its own it can't tell if the data is correct.
+        index_path = os.path.join(self.repository.path, 'index.1')
+        with open(index_path, 'r+b') as fd:
+            index_data = fd.read()
+            # Flip one bit in a key stored in the index
+            corrupted_key = (int.from_bytes(H(0), 'little') ^ 1).to_bytes(32, 'little')
+            corrupted_index_data = index_data.replace(H(0), corrupted_key)
+            assert corrupted_index_data != index_data
+            assert len(corrupted_index_data) == len(index_data)
+            fd.seek(0)
+            fd.write(corrupted_index_data)
+
     def test_index_corrupted(self):
-        self.corrupt(os.path.join(self.repository.path, 'index.1'))
+        # HashIndex is able to detect incorrect headers and file lengths,
+        # but on its own it can't tell if the data itself is correct.
+        self._corrupt_index()
         with self.repository:
+            # Data corruption is detected due to mismatching checksums
+            # and fixed by rebuilding the index.
             assert len(self.repository) == 1
             assert self.repository.get(H(0)) == b'foo'
+
+    def test_index_corrupted_without_integrity(self):
+        self._corrupt_index()
+        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        os.unlink(integrity_path)
+        with self.repository:
+            # Since the corrupted key is not noticed, the repository still thinks
+            # it contains one key...
+            assert len(self.repository) == 1
+            with pytest.raises(Repository.ObjectNotFound):
+                # ... but the real, uncorrupted key is not found in the corrupted index.
+                self.repository.get(H(0))
 
     def test_unreadable_index(self):
         index = os.path.join(self.repository.path, 'index.1')
@@ -558,13 +583,16 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             self.do_commit()
 
     def test_unknown_integrity_version(self):
+        # For now an unknown integrity data version is ignored and not an error.
         integrity_path = os.path.join(self.repository.path, 'integrity.1')
         with open(integrity_path, 'r+b') as fd:
             msgpack.pack({
+                # Borg only understands version 2
                 b'version': 4.7,
             }, fd)
             fd.truncate()
         with self.repository:
+            # No issues accessing the repository
             assert len(self.repository) == 1
             assert self.repository.get(H(0)) == b'foo'
 

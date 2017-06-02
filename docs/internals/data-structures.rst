@@ -223,7 +223,7 @@ since the quota can be changed in the repository config.
 The quota is enforcible only if *all* :ref:`borg_serve` versions
 accessible to clients support quotas (see next section). Further, quota is
 per repository. Therefore, ensure clients can only access a defined set of repositories
-with their quotas set, using ``--restrict-to-path``.
+with their quotas set, using ``--restrict-to-repository``.
 
 If the client exceeds the storage quota the ``StorageQuotaExceeded`` exception is
 raised. Normally a client could ignore such an exception and just send a ``commit()``

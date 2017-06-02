@@ -215,6 +215,10 @@ Tracking effective size on the other hand accounts DELETEs immediately as freein
 
 The storage quota is meant as a robust mechanism for service providers, therefore
 :ref:`borg_serve` has to enforce it without loopholes (e.g. modified clients).
+The following sections refer to using quotas on remotely accessed repositories.
+For local access, consider *client* and *serve* the same.
+Accordingly, quotas cannot be enforced with local access,
+since the quota can be changed in the repository config.
 
 The quota is enforcible only if *all* :ref:`borg_serve` versions
 accessible to clients support quotas (see next section). Further, quota is

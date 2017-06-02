@@ -715,3 +715,170 @@ In case you run into troubles with the locks, you can use the ``borg break-lock`
 command after you first have made sure that no |project_name| process is
 running on any machine that accesses this resource. Be very careful, the cache
 or repository might get damaged if multiple processes use it at the same time.
+
+Checksumming data structures
+----------------------------
+
+As detailed in the previous sections, Borg generates and stores various files
+containing important meta data, such as the repository index, repository hints,
+chunks caches and files cache.
+
+Data corruption in these files can damage the archive data in a repository,
+e.g. due to wrong reference counts in the chunks cache. Only some parts of Borg
+were designed to handle corrupted data structures, so a corrupted files cache
+may cause crashes or write incorrect archives.
+
+Therefore, Borg calculates checksums when writing these files and tests checksums
+when reading them. Checksums are generally 64-bit XXH64 checksums.
+XXH64 has been chosen for its high speed on all platforms, which avoids performance
+degradation in CPU-limited parts (e.g. cache synchronization). Unlike CRC32,
+it does neither require hardware support (crc32c or CLMUL) nor vectorized code
+nor large, cache-unfriendly lookup tables to achieve good performance.
+This simplifies deployment of it considerably (cf. src/borg/algorithms/crc32...).
+
+Further, XXH64 is a non-linear hash function and thus has a "more or less" good
+chance to detect larger burst errors, unlike linear CRCs where the probability
+of detection decreases with error size.
+
+The 64-bit checksum length is considered sufficient for the file sizes typically
+checksummed (individual files up to a few GB, usually less).
+
+The canonical xxHash representation is used, i.e. big-endian.
+Checksums are generally stored as hexadecimal ASCII strings.
+
+Lower layer — file_integrity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To accommodate the different transaction models used for the cache and repository,
+there is a lower layer (borg.crypto.file_integrity.IntegrityCheckedFile) which
+wraps a file-like object and performs streaming calculation and comparison of checksums.
+Checksum errors are signalled by raising an exception (borg.crypto.file_integrity.FileIntegrityError)
+at the earliest possible moment.
+
+.. rubric:: Calculating checksums
+
+The various indices used by Borg have separate header and main data parts.
+IntegrityCheckedFile allows to checksum them independently, which avoids
+even reading the data when the header is corrupted. When a part is signalled,
+the length of the pathname is mixed into the checksum state first (encoded
+as an ASCII string via `%10d` printf format), then the name of the part
+is mixed in as an UTF-8 string. Lastly, the current position (length)
+in the file is mixed in as well.
+
+The checksum state is not reset at part boundaries.
+
+A final checksum is always calculated from the entire state.
+
+.. rubric:: Serializing checksums
+
+All checksums are compiled into a simple JSON structure called *integrity data*:
+
+.. code-block:: json
+
+    {
+        "algorithm": "XXH64",
+        "digests": {
+            "HashHeader": "eab6802590ba39e3",
+            "final": "e2a7f132fc2e8b24"
+        }
+    }
+
+The *algorithm* key notes the used algorithm. When reading, integrity data containing
+an unknown algorithm is not inspected further.
+
+The *digests* key contains a mapping of part names to their digests.
+
+Integrity data is generally stored by the upper layers, introduced below. An exception
+is the DetachedIntegrityCheckedFile, which automatically writes and reads it from
+a ".integrity" file next to the data file. It is used for archive chunks in chunks.archive.d.
+
+Upper layer
+~~~~~~~~~~~
+
+Storage of integrity data depends on the component using it, since they have
+different transaction mechanisms, and integrity data needs to be
+transacted with the data it is supposed to protect.
+
+.. rubric:: Main cache files: chunks and files cache
+
+The integrity data of the ``chunks`` and ``files`` caches is stored in the
+cache ``config``, since all three are transacted together.
+
+The ``[integrity]`` section is used:
+
+.. code-block:: ini
+
+    [cache]
+    version = 1
+    repository = 3c4...e59
+    manifest = 10e...21c
+    timestamp = 2017-06-01T21:31:39.699514
+    key_type = 2
+    previous_location = /path/to/repo
+
+    [integrity]
+    manifest = 10e...21c
+    chunks = {"algorithm": "XXH64", "digests": {"HashHeader": "eab...39e3", "final": "e2a...b24"}}
+
+The manifest ID is duplicated in the integrity section due to the way all Borg
+versions handle the config file. Instead of creating a "new" config file from
+an internal representation containing only the data understood by Borg,
+the config file is read in entirety (using the Python ConfigParser) and modified.
+This preserves all sections and values not understood by the Borg version
+modifying it.
+
+Thus, if an older versions uses a cache with integrity data, it would preserve
+the integrity section and its contents. If a integrity-aware Borg version
+would read this cache, it would incorrectly report checksum errors, since
+the older version did not update the checksums.
+
+However, by duplicating the manifest ID in the integrity section, it is
+easy to tell whether the checksums concern the current state of the cache.
+
+Integrity errors are fatal in these files, terminating the program,
+and are not automatically corrected at this time.
+
+.. rubric:: chunks.archive.d
+
+Indices in chunks.archive.d are not transacted and use DetachedIntegrityCheckedFile, which
+writes the integrity data to a separate ".integrity" file.
+
+Integrity errors result in deleting the affected index and rebuilding it.
+This logs a warning and increases the exit code to WARNING (1).
+
+.. rubric:: Repository index and hints
+
+The repository associates index and hints files with a transaction by including the
+transaction ID in the file names. Integrity data is stored in a third file
+("integrity.<TRANSACTION_ID>"). Like the hints file, it is msgpacked:
+
+.. code-block:: python
+
+    {
+        b'version': 2,
+        b'hints': b'{"algorithm": "XXH64", "digests": {"final": "411208db2aa13f1a"}}',
+        b'index': b'{"algorithm": "XXH64", "digests": {"HashHeader": "846b7315f91b8e48", "final": "cb3e26cadc173e40"}}'
+    }
+
+The *version* key started at 2, the same version used for the hints. Since Borg has
+many versioned file formats, this keeps the number of different versions in use
+a bit lower.
+
+The other keys map an auxiliary file, like *index* or *hints* to their integrity data.
+Note that the JSON is stored as-is, and not as part of the msgpack structure.
+
+Integrity errors result in deleting the affected file(s) (index/hints) and rebuilding the index,
+which is the same action taken when corruption is noticed in other ways (e.g. HashIndex can
+detect most corrupted headers, but not data corruption). A warning is logged as well.
+The exit code is not influenced, since remote repositories cannot perform that action.
+Raising the exit code would be possible for local repositories, but is not implemented.
+
+Unlike the cache design this mechanism can have false positives whenever an older version
+*rewrites* the auxiliary files for a transaction created by a newer version,
+since that might result in a different index (due to hash-table resizing) or hints file
+(hash ordering, or the older version 1 format), while not invalidating the integrity file.
+
+For example, using 1.1 on a repository, noticing corruption or similar issues and then running
+``borg-1.0 check --repair``, which rewrites the index and hints, results in this situation.
+Borg 1.1 would erroneously report checksum errors in the hints and/or index files and trigger
+an automatic rebuild of these files.

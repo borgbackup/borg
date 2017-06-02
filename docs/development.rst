@@ -249,6 +249,8 @@ Usage::
 
    # To create and provision the VM:
    vagrant up OS
+   # same, but use 6 VM cpus and 12 workers for pytest:
+   VMCPUS=6 XDISTN=12 vagrant up OS
    # To create an ssh session to the VM:
    vagrant ssh OS
    # To execute a command via ssh in the VM:

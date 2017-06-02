@@ -373,17 +373,18 @@ class Repository:
         self.write_index()
         self.rollback()
 
-    def _read_integrity(self, transaction_id, key=None):
-        integrity_path = os.path.join(self.path, 'integrity.%d' % transaction_id)
+    def _read_integrity(self, transaction_id, key):
+        integrity_file = 'integrity.%d' % transaction_id
+        integrity_path = os.path.join(self.path, integrity_file)
         try:
             with open(integrity_path, 'rb') as fd:
                 integrity = msgpack.unpack(fd)
         except FileNotFoundError:
             return
-        if key:
-            return integrity[key].decode()
-        else:
-            return integrity
+        if integrity.get(b'version') != 2:
+            logger.warning('Unknown integrity data version %r in %s', integrity.get(b'version'), integrity_file)
+            return
+        return integrity[key].decode()
 
     def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
@@ -617,7 +618,7 @@ class Repository:
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:
                 logger.debug('complete_xfer: deleting unused segment %d', segment)
-                assert self.segments.pop(segment) == 0
+                assert self.segments.pop(segment) == 0, 'Corrupted segment reference count - corrupted index or hints'
                 self.io.delete_segment(segment)
                 del self.compact[segment]
             unused = []
@@ -711,7 +712,7 @@ class Repository:
                             new_segment, size = self.io.write_delete(key)
                         self.compact[new_segment] += size
                         segments.setdefault(new_segment, 0)
-            assert segments[segment] == 0
+            assert segments[segment] == 0, 'Corrupted segment reference count - corrupted index or hints'
             unused.append(segment)
             pi.show()
         pi.finish()

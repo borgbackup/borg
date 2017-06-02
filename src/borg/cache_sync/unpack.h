@@ -31,11 +31,11 @@
 #define MIN(x, y) ((x) < (y) ? (x): (y))
 
 #ifdef DEBUG
-#define set_last_error(msg) \
+#define SET_LAST_ERROR(msg) \
   fprintf(stderr, "cache_sync parse error: %s\n", (msg)); \
   u->last_error = (msg);
 #else
-#define set_last_error(msg) \
+#define SET_LAST_ERROR(msg) \
   u->last_error = (msg);
 #endif
 
@@ -104,9 +104,9 @@ struct unpack_context;
 typedef struct unpack_context unpack_context;
 typedef int (*execute_fn)(unpack_context *ctx, const char* data, size_t len, size_t* off);
 
-#define unexpected(what)                                            \
+#define UNEXPECTED(what)                                            \
     if(u->inside_chunks || u->expect == expect_chunks_map_key) { \
-        set_last_error("Unexpected object: " what);                 \
+        SET_LAST_ERROR("Unexpected object: " what);                 \
         return -1;                                                  \
     }
 
@@ -130,7 +130,7 @@ static inline int unpack_callback_int64(unpack_user* u, int64_t d)
             u->expect = expect_entry_end;
             break;
         default:
-            unexpected("integer");
+            UNEXPECTED("integer");
     }
     return 0;
 }
@@ -175,33 +175,33 @@ static inline int unpack_callback_int8(unpack_user* u, int8_t d)
 static inline int unpack_callback_double(unpack_user* u, double d)
 {
     (void)d;
-    unexpected("double");
+    UNEXPECTED("double");
     return 0;
 }
 
 static inline int unpack_callback_float(unpack_user* u, float d)
 {
     (void)d;
-    unexpected("float");
+    UNEXPECTED("float");
     return 0;
 }
 
 /* nil/true/false — I/don't/care */
 static inline int unpack_callback_nil(unpack_user* u)
 {
-    unexpected("nil");
+    UNEXPECTED("nil");
     return 0;
 }
 
 static inline int unpack_callback_true(unpack_user* u)
 {
-    unexpected("true");
+    UNEXPECTED("true");
     return 0;
 }
 
 static inline int unpack_callback_false(unpack_user* u)
 {
-    unexpected("false");
+    UNEXPECTED("false");
     return 0;
 }
 
@@ -217,14 +217,14 @@ static inline int unpack_callback_array(unpack_user* u, unsigned int n)
         /* b'chunks': [ (
          *              ^ */
         if(n != 3) {
-            set_last_error("Invalid chunk list entry length");
+            SET_LAST_ERROR("Invalid chunk list entry length");
             return -1;
         }
         u->expect = expect_key;
         break;
     default:
         if(u->inside_chunks) {
-            set_last_error("Unexpected array start");
+            SET_LAST_ERROR("Unexpected array start");
             return -1;
         } else {
             u->level++;
@@ -261,7 +261,7 @@ static inline int unpack_callback_array_end(unpack_user* u)
             cache_values[1] = _htole32(u->current.size);
             cache_values[2] = _htole32(u->current.csize);
             if (!hashindex_set(u->chunks, u->current.key, cache_values)) {
-                set_last_error("hashindex_set failed");
+                SET_LAST_ERROR("hashindex_set failed");
                 return -1;
             }
         }
@@ -277,7 +277,7 @@ static inline int unpack_callback_array_end(unpack_user* u)
         break;
     default:
         if(u->inside_chunks) {
-            set_last_error("Invalid state transition (unexpected array end)");
+            SET_LAST_ERROR("Invalid state transition (unexpected array end)");
             return -1;
         } else {
             u->level--;
@@ -294,7 +294,7 @@ static inline int unpack_callback_map(unpack_user* u, unsigned int n)
 
     if(u->level == 0) {
         if(u->expect != expect_item_begin) {
-            set_last_error("Invalid state transition");  /* unreachable */
+            SET_LAST_ERROR("Invalid state transition");  /* unreachable */
             return -1;
         }
         /* This begins a new Item */
@@ -302,7 +302,7 @@ static inline int unpack_callback_map(unpack_user* u, unsigned int n)
     }
 
     if(u->inside_chunks) {
-        unexpected("map");
+        UNEXPECTED("map");
     }
 
     u->level++;
@@ -319,7 +319,7 @@ static inline int unpack_callback_map_item(unpack_user* u, unsigned int current)
             u->expect = expect_chunks_map_key;
             break;
         default:
-            set_last_error("Unexpected map item");
+            SET_LAST_ERROR("Unexpected map item");
             return -1;
         }
     }
@@ -330,7 +330,7 @@ static inline int unpack_callback_map_end(unpack_user* u)
 {
     u->level--;
     if(u->inside_chunks) {
-        set_last_error("Unexpected map end");
+        SET_LAST_ERROR("Unexpected map end");
         return -1;
     }
     return 0;
@@ -345,7 +345,7 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
     switch(u->expect) {
     case expect_key:
         if(l != 32) {
-            set_last_error("Incorrect key length");
+            SET_LAST_ERROR("Incorrect key length");
             return -1;
         }
         memcpy(u->current.key, p, 32);
@@ -361,7 +361,7 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
         break;
     default:
         if(u->inside_chunks) {
-            set_last_error("Unexpected bytes in chunks structure");
+            SET_LAST_ERROR("Unexpected bytes in chunks structure");
             return -1;
         }
     }
@@ -372,7 +372,7 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
 static inline int unpack_callback_bin(unpack_user* u, const char* b, const char* p, unsigned int l)
 {
     (void)u; (void)b; (void)p; (void)l;
-    unexpected("bin");
+    UNEXPECTED("bin");
     return 0;
 }
 
@@ -380,7 +380,7 @@ static inline int unpack_callback_ext(unpack_user* u, const char* base, const ch
                                       unsigned int length)
 {
     (void)u; (void)base; (void)pos; (void)length;
-    unexpected("ext");
+    UNEXPECTED("ext");
     return 0;
 }
 

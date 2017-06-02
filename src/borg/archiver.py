@@ -215,6 +215,7 @@ class Archiver:
         """Start in server mode. This command is usually not used manually."""
         return RepositoryServer(
             restrict_to_paths=args.restrict_to_paths,
+            restrict_to_repositories=args.restrict_to_repositories,
             append_only=args.append_only,
             storage_quota=args.storage_quota,
         ).serve()
@@ -2339,6 +2340,14 @@ class Archiver:
                                metavar='PATH', help='restrict repository access to PATH. '
                                                     'Can be specified multiple times to allow the client access to several directories. '
                                                     'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
+        subparser.add_argument('--restrict-to-repository', dest='restrict_to_repositories', action='append',
+                               metavar='PATH', help='restrict repository access. Only the repository located at PATH (no sub-directories are considered) '
+                                                    'is accessible. '
+                                                    'Can be specified multiple times to allow the client access to several repositories. '
+                                                    'Unlike --restrict-to-path sub-directories are not accessible; '
+                                                    'PATH needs to directly point at a repository location. '
+                                                    'PATH may be an empty directory or the last element of PATH may not exist, in which case '
+                                                    'the client may initialize a repository there.')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='only allow appending to repository segment files')
         subparser.add_argument('--storage-quota', dest='storage_quota', default=None,

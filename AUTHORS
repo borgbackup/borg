@@ -51,3 +51,9 @@ Folding CRC32
 
 Borg includes an extremely fast folding implementation of CRC32, Copyright 2013 Intel Corporation,
 licensed under the terms of the zlib license.
+
+xxHash
+------
+
+XXH64, a fast non-cryptographic hash algorithm. Copyright 2012-2016 Yann Collet,
+licensed under a BSD 2-clause license.

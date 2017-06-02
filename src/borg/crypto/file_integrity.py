@@ -6,6 +6,7 @@ from hmac import compare_digest
 
 from ..helpers import IntegrityError
 from ..logger import create_logger
+from ..algorithms.checksums import StreamingXXH64
 
 logger = create_logger()
 
@@ -37,7 +38,7 @@ class FileLikeWrapper:
         return self.fd.fileno()
 
 
-class SHA512FileHashingWrapper(FileLikeWrapper):
+class FileHashingWrapper(FileLikeWrapper):
     """
     Wrapper for file-like objects that computes a hash on-the-fly while reading/writing.
 
@@ -53,12 +54,13 @@ class SHA512FileHashingWrapper(FileLikeWrapper):
     are illegal.
     """
 
-    ALGORITHM = 'SHA512'
+    ALGORITHM = None
+    FACTORY = None
 
     def __init__(self, backing_fd, write):
         self.fd = backing_fd
         self.writing = write
-        self.hash = hashlib.new(self.ALGORITHM)
+        self.hash = self.FACTORY()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
@@ -99,6 +101,22 @@ class SHA512FileHashingWrapper(FileLikeWrapper):
         self.hash.update(str(self.tell()).encode())
 
 
+class SHA512FileHashingWrapper(FileHashingWrapper):
+    ALGORITHM = 'SHA512'
+    FACTORY = hashlib.sha512
+
+
+class XXH64FileHashingWrapper(FileHashingWrapper):
+    ALGORITHM = 'XXH64'
+    FACTORY = StreamingXXH64
+
+
+SUPPORTED_ALGORITHMS = {
+    SHA512FileHashingWrapper.ALGORITHM: SHA512FileHashingWrapper,
+    XXH64FileHashingWrapper.ALGORITHM: XXH64FileHashingWrapper,
+}
+
+
 class FileIntegrityError(IntegrityError):
     """File failed integrity check: {}"""
 
@@ -109,17 +127,25 @@ class IntegrityCheckedFile(FileLikeWrapper):
         self.writing = write
         mode = 'wb' if write else 'rb'
         self.file_fd = override_fd or open(path, mode)
+        self.digests = {}
 
-        self.fd = self.hasher = SHA512FileHashingWrapper(backing_fd=self.file_fd, write=write)
+        hash_cls = XXH64FileHashingWrapper
 
-        self.hash_filename(filename)
+        if not write:
+            algorithm_and_digests = self.load_integrity_data(path, integrity_data)
+            if algorithm_and_digests:
+                algorithm, self.digests = algorithm_and_digests
+                hash_cls = SUPPORTED_ALGORITHMS[algorithm]
 
-        if write or not integrity_data:
-            self.digests = {}
-        else:
-            self.digests = self.parse_integrity_data(path, integrity_data, self.hasher)
             # TODO: When we're reading but don't have any digests, i.e. no integrity file existed,
             # TODO: then we could just short-circuit.
+
+        self.fd = self.hasher = hash_cls(backing_fd=self.file_fd, write=write)
+        self.hash_filename(filename)
+
+    def load_integrity_data(self, path, integrity_data):
+        if integrity_data is not None:
+            return self.parse_integrity_data(path, integrity_data)
 
     def hash_filename(self, filename=None):
         # Hash the name of the file, but only the basename, ie. not the path.
@@ -133,18 +159,18 @@ class IntegrityCheckedFile(FileLikeWrapper):
         self.hasher.update(filename.encode())
 
     @classmethod
-    def parse_integrity_data(cls, path: str, data: str, hasher: SHA512FileHashingWrapper):
+    def parse_integrity_data(cls, path: str, data: str):
         try:
             integrity_data = json.loads(data)
             # Provisions for agility now, implementation later, but make sure the on-disk joint is oiled.
             algorithm = integrity_data['algorithm']
-            if algorithm != hasher.ALGORITHM:
+            if algorithm not in SUPPORTED_ALGORITHMS:
                 logger.warning('Cannot verify integrity of %s: Unknown algorithm %r', path, algorithm)
                 return
             digests = integrity_data['digests']
             # Require at least presence of the final digest
             digests['final']
-            return digests
+            return algorithm, digests
         except (ValueError, TypeError, KeyError) as e:
             logger.warning('Could not parse integrity data for %s: %s', path, e)
             raise FileIntegrityError(path)
@@ -186,18 +212,20 @@ class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
         filename = filename or os.path.basename(path)
         output_dir = os.path.dirname(path)
         self.output_integrity_file = self.integrity_file_path(os.path.join(output_dir, filename))
-        if not write:
-            self.digests = self.read_integrity_file(self.path, self.hasher)
+
+    def load_integrity_data(self, path, integrity_data):
+        assert not integrity_data, 'Cannot pass explicit integrity_data to DetachedIntegrityCheckedFile'
+        return self.read_integrity_file(self.path)
 
     @staticmethod
     def integrity_file_path(path):
         return path + '.integrity'
 
     @classmethod
-    def read_integrity_file(cls, path, hasher):
+    def read_integrity_file(cls, path):
         try:
             with open(cls.integrity_file_path(path), 'r') as fd:
-                return cls.parse_integrity_data(path, fd.read(), hasher)
+                return cls.parse_integrity_data(path, fd.read())
         except FileNotFoundError:
             logger.info('No integrity file found for %s', path)
         except OSError as e:

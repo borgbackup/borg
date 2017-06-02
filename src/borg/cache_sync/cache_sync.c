@@ -19,11 +19,8 @@ cache_sync_init(HashIndex *chunks)
     }
 
     unpack_init(&ctx->ctx);
-
+    /* needs to be set only once */
     ctx->ctx.user.chunks = chunks;
-    ctx->ctx.user.last_error = NULL;
-    ctx->ctx.user.level = 0;
-    ctx->ctx.user.inside_chunks = false;
     ctx->buf = NULL;
     ctx->head = 0;
     ctx->tail = 0;

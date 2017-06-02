@@ -89,6 +89,8 @@ typedef struct unpack_user {
         expect_csize,
         /* next thing must be the end of the CLE (array_end) */
         expect_entry_end,
+
+        expect_item_begin
     } expect;
 
     struct {
@@ -107,6 +109,14 @@ typedef int (*execute_fn)(unpack_context *ctx, const char* data, size_t len, siz
         set_last_error("Unexpected object: " what);                 \
         return -1;                                                  \
     }
+
+static inline void unpack_init_user_state(unpack_user *u)
+{
+    u->last_error = NULL;
+    u->level = 0;
+    u->inside_chunks = false;
+    u->expect = expect_item_begin;
+}
 
 static inline int unpack_callback_int64(unpack_user* u, int64_t d)
 {
@@ -282,8 +292,11 @@ static inline int unpack_callback_map(unpack_user* u, unsigned int n)
 {
     (void)n;
 
-
     if(u->level == 0) {
+        if(u->expect != expect_item_begin) {
+            set_last_error("Invalid state transition");  /* unreachable */
+            return -1;
+        }
         /* This begins a new Item */
         u->expect = expect_chunks_map_key;
     }

@@ -42,6 +42,7 @@ static inline void unpack_init(unpack_context* ctx)
     ctx->cs = CS_HEADER;
     ctx->trail = 0;
     ctx->top = 0;
+    unpack_init_user_state(&ctx->user);
 }
 
 #define construct 1

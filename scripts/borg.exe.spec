@@ -16,7 +16,9 @@ a = Analysis([os.path.join(basepath, 'src/borg/__main__.py'), ],
              hiddenimports=['borg.platform.posix'],
              hookspath=[],
              runtime_hooks=[],
-             excludes=[],
+             excludes=[
+                '_ssl', 'ssl',
+             ],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher)
@@ -38,3 +40,16 @@ exe = EXE(pyz,
           strip=False,
           upx=True,
           console=True )
+
+if False:
+    # Enable this block to build a directory-based binary instead of
+    # a packed single file. This allows to easily look at all included
+    # files (e.g. without having to strace or halt the built binary
+    # and introspect /tmp).
+    coll = COLLECT(exe,
+                   a.binaries,
+                   a.zipfiles,
+                   a.datas,
+                   strip=False,
+                   upx=True,
+                   name='borg-dir')

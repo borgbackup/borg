@@ -355,11 +355,9 @@ updates.
 
 OpenSSL is a large and complex piece of software and has had its share of vulnerabilities,
 however, it is important to note that Borg links against ``libcrypto`` **not** ``libssl``.
-libcrypto is the low-level cryptography part of OpenSSL, while libssl implements TLS and related protocols.
-The latter is not used by Borg (cf. `Remote RPC protocol security`_, Borg does not implement
+libcrypto is the low-level cryptography part of OpenSSL,
+while libssl implements TLS and related protocols.
+
+The latter is not used by Borg (cf. `Remote RPC protocol security`_, Borg itself does not implement
 any network access) and historically contained most vulnerabilities, especially critical ones.
-
-Historic vulnerabilities affecting libcrypto in ways relevant to Borg were flaws in primtives
-enabling side-channel and similar attacks.
-
-Therefore, both using and bundling OpenSSL is considered unproblematic for Borg.
+The static binaries released by the project contain neither libssl nor the Python ssl/_ssl modules.

@@ -215,6 +215,10 @@ Tracking effective size on the other hand accounts DELETEs immediately as freein
 
 The storage quota is meant as a robust mechanism for service providers, therefore
 :ref:`borg_serve` has to enforce it without loopholes (e.g. modified clients).
+The following sections refer to using quotas on remotely accessed repositories.
+For local access, consider *client* and *serve* the same.
+Accordingly, quotas cannot be enforced with local access,
+since the quota can be changed in the repository config.
 
 The quota is enforcible only if *all* :ref:`borg_serve` versions
 accessible to clients support quotas (see next section). Further, quota is
@@ -233,8 +237,11 @@ state).
 .. rubric:: Compatibility with older servers and enabling quota after-the-fact
 
 If no quota data is stored in the hints file, Borg assumes zero quota is used.
-Thus, if a repository with an enabled quota is written to with an older version
-that does not understand quotas, then the quota usage will be erased.
+Thus, if a repository with an enabled quota is written to with an older ``borg serve``
+version that does not understand quotas, then the quota usage will be erased.
+
+The client version is irrelevant to the storage quota and has no part in it.
+The form of error messages due to exceeding quota varies with client versions.
 
 A similar situation arises when upgrading from a Borg release that did not have quotas.
 Borg will start tracking quota use from the time of the upgrade, starting at zero.

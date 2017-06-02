@@ -24,6 +24,7 @@ from .logger import create_logger
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
 from .algorithms.checksums import crc32
+from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
 logger = create_logger(__name__)
 
@@ -372,13 +373,28 @@ class Repository:
         self.write_index()
         self.rollback()
 
+    def _read_integrity(self, transaction_id, key):
+        integrity_file = 'integrity.%d' % transaction_id
+        integrity_path = os.path.join(self.path, integrity_file)
+        try:
+            with open(integrity_path, 'rb') as fd:
+                integrity = msgpack.unpack(fd)
+        except FileNotFoundError:
+            return
+        if integrity.get(b'version') != 2:
+            logger.warning('Unknown integrity data version %r in %s', integrity.get(b'version'), integrity_file)
+            return
+        return integrity[key].decode()
+
     def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
             return NSIndex()
-        index_path = os.path.join(self.path, 'index.%d' % transaction_id).encode('utf-8')
+        index_path = os.path.join(self.path, 'index.%d' % transaction_id)
+        integrity_data = self._read_integrity(transaction_id, b'index')
         try:
-            return NSIndex.read(index_path)
-        except (ValueError, OSError) as exc:
+            with IntegrityCheckedFile(index_path, write=False, integrity_data=integrity_data) as fd:
+                return NSIndex.read(fd)
+        except (ValueError, OSError, FileIntegrityError) as exc:
             logger.warning('Repository index missing or corrupted, trying to recover from: %s', exc)
             os.unlink(index_path)
             if not auto_recover:
@@ -409,11 +425,11 @@ class Repository:
                 raise
         if not self.index or transaction_id is None:
             try:
-                self.index = self.open_index(transaction_id, False)
-            except (ValueError, OSError) as exc:
+                self.index = self.open_index(transaction_id, auto_recover=False)
+            except (ValueError, OSError, FileIntegrityError) as exc:
                 logger.warning('Checking repository transaction due to previous error: %s', exc)
                 self.check_transaction()
-                self.index = self.open_index(transaction_id, False)
+                self.index = self.open_index(transaction_id, auto_recover=False)
         if transaction_id is None:
             self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
             self.compact = FreeSpace()  # XXX bad name: freeable_space_of_segment_x = self.compact[x]
@@ -424,11 +440,12 @@ class Repository:
                 self.io.cleanup(transaction_id)
             hints_path = os.path.join(self.path, 'hints.%d' % transaction_id)
             index_path = os.path.join(self.path, 'index.%d' % transaction_id)
+            integrity_data = self._read_integrity(transaction_id, b'hints')
             try:
-                with open(hints_path, 'rb') as fd:
+                with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
                     hints = msgpack.unpack(fd)
-            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError) as e:
-                logger.warning('Repository hints file missing or corrupted, trying to recover')
+            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError, FileIntegrityError) as e:
+                logger.warning('Repository hints file missing or corrupted, trying to recover: %s', e)
                 if not isinstance(e, FileNotFoundError):
                     os.unlink(hints_path)
                 # index must exist at this point
@@ -459,28 +476,68 @@ class Repository:
                         shadowed_segments.remove(segment)
 
     def write_index(self):
-        hints = {b'version': 2,
-                 b'segments': self.segments,
-                 b'compact': self.compact,
-                 b'storage_quota_use': self.storage_quota_use, }
-        transaction_id = self.io.get_segments_transaction_id()
-        assert transaction_id is not None
-        hints_file = os.path.join(self.path, 'hints.%d' % transaction_id)
-        with open(hints_file + '.tmp', 'wb') as fd:
-            msgpack.pack(hints, fd)
+        def flush_and_sync(fd):
             fd.flush()
             os.fsync(fd.fileno())
-        os.rename(hints_file + '.tmp', hints_file)
-        self.index.write(os.path.join(self.path, 'index.tmp'))
-        os.rename(os.path.join(self.path, 'index.tmp'),
-                  os.path.join(self.path, 'index.%d' % transaction_id))
+
+        def rename_tmp(file):
+            os.rename(file + '.tmp', file)
+
+        hints = {
+            b'version': 2,
+            b'segments': self.segments,
+            b'compact': self.compact,
+            b'storage_quota_use': self.storage_quota_use,
+        }
+        integrity = {
+            # Integrity version started at 2, the current hints version.
+            # Thus, integrity version == hints version, for now.
+            b'version': 2,
+        }
+        transaction_id = self.io.get_segments_transaction_id()
+        assert transaction_id is not None
+
+        # Log transaction in append-only mode
         if self.append_only:
             with open(os.path.join(self.path, 'transactions'), 'a') as log:
                 print('transaction %d, UTC time %s' % (transaction_id, datetime.utcnow().isoformat()), file=log)
+
+        # Write hints file
+        hints_name = 'hints.%d' % transaction_id
+        hints_file = os.path.join(self.path, hints_name)
+        with IntegrityCheckedFile(hints_file + '.tmp', filename=hints_name, write=True) as fd:
+            msgpack.pack(hints, fd)
+            flush_and_sync(fd)
+        integrity[b'hints'] = fd.integrity_data
+
+        # Write repository index
+        index_name = 'index.%d' % transaction_id
+        index_file = os.path.join(self.path, index_name)
+        with IntegrityCheckedFile(index_file + '.tmp', filename=index_name, write=True) as fd:
+            # XXX: Consider using SyncFile for index write-outs.
+            self.index.write(fd)
+            flush_and_sync(fd)
+        integrity[b'index'] = fd.integrity_data
+
+        # Write integrity file, containing checksums of the hints and index files
+        integrity_name = 'integrity.%d' % transaction_id
+        integrity_file = os.path.join(self.path, integrity_name)
+        with open(integrity_file + '.tmp', 'wb') as fd:
+            msgpack.pack(integrity, fd)
+            flush_and_sync(fd)
+
+        # Rename the integrity file first
+        rename_tmp(integrity_file)
+        sync_dir(self.path)
+        # Rename the others after the integrity file is hypothetically on disk
+        rename_tmp(hints_file)
+        rename_tmp(index_file)
+        sync_dir(self.path)
+
         # Remove old auxiliary files
         current = '.%d' % transaction_id
         for name in os.listdir(self.path):
-            if not name.startswith(('index.', 'hints.')):
+            if not name.startswith(('index.', 'hints.', 'integrity.')):
                 continue
             if name.endswith(current):
                 continue
@@ -563,7 +620,7 @@ class Repository:
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:
                 logger.debug('complete_xfer: deleting unused segment %d', segment)
-                assert self.segments.pop(segment) == 0
+                assert self.segments.pop(segment) == 0, 'Corrupted segment reference count - corrupted index or hints'
                 self.io.delete_segment(segment)
                 del self.compact[segment]
             unused = []
@@ -657,7 +714,7 @@ class Repository:
                             new_segment, size = self.io.write_delete(key)
                         self.compact[new_segment] += size
                         segments.setdefault(new_segment, 0)
-            assert segments[segment] == 0
+            assert segments[segment] == 0, 'Corrupted segment reference count - corrupted index or hints'
             unused.append(segment)
             pi.show()
         pi.finish()

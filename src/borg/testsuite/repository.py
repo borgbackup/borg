@@ -6,6 +6,8 @@ import sys
 import tempfile
 from unittest.mock import patch
 
+import msgpack
+
 import pytest
 
 from ..hashindex import NSIndex
@@ -537,12 +539,108 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         with self.repository:
             assert len(self.repository) == 1
 
+    def _corrupt_index(self):
+        # HashIndex is able to detect incorrect headers and file lengths,
+        # but on its own it can't tell if the data is correct.
+        index_path = os.path.join(self.repository.path, 'index.1')
+        with open(index_path, 'r+b') as fd:
+            index_data = fd.read()
+            # Flip one bit in a key stored in the index
+            corrupted_key = (int.from_bytes(H(0), 'little') ^ 1).to_bytes(32, 'little')
+            corrupted_index_data = index_data.replace(H(0), corrupted_key)
+            assert corrupted_index_data != index_data
+            assert len(corrupted_index_data) == len(index_data)
+            fd.seek(0)
+            fd.write(corrupted_index_data)
+
+    def test_index_corrupted(self):
+        # HashIndex is able to detect incorrect headers and file lengths,
+        # but on its own it can't tell if the data itself is correct.
+        self._corrupt_index()
+        with self.repository:
+            # Data corruption is detected due to mismatching checksums
+            # and fixed by rebuilding the index.
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
+
+    def test_index_corrupted_without_integrity(self):
+        self._corrupt_index()
+        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        os.unlink(integrity_path)
+        with self.repository:
+            # Since the corrupted key is not noticed, the repository still thinks
+            # it contains one key...
+            assert len(self.repository) == 1
+            with pytest.raises(Repository.ObjectNotFound):
+                # ... but the real, uncorrupted key is not found in the corrupted index.
+                self.repository.get(H(0))
+
     def test_unreadable_index(self):
         index = os.path.join(self.repository.path, 'index.1')
         os.unlink(index)
         os.mkdir(index)
         with self.assert_raises(OSError):
             self.do_commit()
+
+    def test_unknown_integrity_version(self):
+        # For now an unknown integrity data version is ignored and not an error.
+        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        with open(integrity_path, 'r+b') as fd:
+            msgpack.pack({
+                # Borg only understands version 2
+                b'version': 4.7,
+            }, fd)
+            fd.truncate()
+        with self.repository:
+            # No issues accessing the repository
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
+
+    def _subtly_corrupted_hints_setup(self):
+        with self.repository:
+            self.repository.append_only = True
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
+            self.repository.put(H(1), b'bar')
+            self.repository.put(H(2), b'baz')
+            self.repository.commit()
+            self.repository.put(H(2), b'bazz')
+            self.repository.commit()
+
+        hints_path = os.path.join(self.repository.path, 'hints.5')
+        with open(hints_path, 'r+b') as fd:
+            hints = msgpack.unpack(fd)
+            fd.seek(0)
+            # Corrupt segment refcount
+            assert hints[b'segments'][2] == 1
+            hints[b'segments'][2] = 0
+            msgpack.pack(hints, fd)
+            fd.truncate()
+
+    def test_subtly_corrupted_hints(self):
+        self._subtly_corrupted_hints_setup()
+        with self.repository:
+            self.repository.append_only = False
+            self.repository.put(H(3), b'1234')
+            # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
+            self.repository.commit()
+
+            assert len(self.repository) == 4
+            assert self.repository.get(H(0)) == b'foo'
+            assert self.repository.get(H(1)) == b'bar'
+            assert self.repository.get(H(2)) == b'bazz'
+
+    def test_subtly_corrupted_hints_without_integrity(self):
+        self._subtly_corrupted_hints_setup()
+        integrity_path = os.path.join(self.repository.path, 'integrity.5')
+        os.unlink(integrity_path)
+        with self.repository:
+            self.repository.append_only = False
+            self.repository.put(H(3), b'1234')
+            # Do a compaction run. Fails, since the corrupted refcount was not detected and leads to an assertion failure.
+            with pytest.raises(AssertionError) as exc_info:
+                self.repository.commit()
+            assert 'Corrupted segment reference count' in str(exc_info.value)
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):

@@ -336,3 +336,30 @@ like remote code execution are inhibited by the design of the protocol:
       general pattern of server-sent responses and are sent instead of response data
       for a request.
 
+The msgpack implementation used (msgpack-python) has a good security track record,
+a large test suite and no issues found by fuzzing. It is based on the msgpack-c implementation,
+sharing the unpacking engine and some support code. msgpack-c has a good track record as well.
+Some issues [#]_ in the past were located in code not included in msgpack-python.
+Borg does not use msgpack-c.
+
+.. [#] - `MessagePack fuzzing <https://blog.gypsyengineer.com/fun/msgpack-fuzzing.html>`_
+       - `Fixed integer overflow and EXT size problem <https://github.com/msgpack/msgpack-c/pull/547>`_
+       - `Fixed array and map size overflow <https://github.com/msgpack/msgpack-c/pull/550>`_
+
+Using OpenSSL
+=============
+
+Borg uses the OpenSSL library for most cryptography (see `Implementations used`_ above).
+OpenSSL is bundled with static releases, thus the bundled copy is not updated with system
+updates.
+
+OpenSSL is a large and complex piece of software and has had its share of vulnerabilities,
+however, it is important to note that Borg links against ``libcrypto`` **not** ``libssl``.
+libcrypto is the low-level cryptography part of OpenSSL, while libssl implements TLS and related protocols.
+The latter is not used by Borg (cf. `Remote RPC protocol security`_, Borg does not implement
+any network access) and historically contained most vulnerabilities, especially critical ones.
+
+Historic vulnerabilities affecting libcrypto in ways relevant to Borg were flaws in primtives
+enabling side-channel and similar attacks.
+
+Therefore, both using and bundling OpenSSL is considered unproblematic for Borg.

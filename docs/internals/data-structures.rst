@@ -233,8 +233,11 @@ state).
 .. rubric:: Compatibility with older servers and enabling quota after-the-fact
 
 If no quota data is stored in the hints file, Borg assumes zero quota is used.
-Thus, if a repository with an enabled quota is written to with an older version
-that does not understand quotas, then the quota usage will be erased.
+Thus, if a repository with an enabled quota is written to with an older ``borg serve``
+version that does not understand quotas, then the quota usage will be erased.
+
+The client version is irrelevant to the storage quota and has no part in it.
+The form of error messages due to exceeding quota varies with client versions.
 
 A similar situation arises when upgrading from a Borg release that did not have quotas.
 Borg will start tracking quota use from the time of the upgrade, starting at zero.

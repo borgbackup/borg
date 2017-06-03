@@ -729,11 +729,22 @@ were designed to handle corrupted data structures, so a corrupted files cache
 may cause crashes or write incorrect archives.
 
 Therefore, Borg calculates checksums when writing these files and tests checksums
-when reading them. Checksums are generally 64-bit XXH64 checksums.
+when reading them. Checksums are generally 64-bit XXH64 hashes.
+The canonical xxHash representation is used, i.e. big-endian.
+Checksums are stored as hexadecimal ASCII strings.
+
+For compatibility, checksums are not required and absent checksums do not trigger errors.
+The mechanisms have been designed to avoid false-positives when various Borg
+versions are used alternately on the same repositories.
+
+Checksums are a data safety mechanism. They are not a security mechanism.
+
+.. rubric:: Choice of algorithm
+
 XXH64 has been chosen for its high speed on all platforms, which avoids performance
-degradation in CPU-limited parts (e.g. cache synchronization). Unlike CRC32,
-it does neither require hardware support (crc32c or CLMUL) nor vectorized code
-nor large, cache-unfriendly lookup tables to achieve good performance.
+degradation in CPU-limited parts (e.g. cache synchronization).
+Unlike CRC32, it neither requires hardware support (crc32c or CLMUL)
+nor vectorized code nor large, cache-unfriendly lookup tables to achieve good performance.
 This simplifies deployment of it considerably (cf. src/borg/algorithms/crc32...).
 
 Further, XXH64 is a non-linear hash function and thus has a "more or less" good
@@ -742,32 +753,36 @@ of detection decreases with error size.
 
 The 64-bit checksum length is considered sufficient for the file sizes typically
 checksummed (individual files up to a few GB, usually less).
-
-The canonical xxHash representation is used, i.e. big-endian.
-Checksums are generally stored as hexadecimal ASCII strings.
+xxHash was expressly designed for data blocks of these sizes.
 
 Lower layer — file_integrity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To accommodate the different transaction models used for the cache and repository,
-there is a lower layer (borg.crypto.file_integrity.IntegrityCheckedFile) which
-wraps a file-like object and performs streaming calculation and comparison of checksums.
+there is a lower layer (borg.crypto.file_integrity.IntegrityCheckedFile)
+wrapping a file-like object, performing streaming calculation and comparison of checksums.
 Checksum errors are signalled by raising an exception (borg.crypto.file_integrity.FileIntegrityError)
 at the earliest possible moment.
 
 .. rubric:: Calculating checksums
 
+Before feeding the checksum algorithm any data, the file name (i.e. without any path)
+is mixed into the checksum, since the name encodes the context of the data for Borg.
+
 The various indices used by Borg have separate header and main data parts.
 IntegrityCheckedFile allows to checksum them independently, which avoids
 even reading the data when the header is corrupted. When a part is signalled,
-the length of the pathname is mixed into the checksum state first (encoded
+the length of the part name is mixed into the checksum state first (encoded
 as an ASCII string via `%10d` printf format), then the name of the part
 is mixed in as an UTF-8 string. Lastly, the current position (length)
 in the file is mixed in as well.
 
 The checksum state is not reset at part boundaries.
 
-A final checksum is always calculated from the entire state.
+A final checksum is always calculated in the same way as the parts described above,
+after seeking to the end of the file. The final checksum cannot prevent code
+from processing corrupted data during reading, however, it prevents use of the
+corrupted data.
 
 .. rubric:: Serializing checksums
 
@@ -790,7 +805,8 @@ The *digests* key contains a mapping of part names to their digests.
 
 Integrity data is generally stored by the upper layers, introduced below. An exception
 is the DetachedIntegrityCheckedFile, which automatically writes and reads it from
-a ".integrity" file next to the data file. It is used for archive chunks in chunks.archive.d.
+a ".integrity" file next to the data file.
+It is used for archive chunks indexes in chunks.archive.d.
 
 Upper layer
 ~~~~~~~~~~~
@@ -840,8 +856,8 @@ and are not automatically corrected at this time.
 
 .. rubric:: chunks.archive.d
 
-Indices in chunks.archive.d are not transacted and use DetachedIntegrityCheckedFile, which
-writes the integrity data to a separate ".integrity" file.
+Indices in chunks.archive.d are not transacted and use DetachedIntegrityCheckedFile,
+which writes the integrity data to a separate ".integrity" file.
 
 Integrity errors result in deleting the affected index and rebuilding it.
 This logs a warning and increases the exit code to WARNING (1).

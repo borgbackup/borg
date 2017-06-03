@@ -136,15 +136,13 @@ Version 1.1.0b6 (unreleased)
 
 Compatibility notes:
 
-- Repositories in the "repokey" and "repokey-blake2" modes with an empty passphrase
-  and also repos in "authenticated" mode are now treated as unencrypted repositories
-  for security checks (e.g. BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
 - Running "borg init" via a "borg serve --append-only" server will *not* create
   an append-only repository anymore. Use "borg init --append-only" to initialize
   an append-only repository.
 
-  Repositories in the "authenticated" mode are now treated as the unencrypted repositories
-  they are.
+- Repositories in the "repokey" and "repokey-blake2" modes with an empty passphrase
+  are now treated as unencrypted repositories for security checks (e.g.
+  BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
 
   Previously there would be no prompts nor messages if an unknown repository
   in one of these modes with an empty passphrase was encountered. This would
@@ -154,13 +152,17 @@ Compatibility notes:
   Since the "trick" does not work if BORG_PASSPHRASE is set, this does generally
   not affect scripts.
 
+- Repositories in the "authenticated" mode are now treated as the unencrypted
+  repositories they are.
+
+
 New features:
 
 - integrity checking for important files used by borg:
 
   - repository: index and hints files
   - cache: chunks and files caches, archive.chunks.d
-- Verify most operations against securitymanager. Location, manifest timestamp
+- Verify most operations against SecurityManager. Location, manifest timestamp
   and key types are now checked for almost all non-debug commands. #2487
 - implement storage quotas, #2517
 - serve: add --restrict-to-repository, #2589

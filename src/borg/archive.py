@@ -1612,11 +1612,11 @@ class ArchiveRecreater:
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
         if self.matcher.empty() and not self.recompress and not target.recreate_rechunkify and comment is None:
-            logger.info("Skipping archive %s, nothing to do", archive_name)
-            return
+            return False
         self.process_items(archive, target)
         replace_original = target_name is None
         self.save(archive, target, comment, replace_original=replace_original)
+        return True
 
     def process_items(self, archive, target):
         matcher = self.matcher

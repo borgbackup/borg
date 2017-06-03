@@ -1,13 +1,17 @@
 import errno
 import os
+import io
 import time
 from unittest.mock import patch
 
 import pytest
 
-from ..remote import SleepingBandwidthLimiter, RepositoryCache
+from ..remote import SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
 from ..repository import Repository
+from ..crypto.key import PlaintextKey
+from ..compress import CompressionSpec
 from .hashindex import H
+from .key import TestKey
 
 
 class TestSleepingBandwidthLimiter:
@@ -147,3 +151,51 @@ class TestRepositoryCache:
             assert cache.evictions == 0
 
         assert next(iterator) == bytes(100)
+
+    @pytest.fixture
+    def key(self, repository, monkeypatch):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
+        key = PlaintextKey.create(repository, TestKey.MockArgs())
+        key.compressor = CompressionSpec('none').compressor
+        return key
+
+    def _put_encrypted_object(self, key, repository, data):
+        id_ = key.id_hash(data)
+        repository.put(id_, key.encrypt(data))
+        return id_
+
+    @pytest.fixture
+    def H1(self, key, repository):
+        return self._put_encrypted_object(key, repository, b'1234')
+
+    @pytest.fixture
+    def H2(self, key, repository):
+        return self._put_encrypted_object(key, repository, b'5678')
+
+    @pytest.fixture
+    def H3(self, key, repository):
+        return self._put_encrypted_object(key, repository, bytes(100))
+
+    @pytest.fixture
+    def decrypted_cache(self, key, repository):
+        return cache_if_remote(repository, decrypted_cache=key, force_cache=True)
+
+    def test_cache_corruption(self, decrypted_cache: RepositoryCache, H1, H2, H3):
+        list(decrypted_cache.get_many([H1, H2, H3]))
+
+        iterator = decrypted_cache.get_many([H1, H2, H3])
+        assert next(iterator) == (7, b'1234')
+
+        with open(decrypted_cache.key_filename(H2), 'a+b') as fd:
+            fd.seek(-1, io.SEEK_END)
+            corrupted = (int.from_bytes(fd.read(), 'little') ^ 2).to_bytes(1, 'little')
+            fd.seek(-1, io.SEEK_END)
+            fd.write(corrupted)
+            fd.truncate()
+
+        assert next(iterator) == (7, b'5678')
+        assert decrypted_cache.checksum_errors == 1
+        assert decrypted_cache.slow_misses == 1
+        assert next(iterator) == (103, bytes(100))
+        assert decrypted_cache.hits == 3
+        assert decrypted_cache.misses == 3

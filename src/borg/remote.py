@@ -87,7 +87,7 @@ class ConnectionClosedWithHint(ConnectionClosed):
 
 
 class PathNotAllowed(Error):
-    """Repository path not allowed"""
+    """Repository path not allowed: {}"""
 
 
 class InvalidRPCMethod(Error):
@@ -178,9 +178,10 @@ class RepositoryServer:  # pragma: no cover
         'inject_exception',
     )
 
-    def __init__(self, restrict_to_paths, append_only, storage_quota):
+    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
+        self.restrict_to_repositories = restrict_to_repositories
         # This flag is parsed from the serve command line via Archiver.do_serve,
         # i.e. it reflects local system policy and generally ranks higher than
         # whatever the client wants, except when initializing a new repository
@@ -348,14 +349,21 @@ class RepositoryServer:  # pragma: no cover
         logging.debug('Resolving repository path %r', path)
         path = self._resolve_path(path)
         logging.debug('Resolved repository path to %r', path)
+        path_with_sep = os.path.join(path, '')  # make sure there is a trailing slash (os.sep)
         if self.restrict_to_paths:
             # if --restrict-to-path P is given, we make sure that we only operate in/below path P.
             # for the prefix check, it is important that the compared pathes both have trailing slashes,
             # so that a path /foobar will NOT be accepted with --restrict-to-path /foo option.
-            path_with_sep = os.path.join(path, '')  # make sure there is a trailing slash (os.sep)
             for restrict_to_path in self.restrict_to_paths:
                 restrict_to_path_with_sep = os.path.join(os.path.realpath(restrict_to_path), '')  # trailing slash
                 if path_with_sep.startswith(restrict_to_path_with_sep):
+                    break
+            else:
+                raise PathNotAllowed(path)
+        if self.restrict_to_repositories:
+            for restrict_to_repository in self.restrict_to_repositories:
+                restrict_to_repository_with_sep = os.path.join(os.path.realpath(restrict_to_repository), '')
+                if restrict_to_repository_with_sep == path_with_sep:
                     break
             else:
                 raise PathNotAllowed(path)
@@ -383,7 +391,7 @@ class RepositoryServer:  # pragma: no cover
         elif kind == 'IntegrityError':
             raise IntegrityError(s1)
         elif kind == 'PathNotAllowed':
-            raise PathNotAllowed()
+            raise PathNotAllowed('foo')
         elif kind == 'ObjectNotFound':
             raise Repository.ObjectNotFound(s1, s2)
         elif kind == 'InvalidRPCMethod':
@@ -739,7 +747,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 else:
                     raise IntegrityError(args[0].decode())
             elif error == 'PathNotAllowed':
-                raise PathNotAllowed()
+                if old_server:
+                    raise PathNotAllowed('(unknown)')
+                else:
+                    raise PathNotAllowed(args[0].decode())
             elif error == 'ObjectNotFound':
                 if old_server:
                     raise Repository.ObjectNotFound('(not available)', self.location.orig)

@@ -815,7 +815,8 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         try:
             self.repository.call('inject_exception', {'kind': 'PathNotAllowed'})
         except PathNotAllowed as e:
-            assert len(e.args) == 0
+            assert len(e.args) == 1
+            assert e.args[0] == 'foo'
 
         try:
             self.repository.call('inject_exception', {'kind': 'ObjectNotFound'})

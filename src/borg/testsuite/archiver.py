@@ -2861,6 +2861,15 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
             self.cmd('init', '--encryption=repokey', self.repository_location + '_3')
 
+    def test_remote_repo_restrict_to_repository(self):
+        # restricted to repo directory itself:
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-repository', self.repository_path]):
+            self.cmd('init', '--encryption=repokey', self.repository_location)
+        parent_path = os.path.join(self.repository_path, '..')
+        with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-repository', parent_path]):
+            with pytest.raises(PathNotAllowed):
+                self.cmd('init', '--encryption=repokey', self.repository_location)
+
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
         pass

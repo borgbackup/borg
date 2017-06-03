@@ -137,8 +137,8 @@ Version 1.1.0b6 (unreleased)
 Compatibility notes:
 
 - Repositories in the "repokey" and "repokey-blake2" modes with an empty passphrase
-  are now treated as unencrypted repositories for security checks
-  (e.g. BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
+  and also repos in "authenticated" mode are now treated as unencrypted repositories
+  for security checks (e.g. BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
 - Running "borg init" via a "borg serve --append-only" server will *not* create
   an append-only repository anymore. Use "borg init --append-only" to initialize
   an append-only repository.
@@ -160,25 +160,24 @@ New features:
 
   - repository: index and hints files
   - cache: chunks and files caches, archive.chunks.d
-  - temporary metadata cache contents
-- Verify most operations against securitymanager, #2487
-- use assert_secure for all commands that use the manifest
+- Verify most operations against securitymanager. Location, manifest timestamp
+  and key types are now checked for almost all non-debug commands. #2487
 - implement storage quotas, #2517
 - serve: add --restrict-to-repository, #2589
 - BORG_PASSCOMMAND: use external tool providing the key passphrase, #2573
 - borg export-tar, #2519
-- list: --json-lines for archive contents, #2439
+- list: --json-lines instead of --json for archive contents, #2439
 - add --debug-profile option (and also "borg debug convert-profile"), #2473
 
 Fixes:
-
-- hashindex: hash indices >2 GiB, better error reporting, #2496
-- repository URLs: implement IP v6 address support and also more informative
-  exception when parsing fails.
+- hashindex: read/write indices >2 GiB on 32bit systems, better error
+  reporting, #2496
+- repository URLs: implement IPv6 address support and also more informative
+  error message when parsing fails.
 - mount: check whether llfuse is installed before asking for passphrase, #2540
 - mount: do pre-mount checks before opening repository, #2541
 - FUSE: fix crash if empty (None) xattr is read, #2534
-- serve: ignore --append-only when creating a repository, #2501
+- serve: ignore --append-only when initializing a repository (borg init), #2501
 - fix --exclude and --exclude-from recursing into directories, #2469
 - init: don't allow creating nested repositories, #2563
 - --json: fix encryption[mode] not being the cmdline name
@@ -191,10 +190,6 @@ Fixes:
   - rpc negotiate: enable v3 log protocol only for supported clients
   - fix --progress and logging in general for remote
 
-
-XXX start fakeroot faked in debug mode - fixes EISDIR issues
-    --> NOPE, it did not fix the issue, guess we should revert that?
-
 Other changes:
 
 - remote: show path in PathNotAllowed
@@ -206,6 +201,7 @@ Other changes:
 - support common options on the main command, #2508
 - support common options on mid-level commands (e.g. borg *key* export)
 - make --progress a common option
+- increase DEFAULT_SEGMENTS_PER_DIR to 1000
 
 - docs:
 
@@ -230,7 +226,7 @@ Other changes:
   - README: add bountysource badge, #2558
   - logo: vectorized (PDF and SVG) versions
   - frontends: use headlines - you can link to them
-  - sphinx: disable smartypants
+  - sphinx: disable smartypants, avoids mangled Unicode options like "—exclude"
 
 - testing / checking:
 
@@ -263,10 +259,6 @@ Other changes:
   - cache: extract CacheConfig class
   - implement IntegrityCheckedFile + Detached variant, #2502 #1688
   - introduce popen_with_error_handling to handle common user errors
-
-
-XXX increase DEFAULT_SEGMENTS_PER_DIR to 2000
-    ---> hmm, maybe 1000 would be prettier result (directory names)?
 
 
 Version 1.1.0b5 (2017-04-30)

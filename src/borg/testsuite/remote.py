@@ -10,6 +10,7 @@ from ..remote import SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
 from ..repository import Repository
 from ..crypto.key import PlaintextKey
 from ..compress import CompressionSpec
+from ..helpers import IntegrityError
 from .hashindex import H
 from .key import TestKey
 
@@ -193,9 +194,5 @@ class TestRepositoryCache:
             fd.write(corrupted)
             fd.truncate()
 
-        assert next(iterator) == (7, b'5678')
-        assert decrypted_cache.checksum_errors == 1
-        assert decrypted_cache.slow_misses == 1
-        assert next(iterator) == (103, bytes(100))
-        assert decrypted_cache.hits == 3
-        assert decrypted_cache.misses == 3
+        with pytest.raises(IntegrityError):
+            assert next(iterator) == (7, b'5678')

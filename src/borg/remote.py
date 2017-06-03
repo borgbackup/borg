@@ -1087,9 +1087,6 @@ class RepositoryCache(RepositoryNoCache):
     should return the initial data (as returned by *transform*).
     """
 
-    class InvalidateCacheEntry(Exception):
-        pass
-
     def __init__(self, repository, pack=None, unpack=None, transform=None):
         super().__init__(repository, transform)
         self.pack = pack or (lambda data: data)
@@ -1104,7 +1101,6 @@ class RepositoryCache(RepositoryNoCache):
         self.slow_misses = 0
         self.slow_lat = 0.0
         self.evictions = 0
-        self.checksum_errors = 0
         self.enospc = 0
 
     def query_size_limit(self):
@@ -1149,10 +1145,10 @@ class RepositoryCache(RepositoryNoCache):
 
     def close(self):
         logger.debug('RepositoryCache: current items %d, size %s / %s, %d hits, %d misses, %d slow misses (+%.1fs), '
-                     '%d evictions, %d ENOSPC hit, %d checksum errors',
+                     '%d evictions, %d ENOSPC hit',
                      len(self.cache), format_file_size(self.size), format_file_size(self.size_limit),
                      self.hits, self.misses, self.slow_misses, self.slow_lat,
-                     self.evictions, self.enospc, self.checksum_errors)
+                     self.evictions, self.enospc)
         self.cache.clear()
         shutil.rmtree(self.basedir)
 
@@ -1162,31 +1158,24 @@ class RepositoryCache(RepositoryNoCache):
         for key in keys:
             if key in self.cache:
                 file = self.key_filename(key)
-                try:
-                    with open(file, 'rb') as fd:
-                        self.hits += 1
-                        yield self.unpack(fd.read())
-                        continue  # go to the next key
-                except self.InvalidateCacheEntry:
-                    self.cache.remove(key)
-                    self.size -= os.stat(file).st_size
-                    self.checksum_errors += 1
-                    os.unlink(file)
-                    # fall through to fetch the object again
-            for key_, data in repository_iterator:
-                if key_ == key:
-                    transformed = self.add_entry(key, data, cache)
-                    self.misses += 1
-                    yield transformed
-                    break
+                with open(file, 'rb') as fd:
+                    self.hits += 1
+                    yield self.unpack(fd.read())
             else:
-                # slow path: eviction during this get_many removed this key from the cache
-                t0 = time.perf_counter()
-                data = self.repository.get(key)
-                self.slow_lat += time.perf_counter() - t0
-                transformed = self.add_entry(key, data, cache)
-                self.slow_misses += 1
-                yield transformed
+                for key_, data in repository_iterator:
+                    if key_ == key:
+                        transformed = self.add_entry(key, data, cache)
+                        self.misses += 1
+                        yield transformed
+                        break
+                else:
+                    # slow path: eviction during this get_many removed this key from the cache
+                    t0 = time.perf_counter()
+                    data = self.repository.get(key)
+                    self.slow_lat += time.perf_counter() - t0
+                    transformed = self.add_entry(key, data, cache)
+                    self.slow_misses += 1
+                    yield transformed
         # Consume any pending requests
         for _ in repository_iterator:
             pass
@@ -1220,8 +1209,7 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
             csize, checksum = cache_struct.unpack(data[:cache_struct.size])
             compressed = data[cache_struct.size:]
             if checksum != xxh64(compressed):
-                logger.warning('Repository metadata cache: detected corrupted data in cache!')
-                raise RepositoryCache.InvalidateCacheEntry
+                raise IntegrityError('detected corrupted data in metadata cache')
             return csize, compressor.decompress(compressed)
 
         def transform(id_, data):

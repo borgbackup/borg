@@ -251,8 +251,12 @@ static inline int unpack_callback_array_end(unpack_user* u)
         /* b'chunks': [ ( b'1234...', 123, 345 )
          *                                     ^ */
         cache_entry = (uint32_t*) hashindex_get(u->chunks, u->current.key);
-        if (cache_entry) {
+        if(cache_entry) {
             refcount = _le32toh(cache_entry[0]);
+            if(refcount > _MAX_VALUE) {
+                SET_LAST_ERROR("invalid reference count");
+                return -1;
+            }
             refcount += 1;
             cache_entry[0] = _htole32(MIN(refcount, _MAX_VALUE));
         } else {
@@ -260,7 +264,7 @@ static inline int unpack_callback_array_end(unpack_user* u)
             cache_values[0] = _htole32(1);
             cache_values[1] = _htole32(u->current.size);
             cache_values[2] = _htole32(u->current.csize);
-            if (!hashindex_set(u->chunks, u->current.key, cache_values)) {
+            if(!hashindex_set(u->chunks, u->current.key, cache_values)) {
                 SET_LAST_ERROR("hashindex_set failed");
                 return -1;
             }

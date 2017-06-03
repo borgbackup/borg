@@ -1,3 +1,4 @@
+import io
 
 from msgpack import packb
 
@@ -137,3 +138,61 @@ class TestCacheSynchronizer:
         with pytest.raises(ValueError) as excinfo:
             sync.feed(packed)
         assert str(excinfo.value) == 'cache_sync_feed failed: ' + error
+
+    def make_index_with_refcount(self, refcount):
+        index_data = io.BytesIO()
+        index_data.write(b'BORG_IDX')
+        # num_entries
+        index_data.write((1).to_bytes(4, 'little'))
+        # num_buckets
+        index_data.write((1).to_bytes(4, 'little'))
+        # key_size
+        index_data.write((32).to_bytes(1, 'little'))
+        # value_size
+        index_data.write((3 * 4).to_bytes(1, 'little'))
+
+        index_data.write(H(0))
+        index_data.write(refcount.to_bytes(4, 'little'))
+        index_data.write((1234).to_bytes(4, 'little'))
+        index_data.write((5678).to_bytes(4, 'little'))
+
+        index_data.seek(0)
+        index = ChunkIndex.read(index_data)
+        return index
+
+    def test_corrupted_refcount(self):
+        index = self.make_index_with_refcount(ChunkIndex.MAX_VALUE + 1)
+        sync = CacheSynchronizer(index)
+        data = packb({
+            'chunks': [
+                (H(0), 1, 2),
+            ]
+        })
+        with pytest.raises(ValueError) as excinfo:
+            sync.feed(data)
+        assert str(excinfo.value) == 'cache_sync_feed failed: invalid reference count'
+
+    def test_refcount_max_value(self):
+        index = self.make_index_with_refcount(ChunkIndex.MAX_VALUE)
+        sync = CacheSynchronizer(index)
+        data = packb({
+            'chunks': [
+                (H(0), 1, 2),
+            ]
+        })
+        sync.feed(data)
+        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)
+
+    def test_refcount_one_below_max_value(self):
+        index = self.make_index_with_refcount(ChunkIndex.MAX_VALUE - 1)
+        sync = CacheSynchronizer(index)
+        data = packb({
+            'chunks': [
+                (H(0), 1, 2),
+            ]
+        })
+        sync.feed(data)
+        # Incremented to maximum
+        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)
+        sync.feed(data)
+        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)

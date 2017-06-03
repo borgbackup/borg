@@ -160,9 +160,11 @@ New features:
 
   - repository: index and hints files
   - cache: chunks and files caches, archive.chunks.d
+  - temporary metadata cache contents
 - Verify most operations against securitymanager, #2487
 - use assert_secure for all commands that use the manifest
 - implement storage quotas, #2517
+- serve: add --restrict-to-repository, #2589
 - BORG_PASSCOMMAND: use external tool providing the key passphrase, #2573
 - borg export-tar, #2519
 - list: --json-lines for archive contents, #2439
@@ -195,6 +197,7 @@ XXX start fakeroot faked in debug mode - fixes EISDIR issues
 
 Other changes:
 
+- remote: show path in PathNotAllowed
 - consider repokey w/o passphrase == unencrypted, #2169
 - consider authenticated mode == unencrypted, #2503
 - restrict key file names, #2560
@@ -216,6 +219,7 @@ Other changes:
   - book: create appendices
   - data structures: explain repository compaction
   - data structures: add chunk layout diagram
+  - data structures: integrity checking
   - Attic FAQ: separate section for attic stuff
   - FAQ: I get an IntegrityError or similar - what now?
   - add systemd warning regarding placeholders, #2543

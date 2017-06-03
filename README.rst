@@ -154,7 +154,7 @@ see ``docs/suppport.rst`` in the source distribution).
 
 .. start-badges
 
-|bounties| |doc| |build| |coverage| |bestpractices|
+|doc| |build| |coverage| |bestpractices| |bounties|
 
 .. |bounties| image:: https://api.bountysource.com/badge/team?team_id=78284&style=bounties_posted
         :alt: Bounty Source

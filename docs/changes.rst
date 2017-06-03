@@ -136,15 +136,13 @@ Version 1.1.0b6 (unreleased)
 
 Compatibility notes:
 
-- Repositories in the "repokey" and "repokey-blake2" modes with an empty passphrase
-  are now treated as unencrypted repositories for security checks
-  (e.g. BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
 - Running "borg init" via a "borg serve --append-only" server will *not* create
   an append-only repository anymore. Use "borg init --append-only" to initialize
   an append-only repository.
 
-  Repositories in the "authenticated" mode are now treated as the unencrypted repositories
-  they are.
+- Repositories in the "repokey" and "repokey-blake2" modes with an empty passphrase
+  are now treated as unencrypted repositories for security checks (e.g.
+  BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
 
   Previously there would be no prompts nor messages if an unknown repository
   in one of these modes with an empty passphrase was encountered. This would
@@ -153,6 +151,117 @@ Compatibility notes:
 
   Since the "trick" does not work if BORG_PASSPHRASE is set, this does generally
   not affect scripts.
+
+- Repositories in the "authenticated" mode are now treated as the unencrypted
+  repositories they are.
+
+
+New features:
+
+- integrity checking for important files used by borg:
+
+  - repository: index and hints files
+  - cache: chunks and files caches, archive.chunks.d
+- Verify most operations against SecurityManager. Location, manifest timestamp
+  and key types are now checked for almost all non-debug commands. #2487
+- implement storage quotas, #2517
+- serve: add --restrict-to-repository, #2589
+- BORG_PASSCOMMAND: use external tool providing the key passphrase, #2573
+- borg export-tar, #2519
+- list: --json-lines instead of --json for archive contents, #2439
+- add --debug-profile option (and also "borg debug convert-profile"), #2473
+
+Fixes:
+- hashindex: read/write indices >2 GiB on 32bit systems, better error
+  reporting, #2496
+- repository URLs: implement IPv6 address support and also more informative
+  error message when parsing fails.
+- mount: check whether llfuse is installed before asking for passphrase, #2540
+- mount: do pre-mount checks before opening repository, #2541
+- FUSE: fix crash if empty (None) xattr is read, #2534
+- serve: ignore --append-only when initializing a repository (borg init), #2501
+- fix --exclude and --exclude-from recursing into directories, #2469
+- init: don't allow creating nested repositories, #2563
+- --json: fix encryption[mode] not being the cmdline name
+- remote: propagate Error.traceback correctly
+- serve: fix incorrect type of exception_short for Errors, #2513
+- fix remote logging and progress, #2241
+
+  - implement --debug-topic for remote servers
+  - remote: restore "Remote:" prefix (as used in 1.0.x)
+  - rpc negotiate: enable v3 log protocol only for supported clients
+  - fix --progress and logging in general for remote
+
+Other changes:
+
+- remote: show path in PathNotAllowed
+- consider repokey w/o passphrase == unencrypted, #2169
+- consider authenticated mode == unencrypted, #2503
+- restrict key file names, #2560
+- document follow_symlinks requirements, check libc, use stat and chown
+  with follow_symlinks=False, #2507
+- support common options on the main command, #2508
+- support common options on mid-level commands (e.g. borg *key* export)
+- make --progress a common option
+- increase DEFAULT_SEGMENTS_PER_DIR to 1000
+
+- docs:
+
+  - init: document --encryption as required
+  - security: OpenSSL usage
+  - security: used implementations; note python libraries
+  - security: security track record of OpenSSL and msgpack
+  - quotas: local repo disclaimer
+  - quotas: clarify compatbility; only relevant to serve side
+  - book: use A4 format, new builder option format.
+  - book: create appendices
+  - data structures: explain repository compaction
+  - data structures: add chunk layout diagram
+  - data structures: integrity checking
+  - Attic FAQ: separate section for attic stuff
+  - FAQ: I get an IntegrityError or similar - what now?
+  - add systemd warning regarding placeholders, #2543
+  - xattr: document API
+  - add docs/misc/borg-data-flow data flow chart
+  - debugging facilities
+  - README: how to help the project, #2550
+  - README: add bountysource badge, #2558
+  - logo: vectorized (PDF and SVG) versions
+  - frontends: use headlines - you can link to them
+  - sphinx: disable smartypants, avoids mangled Unicode options like "—exclude"
+
+- testing / checking:
+
+  - add support for using coala, #1366
+  - testsuite: add ArchiverCorruptionTestCase
+  - do not test logger name, #2504
+  - call setup_logging after destroying logging config
+  - testsuite.archiver: normalise pytest.raises vs. assert_raises
+  - add test for preserved intermediate folder permissions, #2477
+  - key: add round-trip test
+
+- vagrant:
+
+  - control VM cpus and pytest workers via env vars VMCPUS and XDISTN
+  - update cleaning workdir
+  - fix openbsd shell
+
+- packaging:
+
+  - binaries: don't bundle libssl
+  - setup.py clean to remove compiled files
+  - fail in borg package if version metadata is very broken (setuptools_scm)
+
+- repo / code structure:
+
+  - create borg.algorithms and borg.crypto packages
+  - algorithms: rename crc32 to checksums
+  - move patterns to module, #2469
+  - gitignore: complete paths for src/ excludes
+  - cache: extract CacheConfig class
+  - implement IntegrityCheckedFile + Detached variant, #2502 #1688
+  - introduce popen_with_error_handling to handle common user errors
+
 
 Version 1.1.0b5 (2017-04-30)
 ----------------------------

@@ -154,6 +154,117 @@ Compatibility notes:
   Since the "trick" does not work if BORG_PASSPHRASE is set, this does generally
   not affect scripts.
 
+New features:
+
+- integrity checking for important files used by borg:
+
+  - repository: index and hints files
+  - cache: chunks and files caches, archive.chunks.d
+- Verify most operations against securitymanager, #2487
+- use assert_secure for all commands that use the manifest
+- implement storage quotas, #2517
+- BORG_PASSCOMMAND: use external tool providing the key passphrase, #2573
+- borg export-tar, #2519
+- list: --json-lines for archive contents, #2439
+- add --debug-profile option (and also "borg debug convert-profile"), #2473
+
+Fixes:
+
+- hashindex: hash indices >2 GiB, better error reporting, #2496
+- repository URLs: implement IP v6 address support and also more informative
+  exception when parsing fails.
+- mount: check whether llfuse is installed before asking for passphrase, #2540
+- mount: do pre-mount checks before opening repository, #2541
+- FUSE: fix crash if empty (None) xattr is read, #2534
+- serve: ignore --append-only when creating a repository, #2501
+- fix --exclude and --exclude-from recursing into directories, #2469
+- init: don't allow creating nested repositories, #2563
+- --json: fix encryption[mode] not being the cmdline name
+- remote: propagate Error.traceback correctly
+- serve: fix incorrect type of exception_short for Errors, #2513
+- fix remote logging and progress, #2241
+
+  - implement --debug-topic for remote servers
+  - remote: restore "Remote:" prefix (as used in 1.0.x)
+  - rpc negotiate: enable v3 log protocol only for supported clients
+  - fix --progress and logging in general for remote
+
+
+XXX start fakeroot faked in debug mode - fixes EISDIR issues
+    --> NOPE, it did not fix the issue, guess we should revert that?
+
+Other changes:
+
+- consider repokey w/o passphrase == unencrypted, #2169
+- consider authenticated mode == unencrypted, #2503
+- restrict key file names, #2560
+- document follow_symlinks requirements, check libc, use stat and chown
+  with follow_symlinks=False, #2507
+- support common options on the main command, #2508
+- support common options on mid-level commands (e.g. borg *key* export)
+- make --progress a common option
+
+- docs:
+
+  - init: document --encryption as required
+  - security: OpenSSL usage
+  - security: used implementations; note python libraries
+  - security: security track record of OpenSSL and msgpack
+  - quotas: local repo disclaimer
+  - quotas: clarify compatbility; only relevant to serve side
+  - book: use A4 format, new builder option format.
+  - book: create appendices
+  - data structures: explain repository compaction
+  - data structures: add chunk layout diagram
+  - Attic FAQ: separate section for attic stuff
+  - FAQ: I get an IntegrityError or similar - what now?
+  - add systemd warning regarding placeholders, #2543
+  - xattr: document API
+  - add docs/misc/borg-data-flow data flow chart
+  - debugging facilities
+  - README: how to help the project, #2550
+  - README: add bountysource badge, #2558
+  - logo: vectorized (PDF and SVG) versions
+  - frontends: use headlines - you can link to them
+  - sphinx: disable smartypants
+
+- testing / checking:
+
+  - add support for using coala, #1366
+  - testsuite: add ArchiverCorruptionTestCase
+  - do not test logger name, #2504
+  - call setup_logging after destroying logging config
+  - testsuite.archiver: normalise pytest.raises vs. assert_raises
+  - add test for preserved intermediate folder permissions, #2477
+  - key: add round-trip test
+
+- vagrant:
+
+  - control VM cpus and pytest workers via env vars VMCPUS and XDISTN
+  - update cleaning workdir
+  - fix openbsd shell
+
+- packaging:
+
+  - binaries: don't bundle libssl
+  - setup.py clean to remove compiled files
+  - fail in borg package if version metadata is very broken (setuptools_scm)
+
+- repo / code structure:
+
+  - create borg.algorithms and borg.crypto packages
+  - algorithms: rename crc32 to checksums
+  - move patterns to module, #2469
+  - gitignore: complete paths for src/ excludes
+  - cache: extract CacheConfig class
+  - implement IntegrityCheckedFile + Detached variant, #2502 #1688
+  - introduce popen_with_error_handling to handle common user errors
+
+
+XXX increase DEFAULT_SEGMENTS_PER_DIR to 2000
+    ---> hmm, maybe 1000 would be prettier result (directory names)?
+
+
 Version 1.1.0b5 (2017-04-30)
 ----------------------------
 

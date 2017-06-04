@@ -1599,7 +1599,9 @@ class Archiver:
             if recreater.is_temporary_archive(name):
                 self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                 return self.exit_code
-            recreater.recreate(name, args.comment, target)
+            if not recreater.recreate(name, args.comment, target):
+                self.print_error('Nothing to do. Archive was not processed.\n'
+                                 'Specify at least one pattern, PATH, --comment, re-compression or re-chunking option.')
         else:
             if args.target is not None:
                 self.print_error('--target: Need to specify single archive')
@@ -1609,7 +1611,8 @@ class Archiver:
                 if recreater.is_temporary_archive(name):
                     continue
                 print('Processing', name)
-                recreater.recreate(name, args.comment)
+                if not recreater.recreate(name, args.comment):
+                    logger.info('Skipped archive %s: Nothing to do. Archive was not processed.', name)
         if not args.dry_run:
             manifest.write()
             repository.commit()

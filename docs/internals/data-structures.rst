@@ -499,7 +499,11 @@ The chunks cache is a key -> value mapping and contains:
   - size
   - encrypted/compressed size
 
-The chunks cache is a HashIndex_.
+The chunks cache is a HashIndex_. Due to some restrictions of HashIndex,
+the reference count of each given chunk is limited to a constant, MAX_VALUE
+(introduced below in HashIndex_), approximately 2**32.
+If a reference count hits MAX_VALUE, decrementing it yields MAX_VALUE again,
+i.e. the reference count is pinned to MAX_VALUE.
 
 .. _cache-memory-usage:
 
@@ -598,9 +602,32 @@ outputs of a cryptographic hash or MAC and thus already have excellent distribut
 Thus, HashIndex simply uses the first 32 bits of the key as its "hash".
 
 The format is easy to read and write, because the buckets array has the same layout
-in memory and on disk. Only the header formats differ.
+in memory and on disk. Only the header formats differ. The on-disk header is
+``struct HashHeader``:
 
-.. todo:: Describe HashHeader
+- First, the HashIndex magic, the eight byte ASCII string "BORG_IDX".
+- Second, the signed 32-bit number of entries (i.e. buckets which are not deleted and not empty).
+- Third, the signed 32-bit number of buckets, i.e. the length of the buckets array
+  contained in the file, and the modulus for index calculation.
+- Fourth, the signed 8-bit length of keys.
+- Fifth, the signed 8-bit length of values. This has to be at least four bytes.
+
+All fields are packed.
+
+The HashIndex is *not* a general purpose data structure.
+The value size must be at least 4 bytes, and these first bytes are used for in-band
+signalling in the data structure itself.
+
+The constant MAX_VALUE (defined as 2**32-1025 = 4294966271) defines the valid range for
+these 4 bytes when interpreted as an uint32_t from 0 to MAX_VALUE (inclusive).
+The following reserved values beyond MAX_VALUE are currently in use (byte order is LE):
+
+- 0xffffffff marks empty buckets in the hash table
+- 0xfffffffe marks deleted buckets in the hash table
+
+HashIndex is implemented in C and wrapped with Cython in a class-based interface.
+The Cython wrapper checks every passed value against these reserved values and
+raises an AssertionError if they are used.
 
 Encryption
 ----------

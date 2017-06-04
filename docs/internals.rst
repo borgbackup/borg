@@ -27,6 +27,8 @@ chunk is checked against the :ref:`chunks cache <cache>`, which is a
 hash-table of all chunks that already exist.
 
 .. figure:: internals/structure.png
+    :figwidth: 100%
+    :width: 100%
 
     Layers in Borg. On the very top commands are implemented, using
     a data access layer provided by the Archive and Item classes.

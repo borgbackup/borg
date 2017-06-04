@@ -310,7 +310,7 @@ or modified. It looks like this:
         b'item_keys': [b'acl_access', b'acl_default', ...],
         b'config': {},
         b'archives': {
-            b'archive name': {
+            b'2017-05-05-system-backup': {
                 b'id': b'<32 byte binary object ID>',
                 b'time': b'2017-05-05T12:42:22.942864',
             },
@@ -392,6 +392,10 @@ These can be locked out with manifest version 2. Thus, the only difference betwe
 manifest versions 1 and 2 is that the latter is only accepted by Borg releases
 implementing feature flags.
 
+Therefore, as soon as any mandatory feature flag is enabled in a repository,
+the manifest version must be switched to version 2 in order to lock out all
+Borg releases unaware of feature flags.
+
 .. rubric:: Cache feature flags
 
 `The cache`_ does not have its separate flag of feature flags. Instead, Borg stores
@@ -414,13 +418,18 @@ relevant to operating the cache. Otherwise, the client would not pass the featur
 set test against the manifest.
 
 When opening a cache and the *mandatory_features* set is a superset of the features
-supported by the client, the cache is wiped out and rebuilt.
-Since a client not supporting a mandatory feature that the cache was built with
+supported by the client, the cache is wiped out and rebuilt,
+since a client not supporting a mandatory feature that the cache was built with
 would be unable to update it correctly.
 
 When opening a cache and the intersection of *ignored_features* and the features
 supported by the client contains any elements, i.e. the client possesses features
-that the previous client did not have, the cache is wiped out and rebuilt.
+that the previous client did not have and those new features are enabled in the repository,
+the cache is wiped out and rebuilt.
+
+While the former condition likely requires no tweaks, the latter condition is formulated
+in an especially conservative way to play it safe. It seems likely that specific features
+might be exempted from the latter condition.
 
 .. rubric:: Defined feature flags
 

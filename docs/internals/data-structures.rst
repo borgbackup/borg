@@ -79,10 +79,6 @@ strong hash or MAC.
 Segments
 ~~~~~~~~
 
-A |project_name| repository is a filesystem based transactional key/value
-store. It makes extensive use of msgpack_ to store data and, unless
-otherwise noted, data is stored in msgpack_ encoded files.
-
 Objects referenced by a key are stored inline in files (`segments`) of approx.
 500 MB size in numbered subdirectories of ``repo/data``.
 

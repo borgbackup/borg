@@ -37,6 +37,8 @@ Under these circumstances Borg guarantees that the attacker cannot
 The attacker can always impose a denial of service per definition (he could
 forbid connections to the repository, or delete it entirely).
 
+.. _security_structural_auth:
+
 Structural Authentication
 -------------------------
 

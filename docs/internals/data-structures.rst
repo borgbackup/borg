@@ -278,10 +278,21 @@ If the quota shall be enforced accurately in these cases, either
 - edit the msgpacked ``hints.N`` file (not recommended and thus not
   documented further).
 
+The object graph
+----------------
+
+On top of the simple key-value store offered by the Repository_,
+Borg builds a much more sophisticated data structure that is essentially
+a completely encrypted object graph. Objects, such as archives_, are referenced
+by their chunk ID, which is cryptographically derived from their contents.
+More on how this helps security in :ref:`security_structural_auth`.
+
+.. figure:: object-graph.png
+
 .. _manifest:
 
 The manifest
-------------
+~~~~~~~~~~~~
 
 The manifest is an object with an all-zero key that references all the
 archives. It contains:
@@ -303,24 +314,33 @@ each time an archive is added, modified or deleted.
 .. _archive:
 
 Archives
---------
+~~~~~~~~
 
-The archive metadata does not contain the file items directly. Only
-references to other objects that contain that data. An archive is an
-object that contains:
+Each archive is an object referenced by the manifest. The archive object
+itself does not store any of the data contained in the archive it describes.
 
-* version
-* name
-* list of chunks containing item metadata (size: count * ~40B)
-* cmdline
-* hostname
-* username
-* time
+Instead, it contains a list of chunks which form a msgpacked stream of items_.
+The archive object itself further contains some metadata:
+
+* *version*
+* *name*, which might differ from the name set in the manifest.
+  When :ref:`borg_check` rebuilds the manifest (e.g. if it was corrupted) and finds
+  more than one archive object with the same name, it adds a counter to the name
+  in the manifest, but leaves the *name* field of the archives as it was.
+* *items*, a list of chunk IDs containing item metadata (size: count * ~31B)
+* *cmdline*, the command line which was used to create the archive
+* *hostname*
+* *username*
+* *time* and *time_end* are the start and end timestamps, respectively
+* *comment*, a user-specified archive comment
+* *chunker_params* are the :ref:`chunker-params <chunker-params>` used for creating the archive.
+  This is used by :ref:`borg_recreate` to determine whether a given archive needs rechunking.
+* Some other pieces of information related to recreate.
 
 .. _archive_limitation:
 
 Note about archive limitations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++
 
 The archive is currently stored as a single object in the repository
 and thus limited in size to MAX_OBJECT_SIZE (20MiB).
@@ -349,10 +369,10 @@ also :issue:`1452`.
 .. _item:
 
 Items
------
+~~~~~
 
-Each item represents a file, directory or other fs item and is stored as an
-``item`` dictionary that contains:
+Each item represents a file, directory or other file system item and is stored as a
+dictionary created by the ``Item`` class that contains:
 
 * path
 * list of data chunks (size: count * ~40B)
@@ -361,12 +381,12 @@ Each item represents a file, directory or other fs item and is stored as an
 * uid
 * gid
 * mode (item type + permissions)
-* source (for links)
-* rdev (for devices)
+* source (for symlinks, and for hardlinks within one archive)
+* rdev (for device files)
 * mtime, atime, ctime in nanoseconds
 * xattrs
-* acl
-* bsdfiles
+* acl (various OS-dependent fields)
+* bsdflags
 
 All items are serialized using msgpack and the resulting byte stream
 is fed into the same chunker algorithm as used for regular file data
@@ -381,7 +401,7 @@ A chunk is stored as an object as well, of course.
 .. _chunker_details:
 
 Chunks
-------
+~~~~~~
 
 The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorithm.
 It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,

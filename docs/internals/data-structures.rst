@@ -294,22 +294,119 @@ More on how this helps security in :ref:`security_structural_auth`.
 The manifest
 ~~~~~~~~~~~~
 
-The manifest is an object with an all-zero key that references all the
-archives. It contains:
+The manifest is the root of the object hierarchy. It references
+all archives in a repository, and thus all data in it.
+Since no object references it, it cannot be stored under its ID key.
+Instead, the manifest has a fixed all-zero key.
 
-* Manifest version
-* A list of archive infos
-* timestamp
-* config
+The manifest is rewritten each time an archive is created, deleted,
+or modified. It looks like this:
 
-Each archive info contains:
+.. code-block:: python
 
-* name
-* id
-* time
+    {
+        b'version': 1,
+        b'timestamp': b'2017-05-05T12:42:23.042864',
+        b'item_keys': [b'acl_access', b'acl_default', ...],
+        b'config': {},
+        b'archives': {
+            b'archive name': {
+                b'id': b'<32 byte binary object ID>',
+                b'time': b'2017-05-05T12:42:22.942864',
+            },
+        },
+        b'tam': ...,
+    }
 
-It is the last object stored, in the last segment, and is replaced
-each time an archive is added, modified or deleted.
+The *version* field can be either 1 or 2. The versions differ in the
+way feature flags are handled, described below.
+
+The *timestamp* field was used to avoid a certain class of replay attack.
+It is still used for that purpose, however, the newer replay protection
+introduced in Borg 1.1 includes all reply attacks. Thus it is not strictly
+necessary any more.
+
+*item_keys* is a list containing all Item_ keys that may be encountered in
+the repository. It is used by *borg check*, which verifies that all keys
+in all items are a subset of these keys. Thus, an older version of *borg check*
+supporting this mechanism can correctly detect keys introduced in later versions.
+
+The *tam* key is part of the :ref:`tertiary authentication mechanism <tam_description>`
+(formerly known as "tertiary authentication for metadata") and authenticates
+the manifest, since an ID check is not possible.
+
+*config* is a general-purpose location for additional metadata. All versions
+of Borg preserve its contents (it may have been a better place for *item_keys*,
+which is not preserved by unaware Borg versions).
+
+.. rubric:: Feature flags
+
+Feature flags are used to add features to data structures without causing
+corruption if older versions are used to access or modify them.
+
+The *config* key stores the feature flags enabled on a repository:
+
+.. code-block:: python
+
+    config = {
+        b'feature_flags': {
+            b'read': {
+                b'mandatory': [b'some_feature'],
+            },
+            b'check': {
+                b'mandatory': [b'other_feature'],
+            }
+            b'write': ...,
+            b'delete': ...
+        },
+    }
+
+The top-level distinction for feature flags is the operation the client intends
+to perform,
+
+| the *read* operation includes extraction and listing of archives,
+| the *write* operation includes creating new archives,
+| the *delete* (archives) operation,
+| the *check* operation requires full understanding of everything in the repository.
+|
+
+These are weakly set-ordered; *check* will include everything required for *delete*,
+*delete* will likely include *write* and *read*. However, *read* may require more
+features than *write* (due to ID-based deduplication, *write* does not necessarily
+require reading/understanding repository contents).
+
+Each operation can contain several sets of feature flags. Only one set,
+the *mandatory* set is currently defined.
+
+Upon reading the manifest, the Borg client has already determined which operation
+is to be performed. If feature flags are found in the manifest, the set
+of feature flags supported by the client is compared to the mandatory set
+found in the manifest. If any unsupported flags are found (i.e. the mandatory set is
+a superset of the features supported by the Borg client used), the operation
+is aborted with a *MandatoryFeatureUnsupported* error:
+
+    Unsupported repository feature(s) {'some_feature'}. A newer version of borg is required to access this repository.
+
+Older Borg releases do not have this concept and do not perform feature flags checks.
+These can be locked out with manifest version 2. Thus, the only difference between
+manifest versions 1 and 2 is that the latter is only accepted by Borg releases
+implementing feature flags.
+
+.. rubric:: Defined feature flags
+
+Currently no feature flags are defined.
+
+From currently planned features, some examples follow,
+these may/may not be implemented and purely serve as examples.
+
+- A mandatory *read* feature could be using a different encryption scheme (e.g. session keys).
+  This may not be mandatory for the *write* operation - reading data is not strictly required for
+  creating an archive.
+- Any additions to the way chunks are referenced (e.g. to support larger archives) would
+  become a mandatory *delete* and *check* feature; *delete* implies knowing correct
+  reference counts, so all object references need to be understood. *check* must
+  discover the entire object graph as well, otherwise the "orphan chunks check"
+  could delete data still in use.
 
 .. _archive:
 

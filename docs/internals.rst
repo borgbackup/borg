@@ -26,6 +26,16 @@ To actually perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks cache <cache>`, which is a
 hash-table of all chunks that already exist.
 
+.. figure:: internals/structure.png
+
+    Layers in Borg. On the very top commands are implemented, using
+    a data access layer provided by the Archive and Item classes.
+    The "key" object provides both compression and authenticated
+    encryption used by the data access layer. The "key" object represents
+    the sole trust boundary in Borg.
+    The lowest layer is the repository, either accessed directly
+    (Repository) or remotely (RemoteRepository).
+
 .. toctree::
     :caption: Contents
 

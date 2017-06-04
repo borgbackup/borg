@@ -506,7 +506,7 @@ The chunks cache is a HashIndex_.
 Indexes / Caches memory usage
 -----------------------------
 
-Here is the estimated memory usage of |project_name| - it's complicated:
+Here is the estimated memory usage of |project_name| - it's complicated::
 
   chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
 
@@ -520,12 +520,11 @@ Here is the estimated memory usage of |project_name| - it's complicated:
              = chunk_count * 164 + total_file_count * 240
 
 Due to the hashtables, the best/usual/worst cases for memory allocation can
-be estimated like that:
+be estimated like that::
 
   mem_allocation = mem_usage / load_factor  # l_f = 0.25 .. 0.75
 
   mem_allocation_peak = mem_allocation * (1 + growth_factor)  # g_f = 1.1 .. 2
-
 
 All units are Bytes.
 

@@ -6,6 +6,10 @@
 Data structures and file formats
 ================================
 
+.. todo:: Clarify terms, perhaps create a glossary.
+          ID (client?) vs. key (repository?),
+          chunks (blob of data in repo?) vs. object (blob of data in repo, referred to from another object?),
+
 .. _repository:
 
 Repository
@@ -79,10 +83,6 @@ strong hash or MAC.
 Segments
 ~~~~~~~~
 
-A |project_name| repository is a filesystem based transactional key/value
-store. It makes extensive use of msgpack_ to store data and, unless
-otherwise noted, data is stored in msgpack_ encoded files.
-
 Objects referenced by a key are stored inline in files (`segments`) of approx.
 500 MB size in numbered subdirectories of ``repo/data``.
 
@@ -104,11 +104,36 @@ to the file containing the object id and data. If an object is deleted
 a ``DELETE`` entry is appended with the object id.
 
 A ``COMMIT`` tag is written when a repository transaction is
-committed.
+committed. The segment number of the segment containing
+a commit is the **transaction ID**.
 
 When a repository is opened any ``PUT`` or ``DELETE`` operations not
 followed by a ``COMMIT`` tag are discarded since they are part of a
 partial/uncommitted transaction.
+
+Index, hints and integrity
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **repository index** is stored in ``index.<TRANSACTION_ID>`` and is used to
+determine an object's location in the repository. It is a HashIndex_,
+a hash table using open addressing. It maps object keys_ to two
+unsigned 32-bit integers; the first integer gives the segment number,
+the second indicates the offset of the object's entry within the segment.
+
+The **hints file** is a msgpacked file named ``hints.<TRANSACTION_ID>``.
+It contains:
+
+* version
+* list of segments
+* compact
+
+The **integrity file** is a msgpacked file named ``integrity.<TRANSACTION_ID>``.
+It contains checksums of the index and hints files and is described in the
+:ref:`Checksumming data structures <integrity_repo>` section below.
+
+If the index or hints are corrupted, they are re-generated automatically.
+If they are outdated, segments are replayed from the index state to the currently
+committed transaction.
 
 Compaction
 ~~~~~~~~~~
@@ -253,10 +278,21 @@ If the quota shall be enforced accurately in these cases, either
 - edit the msgpacked ``hints.N`` file (not recommended and thus not
   documented further).
 
+The object graph
+----------------
+
+On top of the simple key-value store offered by the Repository_,
+Borg builds a much more sophisticated data structure that is essentially
+a completely encrypted object graph. Objects, such as archives_, are referenced
+by their chunk ID, which is cryptographically derived from their contents.
+More on how this helps security in :ref:`security_structural_auth`.
+
+.. figure:: object-graph.png
+
 .. _manifest:
 
 The manifest
-------------
+~~~~~~~~~~~~
 
 The manifest is an object with an all-zero key that references all the
 archives. It contains:
@@ -278,24 +314,32 @@ each time an archive is added, modified or deleted.
 .. _archive:
 
 Archives
---------
+~~~~~~~~
 
-The archive metadata does not contain the file items directly. Only
-references to other objects that contain that data. An archive is an
-object that contains:
+Each archive is an object referenced by the manifest. The archive object
+itself does not store any of the data contained in the archive it describes.
 
-* version
-* name
-* list of chunks containing item metadata (size: count * ~40B)
-* cmdline
-* hostname
-* username
-* time
+Instead, it contains a list of chunks which form a msgpacked stream of items_.
+The archive object itself further contains some metadata:
+
+* *version*
+* *name*, which might differ from the name set in the manifest.
+  When :ref:`borg_check` rebuilds the manifest (e.g. if it was corrupted) and finds
+  more than one archive object with the same name, it adds a counter to the name
+  in the manifest, but leaves the *name* field of the archives as it was.
+* *items*, a list of chunk IDs containing item metadata (size: count * ~34B)
+* *cmdline*, the command line which was used to create the archive
+* *hostname*
+* *username*
+* *time* and *time_end* are the start and end timestamps, respectively
+* *comment*, a user-specified archive comment
+* *chunker_params* are the :ref:`chunker-params <chunker-params>` used for creating the archive.
+  This is used by :ref:`borg_recreate` to determine whether a given archive needs rechunking.
+* Some other pieces of information related to recreate.
 
 .. _archive_limitation:
 
-Note about archive limitations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Note about archive limitations
 
 The archive is currently stored as a single object in the repository
 and thus limited in size to MAX_OBJECT_SIZE (20MiB).
@@ -324,10 +368,10 @@ also :issue:`1452`.
 .. _item:
 
 Items
------
+~~~~~
 
-Each item represents a file, directory or other fs item and is stored as an
-``item`` dictionary that contains:
+Each item represents a file, directory or other file system item and is stored as a
+dictionary created by the ``Item`` class that contains:
 
 * path
 * list of data chunks (size: count * ~40B)
@@ -336,12 +380,12 @@ Each item represents a file, directory or other fs item and is stored as an
 * uid
 * gid
 * mode (item type + permissions)
-* source (for links)
-* rdev (for devices)
+* source (for symlinks, and for hardlinks within one archive)
+* rdev (for device files)
 * mtime, atime, ctime in nanoseconds
 * xattrs
-* acl
-* bsdfiles
+* acl (various OS-dependent fields)
+* bsdflags
 
 All items are serialized using msgpack and the resulting byte stream
 is fed into the same chunker algorithm as used for regular file data
@@ -356,7 +400,7 @@ A chunk is stored as an object as well, of course.
 .. _chunker_details:
 
 Chunks
-------
+~~~~~~
 
 The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorithm.
 It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
@@ -384,24 +428,22 @@ For some more general usage hints see also ``--chunker-params``.
 
 .. _cache:
 
-Indexes / Caches
-----------------
+The cache
+---------
 
 The **files cache** is stored in ``cache/files`` and is used at backup time to
 quickly determine whether a given file is unchanged and we have all its chunks.
 
-The files cache is a key -> value mapping and contains:
+In memory, the files cache is a key -> value mapping (a Python *dict*) and contains:
 
-* key:
-
-  - full, absolute file path id_hash
+* key: id_hash of the encoded, absolute file path
 * value:
 
   - file inode number
   - file size
   - file mtime_ns
-  - list of file content chunk id hashes
   - age (0 [newest], 1, 2, 3, ..., BORG_FILES_CACHE_TTL - 1)
+  - list of chunk ids representing the file's contents
 
 To determine whether a file has not changed, cached values are looked up via
 the key in the mapping and compared to the current file attribute values.
@@ -438,6 +480,10 @@ Borg can also work without using the files cache (saves memory if you have a
 lot of files or not much RAM free), then all files are assumed to have changed.
 This is usually much slower than with files cache.
 
+The on-disk format of the files cache is a stream of msgpacked tuples (key, value).
+Loading the files cache involves reading the file, one msgpack object at a time,
+unpacking it, and msgpacking the value (in an effort to save memory).
+
 The **chunks cache** is stored in ``cache/chunks`` and is used to determine
 whether we already have a specific chunk, to count references to it and also
 for statistics.
@@ -453,53 +499,18 @@ The chunks cache is a key -> value mapping and contains:
   - size
   - encrypted/compressed size
 
-The chunks cache is a hashindex, a hash table implemented in C and tuned for
-memory efficiency.
-
-The **repository index** is stored in ``repo/index.%d`` and is used to
-determine a chunk's location in the repository.
-
-The repo index is a key -> value mapping and contains:
-
-* key:
-
-  - chunk id_hash
-* value:
-
-  - segment (that contains the chunk)
-  - offset (where the chunk is located in the segment)
-
-The repo index is a hashindex, a hash table implemented in C and tuned for
-memory efficiency.
-
-
-Hints are stored in a file (``repo/hints.%d``).
-
-It contains:
-
-* version
-* list of segments
-* compact
-
-hints and index can be recreated if damaged or lost using ``check --repair``.
-
-The chunks cache and the repository index are stored as hash tables, with
-only one slot per bucket, but that spreads the collisions to the following
-buckets. As a consequence the hash is just a start position for a linear
-search, and if the element is not in the table the index is linearly crossed
-until an empty bucket is found.
-
-When the hash table is filled to 75%, its size is grown. When it's
-emptied to 25%, its size is shrinked. So operations on it have a variable
-complexity between constant and linear with low factor, and memory overhead
-varies between 33% and 300%.
+The chunks cache is a HashIndex_. Due to some restrictions of HashIndex,
+the reference count of each given chunk is limited to a constant, MAX_VALUE
+(introduced below in HashIndex_), approximately 2**32.
+If a reference count hits MAX_VALUE, decrementing it yields MAX_VALUE again,
+i.e. the reference count is pinned to MAX_VALUE.
 
 .. _cache-memory-usage:
 
 Indexes / Caches memory usage
 -----------------------------
 
-Here is the estimated memory usage of |project_name| - it's complicated:
+Here is the estimated memory usage of |project_name| - it's complicated::
 
   chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
 
@@ -513,12 +524,11 @@ Here is the estimated memory usage of |project_name| - it's complicated:
              = chunk_count * 164 + total_file_count * 240
 
 Due to the hashtables, the best/usual/worst cases for memory allocation can
-be estimated like that:
+be estimated like that::
 
   mem_allocation = mem_usage / load_factor  # l_f = 0.25 .. 0.75
 
   mem_allocation_peak = mem_allocation * (1 + growth_factor)  # g_f = 1.1 .. 2
-
 
 All units are Bytes.
 
@@ -555,6 +565,69 @@ b) with ``create --chunker-params 19,23,21,4095`` (default):
 .. note:: There is also the ``--no-files-cache`` option to switch off the files cache.
    You'll save some memory, but it will need to read / chunk all the files as
    it can not skip unmodified files then.
+
+HashIndex
+---------
+
+The chunks cache and the repository index are stored as hash tables, with
+only one slot per bucket, spreading hash collisions to the following
+buckets. As a consequence the hash is just a start position for a linear
+search. If a key is looked up that is not in the table, then the hash table
+is searched from the start position (the hash) until the first empty
+bucket is reached.
+
+This particular mode of operation is open addressing with linear probing.
+
+When the hash table is filled to 75%, its size is grown. When it's
+emptied to 25%, its size is shrinked. Operations on it have a variable
+complexity between constant and linear with low factor, and memory overhead
+varies between 33% and 300%.
+
+If an element is deleted, and the slot behind the deleted element is not empty,
+then the element will leave a tombstone, a bucket marked as deleted. Tombstones
+are only removed by insertions using the tombstone's bucket, or by resizing
+the table. They present the same load to the hash table as a real entry,
+but do not count towards the regular load factor.
+
+Thus, if the number of empty slots becomes too low (recall that linear probing
+for an element not in the index stops at the first empty slot), the hash table
+is rebuilt. The maximum *effective* load factor, i.e. including tombstones, is 93%.
+
+Data in a HashIndex is always stored in little-endian format, which increases
+efficiency for almost everyone, since basically no one uses big-endian processors
+any more.
+
+HashIndex does not use a hashing function, because all keys (save manifest) are
+outputs of a cryptographic hash or MAC and thus already have excellent distribution.
+Thus, HashIndex simply uses the first 32 bits of the key as its "hash".
+
+The format is easy to read and write, because the buckets array has the same layout
+in memory and on disk. Only the header formats differ. The on-disk header is
+``struct HashHeader``:
+
+- First, the HashIndex magic, the eight byte ASCII string "BORG_IDX".
+- Second, the signed 32-bit number of entries (i.e. buckets which are not deleted and not empty).
+- Third, the signed 32-bit number of buckets, i.e. the length of the buckets array
+  contained in the file, and the modulus for index calculation.
+- Fourth, the signed 8-bit length of keys.
+- Fifth, the signed 8-bit length of values. This has to be at least four bytes.
+
+All fields are packed.
+
+The HashIndex is *not* a general purpose data structure.
+The value size must be at least 4 bytes, and these first bytes are used for in-band
+signalling in the data structure itself.
+
+The constant MAX_VALUE (defined as 2**32-1025 = 4294966271) defines the valid range for
+these 4 bytes when interpreted as an uint32_t from 0 to MAX_VALUE (inclusive).
+The following reserved values beyond MAX_VALUE are currently in use (byte order is LE):
+
+- 0xffffffff marks empty buckets in the hash table
+- 0xfffffffe marks deleted buckets in the hash table
+
+HashIndex is implemented in C and wrapped with Cython in a class-based interface.
+The Cython wrapper checks every passed value against these reserved values and
+raises an AssertionError if they are used.
 
 Encryption
 ----------
@@ -861,6 +934,8 @@ which writes the integrity data to a separate ".integrity" file.
 
 Integrity errors result in deleting the affected index and rebuilding it.
 This logs a warning and increases the exit code to WARNING (1).
+
+.. _integrity_repo:
 
 .. rubric:: Repository index and hints
 

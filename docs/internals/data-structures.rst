@@ -339,10 +339,31 @@ the manifest, since an ID check is not possible.
 of Borg preserve its contents (it may have been a better place for *item_keys*,
 which is not preserved by unaware Borg versions).
 
-.. rubric:: Feature flags
+Feature flags
++++++++++++++
 
 Feature flags are used to add features to data structures without causing
-corruption if older versions are used to access or modify them.
+corruption if older versions are used to access or modify them. The main issues
+to consider for a feature flag oriented design are flag granularity,
+flag storage, and cache_ invalidation.
+
+Feature flags are divided in approximately three categories, detailed below.
+Due to the nature of ID-based deduplication, write (i.e. creating archives) and
+read access are not symmetric; it is possible to create archives referencing
+chunks that are not readable with the current feature set. The third
+category are operations that require accurate reference counts, for example
+archive deletion and check.
+
+As the manifest is always updated and always read, it is the ideal place to store
+feature flags, comparable to the super-block of a file system. The only issue problem
+is to recover from a lost manifest, i.e. how is it possible to detect which feature
+flags are enabled, if there is no manifest to tell. This issue is left open at this time,
+but is not expected to be a major hurdle; it doesn't have to be handled efficiently, it just
+needs to be handled.
+
+Lastly, cache_ invalidation is handled by noting which feature
+flags were and were not used to manipulate a cache. This allows to detect whether
+the cache needs to be invalidated, i.e. rebuilt from scratch. See `Cache feature flags`_ below.
 
 The *config* key stores the feature flags enabled on a repository:
 
@@ -396,6 +417,7 @@ Therefore, as soon as any mandatory feature flag is enabled in a repository,
 the manifest version must be switched to version 2 in order to lock out all
 Borg releases unaware of feature flags.
 
+.. _Cache feature flags:
 .. rubric:: Cache feature flags
 
 `The cache`_ does not have its separate flag of feature flags. Instead, Borg stores

@@ -204,8 +204,9 @@ commit is written to the new segment. Then, the old segment is deleted
 A simplified example (excluding conditional compaction and with simpler
 commit logic) showing the principal operation of compaction:
 
-.. figure::
-    compaction.png
+.. figure:: compaction.png
+    :figwidth: 100%
+    :width: 100%
 
 (The actual algorithm is more complex to avoid various consistency issues, refer to
 the ``borg.repository`` module for more comments and documentation on these issues.)
@@ -288,6 +289,8 @@ by their chunk ID, which is cryptographically derived from their contents.
 More on how this helps security in :ref:`security_structural_auth`.
 
 .. figure:: object-graph.png
+    :figwidth: 100%
+    :width: 100%
 
 .. _manifest:
 
@@ -640,6 +643,8 @@ and both are stored in the chunk. Encryption and MAC use two different keys.
 Each chunk consists of ``TYPE(1)`` + ``MAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``:
 
 .. figure:: encryption.png
+    :figwidth: 100%
+    :width: 100%
 
 In AES-CTR mode you can think of the IV as the start value for the counter.
 The counter itself is incremented by one after each 16 byte block.

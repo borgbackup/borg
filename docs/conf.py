@@ -207,6 +207,7 @@ latex_logo = '_static/logo.pdf'
 latex_elements = {
     'papersize': 'a4paper',
     'pointsize': '10pt',
+    'figure_align': 'H',
 }
 
 # For "manual" documents, if this is true, then toplevel headings are parts,

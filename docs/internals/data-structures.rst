@@ -327,7 +327,7 @@ The archive object itself further contains some metadata:
   When :ref:`borg_check` rebuilds the manifest (e.g. if it was corrupted) and finds
   more than one archive object with the same name, it adds a counter to the name
   in the manifest, but leaves the *name* field of the archives as it was.
-* *items*, a list of chunk IDs containing item metadata (size: count * ~33B)
+* *items*, a list of chunk IDs containing item metadata (size: count * ~34B)
 * *cmdline*, the command line which was used to create the archive
 * *hostname*
 * *username*
@@ -339,8 +339,7 @@ The archive object itself further contains some metadata:
 
 .. _archive_limitation:
 
-Note about archive limitations
-++++++++++++++++++++++++++++++
+.. rubric:: Note about archive limitations
 
 The archive is currently stored as a single object in the repository
 and thus limited in size to MAX_OBJECT_SIZE (20MiB).
@@ -435,18 +434,16 @@ The cache
 The **files cache** is stored in ``cache/files`` and is used at backup time to
 quickly determine whether a given file is unchanged and we have all its chunks.
 
-The files cache is in memory a key -> value mapping (a Python *dict*) and contains:
+In memory, the files cache is a key -> value mapping (a Python *dict*) and contains:
 
-* key:
-
-  - full, absolute file path id_hash
+* key: id_hash of the encoded, absolute file path
 * value:
 
   - file inode number
   - file size
   - file mtime_ns
-  - list of file content chunk id hashes
   - age (0 [newest], 1, 2, 3, ..., BORG_FILES_CACHE_TTL - 1)
+  - list of chunk ids representing the file's contents
 
 To determine whether a file has not changed, cached values are looked up via
 the key in the mapping and compared to the current file attribute values.
@@ -572,8 +569,9 @@ HashIndex
 The chunks cache and the repository index are stored as hash tables, with
 only one slot per bucket, spreading hash collisions to the following
 buckets. As a consequence the hash is just a start position for a linear
-search, and if the element is not in the table the index is linearly crossed
-until an empty bucket is found.
+search. If a key is looked up that is not in the table, then the hash table
+is searched from the start position (the hash) until the first empty
+bucket is reached.
 
 This particular mode of operation is open addressing with linear probing.
 
@@ -582,13 +580,23 @@ emptied to 25%, its size is shrinked. Operations on it have a variable
 complexity between constant and linear with low factor, and memory overhead
 varies between 33% and 300%.
 
-Further, if the number of empty slots becomes too low (recall that linear probing
+If an element is deleted, and the slot behind the deleted element is not empty,
+then the element will leave a tombstone, a bucket marked as deleted. Tombstones
+are only removed by insertions using the tombstone's bucket, or by resizing
+the table. They present the same load to the hash table as a real entry,
+but do not count towards the regular load factor.
+
+Thus, if the number of empty slots becomes too low (recall that linear probing
 for an element not in the index stops at the first empty slot), the hash table
-is rebuilt. The maximum *effective* load factor is 93%.
+is rebuilt. The maximum *effective* load factor, i.e. including tombstones, is 93%.
 
 Data in a HashIndex is always stored in little-endian format, which increases
 efficiency for almost everyone, since basically no one uses big-endian processors
 any more.
+
+HashIndex does not use a hashing function, because all keys (save manifest) are
+outputs of a cryptographic hash or MAC and thus already have excellent distribution.
+Thus, HashIndex simply uses the first 32 bits of the key as its "hash".
 
 The format is easy to read and write, because the buckets array has the same layout
 in memory and on disk. Only the header formats differ.

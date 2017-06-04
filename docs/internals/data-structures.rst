@@ -392,6 +392,36 @@ These can be locked out with manifest version 2. Thus, the only difference betwe
 manifest versions 1 and 2 is that the latter is only accepted by Borg releases
 implementing feature flags.
 
+.. rubric:: Cache feature flags
+
+`The cache`_ does not have its separate flag of feature flags. Instead, Borg stores
+which flags were used to create or modify a cache.
+
+All mandatory manifest features from all operations are gathered in one set.
+Then, two sets of features are computed;
+
+- those features that are supported by the client and mandated by the manifest
+  are added to the *mandatory_features* set,
+- the complement to *mandatory_features*, *ignored_features* comprised
+  of those features mandated by the manifest, but not supported by the client.
+
+Because the client previously checked compliance with the mandatory set of features
+required for the particular operation it is executing, the *mandatory_features* set
+will contain all necessary features required for using the cache safely.
+
+Conversely, the *ignored_features* set contains only those features which were not
+relevant to operating the cache. Otherwise, the client would not pass the feature
+set test against the manifest.
+
+When opening a cache and the *mandatory_features* set is a superset of the features
+supported by the client, the cache is wiped out and rebuilt.
+Since a client not supporting a mandatory feature that the cache was built with
+would be unable to update it correctly.
+
+When opening a cache and the intersection of *ignored_features* and the features
+supported by the client contains any elements, i.e. the client possesses features
+that the previous client did not have, the cache is wiped out and rebuilt.
+
 .. rubric:: Defined feature flags
 
 Currently no feature flags are defined.

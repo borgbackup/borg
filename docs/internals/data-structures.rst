@@ -6,6 +6,10 @@
 Data structures and file formats
 ================================
 
+.. todo:: Clarify terms, perhaps create a glossary.
+          ID (client?) vs. key (repository?),
+          chunks (blob of data in repo?) vs. object (blob of data in repo, referred to from another object?),
+
 .. _repository:
 
 Repository
@@ -323,7 +327,7 @@ The archive object itself further contains some metadata:
   When :ref:`borg_check` rebuilds the manifest (e.g. if it was corrupted) and finds
   more than one archive object with the same name, it adds a counter to the name
   in the manifest, but leaves the *name* field of the archives as it was.
-* *items*, a list of chunk IDs containing item metadata (size: count * ~31B)
+* *items*, a list of chunk IDs containing item metadata (size: count * ~33B)
 * *cmdline*, the command line which was used to create the archive
 * *hostname*
 * *username*

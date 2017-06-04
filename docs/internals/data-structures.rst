@@ -104,11 +104,36 @@ to the file containing the object id and data. If an object is deleted
 a ``DELETE`` entry is appended with the object id.
 
 A ``COMMIT`` tag is written when a repository transaction is
-committed.
+committed. The segment number of the segment containing
+a commit is the **transaction ID**.
 
 When a repository is opened any ``PUT`` or ``DELETE`` operations not
 followed by a ``COMMIT`` tag are discarded since they are part of a
 partial/uncommitted transaction.
+
+Index, hints and integrity
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **repository index** is stored in ``index.<TRANSACTION_ID>`` and is used to
+determine an object's location in the repository. It is a HashIndex_,
+a hash table using open addressing. It maps object keys_ to two
+unsigned 32-bit integers; the first integer gives the segment number,
+the second indicates the offset of the object's entry within the segment.
+
+The **hints file** is a msgpacked file named ``hints.<TRANSACTION_ID>``.
+It contains:
+
+* version
+* list of segments
+* compact
+
+The **integrity file** is a msgpacked file named ``integrity.<TRANSACTION_ID>``.
+It contains checksums of the index and hints files and is described in the
+:ref:`Checksumming data structures <integrity_repo>` section below.
+
+If the index or hints are corrupted, they are re-generated automatically.
+If they are outdated, segments are replayed from the index state to the currently
+committed transaction.
 
 Compaction
 ~~~~~~~~~~
@@ -384,13 +409,13 @@ For some more general usage hints see also ``--chunker-params``.
 
 .. _cache:
 
-Indexes / Caches
-----------------
+The cache
+---------
 
 The **files cache** is stored in ``cache/files`` and is used at backup time to
 quickly determine whether a given file is unchanged and we have all its chunks.
 
-The files cache is a key -> value mapping and contains:
+The files cache is in memory a key -> value mapping (a Python *dict*) and contains:
 
 * key:
 
@@ -438,6 +463,10 @@ Borg can also work without using the files cache (saves memory if you have a
 lot of files or not much RAM free), then all files are assumed to have changed.
 This is usually much slower than with files cache.
 
+The on-disk format of the files cache is a stream of msgpacked tuples (key, value).
+Loading the files cache involves reading the file, one msgpack object at a time,
+unpacking it, and msgpacking the value (in an effort to save memory).
+
 The **chunks cache** is stored in ``cache/chunks`` and is used to determine
 whether we already have a specific chunk, to count references to it and also
 for statistics.
@@ -453,46 +482,7 @@ The chunks cache is a key -> value mapping and contains:
   - size
   - encrypted/compressed size
 
-The chunks cache is a hashindex, a hash table implemented in C and tuned for
-memory efficiency.
-
-The **repository index** is stored in ``repo/index.%d`` and is used to
-determine a chunk's location in the repository.
-
-The repo index is a key -> value mapping and contains:
-
-* key:
-
-  - chunk id_hash
-* value:
-
-  - segment (that contains the chunk)
-  - offset (where the chunk is located in the segment)
-
-The repo index is a hashindex, a hash table implemented in C and tuned for
-memory efficiency.
-
-
-Hints are stored in a file (``repo/hints.%d``).
-
-It contains:
-
-* version
-* list of segments
-* compact
-
-hints and index can be recreated if damaged or lost using ``check --repair``.
-
-The chunks cache and the repository index are stored as hash tables, with
-only one slot per bucket, but that spreads the collisions to the following
-buckets. As a consequence the hash is just a start position for a linear
-search, and if the element is not in the table the index is linearly crossed
-until an empty bucket is found.
-
-When the hash table is filled to 75%, its size is grown. When it's
-emptied to 25%, its size is shrinked. So operations on it have a variable
-complexity between constant and linear with low factor, and memory overhead
-varies between 33% and 300%.
+The chunks cache is a HashIndex_.
 
 .. _cache-memory-usage:
 
@@ -555,6 +545,35 @@ b) with ``create --chunker-params 19,23,21,4095`` (default):
 .. note:: There is also the ``--no-files-cache`` option to switch off the files cache.
    You'll save some memory, but it will need to read / chunk all the files as
    it can not skip unmodified files then.
+
+HashIndex
+---------
+
+The chunks cache and the repository index are stored as hash tables, with
+only one slot per bucket, spreading hash collisions to the following
+buckets. As a consequence the hash is just a start position for a linear
+search, and if the element is not in the table the index is linearly crossed
+until an empty bucket is found.
+
+This particular mode of operation is open addressing with linear probing.
+
+When the hash table is filled to 75%, its size is grown. When it's
+emptied to 25%, its size is shrinked. Operations on it have a variable
+complexity between constant and linear with low factor, and memory overhead
+varies between 33% and 300%.
+
+Further, if the number of empty slots becomes too low (recall that linear probing
+for an element not in the index stops at the first empty slot), the hash table
+is rebuilt. The maximum *effective* load factor is 93%.
+
+Data in a HashIndex is always stored in little-endian format, which increases
+efficiency for almost everyone, since basically no one uses big-endian processors
+any more.
+
+The format is easy to read and write, because the buckets array has the same layout
+in memory and on disk. Only the header formats differ.
+
+.. todo:: Describe HashHeader
 
 Encryption
 ----------
@@ -861,6 +880,8 @@ which writes the integrity data to a separate ".integrity" file.
 
 Integrity errors result in deleting the affected index and rebuilding it.
 This logs a warning and increases the exit code to WARNING (1).
+
+.. _integrity_repo:
 
 .. rubric:: Repository index and hints
 

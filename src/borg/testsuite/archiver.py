@@ -2431,7 +2431,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--progress')
         with changedir('output'):
             # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
-            subprocess.check_call(['tar', 'xpf', '../simple.tar'])
+            subprocess.check_call(['tar', 'xpf', '../simple.tar', '--warning=no-timestamp'])
         self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
 
     @requires_gnutar
@@ -2447,7 +2447,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'input/file1\n' in list
         assert 'input/dir2\n' in list
         with changedir('output'):
-            subprocess.check_call(['tar', 'xpf', '../simple.tar.gz'])
+            subprocess.check_call(['tar', 'xpf', '../simple.tar.gz', '--warning=no-timestamp'])
         self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
 
     @requires_gnutar
@@ -2463,7 +2463,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'input/file1\n' in list
         assert 'input/dir2\n' in list
         with changedir('output'):
-            subprocess.check_call(['tar', 'xpf', '../simple.tar'])
+            subprocess.check_call(['tar', 'xpf', '../simple.tar', '--warning=no-timestamp'])
         self.assert_dirs_equal('input', 'output/', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
 
     @requires_hardlinks
@@ -2472,7 +2472,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self._extract_hardlinks_setup()
         self.cmd('export-tar', self.repository_location + '::test', 'output.tar', '--strip-components=2')
         with changedir('output'):
-            subprocess.check_call(['tar', 'xpf', '../output.tar'])
+            subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
             assert os.stat('hardlink').st_nlink == 2
             assert os.stat('subdir/hardlink').st_nlink == 2
             assert os.stat('aaaa').st_nlink == 2
@@ -2484,7 +2484,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self._extract_hardlinks_setup()
         self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1')
         with changedir('output'):
-            subprocess.check_call(['tar', 'xpf', '../output.tar'])
+            subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert os.stat('input/dir1/aaaa').st_nlink == 2

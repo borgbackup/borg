@@ -321,10 +321,8 @@ or modified. It looks like this:
 The *version* field can be either 1 or 2. The versions differ in the
 way feature flags are handled, described below.
 
-The *timestamp* field was used to avoid a certain class of replay attack.
-It is still used for that purpose, however, the newer replay protection
-introduced in Borg 1.1 includes all reply attacks. Thus it is not strictly
-necessary any more.
+The *timestamp* field is used to avoid logical replay attacks where
+the server just resets the repository to a previous state.
 
 *item_keys* is a list containing all Item_ keys that may be encountered in
 the repository. It is used by *borg check*, which verifies that all keys
@@ -337,7 +335,9 @@ the manifest, since an ID check is not possible.
 
 *config* is a general-purpose location for additional metadata. All versions
 of Borg preserve its contents (it may have been a better place for *item_keys*,
-which is not preserved by unaware Borg versions).
+which is not preserved by unaware Borg versions, releases predating 1.0.4).
+
+.. This was implemented in PR#1149, 78121a8 and a7b5165
 
 Feature flags
 +++++++++++++
@@ -362,8 +362,9 @@ but is not expected to be a major hurdle; it doesn't have to be handled efficien
 needs to be handled.
 
 Lastly, cache_ invalidation is handled by noting which feature
-flags were and were not used to manipulate a cache. This allows to detect whether
-the cache needs to be invalidated, i.e. rebuilt from scratch. See `Cache feature flags`_ below.
+flags were and which were not understood while manipulating a cache.
+This allows to detect whether the cache needs to be invalidated,
+i.e. rebuilt from scratch. See `Cache feature flags`_ below.
 
 The *config* key stores the feature flags enabled on a repository:
 
@@ -403,7 +404,7 @@ Upon reading the manifest, the Borg client has already determined which operatio
 is to be performed. If feature flags are found in the manifest, the set
 of feature flags supported by the client is compared to the mandatory set
 found in the manifest. If any unsupported flags are found (i.e. the mandatory set is
-a superset of the features supported by the Borg client used), the operation
+not a subset of the features supported by the Borg client used), the operation
 is aborted with a *MandatoryFeatureUnsupported* error:
 
     Unsupported repository feature(s) {'some_feature'}. A newer version of borg is required to access this repository.
@@ -428,8 +429,8 @@ Then, two sets of features are computed;
 
 - those features that are supported by the client and mandated by the manifest
   are added to the *mandatory_features* set,
-- the complement to *mandatory_features*, *ignored_features* comprised
-  of those features mandated by the manifest, but not supported by the client.
+- the *ignored_features* set comprised of those features mandated by the manifest,
+  but not supported by the client.
 
 Because the client previously checked compliance with the mandatory set of features
 required for the particular operation it is executing, the *mandatory_features* set
@@ -439,7 +440,7 @@ Conversely, the *ignored_features* set contains only those features which were n
 relevant to operating the cache. Otherwise, the client would not pass the feature
 set test against the manifest.
 
-When opening a cache and the *mandatory_features* set is a superset of the features
+When opening a cache and the *mandatory_features* set is a not a subset of the features
 supported by the client, the cache is wiped out and rebuilt,
 since a client not supporting a mandatory feature that the cache was built with
 would be unable to update it correctly.

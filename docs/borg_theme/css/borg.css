@@ -28,3 +28,16 @@
 #usage dl dl dd {
     margin-bottom: 0.5em;
 }
+
+#internals .toctree-wrapper > ul {
+    column-count: 3;
+}
+
+#internals .toctree-wrapper > ul > li {
+    display: inline-block;
+    font-weight: bold;
+}
+
+#internals .toctree-wrapper > ul > li > ul {
+    font-weight: normal;
+}

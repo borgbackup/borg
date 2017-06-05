@@ -39,7 +39,7 @@ hash-table of all chunks that already exist.
     (Repository) or remotely (RemoteRepository).
 
 .. toctree::
-    :caption: Contents
+    :caption: Internals contents
 
     internals/security
     internals/data-structures

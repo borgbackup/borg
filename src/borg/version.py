@@ -3,33 +3,33 @@ import re
 
 def parse_version(version):
     """
-    simplistic parser for setuptools_scm versions
+    Simplistic parser for setuptools_scm versions.
 
-    supports final versions and alpha ('a'), beta ('b') and rc versions. It just discards commits since last tag
-    and git revision hash.
+    Supports final versions and alpha ('a'), beta ('b') and release candidate ('rc') versions.
+    It does not try to parse anything else than that, even if there is more in the version string.
 
     Output is a version tuple containing integers. It ends with one or two elements that ensure that relational
-    operators yield correct relations for alpha, beta and rc versions too. For final versions the last element
-    is a -1, for prerelease versions the last two elements are a smaller negative number and the number of e.g.
-    the beta.
-
-    Note, this sorts version 1.0 before 1.0.0.
+    operators yield correct relations for alpha, beta and rc versions, too.
+    For final versions the last element is a -1.
+    For prerelease versions the last two elements are a smaller negative number and the number of e.g. the beta.
 
     This version format is part of the remote protocol, don‘t change in breaking ways.
     """
-
-    parts = version.split('+')[0].split('.')
-    if parts[-1].startswith('dev'):
-        del parts[-1]
-    version = [int(segment) for segment in parts[:-1]]
-
-    prerelease = re.fullmatch('([0-9]+)(a|b|rc)([0-9]+)', parts[-1])
-    if prerelease:
-        version_type = {'a': -4, 'b': -3, 'rc': -2}[prerelease.group(2)]
-        version += [int(prerelease.group(1)), version_type, int(prerelease.group(3))]
+    version_re = r"""
+        (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)   # version, e.g. 1.2.33
+        (?P<prerelease>(?P<ptype>a|b|rc)(?P<pnum>\d+))?  # optional prerelease, e.g. a1 or b2 or rc33
+    """
+    m = re.match(version_re, version, re.VERBOSE)
+    if m is None:
+        raise ValueError('Invalid version string %s' % version)
+    gd = m.groupdict()
+    version = [int(gd['major']), int(gd['minor']), int(gd['patch'])]
+    if m.lastgroup == 'prerelease':
+        p_type = {'a': -4, 'b': -3, 'rc': -2}[gd['ptype']]
+        p_num = int(gd['pnum'])
+        version += [p_type, p_num]
     else:
-        version += [int(parts[-1]), -1]
-
+        version += [-1]
     return tuple(version)
 
 

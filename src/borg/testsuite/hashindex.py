@@ -4,8 +4,7 @@ import os
 import tempfile
 import zlib
 
-from ..hashindex import NSIndex, ChunkIndex
-from .. import hashindex
+from ..algorithms.hashindex import NSIndex, ChunkIndex
 from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from . import BaseTestCase
 

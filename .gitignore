@@ -6,10 +6,10 @@ borg-env
 .tox
 src/borg/compress.c
 src/borg/crypto/low_level.c
-src/borg/hashindex.c
 src/borg/item.c
 src/borg/algorithms/chunker.c
 src/borg/algorithms/checksums.c
+src/borg/algorithms/hashindex.c
 src/borg/platform/darwin.c
 src/borg/platform/freebsd.c
 src/borg/platform/linux.c

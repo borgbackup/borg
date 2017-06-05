@@ -1699,7 +1699,6 @@ class ArchiveRecreater:
     def save(self, archive, target, comment=None, replace_original=True):
         if self.dry_run:
             return
-        timestamp = archive.ts.replace(tzinfo=None)
         if comment is None:
             comment = archive.metadata.get('comment', '')
         target.save(comment=comment, additional_metadata={

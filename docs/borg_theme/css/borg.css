@@ -31,6 +31,7 @@
 
 #internals .toctree-wrapper > ul {
     column-count: 3;
+    -webkit-column-count: 3;
 }
 
 #internals .toctree-wrapper > ul > li {

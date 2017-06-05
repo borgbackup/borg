@@ -1699,11 +1699,14 @@ class ArchiveRecreater:
     def save(self, archive, target, comment=None, replace_original=True):
         if self.dry_run:
             return
-        timestamp = archive.ts.replace(tzinfo=None)
         if comment is None:
             comment = archive.metadata.get('comment', '')
-        target.save(timestamp=timestamp, comment=comment, additional_metadata={
+        target.save(comment=comment, additional_metadata={
+            # keep some metadata as in original archive:
+            'time': archive.metadata.time,
+            'time_end': archive.metadata.time_end,
             'cmdline': archive.metadata.cmdline,
+            # but also remember recreate metadata:
             'recreate_cmdline': sys.argv,
         })
         if replace_original:

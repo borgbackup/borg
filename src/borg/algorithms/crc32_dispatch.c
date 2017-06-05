@@ -4,6 +4,12 @@
 
 #ifdef __GNUC__
 /*
+ * GCC 4.4(.7) has a bug that causes it to recurse infinitely if an unknown option
+ * is pushed onto the options stack. GCC 4.5 was not tested, so is excluded as well.
+ * GCC 4.6 is known good.
+ */
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+/*
  * clang also has or had GCC bug #56298 explained below, but doesn't support
  * target attributes or the options stack. So we disable this faster code path for clang.
  */
@@ -66,6 +72,7 @@
 #endif /* if __x86_64__ */
 #endif /* ifndef __OpenBSD__ */
 #endif /* ifndef __clang__ */
+#endif /* __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) */
 #endif /* ifdef __GNUC__ */
 
 #ifdef FOLDING_CRC
@@ -75,6 +82,7 @@
 static uint32_t
 crc32_clmul(const uint8_t *src, long len, uint32_t initial_crc)
 {
+    (void)src; (void)len; (void)initial_crc;
     assert(0);
     return 0;
 }

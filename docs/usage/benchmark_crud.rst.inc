@@ -14,7 +14,7 @@ positional arguments
     PATH
         path were to create benchmark input data
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

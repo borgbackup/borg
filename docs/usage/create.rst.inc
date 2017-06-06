@@ -26,7 +26,7 @@ optional arguments
     ``--json``
         | output stats as JSON (implies --stats)
 
-`Common options`_
+:ref:`common_options`
     |
 
 Exclusion options

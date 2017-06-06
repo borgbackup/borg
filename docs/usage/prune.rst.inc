@@ -42,7 +42,7 @@ optional arguments
     ``--save-space``
         | work slower, but using less space
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

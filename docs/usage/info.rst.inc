@@ -16,7 +16,7 @@ optional arguments
     ``--json``
         | format output as JSON
 
-`Common options`_
+:ref:`common_options`
     |
 
 filters

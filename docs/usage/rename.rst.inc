@@ -14,7 +14,7 @@ positional arguments
     NEWNAME
         the new archive name to use
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

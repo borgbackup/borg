@@ -16,7 +16,7 @@ positional arguments
     ARGS
         command arguments
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

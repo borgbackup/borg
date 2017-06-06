@@ -32,7 +32,7 @@ optional arguments
     ``--strip-components NUMBER``
         | Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

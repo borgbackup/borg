@@ -287,7 +287,7 @@ class build_usage(Command):
     def write_options(self, parser, fp):
         for group in parser._action_groups:
             if group.title == 'Common options':
-                fp.write('\n\n`Common options`_\n')
+                fp.write('\n\n:ref:`common_options`\n')
                 fp.write('    |')
             else:
                 self.write_options_group(group, fp)

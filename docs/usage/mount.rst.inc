@@ -20,7 +20,7 @@ optional arguments
     ``-o``
         | Extra mount options
 
-`Common options`_
+:ref:`common_options`
     |
 
 filters

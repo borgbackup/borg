@@ -12,7 +12,7 @@ positional arguments
     REPOSITORY
 
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

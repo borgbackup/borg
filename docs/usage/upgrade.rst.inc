@@ -25,7 +25,7 @@ optional arguments
     ``--disable-tam``
         | Disable manifest authentication (in key and cache)
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

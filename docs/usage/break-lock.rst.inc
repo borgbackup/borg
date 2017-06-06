@@ -12,7 +12,7 @@ positional arguments
     REPOSITORY
         repository for which to break the locks
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

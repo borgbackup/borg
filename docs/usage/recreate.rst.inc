@@ -24,7 +24,7 @@ optional arguments
     ``-s``, ``--stats``
         | print statistics at end
 
-`Common options`_
+:ref:`common_options`
     |
 
 Exclusion options

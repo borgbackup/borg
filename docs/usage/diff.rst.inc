@@ -24,7 +24,7 @@ optional arguments
     ``--sort``
         | Sort the output lines by file path.
 
-`Common options`_
+:ref:`common_options`
     |
 
 Exclusion options

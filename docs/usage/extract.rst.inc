@@ -36,7 +36,7 @@ optional arguments
     ``--sparse``
         | create holes in output sparse file from all-zero chunks
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

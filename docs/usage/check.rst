@@ -1,0 +1,1 @@
+.. include:: check.rst.inc

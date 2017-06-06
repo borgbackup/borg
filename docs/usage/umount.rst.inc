@@ -12,7 +12,7 @@ positional arguments
     MOUNTPOINT
         mountpoint of the filesystem to umount
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

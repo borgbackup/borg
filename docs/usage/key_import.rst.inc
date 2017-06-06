@@ -18,7 +18,7 @@ optional arguments
     ``--paper``
         | interactively import from a backup done with --paper
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

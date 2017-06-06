@@ -149,8 +149,8 @@ may be surprised that the following ``export`` has no effect on your command::
    export BORG_PASSPHRASE='complicated & long'
    sudo ./yourborgwrapper.sh  # still prompts for password
 
-For more information, see sudo(8) man page. Hint: see ``env_keep`` in
-sudoers(5), or try ``sudo BORG_PASSPHRASE='yourphrase' borg`` syntax.
+For more information, refer to the sudo(8) man page and ``env_keep`` in
+the sudoers(5) man page.
 
 .. Tip::
     To debug what your borg process is actually seeing, find its PID

@@ -131,7 +131,6 @@ class AtticRepositoryUpgrader(Repository):
 
     @staticmethod
     def convert_keyfiles(keyfile, dryrun):
-
         """convert key files from attic to borg
 
         replacement pattern is `s/ATTIC KEY/BORG_KEY/` in

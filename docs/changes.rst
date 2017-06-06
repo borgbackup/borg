@@ -172,6 +172,7 @@ New features:
 - add --debug-profile option (and also "borg debug convert-profile"), #2473
 
 Fixes:
+
 - hashindex: read/write indices >2 GiB on 32bit systems, better error
   reporting, #2496
 - repository URLs: implement IPv6 address support and also more informative

@@ -20,10 +20,10 @@ from .helpers import hostname_is_unique
 from .helpers import secure_erase, truncate_and_unlink
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
-from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
 from .algorithms.hashindex import NSIndex
 from .algorithms.checksums import crc32
+from .algorithms.lrucache import LRUCache
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
 logger = create_logger(__name__)

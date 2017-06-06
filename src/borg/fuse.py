@@ -18,7 +18,7 @@ logger = create_logger()
 from .archive import Archive
 from .helpers import daemonize, hardlinkable
 from .item import Item
-from .lrucache import LRUCache
+from .algorithms.lrucache import LRUCache
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')

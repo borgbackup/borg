@@ -59,7 +59,7 @@ cdef class CompressorBase:
         This exists for a very specific case: If borg recreate is instructed to recompress
         using Auto compression it needs to determine the _actual_ target compression of a chunk
         in order to detect whether it should be recompressed.
-        
+
         For all Compressors that are not Auto this always returns *self*.
         """
         return self

@@ -1,6 +1,8 @@
 import errno
 import os
 
+from borg.helpers import truncate_and_unlink
+
 """
 platform base module
 ====================
@@ -157,7 +159,7 @@ class SaveFile:
     def __enter__(self):
         from .. import platform
         try:
-            os.unlink(self.tmppath)
+            truncate_and_unlink(self.tmppath)
         except FileNotFoundError:
             pass
         self.fd = platform.SyncFile(self.tmppath, self.binary)
@@ -167,7 +169,7 @@ class SaveFile:
         from .. import platform
         self.fd.close()
         if exc_type is not None:
-            os.unlink(self.tmppath)
+            truncate_and_unlink(self.tmppath)
             return
         os.replace(self.tmppath, self.path)
         platform.sync_dir(os.path.dirname(self.path))

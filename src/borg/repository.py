@@ -18,7 +18,7 @@ from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import hostname_is_unique
-from .helpers import secure_erase
+from .helpers import secure_erase, truncate_and_unlink
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -1159,9 +1159,7 @@ class LoggedIO:
         for segment, filename in self.segment_iterator(reverse=True):
             if segment > transaction_id:
                 # Truncate segment files before unlink(). This can help a full file system recover.
-                # We can use 'wb', since the segment must exist (just returned by the segment_iterator).
-                open(filename, 'wb').close()
-                os.unlink(filename)
+                truncate_and_unlink(filename)
             else:
                 break
 
@@ -1241,9 +1239,7 @@ class LoggedIO:
             # In this instance (cf. cleanup()) we need to use r+b (=O_RDWR|O_BINARY) and
             # issue an explicit truncate() to avoid creating a file
             # if *segment* did not exist in the first place.
-            with open(filename, 'r+b') as fd:
-                fd.truncate()
-            os.unlink(filename)
+            truncate_and_unlink(filename)
         except FileNotFoundError:
             pass
 
@@ -1297,7 +1293,7 @@ class LoggedIO:
         if segment in self.fds:
             del self.fds[segment]
         with open(filename, 'rb') as fd:
-            # XXX: Rather use mmap.
+            # XXX: Rather use mmap, this loads the entire segment (up to 500 MB by default) into memory.
             data = memoryview(fd.read())
         os.rename(filename, filename + '.beforerecover')
         logger.info('attempting to recover ' + filename)

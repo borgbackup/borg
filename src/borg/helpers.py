@@ -1995,6 +1995,12 @@ def secure_erase(path):
     os.unlink(path)
 
 
+def truncate_and_unlink(path):
+    with open(path, 'r+b') as fd:
+        fd.truncate()
+    os.unlink(path)
+
+
 def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
     """
     Handle typical errors raised by subprocess.Popen. Return None if an error occurred,

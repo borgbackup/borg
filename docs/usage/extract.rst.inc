@@ -4,9 +4,9 @@
 
 borg extract
 ------------
-::
+.. code-block:: none
 
-    borg [common options] extract <options> ARCHIVE PATH
+    borg [common options] extract [options] ARCHIVE PATH
 
 positional arguments
     ARCHIVE

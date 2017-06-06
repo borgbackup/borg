@@ -4,9 +4,9 @@
 
 borg list
 ---------
-::
+.. code-block:: none
 
-    borg [common options] list <options> REPOSITORY_OR_ARCHIVE PATH
+    borg [common options] list [options] REPOSITORY_OR_ARCHIVE PATH
 
 positional arguments
     REPOSITORY_OR_ARCHIVE

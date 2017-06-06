@@ -4,9 +4,9 @@
 
 borg init
 ---------
-::
+.. code-block:: none
 
-    borg [common options] init <options> REPOSITORY
+    borg [common options] init [options] REPOSITORY
 
 positional arguments
     REPOSITORY

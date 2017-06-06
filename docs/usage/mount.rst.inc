@@ -4,9 +4,9 @@
 
 borg mount
 ----------
-::
+.. code-block:: none
 
-    borg [common options] mount <options> REPOSITORY_OR_ARCHIVE MOUNTPOINT
+    borg [common options] mount [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT
 
 positional arguments
     REPOSITORY_OR_ARCHIVE

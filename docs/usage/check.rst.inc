@@ -4,9 +4,9 @@
 
 borg check
 ----------
-::
+.. code-block:: none
 
-    borg [common options] check <options> REPOSITORY_OR_ARCHIVE
+    borg [common options] check [options] REPOSITORY_OR_ARCHIVE
 
 positional arguments
     REPOSITORY_OR_ARCHIVE

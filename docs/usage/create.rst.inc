@@ -4,9 +4,9 @@
 
 borg create
 -----------
-::
+.. code-block:: none
 
-    borg [common options] create <options> ARCHIVE PATH
+    borg [common options] create [options] ARCHIVE PATH
 
 positional arguments
     ARCHIVE

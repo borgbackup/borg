@@ -4,9 +4,9 @@
 
 borg upgrade
 ------------
-::
+.. code-block:: none
 
-    borg [common options] upgrade <options> REPOSITORY
+    borg [common options] upgrade [options] REPOSITORY
 
 positional arguments
     REPOSITORY

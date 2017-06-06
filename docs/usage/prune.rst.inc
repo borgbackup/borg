@@ -4,9 +4,9 @@
 
 borg prune
 ----------
-::
+.. code-block:: none
 
-    borg [common options] prune <options> REPOSITORY
+    borg [common options] prune [options] REPOSITORY
 
 positional arguments
     REPOSITORY

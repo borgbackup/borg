@@ -261,7 +261,7 @@ class build_usage(Command):
                               "command_": command.replace(' ', '_'),
                               "underline": '-' * len('borg ' + command)}
                     doc.write(".. _borg_{command_}:\n\n".format(**params))
-                    doc.write("borg {command}\n{underline}\n::\n\n    borg [common options] {command}".format(**params))
+                    doc.write("borg {command}\n{underline}\n.. code-block:: none\n\n    borg [common options] {command}".format(**params))
                     self.write_usage(parser, doc)
                     epilog = parser.epilog
                     parser.epilog = None
@@ -278,7 +278,7 @@ class build_usage(Command):
 
     def write_usage(self, parser, fp):
         if any(len(o.option_strings) for o in parser._actions):
-            fp.write(' <options>')
+            fp.write(' [options]')
         for option in parser._actions:
             if option.option_strings:
                 continue

@@ -4,9 +4,9 @@
 
 borg umount
 -----------
-::
+.. code-block:: none
 
-    borg [common options] umount <options> MOUNTPOINT
+    borg [common options] umount [options] MOUNTPOINT
 
 positional arguments
     MOUNTPOINT

@@ -4,9 +4,9 @@
 
 borg benchmark crud
 -------------------
-::
+.. code-block:: none
 
-    borg [common options] benchmark crud <options> REPO PATH
+    borg [common options] benchmark crud [options] REPO PATH
 
 positional arguments
     REPO

@@ -4,9 +4,9 @@
 
 borg delete
 -----------
-::
+.. code-block:: none
 
-    borg [common options] delete <options> TARGET
+    borg [common options] delete [options] TARGET
 
 positional arguments
     TARGET

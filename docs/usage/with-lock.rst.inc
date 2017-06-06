@@ -4,9 +4,9 @@
 
 borg with-lock
 --------------
-::
+.. code-block:: none
 
-    borg [common options] with-lock <options> REPOSITORY COMMAND ARGS
+    borg [common options] with-lock [options] REPOSITORY COMMAND ARGS
 
 positional arguments
     REPOSITORY

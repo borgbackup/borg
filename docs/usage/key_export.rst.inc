@@ -4,9 +4,9 @@
 
 borg key export
 ---------------
-::
+.. code-block:: none
 
-    borg [common options] key export <options> REPOSITORY PATH
+    borg [common options] key export [options] REPOSITORY PATH
 
 positional arguments
     REPOSITORY

@@ -4,9 +4,9 @@
 
 borg serve
 ----------
-::
+.. code-block:: none
 
-    borg [common options] serve <options>
+    borg [common options] serve [options]
 
 optional arguments
     ``--restrict-to-path PATH``

@@ -25,7 +25,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex, \
-    get_security_dir, MAX_S, MandatoryFeatureUnsupported
+    get_security_dir, MAX_S, MandatoryFeatureUnsupported, Location
 from ..key import RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
@@ -978,6 +978,47 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.mkdir(mountpoint)
         # XXX this might hang if it doesn't raise an error
         self.cmd_raises_unknown_feature(['mount', self.repository_location + '::test', mountpoint])
+
+    @pytest.mark.allow_cache_wipe
+    def test_unknown_mandatory_feature_in_cache(self):
+        if self.prefix:
+            path_prefix = 'ssh://__testsuite__'
+        else:
+            path_prefix = ''
+
+        print(self.cmd('init', self.repository_location))
+
+        with Repository(self.repository_path, exclusive=True) as repository:
+            if path_prefix:
+                repository._location = Location(self.repository_location)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, key, manifest) as cache:
+                cache.begin_txn()
+                cache.mandatory_features = set(['unknown-feature'])
+                cache.commit()
+
+        if self.FORK_DEFAULT:
+            self.cmd('create', self.repository_location + '::test', 'input')
+        else:
+            called = False
+            wipe_cache_safe = Cache.wipe_cache
+
+            def wipe_wrapper(*args):
+                nonlocal called
+                called = True
+                wipe_cache_safe(*args)
+
+            with patch.object(Cache, 'wipe_cache', wipe_wrapper):
+                self.cmd('create', self.repository_location + '::test', 'input')
+
+            assert called
+
+        with Repository(self.repository_path, exclusive=True) as repository:
+            if path_prefix:
+                repository._location = Location(self.repository_location)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, key, manifest) as cache:
+                assert cache.mandatory_features == set([])
 
     def test_progress(self):
         self.create_regular_file('file1', size=1024 * 80)

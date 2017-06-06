@@ -4,6 +4,8 @@ import sys
 
 import pytest
 
+import borg.cache
+
 # needed to get pretty assertion failures in unit tests:
 if hasattr(pytest, 'register_assert_rewrite'):
     pytest.register_assert_rewrite('borg.testsuite')
@@ -35,3 +37,22 @@ def clean_env(tmpdir_factory, monkeypatch):
     keys = [key for key in os.environ if key.startswith('BORG_')]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
+
+
+class DefaultPatches:
+    def __init__(self, request):
+        self.org_cache_wipe_cache = borg.cache.Cache.wipe_cache
+
+        def wipe_should_not_be_called(*a, **kw):
+            raise AssertionError("Cache wipe was triggered, if this is part of the test add @pytest.mark.allow_cache_wipe")
+        if 'allow_cache_wipe' not in request.keywords:
+            borg.cache.Cache.wipe_cache = wipe_should_not_be_called
+        request.addfinalizer(self.undo)
+
+    def undo(self):
+        borg.cache.Cache.wipe_cache = self.org_cache_wipe_cache
+
+
+@pytest.fixture(autouse=True)
+def default_patches(request):
+    return DefaultPatches(request)

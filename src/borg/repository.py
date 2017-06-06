@@ -1158,7 +1158,6 @@ class LoggedIO:
         self.segment = transaction_id + 1
         for segment, filename in self.segment_iterator(reverse=True):
             if segment > transaction_id:
-                # Truncate segment files before unlink(). This can help a full file system recover.
                 truncate_and_unlink(filename)
             else:
                 break
@@ -1234,12 +1233,7 @@ class LoggedIO:
         if segment in self.fds:
             del self.fds[segment]
         try:
-            filename = self.segment_filename(segment)
-            # Truncate segment files before unlink(). This can help a full file system recover.
-            # In this instance (cf. cleanup()) we need to use r+b (=O_RDWR|O_BINARY) and
-            # issue an explicit truncate() to avoid creating a file
-            # if *segment* did not exist in the first place.
-            truncate_and_unlink(filename)
+            truncate_and_unlink(self.segment_filename(segment))
         except FileNotFoundError:
             pass
 

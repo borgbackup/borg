@@ -18,7 +18,7 @@ from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import hostname_is_unique
-from .helpers import secure_erase
+from .helpers import secure_erase, truncate_and_unlink
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -83,6 +83,30 @@ class Repository:
     dir/data/<X // SEGMENTS_PER_DIR>/<X>
     dir/index.X
     dir/hints.X
+
+    File system interaction
+    -----------------------
+
+    LoggedIO generally tries to rely on common behaviours across transactional file systems.
+
+    Segments that are deleted are truncated first, which avoids problems if the FS needs to
+    allocate space to delete the dirent of the segment. This mostly affects CoW file systems,
+    traditional journaling file systems have a fairly good grip on this problem.
+
+    Note that deletion, i.e. unlink(2), is atomic on every file system that uses inode reference
+    counts, which includes pretty much all of them. To remove a dirent the inodes refcount has
+    to be decreased, but you can't decrease the refcount before removing the dirent nor can you
+    decrease the refcount after removing the dirent. File systems solve this with a lock,
+    and by ensuring it all stays within the same FS transaction.
+
+    Truncation is generally not atomic in itself, and combining truncate(2) and unlink(2) is of
+    course never guaranteed to be atomic. Truncation in a classic extent-based FS is done in
+    roughly two phases, first the extents are removed then the inode is updated. (In practice
+    this is of course way more complex).
+
+    LoggedIO gracefully handles truncate/unlink splits as long as the truncate resulted in
+    a zero length file. Zero length segments are considered to not exist, while LoggedIO.cleanup()
+    will still get rid of them.
     """
 
     class DoesNotExist(Error):
@@ -1111,6 +1135,8 @@ class LoggedIO:
                 filenames = [filename for filename in filenames if filename.isdigit() and int(filename) <= segment]
             filenames = sorted(filenames, key=int, reverse=reverse)
             for filename in filenames:
+                # Note: Do not filter out logically deleted segments  (see "File system interaction" above),
+                # since this is used by cleanup and txn state detection as well.
                 yield int(filename), os.path.join(data_path, dir, filename)
 
     def get_latest_segment(self):
@@ -1132,7 +1158,7 @@ class LoggedIO:
         self.segment = transaction_id + 1
         for segment, filename in self.segment_iterator(reverse=True):
             if segment > transaction_id:
-                os.unlink(filename)
+                truncate_and_unlink(filename)
             else:
                 break
 
@@ -1207,12 +1233,15 @@ class LoggedIO:
         if segment in self.fds:
             del self.fds[segment]
         try:
-            os.unlink(self.segment_filename(segment))
+            truncate_and_unlink(self.segment_filename(segment))
         except FileNotFoundError:
             pass
 
     def segment_exists(self, segment):
-        return os.path.exists(self.segment_filename(segment))
+        filename = self.segment_filename(segment)
+        # When deleting segments, they are first truncated. If truncate(2) and unlink(2) are split
+        # across FS transactions, then logically deleted segments will show up as truncated.
+        return os.path.exists(filename) and os.path.getsize(filename)
 
     def segment_size(self, segment):
         return os.path.getsize(self.segment_filename(segment))
@@ -1258,6 +1287,7 @@ class LoggedIO:
         if segment in self.fds:
             del self.fds[segment]
         with open(filename, 'rb') as fd:
+            # XXX: Rather use mmap, this loads the entire segment (up to 500 MB by default) into memory.
             data = memoryview(fd.read())
         os.rename(filename, filename + '.beforerecover')
         logger.info('attempting to recover ' + filename)

@@ -1995,6 +1995,23 @@ def secure_erase(path):
     os.unlink(path)
 
 
+def truncate_and_unlink(path):
+    """
+    Truncate and then unlink *path*.
+
+    Do not create *path* if it does not exist.
+    Open *path* for truncation in r+b mode (=O_RDWR|O_BINARY).
+
+    Use this when deleting potentially large files when recovering
+    from a VFS error such as ENOSPC. It can help a full file system
+    recover. Refer to the "File system interaction" section
+    in repository.py for further explanations.
+    """
+    with open(path, 'r+b') as fd:
+        fd.truncate()
+    os.unlink(path)
+
+
 def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
     """
     Handle typical errors raised by subprocess.Popen. Return None if an error occurred,

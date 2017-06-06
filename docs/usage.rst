@@ -52,6 +52,7 @@ Usage
    usage/tar
    usage/serve
    usage/lock
+   usage/benchmark
 
    usage/help
    usage/debug

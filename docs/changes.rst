@@ -418,7 +418,7 @@ Other changes:
 - ArchiveFormatter: add "start" key for compatibility with "info"
 - RemoteRepository: account rx/tx bytes
 - setup.py build_usage/build_man/build_api fixes
-- Manifest.in: simplify, exclude *.{so,dll,orig}, #2066
+- Manifest.in: simplify, exclude .so, .dll and .orig, #2066
 - FUSE: get rid of chunk accounting, st_blocks = ceil(size / blocksize).
 - tests:
 

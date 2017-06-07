@@ -11,8 +11,8 @@ from .logger import create_logger
 
 logger = create_logger()
 
+from .algorithms.hashindex import ChunkIndex, ChunkIndexEntry
 from .constants import CACHE_README
-from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir

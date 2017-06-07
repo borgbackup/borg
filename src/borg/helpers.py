@@ -40,8 +40,7 @@ logger = create_logger()
 import borg.crypto.low_level
 from . import __version__ as borg_version
 from . import __version_tuple__ as borg_version_tuple
-from . import hashindex
-from .algorithms import chunker
+from .algorithms import chunker, hashindex
 from .constants import *  # NOQA
 
 

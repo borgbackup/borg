@@ -10,7 +10,7 @@ import msgpack
 
 import pytest
 
-from ..hashindex import NSIndex
+from ..algorithms.hashindex import NSIndex
 from ..helpers import Location
 from ..helpers import IntegrityError
 from ..locking import Lock, LockFailed

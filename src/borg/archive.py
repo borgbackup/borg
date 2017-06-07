@@ -21,11 +21,11 @@ logger = create_logger()
 
 from . import xattr
 from .algorithms.chunker import Chunker
+from .algorithms.hashindex import ChunkIndex, ChunkIndexEntry
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
-from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import ChunkIteratorFileWrapper, open_item

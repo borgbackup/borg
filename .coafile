@@ -5,8 +5,8 @@ use_spaces = True
 
 [all.general]
 files = src/borg/**/*.(py|pyx|c)
-ignore = src/borg/(compress.c|hashindex.c|item.c),
-         src/borg/algorithms/(chunker.c|checksums.c|crc32.c),
+ignore = src/borg/(compress.c|item.c),
+         src/borg/algorithms/(chunker.c|checksums.c|crc32.c|hashindex.c),
          src/borg/algorithms/blake2/*,
          src/borg/algorithms/xxh64/*,
          src/borg/crypto/low_level.c,

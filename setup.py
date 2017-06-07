@@ -52,7 +52,7 @@ from distutils.command.clean import clean
 
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
-chunker_source = 'src/borg/algorithms/chunker.pyx'
+chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
 checksums_source = 'src/borg/algorithms/checksums.pyx'
@@ -89,7 +89,7 @@ try:
             self.filelist.extend([
                 'src/borg/compress.c',
                 'src/borg/crypto/low_level.c',
-                'src/borg/algorithms/chunker.c', 'src/borg/algorithms/buzhash.c',
+                'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
                 'src/borg/item.c',
                 'src/borg/algorithms/checksums.c',
@@ -623,8 +623,9 @@ if not on_rtd:
     Extension('borg.crypto.low_level', [crypto_ll_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),
-    Extension('borg.algorithms.chunker', [chunker_source]),
+    Extension('borg.chunker', [chunker_source]),
     Extension('borg.algorithms.checksums', [checksums_source]),
+
 ]
     if not sys.platform.startswith(('win32', )):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))

@@ -64,6 +64,7 @@ from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
 from .helpers import ChunkIteratorFileWrapper
 from .helpers import popen_with_error_handling
+from .nanorst import RstToTextLazy, ansi_escapes
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
 from .item import Item
@@ -2256,6 +2257,18 @@ class Archiver:
                 setattr(args, dest, option_value)
 
     def build_parser(self):
+        if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty() and (sys.platform != 'win32' or 'ANSICON' in os.environ):
+            rst_state_hook = ansi_escapes
+        else:
+            rst_state_hook = None
+
+        # You can use :ref:`xyz` in the following usage pages. However, for plain-text view,
+        # e.g. through "borg ... --help", define a substitution for the reference here.
+        # It will replace the entire :ref:`foo` verbatim.
+        rst_plain_text_references = {
+            'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
+        }
+
         def process_epilog(epilog):
             epilog = textwrap.dedent(epilog).splitlines()
             try:
@@ -2264,7 +2277,10 @@ class Archiver:
                 mode = 'command-line'
             if mode in ('command-line', 'build_usage'):
                 epilog = [line for line in epilog if not line.startswith('.. man')]
-            return '\n'.join(epilog)
+            epilog = '\n'.join(epilog)
+            if mode == 'command-line':
+                epilog = RstToTextLazy(epilog, rst_state_hook, rst_plain_text_references)
+            return epilog
 
         def define_common_options(add_common_option):
             add_common_option('-h', '--help', action='help', help='show this help message and exit')
@@ -3451,7 +3467,7 @@ class Archiver:
         used to have upgraded Borg 0.xx or Attic archives deduplicate with
         Borg 1.x archives.
 
-        USE WITH CAUTION.
+        **USE WITH CAUTION.**
         Depending on the PATHs and patterns given, recreate can be used to permanently
         delete files from archives.
         When in doubt, use "--dry-run --verbose --list" to see how patterns/PATHS are
@@ -3761,7 +3777,7 @@ class Archiver:
 
         It creates input data below the given PATH and backups this data into the given REPO.
         The REPO must already exist (it could be a fresh empty repo or an existing repo, the
-        command will create / read / update / delete some archives named borg-test-data* there.
+        command will create / read / update / delete some archives named borg-test-data\* there.
 
         Make sure you have free space there, you'll need about 1GB each (+ overhead).
 

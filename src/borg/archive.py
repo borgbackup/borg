@@ -1145,7 +1145,7 @@ class ArchiveChecker:
         else:
             try:
                 self.manifest, _ = Manifest.load(repository, (Manifest.Operation.CHECK,), key=self.key)
-            except IntegrityError as exc:
+            except IntegrityError as exc:  # KILLING manifest
                 logger.error('Repository manifest is corrupted: %s', exc)
                 self.error_found = True
                 del self.chunks[Manifest.MANIFEST_ID]
@@ -1208,7 +1208,7 @@ class ArchiveChecker:
                 chunk_id = chunk_ids_revd.pop(-1)  # better efficiency
                 try:
                     encrypted_data = next(chunk_data_iter)
-                except (Repository.ObjectNotFound, IntegrityError) as err:
+                except (Repository.ObjectNotFound, IntegrityError) as err:  # KILLING chunk on 2nd fail, see below
                     self.error_found = True
                     errors += 1
                     logger.error('chunk %s: %s', bin_to_hex(chunk_id), err)
@@ -1222,7 +1222,7 @@ class ArchiveChecker:
                     _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
                     try:
                         self.key.decrypt(_chunk_id, encrypted_data)
-                    except IntegrityError as integrity_error:
+                    except IntegrityError as integrity_error:  # KILLING chunk on 2nd fail, see below
                         self.error_found = True
                         errors += 1
                         logger.error('chunk %s, integrity error: %s', bin_to_hex(chunk_id), integrity_error)
@@ -1251,7 +1251,7 @@ class ArchiveChecker:
                         encrypted_data = self.repository.get(defect_chunk)
                         _chunk_id = None if defect_chunk == Manifest.MANIFEST_ID else defect_chunk
                         self.key.decrypt(_chunk_id, encrypted_data)
-                    except IntegrityError:
+                    except IntegrityError:  # KILLING chunk now
                         # failed twice -> get rid of this chunk
                         del self.chunks[defect_chunk]
                         self.repository.delete(defect_chunk)
@@ -1292,7 +1292,7 @@ class ArchiveChecker:
             cdata = self.repository.get(chunk_id)
             try:
                 data = self.key.decrypt(chunk_id, cdata)
-            except IntegrityError as exc:
+            except IntegrityError as exc:  # KILLING - if chunk was an archive, it will be missing from manifest
                 logger.error('Skipping corrupted chunk: %s', exc)
                 self.error_found = True
                 continue

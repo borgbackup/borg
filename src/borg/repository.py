@@ -873,7 +873,7 @@ class Repository:
                 continue
             try:
                 objects = list(self.io.iter_objects(segment))
-            except IntegrityError as err:
+            except IntegrityError as err:  # note: recover_segment below will keep all entries with valid crc32
                 report_error(str(err))
                 objects = []
                 if repair:
@@ -1167,7 +1167,7 @@ class LoggedIO:
         """
         try:
             iterator = self.iter_objects(segment)
-        except IntegrityError:
+        except IntegrityError:  # KILLING? because found to be "not committed"?
             return False
         with open(self.segment_filename(segment), 'rb') as fd:
             try:
@@ -1183,7 +1183,7 @@ class LoggedIO:
         while True:
             try:
                 tag, key, offset, _ = next(iterator)
-            except IntegrityError:
+            except IntegrityError:  # KILLING? because found to be "not committed"?
                 return False
             except StopIteration:
                 break
@@ -1284,6 +1284,7 @@ class LoggedIO:
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
+        """recreate segment, keep all entries with valid crc32"""
         if segment in self.fds:
             del self.fds[segment]
         with open(filename, 'rb') as fd:
@@ -1318,12 +1319,26 @@ class LoggedIO:
         header = fd.read(self.put_header_fmt.size)
         size, tag, key, data = self._read(fd, self.put_header_fmt, header, segment, offset, (TAG_PUT, ), read_data)
         if id != key:
+            # XXX if we get here, it could be:
+            # - that the repo index is corrupted and pointed us to a wrong segment/offset (and if we get this far
+            #   and no IntegrityError was raised earlier in _read(), it means that the crc32 check worked - so we
+            #   likely are at a valid segment entry, just not at the one we wanted).
+            #   problem: crc32 check in _read() is only done when read_data is True.
+            #   this means we do not want to kill this entry, but rather rebuild the repo index (assuming that we
+            #   got segment/offset from the repo index).
+            # - less likely: the repo index is correct, the segment entry is the one we wanted, but the key in there
+            #   got corrupted in a way not triggering the crc32 check in _read().
+            # - least likely: the id in memory got corrupted short before this check.
             raise IntegrityError('Invalid segment entry header, is not for wanted id [segment {}, offset {}]'.format(
                 segment, offset))
         return data if read_data else size
 
     def _read(self, fd, fmt, header, segment, offset, acceptable_tags, read_data=True):
         # some code shared by read() and iter_objects()
+        # XXX problem: all IntegrityErrors raised here could be caused by _read() getting called
+        #              with bad segment/offset values, e.g.:
+        #              - because the repo index is corrupted (called from read()).
+        #              - because a previous entry is undetectably corrupted (when called from iter_objects())
         try:
             hdr_tuple = fmt.unpack(header)
         except struct.error as err:
@@ -1346,6 +1361,7 @@ class LoggedIO:
                 size, segment, offset))
         length = size - fmt.size
         if read_data:
+            # problem: we only have a crc32 for header+data, so if read_data is False, we can't check the crc. #1704
             data = fd.read(length)
             if len(data) != length:
                 raise IntegrityError('Segment entry data short read [segment {}, offset {}]: expected {}, got {} bytes'.format(

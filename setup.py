@@ -358,6 +358,23 @@ class build_man(Command):
 
     """)
 
+    usage_group = {
+        'break-lock': 'lock',
+        'with-lock': 'lock',
+
+        'change-passphrase': 'key',
+        'key_change-passphrase': 'key',
+        'key_export': 'key',
+        'key_import': 'key',
+        'key_migrate-to-repokey': 'key',
+
+        'export-tar': 'tar',
+
+        'benchmark_crud': 'benchmark',
+
+        'umount': 'mount',
+    }
+
     def initialize_options(self):
         pass
 
@@ -495,11 +512,15 @@ class build_man(Command):
         write()
 
     def write_examples(self, write, command):
-        with open('docs/usage.rst') as fd:
+        command = command.replace(' ', '_')
+        with open('docs/usage/%s.rst' % self.usage_group.get(command, command)) as fd:
             usage = fd.read()
-            usage_include = '.. include:: usage/%s.rst.inc' % command
+            usage_include = '.. include:: %s.rst.inc' % command
             begin = usage.find(usage_include)
             end = usage.find('.. include', begin + 1)
+            # If a command has a dedicated anchor, it will occur before the command's include.
+            if 0 < usage.find('.. _', begin + 1) < end:
+                end = usage.find('.. _', begin + 1)
             examples = usage[begin:end]
             examples = examples.replace(usage_include, '')
             examples = examples.replace('Examples\n~~~~~~~~', '')

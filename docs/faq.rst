@@ -171,6 +171,23 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
+Can I use Borg on SMR hard drives?
+----------------------------------
+
+SMR (shingled magnetic recording) hard drives are very different from
+regular hard drives. Applications have to behave in certain ways or
+performance will be heavily degraded.
+
+Borg 1.1 ships with default settings suitable for SMR drives,
+and has been successfully tested on *Seagate Archive v2* drives
+using the ext4 file system.
+
+Some Linux kernel versions between 3.19 and 4.5 had various bugs
+handling device-managed SMR drives, leading to IO errors, unresponsive
+drives and unreliable operation in general.
+
+For more details, refer to :issue:`2252`.
+
 .. _faq-integrityerror:
 
 I get an IntegrityError or similar - what now?

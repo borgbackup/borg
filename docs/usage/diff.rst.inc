@@ -4,9 +4,9 @@
 
 borg diff
 ---------
-::
+.. code-block:: none
 
-    borg [common options] diff <options> REPO_ARCHIVE1 ARCHIVE2 PATH
+    borg [common options] diff [options] REPO_ARCHIVE1 ARCHIVE2 PATH
 
 positional arguments
     REPO_ARCHIVE1
@@ -24,7 +24,7 @@ optional arguments
     ``--sort``
         | Sort the output lines by file path.
 
-`Common options`_
+:ref:`common_options`
     |
 
 Exclusion options

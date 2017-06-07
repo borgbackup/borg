@@ -4,9 +4,9 @@
 
 borg extract
 ------------
-::
+.. code-block:: none
 
-    borg [common options] extract <options> ARCHIVE PATH
+    borg [common options] extract [options] ARCHIVE PATH
 
 positional arguments
     ARCHIVE
@@ -36,7 +36,7 @@ optional arguments
     ``--sparse``
         | create holes in output sparse file from all-zero chunks
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

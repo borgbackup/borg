@@ -4,15 +4,15 @@
 
 borg umount
 -----------
-::
+.. code-block:: none
 
-    borg [common options] umount <options> MOUNTPOINT
+    borg [common options] umount [options] MOUNTPOINT
 
 positional arguments
     MOUNTPOINT
         mountpoint of the filesystem to umount
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

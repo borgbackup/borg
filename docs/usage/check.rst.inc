@@ -4,9 +4,9 @@
 
 borg check
 ----------
-::
+.. code-block:: none
 
-    borg [common options] check <options> REPOSITORY_OR_ARCHIVE
+    borg [common options] check [options] REPOSITORY_OR_ARCHIVE
 
 positional arguments
     REPOSITORY_OR_ARCHIVE
@@ -24,7 +24,7 @@ optional arguments
     ``--save-space``
         | work slower, but using less space
 
-`Common options`_
+:ref:`common_options`
     |
 
 filters

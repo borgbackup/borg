@@ -4,9 +4,9 @@
 
 borg prune
 ----------
-::
+.. code-block:: none
 
-    borg [common options] prune <options> REPOSITORY
+    borg [common options] prune [options] REPOSITORY
 
 positional arguments
     REPOSITORY
@@ -42,7 +42,7 @@ optional arguments
     ``--save-space``
         | work slower, but using less space
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

@@ -4,9 +4,9 @@
 
 borg create
 -----------
-::
+.. code-block:: none
 
-    borg [common options] create <options> ARCHIVE PATH
+    borg [common options] create [options] ARCHIVE PATH
 
 positional arguments
     ARCHIVE
@@ -26,7 +26,7 @@ optional arguments
     ``--json``
         | output stats as JSON (implies --stats)
 
-`Common options`_
+:ref:`common_options`
     |
 
 Exclusion options

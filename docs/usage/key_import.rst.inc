@@ -4,9 +4,9 @@
 
 borg key import
 ---------------
-::
+.. code-block:: none
 
-    borg [common options] key import <options> REPOSITORY PATH
+    borg [common options] key import [options] REPOSITORY PATH
 
 positional arguments
     REPOSITORY
@@ -18,7 +18,7 @@ optional arguments
     ``--paper``
         | interactively import from a backup done with --paper
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

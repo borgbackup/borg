@@ -4,15 +4,15 @@
 
 borg key migrate-to-repokey
 ---------------------------
-::
+.. code-block:: none
 
-    borg [common options] key migrate-to-repokey <options> REPOSITORY
+    borg [common options] key migrate-to-repokey [options] REPOSITORY
 
 positional arguments
     REPOSITORY
 
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

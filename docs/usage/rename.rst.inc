@@ -4,9 +4,9 @@
 
 borg rename
 -----------
-::
+.. code-block:: none
 
-    borg [common options] rename <options> ARCHIVE NEWNAME
+    borg [common options] rename [options] ARCHIVE NEWNAME
 
 positional arguments
     ARCHIVE
@@ -14,7 +14,7 @@ positional arguments
     NEWNAME
         the new archive name to use
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

@@ -4,9 +4,9 @@
 
 borg recreate
 -------------
-::
+.. code-block:: none
 
-    borg [common options] recreate <options> REPOSITORY_OR_ARCHIVE PATH
+    borg [common options] recreate [options] REPOSITORY_OR_ARCHIVE PATH
 
 positional arguments
     REPOSITORY_OR_ARCHIVE
@@ -24,7 +24,7 @@ optional arguments
     ``-s``, ``--stats``
         | print statistics at end
 
-`Common options`_
+:ref:`common_options`
     |
 
 Exclusion options

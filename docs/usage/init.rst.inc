@@ -4,9 +4,9 @@
 
 borg init
 ---------
-::
+.. code-block:: none
 
-    borg [common options] init <options> REPOSITORY
+    borg [common options] init [options] REPOSITORY
 
 positional arguments
     REPOSITORY
@@ -20,7 +20,7 @@ optional arguments
     ``--storage-quota``
         | Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

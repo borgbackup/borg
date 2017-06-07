@@ -4,9 +4,9 @@
 
 borg export-tar
 ---------------
-::
+.. code-block:: none
 
-    borg [common options] export-tar <options> ARCHIVE FILE PATH
+    borg [common options] export-tar [options] ARCHIVE FILE PATH
 
 positional arguments
     ARCHIVE
@@ -32,7 +32,7 @@ optional arguments
     ``--strip-components NUMBER``
         | Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

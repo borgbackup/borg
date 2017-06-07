@@ -4,9 +4,9 @@
 
 borg upgrade
 ------------
-::
+.. code-block:: none
 
-    borg [common options] upgrade <options> REPOSITORY
+    borg [common options] upgrade [options] REPOSITORY
 
 positional arguments
     REPOSITORY
@@ -25,7 +25,7 @@ optional arguments
     ``--disable-tam``
         | Disable manifest authentication (in key and cache)
 
-`Common options`_
+:ref:`common_options`
     |
 
 Description

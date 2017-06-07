@@ -4,9 +4,9 @@
 
 borg delete
 -----------
-::
+.. code-block:: none
 
-    borg [common options] delete <options> TARGET
+    borg [common options] delete [options] TARGET
 
 positional arguments
     TARGET
@@ -22,7 +22,7 @@ optional arguments
     ``--save-space``
         | work slower, but using less space
 
-`Common options`_
+:ref:`common_options`
     |
 
 filters

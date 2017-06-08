@@ -260,6 +260,8 @@ standalone binaries for various platforms.
 For better security, there is no automatic sync in the VM to host direction.
 The plugin `vagrant-scp` is useful to copy stuff from the VMs to the host.
 
+The "windows10" box requires the `reload` plugin (``vagrant plugin install vagrant-reload``).
+
 Usage::
 
    # To create and provision the VM:

@@ -30,6 +30,7 @@ try:
 except ImportError:
     pass
 
+import borg
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
 from ..archiver import Archiver, parse_storage_quota
@@ -44,6 +45,7 @@ from ..helpers import Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
+from ..nanorst import RstToTextLazy
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item
 from ..logger import setup_logging
@@ -3335,3 +3337,33 @@ def test_parse_storage_quota():
     assert parse_storage_quota('50M') == 50 * 1000**2
     with pytest.raises(argparse.ArgumentTypeError):
         parse_storage_quota('5M')
+
+
+def get_all_parsers():
+    """
+    Return dict mapping command to parser.
+    """
+    parser = Archiver(prog='borg').build_parser()
+    parsers = {}
+
+    def discover_level(prefix, parser, Archiver):
+        choices = {}
+        for action in parser._actions:
+            if action.choices is not None and 'SubParsersAction' in str(action.__class__):
+                for cmd, parser in action.choices.items():
+                    choices[prefix + cmd] = parser
+        if prefix and not choices:
+            return
+
+        for command, parser in sorted(choices.items()):
+            discover_level(command + " ", parser, Archiver)
+            parsers[command] = parser
+
+    discover_level("", parser, Archiver)
+    return parsers
+
+
+@pytest.mark.parametrize('command, parser', list(get_all_parsers().items()))
+def test_help_formatting(command, parser):
+    if isinstance(parser.epilog, RstToTextLazy):
+        assert parser.epilog.rst

@@ -774,7 +774,6 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             self.assert_equal(self.repository.get(H(0)), b'data2')
 
 
-@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryTestCase(RepositoryTestCase):
     repository = None  # type: RemoteRepository
 
@@ -901,7 +900,6 @@ class RemoteLegacyFree(RepositoryTestCaseBase):
             self.repository.commit()
 
 
-@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):

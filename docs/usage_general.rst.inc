@@ -60,10 +60,25 @@ Repository / Archive Locations
 Many commands want either a repository (just give the repo URL, see above) or
 an archive location, which is a repo URL followed by ``::archive_name``.
 
-Archive names must not contain the ``/`` (slash) character. For simplicity,
-maybe also avoid blanks or other characters that have special meaning on the
-shell or in a filesystem (borg mount will use the archive name as directory
-name).
+Archive names can be almost any string, but Borg places two important restrictions
+on them:
+
+1. Since archives can only be filtered by ``--prefix`` (for e.g. :ref:`borg_prune`),
+   grouping needs to be prefix based. For example, when backing up multiple hosts
+   into the same repository ``{hostname}-{date}`` makes sense, while ``{date}-{hostname}``
+   will pose issues for pruning.
+2. When mounting (:ref:`borg_mount`) an entire repository, archive names are interpreted
+   as paths. Therefore archives cannot be named ".", "..", cannot start nor end with a slash,
+   and may not contain two or more consecutive slashes.
+
+Otherwise any string can be used, including whitespace, newlines, Unicode
+and so on, however, to cause less confusion and maximize portability it's
+likely a good idea to avoid special characters. Similarly backslashes are permitted,
+but should not be used to improve portability.
+
+In summary, these are valid archive names: ``foo.example.net..myfiles``,
+``foo.example.net-system@2017-04-01``, whereas these are invalid: ``/foo``,
+``foo/../bar``, ``foo/.``, ``//foohost/share``.
 
 If you have set BORG_REPO (see above) and an archive location is needed, use
 ``::archive_name`` - the repo URL part is then read from BORG_REPO.

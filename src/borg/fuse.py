@@ -93,8 +93,7 @@ class FuseOperations(llfuse.Operations):
                     self.process_archive(archive)
                 else:
                     # lazy load archives, create archive placeholder inode
-                    archive_inode = self._create_dir(parent=1)
-                    self.contents[1][os.fsencode(name)] = archive_inode
+                    archive_inode = self._create_dir_parents(os.fsencode(name))
                     self.pending_archives[archive_inode] = archive
 
     def mount(self, mountpoint, mount_options, foreground=False):
@@ -137,6 +136,23 @@ class FuseOperations(llfuse.Operations):
         self.items[ino] = self.default_dir
         self.parent[ino] = parent
         return ino
+
+    def _create_dir_parents(self, path, parent=1):
+        """Create directory tree (equivalent to mkdir --parents)."""
+        segments = path.split(b'/')
+        segments.reverse()
+        inode = parent
+        while segments:
+            try:
+                inode = self.contents[inode][segments[-1]]
+            except KeyError:
+                break
+            segments.pop()
+        for segment in reversed(segments):
+            new_dir_inode = self._create_dir(inode)
+            self.contents[inode][segment] = new_dir_inode
+            inode = new_dir_inode
+        return inode
 
     def process_archive(self, archive, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
@@ -296,7 +312,7 @@ class FuseOperations(llfuse.Operations):
         # Check if this is an archive we need to load
         archive = self.pending_archives.pop(inode, None)
         if archive:
-            self.process_archive(archive, [os.fsencode(archive.name)])
+            self.process_archive(archive, os.fsencode(archive.name).split(b'/'))
 
     def lookup(self, parent_inode, name, ctx=None):
         self._load_pending_archive(parent_inode)

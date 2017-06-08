@@ -9,6 +9,7 @@ import json
 import os
 import os.path
 import platform
+import posixpath
 import pwd
 import re
 import shlex
@@ -810,13 +811,11 @@ class Location:
         (?P<path>(/([^:]|(:(?!:)))+))                       # start with /, then any chars, but no "::"
         """
 
-    # optional ::archive_name at the end, archive name must not contain "/".
-    # borg mount's FUSE filesystem creates one level of directories from
-    # the archive names and of course "/" is not valid in a directory name.
+    # optional ::archive_name at the end.
     optional_archive_re = r"""
         (?:
             ::                                              # "::" as separator
-            (?P<archive>[^/]+)                              # archive name must not contain "/"
+            (?P<archive>[^/].*)
         )?$"""                                              # must match until the end
 
     # regexes for misc. kinds of supported location specifiers:
@@ -856,7 +855,7 @@ class Location:
         text = replace_placeholders(text)
         valid = self._parse(text)
         if valid:
-            return True
+            return self.archive_valid(self.archive)
         m = self.env_re.match(text)
         if not m:
             return False
@@ -867,7 +866,7 @@ class Location:
         if not valid:
             return False
         self.archive = m.group('archive')
-        return True
+        return self.archive_valid(self.archive)
 
     def _parse(self, text):
         def normpath_special(p):
@@ -900,6 +899,10 @@ class Location:
             self.proto = self._host and 'ssh' or 'file'
             return True
         return False
+
+    @staticmethod
+    def archive_valid(archive):
+        return not archive or (archive == posixpath.normpath(archive) and archive not in ('..', '.') and '::' not in archive)
 
     def __str__(self):
         items = [
@@ -964,8 +967,8 @@ def location_validator(archive=None):
 
 def archivename_validator():
     def validator(text):
-        if '/' in text or '::' in text or not text:
-            raise argparse.ArgumentTypeError('Invalid repository name: "%s"' % text)
+        if not Location.archive_valid(text):
+            raise argparse.ArgumentTypeError('Invalid archive name: "%s"' % text)
         return text
     return validator
 

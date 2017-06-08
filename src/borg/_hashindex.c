@@ -473,7 +473,7 @@ hashindex_write(HashIndex *index, PyObject *file_py)
         .value_size = index->value_size
     };
 
-    length_object = PyObject_CallMethod(file_py, "write", "y#", &header, (int)sizeof(HashHeader));
+    length_object = PyObject_CallMethod(file_py, "write", "y#", &header, (Py_ssize_t)sizeof(HashHeader));
     if(PyErr_Occurred()) {
         return;
     }

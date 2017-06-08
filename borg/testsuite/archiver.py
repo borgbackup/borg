@@ -1786,7 +1786,6 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         assert not self.cmd('list', self.repository_location)
 
 
-@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
 

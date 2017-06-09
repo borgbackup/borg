@@ -55,7 +55,7 @@ multiple times to permit access to more than one repository.
 The repository may not exist yet; it can be initialized by the user,
 which allows for encryption.
 
-Storage quotas can be enabled by adding the ``--storage-quota`` option
+**Storage quotas** can be enabled by adding the ``--storage-quota`` option
 to the ``borg serve`` command line::
 
 	restrict,command="borg serve --storage-quota 20G ..." ...
@@ -70,4 +70,4 @@ support storage quotas.
 Refer to :ref:`internals_storage_quota` for more details on storage quotas.
 
 Refer to the `sshd(8) <http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
-for more details on securing SSH.
+man page for more details on SSH options.

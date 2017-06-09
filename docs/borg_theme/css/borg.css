@@ -51,4 +51,11 @@ dt code {
     /* fancy red-orange stripes */
     border-image: repeating-linear-gradient(
             -45deg,red 0,red 10px,#ffa800 10px,#ffa800 20px,red 20px) 0 20 repeat;
+
+.topic {
+    margin: 0 1em;
+    padding: 0 1em;
+    /* #4e4a4a = background of the ToC sidebar */
+    border-left: 2px solid #4e4a4a;;
+    border-right: 2px solid #4e4a4a;;
 }

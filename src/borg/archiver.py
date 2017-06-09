@@ -1942,39 +1942,40 @@ class Archiver:
             EOF
             $ borg create --exclude-from exclude.txt backup /
 
+        .. container:: experimental
 
-        A more general and easier to use way to define filename matching patterns exists
-        with the `--pattern` and `--patterns-from` options. Using these, you may specify
-        the backup roots (starting points) and patterns for inclusion/exclusion. A
-        root path starts with the prefix `R`, followed by a path (a plain path, not a
-        file pattern). An include rule starts with the prefix +, an exclude rule starts
-        with the prefix -, both followed by a pattern.
-        Inclusion patterns are useful to include paths that are contained in an excluded
-        path. The first matching pattern is used so if an include pattern matches before
-        an exclude pattern, the file is backed up.
+            A more general and easier to use way to define filename matching patterns exists
+            with the experimental `--pattern` and `--patterns-from` options. Using these, you
+            may specify the backup roots (starting points) and patterns for inclusion/exclusion.
+            A root path starts with the prefix `R`, followed by a path (a plain path, not a
+            file pattern). An include rule starts with the prefix +, an exclude rule starts
+            with the prefix -, both followed by a pattern.
+            Inclusion patterns are useful to include paths that are contained in an excluded
+            path. The first matching pattern is used so if an include pattern matches before
+            an exclude pattern, the file is backed up.
 
-        Note that the default pattern style for `--pattern` and `--patterns-from` is
-        shell style (`sh:`), so those patterns behave similar to rsync include/exclude
-        patterns. The pattern style can be set via the `P` prefix.
+            Note that the default pattern style for `--pattern` and `--patterns-from` is
+            shell style (`sh:`), so those patterns behave similar to rsync include/exclude
+            patterns. The pattern style can be set via the `P` prefix.
 
-        Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
-        considered first (in the order of appearance). Then patterns from `--patterns-from`
-        are added. Exclusion patterns from `--exclude-from` files are appended last.
+            Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
+            considered first (in the order of appearance). Then patterns from `--patterns-from`
+            are added. Exclusion patterns from `--exclude-from` files are appended last.
 
-        An example `--patterns-from` file could look like that::
+            An example `--patterns-from` file could look like that::
 
-            # "sh:" pattern style is the default, so the following line is not needed:
-            P sh
-            R /
-            # can be rebuild
-            - /home/*/.cache
-            # they're downloads for a reason
-            - /home/*/Downloads
-            # susan is a nice person
-            # include susans home
-            + /home/susan
-            # don't backup the other home directories
-            - /home/*\n\n''')
+                # "sh:" pattern style is the default, so the following line is not needed:
+                P sh
+                R /
+                # can be rebuild
+                - /home/*/.cache
+                # they're downloads for a reason
+                - /home/*/Downloads
+                # susan is a nice person
+                # include susans home
+                + /home/susan
+                # don't backup the other home directories
+                - /home/*\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, --prefix and --remote-path values support these
         placeholders:
@@ -2790,9 +2791,9 @@ class Archiver:
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
-                                   metavar="PATTERN", help='include/exclude paths matching PATTERN')
+                                   metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
         exclude_group.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                                   metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
+                                   metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system',
@@ -2875,9 +2876,9 @@ class Archiver:
         subparser.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--pattern', action=ArgparsePatternAction,
-                               metavar="PATTERN", help='include/exclude paths matching PATTERN')
+                               metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
         subparser.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                               metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
+                               metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('--numeric-owner', dest='numeric_owner',
                                action='store_true', default=False,
                                help='only obey numeric user and group identifiers')
@@ -2948,9 +2949,9 @@ class Archiver:
         subparser.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
                                metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         subparser.add_argument('--pattern', action=ArgparsePatternAction,
-                               metavar="PATTERN", help='include/exclude paths matching PATTERN')
+                               metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
         subparser.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                               metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
+                               metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
         subparser.add_argument('--strip-components', dest='strip_components',
                                type=int, default=0, metavar='NUMBER',
                                help='Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.')
@@ -3024,9 +3025,9 @@ class Archiver:
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
-                                   metavar="PATTERN", help='include/exclude paths matching PATTERN')
+                                   metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
         exclude_group.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                                   metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
+                                   metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
 
         rename_epilog = process_epilog("""
         This command renames an archive in the repository.
@@ -3145,9 +3146,9 @@ class Archiver:
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
-                                   metavar="PATTERN", help='include/exclude paths matching PATTERN')
+                                   metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
         exclude_group.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                                   metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
+                                   metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
 
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3519,9 +3520,9 @@ class Archiver:
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
-                                   metavar="PATTERN", help='include/exclude paths matching PATTERN')
+                                   metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
         exclude_group.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                                   metavar='PATTERNFILE', help='read include/exclude patterns from PATTERNFILE, one per line')
+                                   metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
 
         archive_group = subparser.add_argument_group('Archive options')
         archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,

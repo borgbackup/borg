@@ -30,7 +30,7 @@ two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
     must match from the start to just before a path separator. Except
     for the root path, paths will never end in the path separator when
     matching is attempted.  Thus, if a given pattern ends in a path
-    separator, a '*' is appended before matching is attempted.
+    separator, a '\*' is appended before matching is attempted.
 
 Shell-style patterns, selector `sh:`
 
@@ -113,39 +113,40 @@ Examples::
     EOF
     $ borg create --exclude-from exclude.txt backup /
 
+.. container:: experimental
 
-A more general and easier to use way to define filename matching patterns exists
-with the `--pattern` and `--patterns-from` options. Using these, you may specify
-the backup roots (starting points) and patterns for inclusion/exclusion. A
-root path starts with the prefix `R`, followed by a path (a plain path, not a
-file pattern). An include rule starts with the prefix +, an exclude rule starts
-with the prefix -, both followed by a pattern.
-Inclusion patterns are useful to include paths that are contained in an excluded
-path. The first matching pattern is used so if an include pattern matches before
-an exclude pattern, the file is backed up.
+    A more general and easier to use way to define filename matching patterns exists
+    with the experimental `--pattern` and `--patterns-from` options. Using these, you
+    may specify the backup roots (starting points) and patterns for inclusion/exclusion.
+    A root path starts with the prefix `R`, followed by a path (a plain path, not a
+    file pattern). An include rule starts with the prefix +, an exclude rule starts
+    with the prefix -, both followed by a pattern.
+    Inclusion patterns are useful to include paths that are contained in an excluded
+    path. The first matching pattern is used so if an include pattern matches before
+    an exclude pattern, the file is backed up.
 
-Note that the default pattern style for `--pattern` and `--patterns-from` is
-shell style (`sh:`), so those patterns behave similar to rsync include/exclude
-patterns. The pattern style can be set via the `P` prefix.
+    Note that the default pattern style for `--pattern` and `--patterns-from` is
+    shell style (`sh:`), so those patterns behave similar to rsync include/exclude
+    patterns. The pattern style can be set via the `P` prefix.
 
-Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
-considered first (in the order of appearance). Then patterns from `--patterns-from`
-are added. Exclusion patterns from `--exclude-from` files are appended last.
+    Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
+    considered first (in the order of appearance). Then patterns from `--patterns-from`
+    are added. Exclusion patterns from `--exclude-from` files are appended last.
 
-An example `--patterns-from` file could look like that::
+    An example `--patterns-from` file could look like that::
 
-    # "sh:" pattern style is the default, so the following line is not needed:
-    P sh
-    R /
-    # can be rebuild
-    - /home/*/.cache
-    # they're downloads for a reason
-    - /home/*/Downloads
-    # susan is a nice person
-    # include susans home
-    + /home/susan
-    # don't backup the other home directories
-    - /home/*
+        # "sh:" pattern style is the default, so the following line is not needed:
+        P sh
+        R /
+        # can be rebuild
+        - /home/*/.cache
+        # they're downloads for a reason
+        - /home/*/Downloads
+        # susan is a nice person
+        # include susans home
+        + /home/susan
+        # don't backup the other home directories
+        - /home/*
 
 .. _borg_placeholders:
 

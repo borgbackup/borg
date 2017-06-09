@@ -563,12 +563,14 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             for id in ids:
                 cleanup_cached_archive(id)
 
-        def cleanup_cached_archive(id):
+        def cleanup_cached_archive(id, cleanup_compact=True):
             try:
                 os.unlink(mkpath(id))
                 os.unlink(mkpath(id) + '.integrity')
             except FileNotFoundError:
                 pass
+            if not cleanup_compact:
+                return
             try:
                 os.unlink(mkpath(id, suffix='.compact'))
                 os.unlink(mkpath(id, suffix='.compact') + '.integrity')
@@ -578,7 +580,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
         def fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx):
             nonlocal processed_item_metadata_bytes
             nonlocal processed_item_metadata_chunks
-            nonlocal compact_chunks_archive_saved_space
             csize, data = decrypted_repository.get(archive_id)
             chunk_idx.add(archive_id, 1, len(data), csize)
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
@@ -591,17 +592,21 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 processed_item_metadata_chunks += 1
                 sync.feed(data)
             if self.do_cache:
-                compact_chunks_archive_saved_space += chunk_idx.compact()
-                fn = mkpath(archive_id, suffix='.compact')
-                fn_tmp = mkpath(archive_id, suffix='.tmp')
-                try:
-                    with DetachedIntegrityCheckedFile(path=fn_tmp, write=True,
-                                                      filename=bin_to_hex(archive_id)) as fd:
-                        chunk_idx.write(fd)
-                except Exception:
-                    os.unlink(fn_tmp)
-                else:
-                    os.rename(fn_tmp, fn)
+                write_archive_index(archive_id, chunk_idx)
+
+        def write_archive_index(archive_id, chunk_idx):
+            nonlocal compact_chunks_archive_saved_space
+            compact_chunks_archive_saved_space += chunk_idx.compact()
+            fn = mkpath(archive_id, suffix='.compact')
+            fn_tmp = mkpath(archive_id, suffix='.tmp')
+            try:
+                with DetachedIntegrityCheckedFile(path=fn_tmp, write=True,
+                                                  filename=bin_to_hex(archive_id)) as fd:
+                    chunk_idx.write(fd)
+            except Exception:
+                os.unlink(fn_tmp)
+            else:
+                os.rename(fn_tmp, fn)
 
         def get_archive_ids_to_names(archive_ids):
             # Pass once over all archives and build a mapping from ids to names.
@@ -642,11 +647,19 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                             logger.info("Reading cached archive chunk index for %s ...", archive_name)
                             try:
                                 try:
+                                    # Attempt to load compact index first
                                     with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path + '.compact', write=False) as fd:
                                         archive_chunk_idx = ChunkIndex.read(fd, permit_compact=True)
+                                    # In case a non-compact index exists, delete it.
+                                    cleanup_cached_archive(archive_id, cleanup_compact=False)
                                 except FileNotFoundError:
+                                    # No compact index found, load non-compact index
                                     with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
                                         archive_chunk_idx = ChunkIndex.read(fd)
+                                    # Automatically convert to compact index. Delete the existing index first.
+                                    logger.debug('Found non-compact index for %s, converting to compact.', archive_name)
+                                    cleanup_cached_archive(archive_id)
+                                    write_archive_index(archive_id, archive_chunk_idx)
                             except FileIntegrityError as fie:
                                 logger.error('Cached archive chunk index of %s is corrupted: %s', archive_name, fie)
                                 # Delete it and fetch a new index

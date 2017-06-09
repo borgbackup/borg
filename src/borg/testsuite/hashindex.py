@@ -162,22 +162,6 @@ class HashIndexExtraTestCase(BaseTestCase):
         # the index should now be empty
         assert list(index.iteritems()) == []
 
-    def test_vacuum(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = 1, 100, 100
-        idx1[H(2)] = 2, 200, 200
-        idx1[H(3)] = 3, 300, 300
-        idx1.compact()
-        assert idx1.size() == 18 + 3 * (32 + 3 * 4)
-        #with self.assert_raises(KeyError):
-        #    idx1[H(1)]
-        data = list(idx1.iteritems())
-        print(data)
-        assert (H(1), ChunkIndexEntry(1, 100, 100)) in data
-        assert (H(2), ChunkIndexEntry(2, 200, 200)) in data
-        assert (H(3), ChunkIndexEntry(3, 300, 300)) in data
-
-
 
 class HashIndexSizeTestCase(BaseTestCase):
     def test_size_on_disk(self):
@@ -486,6 +470,20 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
         self.index(num_entries=0, num_buckets=0)
         assert compact_index == self.index_data.getvalue()
+
+    def test_merge(self):
+        master = ChunkIndex()
+        idx1 = ChunkIndex()
+        idx1[H(1)] = 1, 100, 100
+        idx1[H(2)] = 2, 200, 200
+        idx1[H(3)] = 3, 300, 300
+        idx1.compact()
+        assert idx1.size() == 18 + 3 * (32 + 3 * 4)
+
+        master.merge(idx1)
+        assert master[H(1)] == (1, 100, 100)
+        assert master[H(2)] == (2, 200, 200)
+        assert master[H(3)] == (3, 300, 300)
 
 
 class NSIndexTestCase(BaseTestCase):

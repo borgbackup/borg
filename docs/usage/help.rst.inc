@@ -8,8 +8,10 @@ borg help patterns
 
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full-matches. By default, fnmatch is used for
-`--exclude` patterns and shell-style is used for `--pattern`. If followed
-by a colon (':') the first two characters of a pattern are used as a
+`--exclude` patterns and shell-style is used for the experimental `--pattern`
+option.
+
+If followed by a colon (':') the first two characters of a pattern are used as a
 style selector. Explicit style selection is necessary when a
 non-default style is desired or when the desired pattern starts with
 two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
@@ -17,7 +19,7 @@ two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
 `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
 
     This is the default style for --exclude and --exclude-from.
-    These patterns use a variant of shell pattern syntax, with '*' matching
+    These patterns use a variant of shell pattern syntax, with '\*' matching
     any number of characters, '?' matching any single character, '[...]'
     matching any single character specified, including ranges, and '[!...]'
     matching any character not specified. For the purpose of these patterns,

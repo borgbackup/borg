@@ -16,6 +16,10 @@ def test_comment_inline():
     assert rst_to_text('Foo and Bar\n.. foo\nbar') == 'Foo and Bar\n.. foo\nbar'
 
 
+def test_inline_escape():
+    assert rst_to_text('Such as "\\*" characters.') == 'Such as "*" characters.'
+
+
 def test_comment():
     assert rst_to_text('Foo and Bar\n\n.. foo\nbar') == 'Foo and Bar\n\nbar'
 

@@ -45,7 +45,7 @@ from ..helpers import Manifest
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
-from ..nanorst import RstToTextLazy
+from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item
 from ..logger import setup_logging
@@ -3366,3 +3366,8 @@ def get_all_parsers():
 def test_help_formatting(command, parser):
     if isinstance(parser.epilog, RstToTextLazy):
         assert parser.epilog.rst
+
+
+@pytest.mark.parametrize('topic, helptext', list(Archiver.helptext.items()))
+def test_help_formatting_helptexts(topic, helptext):
+    assert str(rst_to_terminal(helptext))

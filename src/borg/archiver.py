@@ -64,7 +64,7 @@ from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
 from .helpers import ChunkIteratorFileWrapper
 from .helpers import popen_with_error_handling
-from .nanorst import RstToTextLazy, ansi_escapes
+from .nanorst import rst_to_terminal
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
 from .item import Item
@@ -1837,8 +1837,10 @@ class Archiver:
     helptext['patterns'] = textwrap.dedent('''
         File patterns support these styles: fnmatch, shell, regular expressions,
         path prefixes and path full-matches. By default, fnmatch is used for
-        `--exclude` patterns and shell-style is used for `--pattern`. If followed
-        by a colon (':') the first two characters of a pattern are used as a
+        `--exclude` patterns and shell-style is used for the experimental `--pattern`
+        option.
+
+        If followed by a colon (':') the first two characters of a pattern are used as a
         style selector. Explicit style selection is necessary when a
         non-default style is desired or when the desired pattern starts with
         two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
@@ -1846,7 +1848,7 @@ class Archiver:
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
 
             This is the default style for --exclude and --exclude-from.
-            These patterns use a variant of shell pattern syntax, with '*' matching
+            These patterns use a variant of shell pattern syntax, with '\*' matching
             any number of characters, '?' matching any single character, '[...]'
             matching any single character specified, including ranges, and '[!...]'
             matching any character not specified. For the purpose of these patterns,
@@ -1857,7 +1859,7 @@ class Archiver:
             must match from the start to just before a path separator. Except
             for the root path, paths will never end in the path separator when
             matching is attempted.  Thus, if a given pattern ends in a path
-            separator, a '*' is appended before matching is attempted.
+            separator, a '\*' is appended before matching is attempted.
 
         Shell-style patterns, selector `sh:`
 
@@ -2099,7 +2101,7 @@ class Archiver:
         if not args.topic:
             parser.print_help()
         elif args.topic in self.helptext:
-            print(self.helptext[args.topic])
+            print(rst_to_terminal(self.helptext[args.topic]))
         elif args.topic in commands:
             if args.epilog_only:
                 print(commands[args.topic].epilog)
@@ -2257,11 +2259,6 @@ class Archiver:
                 setattr(args, dest, option_value)
 
     def build_parser(self):
-        if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty() and (sys.platform != 'win32' or 'ANSICON' in os.environ):
-            rst_state_hook = ansi_escapes
-        else:
-            rst_state_hook = None
-
         # You can use :ref:`xyz` in the following usage pages. However, for plain-text view,
         # e.g. through "borg ... --help", define a substitution for the reference here.
         # It will replace the entire :ref:`foo` verbatim.
@@ -2279,7 +2276,7 @@ class Archiver:
                 epilog = [line for line in epilog if not line.startswith('.. man')]
             epilog = '\n'.join(epilog)
             if mode == 'command-line':
-                epilog = RstToTextLazy(epilog, rst_state_hook, rst_plain_text_references)
+                epilog = rst_to_terminal(epilog, rst_plain_text_references)
             return epilog
 
         def define_common_options(add_common_option):

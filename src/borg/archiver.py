@@ -245,7 +245,7 @@ class Archiver:
                 'By default repositories initialized with this version will produce security\n'
                 'errors if written to with an older version (up to and including Borg 1.0.8).\n'
                 '\n'
-                'If you want to use these older versions, you can disable the check by runnning:\n'
+                'If you want to use these older versions, you can disable the check by running:\n'
                 'borg upgrade --disable-tam \'%s\'\n'
                 '\n'
                 'See https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability '
@@ -1947,7 +1947,7 @@ class Archiver:
         root path starts with the prefix `R`, followed by a path (a plain path, not a
         file pattern). An include rule starts with the prefix +, an exclude rule starts
         with the prefix -, both followed by a pattern.
-        Inclusion patterns are useful to include pathes that are contained in an excluded
+        Inclusion patterns are useful to include paths that are contained in an excluded
         path. The first matching pattern is used so if an include pattern matches before
         an exclude pattern, the file is backed up.
 

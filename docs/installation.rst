@@ -47,7 +47,7 @@ Repository File System
   - link - when upgrading an Attic repo in-place
   - listdir, stat
   - fsync on files and directories to ensure data is written onto storage media
-    (some file systems do not support fsync on directories, which Borg accomodates for)
+    (some file systems do not support fsync on directories, which Borg accommodates for)
 
 :ref:`data-structures` contains additional information about how |project_name|
 manages data.

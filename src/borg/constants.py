@@ -15,7 +15,7 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'us
 # this is the set of keys that are always present in archives:
 REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])
 
-# default umask, overriden by --umask, defaults to read/write only for owner
+# default umask, overridden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
 
 CACHE_TAG_NAME = 'CACHEDIR.TAG'

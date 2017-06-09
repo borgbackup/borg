@@ -46,7 +46,7 @@ from .constants import *  # NOQA
 
 '''
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
-warning or error occured during their operation. This is different from archiver.exit_code, which is only accessible
+warning or error occurred during their operation. This is different from archiver.exit_code, which is only accessible
 from the archiver object.
 '''
 exit_code = EXIT_SUCCESS
@@ -145,7 +145,7 @@ ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
 class Archives(abc.MutableMapping):
     """
     Nice wrapper around the archives dict, making sure only valid types/values get in
-    and we can deal with str keys (and it internally encodes to byte keys) and eiter
+    and we can deal with str keys (and it internally encodes to byte keys) and either
     str timestamps or datetime timestamps.
     """
     def __init__(self):
@@ -830,7 +830,7 @@ class Location:
         (?P<proto>file)://                                  # file://
         """ + file_path_re + optional_archive_re, re.VERBOSE)  # servername/path, path or path::archive
 
-    # note: scp_re is also use for local pathes
+    # note: scp_re is also use for local paths
     scp_re = re.compile(r"""
         (
             """ + optional_user_re + r"""                   # user@  (optional)
@@ -979,7 +979,7 @@ def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
 
 def prepare_dump_dict(d):
     def decode_bytes(value):
-        # this should somehow be reversable later, but usual strings should
+        # this should somehow be reversible later, but usual strings should
         # look nice and chunk ids should mostly show in hex. Use a special
         # inband signaling character (ASCII DEL) to distinguish between
         # decoded and hex mode.

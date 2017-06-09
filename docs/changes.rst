@@ -936,7 +936,7 @@ Other changes:
 
 - avoid previous_location mismatch, #1741
 
-  due to the changed canonicalization for relative pathes in PR #1711 / #1655
+  due to the changed canonicalization for relative paths in PR #1711 / #1655
   (implement /./ relpath hack), there would be a changed repo location warning
   and the user would be asked if this is ok. this would break automation and
   require manual intervention, which is unwanted.
@@ -983,8 +983,8 @@ Bug fixes:
   (this seems not to get triggered in 1.0.x, but was discovered in master)
 - hashindex: fix iterators (always raise StopIteration when exhausted)
   (this seems not to get triggered in 1.0.x, but was discovered in master)
-- enable relative pathes in ssh:// repo URLs, via /./relpath hack, #1655
-- allow repo pathes with colons, #1705
+- enable relative paths in ssh:// repo URLs, via /./relpath hack, #1655
+- allow repo paths with colons, #1705
 - update changed repo location immediately after acceptance, #1524
 - fix debug get-obj / delete-obj crash if object not found and remote repo,
   #1684
@@ -1063,7 +1063,7 @@ Security fixes:
   working in e.g. /path/client13 or /path/client1000.
 
   As this could accidentally lead to major security/privacy issues depending on
-  the pathes you use, the behaviour was changed to be a strict directory match.
+  the paths you use, the behaviour was changed to be a strict directory match.
   That means --restrict-to-path /path/client1 (with or without trailing slash
   does not make a difference) now uses /path/client1/ internally (note the
   trailing slash here!) for matching and allows precisely that path AND any
@@ -1071,7 +1071,7 @@ Security fixes:
   but not /path/client13 or /path/client1000.
 
   If you willingly used the undocumented (dangerous) previous behaviour, you
-  may need to rearrange your --restrict-to-path pathes now. We are sorry if
+  may need to rearrange your --restrict-to-path paths now. We are sorry if
   that causes work for you, but we did not want a potentially dangerous
   behaviour in the software (not even using a for-backwards-compat option).
 
@@ -1151,7 +1151,7 @@ Bug fixes:
 - fix repo lock deadlocks (related to lock upgrade), #1220
 - catch unpacker exceptions, resync, #1351
 - fix borg break-lock ignoring BORG_REPO env var, #1324
-- files cache performance fixes (fixes unneccessary re-reading/chunking/
+- files cache performance fixes (fixes unnecessary re-reading/chunking/
   hashing of unmodified files for some use cases):
 
   - fix unintended file cache eviction, #1430
@@ -1434,7 +1434,7 @@ Bug fixes:
 - add overflow and range checks for 1st (special) uint32 of the hashindex
   values, switch from int32 to uint32.
 - fix so that refcount will never overflow, but just stick to max. value after
-  a overflow would have occured.
+  a overflow would have occurred.
 - borg delete: fix --cache-only for broken caches, #874
 
   Makes --cache-only idempotent: it won't fail if the cache is already deleted.

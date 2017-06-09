@@ -25,7 +25,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex, \
-    get_security_dir, MAX_S
+    get_security_dir, MAX_S, MandatoryFeatureUnsupported, Location
 from ..key import RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
@@ -248,7 +248,7 @@ class ArchiverTestCaseBase(BaseTestCase):
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(repository, key, manifest, name)
         return archive, repository
 
@@ -815,7 +815,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('extract', '--dry-run', self.repository_location + '::test.4')
         # Make sure both archives have been renamed
         with Repository(self.repository_path) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         self.assert_equal(len(manifest.archives), 2)
         self.assert_in('test.3', manifest.archives)
         self.assert_in('test.4', manifest.archives)
@@ -853,7 +853,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=none', self.repository_location)
         self.create_src_archive('test')
         with Repository(self.repository_path, exclusive=True) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(repository, key, manifest, 'test')
             for item in archive.iter_items():
                 if 'chunks' in item:
@@ -870,7 +870,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=none', self.repository_location)
         self.create_src_archive('test')
         with Repository(self.repository_path, exclusive=True) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(repository, key, manifest, 'test')
             id = archive.metadata[b'items'][0]
             repository.put(id, b'corrupted items metadata stream chunk')
@@ -915,8 +915,110 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', '--dry-run', self.repository_location + '::test', 'input')
         # Make sure no archive has been created
         with Repository(self.repository_path) as repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         self.assert_equal(len(manifest.archives), 0)
+
+    def add_unknown_feature(self, operation):
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            manifest.config[b'feature_flags'] = {operation.value.encode(): {b'mandatory': [b'unknown-feature']}}
+            manifest.write()
+            repository.commit()
+
+    def cmd_raises_unknown_feature(self, args):
+        if self.FORK_DEFAULT:
+            self.cmd(*args, exit_code=EXIT_ERROR)
+        else:
+            with pytest.raises(MandatoryFeatureUnsupported) as excinfo:
+                self.cmd(*args)
+            assert excinfo.value.args == (['unknown-feature'],)
+
+    def test_unknown_feature_on_create(self):
+        print(self.cmd('init', self.repository_location))
+        self.add_unknown_feature(Manifest.Operation.WRITE)
+        self.cmd_raises_unknown_feature(['create', self.repository_location + '::test', 'input'])
+
+    def test_unknown_feature_on_change_passphrase(self):
+        print(self.cmd('init', self.repository_location))
+        self.add_unknown_feature(Manifest.Operation.CHECK)
+        self.cmd_raises_unknown_feature(['change-passphrase', self.repository_location])
+
+    def test_unknown_feature_on_read(self):
+        print(self.cmd('init', self.repository_location))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.READ)
+        with changedir('output'):
+            self.cmd_raises_unknown_feature(['extract', self.repository_location + '::test'])
+
+        self.cmd_raises_unknown_feature(['list', self.repository_location])
+        self.cmd_raises_unknown_feature(['info', self.repository_location + '::test'])
+
+    def test_unknown_feature_on_rename(self):
+        print(self.cmd('init', self.repository_location))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.CHECK)
+        self.cmd_raises_unknown_feature(['rename', self.repository_location + '::test', 'other'])
+
+    def test_unknown_feature_on_delete(self):
+        print(self.cmd('init', self.repository_location))
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.DELETE)
+        # delete of an archive raises
+        self.cmd_raises_unknown_feature(['delete', self.repository_location + '::test'])
+        self.cmd_raises_unknown_feature(['prune', '--keep-daily=3', self.repository_location])
+        # delete of the whole repository ignores features
+        self.cmd('delete', self.repository_location)
+
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_unknown_feature_on_mount(self):
+        self.cmd('init', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        self.add_unknown_feature(Manifest.Operation.READ)
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        os.mkdir(mountpoint)
+        # XXX this might hang if it doesn't raise an error
+        self.cmd_raises_unknown_feature(['mount', self.repository_location + '::test', mountpoint])
+
+    @pytest.mark.allow_cache_wipe
+    def test_unknown_mandatory_feature_in_cache(self):
+        if self.prefix:
+            path_prefix = 'ssh://__testsuite__'
+        else:
+            path_prefix = ''
+
+        print(self.cmd('init', self.repository_location))
+
+        with Repository(self.repository_path, exclusive=True) as repository:
+            if path_prefix:
+                repository._location = Location(self.repository_location)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, key, manifest) as cache:
+                cache.begin_txn()
+                cache.mandatory_features = set(['unknown-feature'])
+                cache.commit()
+
+        if self.FORK_DEFAULT:
+            self.cmd('create', self.repository_location + '::test', 'input')
+        else:
+            called = False
+            wipe_cache_safe = Cache.wipe_cache
+
+            def wipe_wrapper(*args):
+                nonlocal called
+                called = True
+                wipe_cache_safe(*args)
+
+            with patch.object(Cache, 'wipe_cache', wipe_wrapper):
+                self.cmd('create', self.repository_location + '::test', 'input')
+
+            assert called
+
+        with Repository(self.repository_path, exclusive=True) as repository:
+            if path_prefix:
+                repository._location = Location(self.repository_location)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, key, manifest) as cache:
+                assert cache.mandatory_features == set([])
 
     def test_progress(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -1594,7 +1696,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         # This bug can still live on in Borg repositories (through borg upgrade).
         archive, repository = self.open_archive('archive1')
         with repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
                 archive = Archive(repository, key, manifest, '0.13', cache=cache, create=True)
                 archive.items_buffer.add({
@@ -1611,7 +1713,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 class ManifestAuthenticationTest(ArchiverTestCaseBase):
     def spoof_manifest(self, repository):
         with repository:
-            _, key = Manifest.load(repository)
+            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
@@ -1624,7 +1726,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         self.cmd('init', self.repository_location)
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
-            manifest, key = Manifest.load(repository)
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
@@ -1641,7 +1743,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
             shutil.rmtree(get_security_dir(bin_to_hex(repository.id)))
-            _, key = Manifest.load(repository)
+            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             key.tam_required = False
             key.change_passphrase(key._passphrase)
 

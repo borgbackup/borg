@@ -1222,7 +1222,7 @@ class LoggedIO:
             return fd
 
     def close_segment(self):
-        # set self._write_fd to None early to guard against reentry from error handling code pathes:
+        # set self._write_fd to None early to guard against reentry from error handling code paths:
         fd, self._write_fd = self._write_fd, None
         if fd is not None:
             self.segment += 1

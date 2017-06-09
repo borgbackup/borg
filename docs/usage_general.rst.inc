@@ -19,7 +19,7 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 ``ssh://user@host:port/path/to/repo`` - same, alternative syntax, port can be given
 
 
-**Remote repositories with relative pathes** can be given using this syntax:
+**Remote repositories with relative paths** can be given using this syntax:
 
 ``user@host:path/to/repo`` - path relative to current directory
 
@@ -31,7 +31,7 @@ Note: giving ``user@host:/./path/to/repo`` or ``user@host:/~/path/to/repo`` or
 ``user@host:/~other/path/to/repo`` is also supported, but not required here.
 
 
-**Remote repositories with relative pathes, alternative syntax with port**:
+**Remote repositories with relative paths, alternative syntax with port**:
 
 ``ssh://user@host:port/./path/to/repo`` - path relative to current directory
 
@@ -231,7 +231,7 @@ this with some hardware -- independent of the software used. We don't
 know a list of affected hardware.
 
 If you are suspicious whether your Borg repository is still consistent
-and readable after one of the failures mentioned above occured, run
+and readable after one of the failures mentioned above occurred, run
 ``borg check --verify-data`` to make sure it is consistent.
 
 Units

@@ -354,7 +354,7 @@ class RepositoryServer:  # pragma: no cover
         path_with_sep = os.path.join(path, '')  # make sure there is a trailing slash (os.sep)
         if self.restrict_to_paths:
             # if --restrict-to-path P is given, we make sure that we only operate in/below path P.
-            # for the prefix check, it is important that the compared pathes both have trailing slashes,
+            # for the prefix check, it is important that the compared paths both have trailing slashes,
             # so that a path /foobar will NOT be accepted with --restrict-to-path /foo option.
             for restrict_to_path in self.restrict_to_paths:
                 restrict_to_path_with_sep = os.path.join(os.path.realpath(restrict_to_path), '')  # trailing slash

@@ -50,7 +50,7 @@ class NonceManager:
     def ensure_reservation(self, nonce_space_needed):
         # Nonces may never repeat, even if a transaction aborts or the system crashes.
         # Therefore a part of the nonce space is reserved before any nonce is used for encryption.
-        # As these reservations are commited to permanent storage before any nonce is used, this protects
+        # As these reservations are committed to permanent storage before any nonce is used, this protects
         # against nonce reuse in crashes and transaction aborts. In that case the reservation still
         # persists and the whole reserved space is never reused.
         #

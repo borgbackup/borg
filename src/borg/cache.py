@@ -601,7 +601,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             fn_tmp = mkpath(archive_id, suffix='.tmp')
             try:
                 with DetachedIntegrityCheckedFile(path=fn_tmp, write=True,
-                                                  filename=bin_to_hex(archive_id)) as fd:
+                                                  filename=bin_to_hex(archive_id) + '.compact') as fd:
                     chunk_idx.write(fd)
             except Exception:
                 os.unlink(fn_tmp)

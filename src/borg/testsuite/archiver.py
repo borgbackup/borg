@@ -2934,7 +2934,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         chunks_archive = os.path.join(self.cache_path, 'chunks.archive.d')
         assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
 
-        self.corrupt(os.path.join(chunks_archive, target_id))
+        self.corrupt(os.path.join(chunks_archive, target_id + '.compact'))
 
         # Trigger cache sync by changing the manifest ID in the cache config
         config_path = os.path.join(self.cache_path, 'config')

@@ -608,6 +608,35 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             else:
                 os.rename(fn_tmp, fn)
 
+        def read_archive_index(archive_id, archive_name):
+            archive_chunk_idx_path = mkpath(archive_id)
+            logger.info("Reading cached archive chunk index for %s ...", archive_name)
+            try:
+                try:
+                    # Attempt to load compact index first
+                    with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path + '.compact', write=False) as fd:
+                        archive_chunk_idx = ChunkIndex.read(fd, permit_compact=True)
+                    # In case a non-compact index exists, delete it.
+                    cleanup_cached_archive(archive_id, cleanup_compact=False)
+                    # Compact index read - return index, no conversion necessary (below).
+                    return archive_chunk_idx
+                except FileNotFoundError:
+                    # No compact index found, load non-compact index, and convert below.
+                    with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
+                        archive_chunk_idx = ChunkIndex.read(fd)
+            except FileIntegrityError as fie:
+                logger.error('Cached archive chunk index of %s is corrupted: %s', archive_name, fie)
+                # Delete corrupted index, set warning. A new index must be build.
+                cleanup_cached_archive(archive_id)
+                set_ec(EXIT_WARNING)
+                return None
+
+            # Convert to compact index. Delete the existing index first.
+            logger.debug('Found non-compact index for %s, converting to compact.', archive_name)
+            cleanup_cached_archive(archive_id)
+            write_archive_index(archive_id, archive_chunk_idx)
+            return archive_chunk_idx
+
         def get_archive_ids_to_names(archive_ids):
             # Pass once over all archives and build a mapping from ids to names.
             # The easier approach, doing a similar loop for each archive, has
@@ -643,29 +672,9 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                     pi.show(info=[remove_surrogates(archive_name)])
                     if self.do_cache:
                         if archive_id in cached_ids:
-                            archive_chunk_idx_path = mkpath(archive_id)
-                            logger.info("Reading cached archive chunk index for %s ...", archive_name)
-                            try:
-                                try:
-                                    # Attempt to load compact index first
-                                    with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path + '.compact', write=False) as fd:
-                                        archive_chunk_idx = ChunkIndex.read(fd, permit_compact=True)
-                                    # In case a non-compact index exists, delete it.
-                                    cleanup_cached_archive(archive_id, cleanup_compact=False)
-                                except FileNotFoundError:
-                                    # No compact index found, load non-compact index
-                                    with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
-                                        archive_chunk_idx = ChunkIndex.read(fd)
-                                    # Automatically convert to compact index. Delete the existing index first.
-                                    logger.debug('Found non-compact index for %s, converting to compact.', archive_name)
-                                    cleanup_cached_archive(archive_id)
-                                    write_archive_index(archive_id, archive_chunk_idx)
-                            except FileIntegrityError as fie:
-                                logger.error('Cached archive chunk index of %s is corrupted: %s', archive_name, fie)
-                                # Delete it and fetch a new index
-                                cleanup_cached_archive(archive_id)
+                            archive_chunk_idx = read_archive_index(archive_id, archive_name)
+                            if archive_chunk_idx is None:
                                 cached_ids.remove(archive_id)
-                                set_ec(EXIT_WARNING)
                         if archive_id not in cached_ids:
                             # Do not make this an else branch; the FileIntegrityError exception handler
                             # above can remove *archive_id* from *cached_ids*.

@@ -10,3 +10,4 @@ This chapter details deployment strategies for the following scenarios.
    :titlesonly:
 
    deployment/central-backup-server
+   deployment/hosting-repositories

@@ -650,7 +650,8 @@ hashindex_compact(HashIndex *index)
         begin_used_idx = idx;
 
         if(!empty_slot_count) {
-            memcpy(BUCKET_ADDR(index, compact_tail_idx), BUCKET_ADDR(index, idx), index->bucket_size);
+            /* In case idx==compact_tail_idx, the areas overlap */
+            memmove(BUCKET_ADDR(index, compact_tail_idx), BUCKET_ADDR(index, idx), index->bucket_size);
             idx++;
             compact_tail_idx++;
             continue;

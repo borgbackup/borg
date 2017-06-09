@@ -74,6 +74,10 @@ exclude_patterns = ['_build']
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
 
+# The Borg docs contain no or very little Python docs.
+# Thus, the primary domain is rst.
+primary_domain = 'rst'
+
 # If true, '()' will be appended to :func: etc. cross-reference text.
 #add_function_parentheses = True
 

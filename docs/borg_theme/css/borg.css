@@ -38,3 +38,17 @@ dt code {
 #internals .toctree-wrapper > ul > li > ul {
     font-weight: normal;
 }
+
+.experimental,
+#debugging-facilities,
+#borg-recreate {
+    /* don't change text dimensions */
+    margin: 0 -40px; /* padding below + border width */
+    padding: 0 20px; /* 20 px visual margin between edge of text and the border */
+    /* fallback for browsers that don't have repeating-linear-gradient: thick, red lines */
+    border-left: 20px solid red;
+    border-right: 20px solid red;
+    /* fancy red-orange stripes */
+    border-image: repeating-linear-gradient(
+            -45deg,red 0,red 10px,#ffa800 10px,#ffa800 20px,red 20px) 0 20 repeat;
+}

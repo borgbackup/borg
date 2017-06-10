@@ -2,6 +2,13 @@ import os
 
 import pytest
 
+# IMPORTANT keep this above all other borg imports to avoid inconsistent values
+# for `from borg.constants import PBKDF2_ITERATIONS` (or star import) usages before
+# this is executed
+from borg import constants
+# no fixture-based monkey-patching since star-imports are used for the constants module
+constants.PBKDF2_ITERATIONS = 1
+
 # needed to get pretty assertion failures in unit tests:
 if hasattr(pytest, 'register_assert_rewrite'):
     pytest.register_assert_rewrite('borg.testsuite')
@@ -14,12 +21,7 @@ setup_logging()
 from borg.testsuite import has_lchflags, has_llfuse
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported
 from borg.testsuite.platform import fakeroot_detected, are_acls_working
-from borg import xattr, constants
-
-
-def pytest_configure(config):
-    # no fixture-based monkey-patching since star-imports are used for the constants module
-    constants.PBKDF2_ITERATIONS = 1
+from borg import xattr
 
 
 @pytest.fixture(autouse=True)

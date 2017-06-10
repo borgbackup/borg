@@ -62,16 +62,16 @@ def pytest_report_header(config, startdir):
 
 class DefaultPatches:
     def __init__(self, request):
-        self.org_cache_wipe_cache = borg.cache.Cache.wipe_cache
+        self.org_cache_wipe_cache = borg.cache.LocalCache.wipe_cache
 
         def wipe_should_not_be_called(*a, **kw):
             raise AssertionError("Cache wipe was triggered, if this is part of the test add @pytest.mark.allow_cache_wipe")
         if 'allow_cache_wipe' not in request.keywords:
-            borg.cache.Cache.wipe_cache = wipe_should_not_be_called
+            borg.cache.LocalCache.wipe_cache = wipe_should_not_be_called
         request.addfinalizer(self.undo)
 
     def undo(self):
-        borg.cache.Cache.wipe_cache = self.org_cache_wipe_cache
+        borg.cache.LocalCache.wipe_cache = self.org_cache_wipe_cache
 
 
 @pytest.fixture(autouse=True)

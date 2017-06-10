@@ -8,8 +8,9 @@ from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
+from cpython.bytes cimport PyBytes_FromStringAndSize
 
-API_VERSION = '1.1_05'
+API_VERSION = '1.1_06'
 
 
 cdef extern from "_hashindex.c":
@@ -409,6 +410,22 @@ cdef class ChunkIndex(IndexBase):
             if not key:
                 break
             self._add(key, <uint32_t*> (key + self.key_size))
+
+    def zero_csize_ids(self):
+        cdef void *key = NULL
+        cdef uint32_t *values
+        entries = []
+        while True:
+            key = hashindex_next_key(self.index, key)
+            if not key:
+                break
+            values = <uint32_t*> (key + self.key_size)
+            refcount = _le32toh(values[0])
+            assert refcount <= _MAX_VALUE, "invalid reference count"
+            if _le32toh(values[2]) == 0:
+                # csize == 0
+                entries.append(PyBytes_FromStringAndSize(<char*> key, self.key_size))
+        return entries
 
 
 cdef class ChunkKeyIterator:

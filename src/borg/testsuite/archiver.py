@@ -34,7 +34,7 @@ import borg
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
 from ..archiver import Archiver, parse_storage_quota
-from ..cache import Cache
+from ..cache import Cache, LocalCache
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_aes_blocks
 from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
@@ -1031,6 +1031,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert out_list.index('d x/a') < out_list.index('- x/a/foo_a')
         assert out_list.index('d x/b') < out_list.index('- x/b/foo_b')
 
+    def test_create_no_cache_sync(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('delete', '--cache-only', self.repository_location)
+        create_json = json.loads(self.cmd('create', '--no-cache-sync', self.repository_location + '::test', 'input',
+                                          '--json', '--error'))  # ignore experimental warning
+        info_json = json.loads(self.cmd('info', self.repository_location + '::test', '--json'))
+        create_stats = create_json['cache']['stats']
+        info_stats = info_json['cache']['stats']
+        assert create_stats == info_stats
+        self.cmd('check', self.repository_location)
+
     def test_extract_pattern_opt(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
@@ -1509,14 +1521,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('create', self.repository_location + '::test', 'input')
         else:
             called = False
-            wipe_cache_safe = Cache.wipe_cache
+            wipe_cache_safe = LocalCache.wipe_cache
 
             def wipe_wrapper(*args):
                 nonlocal called
                 called = True
                 wipe_cache_safe(*args)
 
-            with patch.object(Cache, 'wipe_cache', wipe_wrapper):
+            with patch.object(LocalCache, 'wipe_cache', wipe_wrapper):
                 self.cmd('create', self.repository_location + '::test', 'input')
 
             assert called
@@ -2223,7 +2235,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest, sync=False) as cache:
                 original_chunks = cache.chunks
-            cache.destroy(repository)
+            Cache.destroy(repository)
             with Cache(repository, key, manifest) as cache:
                 correct_chunks = cache.chunks
         assert original_chunks is not correct_chunks

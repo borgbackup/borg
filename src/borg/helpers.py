@@ -131,7 +131,7 @@ class MandatoryFeatureUnsupported(Error):
 
 def check_extension_modules():
     from . import platform, compress, item
-    if hashindex.API_VERSION != '1.1_05':
+    if hashindex.API_VERSION != '1.1_06':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError
@@ -2010,7 +2010,7 @@ class BorgJsonEncoder(json.JSONEncoder):
         from .repository import Repository
         from .remote import RemoteRepository
         from .archive import Archive
-        from .cache import Cache
+        from .cache import LocalCache, AdHocCache
         if isinstance(o, Repository) or isinstance(o, RemoteRepository):
             return {
                 'id': bin_to_hex(o.id),
@@ -2018,9 +2018,13 @@ class BorgJsonEncoder(json.JSONEncoder):
             }
         if isinstance(o, Archive):
             return o.info()
-        if isinstance(o, Cache):
+        if isinstance(o, LocalCache):
             return {
                 'path': o.path,
+                'stats': o.stats(),
+            }
+        if isinstance(o, AdHocCache):
+            return {
                 'stats': o.stats(),
             }
         return super().default(o)

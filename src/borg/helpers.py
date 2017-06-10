@@ -125,7 +125,7 @@ def check_python():
 
 def check_extension_modules():
     from . import platform, compress, item
-    if hashindex.API_VERSION != '1.1_02':
+    if hashindex.API_VERSION != '1.1_03':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError

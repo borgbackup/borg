@@ -16,7 +16,8 @@ Examples
         ~/src                             \
         --exclude '*.pyc'
 
-    # Do the same using a shell-style pattern
+    # Backup home directories excluding image thumbnails (i.e. only
+    # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
     $ borg create /path/to/repo::my-files /home \
         --exclude 'sh:/home/*/.thumbnails'
 

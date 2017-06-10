@@ -26,9 +26,9 @@ optional arguments
     ``--exclude-from EXCLUDEFILE``
         | read exclude patterns from EXCLUDEFILE, one per line
     ``--pattern PATTERN``
-        | include/exclude paths matching PATTERN
+        | experimental: include/exclude paths matching PATTERN
     ``--patterns-from PATTERNFILE``
-        | read include/exclude patterns from PATTERNFILE, one per line
+        | experimental: read include/exclude patterns from PATTERNFILE, one per line
     ``--strip-components NUMBER``
         | Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
 

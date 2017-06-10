@@ -39,9 +39,9 @@ Exclusion options
     ``--keep-exclude-tags``, ``--keep-tag-files``
         | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
     ``--pattern PATTERN``
-        | include/exclude paths matching PATTERN
+        | experimental: include/exclude paths matching PATTERN
     ``--patterns-from PATTERNFILE``
-        | read include/exclude patterns from PATTERNFILE, one per line
+        | experimental: read include/exclude patterns from PATTERNFILE, one per line
 
 Archive options
     ``--target TARGET``
@@ -82,7 +82,7 @@ There is no risk of data loss by this.
 used to have upgraded Borg 0.xx or Attic archives deduplicate with
 Borg 1.x archives.
 
-USE WITH CAUTION.
+**USE WITH CAUTION.**
 Depending on the PATHs and patterns given, recreate can be used to permanently
 delete files from archives.
 When in doubt, use "--dry-run --verbose --list" to see how patterns/PATHS are

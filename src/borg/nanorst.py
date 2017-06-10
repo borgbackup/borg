@@ -1,5 +1,6 @@
-
 import io
+import os
+import sys
 
 
 class TextPecker:
@@ -31,6 +32,21 @@ class TextPecker:
         return out
 
 
+def process_directive(directive, arguments, out, state_hook):
+    if directive == 'container' and arguments == 'experimental':
+        state_hook('text', '**', out)
+        out.write('++ Experimental ++')
+        state_hook('**', 'text', out)
+    else:
+        state_hook('text', '**', out)
+        out.write(directive.title())
+        out.write(':\n')
+        state_hook('**', 'text', out)
+        if arguments:
+            out.write(arguments)
+            out.write('\n')
+
+
 def rst_to_text(text, state_hook=None, references=None):
     """
     Convert rST to a more human text form.
@@ -54,8 +70,10 @@ def rst_to_text(text, state_hook=None, references=None):
         next = text.peek(1)  # type: str
 
         if state == 'text':
+            if char == '\\' and text.peek(1) in inline_single:
+                continue
             if text.peek(-1) != '\\':
-                if char in inline_single and next not in inline_single:
+                if char in inline_single and next != char:
                     state_hook(state, char, out)
                     state = char
                     continue
@@ -88,21 +106,19 @@ def rst_to_text(text, state_hook=None, references=None):
                         raise ValueError("Undefined reference in Archiver help: %r — please add reference substitution"
                                          "to 'rst_plain_text_references'" % ref)
                     continue
+                if char == ':' and text.peek(2) == ':\n':  # End of line code block
+                    text.read(2)
+                    state_hook(state, 'code-block', out)
+                    state = 'code-block'
+                    out.write(':\n')
+                    continue
             if text.peek(-2) in ('\n\n', '') and char == next == '.':
                 text.read(2)
-                try:
-                    directive, arguments = text.peekline().split('::', maxsplit=1)
-                except ValueError:
-                    directive = None
-                text.readline()
+                directive, is_directive, arguments = text.readline().partition('::')
                 text.read(1)
-                if not directive:
+                if not is_directive:
                     continue
-                out.write(directive.title())
-                out.write(':\n')
-                if arguments:
-                    out.write(arguments)
-                    out.write('\n')
+                process_directive(directive, arguments.strip(), out, state_hook)
                 continue
         if state in inline_single and char == state:
             state_hook(state, 'text', out)
@@ -118,19 +134,20 @@ def rst_to_text(text, state_hook=None, references=None):
             state = 'text'
             text.read(1)
             continue
+        if state == 'code-block' and char == next == '\n' and text.peek(5)[1:] != '    ':
+            # Foo::
+            #
+            #     *stuff* *code* *ignore .. all markup*
+            #
+            #     More arcane stuff
+            #
+            # Regular text...
+            state_hook(state, 'text', out)
+            state = 'text'
         out.write(char)
 
     assert state == 'text', 'Invalid final state %r (This usually indicates unmatched */**)' % state
     return out.getvalue()
-
-
-def ansi_escapes(old_state, new_state, out):
-    if old_state == 'text' and new_state in ('*', '`', '``'):
-        out.write('\033[4m')
-    if old_state == 'text' and new_state == '**':
-        out.write('\033[1m')
-    if old_state in ('*', '`', '``', '**') and new_state == 'text':
-        out.write('\033[0m')
 
 
 class RstToTextLazy:
@@ -160,3 +177,26 @@ class RstToTextLazy:
 
     def __contains__(self, item):
         return item in self.rst
+
+
+def ansi_escapes(old_state, new_state, out):
+    if old_state == 'text' and new_state in ('*', '`', '``'):
+        out.write('\033[4m')
+    if old_state == 'text' and new_state == '**':
+        out.write('\033[1m')
+    if old_state in ('*', '`', '``', '**') and new_state == 'text':
+        out.write('\033[0m')
+
+
+def rst_to_terminal(rst, references=None, destination=sys.stdout):
+    """
+    Convert *rst* to a lazy string.
+
+    If *destination* is a file-like object connected to a terminal,
+    enrich text with suitable ANSI escapes. Otherwise return plain text.
+    """
+    if hasattr(destination, 'isatty') and destination.isatty() and (sys.platform != 'win32' or 'ANSICON' in os.environ):
+        rst_state_hook = ansi_escapes
+    else:
+        rst_state_hook = None
+    return RstToTextLazy(rst, rst_state_hook, references)

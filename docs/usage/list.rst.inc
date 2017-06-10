@@ -50,9 +50,9 @@ Exclusion options
     ``--keep-exclude-tags``, ``--keep-tag-files``
         | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
     ``--pattern PATTERN``
-        | include/exclude paths matching PATTERN
+        | experimental: include/exclude paths matching PATTERN
     ``--patterns-from PATTERNFILE``
-        | read include/exclude patterns from PATTERNFILE, one per line
+        | experimental: read include/exclude patterns from PATTERNFILE, one per line
 
 Description
 ~~~~~~~~~~~

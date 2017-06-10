@@ -7,6 +7,7 @@ cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
+from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
 API_VERSION = '1.1_02'
 
@@ -386,6 +387,12 @@ cdef class ChunkKeyIterator:
         return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]), _le32toh(value[2]))
 
 
+cdef Py_buffer ro_buffer(object data) except *:
+    cdef Py_buffer view
+    PyObject_GetBuffer(data, &view, PyBUF_SIMPLE)
+    return view
+
+
 cdef class CacheSynchronizer:
     cdef ChunkIndex chunks
     cdef CacheSyncCtx *sync
@@ -401,7 +408,11 @@ cdef class CacheSynchronizer:
             cache_sync_free(self.sync)
 
     def feed(self, chunk):
-        if not cache_sync_feed(self.sync, <char *>chunk, len(chunk)):
+        cdef Py_buffer chunk_buf = ro_buffer(chunk)
+        cdef int rc
+        rc = cache_sync_feed(self.sync, chunk_buf.buf, chunk_buf.len)
+        PyBuffer_Release(&chunk_buf)
+        if not rc:
             error = cache_sync_error(self.sync)
             if error != NULL:
                 raise ValueError('cache_sync_feed failed: ' + error.decode('ascii'))

@@ -974,7 +974,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         size = len(chunk)
         refcount = self.seen_chunk(id, size)
         if refcount:
-            return self.chunk_incref(id, stats)
+            return self.chunk_incref(id, stats, size_=size)
         data = self.key.encrypt(chunk)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
@@ -985,12 +985,12 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def seen_chunk(self, id, size=None):
         return self.chunks.get(id, ChunkIndexEntry(0, None, None)).refcount
 
-    def chunk_incref(self, id, stats):
+    def chunk_incref(self, id, stats, size_=None):
         if not self._txn_active:
             self._begin_txn()
         count, size, csize = self.chunks.incref(id)
-        stats.update(size, csize, False)
-        return ChunkListEntry(id, size, csize)
+        stats.update(size or size_, csize, False)
+        return ChunkListEntry(id, size or size_, csize)
 
     def chunk_decref(self, id, stats, wait=True):
         if not self._txn_active:

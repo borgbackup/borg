@@ -288,7 +288,6 @@ static inline int unpack_callback_array_end(unpack_user* u)
             return 0;
         }
     }
-
     return 0;
 }
 
@@ -317,6 +316,7 @@ static inline int unpack_callback_map(unpack_user* u, unsigned int n)
 static inline int unpack_callback_map_item(unpack_user* u, unsigned int current)
 {
     (void)u; (void)current;
+
     if(u->level == 1) {
         switch(u->expect) {
         case expect_map_item_end:
@@ -340,7 +340,7 @@ static inline int unpack_callback_map_end(unpack_user* u)
     return 0;
 }
 
-static inline int unpack_callback_raw(unpack_user* u, const char* b, const char* p, unsigned int l)
+static inline int unpack_callback_raw(unpack_user* u, const char* b, const char* p, unsigned int length)
 {
     /* raw = what Borg uses for binary stuff and strings as well */
     /* Note: p points to an internal buffer which contains l bytes. */
@@ -348,7 +348,7 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
 
     switch(u->expect) {
     case expect_key:
-        if(l != 32) {
+        if(length != 32) {
             SET_LAST_ERROR("Incorrect key length");
             return -1;
         }
@@ -356,7 +356,7 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
         u->expect = expect_size;
         break;
     case expect_chunks_map_key:
-        if(l == 6 && !memcmp("chunks", p, 6)) {
+        if(length == 6 && !memcmp("chunks", p, 6)) {
             u->expect = expect_chunks_begin;
             u->inside_chunks = 1;
         } else {
@@ -369,13 +369,12 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
             return -1;
         }
     }
-
     return 0;
 }
 
-static inline int unpack_callback_bin(unpack_user* u, const char* b, const char* p, unsigned int l)
+static inline int unpack_callback_bin(unpack_user* u, const char* b, const char* p, unsigned int length)
 {
-    (void)u; (void)b; (void)p; (void)l;
+    (void)u; (void)b; (void)p; (void)length;
     UNEXPECTED("bin");
     return 0;
 }

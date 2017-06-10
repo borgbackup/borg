@@ -15,6 +15,11 @@
  *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
+ *
+ *
+ * This has been slightly adapted from the vanilla msgpack-{c, python} version.
+ * Since cache_sync does not intend to build an output data structure,
+ * msgpack_unpack_object and all of its uses was removed.
  */
 
 #ifndef USE_CASE_RANGE

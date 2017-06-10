@@ -1,3 +1,20 @@
+/*
+ * Borg cache synchronizer,
+ * high level interface.
+ *
+ * These routines parse msgpacked item metadata and update a HashIndex
+ * with all chunks that are referenced from the items.
+ *
+ * This file only contains some initialization and buffer management.
+ *
+ * The parser is split in two parts, somewhat similar to lexer/parser combinations:
+ *
+ * unpack_template.h munches msgpack and calls a specific callback for each object
+ * encountered (e.g. beginning of a map, an integer, a string, a map item etc.).
+ *
+ * unpack.h implements these callbacks and uses another state machine to
+ * extract chunk references from it.
+ */
 
 #include "unpack.h"
 

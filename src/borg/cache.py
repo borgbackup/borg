@@ -644,14 +644,17 @@ class LocalCache(CacheStatsMixin):
 
             all_missing_ids = chunk_idx.zero_csize_ids()
             fetch_ids = []
-            for id_ in all_missing_ids:
-                already_fetched_entry = chunks_fetched_size_index.get(id_)
-                if already_fetched_entry:
-                    entry = chunk_idx[id_]._replace(csize=already_fetched_entry.csize)
-                    assert entry.size == already_fetched_entry.size, 'Chunk size mismatch'
-                    chunk_idx[id_] = entry
-                else:
-                    fetch_ids.append(id_)
+            if len(chunks_fetched_size_index):
+                for id_ in all_missing_ids:
+                    already_fetched_entry = chunks_fetched_size_index.get(id_)
+                    if already_fetched_entry:
+                        entry = chunk_idx[id_]._replace(csize=already_fetched_entry.csize)
+                        assert entry.size == already_fetched_entry.size, 'Chunk size mismatch'
+                        chunk_idx[id_] = entry
+                    else:
+                        fetch_ids.append(id_)
+            else:
+                fetch_ids = all_missing_ids
 
             for id_, data in zip(fetch_ids, decrypted_repository.repository.get_many(fetch_ids)):
                 entry = chunk_idx[id_]._replace(csize=len(data))

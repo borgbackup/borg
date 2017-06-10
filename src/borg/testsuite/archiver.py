@@ -1041,6 +1041,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         create_stats = create_json['cache']['stats']
         info_stats = info_json['cache']['stats']
         assert create_stats == info_stats
+        self.cmd('delete', '--cache-only', self.repository_location)
+        self.cmd('create', '--no-cache-sync', self.repository_location + '::test2', 'input')
+        self.cmd('info', self.repository_location)
         self.cmd('check', self.repository_location)
 
     def test_extract_pattern_opt(self):

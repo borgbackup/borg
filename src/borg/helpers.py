@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import collections
+import enum
 import grp
 import hashlib
 import logging
@@ -123,6 +124,10 @@ def check_python():
         raise PythonLibcTooOld
 
 
+class MandatoryFeatureUnsupported(Error):
+    """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
+
+
 def check_extension_modules():
     from . import platform, compress, item
     if hashindex.API_VERSION != '1.1_03':
@@ -222,6 +227,34 @@ class Archives(abc.MutableMapping):
 
 class Manifest:
 
+    @enum.unique
+    class Operation(enum.Enum):
+        # The comments here only roughly describe the scope of each feature. In the end, additions need to be
+        # based on potential problems older clients could produce when accessing newer repositories and the
+        # tradeofs of locking version out or still allowing access. As all older versions and their exact
+        # behaviours are known when introducing new features sometimes this might not match the general descriptions
+        # below.
+
+        # The READ operation describes which features are needed to safely list and extract the archives in the
+        # repository.
+        READ = 'read'
+        # The CHECK operation is for all operations that need either to understand every detail
+        # of the repository (for consistency checks and repairs) or are seldom used functions that just
+        # should use the most restrictive feature set because more fine grained compatibility tracking is
+        # not needed.
+        CHECK = 'check'
+        # The WRITE operation is for adding archives. Features here ensure that older clients don't add archives
+        # in an old format, or is used to lock out clients that for other reasons can no longer safely add new
+        # archives.
+        WRITE = 'write'
+        # The DELETE operation is for all operations (like archive deletion) that need a 100% correct reference
+        # count and the need to be able to find all (directly and indirectly) referenced chunks of a given archive.
+        DELETE = 'delete'
+
+    NO_OPERATION_CHECK = tuple()
+
+    SUPPORTED_REPO_FEATURES = frozenset([])
+
     MANIFEST_ID = b'\0' * 32
 
     def __init__(self, key, repository, item_keys=None):
@@ -242,7 +275,7 @@ class Manifest:
         return datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
 
     @classmethod
-    def load(cls, repository, key=None, force_tam_not_required=False):
+    def load(cls, repository, operations, key=None, force_tam_not_required=False):
         from .item import ManifestItem
         from .crypto.key import key_factory, tam_required_file, tam_required
         from .repository import Repository
@@ -257,7 +290,7 @@ class Manifest:
         manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = key.id_hash(data)
-        if m.get('version') != 1:
+        if m.get('version') not in (1, 2):
             raise ValueError('Invalid manifest version')
         manifest.archives.set_raw_dict(m.archives)
         manifest.timestamp = m.get('timestamp')
@@ -275,7 +308,33 @@ class Manifest:
             if not manifest_required and security_required:
                 logger.debug('Manifest is TAM verified and says TAM is *not* required, updating security database...')
                 os.unlink(tam_required_file(repository))
+        manifest.check_repository_compatibility(operations)
         return manifest, key
+
+    def check_repository_compatibility(self, operations):
+        for operation in operations:
+            assert isinstance(operation, self.Operation)
+            feature_flags = self.config.get(b'feature_flags', None)
+            if feature_flags is None:
+                return
+            if operation.value.encode() not in feature_flags:
+                continue
+            requirements = feature_flags[operation.value.encode()]
+            if b'mandatory' in requirements:
+                unsupported = set(requirements[b'mandatory']) - self.SUPPORTED_REPO_FEATURES
+                if unsupported:
+                    raise MandatoryFeatureUnsupported([f.decode() for f in unsupported])
+
+    def get_all_mandatory_features(self):
+        result = {}
+        feature_flags = self.config.get(b'feature_flags', None)
+        if feature_flags is None:
+            return result
+
+        for operation, requirements in feature_flags.items():
+            if b'mandatory' in requirements:
+                result[operation.decode()] = set([feature.decode() for feature in requirements[b'mandatory']])
+        return result
 
     def write(self):
         from .item import ManifestItem
@@ -773,6 +832,11 @@ def safe_encode(s, coding='utf-8', errors='surrogateescape'):
 
 def bin_to_hex(binary):
     return hexlify(binary).decode('ascii')
+
+
+def parse_stringified_list(s):
+    l = re.split(" *, *", s)
+    return [item for item in l if item != '']
 
 
 class Location:

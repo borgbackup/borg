@@ -15,8 +15,9 @@ from .constants import CACHE_README
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Location
 from .helpers import Error
+from .helpers import Manifest
 from .helpers import get_cache_dir, get_security_dir
-from .helpers import int_to_bigint, bigint_to_int, bin_to_hex
+from .helpers import int_to_bigint, bigint_to_int, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size
 from .helpers import safe_ns
 from .helpers import yes, hostname_is_unique
@@ -257,6 +258,8 @@ class CacheConfig:
         self.manifest_id = unhexlify(self._config.get('cache', 'manifest'))
         self.timestamp = self._config.get('cache', 'timestamp', fallback=None)
         self.key_type = self._config.get('cache', 'key_type', fallback=None)
+        self.ignored_features = set(parse_stringified_list(self._config.get('cache', 'ignored_features', fallback='')))
+        self.mandatory_features = set(parse_stringified_list(self._config.get('cache', 'mandatory_features', fallback='')))
         try:
             self.integrity = dict(self._config.items('integrity'))
             if self._config.get('cache', 'manifest') != self.integrity.pop('manifest'):
@@ -281,6 +284,8 @@ class CacheConfig:
         if manifest:
             self._config.set('cache', 'manifest', manifest.id_str)
             self._config.set('cache', 'timestamp', manifest.timestamp)
+            self._config.set('cache', 'ignored_features', ','.join(self.ignored_features))
+            self._config.set('cache', 'mandatory_features', ','.join(self.mandatory_features))
             if not self._config.has_section('integrity'):
                 self._config.add_section('integrity')
             for file, integrity_data in self.integrity.items():
@@ -370,6 +375,12 @@ class Cache:
         self.open()
         try:
             self.security_manager.assert_secure(manifest, key, cache_config=self.cache_config)
+
+            if not self.check_cache_compatibility():
+                self.wipe_cache()
+
+            self.update_compatibility()
+
             if sync and self.manifest.id != self.cache_config.manifest_id:
                 self.sync()
                 self.commit()
@@ -717,6 +728,43 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
+
+    def check_cache_compatibility(self):
+        my_features = Manifest.SUPPORTED_REPO_FEATURES
+        if self.cache_config.ignored_features & my_features:
+            # The cache might not contain references of chunks that need a feature that is mandatory for some operation
+            # and which this version supports. To avoid corruption while executing that operation force rebuild.
+            return False
+        if not self.cache_config.mandatory_features <= my_features:
+            # The cache was build with consideration to at least one feature that this version does not understand.
+            # This client might misinterpret the cache. Thus force a rebuild.
+            return False
+        return True
+
+    def wipe_cache(self):
+        logger.warning("Discarding incompatible cache and forcing a cache rebuild")
+        archive_path = os.path.join(self.path, 'chunks.archive.d')
+        if os.path.isdir(archive_path):
+            shutil.rmtree(os.path.join(self.path, 'chunks.archive.d'))
+            os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
+        self.chunks = ChunkIndex()
+        with open(os.path.join(self.path, 'files'), 'wb'):
+            pass  # empty file
+        self.cache_config.manifest_id = ''
+        self.cache_config._config.set('cache', 'manifest', '')
+
+        self.cache_config.ignored_features = set()
+        self.cache_config.mandatory_features = set()
+
+    def update_compatibility(self):
+        operation_to_features_map = self.manifest.get_all_mandatory_features()
+        my_features = Manifest.SUPPORTED_REPO_FEATURES
+        repo_features = set()
+        for operation, features in operation_to_features_map.items():
+            repo_features.update(features)
+
+        self.cache_config.ignored_features.update(repo_features - my_features)
+        self.cache_config.mandatory_features.update(repo_features & my_features)
 
     def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
         if not self.txn_active:

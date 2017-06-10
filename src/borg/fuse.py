@@ -340,7 +340,7 @@ class FuseOperations(llfuse.Operations):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                data = self.key.decrypt(id, self.repository.get(id))
+                data = self.key.decrypt(id, self.repository_uncached.get(id))
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

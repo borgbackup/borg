@@ -91,6 +91,8 @@ try:
                 'src/borg/crypto/low_level.c',
                 'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
+                'src/borg/cache_sync/cache_sync.c', 'src/borg/cache_sync/sysdep.h', 'src/borg/cache_sync/unpack.h',
+                'src/borg/cache_sync/unpack_define.h', 'src/borg/cache_sync/unpack_template.h',
                 'src/borg/item.c',
                 'src/borg/algorithms/checksums.c',
                 'src/borg/algorithms/crc32_dispatch.c', 'src/borg/algorithms/crc32_clmul.c', 'src/borg/algorithms/crc32_slice_by_8.c',

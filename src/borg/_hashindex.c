@@ -1,6 +1,6 @@
-#include <Python.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -56,8 +56,10 @@ typedef struct {
     int lower_limit;
     int upper_limit;
     int min_empty;
+#ifdef Py_PYTHON_H
     /* buckets may be backed by a Python buffer. If buckets_buffer.buf is NULL then this is not used. */
     Py_buffer buckets_buffer;
+#endif
 } HashIndex;
 
 /* prime (or w/ big prime factors) hash table sizes
@@ -106,8 +108,11 @@ static int hash_sizes[] = {
 #define EPRINTF(msg, ...) fprintf(stderr, "hashindex: " msg "(%s)\n", ##__VA_ARGS__, strerror(errno))
 #define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg " (%s)\n", path, ##__VA_ARGS__, strerror(errno))
 
+#ifdef Py_PYTHON_H
 static HashIndex *hashindex_read(PyObject *file_py);
 static void hashindex_write(HashIndex *index, PyObject *file_py);
+#endif
+
 static HashIndex *hashindex_init(int capacity, int key_size, int value_size);
 static const void *hashindex_get(HashIndex *index, const void *key);
 static int hashindex_set(HashIndex *index, const void *key, const void *value);
@@ -120,9 +125,12 @@ static void hashindex_free(HashIndex *index);
 static void
 hashindex_free_buckets(HashIndex *index)
 {
+#ifdef Py_PYTHON_H
     if(index->buckets_buffer.buf) {
         PyBuffer_Release(&index->buckets_buffer);
-    } else {
+    } else
+#endif
+    {
         free(index->buckets);
     }
 }
@@ -263,6 +271,7 @@ count_empty(HashIndex *index)
 
 /* Public API */
 
+#ifdef Py_PYTHON_H
 static HashIndex *
 hashindex_read(PyObject *file_py)
 {
@@ -418,6 +427,7 @@ fail_decref_header:
 fail:
     return index;
 }
+#endif
 
 static HashIndex *
 hashindex_init(int capacity, int key_size, int value_size)
@@ -444,7 +454,9 @@ hashindex_init(int capacity, int key_size, int value_size)
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
     index->min_empty = get_min_empty(index->num_buckets);
+#ifdef Py_PYTHON_H
     index->buckets_buffer.buf = NULL;
+#endif
     for(i = 0; i < capacity; i++) {
         BUCKET_MARK_EMPTY(index, i);
     }
@@ -458,7 +470,7 @@ hashindex_free(HashIndex *index)
     free(index);
 }
 
-
+#ifdef Py_PYTHON_H
 static void
 hashindex_write(HashIndex *index, PyObject *file_py)
 {
@@ -521,6 +533,7 @@ hashindex_write(HashIndex *index, PyObject *file_py)
         return;
     }
 }
+#endif
 
 static const void *
 hashindex_get(HashIndex *index, const void *key)

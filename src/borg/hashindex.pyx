@@ -7,8 +7,9 @@ cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
+from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-API_VERSION = '1.1_01'
+API_VERSION = '1.1_02'
 
 
 cdef extern from "_hashindex.c":
@@ -31,6 +32,18 @@ cdef extern from "_hashindex.c":
     double HASH_MAX_LOAD
 
 
+cdef extern from "cache_sync/cache_sync.c":
+    ctypedef struct CacheSyncCtx:
+        pass
+
+    CacheSyncCtx *cache_sync_init(HashIndex *chunks)
+    const char *cache_sync_error(CacheSyncCtx *ctx)
+    int cache_sync_feed(CacheSyncCtx *ctx, void *data, uint32_t length)
+    void cache_sync_free(CacheSyncCtx *ctx)
+
+    uint32_t _MAX_VALUE
+
+
 cdef _NoDefault = object()
 
 """
@@ -49,9 +62,6 @@ AssertionError is raised instead.
 """
 
 assert UINT32_MAX == 2**32-1
-
-# module-level constant because cdef's in classes can't have default values
-cdef uint32_t _MAX_VALUE = 2**32-1025
 
 assert _MAX_VALUE % 2 == 1
 
@@ -375,3 +385,34 @@ cdef class ChunkKeyIterator:
         cdef uint32_t refcount = _le32toh(value[0])
         assert refcount <= _MAX_VALUE, "invalid reference count"
         return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]), _le32toh(value[2]))
+
+
+cdef Py_buffer ro_buffer(object data) except *:
+    cdef Py_buffer view
+    PyObject_GetBuffer(data, &view, PyBUF_SIMPLE)
+    return view
+
+
+cdef class CacheSynchronizer:
+    cdef ChunkIndex chunks
+    cdef CacheSyncCtx *sync
+
+    def __cinit__(self, chunks):
+        self.chunks = chunks
+        self.sync = cache_sync_init(self.chunks.index)
+        if not self.sync:
+            raise Exception('cache_sync_init failed')
+
+    def __dealloc__(self):
+        if self.sync:
+            cache_sync_free(self.sync)
+
+    def feed(self, chunk):
+        cdef Py_buffer chunk_buf = ro_buffer(chunk)
+        cdef int rc
+        rc = cache_sync_feed(self.sync, chunk_buf.buf, chunk_buf.len)
+        PyBuffer_Release(&chunk_buf)
+        if not rc:
+            error = cache_sync_error(self.sync)
+            if error != NULL:
+                raise ValueError('cache_sync_feed failed: ' + error.decode('ascii'))

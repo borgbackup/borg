@@ -721,6 +721,11 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
             except:
                 pass
 
+        # The cache can be used by a command that e.g. only checks against Manifest.Operation.WRITE,
+        # which does not have to include all flags from Manifest.Operation.READ.
+        # Since the sync will attempt to read archives, check compatibility with Manifest.Operation.READ.
+        self.manifest.check_repository_compatibility((Manifest.Operation.READ, ))
+
         self.begin_txn()
         with cache_if_remote(self.repository, decrypted_cache=self.key) as decrypted_repository:
             legacy_cleanup()

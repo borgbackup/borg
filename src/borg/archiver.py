@@ -2434,34 +2434,52 @@ class Archiver:
         Encryption modes
         ++++++++++++++++
 
+        +----------+---------------+------------------------+--------------------------+
+        | Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
+        |          | no auth       | but authenticated      | and authenticated        |
+        +----------+---------------+------------------------+--------------------------+
+        | SHA-256  | none          | authenticated          | repokey, keyfile         |
+        +----------+---------------+------------------------+--------------------------+
+        | BLAKE2b  | n/a           | authenticated-blake2   | repokey-blake2,          |
+        |          |               |                        | keyfile-blake2           |
+        +----------+---------------+------------------------+--------------------------+
+
+        On modern Intel/AMD CPUs (except very cheap ones), AES is usually
+        hardware-accelerated.
+        BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs,
+        which makes `authenticated-blake2` faster than `none` and `authenticated`.
+
+        On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
+        than BLAKE2b-256 there. NEON accelerates AES as well.
+
+        Hardware acceleration is always used automatically when available.
+
         `repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
         authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
         is HMAC-SHA256 as well (with a separate key).
-        These modes are compatible with borg 1.0.x.
+        These modes are compatible with Borg 1.0.x.
 
         `repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
         but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
         hash is a keyed BLAKE2b-256 hash.
-        These modes are new and *not* compatible with borg 1.0.x.
+        These modes are new and *not* compatible with Borg 1.0.x.
 
         `authenticated` mode uses no encryption, but authenticates repository contents
-        through the same keyed BLAKE2b-256 hash as the other blake2 modes (it uses it
-        as the chunk ID hash). The key is stored like repokey.
-        This mode is new and *not* compatible with borg 1.0.x.
+        through the same HMAC-SHA256 hash as the `repokey` and `keyfile` modes (it uses it
+        as the chunk ID hash). The key is stored like `repokey`.
+        This mode is new and *not* compatible with Borg 1.0.x.
 
-        `none` mode uses no encryption and no authentication. It uses sha256 as chunk
+        `authenticated-blake2` is like `authenticated`, but uses the keyed BLAKE2b-256 hash
+        from the other blake2 modes.
+        This mode is new and *not* compatible with Borg 1.0.x.
+
+        `none` mode uses no encryption and no authentication. It uses SHA256 as chunk
         ID hash. Not recommended, rather consider using an authenticated or
         authenticated/encrypted mode.
-        This mode is compatible with borg 1.0.x.
-
-        Hardware acceleration will be used automatically.
-
-        On modern Intel/AMD CPUs (except very cheap ones), AES is usually
-        hardware-accelerated. BLAKE2b is faster than SHA256 on Intel/AMD 64bit CPUs,
-        which makes `authenticated` faster than `none`.
-
-        On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
-        than BLAKE2b-256 there.
+        Use it only for new repositories where no encryption is wanted **and** when compatibility
+        with 1.0.x is important. If compatibility with 1.0.x is not important, use
+        `authenticated-blake2` or `authenticated` instead.
+        This mode is compatible with Borg 1.0.x.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,

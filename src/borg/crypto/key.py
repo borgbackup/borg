@@ -781,10 +781,7 @@ class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
     MAC = blake2b_256
 
 
-class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
-    TYPE = 0x06
-    NAME = 'authenticated BLAKE2b'
-    ARG_NAME = 'authenticated'
+class AuthenticatedKeyBase(RepoKey):
     STORAGE = KeyBlobStorage.REPO
 
     # It's only authenticated, not encrypted.
@@ -825,9 +822,21 @@ class AuthenticatedKey(ID_BLAKE2b_256, RepoKey):
         return data
 
 
+class AuthenticatedKey(AuthenticatedKeyBase):
+    TYPE = 0x07
+    NAME = 'authenticated'
+    ARG_NAME = 'authenticated'
+
+
+class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
+    TYPE = 0x06
+    NAME = 'authenticated BLAKE2b'
+    ARG_NAME = 'authenticated-blake2'
+
+
 AVAILABLE_KEY_TYPES = (
     PlaintextKey,
     PassphraseKey,
-    KeyfileKey, RepoKey,
-    Blake2KeyfileKey, Blake2RepoKey, AuthenticatedKey,
+    KeyfileKey, RepoKey, AuthenticatedKey,
+    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey,
 )

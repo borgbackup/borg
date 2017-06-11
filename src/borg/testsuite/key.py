@@ -8,8 +8,9 @@ import msgpack
 import pytest
 
 from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
-from ..crypto.key import PlaintextKey, PassphraseKey, KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, \
-    AuthenticatedKey
+from ..crypto.key import PlaintextKey, PassphraseKey, AuthenticatedKey, RepoKey, KeyfileKey, \
+    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey
+from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
 from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError
 from ..crypto.key import identify_key
 from ..crypto.low_level import bytes_to_long, num_aes_blocks
@@ -70,12 +71,13 @@ class TestKey:
         return tmpdir
 
     @pytest.fixture(params=(
-        KeyfileKey,
         PlaintextKey,
+        AuthenticatedKey,
+        KeyfileKey,
         RepoKey,
         Blake2KeyfileKey,
         Blake2RepoKey,
-        AuthenticatedKey,
+        Blake2AuthenticatedKey,
     ))
     def key(self, request, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -256,6 +258,19 @@ class TestKey:
     def test_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
+        assert AuthenticatedKey.id_hash is ID_HMAC_SHA_256.id_hash
+        assert len(key.id_key) == 32
+        plaintext = b'123456789'
+        authenticated = key.encrypt(plaintext)
+        # 0x07 is the key TYPE, 0x0100 identifies LZ4 compression, 0x90 is part of LZ4 and means that an uncompressed
+        # block of length nine follows (the plaintext).
+        assert authenticated == b'\x07\x01\x00\x90' + plaintext
+
+    def test_blake2_authenticated_encrypt(self, monkeypatch):
+        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
+        key = Blake2AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
+        assert Blake2AuthenticatedKey.id_hash is ID_BLAKE2b_256.id_hash
+        assert len(key.id_key) == 128
         plaintext = b'123456789'
         authenticated = key.encrypt(plaintext)
         # 0x06 is the key TYPE, 0x0100 identifies LZ4 compression, 0x90 is part of LZ4 and means that an uncompressed

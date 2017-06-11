@@ -27,6 +27,7 @@ from .helpers import hostname_is_unique
 from .helpers import replace_placeholders
 from .helpers import sysinfo
 from .helpers import format_file_size
+from .helpers import truncate_and_unlink
 from .logger import create_logger, setup_logging
 from .repository import Repository, MAX_OBJECT_SIZE, LIST_SCAN_LIMIT
 from .version import parse_version, format_version
@@ -1144,6 +1145,10 @@ class RepositoryCache(RepositoryNoCache):
             with open(file, 'wb') as fd:
                 fd.write(packed)
         except OSError as os_error:
+            try:
+                truncate_and_unlink(file)
+            except FileNotFoundError:
+                pass  # open() could have failed as well
             if os_error.errno == errno.ENOSPC:
                 self.enospc += 1
                 self.backoff()

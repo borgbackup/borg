@@ -141,6 +141,9 @@ class TestRepositoryCache:
             def write(self, data):
                 raise OSError(errno.ENOSPC, 'foo')
 
+            def truncate(self, n=None):
+                pass
+
         iterator = cache.get_many([H(1), H(2), H(3)])
         assert next(iterator) == b'1234'
 

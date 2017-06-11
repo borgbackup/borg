@@ -337,8 +337,6 @@ the manifest, since an ID check is not possible.
 of Borg preserve its contents (it may have been a better place for *item_keys*,
 which is not preserved by unaware Borg versions, releases predating 1.0.4).
 
-.. This was implemented in PR#1149, 78121a8 and a7b5165
-
 Feature flags
 +++++++++++++
 
@@ -355,7 +353,7 @@ category are operations that require accurate reference counts, for example
 archive deletion and check.
 
 As the manifest is always updated and always read, it is the ideal place to store
-feature flags, comparable to the super-block of a file system. The only issue problem
+feature flags, comparable to the super-block of a file system. The only problem
 is to recover from a lost manifest, i.e. how is it possible to detect which feature
 flags are enabled, if there is no manifest to tell. This issue is left open at this time,
 but is not expected to be a major hurdle; it doesn't have to be handled efficiently, it just
@@ -401,7 +399,7 @@ Each operation can contain several sets of feature flags. Only one set,
 the *mandatory* set is currently defined.
 
 Upon reading the manifest, the Borg client has already determined which operation
-is to be performed. If feature flags are found in the manifest, the set
+should be performed. If feature flags are found in the manifest, the set
 of feature flags supported by the client is compared to the mandatory set
 found in the manifest. If any unsupported flags are found (i.e. the mandatory set is
 not a subset of the features supported by the Borg client used), the operation
@@ -421,7 +419,7 @@ Borg releases unaware of feature flags.
 .. _Cache feature flags:
 .. rubric:: Cache feature flags
 
-`The cache`_ does not have its separate flag of feature flags. Instead, Borg stores
+`The cache`_ does not have its separate set of feature flags. Instead, Borg stores
 which flags were used to create or modify a cache.
 
 All mandatory manifest features from all operations are gathered in one set.
@@ -440,10 +438,16 @@ Conversely, the *ignored_features* set contains only those features which were n
 relevant to operating the cache. Otherwise, the client would not pass the feature
 set test against the manifest.
 
-When opening a cache and the *mandatory_features* set is a not a subset of the features
+When opening a cache and the *mandatory_features* set is not a subset of the features
 supported by the client, the cache is wiped out and rebuilt,
 since a client not supporting a mandatory feature that the cache was built with
 would be unable to update it correctly.
+The assumption behind this behaviour is that any of the unsupported features could have
+been reflected in the cache and there is no way for the client to discern whether
+that is the case.
+Meanwhile, it may not be practical for every feature to have clients using it track
+whether the feature had an impact on the cache.
+Therefore, the cache is wiped.
 
 When opening a cache and the intersection of *ignored_features* and the features
 supported by the client contains any elements, i.e. the client possesses features

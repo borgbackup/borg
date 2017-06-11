@@ -63,6 +63,8 @@ in a particular part of its own data structure assigns this meaning.
 This results in a directed acyclic graph of authentication from the manifest
 to the data chunks of individual files.
 
+.. _tam_description:
+
 .. rubric:: Authenticating the manifest
 
 Since the manifest has a fixed ID (000...000) the aforementioned authentication

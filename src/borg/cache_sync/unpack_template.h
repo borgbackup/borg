@@ -54,8 +54,6 @@ static inline void unpack_init(unpack_context* ctx)
 
 static inline int unpack_execute(unpack_context* ctx, const char* data, size_t len, size_t* off)
 {
-    assert(len >= *off);
-
     const unsigned char* p = (unsigned char*)data + *off;
     const unsigned char* const pe = (unsigned char*)data + len;
     const void* n = NULL;
@@ -69,6 +67,8 @@ static inline int unpack_execute(unpack_context* ctx, const char* data, size_t l
     unpack_stack* c = NULL;
 
     int ret;
+
+    assert(len >= *off);
 
 #define construct_cb(name) \
     construct && unpack_callback ## name

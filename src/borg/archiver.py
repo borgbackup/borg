@@ -2827,7 +2827,7 @@ class Archiver:
         subparser.add_argument('--json', action='store_true',
                                help='output stats as JSON (implies --stats)')
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
-                               help='experimental: do not synchronize the cache')
+                               help='experimental: do not synchronize the cache. Implies --no-files-cache.')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='patterns',

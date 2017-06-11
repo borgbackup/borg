@@ -587,7 +587,7 @@ class LocalCache(CacheStatsMixin):
         archive indexes.
         """
         archive_path = os.path.join(self.path, 'chunks.archive.d')
-        # An index of chunks were the size had to be fetched
+        # An index of chunks whose size had to be fetched
         chunks_fetched_size_index = ChunkIndex()
         # Instrumentation
         processed_item_metadata_bytes = 0
@@ -965,7 +965,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     do_files = False
 
     def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
-        pass
+        return None
 
     def memorize_file(self, path_hash, st, ids):
         pass
@@ -986,7 +986,15 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):
-        return self.chunks.get(id, ChunkIndexEntry(0, None, None)).refcount
+        if not self._txn_active:
+            self._begin_txn()
+        entry = self.chunks.get(id, ChunkIndexEntry(0, None, None))
+        if entry.refcount and size and not entry.size:
+            # The LocalCache has existing size information and uses *size* to make an effort at detecting collisions.
+            # This is of course not possible for the AdHocCache.
+            # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
+            self.chunks[id] = entry._replace(size=size)
+        return entry.refcount
 
     def chunk_incref(self, id, stats, size_=None):
         if not self._txn_active:

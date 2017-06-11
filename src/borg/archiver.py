@@ -33,6 +33,7 @@ import msgpack
 import borg
 from . import __version__
 from . import helpers
+from . import shellpattern
 from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
@@ -283,9 +284,11 @@ class Archiver:
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space):
                 return EXIT_WARNING
+        if args.prefix:
+            args.glob_archives = args.prefix + '*'
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.location.archive,
-                first=args.first, last=args.last, sort_by=args.sort_by or 'ts', prefix=args.prefix,
+                first=args.first, last=args.last, sort_by=args.sort_by or 'ts', glob=args.glob_archives,
                 verify_data=args.verify_data, save_space=args.save_space):
             return EXIT_WARNING
         return EXIT_SUCCESS
@@ -1168,7 +1171,7 @@ class Archiver:
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
         """Delete an existing repository or archives"""
-        if any((args.location.archive, args.first, args.last, args.prefix)):
+        if any((args.location.archive, args.first, args.last, args.prefix, args.glob_archives)):
             return self._delete_archives(args, repository)
         else:
             return self._delete_repository(args, repository)
@@ -1365,7 +1368,7 @@ class Archiver:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
-        if any((args.location.archive, args.first, args.last, args.prefix)):
+        if any((args.location.archive, args.first, args.last, args.prefix, args.glob_archives)):
             return self._info_archives(args, repository, manifest, key, cache)
         else:
             return self._info_repository(args, repository, manifest, key, cache)
@@ -1463,7 +1466,10 @@ class Archiver:
             return self.exit_code
         archives_checkpoints = manifest.archives.list(sort_by=['ts'], reverse=True)  # just a ArchiveInfo list
         if args.prefix:
-            archives_checkpoints = [arch for arch in archives_checkpoints if arch.name.startswith(args.prefix)]
+            args.glob_archives = args.prefix + '*'
+        if args.glob_archives:
+            regex = re.compile(shellpattern.translate(args.glob_archives))
+            archives_checkpoints = [arch for arch in archives_checkpoints if regex.match(arch.name) is not None]
         is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
         checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
         # keep the latest checkpoint, if there is no later non-checkpoint archive
@@ -3344,8 +3350,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec,
-                               help='only consider archive names starting with this prefix')
+        self.add_archives_filters_args(subparser, sort_by=False, first_last=False)
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
@@ -3839,21 +3844,28 @@ class Archiver:
         return parser
 
     @staticmethod
-    def add_archives_filters_args(subparser):
+    def add_archives_filters_args(subparser, sort_by=True, first_last=True):
         filters_group = subparser.add_argument_group('filters', 'Archive filters can be applied to repository targets.')
-        filters_group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='',
-                                   help='only consider archive names starting with this prefix')
-
-        sort_by_default = 'timestamp'
-        filters_group.add_argument('--sort-by', dest='sort_by', type=SortBySpec, default=sort_by_default,
-                                   help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
-                                   .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
-
         group = filters_group.add_mutually_exclusive_group()
-        group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
-                           help='consider first N archives after other filters were applied')
-        group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
-                           help='consider last N archives after other filters were applied')
+        group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='',
+                           help='only consider archive names starting with this prefix.')
+        group.add_argument('-a', '--glob-archives', dest='glob_archives', default=None,
+                           help='only consider archive names matching the glob. '
+                                'sh: rules apply, see "borg help patterns". '
+                                '--prefix and --glob-archives are mutually exclusive.')
+
+        if sort_by:
+            sort_by_default = 'timestamp'
+            filters_group.add_argument('--sort-by', dest='sort_by', type=SortBySpec, default=sort_by_default,
+                                       help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
+                                       .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
+
+        if first_last:
+            group = filters_group.add_mutually_exclusive_group()
+            group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
+                               help='consider first N archives after other filters were applied')
+            group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
+                               help='consider last N archives after other filters were applied')
 
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""

@@ -1,3 +1,6 @@
+
+#define BORG_NO_PYTHON
+
 #include "../../src/borg/_hashindex.c"
 #include "../../src/borg/cache_sync/cache_sync.c"
 

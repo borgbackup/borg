@@ -938,6 +938,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.add_unknown_feature(Manifest.Operation.WRITE)
         self.cmd_raises_unknown_feature(['create', self.repository_location + '::test', 'input'])
 
+    def test_unknown_feature_on_cache_sync(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('delete', '--cache-only', self.repository_location)
+        self.add_unknown_feature(Manifest.Operation.READ)
+        self.cmd_raises_unknown_feature(['create', self.repository_location + '::test', 'input'])
+
     def test_unknown_feature_on_change_passphrase(self):
         print(self.cmd('init', self.repository_location))
         self.add_unknown_feature(Manifest.Operation.CHECK)

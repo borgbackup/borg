@@ -7,7 +7,7 @@ The following sections will describe each command in detail.
 
 .. container:: experimental
 
-   Experimental features are marked with red-orange stripes on the sides, like this paragraph.
+   Experimental features are marked with red stripes on the sides, like this paragraph.
 
    Experimental features are not stable, which means that they may be changed in incompatible
    ways or even removed entirely without prior notice in following releases.

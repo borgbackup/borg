@@ -11,3 +11,4 @@ This chapter details deployment strategies for the following scenarios.
 
    deployment/central-backup-server
    deployment/hosting-repositories
+   deployment/automated-local

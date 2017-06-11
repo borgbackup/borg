@@ -118,7 +118,7 @@ static inline void unpack_init_user_state(unpack_user *u)
     u->expect = expect_item_begin;
 }
 
-static inline int unpack_callback_int64(unpack_user* u, int64_t d)
+static inline int unpack_callback_uint64(unpack_user* u, int64_t d)
 {
     switch(u->expect) {
         case expect_size:
@@ -135,40 +135,39 @@ static inline int unpack_callback_int64(unpack_user* u, int64_t d)
     return 0;
 }
 
+static inline int unpack_callback_uint32(unpack_user* u, uint32_t d)
+{
+    return unpack_callback_uint64(u, d);
+}
+
 static inline int unpack_callback_uint16(unpack_user* u, uint16_t d)
 {
-    return unpack_callback_int64(u, d);
+    return unpack_callback_uint64(u, d);
 }
 
 static inline int unpack_callback_uint8(unpack_user* u, uint8_t d)
 {
-    return unpack_callback_int64(u, d);
+    return unpack_callback_uint64(u, d);
 }
 
-
-static inline int unpack_callback_uint32(unpack_user* u, uint32_t d)
+static inline int unpack_callback_int64(unpack_user* u, uint64_t d)
 {
-    return unpack_callback_int64(u, d);
-}
-
-static inline int unpack_callback_uint64(unpack_user* u, uint64_t d)
-{
-    return unpack_callback_int64(u, d);
+    return unpack_callback_uint64(u, d);
 }
 
 static inline int unpack_callback_int32(unpack_user* u, int32_t d)
 {
-    return unpack_callback_int64(u, d);
+    return unpack_callback_uint64(u, d);
 }
 
 static inline int unpack_callback_int16(unpack_user* u, int16_t d)
 {
-    return unpack_callback_int64(u, d);
+    return unpack_callback_uint64(u, d);
 }
 
 static inline int unpack_callback_int8(unpack_user* u, int8_t d)
 {
-    return unpack_callback_int64(u, d);
+    return unpack_callback_uint64(u, d);
 }
 
 /* Ain't got anything to do with those floats */

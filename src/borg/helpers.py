@@ -42,6 +42,7 @@ from . import __version__ as borg_version
 from . import __version_tuple__ as borg_version_tuple
 from . import chunker
 from . import hashindex
+from . import shellpattern
 from .constants import *  # NOQA
 
 
@@ -189,7 +190,7 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, sort_by=(), reverse=False, prefix='', first=None, last=None):
+    def list(self, sort_by=(), reverse=False, glob=None, first=None, last=None):
         """
         Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
         Returns list of borg.helpers.ArchiveInfo instances.
@@ -197,7 +198,8 @@ class Archives(abc.MutableMapping):
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError('sort_by must be a sequence of str')
-        archives = [x for x in self.values() if x.name.startswith(prefix)]
+        regex = re.compile(shellpattern.translate(glob or '*'))
+        archives = [x for x in self.values() if regex.match(x.name) is not None]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))
         if reverse or last:
@@ -207,11 +209,13 @@ class Archives(abc.MutableMapping):
 
     def list_considering(self, args):
         """
-        get a list of archives, considering --first/last/prefix/sort cmdline args
+        get a list of archives, considering --first/last/prefix/glob-archives/sort cmdline args
         """
         if args.location.archive:
-            raise Error('The options --first, --last and --prefix can only be used on repository targets.')
-        return self.list(sort_by=args.sort_by.split(','), prefix=args.prefix, first=args.first, last=args.last)
+            raise Error('The options --first, --last, --prefix and --glob-archives can only be used on repository targets.')
+        if args.prefix:
+            args.glob_archives = args.prefix + '*'
+        return self.list(sort_by=args.sort_by.split(','), glob=args.glob_archives, first=args.first, last=args.last)
 
     def set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""

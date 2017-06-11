@@ -1124,19 +1124,19 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, archive=None, first=0, last=0, sort_by='', prefix='',
+    def check(self, repository, repair=False, archive=None, first=0, last=0, sort_by='', glob=None,
               verify_data=False, save_space=False):
         """Perform a set of checks on 'repository'
 
         :param repair: enable repair mode, write updated or corrected data into repository
         :param archive: only check this archive
         :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
-        :param prefix: only check archives with this prefix
+        :param glob: only check archives matching this glob
         :param verify_data: integrity verification of data referenced by archives
         :param save_space: Repository.commit(save_space)
         """
         logger.info('Starting archive consistency check...')
-        self.check_all = archive is None and not any((first, last, prefix))
+        self.check_all = archive is None and not any((first, last, glob))
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -1158,7 +1158,7 @@ class ArchiveChecker:
                 self.error_found = True
                 del self.chunks[Manifest.MANIFEST_ID]
                 self.manifest = self.rebuild_manifest()
-        self.rebuild_refcounts(archive=archive, first=first, last=last, sort_by=sort_by, prefix=prefix)
+        self.rebuild_refcounts(archive=archive, first=first, last=last, sort_by=sort_by, glob=glob)
         self.orphan_chunks_check()
         self.finish(save_space=save_space)
         if self.error_found:
@@ -1331,7 +1331,7 @@ class ArchiveChecker:
         logger.info('Manifest rebuild complete.')
         return manifest
 
-    def rebuild_refcounts(self, archive=None, first=0, last=0, sort_by='', prefix=''):
+    def rebuild_refcounts(self, archive=None, first=0, last=0, sort_by='', glob=None):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -1495,10 +1495,10 @@ class ArchiveChecker:
 
         if archive is None:
             sort_by = sort_by.split(',')
-            if any((first, last, prefix)):
-                archive_infos = self.manifest.archives.list(sort_by=sort_by, prefix=prefix, first=first, last=last)
-                if prefix and not archive_infos:
-                    logger.warning('--prefix %s does not match any archives', prefix)
+            if any((first, last, glob)):
+                archive_infos = self.manifest.archives.list(sort_by=sort_by, glob=glob, first=first, last=last)
+                if glob and not archive_infos:
+                    logger.warning('--glob-archives %s does not match any archives', glob)
                 if first and len(archive_infos) < first:
                     logger.warning('--first %d archives: only found %d archives', first, len(archive_infos))
                 if last and len(archive_infos) < last:

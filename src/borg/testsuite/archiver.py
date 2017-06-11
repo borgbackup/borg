@@ -1708,6 +1708,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('bar-2015-08-12-10:00', output)
         self.assert_in('bar-2015-08-12-20:00', output)
 
+    def test_prune_repository_glob(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::2015-08-12-10:00-foo', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-20:00-foo', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
+        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--glob-archives=2015-*-foo')
+        self.assert_in('Keeping archive: 2015-08-12-20:00-foo', output)
+        self.assert_in('Would prune:     2015-08-12-10:00-foo', output)
+        output = self.cmd('list', self.repository_location)
+        self.assert_in('2015-08-12-10:00-foo', output)
+        self.assert_in('2015-08-12-20:00-foo', output)
+        self.assert_in('2015-08-12-10:00-bar', output)
+        self.assert_in('2015-08-12-20:00-bar', output)
+        self.cmd('prune', self.repository_location, '--keep-daily=2', '--glob-archives=2015-*-foo')
+        output = self.cmd('list', self.repository_location)
+        self.assert_not_in('2015-08-12-10:00-foo', output)
+        self.assert_in('2015-08-12-20:00-foo', output)
+        self.assert_in('2015-08-12-10:00-bar', output)
+        self.assert_in('2015-08-12-20:00-bar', output)
+
     def test_list_prefix(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test-1', src_dir)

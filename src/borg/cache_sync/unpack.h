@@ -26,7 +26,7 @@
 #include "unpack_define.h"
 
 // 2**32 - 1025
-#define _MAX_VALUE ( (uint32_t) 4294966271 )
+#define _MAX_VALUE ( (uint32_t) 4294966271UL )
 
 #define MIN(x, y) ((x) < (y) ? (x): (y))
 

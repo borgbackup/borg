@@ -189,6 +189,7 @@ class Item(PropDict):
         If memorize is True, the computed size value will be stored into the item.
         """
         attr = 'csize' if compressed else 'size'
+        assert not (compressed and memorize), 'Item does not have a csize field.'
         try:
             if from_chunks:
                 raise AttributeError

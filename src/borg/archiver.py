@@ -704,7 +704,7 @@ class Archiver:
                 else:
                     if stat.S_ISDIR(item.mode):
                         dirs.append(item)
-                        archive.extract_item(item, restore_attrs=False)
+                        archive.extract_item(item, stdout=stdout, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
                                              stripped_components=strip_components, original_path=orig_path, pi=pi)
@@ -721,7 +721,7 @@ class Archiver:
                 pi.show()
                 dir_item = dirs.pop(-1)
                 try:
-                    archive.extract_item(dir_item)
+                    archive.extract_item(dir_item, stdout=stdout)
                 except BackupOSError as e:
                     self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
         for pattern in matcher.get_unmatched_include_patterns():

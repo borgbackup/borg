@@ -270,7 +270,7 @@ def install_borg(fuse)
     cd borg
     # clean up (wrong/outdated) stuff we likely got via rsync:
     rm -rf __pycache__
-    find src -name '__pycache__' -exec rm -rf {} \;
+    find src -name '__pycache__' -exec rm -rf {} \\;
     pip install -r requirements.d/development.txt
     python setup.py clean
   EOF

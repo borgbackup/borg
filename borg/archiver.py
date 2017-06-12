@@ -486,7 +486,7 @@ class Archiver:
                 else:
                     if stat.S_ISDIR(item[b'mode']):
                         dirs.append(item)
-                        archive.extract_item(item, restore_attrs=False)
+                        archive.extract_item(item, stdout=stdout, restore_attrs=False)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse)
             except BackupOSError as e:
@@ -496,7 +496,7 @@ class Archiver:
             while dirs:
                 dir_item = dirs.pop(-1)
                 try:
-                    archive.extract_item(dir_item)
+                    archive.extract_item(dir_item, stdout=stdout)
                 except BackupOSError as e:
                     self.print_warning('%s: %s', remove_surrogates(dir_item[b'path']), e)
         for pattern in include_patterns:

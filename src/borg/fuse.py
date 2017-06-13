@@ -70,7 +70,9 @@ class FuseOperations(llfuse.Operations):
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
-        self.default_dir = Item(mode=0o40755, mtime=int(time.time() * 1e9), uid=os.getuid(), gid=os.getgid())
+        self.default_uid = os.getuid()
+        self.default_gid = os.getgid()
+        self.default_dir = Item(mode=0o40755, mtime=int(time.time() * 1e9), uid=self.default_uid, gid=self.default_gid)
         self.pending_archives = {}
         self.cache = ItemCache()
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
@@ -263,8 +265,8 @@ class FuseOperations(llfuse.Operations):
         entry.attr_timeout = 300
         entry.st_mode = item.mode
         entry.st_nlink = item.get('nlink', 1)
-        entry.st_uid = item.uid
-        entry.st_gid = item.gid
+        entry.st_uid = item.uid if item.uid >= 0 else self.default_uid
+        entry.st_gid = item.gid if item.gid >= 0 else self.default_gid
         entry.st_rdev = item.get('rdev', 0)
         entry.st_size = item.get_size()
         entry.st_blksize = 512

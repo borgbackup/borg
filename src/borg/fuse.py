@@ -166,7 +166,7 @@ class FuseOperations(llfuse.Operations):
             unpacker.feed(data)
             for item in unpacker:
                 item = Item(internal_dict=item)
-                path = os.fsencode(os.path.normpath(item.path))
+                path = os.fsencode(item.path)
                 is_dir = stat.S_ISDIR(item.mode)
                 if is_dir:
                     try:
@@ -208,14 +208,14 @@ class FuseOperations(llfuse.Operations):
             if version is not None:
                 # regular file, with contents - maybe a hardlink master
                 name = make_versioned_name(name, version)
-                path = os.fsencode(os.path.normpath(item.path))
+                path = os.fsencode(item.path)
                 self.file_versions[path] = version
 
         path = item.path
         del item.path  # safe some space
         if 'source' in item and hardlinkable(item.mode):
             # a hardlink, no contents, <source> is the hardlink master
-            source = os.fsencode(os.path.normpath(item.source))
+            source = os.fsencode(item.source)
             if self.versions:
                 # adjust source name with version
                 version = self.file_versions[source]

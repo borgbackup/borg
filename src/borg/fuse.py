@@ -160,6 +160,7 @@ class FuseOperations(llfuse.Operations):
         """
         self.file_versions = {}  # for versions mode: original path -> version
         unpacker = msgpack.Unpacker()
+        t0 = time.perf_counter()
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
@@ -183,6 +184,8 @@ class FuseOperations(llfuse.Operations):
                 for segment in segments[:-1]:
                     parent = self.process_inner(segment, parent)
                 self.process_leaf(segments[-1], item, parent, prefix, is_dir)
+        duration = time.perf_counter() - t0
+        logger.debug('fuse: process_archive completed in %.1f s for archive %s', duration, archive.name)
 
     def process_leaf(self, name, item, parent, prefix, is_dir):
         def file_version(item):

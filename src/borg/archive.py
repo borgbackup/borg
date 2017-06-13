@@ -25,7 +25,7 @@ from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
-from .hashindex import ChunkIndex, ChunkIndexEntry
+from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import ChunkIteratorFileWrapper, open_item
@@ -478,30 +478,22 @@ Utilization of max. archive size: {csize_max:.0%}
 
     def calc_stats(self, cache):
         def add(id):
-            count, size, csize = cache.chunks[id]
-            stats.update(size, csize, count == 1)
-            cache.chunks[id] = count - 1, size, csize
+            entry = cache.chunks[id]
+            archive_index.add(id, 1, entry.size, entry.csize)
 
-        def add_file_chunks(chunks):
-            for id, _, _ in chunks:
-                add(id)
-
-        # This function is a bit evil since it abuses the cache to calculate
-        # the stats. The cache transaction must be rolled back afterwards
-        unpacker = msgpack.Unpacker(use_list=False)
-        cache.begin_txn()
-        stats = Statistics()
+        archive_index = ChunkIndex()
+        sync = CacheSynchronizer(archive_index)
         add(self.id)
+        pi = ProgressIndicatorPercent(total=len(self.metadata.items), msg='Calculating statistics... %3d%%')
         for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
+            pi.show(increase=1)
             add(id)
             data = self.key.decrypt(id, chunk)
-            unpacker.feed(data)
-            for item in unpacker:
-                chunks = item.get(b'chunks')
-                if chunks is not None:
-                    stats.nfiles += 1
-                    add_file_chunks(chunks)
-        cache.rollback()
+            sync.feed(data)
+        stats = Statistics()
+        stats.osize, stats.csize, unique_size, stats.usize, unique_chunks, chunks = archive_index.stats_against(cache.chunks)
+        stats.nfiles = sync.num_files
+        pi.finish()
         return stats
 
     @contextmanager

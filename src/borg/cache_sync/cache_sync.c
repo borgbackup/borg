@@ -38,6 +38,7 @@ cache_sync_init(HashIndex *chunks)
     unpack_init(&ctx->ctx);
     /* needs to be set only once */
     ctx->ctx.user.chunks = chunks;
+    ctx->ctx.user.num_files = 0;
     ctx->buf = NULL;
     ctx->head = 0;
     ctx->tail = 0;
@@ -56,9 +57,15 @@ cache_sync_free(CacheSyncCtx *ctx)
 }
 
 static const char *
-cache_sync_error(CacheSyncCtx *ctx)
+cache_sync_error(const CacheSyncCtx *ctx)
 {
     return ctx->ctx.user.last_error;
+}
+
+static uint64_t
+cache_sync_num_files(const CacheSyncCtx *ctx)
+{
+    return ctx->ctx.user.num_files;
 }
 
 /**

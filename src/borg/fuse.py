@@ -35,22 +35,76 @@ else:
 
 
 class ItemCache:
-    def __init__(self):
+    GROW_BY = 2 * 1024 * 1024
+
+    def __init__(self, repository, key):
+        self.repository = repository
+        self.key = key
+        self.data = bytearray()
+        self.writeptr = 0
         self.fd = tempfile.TemporaryFile(prefix='borg-tmp')
         self.offset = 1000000
 
-    def add(self, item):
-        pos = self.fd.seek(0, io.SEEK_END)
-        self.fd.write(msgpack.packb(item.as_dict()))
-        return pos + self.offset
+    def new_stream(self):
+        self.stream_offset = 0
+        self.chunk_begin = 0
+        self.chunk_length = 0
+        self.current_item = b''
+
+    def set_current_id(self, chunk_id, chunk_length):
+        self.chunk_id = chunk_id
+        self.chunk_begin += self.chunk_length
+        self.chunk_length = chunk_length
+
+    def write_bytes(self, msgpacked_bytes):
+        self.current_item += msgpacked_bytes
+        self.stream_offset += len(msgpacked_bytes)
+
+    def unpacked(self):
+        msgpacked_bytes = self.current_item
+        self.current_item = b''
+        self.last_context_sensitive = self.stream_offset - len(msgpacked_bytes) <= self.chunk_begin
+        self.last_length = len(msgpacked_bytes)
+        self.last_item = msgpacked_bytes
+
+    def inode_for_current_item(self):
+        if self.writeptr + 37 >= len(self.data):
+            self.data = self.data + bytes(self.GROW_BY)
+
+        if self.last_context_sensitive:
+            pos = self.fd.seek(0, io.SEEK_END)
+            self.fd.write(self.last_item)
+            self.data[self.writeptr:self.writeptr+9] = b'S' + pos.to_bytes(8, 'little')
+            self.writeptr += 9
+            return self.writeptr - 9 + self.offset
+        else:
+            self.data[self.writeptr:self.writeptr+1] = b'I'
+            self.data[self.writeptr+1:self.writeptr+33] = self.chunk_id
+            last_item_offset = self.stream_offset - self.last_length
+            last_item_offset -= self.chunk_begin
+            self.data[self.writeptr+33:self.writeptr+37] = last_item_offset.to_bytes(4, 'little')
+            self.writeptr += 37
+            return self.writeptr - 37 + self.offset
 
     def get(self, inode):
         offset = inode - self.offset
         if offset < 0:
             raise ValueError('ItemCache.get() called with an invalid inode number')
-        self.fd.seek(offset, io.SEEK_SET)
-        item = next(msgpack.Unpacker(self.fd, read_size=1024))
-        return Item(internal_dict=item)
+        is_context_sensitive = self.data[offset] == ord(b'S')
+
+        # print(is_context_sensitive)
+        if is_context_sensitive:
+            fd_offset = int.from_bytes(self.data[offset+1:offset+9], 'little')
+            self.fd.seek(fd_offset, io.SEEK_SET)
+            return Item(internal_dict=next(msgpack.Unpacker(self.fd, read_size=1024)))
+        else:
+            chunk_id = bytes(self.data[offset+1:offset+33])
+            chunk_offset = int.from_bytes(self.data[offset+33:offset+37], 'little')
+            chunk = self.key.decrypt(chunk_id, next(self.repository.get_many([chunk_id])))
+            data = memoryview(chunk)[chunk_offset:]
+            unpacker = msgpack.Unpacker()
+            unpacker.feed(data)
+            return Item(internal_dict=next(unpacker))
 
 
 class FuseOperations(llfuse.Operations):
@@ -75,7 +129,7 @@ class FuseOperations(llfuse.Operations):
         self.default_gid = os.getgid()
         self.default_dir = Item(mode=0o40755, mtime=int(time.time() * 1e9), uid=self.default_uid, gid=self.default_gid)
         self.pending_archives = {}
-        self.cache = ItemCache()
+        self.cache = ItemCache(cached_repo, key)
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
         logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
@@ -103,8 +157,9 @@ class FuseOperations(llfuse.Operations):
                      # which are shared due to code structure (this has been verified).
                      format_file_size(sys.getsizeof(self.parent) + len(self.parent) * sys.getsizeof(self._inode_count)))
         logger.debug('fuse: %d pending archives', len(self.pending_archives))
-        logger.debug('fuse: ItemCache %d entries, %s',
+        logger.debug('fuse: ItemCache %d entries, meta-array %s, dependent items %s',
                      self._inode_count - len(self.items),
+                     format_file_size(sys.getsizeof(self.cache.data)),
                      format_file_size(os.stat(self.cache.fd.fileno()).st_size))
         logger.debug('fuse: data cache: %d/%d entries, %s', len(self.data_cache.items()), self.data_cache._capacity,
                      format_file_size(sum(len(chunk) for key, chunk in self.data_cache.items())))
@@ -161,10 +216,17 @@ class FuseOperations(llfuse.Operations):
         unpacker = msgpack.Unpacker()
         archive = Archive(self.repository_uncached, self.key, self.manifest, archive_name,
                           consider_part_files=self.args.consider_part_files)
+        self.cache.new_stream()
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             data = self.key.decrypt(key, chunk)
+            self.cache.set_current_id(key, len(data))
             unpacker.feed(data)
-            for item in unpacker:
+            while True:
+                try:
+                    item = unpacker.unpack(self.cache.write_bytes)
+                except msgpack.OutOfData:
+                    break
+                self.cache.unpacked()
                 item = Item(internal_dict=item)
                 path = os.fsencode(item.path)
                 is_dir = stat.S_ISDIR(item.mode)
@@ -230,7 +292,7 @@ class FuseOperations(llfuse.Operations):
             item.nlink = item.get('nlink', 1) + 1
             self.items[inode] = item
         else:
-            inode = self.cache.add(item)
+            inode = self.cache.inode_for_current_item()
         self.parent[inode] = parent
         if name:
             self.contents[parent][name] = inode

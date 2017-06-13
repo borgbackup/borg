@@ -1088,6 +1088,9 @@ class RepositoryNoCache:
         for key, data in zip(keys, self.repository.get_many(keys)):
             yield self.transform(key, data)
 
+    def log_instrumentation(self):
+        pass
+
 
 class RepositoryCache(RepositoryNoCache):
     """
@@ -1161,12 +1164,15 @@ class RepositoryCache(RepositoryNoCache):
                 self.backoff()
         return transformed
 
-    def close(self):
+    def log_instrumentation(self):
         logger.debug('RepositoryCache: current items %d, size %s / %s, %d hits, %d misses, %d slow misses (+%.1fs), '
                      '%d evictions, %d ENOSPC hit',
                      len(self.cache), format_file_size(self.size), format_file_size(self.size_limit),
                      self.hits, self.misses, self.slow_misses, self.slow_lat,
                      self.evictions, self.enospc)
+
+    def close(self):
+        self.log_instrumentation()
         self.cache.clear()
         shutil.rmtree(self.basedir)
 

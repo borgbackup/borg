@@ -2,6 +2,7 @@ import errno
 import io
 import os
 import stat
+import sys
 import tempfile
 import time
 from collections import defaultdict
@@ -16,7 +17,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .archive import Archive
-from .helpers import daemonize, hardlinkable
+from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
 from .item import Item
 from .lrucache import LRUCache
 
@@ -97,6 +98,20 @@ class FuseOperations(llfuse.Operations):
                     self.contents[1][os.fsencode(name)] = archive_inode
                     self.pending_archives[archive_inode] = archive
 
+    def sig_info_handler(self, sig_no, stack):
+        logger.debug('fuse: %d inodes, %d synth inodes, %d edges (%s)',
+                     self._inode_count, len(self.items), len(self.parent),
+                     # getsizeof is the size of the dict itself; key and value are two small-ish integers,
+                     # which are shared due to code structure (this has been verified).
+                     format_file_size(sys.getsizeof(self.parent) + len(self.parent) * sys.getsizeof(self._inode_count)))
+        logger.debug('fuse: %d pending archives', len(self.pending_archives))
+        logger.debug('fuse: ItemCache %d entries, %s',
+                     self._inode_count - len(self.items),
+                     format_file_size(os.stat(self.cache.fd.fileno()).st_size))
+        logger.debug('fuse: data cache: %d/%d entries, %s', len(self.data_cache.items()), self.data_cache._capacity,
+                     format_file_size(sum(len(chunk) for key, chunk in self.data_cache.items())))
+        self.repository.log_instrumentation()
+
     def mount(self, mountpoint, mount_options, foreground=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
         options = ['fsname=borgfs', 'ro']
@@ -124,7 +139,9 @@ class FuseOperations(llfuse.Operations):
         # mirror.
         umount = False
         try:
-            signal = fuse_main()
+            with signal_handler('SIGUSR1', self.sig_info_handler), \
+                 signal_handler('SIGINFO', self.sig_info_handler):
+                signal = fuse_main()
             # no crash and no signal (or it's ^C and we're in the foreground) -> umount request
             umount = (signal is None or (signal == SIGINT and foreground))
         finally:

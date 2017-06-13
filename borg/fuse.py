@@ -60,7 +60,10 @@ class FuseOperations(llfuse.Operations):
         self.items = {}
         self.parent = {}
         self.contents = defaultdict(dict)
-        self.default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9), b'uid': os.getuid(), b'gid': os.getgid()}
+        self.default_uid = os.getuid()
+        self.default_gid = os.getgid()
+        self.default_dir = {b'mode': 0o40755, b'mtime': int(time.time() * 1e9),
+                            b'uid': self.default_uid, b'gid': self.default_gid}
         self.pending_archives = {}
         self.accounted_chunks = {}
         self.cache = ItemCache()
@@ -209,8 +212,8 @@ class FuseOperations(llfuse.Operations):
         entry.attr_timeout = 300
         entry.st_mode = item[b'mode']
         entry.st_nlink = item.get(b'nlink', 1)
-        entry.st_uid = item[b'uid']
-        entry.st_gid = item[b'gid']
+        entry.st_uid = item[b'uid'] if item[b'uid'] >= 0 else self.default_uid
+        entry.st_gid = item[b'gid'] if item[b'gid'] >= 0 else self.default_gid
         entry.st_rdev = item.get(b'rdev', 0)
         entry.st_size = size
         entry.st_blksize = 512

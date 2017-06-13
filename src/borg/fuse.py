@@ -81,22 +81,18 @@ class FuseOperations(llfuse.Operations):
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
         if self.args.location.archive:
-            archive = Archive(self.repository_uncached, self.key, self.manifest, self.args.location.archive,
-                              consider_part_files=self.args.consider_part_files)
-            self.process_archive(archive)
+            self.process_archive(self.args.location.archive)
         else:
             archive_names = (x.name for x in self.manifest.archives.list_considering(self.args))
-            for name in archive_names:
-                archive = Archive(self.repository_uncached, self.key, self.manifest, name,
-                                  consider_part_files=self.args.consider_part_files)
+            for archive_name in archive_names:
                 if self.versions:
                     # process archives immediately
-                    self.process_archive(archive)
+                    self.process_archive(archive_name)
                 else:
                     # lazy load archives, create archive placeholder inode
                     archive_inode = self._create_dir(parent=1)
-                    self.contents[1][os.fsencode(name)] = archive_inode
-                    self.pending_archives[archive_inode] = archive
+                    self.contents[1][os.fsencode(archive_name)] = archive_inode
+                    self.pending_archives[archive_inode] = archive_name
 
     def sig_info_handler(self, sig_no, stack):
         logger.debug('fuse: %d inodes, %d synth inodes, %d edges (%s)',
@@ -155,12 +151,14 @@ class FuseOperations(llfuse.Operations):
         self.parent[ino] = parent
         return ino
 
-    def process_archive(self, archive, prefix=[]):
+    def process_archive(self, archive_name, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
         """
         self.file_versions = {}  # for versions mode: original path -> version
-        unpacker = msgpack.Unpacker()
         t0 = time.perf_counter()
+        unpacker = msgpack.Unpacker()
+        archive = Archive(self.repository_uncached, self.key, self.manifest, archive_name,
+                          consider_part_files=self.args.consider_part_files)
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
@@ -314,9 +312,9 @@ class FuseOperations(llfuse.Operations):
 
     def _load_pending_archive(self, inode):
         # Check if this is an archive we need to load
-        archive = self.pending_archives.pop(inode, None)
-        if archive:
-            self.process_archive(archive, [os.fsencode(archive.name)])
+        archive_name = self.pending_archives.pop(inode, None)
+        if archive_name:
+            self.process_archive(archive_name, [os.fsencode(archive_name)])
 
     def lookup(self, parent_inode, name, ctx=None):
         self._load_pending_archive(parent_inode)

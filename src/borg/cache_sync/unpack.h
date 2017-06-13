@@ -50,6 +50,8 @@ typedef struct unpack_user {
 
     HashIndex *chunks;
 
+    uint64_t num_files;
+
     /*
      * We don't care about most stuff. This flag tells us whether we're at the chunks structure,
      * meaning:
@@ -358,6 +360,7 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
         if(length == 6 && !memcmp("chunks", p, 6)) {
             u->expect = expect_chunks_begin;
             u->inside_chunks = 1;
+            u->num_files++;
         } else {
             u->expect = expect_map_item_end;
         }

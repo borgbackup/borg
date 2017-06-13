@@ -9,7 +9,7 @@ from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.1_04'
 
 
 cdef extern from "_hashindex.c":
@@ -38,7 +38,8 @@ cdef extern from "cache_sync/cache_sync.c":
         pass
 
     CacheSyncCtx *cache_sync_init(HashIndex *chunks)
-    const char *cache_sync_error(CacheSyncCtx *ctx)
+    const char *cache_sync_error(const CacheSyncCtx *ctx)
+    uint64_t cache_sync_num_files(const CacheSyncCtx *ctx)
     int cache_sync_feed(CacheSyncCtx *ctx, void *data, uint32_t length)
     void cache_sync_free(CacheSyncCtx *ctx)
 
@@ -329,6 +330,48 @@ cdef class ChunkIndex(IndexBase):
 
         return size, csize, unique_size, unique_csize, unique_chunks, chunks
 
+    def stats_against(self, ChunkIndex master_index):
+        """
+        Calculate chunk statistics of this index against *master_index*.
+
+        A chunk is counted as unique if the number of references
+        in this index matches the number of references in *master_index*.
+
+        This index must be a subset of *master_index*.
+
+        Return the same statistics tuple as summarize:
+        size, csize, unique_size, unique_csize, unique_chunks, chunks.
+        """
+        cdef uint64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
+        cdef uint32_t our_refcount, chunk_size, chunk_csize
+        cdef const uint32_t *our_values
+        cdef const uint32_t *master_values
+        cdef const void *key = NULL
+        cdef HashIndex *master = master_index.index
+
+        while True:
+            key = hashindex_next_key(self.index, key)
+            if not key:
+                break
+            our_values = <const uint32_t*> (key + self.key_size)
+            master_values = <const uint32_t*> hashindex_get(master, key)
+            if not master_values:
+                raise ValueError('stats_against: key contained in self but not in master_index.')
+            our_refcount = _le32toh(our_values[0])
+            chunk_size = _le32toh(master_values[1])
+            chunk_csize = _le32toh(master_values[2])
+
+            chunks += our_refcount
+            size += <uint64_t> chunk_size * our_refcount
+            csize += <uint64_t> chunk_csize * our_refcount
+            if our_values[0] == master_values[0]:
+                # our refcount equals the master's refcount, so this chunk is unique to us
+                unique_chunks += 1
+                unique_size += chunk_size
+                unique_csize += chunk_csize
+
+        return size, csize, unique_size, unique_csize, unique_chunks, chunks
+
     def add(self, key, refs, size, csize):
         assert len(key) == self.key_size
         cdef uint32_t[3] data
@@ -420,3 +463,7 @@ cdef class CacheSynchronizer:
             error = cache_sync_error(self.sync)
             if error != NULL:
                 raise ValueError('cache_sync_feed failed: ' + error.decode('ascii'))
+
+    @property
+    def num_files(self):
+        return cache_sync_num_files(self.sync)

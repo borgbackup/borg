@@ -87,8 +87,10 @@ cache_sync_feed(CacheSyncCtx *ctx, void *data, uint32_t length)
                 ctx->ctx.user.last_error = "cache_sync_feed: unable to allocate buffer";
                 return 0;
             }
-            memcpy(new_buf, ctx->buf + ctx->head, ctx->tail - ctx->head);
-            free(ctx->buf);
+            if(ctx->buf) {
+                memcpy(new_buf, ctx->buf + ctx->head, ctx->tail - ctx->head);
+                free(ctx->buf);
+            }
             ctx->buf = new_buf;
             ctx->tail -= ctx->head;
             ctx->head = 0;

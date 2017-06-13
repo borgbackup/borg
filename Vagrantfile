@@ -161,6 +161,16 @@ def packages_netbsd
   EOF
 end
 
+def packages_openindiana
+  return <<-EOF
+    #pkg update  # XXX needs separate provisioning step + reboot
+    pkg install python-34 clang-3.4 lz4 git
+    python3 -m ensurepip
+    pip3 install -U setuptools pip wheel virtualenv
+    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+  EOF
+end
+
 # Install required cygwin packages and configure environment
 #
 # Microsoft/EdgeOnWindows10 image has MLS-OpenSSH installed by default,
@@ -526,6 +536,19 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64")
+  end
+
+  # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
+  # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
+  config.vm.define "openindiana64" do |b|
+    b.vm.box = "openindiana/hipster"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1536 + $wmem
+    end
+    b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64")
   end
 
   config.vm.define "windows10" do |b|

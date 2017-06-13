@@ -46,14 +46,4 @@ pip install codecov
 python setup.py --version
 pip install -e .[fuse]
 
-if [ -d "$HOME/.rustup/toolchains" ] && [ -f "$HOME/.cargo/env" ]; then
-    source ~/.cargo/env
-    rustup toolchain install stable # also updates
-    rustup default stable
-else
-    curl https://sh.rustup.rs -sSf | sh -s -- -y
-    source ~/.cargo/env
-fi
-
-cd test-wrapper
-cargo build --release
+scripts/build-test-wrapper.sh

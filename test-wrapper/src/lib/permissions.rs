@@ -169,8 +169,8 @@ wrap! {
 
 #[cfg(target_os = "linux")]
 wrap! {
-    unsafe fn __xstat:ORIG_SXTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
-        let ret = ORIG_SXTAT(ver, path, statbuf);
+    unsafe fn __xstat:ORIG_XSTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
+        let ret = ORIG_XSTAT(ver, path, statbuf);
         if ret == 0 {
             stat_base(CPath::from_path(path, true), &mut *statbuf);
         }

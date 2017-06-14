@@ -10,7 +10,6 @@ use std::fs;
 use std::thread;
 use std::borrow::Borrow;
 use std::sync::RwLock;
-use std::collections::HashMap;
 use std::process::{self, Command};
 use std::ffi::OsStr;
 use std::os::raw::*;
@@ -18,7 +17,6 @@ use std::path::PathBuf;
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, ErrorKind};
 use std::collections::hash_map;
-use std::hash::BuildHasherDefault;
 
 use std::os::unix::net::{UnixListener, UnixStream};
 
@@ -38,8 +36,8 @@ use serde::ser::Serialize;
 extern crate libc;
 use libc::{mode_t, uid_t, gid_t, dev_t};
 
-extern crate twox_hash;
-use twox_hash::XxHash;
+extern crate fnv;
+use fnv::FnvHashMap;
 
 #[macro_use]
 extern crate serde_derive;
@@ -107,7 +105,7 @@ enum Message {
 
 #[derive(Default)]
 struct FileEntry {
-    xattrs: HashMap<Vec<u8>, Vec<u8>, BuildHasherDefault<XxHash>>,
+    xattrs: FnvHashMap<Vec<u8>, Vec<u8>>,
     mode_and_mask: Option<(mode_t, mode_t)>,
     owner: Option<uid_t>,
     group: Option<gid_t>,
@@ -115,7 +113,7 @@ struct FileEntry {
 }
 
 lazy_static! {
-    static ref DATABASE: RwLock<HashMap<FileId, FileEntry, BuildHasherDefault<XxHash>>> = RwLock::new(Default::default());
+    static ref DATABASE: RwLock<FnvHashMap<FileId, FileEntry>> = RwLock::new(Default::default());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

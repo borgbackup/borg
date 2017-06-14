@@ -7,9 +7,8 @@ use std::ffi::CStr;
 use std::io::prelude::*;
 use std::io::{self, BufReader, BufWriter};
 use std::sync::Mutex;
-use std::collections::{hash_map, HashMap};
+use std::collections::hash_map;
 use std::borrow::Borrow;
-use std::hash::BuildHasherDefault;
 use std::fmt::{self, Debug};
 use std::ops::Deref;
 
@@ -18,7 +17,7 @@ use std::os::unix::net::UnixStream;
 use libc::{self, mode_t, uid_t, gid_t, dev_t};
 use serde::de::DeserializeOwned;
 use bincode::{self, deserialize_from, serialize_into};
-use twox_hash::XxHash;
+use fnv::FnvHashMap;
 use internal_stat::*;
 
 #[allow(non_camel_case_types)]
@@ -274,7 +273,7 @@ macro_rules! wrap {
 }
 
 lazy_static! {
-    pub static ref FD_ID_CACHE: Mutex<HashMap<c_int, FileId, BuildHasherDefault<XxHash>>> = Mutex::new(Default::default());
+    pub static ref FD_ID_CACHE: Mutex<FnvHashMap<c_int, FileId>> = Mutex::new(Default::default());
 }
 
 pub enum CPath {

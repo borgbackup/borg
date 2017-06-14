@@ -14,7 +14,7 @@ extern crate bincode;
 
 extern crate errno;
 
-extern crate twox_hash;
+extern crate fnv;
 
 mod internal_stat;
 #[macro_use]

@@ -28,6 +28,14 @@ class LRUCache:
     def __contains__(self, key):
         return key in self._cache
 
+    def get(self, key, default=None):
+        value = self._cache.get(key, default)
+        if value is default:
+            return value
+        self._lru.remove(key)
+        self._lru.append(key)
+        return value
+
     def clear(self):
         for value in self._cache.values():
             self._dispose(value)

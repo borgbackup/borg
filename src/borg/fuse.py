@@ -37,9 +37,8 @@ else:
 class ItemCache:
     GROW_BY = 2 * 1024 * 1024
 
-    def __init__(self, repository, key):
-        self.repository = repository
-        self.key = key
+    def __init__(self, decrypted_repository):
+        self.decrypted_repository = decrypted_repository
         self.data = bytearray()
         self.writeptr = 0
         self.fd = tempfile.TemporaryFile(prefix='borg-tmp')
@@ -100,7 +99,7 @@ class ItemCache:
         else:
             chunk_id = bytes(self.data[offset+1:offset+33])
             chunk_offset = int.from_bytes(self.data[offset+33:offset+37], 'little')
-            chunk = self.key.decrypt(chunk_id, next(self.repository.get_many([chunk_id])))
+            csize, chunk = next(self.decrypted_repository.get_many([chunk_id]))
             data = memoryview(chunk)[chunk_offset:]
             unpacker = msgpack.Unpacker()
             unpacker.feed(data)
@@ -114,10 +113,10 @@ class FuseOperations(llfuse.Operations):
     allow_damaged_files = False
     versions = False
 
-    def __init__(self, key, repository, manifest, args, cached_repo):
+    def __init__(self, key, repository, manifest, args, decrypted_repository):
         super().__init__()
         self.repository_uncached = repository
-        self.repository = cached_repo
+        self.decrypted_repository = decrypted_repository
         self.args = args
         self.manifest = manifest
         self.key = key
@@ -129,7 +128,7 @@ class FuseOperations(llfuse.Operations):
         self.default_gid = os.getgid()
         self.default_dir = Item(mode=0o40755, mtime=int(time.time() * 1e9), uid=self.default_uid, gid=self.default_gid)
         self.pending_archives = {}
-        self.cache = ItemCache(cached_repo, key)
+        self.cache = ItemCache(decrypted_repository)
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
         logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
@@ -163,7 +162,7 @@ class FuseOperations(llfuse.Operations):
                      format_file_size(os.stat(self.cache.fd.fileno()).st_size))
         logger.debug('fuse: data cache: %d/%d entries, %s', len(self.data_cache.items()), self.data_cache._capacity,
                      format_file_size(sum(len(chunk) for key, chunk in self.data_cache.items())))
-        self.repository.log_instrumentation()
+        self.decrypted_repository.log_instrumentation()
 
     def mount(self, mountpoint, mount_options, foreground=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
@@ -217,8 +216,7 @@ class FuseOperations(llfuse.Operations):
         archive = Archive(self.repository_uncached, self.key, self.manifest, archive_name,
                           consider_part_files=self.args.consider_part_files)
         self.cache.new_stream()
-        for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
-            data = self.key.decrypt(key, chunk)
+        for key, (csize, data) in zip(archive.metadata.items, self.decrypted_repository.get_many(archive.metadata.items)):
             self.cache.set_current_id(key, len(data))
             unpacker.feed(data)
             while True:

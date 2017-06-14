@@ -212,28 +212,32 @@ fn main() {
                         reply(&mut writer, &0);
                     }
                     Message::XattrsGet(id, attr) => {
-                        let database = DATABASE.read().unwrap();
-                        if let Some(file) = database.get(&id) {
-                            if let Some(vec) = file.xattrs.get(&attr) {
-                                reply(&mut writer, &ReplyXattrsGet(Some(vec.as_slice())));
-                                continue;
+                        {
+                            let database = DATABASE.read().unwrap();
+                            if let Some(file) = database.get(&id) {
+                                if let Some(vec) = file.xattrs.get(&attr) {
+                                    reply(&mut writer, &ReplyXattrsGet(Some(vec.as_slice())));
+                                    continue;
+                                }
                             }
                         }
                         reply(&mut writer, &ReplyXattrsGet(None));
                     }
                     Message::XattrsSet(id, attr, value, flags) => {
-                        let mut database = DATABASE.write().unwrap();
-                        let file = database.entry(id).or_insert_with(FileEntry::default);
-                        if file.xattrs.contains_key(&attr) {
-                            if flags & XATTR_CREATE == XATTR_CREATE {
-                                reply(&mut writer, &libc::EEXIST);
+                        {
+                            let mut database = DATABASE.write().unwrap();
+                            let file = database.entry(id).or_insert_with(FileEntry::default);
+                            if file.xattrs.contains_key(&attr) {
+                                if flags & XATTR_CREATE == XATTR_CREATE {
+                                    reply(&mut writer, &libc::EEXIST);
+                                    continue;
+                                }
+                            } else if flags & XATTR_REPLACE == XATTR_REPLACE {
+                                reply(&mut writer, &libc::ENOATTR);
                                 continue;
                             }
-                        } else if flags & XATTR_REPLACE == XATTR_REPLACE {
-                            reply(&mut writer, &libc::ENOATTR);
-                            continue;
+                            file.xattrs.insert(attr, value);
                         }
-                        file.xattrs.insert(attr, value);
                         reply(&mut writer, &0);
                     }
                     Message::XattrsList(id) => {
@@ -247,60 +251,66 @@ fn main() {
                     }
                     Message::OverrideMode(id, mode, mask, rdev) => {
                         debug_assert_eq!(mode & !mask, 0);
-                        let mut database = DATABASE.write().unwrap();
-                        let file = database.entry(id);
-                        match file {
-                            hash_map::Entry::Occupied(mut entry) => {
-                                let file = entry.get_mut();
-                                file.xattrs.clear();
-                                if let Some((old_mode, old_mask)) = file.mode_and_mask {
-                                    file.mode_and_mask = Some((mode | (old_mode & !mask), mask | old_mask));
-                                } else {
-                                    file.mode_and_mask = Some((mode, mask));
+                        {
+                            let mut database = DATABASE.write().unwrap();
+                            let file = database.entry(id);
+                            match file {
+                                hash_map::Entry::Occupied(mut entry) => {
+                                    let file = entry.get_mut();
+                                    file.xattrs.clear();
+                                    if let Some((old_mode, old_mask)) = file.mode_and_mask {
+                                        file.mode_and_mask = Some((mode | (old_mode & !mask), mask | old_mask));
+                                    } else {
+                                        file.mode_and_mask = Some((mode, mask));
+                                    }
+                                    file.rdev = rdev.or(file.rdev);
                                 }
-                                file.rdev = rdev.or(file.rdev);
-                            }
-                            hash_map::Entry::Vacant(entry) => {
-                                let mut file_entry = FileEntry::default();
-                                file_entry.mode_and_mask = Some((mode, mask));
-                                file_entry.rdev = rdev;
-                                entry.insert(file_entry);
+                                hash_map::Entry::Vacant(entry) => {
+                                    let mut file_entry = FileEntry::default();
+                                    file_entry.mode_and_mask = Some((mode, mask));
+                                    file_entry.rdev = rdev;
+                                    entry.insert(file_entry);
+                                }
                             }
                         }
                         reply(&mut writer, &0);
                     }
                     Message::OverrideOwner(id, uid, gid) => {
-                        let mut database = DATABASE.write().unwrap();
-                        let file = database.entry(id);
-                        match file {
-                            hash_map::Entry::Occupied(mut entry) => {
-                                let file = entry.get_mut();
-                                file.xattrs.clear();
-                                if let Some(uid) = uid {
-                                    file.owner = Some(uid);
+                        {
+                            let mut database = DATABASE.write().unwrap();
+                            let file = database.entry(id);
+                            match file {
+                                hash_map::Entry::Occupied(mut entry) => {
+                                    let file = entry.get_mut();
+                                    file.xattrs.clear();
+                                    if let Some(uid) = uid {
+                                        file.owner = Some(uid);
+                                    }
+                                    if let Some(gid) = gid {
+                                        file.group = Some(gid);
+                                    }
                                 }
-                                if let Some(gid) = gid {
-                                    file.group = Some(gid);
+                                hash_map::Entry::Vacant(entry) => {
+                                    let mut file_entry = FileEntry::default();
+                                    file_entry.owner = uid;
+                                    file_entry.group = gid;
+                                    entry.insert(file_entry);
                                 }
-                            }
-                            hash_map::Entry::Vacant(entry) => {
-                                let mut file_entry = FileEntry::default();
-                                file_entry.owner = uid;
-                                file_entry.group = gid;
-                                entry.insert(file_entry);
                             }
                         }
                         reply(&mut writer, &0);
                     }
                     Message::GetPermissions(id) => {
-                        let database = DATABASE.read().unwrap();
-                        let file = database.get(&id);
-                        let file = file.as_ref();
-                        let response = ReplyGetPermissions {
-                            mode_and_mask: file.and_then(|file| file.mode_and_mask),
-                            owner: file.and_then(|file| file.owner),
-                            group: file.and_then(|file| file.group),
-                            rdev: file.and_then(|file| file.rdev),
+                        let response = {
+                            let database = DATABASE.read().unwrap();
+                            let file = database.get(&id);
+                            let file = file.as_ref();
+                            ReplyGetPermissions {
+                                mode_and_mask: file.and_then(|file| file.mode_and_mask),
+                                owner: file.and_then(|file| file.owner),
+                                group: file.and_then(|file| file.group),
+                                rdev: file.and_then(|file| file.rdev),
+                            }
                         };
                         reply(&mut writer, &response);
                     }

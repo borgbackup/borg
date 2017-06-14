@@ -2,6 +2,7 @@ import errno
 import io
 import os
 import stat
+import sys
 import tempfile
 import time
 from collections import defaultdict
@@ -16,7 +17,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .archive import Archive
-from .helpers import daemonize, hardlinkable
+from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
 from .item import Item
 from .lrucache import LRUCache
 
@@ -82,22 +83,32 @@ class FuseOperations(llfuse.Operations):
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
         if self.args.location.archive:
-            archive = Archive(self.repository_uncached, self.key, self.manifest, self.args.location.archive,
-                              consider_part_files=self.args.consider_part_files)
-            self.process_archive(archive)
+            self.process_archive(self.args.location.archive)
         else:
             archive_names = (x.name for x in self.manifest.archives.list_considering(self.args))
-            for name in archive_names:
-                archive = Archive(self.repository_uncached, self.key, self.manifest, name,
-                                  consider_part_files=self.args.consider_part_files)
+            for archive_name in archive_names:
                 if self.versions:
                     # process archives immediately
-                    self.process_archive(archive)
+                    self.process_archive(archive_name)
                 else:
                     # lazy load archives, create archive placeholder inode
                     archive_inode = self._create_dir(parent=1)
-                    self.contents[1][os.fsencode(name)] = archive_inode
-                    self.pending_archives[archive_inode] = archive
+                    self.contents[1][os.fsencode(archive_name)] = archive_inode
+                    self.pending_archives[archive_inode] = archive_name
+
+    def sig_info_handler(self, sig_no, stack):
+        logger.debug('fuse: %d inodes, %d synth inodes, %d edges (%s)',
+                     self._inode_count, len(self.items), len(self.parent),
+                     # getsizeof is the size of the dict itself; key and value are two small-ish integers,
+                     # which are shared due to code structure (this has been verified).
+                     format_file_size(sys.getsizeof(self.parent) + len(self.parent) * sys.getsizeof(self._inode_count)))
+        logger.debug('fuse: %d pending archives', len(self.pending_archives))
+        logger.debug('fuse: ItemCache %d entries, %s',
+                     self._inode_count - len(self.items),
+                     format_file_size(os.stat(self.cache.fd.fileno()).st_size))
+        logger.debug('fuse: data cache: %d/%d entries, %s', len(self.data_cache.items()), self.data_cache._capacity,
+                     format_file_size(sum(len(chunk) for key, chunk in self.data_cache.items())))
+        self.repository.log_instrumentation()
 
     def mount(self, mountpoint, mount_options, foreground=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
@@ -126,7 +137,9 @@ class FuseOperations(llfuse.Operations):
         # mirror.
         umount = False
         try:
-            signal = fuse_main()
+            with signal_handler('SIGUSR1', self.sig_info_handler), \
+                 signal_handler('SIGINFO', self.sig_info_handler):
+                signal = fuse_main()
             # no crash and no signal (or it's ^C and we're in the foreground) -> umount request
             umount = (signal is None or (signal == SIGINT and foreground))
         finally:
@@ -140,11 +153,14 @@ class FuseOperations(llfuse.Operations):
         self.parent[ino] = parent
         return ino
 
-    def process_archive(self, archive, prefix=[]):
+    def process_archive(self, archive_name, prefix=[]):
         """Build fuse inode hierarchy from archive metadata
         """
         self.file_versions = {}  # for versions mode: original path -> version
+        t0 = time.perf_counter()
         unpacker = msgpack.Unpacker()
+        archive = Archive(self.repository_uncached, self.key, self.manifest, archive_name,
+                          consider_part_files=self.args.consider_part_files)
         for key, chunk in zip(archive.metadata.items, self.repository.get_many(archive.metadata.items)):
             data = self.key.decrypt(key, chunk)
             unpacker.feed(data)
@@ -168,6 +184,8 @@ class FuseOperations(llfuse.Operations):
                 for segment in segments[:-1]:
                     parent = self.process_inner(segment, parent)
                 self.process_leaf(segments[-1], item, parent, prefix, is_dir)
+        duration = time.perf_counter() - t0
+        logger.debug('fuse: process_archive completed in %.1f s for archive %s', duration, archive.name)
 
     def process_leaf(self, name, item, parent, prefix, is_dir):
         def file_version(item):
@@ -296,9 +314,9 @@ class FuseOperations(llfuse.Operations):
 
     def _load_pending_archive(self, inode):
         # Check if this is an archive we need to load
-        archive = self.pending_archives.pop(inode, None)
-        if archive:
-            self.process_archive(archive, [os.fsencode(archive.name)])
+        archive_name = self.pending_archives.pop(inode, None)
+        if archive_name:
+            self.process_archive(archive_name, [os.fsencode(archive_name)])
 
     def lookup(self, parent_inode, name, ctx=None):
         self._load_pending_archive(parent_inode)

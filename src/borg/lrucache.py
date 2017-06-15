@@ -1,3 +1,6 @@
+sentinel = object()
+
+
 class LRUCache:
     def __init__(self, capacity, dispose):
         self._cache = {}
@@ -29,9 +32,9 @@ class LRUCache:
         return key in self._cache
 
     def get(self, key, default=None):
-        value = self._cache.get(key, default)
-        if value is default:
-            return value
+        value = self._cache.get(key, sentinel)
+        if value is sentinel:
+            return default
         self._lru.remove(key)
         self._lru.append(key)
         return value

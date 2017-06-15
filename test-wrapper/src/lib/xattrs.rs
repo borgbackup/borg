@@ -13,17 +13,17 @@ unsafe fn setxattr_base(path: CPath, name: *const c_char, value: *const c_void, 
             CStr::from_ptr(name).to_bytes(),
             slice::from_raw_parts(value as *const u8, size),
             flags));
-    match err {
-        Ok(0) => Ok(0),
-        Ok(e) => Err(e),
-        Err(_) => Err(libc::ERANGE),
+    if err == 0 {
+        Ok(0)
+    } else {
+        Err(err)
     }
 }
 
 unsafe fn getxattr_base(path: CPath, name: *const c_char, dest: *mut c_void, size: usize) -> Result<isize> {
     let res = request::<ReplyXattrsGet>(Message::XattrsGet(path.get_id()?,
         CStr::from_ptr(name).to_bytes()));
-    if let Some(value) = res.ok().and_then(|x| x.0) {
+    if let Some(value) = res.0 {
         if value.len() > (isize::max_value() as usize) {
             return Err(libc::E2BIG);
         }
@@ -44,14 +44,7 @@ unsafe fn getxattr_base(path: CPath, name: *const c_char, dest: *mut c_void, siz
 }
 
 unsafe fn listxattr_base(path: CPath, dest: *mut c_char, size: usize) -> Result<isize> {
-    let res = match request::<ReplyXattrsList>(Message::XattrsList(path.get_id()?)) {
-        Ok(x) => x.0,
-        Err(_) => {
-            // thread being destroyed/already destroyed
-            // we try to handle this as peacefully as possible
-            return Err(libc::ENOENT);
-        }
-    };
+    let res = request::<ReplyXattrsList>(Message::XattrsList(path.get_id()?)).0;
     let total_size = res.len() + res.iter().map(|i| i.len()).sum::<usize>();
     if total_size > (isize::max_value() as usize) {
         return Err(libc::E2BIG);

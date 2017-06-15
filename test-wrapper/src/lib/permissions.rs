@@ -64,19 +64,18 @@ fn stat_base(path: CPath, statbuf: &mut StatBase) {
         warn!("Failed to get stat path: {:?} errno {}", path, errno());
         return;
     };
-    if let Ok(overrides) = request::<ReplyGetPermissions>(Message::GetPermissions(id)) {
-        if let Some((mode, mask)) = overrides.mode_and_mask {
-            statbuf.set_mode(mode, mask);
-        }
-        if let Some(owner) = overrides.owner {
-            statbuf.set_owner(owner);
-        }
-        if let Some(group) = overrides.group {
-            statbuf.set_group(group);
-        }
-        if let Some(rdev) = overrides.rdev {
-            statbuf.set_rdev(rdev);
-        }
+    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(id));
+    if let Some((mode, mask)) = overrides.mode_and_mask {
+        statbuf.set_mode(mode, mask);
+    }
+    if let Some(owner) = overrides.owner {
+        statbuf.set_owner(owner);
+    }
+    if let Some(group) = overrides.group {
+        statbuf.set_group(group);
+    }
+    if let Some(rdev) = overrides.rdev {
+        statbuf.set_rdev(rdev);
     }
 }
 

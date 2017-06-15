@@ -11,8 +11,6 @@ use std::collections::hash_map;
 use std::borrow::Borrow;
 use std::fmt::{self, Debug};
 use std::ops::Deref;
-use std::thread::LocalKeyState;
-use std::cell::RefCell;
 
 use std::os::unix::net::UnixStream;
 
@@ -78,13 +76,13 @@ pub enum Message<'a> {
 
 pub type Result<T> = ::std::result::Result<T, c_int>;
 
-thread_local! {
-    static DAEMON_STREAM: RefCell<(BufReader<UnixStream>, BufWriter<UnixStream>)> = {
+lazy_static! {
+    static ref DAEMON_STREAM: Mutex<(BufReader<UnixStream>, BufWriter<UnixStream>)> = {
         let socket = UnixStream::connect(env::var("TEST_WRAPPER_SOCKET")
                 .expect("libtestwrapper preloaded, but TEST_WRAPPER_SOCKET environment variable not passed"))
             .expect("Failed to connect to test-wrapper daemon");
         let reader = BufReader::new(socket.try_clone().expect("Failed to clone Unix socket"));
-        RefCell::new((reader, BufWriter::new(socket)))
+        Mutex::new((reader, BufWriter::new(socket)))
     };
 }
 
@@ -119,32 +117,22 @@ pub fn bincode_result<T>(result: result::Result<T, Box<bincode::ErrorKind>>) -> 
     }
 }
 
-pub enum DaemonError {
-    ThreadDestroyed,
-}
-
-pub fn request<T: DeserializeOwned>(message: Message) -> result::Result<T, DaemonError> {
-    if DAEMON_STREAM.state() == LocalKeyState::Destroyed {
-        return Err(DaemonError::ThreadDestroyed);
+pub fn request<T: DeserializeOwned>(message: Message) -> T {
+    let stream = &mut DAEMON_STREAM.lock().unwrap();
+    {
+        let writer = &mut stream.1;
+        bincode_result(serialize_into(writer, message.borrow(), bincode::Infinite));
+        daemon_result(writer.flush());
     }
-    Ok(DAEMON_STREAM.with(|stream| {
-        let mut stream = stream.borrow_mut();
-        {
-            let writer = &mut stream.1;
-            bincode_result(serialize_into(writer, message.borrow(), bincode::Infinite));
-            daemon_result(writer.flush());
-        }
-        let reader = &mut stream.0;
-        bincode_result(deserialize_from(reader, bincode::Infinite))
-    }))
+    let reader = &mut stream.0;
+    bincode_result(deserialize_from(reader, bincode::Infinite))
 }
 
 // The reply is important, as it ensures the operation is finished serverside
 pub fn message(message: Message) -> Result<()> {
     match request(message) {
-        Ok(0) => Ok(()),
-        Ok(e) => Err(e),
-        Err(DaemonError::ThreadDestroyed) => Ok(()),
+        0 => Ok(()),
+        e => Err(e),
     }
 }
 

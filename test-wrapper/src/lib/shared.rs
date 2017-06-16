@@ -76,14 +76,25 @@ pub enum Message<'a> {
 
 pub type Result<T> = ::std::result::Result<T, c_int>;
 
+fn create_daemon_stream() -> (BufReader<UnixStream>, BufWriter<UnixStream>) {
+    let socket = UnixStream::connect(env::var("TEST_WRAPPER_SOCKET")
+            .expect("libtestwrapper preloaded, but TEST_WRAPPER_SOCKET environment variable not passed"))
+        .expect("Failed to connect to test-wrapper daemon");
+    let reader = BufReader::new(socket.try_clone().expect("Failed to clone Unix socket"));
+    (reader, BufWriter::new(socket))
+}
+
 lazy_static! {
     static ref DAEMON_STREAM: Mutex<(BufReader<UnixStream>, BufWriter<UnixStream>)> = {
-        let socket = UnixStream::connect(env::var("TEST_WRAPPER_SOCKET")
-                .expect("libtestwrapper preloaded, but TEST_WRAPPER_SOCKET environment variable not passed"))
-            .expect("Failed to connect to test-wrapper daemon");
-        let reader = BufReader::new(socket.try_clone().expect("Failed to clone Unix socket"));
-        Mutex::new((reader, BufWriter::new(socket)))
+        unsafe {
+           libc::pthread_atfork(None, None, Some(new_daemon_stream));
+        }
+        Mutex::new(create_daemon_stream())
     };
+}
+
+unsafe extern "C" fn new_daemon_stream() {
+    *DAEMON_STREAM.lock().unwrap() = create_daemon_stream();
 }
 
 pub fn daemon_error(err: &io::Error) -> ! {

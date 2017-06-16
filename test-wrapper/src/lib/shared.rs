@@ -93,7 +93,7 @@ lazy_static! {
     };
 }
 
-unsafe extern "C" fn new_daemon_stream() {
+extern "C" fn new_daemon_stream() {
     *DAEMON_STREAM.lock().unwrap() = create_daemon_stream();
 }
 

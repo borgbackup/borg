@@ -1279,7 +1279,7 @@ class Archiver:
     def _do_mount(self, args, repository, manifest, key):
         from .fuse import FuseOperations
 
-        with cache_if_remote(repository) as cached_repo:
+        with cache_if_remote(repository, decrypted_cache=key) as cached_repo:
             operations = FuseOperations(key, repository, manifest, args, cached_repo)
             logger.info("Mounting filesystem")
             try:

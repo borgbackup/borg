@@ -2529,7 +2529,7 @@ class Archiver:
           stored in the segments.
         - If you use a remote repo server via ssh:, the repo check is executed on the
           repo server without causing significant network traffic.
-        - The repository check can be skipped using the --archives-only option.
+        - The repository check can be skipped using the ``--archives-only`` option.
 
         Second, the consistency and correctness of the archive metadata is verified:
 
@@ -2551,9 +2551,9 @@ class Archiver:
           decryption and this is always done client-side, because key access will be
           required).
         - The archive checks can be time consuming, they can be skipped using the
-          --repository-only option.
+          ``--repository-only`` option.
 
-        The --verify-data option will perform a full integrity verification (as opposed to
+        The ``--verify-data`` option will perform a full integrity verification (as opposed to
         checking the CRC32 of the segment) of data, which means reading the data from the
         repository, decrypting and decompressing it. This is a cryptographic verification,
         which will detect (accidental) corruption. For encrypted repositories it is
@@ -2579,7 +2579,7 @@ class Archiver:
         subparser.add_argument('--verify-data', dest='verify_data', action='store_true',
                                default=False,
                                help='perform cryptographic archive data integrity verification '
-                                    '(conflicts with --repository-only)')
+                                    '(conflicts with ``--repository-only``)')
         subparser.add_argument('--repair', dest='repair', action='store_true',
                                default=False,
                                help='attempt to repair any inconsistencies found')
@@ -2653,7 +2653,7 @@ class Archiver:
                                help='path to the backup')
         subparser.add_argument('--paper', dest='paper', action='store_true',
                                default=False,
-                               help='interactively import from a backup done with --paper')
+                               help='interactively import from a backup done with ``--paper``')
 
         change_passphrase_epilog = process_epilog("""
         The key files used for repository encryption are optionally passphrase
@@ -2725,7 +2725,7 @@ class Archiver:
         {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
         To speed up pulling backups over sshfs and similar network file systems which do
-        not provide correct inode information the --ignore-inode flag can be used. This
+        not provide correct inode information the ``--ignore-inode`` flag can be used. This
         potentially decreases reliability of change detection, while avoiding always reading
         all files on these file systems.
 
@@ -2734,7 +2734,7 @@ class Archiver:
         is used to determine changed files quickly uses absolute filenames.
         If this is not possible, consider creating a bind mount to a stable location.
 
-        The --progress option shows (from left to right) Original, Compressed and Deduplicated
+        The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
         (O, C and D, respectively), then the Number of files (N) processed so far, followed by
         the currently processed path.
 
@@ -2743,8 +2743,8 @@ class Archiver:
 
         .. man NOTES
 
-        The --exclude patterns are not like tar. In tar --exclude .bundler/gems will
-        exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
+        The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
+        exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
         '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
         more information.
 
@@ -2950,7 +2950,7 @@ class Archiver:
 
         When giving '-' as the output FILE, Borg will write a tar stream to standard output.
 
-        By default (--tar-filter=auto) Borg will detect whether the FILE should be compressed
+        By default (``--tar-filter=auto``) Borg will detect whether the FILE should be compressed
         based on its file extension and pipe the tarball through an appropriate filter
         before writing it to FILE:
 
@@ -2958,7 +2958,7 @@ class Archiver:
         - .tar.bz2: bzip2
         - .tar.xz: xz
 
-        Alternatively a --tar-filter program may be explicitly specified. It should
+        Alternatively a ``--tar-filter`` program may be explicitly specified. It should
         read the uncompressed tar stream from stdin and write a compressed/filtered
         tar stream to stdout.
 
@@ -2969,7 +2969,7 @@ class Archiver:
         Timestamp resolution is limited to whole seconds, not the nanosecond resolution
         otherwise supported by Borg.
 
-        A --sparse option (as found in borg extract) is not supported.
+        A ``--sparse`` option (as found in borg extract) is not supported.
 
         By default the entire archive is extracted but a subset of files and directories
         can be selected by passing a list of ``PATHs`` as arguments.
@@ -3024,7 +3024,7 @@ class Archiver:
 
             For archives prior to Borg 1.1 chunk contents are compared by default.
             If you did not create the archives with different chunker params,
-            pass --same-chunker-params.
+            pass ``--same-chunker-params``.
             Note that the chunker params changed from Borg 0.xx to 1.0.
 
             See the output of the "borg help patterns" command for more help on exclude patterns.
@@ -3131,7 +3131,7 @@ class Archiver:
 
         .. man NOTES
 
-        The following keys are available for --format:
+        The following keys are available for ``--format``:
 
 
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
@@ -3157,13 +3157,13 @@ class Archiver:
                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
         subparser.add_argument('--json', action='store_true',
                                help='Only valid for listing repository contents. Format output as JSON. '
-                                    'The form of --format is ignored, '
+                                    'The form of ``--format`` is ignored, '
                                     'but keys used in it are added to the JSON output. '
                                     'Some keys are always present. Note: JSON can only represent text. '
                                     'A "barchive" key is therefore not available.')
         subparser.add_argument('--json-lines', action='store_true',
                                help='Only valid for listing archive contents. Format output as JSON Lines. '
-                                    'The form of --format is ignored, '
+                                    'The form of ``--format`` is ignored, '
                                     'but keys used in it are added to the JSON output. '
                                     'Some keys are always present. Note: JSON can only represent text. '
                                     'A "bpath" key is therefore not available.')
@@ -3217,7 +3217,7 @@ class Archiver:
         - versions: when used with a repository mount, this gives a merged, versioned
           view of the files in the archives. EXPERIMENTAL, layout may change in future.
         - allow_damaged_files: by default damaged files (where missing chunks were
-          replaced with runs of zeros by borg check --repair) are not readable and
+          replaced with runs of zeros by borg check ``--repair``) are not readable and
           return EIO (I/O error). Set this option to read such files.
 
         The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
@@ -3312,7 +3312,7 @@ class Archiver:
         Also, prune automatically removes checkpoint archives (incomplete archives left
         behind by interrupted backup runs) except if the checkpoint is the latest
         archive (and thus still needed). Checkpoint archives are not considered when
-        comparing archive counts against the retention limits (--keep-X).
+        comparing archive counts against the retention limits (``--keep-X``).
 
         If a prefix is set with -P, then only archives that start with the prefix are
         considered for deletion and only those archives count towards the totals
@@ -3325,14 +3325,14 @@ class Archiver:
         from different machines) in one shared repository, use one prune call per
         data set that matches only the respective archives using the -P option.
 
-        The "--keep-within" option takes an argument of the form "<int><char>",
-        where char is "H", "d", "w", "m", "y". For example, "--keep-within 2d" means
+        The ``--keep-within`` option takes an argument of the form "<int><char>",
+        where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
         to keep all archives that were created within the past 48 hours.
         "1m" is taken to mean "31d". The archives kept with this option do not
         count towards the totals specified by any other options.
 
         A good procedure is to thin out more and more the older your backups get.
-        As an example, "--keep-daily 7" means to keep the latest backup on each day,
+        As an example, ``--keep-daily 7`` means to keep the latest backup on each day,
         up to 7 most recent days with backups (days without backups do not count).
         The rules are applied from secondly to yearly, and backups selected by previous
         rules do not count towards those of later rules. The time that each backup
@@ -3340,7 +3340,7 @@ class Archiver:
         the local timezone, and weeks go from Monday to Sunday. Specifying a
         negative number of archives to keep means that there is no limit.
 
-        The "--keep-last N" option is doing the same as "--keep-secondly N" (and it will
+        The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
         """)
@@ -3496,33 +3496,33 @@ class Archiver:
 
         This is an *experimental* feature. Do *not* use this on your only backup.
 
-        --exclude, --exclude-from, --exclude-if-present, --keep-exclude-tags, and PATH
+        ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
         have the exact same semantics as in "borg create". If PATHs are specified the
         resulting archive will only contain files from these PATHs.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
-        will *not* match (--exclude, --exclude-from, PATHs).
+        will *not* match (``--exclude``, ``--exclude-from``, PATHs).
 
-        --recompress allows to change the compression of existing data in archives.
+        ``--recompress`` allows to change the compression of existing data in archives.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.
 
-        --chunker-params will re-chunk all files in the archive, this can be
+        ``--chunker-params`` will re-chunk all files in the archive, this can be
         used to have upgraded Borg 0.xx or Attic archives deduplicate with
         Borg 1.x archives.
 
         **USE WITH CAUTION.**
         Depending on the PATHs and patterns given, recreate can be used to permanently
         delete files from archives.
-        When in doubt, use "--dry-run --verbose --list" to see how patterns/PATHS are
+        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
         interpreted.
 
         The archive being recreated is only removed after the operation completes. The
         archive that is built during the operation exists at the same time at
         "<ARCHIVE>.recreate". The new archive will have a different archive ID.
 
-        With --target the original archive is not replaced, instead a new archive is created.
+        With ``--target`` the original archive is not replaced, instead a new archive is created.
 
         When rechunking space usage can be substantial, expect at least the entire
         deduplicated size of the archives using the previous chunker params.
@@ -3563,7 +3563,7 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                   help='if tag objects are specified with ``--exclude-if-present``, don\'t omit the tag '
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
@@ -3592,15 +3592,15 @@ class Archiver:
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--recompress', dest='recompress', nargs='?', default='never', const='if-different',
                                    choices=('never', 'if-different', 'always'),
-                                   help='recompress data chunks according to --compression if "if-different". '
-                                        'When "always", chunks that are already compressed that way are not skipped, '
-                                        'but compressed again. Only the algorithm is considered for "if-different", '
+                                   help='recompress data chunks according to ``--compression`` if `if-different`. '
+                                        'When `always`, chunks that are already compressed that way are not skipped, '
+                                        'but compressed again. Only the algorithm is considered for `if-different`, '
                                         'not the compression level (if any).')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',
                                    help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or "default" to use the current defaults. '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
                                         'default: %d,%d,%d,%d' % CHUNKER_PARAMS)
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
@@ -3880,7 +3880,7 @@ class Archiver:
         group.add_argument('-a', '--glob-archives', dest='glob_archives', default=None,
                            help='only consider archive names matching the glob. '
                                 'sh: rules apply, see "borg help patterns". '
-                                '--prefix and --glob-archives are mutually exclusive.')
+                                '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
 
         if sort_by:
             sort_by_default = 'timestamp'

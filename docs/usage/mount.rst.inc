@@ -25,7 +25,9 @@ optional arguments
 
 filters
     ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix
+        | only consider archive names starting with this prefix.
+    ``-a``, ``--glob-archives``
+        | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
     ``--sort-by``
         | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
     ``--first N``
@@ -54,7 +56,7 @@ supported by borg:
 - versions: when used with a repository mount, this gives a merged, versioned
   view of the files in the archives. EXPERIMENTAL, layout may change in future.
 - allow_damaged_files: by default damaged files (where missing chunks were
-  replaced with runs of zeros by borg check --repair) are not readable and
+  replaced with runs of zeros by borg check ``--repair``) are not readable and
   return EIO (I/O error). Set this option to read such files.
 
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users

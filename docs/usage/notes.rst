@@ -63,7 +63,7 @@ of them.
 --read-special
 ~~~~~~~~~~~~~~
 
-The --read-special option is special - you do not want to use it for normal
+The ``--read-special`` option is special - you do not want to use it for normal
 full-filesystem backups, but rather after carefully picking some targets for it.
 
 The option ``--read-special`` triggers special treatment for block and char

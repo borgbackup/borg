@@ -84,7 +84,8 @@ Encryption modes
 
 On modern Intel/AMD CPUs (except very cheap ones), AES is usually
 hardware-accelerated.
-BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs,
+BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs
+(except AMD Ryzen and future CPUs with SHA extensions),
 which makes `authenticated-blake2` faster than `none` and `authenticated`.
 
 On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
@@ -95,7 +96,7 @@ Hardware acceleration is always used automatically when available.
 `repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
 authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
 is HMAC-SHA256 as well (with a separate key).
-These modes are compatible with borg 1.0.x.
+These modes are compatible with Borg 1.0.x.
 
 `repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
 but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
@@ -105,7 +106,7 @@ These modes are new and *not* compatible with Borg 1.0.x.
 `authenticated` mode uses no encryption, but authenticates repository contents
 through the same HMAC-SHA256 hash as the `repokey` and `keyfile` modes (it uses it
 as the chunk ID hash). The key is stored like `repokey`.
-This mode is new and *not* compatible with borg 1.0.x.
+This mode is new and *not* compatible with Borg 1.0.x.
 
 `authenticated-blake2` is like `authenticated`, but uses the keyed BLAKE2b-256 hash
 from the other blake2 modes.

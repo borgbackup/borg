@@ -93,7 +93,7 @@ In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
 To speed up pulling backups over sshfs and similar network file systems which do
-not provide correct inode information the --ignore-inode flag can be used. This
+not provide correct inode information the ``--ignore-inode`` flag can be used. This
 potentially decreases reliability of change detection, while avoiding always reading
 all files on these file systems.
 
@@ -102,7 +102,7 @@ creation of a new archive to ensure fast operation. This is because the file cac
 is used to determine changed files quickly uses absolute filenames.
 If this is not possible, consider creating a bind mount to a stable location.
 
-The --progress option shows (from left to right) Original, Compressed and Deduplicated
+The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
 (O, C and D, respectively), then the Number of files (N) processed so far, followed by
 the currently processed path.
 
@@ -111,8 +111,8 @@ See the output of the "borg help placeholders" command for more help on placehol
 
 .. man NOTES
 
-The --exclude patterns are not like tar. In tar --exclude .bundler/gems will
-exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
+The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
+exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
 '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
 more information.
 

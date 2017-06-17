@@ -55,7 +55,7 @@ Borg is instructed to restrict clients into their own paths:
 
 The client will be able to access any file or subdirectory inside of ``/home/backup/repos/<client fqdn>``
 but no other directories. You can allow a client to access several separate directories by passing multiple
-`--restrict-to-path` flags, for instance: ``borg serve --restrict-to-path /home/backup/repos/<client fqdn> --restrict-to-path /home/backup/repos/<other client fqdn>``,
+``--restrict-to-path`` flags, for instance: ``borg serve --restrict-to-path /home/backup/repos/<client fqdn> --restrict-to-path /home/backup/repos/<other client fqdn>``,
 which could make sense if multiple machines belong to one person which should then have access to all the
 backups of their machines.
 

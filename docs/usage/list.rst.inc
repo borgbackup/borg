@@ -21,16 +21,18 @@ optional arguments
         | specify format for file listing
         |                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
     ``--json``
-        | Only valid for listing repository contents. Format output as JSON. The form of --format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
+        | Only valid for listing repository contents. Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
     ``--json-lines``
-        | Only valid for listing archive contents. Format output as JSON Lines. The form of --format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+        | Only valid for listing archive contents. Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 
 :ref:`common_options`
     |
 
 filters
     ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix
+        | only consider archive names starting with this prefix.
+    ``-a``, ``--glob-archives``
+        | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
     ``--sort-by``
         | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
     ``--first N``
@@ -63,7 +65,7 @@ See the "borg help patterns" command for more help on exclude patterns.
 
 .. man NOTES
 
-The following keys are available for --format:
+The following keys are available for ``--format``:
 
  - NEWLINE: OS dependent line separator
  - NL: alias of NEWLINE
@@ -108,12 +110,20 @@ Keys for listing archive files:
  - isoctime
  - isoatime
 
+ - blake2b
+ - blake2s
  - md5
  - sha1
  - sha224
  - sha256
  - sha384
+ - sha3_224
+ - sha3_256
+ - sha3_384
+ - sha3_512
  - sha512
+ - shake_128
+ - shake_256
 
  - archiveid
  - archivename

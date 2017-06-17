@@ -3485,7 +3485,7 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run',
                                default=False, action='store_true',
                                help='do not change repository')
-        subparser.add_argument('-i', '--inplace', dest='inplace',
+        subparser.add_argument('--inplace', dest='inplace',
                                default=False, action='store_true',
                                help="""rewrite repository in place, with no chance of going back to older
                                versions of the repository.""")

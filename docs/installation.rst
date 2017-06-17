@@ -173,20 +173,20 @@ Features & platforms
 
 Besides regular file and directory structures, |project_name| can preserve
 
-    * Symlinks (stored as symlink, the symlink is not followed)
-    * Special files:
+* Symlinks (stored as symlink, the symlink is not followed)
+* Special files:
 
-        * Character and block device files (restored via mknod)
-        * FIFOs ("named pipes")
-        * Special file *contents* can be backed up in ``--read-special`` mode.
-          By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
-    * Hardlinked regular files, devices, FIFOs (considering all items in the same archive)
-    * Timestamps in nanosecond precision: mtime, atime, ctime
-    * Permissions:
+  * Character and block device files (restored via mknod)
+  * FIFOs ("named pipes")
+  * Special file *contents* can be backed up in ``--read-special`` mode.
+    By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
+* Hardlinked regular files, devices, FIFOs (considering all items in the same archive)
+* Timestamps in nanosecond precision: mtime, atime, ctime
+* Permissions:
 
-        * IDs of owning user and owning group
-        * Names of owning user and owning group (if the IDs can be resolved)
-        * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
+  * IDs of owning user and owning group
+  * Names of owning user and owning group (if the IDs can be resolved)
+  * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
 
 On some platforms additional features are supported:
 

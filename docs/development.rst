@@ -237,9 +237,10 @@ Building the docs with Sphinx
 
 The documentation (in reStructuredText format, .rst) is in docs/.
 
-To build the html version of it, you need to have sphinx installed::
+To build the html version of it, you need to have Sphinx installed
+(in your Borg virtualenv with Python 3)::
 
-  pip3 install sphinx sphinx_rtd_theme  # important: this will install sphinx with Python 3
+  pip install -r requirements.d/docs.txt
 
 Now run::
 
@@ -248,7 +249,7 @@ Now run::
 
 Then point a web browser at docs/_build/html/index.html.
 
-The website is updated automatically through Github web hooks on the
+The website is updated automatically by ReadTheDocs through GitHub web hooks on the
 main repository.
 
 Using Vagrant

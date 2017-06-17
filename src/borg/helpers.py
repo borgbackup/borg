@@ -131,7 +131,7 @@ class MandatoryFeatureUnsupported(Error):
 
 def check_extension_modules():
     from . import platform, compress, item
-    if hashindex.API_VERSION != '1.1_04':
+    if hashindex.API_VERSION != '1.1_05':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError

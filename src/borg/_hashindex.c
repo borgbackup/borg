@@ -160,6 +160,8 @@ hashindex_lookup(HashIndex *index, const void *key, int *start_idx)
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
             if (didx != -1) {
+                // note: although lookup is logically a read-only operation,
+                // we optimize (change) the hashindex here "on the fly".
                 memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;
@@ -592,7 +594,7 @@ hashindex_delete(HashIndex *index, const void *key)
 {
     int idx = hashindex_lookup(index, key, NULL);
     if (idx < 0) {
-        return 1;
+        return -1;
     }
     BUCKET_MARK_DELETED(index, idx);
     index->num_entries -= 1;

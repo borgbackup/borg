@@ -1921,6 +1921,15 @@ class Archiver:
             Other include/exclude patterns that would normally match will be ignored.
             Same logic applies for exclude.
 
+        .. note::
+
+            `re:`, `sh:` and `fm:` patterns are all implemented on top of the Python SRE
+            engine. It is very easy to formulate patterns for each of these types which
+            requires an inordinate amount of time to match paths. If untrusted users
+            are able to supply patterns, ensure they cannot supply `re:` patterns.
+            Further, ensure that `sh:` and `fm:` patterns only contain a handful of
+            wildcards at most.
+
         Exclusions can be passed via the command line option `--exclude`. When used
         from within a shell the patterns should be quoted to protect them from
         expansion.

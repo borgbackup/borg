@@ -75,7 +75,7 @@ Type of log output
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want Borg to be mostly silent and only output
 warnings, errors and critical messages, unless output has been requested
-by supplying an option that implies output (eg, --list or --progress).
+by supplying an option that implies output (e.g. ``--list`` or ``--progress``).
 
 Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 
@@ -97,7 +97,7 @@ to get critical level output.
 While you can set misc. log levels, do not expect that every command will
 give different output on different log levels - it's just a possibility.
 
-.. warning:: Options --critical and --error are provided for completeness,
+.. warning:: Options ``--critical`` and ``--error`` are provided for completeness,
              their usage is not recommended as you might miss important information.
 
 Return codes

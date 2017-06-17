@@ -388,7 +388,7 @@ yet noticed on the server. Try these settings:
     ClientAliveCountMax 3
 
 If you have multiple borg create ... ; borg create ... commands in a already
-serialized way in a single script, you need to give them --lock-wait N (with N
+serialized way in a single script, you need to give them ``--lock-wait N`` (with N
 being a bit more than the time the server needs to terminate broken down
 connections and release the lock).
 
@@ -440,7 +440,7 @@ Can I backup my root partition (/) with Borg?
 
 Backing up your entire root partition works just fine, but remember to
 exclude directories that make no sense to backup, such as /dev, /proc,
-/sys, /tmp and /run, and to use --one-file-system if you only want to
+/sys, /tmp and /run, and to use ``--one-file-system`` if you only want to
 backup the root partition (and not any mounted devices e.g.).
 
 If it crashes with a UnicodeError, what can I do?

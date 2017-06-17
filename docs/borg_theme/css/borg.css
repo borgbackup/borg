@@ -61,6 +61,14 @@ dt code {
     border-right: 2px solid #4e4a4a;;
 }
 
+/* the rtd theme has "nowrap" here which causes tables to have scroll bars.
+ * undo that setting. it does not seem to cause issues, even when making the
+ * viewport narrow.
+ */
+.wy-table-responsive table td, .wy-table-responsive table th {
+    white-space: normal;
+}
+
 p .literal,
 p .literal span {
     border: none;
@@ -73,8 +81,8 @@ cite {
     white-space: nowrap;
     color: black; /* slight contrast with #404040 of regular text */
     font-size: 75%;
-    font-family: Consolas,"Andale Mono WT","Andale Mono","Lucida Console","Lucida Sans Typewriter",
-    "DejaVu Sans Mono","Bitstream Vera Sans Mono","Liberation Mono","Nimbus Mono L",Monaco,"Courier New",Courier,monospace;
+    font-family: Consolas, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter",
+    "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Courier New", Courier, monospace;
     font-style: normal;
     text-decoration: underline;
 }

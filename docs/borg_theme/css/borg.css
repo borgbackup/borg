@@ -68,7 +68,7 @@ h1 {
     margin: 14px 0 24px 0;
 }
 
-#borg-documentation .external img {
+#borg-documentation h1 + p .external img {
     width: 100%;
 }
 
@@ -94,24 +94,9 @@ h1 {
     border-right: 2px solid #4e4a4a;;
 }
 
-/* the rtd theme has "nowrap" here which causes tables to have scroll bars.
- * undo that setting. it does not seem to cause issues, even when making the
- * viewport narrow.
- */
-.wy-table-responsive table td, .wy-table-responsive table th {
-    white-space: normal;
-}
-
-/* for some reason the rtd theme makes text in tables very small.
- * fix that.
- */
-.wy-table td,
-.rst-content table.docutils td,
-.rst-content table.field-list td,
-.wy-table th,
-.rst-content table.docutils th,
-.rst-content table.field-list th {
-    font-size: 100%;
+table.docutils td,
+table.docutils th {
+    padding: .2em;
 }
 
 code,

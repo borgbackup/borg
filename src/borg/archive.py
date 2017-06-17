@@ -1328,8 +1328,8 @@ class ArchiveChecker:
 
         Missing and/or incorrect data is repaired when detected
         """
-        # Exclude the manifest from chunks
-        del self.chunks[Manifest.MANIFEST_ID]
+        # Exclude the manifest from chunks (manifest entry might be already deleted from self.chunks)
+        self.chunks.pop(Manifest.MANIFEST_ID, None)
 
         def mark_as_possibly_superseded(id_):
             if self.chunks.get(id_, ChunkIndexEntry(0, 0, 0)).refcount == 0:

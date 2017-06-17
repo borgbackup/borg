@@ -62,10 +62,24 @@ impl From<libc::stat> for FileId {
     }
 }
 
+impl<'a> From<&'a libc::stat> for FileId {
+    fn from(stat: &'a libc::stat) -> FileId {
+        FileId(stat.st_dev, stat.st_ino)
+    }
+}
+
 #[cfg(target_os = "linux")]
 #[cfg(target_pointer_width = "64")]
 impl From<libc::stat64> for FileId {
     fn from(stat: libc::stat64) -> FileId {
+        FileId(stat.st_dev, stat.st_ino)
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[cfg(target_pointer_width = "64")]
+impl<'a> From<&'a libc::stat64> for FileId {
+    fn from(stat: &'a libc::stat64) -> FileId {
         FileId(stat.st_dev, stat.st_ino)
     }
 }

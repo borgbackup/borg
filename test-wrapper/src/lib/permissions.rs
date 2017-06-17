@@ -16,7 +16,7 @@ trait StatBase {
 
 impl StatBase for libc::stat {
     fn get_fileid(&self) -> FileId {
-        self.clone().into()
+        self.into()
     }
 
     fn set_mode(&mut self, mode: mode_t, mask: mode_t) {
@@ -43,7 +43,7 @@ impl StatBase for libc::stat {
 #[cfg(target_pointer_width = "64")]
 impl StatBase for libc::stat64 {
     fn get_fileid(&self) -> FileId {
-        self.clone().into()
+        self.into()
     }
 
     fn set_mode(&mut self, mode: mode_t, mask: mode_t) {

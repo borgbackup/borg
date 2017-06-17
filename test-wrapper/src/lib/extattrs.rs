@@ -38,7 +38,6 @@ unsafe fn base_get(path: CPath, namespace: c_int, name: *const c_char, dest: *mu
         ptr::copy_nonoverlapping(value.as_ptr(), dest as *mut u8, value.len());
         Ok(value.len() as isize)
     } else {
-        error!("{:?}", request::<ReplyXattrsList>(Message::XattrsList(path.get_id()?)).0);
         Err(libc::ENOATTR)
     }
 }
@@ -107,7 +106,7 @@ wrap! {
     unsafe fn extattr_set_fd:_(fd: c_int, namespace: c_int, name: *const c_char, data: *const c_void, size: usize) -> isize {
         base_set(CPath::from_fd(fd), namespace, name, data, size)
     }
-    
+
     unsafe fn extattr_delete_fd:_(fd: c_int, namespace: c_int, name: *const c_char) -> c_int {
         base_delete(CPath::from_fd(fd), namespace, name)
     }
@@ -123,7 +122,7 @@ wrap! {
     unsafe fn extattr_set_file:_(path: *const c_char, namespace: c_int, name: *const c_char, data: *const c_void, size: usize) -> isize {
         base_set(CPath::from_path(path, true), namespace, name, data, size)
     }
-    
+
     unsafe fn extattr_delete_file:_(path: *const c_char, namespace: c_int, name: *const c_char) -> c_int {
         base_delete(CPath::from_path(path, true), namespace, name)
     }
@@ -139,7 +138,7 @@ wrap! {
     unsafe fn extattr_set_link:_(path: *const c_char, namespace: c_int, name: *const c_char, data: *const c_void, size: usize) -> isize {
         base_set(CPath::from_path(path, false), namespace, name, data, size)
     }
-    
+
     unsafe fn extattr_delete_link:_(path: *const c_char, namespace: c_int, name: *const c_char) -> c_int {
         base_delete(CPath::from_path(path, false), namespace, name)
     }

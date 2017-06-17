@@ -44,6 +44,15 @@ class HashIndexTestCase(BaseTestCase):
         # Test delete
         for x in range(50):
             del idx[H(x)]
+        # Test some keys still in there
+        for x in range(50, 100):
+            assert H(x) in idx
+        # Test some keys not there any more
+        for x in range(50):
+            assert H(x) not in idx
+        # Test delete non-existing key
+        for x in range(50):
+            self.assert_raises(KeyError, idx.__delitem__, H(x))
         self.assert_equal(len(idx), 50)
         idx_name = tempfile.NamedTemporaryFile()
         idx.write(idx_name.name)

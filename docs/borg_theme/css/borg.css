@@ -60,3 +60,11 @@ dt code {
     border-left: 2px solid #4e4a4a;;
     border-right: 2px solid #4e4a4a;;
 }
+
+p .literal,
+p .literal span {
+    border: none;
+    padding: 0;
+    color: black; /* slight contrast with #404040 of regular text */
+    background: none;
+}

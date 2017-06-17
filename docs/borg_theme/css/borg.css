@@ -65,7 +65,7 @@ h1 {
 /* by default the top and bottom margins are unequal which looks a bit unbalanced. */
 .sidebar-block {
     padding: 0;
-    margin: 14px 0 14px 0;
+    margin: 14px 0 24px 0;
 }
 
 #borg-documentation .external img {

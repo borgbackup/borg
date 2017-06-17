@@ -58,6 +58,7 @@ def rst_to_text(text, state_hook=None, references=None):
     state_hook = state_hook or (lambda old_state, new_state, out: None)
     references = references or {}
     state = 'text'
+    inline_mode = 'replace'
     text = TextPecker(text)
     out = io.StringIO()
 
@@ -117,17 +118,26 @@ def rst_to_text(text, state_hook=None, references=None):
                 directive, is_directive, arguments = text.readline().partition('::')
                 text.read(1)
                 if not is_directive:
+                    # partition: if the separator is not in the text, the leftmost output is the entire input
+                    if directive == 'nanorst: inline-fill':
+                        inline_mode = 'fill'
+                    elif directive == 'nanorst: inline-replace':
+                        inline_mode = 'replace'
                     continue
                 process_directive(directive, arguments.strip(), out, state_hook)
                 continue
         if state in inline_single and char == state:
             state_hook(state, 'text', out)
             state = 'text'
+            if inline_mode == 'fill':
+                out.write(2 * ' ')
             continue
         if state == '``' and char == next == '`':
             state_hook(state, 'text', out)
             state = 'text'
             text.read(1)
+            if inline_mode == 'fill':
+                out.write(4 * ' ')
             continue
         if state == '**' and char == next == '*':
             state_hook(state, 'text', out)

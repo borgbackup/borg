@@ -2516,7 +2516,7 @@ class Archiver:
         subparser.add_argument('-e', '--encryption', dest='encryption', required=True,
                                choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
                                help='select encryption key mode **(required)**')
-        subparser.add_argument('-a', '--append-only', dest='append_only', action='store_true',
+        subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
         subparser.add_argument('--storage-quota', dest='storage_quota', default=None,
                                type=parse_storage_quota,

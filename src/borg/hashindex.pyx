@@ -9,7 +9,7 @@ from libc.errno cimport errno
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-API_VERSION = '1.1_04'
+API_VERSION = '1.1_05'
 
 
 cdef extern from "_hashindex.c":
@@ -117,7 +117,12 @@ cdef class IndexBase:
 
     def __delitem__(self, key):
         assert len(key) == self.key_size
-        if not hashindex_delete(self.index, <char *>key):
+        rc = hashindex_delete(self.index, <char *>key)
+        if rc == 1:
+            return  # success
+        if rc == -1:
+            raise KeyError(key)
+        if rc == 0:
             raise Exception('hashindex_delete failed')
 
     def get(self, key, default=None):

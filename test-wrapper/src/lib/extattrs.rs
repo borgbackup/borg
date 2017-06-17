@@ -78,8 +78,8 @@ unsafe fn base_list(path: CPath, namespace: c_int, dest: *mut c_void, size: usiz
             &x[4..]
         })
         .collect::<Vec<_>>();
-    let total_size = res.len() + res.iter().map(|i| i.len()).sum::<usize>();
-    if total_size > (isize::max_value() as usize) {
+    let total_size = res.iter().map(|x| 1 + x.len()).sum::<usize>();
+    if total_size > (isize::max_value() as usize) || res.iter().any(|x| x.len() > u8::max_value().into()) {
         return Err(libc::E2BIG);
     }
     if size == 0 {
@@ -90,10 +90,10 @@ unsafe fn base_list(path: CPath, namespace: c_int, dest: *mut c_void, size: usiz
     }
     let mut out = dest as *mut u8;
     for part in res {
+        *out = part.len() as u8;
+        out = out.offset(1);
         ptr::copy_nonoverlapping(part.as_ptr(), out, part.len());
         out = out.offset(part.len() as isize);
-        *out = 0;
-        out = out.offset(1);
     }
     Ok(total_size as isize)
 }

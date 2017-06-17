@@ -68,3 +68,13 @@ p .literal span {
     color: black; /* slight contrast with #404040 of regular text */
     background: none;
 }
+
+cite {
+    white-space: nowrap;
+    color: black; /* slight contrast with #404040 of regular text */
+    font-size: 75%;
+    font-family: Consolas,"Andale Mono WT","Andale Mono","Lucida Console","Lucida Sans Typewriter",
+    "DejaVu Sans Mono","Bitstream Vera Sans Mono","Liberation Mono","Nimbus Mono L",Monaco,"Courier New",Courier,monospace;
+    font-style: normal;
+    text-decoration: underline;
+}

@@ -68,7 +68,7 @@ h1 {
     margin: 14px 0 24px 0;
 }
 
-#borg-documentation .external img {
+#borg-documentation h1 + p .external img {
     width: 100%;
 }
 

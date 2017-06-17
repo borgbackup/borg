@@ -105,7 +105,7 @@ if sys.platform.startswith('linux'):
                 XATTR_FAKEROOT = True
             break
 
-if sys.platform.startswith(('linux', 'darwin')):
+if sys.platform.startswith(('linux', 'darwin', 'freebsd', 'netbsd')):
     for preload in preloads:
         if preload.endswith(('libtestwrapper.so', 'libtestwrapper.dylib')):
             libc_name = preload

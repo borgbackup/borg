@@ -229,11 +229,11 @@ fn main() {
                             let mut database = DATABASE.write().unwrap();
                             let file = database.entry(id).or_insert_with(FileEntry::default);
                             if file.xattrs.contains_key(&attr) {
-                                if flags & XATTR_CREATE == XATTR_CREATE {
+                                if XATTR_CREATE != 0 && flags & XATTR_CREATE == XATTR_CREATE {
                                     reply(&mut writer, &libc::EEXIST);
                                     continue;
                                 }
-                            } else if flags & XATTR_REPLACE == XATTR_REPLACE {
+                            } else if XATTR_REPLACE != 0 && flags & XATTR_REPLACE == XATTR_REPLACE {
                                 reply(&mut writer, &libc::ENOATTR);
                                 continue;
                             }

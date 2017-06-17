@@ -39,12 +39,45 @@ dt code {
     font-weight: normal;
 }
 
-.experimental,
+/* bootstrap has a .container class which clashes with docutils' container class. */
+.docutils.container {
+    width: auto;
+    margin: 0;
+    padding: 0;
+}
+
+/* the default (38px) produces a jumpy baseline in Firefox on Linux. */
+h1 {
+    font-size: 36px;
+}
+
+.text-logo {
+    background-color: #000200;
+    color: #00dd00;
+}
+
+.text-logo:hover,
+.text-logo:active,
+.text-logo:focus {
+    color: #5afe57;
+}
+
+/* by default the top and bottom margins are unequal which looks a bit unbalanced. */
+.sidebar-block {
+    padding: 0;
+    margin: 14px 0 14px 0;
+}
+
+#borg-documentation .external img {
+    width: 100%;
+}
+
+.container.experimental,
 #debugging-facilities,
 #borg-recreate {
     /* don't change text dimensions */
-    margin: 0 -40px; /* padding below + border width */
-    padding: 0 20px; /* 20 px visual margin between edge of text and the border */
+    margin: 0 -30px; /* padding below + border width */
+    padding: 0 10px; /* 10 px visual margin between edge of text and the border */
     /* fallback for browsers that don't have repeating-linear-gradient: thick, red lines */
     border-left: 20px solid red;
     border-right: 20px solid red;
@@ -98,7 +131,6 @@ p .literal span {
 cite {
     white-space: nowrap;
     color: black; /* slight contrast with #404040 of regular text */
-    font-size: 75%;
     font-family: Consolas, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter",
     "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Courier New", Courier, monospace;
     font-style: normal;

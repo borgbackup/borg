@@ -7,6 +7,7 @@ use libc::{self, mode_t, uid_t, gid_t, dev_t};
 use shared::*;
 
 trait StatBase {
+    fn get_fileid(&self) -> FileId;
     fn set_mode(&mut self, mode: mode_t, mask: mode_t);
     fn set_owner(&mut self, owner: uid_t);
     fn set_group(&mut self, group: gid_t);
@@ -14,6 +15,10 @@ trait StatBase {
 }
 
 impl StatBase for libc::stat {
+    fn get_fileid(&self) -> FileId {
+        self.clone().into()
+    }
+
     fn set_mode(&mut self, mode: mode_t, mask: mode_t) {
         assert_eq!(mode & !mask, 0);
         let new_mode = mode | (self.st_mode & !mask);
@@ -37,6 +42,10 @@ impl StatBase for libc::stat {
 #[cfg(target_os = "linux")]
 #[cfg(target_pointer_width = "64")]
 impl StatBase for libc::stat64 {
+    fn get_fileid(&self) -> FileId {
+        self.clone().into()
+    }
+
     fn set_mode(&mut self, mode: mode_t, mask: mode_t) {
         assert_eq!(mode & !mask, 0);
         let new_mode = mode | (self.st_mode & !mask);
@@ -57,14 +66,8 @@ impl StatBase for libc::stat64 {
     }
 }
 
-fn stat_base(path: CPath, statbuf: &mut StatBase) {
-    let id = if let Ok(id) = path.get_id() {
-        id
-    } else {
-        warn!("Failed to get stat path: {:?} errno {}", path, errno());
-        return;
-    };
-    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(id));
+fn stat_base(statbuf: &mut StatBase) {
+    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(statbuf.get_fileid()));
     if let Some((mode, mask)) = overrides.mode_and_mask {
         statbuf.set_mode(mode, mask);
     }
@@ -137,7 +140,7 @@ wrap! {
     unsafe fn stat:ORIG_STAT(path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_STAT(path, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_path(path, true), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -145,7 +148,7 @@ wrap! {
     unsafe fn lstat:ORIG_LSTAT(path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_LSTAT(path, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_path(path, false), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -153,7 +156,7 @@ wrap! {
     unsafe fn fstat:ORIG_FSTAT(fd: c_int, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_FSTAT(fd, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_fd(fd), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -161,7 +164,7 @@ wrap! {
     unsafe fn fstatat:ORIG_FSTATAT(dfd: c_int, path: *const c_char, statbuf: *mut libc::stat, flags: c_int) -> c_int {
         let ret = ORIG_FSTATAT(dfd, path, statbuf, flags);
         if ret == 0 {
-            stat_base(CPath::from_path_at(dfd, path, flags), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -172,7 +175,7 @@ wrap! {
     unsafe fn __xstat:ORIG_XSTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_XSTAT(ver, path, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_path(path, true), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -180,7 +183,7 @@ wrap! {
     unsafe fn __lxstat:ORIG_LXSTAT(ver: c_int, path: *const c_char, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_LXSTAT(ver, path, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_path(path, false), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -188,7 +191,7 @@ wrap! {
     unsafe fn __fxstat:ORIG_FXSTAT(ver: c_int, fd: c_int, statbuf: *mut libc::stat) -> c_int {
         let ret = ORIG_FXSTAT(ver, fd, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_fd(fd), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -196,7 +199,7 @@ wrap! {
     unsafe fn __fxstatat:ORIG_FXSTATAT(ver: c_int, dfd: c_int, path: *const c_char, statbuf: *mut libc::stat, flags: c_int) -> c_int {
         let ret = ORIG_FXSTATAT(ver, dfd, path, statbuf, flags);
         if ret == 0 {
-            stat_base(CPath::from_path_at(dfd, path, flags), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -204,7 +207,7 @@ wrap! {
     unsafe fn __xstat64:ORIG_XSTAT64(ver: c_int, path: *const c_char, statbuf: *mut libc::stat64) -> c_int {
         let ret = ORIG_XSTAT64(ver, path, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_path(path, true), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -212,7 +215,7 @@ wrap! {
     unsafe fn __lxstat64:ORIG_LXSTAT64(ver: c_int, path: *const c_char, statbuf: *mut libc::stat64) -> c_int {
         let ret = ORIG_LXSTAT64(ver, path, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_path(path, false), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -220,7 +223,7 @@ wrap! {
     unsafe fn __fxstat64:ORIG_FXSTAT64(ver: c_int, fd: c_int, statbuf: *mut libc::stat64) -> c_int {
         let ret = ORIG_FXSTAT64(ver, fd, statbuf);
         if ret == 0 {
-            stat_base(CPath::from_fd(fd), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }
@@ -228,7 +231,7 @@ wrap! {
     unsafe fn __fxstatat64:ORIG_FXSTATAT64(ver: c_int, dfd: c_int, path: *const c_char, statbuf: *mut libc::stat64, flags: c_int) -> c_int {
         let ret = ORIG_FXSTATAT64(ver, dfd, path, statbuf, flags);
         if ret == 0 {
-            stat_base(CPath::from_path_at(dfd, path, flags), &mut *statbuf);
+            stat_base(&mut *statbuf);
         }
         Ok(ret)
     }

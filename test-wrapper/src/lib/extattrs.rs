@@ -38,6 +38,7 @@ unsafe fn base_get(path: CPath, namespace: c_int, name: *const c_char, dest: *mu
         ptr::copy_nonoverlapping(value.as_ptr(), dest as *mut u8, value.len());
         Ok(value.len() as isize)
     } else {
+        error!("{:?}", request::<ReplyXattrsList>(Message::XattrsList(path.get_id()?)).0);
         Err(libc::ENOATTR)
     }
 }

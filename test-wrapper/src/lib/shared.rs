@@ -56,8 +56,16 @@ pub enum NetworkLogLevel {
 #[derive(Debug, Serialize, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct FileId(dev_t, ino_t);
 
-impl From<NativeStat> for FileId {
-    fn from(stat: NativeStat) -> FileId {
+impl From<libc::stat> for FileId {
+    fn from(stat: libc::stat) -> FileId {
+        FileId(stat.st_dev, stat.st_ino)
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[cfg(target_pointer_width = "64")]
+impl From<libc::stat64> for FileId {
+    fn from(stat: libc::stat64) -> FileId {
         FileId(stat.st_dev, stat.st_ino)
     }
 }
@@ -353,7 +361,7 @@ impl CPath {
                 match fd_id_cache.entry(fd) {
                     hash_map::Entry::Vacant(entry) => {
                         let stat = self.get_stat()?;
-                        let id = FileId(stat.st_dev, stat.st_ino);
+                        let id: FileId = stat.into();
                         entry.insert(id);
                         Ok(id)
                     }

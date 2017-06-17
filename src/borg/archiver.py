@@ -2449,15 +2449,20 @@ class Archiver:
         Encryption modes
         ++++++++++++++++
 
+        .. nanorst: inline-fill
+
         +----------+---------------+------------------------+--------------------------+
         | Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
         |          | no auth       | but authenticated      | and authenticated        |
         +----------+---------------+------------------------+--------------------------+
-        | SHA-256  | none          | `authenticated`        | repokey, keyfile         |
+        | SHA-256  | none          | `authenticated`        | repokey                  |
+        |          |               |                        | keyfile                  |
         +----------+---------------+------------------------+--------------------------+
-        | BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`,        |
+        | BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`         |
         |          |               |                        | `keyfile-blake2`         |
         +----------+---------------+------------------------+--------------------------+
+
+        .. nanorst: inline-replace
 
         `Marked modes` are new in Borg 1.1 and are not backwards-compatible with Borg 1.0.x.
 

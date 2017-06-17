@@ -3583,15 +3583,15 @@ class Archiver:
                                         '"borg help compression" command for details.')
         archive_group.add_argument('--recompress', dest='recompress', nargs='?', default='never', const='if-different',
                                    choices=('never', 'if-different', 'always'),
-                                   help='recompress data chunks according to ``--compression`` if "if-different". '
-                                        'When "always", chunks that are already compressed that way are not skipped, '
-                                        'but compressed again. Only the algorithm is considered for "if-different", '
+                                   help='recompress data chunks according to ``--compression`` if `if-different`. '
+                                        'When `always`, chunks that are already compressed that way are not skipped, '
+                                        'but compressed again. Only the algorithm is considered for `if-different`, '
                                         'not the compression level (if any).')
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',
                                    help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or "default" to use the current defaults. '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
                                         'default: %d,%d,%d,%d' % CHUNKER_PARAMS)
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',

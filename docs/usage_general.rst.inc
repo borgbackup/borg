@@ -105,14 +105,16 @@ Return codes
 
 Borg can exit with the following return codes (rc):
 
-::
-
-    0 = success (logged as INFO)
-    1 = warning (operation reached its normal end, but there were warnings -
-        you should check the log, logged as WARNING)
-    2 = error (like a fatal error, a local or remote exception, the operation
-        did not reach its normal end, logged as ERROR)
-    128+N = killed by signal N (e.g. 137 == kill -9)
+=========== =======
+Return code Meaning
+=========== =======
+0           success (logged as INFO)
+1           warning (operation reached its normal end, but there were warnings --
+            you should check the log, logged as WARNING)
+2           error (like a fatal error, a local or remote exception, the operation
+            did not reach its normal end, logged as ERROR)
+128+N       killed by signal N (e.g. 137 == kill -9)
+=========== =======
 
 If you use ``--show-rc``, the return code is also logged at the indicated
 level as the last log entry.
@@ -127,8 +129,8 @@ Borg uses some environment variables for automation:
 General:
     BORG_REPO
         When set, use the value to give the default repository location. If a command needs an archive
-        parameter, you can abbreviate as `::archive`. If a command needs a repository parameter, you
-        can either leave it away or abbreviate as `::`, if a positional parameter is required.
+        parameter, you can abbreviate as ``::archive``. If a command needs a repository parameter, you
+        can either leave it away or abbreviate as ``::``, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
@@ -337,7 +339,7 @@ Cache files (client only):
 
 Network (only for client/server operation):
     If your repository is remote, all deduplicated (and optionally compressed/
-    encrypted) data of course has to go over the connection (ssh: repo url).
+    encrypted) data of course has to go over the connection (``ssh://`` repo url).
     If you use a locally mounted network filesystem, additionally some copy
     operations used for transaction support also go over the connection. If
     you backup multiple sources to one target repository, additional traffic

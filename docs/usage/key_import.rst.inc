@@ -16,7 +16,7 @@ positional arguments
 
 optional arguments
     ``--paper``
-        | interactively import from a backup done with --paper
+        | interactively import from a backup done with ``--paper``
 
 :ref:`common_options`
     |

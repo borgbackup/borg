@@ -18,7 +18,7 @@ optional arguments
     ``--archives-only``
         | only perform archives checks
     ``--verify-data``
-        | perform cryptographic archive data integrity verification (conflicts with --repository-only)
+        | perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)
     ``--repair``
         | attempt to repair any inconsistencies found
     ``--save-space``
@@ -29,7 +29,9 @@ optional arguments
 
 filters
     ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix
+        | only consider archive names starting with this prefix.
+    ``-a``, ``--glob-archives``
+        | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
     ``--sort-by``
         | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
     ``--first N``
@@ -54,7 +56,7 @@ First, the underlying repository data files are checked:
   stored in the segments.
 - If you use a remote repo server via ssh:, the repo check is executed on the
   repo server without causing significant network traffic.
-- The repository check can be skipped using the --archives-only option.
+- The repository check can be skipped using the ``--archives-only`` option.
 
 Second, the consistency and correctness of the archive metadata is verified:
 
@@ -76,9 +78,9 @@ Second, the consistency and correctness of the archive metadata is verified:
   decryption and this is always done client-side, because key access will be
   required).
 - The archive checks can be time consuming, they can be skipped using the
-  --repository-only option.
+  ``--repository-only`` option.
 
-The --verify-data option will perform a full integrity verification (as opposed to
+The ``--verify-data`` option will perform a full integrity verification (as opposed to
 checking the CRC32 of the segment) of data, which means reading the data from the
 repository, decrypting and decompressing it. This is a cryptographic verification,
 which will detect (accidental) corruption. For encrypted repositories it is

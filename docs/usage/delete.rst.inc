@@ -27,7 +27,9 @@ optional arguments
 
 filters
     ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix
+        | only consider archive names starting with this prefix.
+    ``-a``, ``--glob-archives``
+        | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
     ``--sort-by``
         | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
     ``--first N``

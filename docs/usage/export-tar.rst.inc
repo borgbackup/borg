@@ -42,7 +42,7 @@ This command creates a tarball from an archive.
 
 When giving '-' as the output FILE, Borg will write a tar stream to standard output.
 
-By default (--tar-filter=auto) Borg will detect whether the FILE should be compressed
+By default (``--tar-filter=auto``) Borg will detect whether the FILE should be compressed
 based on its file extension and pipe the tarball through an appropriate filter
 before writing it to FILE:
 
@@ -50,7 +50,7 @@ before writing it to FILE:
 - .tar.bz2: bzip2
 - .tar.xz: xz
 
-Alternatively a --tar-filter program may be explicitly specified. It should
+Alternatively a ``--tar-filter`` program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered
 tar stream to stdout.
 
@@ -61,7 +61,7 @@ BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
 Timestamp resolution is limited to whole seconds, not the nanosecond resolution
 otherwise supported by Borg.
 
-A --sparse option (as found in borg extract) is not supported.
+A ``--sparse`` option (as found in borg extract) is not supported.
 
 By default the entire archive is extracted but a subset of files and directories
 can be selected by passing a list of ``PATHs`` as arguments.

@@ -69,6 +69,12 @@ dt code {
     white-space: normal;
 }
 
+code,
+.rst-content tt.literal,
+.rst-content tt.literal,
+.rst-content code.literal,
+.rst-content tt,
+.rst-content code,
 p .literal,
 p .literal span {
     border: none;

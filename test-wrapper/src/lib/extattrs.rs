@@ -71,7 +71,7 @@ unsafe fn base_delete(path: CPath, namespace: c_int, name: *const c_char) -> Res
 unsafe fn base_list(path: CPath, namespace: c_int, dest: *mut c_void, size: usize) -> Result<isize> {
     let res = request::<ReplyXattrsList>(Message::XattrsList(path.get_id()?)).0;
     let res = res.into_iter()
-        .filter(|x| &x[..3].read_i32::<NativeEndian>().unwrap() == namespace)
+        .filter(|x| (&x[..3]).read_i32::<NativeEndian>().unwrap() == namespace)
         .collect::<Vec<_>>();
     let res = res.iter()
         .map(|x| {

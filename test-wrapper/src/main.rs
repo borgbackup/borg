@@ -96,6 +96,7 @@ enum Message {
     Remove(FileId),
     XattrsGet(FileId, Vec<u8>),
     XattrsSet(FileId, Vec<u8>, Vec<u8>, c_int),
+    XattrsDelete(FileId, Vec<u8>),
     XattrsList(FileId),
     OverrideMode(FileId, mode_t, mode_t, Option<dev_t>),
     OverrideOwner(FileId, Option<uid_t>, Option<gid_t>),
@@ -237,6 +238,19 @@ fn main() {
                                 continue;
                             }
                             file.xattrs.insert(attr, value);
+                        }
+                        reply(&mut writer, &0);
+                    }
+                    Message::XattrsDelete(id, attr) => {
+                        {
+                            let mut database = DATABASE.write().unwrap();
+                            let file = database.entry(id);
+                            match file {
+                                hash_map::Entry::Occupied(mut entry) => {
+                                    entry.get_mut().xattrs.remove(&attr);
+                                }
+                                _ => {}
+                            }
                         }
                         reply(&mut writer, &0);
                     }

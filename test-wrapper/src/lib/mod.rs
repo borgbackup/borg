@@ -19,11 +19,19 @@ extern crate fnv;
 mod internal_stat;
 #[macro_use]
 mod shared;
-mod xattrs;
-pub use xattrs::*;
 mod permissions;
 pub use permissions::*;
 mod files;
 pub use files::*;
 mod creation;
 pub use creation::*;
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+mod xattrs;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub use xattrs::*;
+
+#[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
+mod extattrs;
+#[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
+pub use extattrs::*;

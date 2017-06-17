@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 bincode = "0.8.0"
+byteorder = "1.0.0"
 env_logger = "0.4.2"
 errno = "0.2.3"
 fnv = "1.0.5"

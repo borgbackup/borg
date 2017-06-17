@@ -63,10 +63,12 @@ impl From<NativeStat> for FileId {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)] // not all variants are used on all platforms
 pub enum Message<'a> {
     Remove(FileId),
     XattrsGet(FileId, &'a [u8]),
     XattrsSet(FileId, &'a [u8], &'a [u8], c_int),
+    XattrsDelete(FileId, &'a [u8]),
     XattrsList(FileId),
     OverrideMode(FileId, mode_t, mode_t, Option<dev_t>),
     OverrideOwner(FileId, Option<uid_t>, Option<gid_t>),

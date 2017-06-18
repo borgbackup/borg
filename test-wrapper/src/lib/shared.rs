@@ -11,6 +11,7 @@ use std::collections::hash_map;
 use std::borrow::Borrow;
 use std::fmt::{self, Debug};
 use std::ops::Deref;
+use std::cell::RefCell;
 
 use std::os::unix::net::UnixStream;
 
@@ -18,6 +19,8 @@ use libc::{self, mode_t, uid_t, gid_t, dev_t};
 use serde::de::DeserializeOwned;
 use bincode::{self, deserialize_from, serialize_into};
 use fnv::FnvHashMap;
+use rand;
+
 use internal_stat::*;
 
 #[allow(non_camel_case_types)]
@@ -122,7 +125,8 @@ extern "C" fn new_daemon_stream() {
 }
 
 pub fn daemon_error(err: &io::Error) -> ! {
-    if err.kind() == io::ErrorKind::ConnectionReset {
+    let kind = err.kind();
+    if kind == io::ErrorKind::ConnectionReset || kind == io::ErrorKind::BrokenPipe {
         if cfg!(debug_assertions) {
             let _ = writeln!(io::stderr(), "Daemon process exited, exiting");
         }
@@ -176,26 +180,26 @@ pub fn message(message: Message) -> Result<()> {
 
 macro_rules! error {
     ($( $x:tt )*) => {
-        let _ = message(Message::Log(NetworkLogLevel::Error, format!($( $x )*).as_str()));
+        let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Error, format!($( $x )*).as_str()));
     }
 }
 
 macro_rules! warn {
     ($( $x:tt )*) => {
-        let _ = message(Message::Log(NetworkLogLevel::Warn, format!($( $x )*).as_str()));
+        let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Warn, format!($( $x )*).as_str()));
     }
 }
 
 macro_rules! info {
     ($( $x:tt )*) => {
-        let _ = message(Message::Log(NetworkLogLevel::Info, format!($( $x )*).as_str()));
+        let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Info, format!($( $x )*).as_str()));
     }
 }
 
 macro_rules! debug {
     ($( $x:tt )*) => {
         if cfg!(debug_assertions) {
-            let _ = message(Message::Log(NetworkLogLevel::Debug, format!($( $x )*).as_str()));
+            let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Debug, format!($( $x )*).as_str()));
         }
     }
 }
@@ -203,7 +207,7 @@ macro_rules! debug {
 macro_rules! trace {
     ($( $x:tt )*) => {
         if cfg!(debug_assertions) {
-            let _ = message(Message::Log(NetworkLogLevel::Trace, format!($( $x )*).as_str()));
+            let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Trace, format!($( $x )*).as_str()));
         }
     }
 }
@@ -237,6 +241,10 @@ macro_rules! __wrap_maybe_ident {
     };
 }
 
+thread_local! {
+    pub static THREAD_WEAK_RNG: RefCell<rand::XorShiftRng> = RefCell::new(rand::weak_rng());
+}
+
 macro_rules! __wrap_fn {
     ( $( [ $attr:meta ] ),* ; unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
         $( #[ $attr ] )*
@@ -244,27 +252,59 @@ macro_rules! __wrap_fn {
         pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
             trace!(concat!(stringify!($name), $( __wrap_arg_string!($arg_n) ),*), $( __wrap_maybe_ident!($arg_n) ),*);
             define_dlsym_fn!($name, $orig_name; $( $arg_t ),*; $ret_t);
-
             let old_errno = ::errno::errno();
-            match (move || -> Result<$ret_t> { $code })() {
-                Ok(r) => {
-                    if r == -1 {
-                        debug!(concat!(stringify!($name), " -> Ok(-1) {:?}"), ::errno::errno());
-                    } else {
-                        trace!(concat!(stringify!($name), " -> Ok({})"), r);
-                        ::errno::set_errno(old_errno);
+
+            let overrides = ::overrides::get_overrides();
+            let mut fn_override = overrides.get(stringify!($name));
+            let override_inv_prob = fn_override.map(|x| x.inverse_probability);
+            if let Some(inv_prob) = override_inv_prob {
+                if inv_prob > 1 {
+                    let should_override = ::shared::THREAD_WEAK_RNG.with(|rng| {
+                        ::rand::Rng::gen_weighted_bool(&mut *rng.borrow_mut(), inv_prob)
+                    });
+                    if !should_override {
+                        fn_override = None;
                     }
-                    r
-                },
-                Err(e) => {
-                    if e == 0 {
-                        debug!(concat!(stringify!($name), " -> Err(0) {:?}"), ::errno::errno());
-                    } else {
-                        debug!(concat!(stringify!($name), " -> Err({})"), e);
-                        ::errno::set_errno(::errno::Errno(e));
-                    }
-                    -1
                 }
+            }
+            let side_effect = fn_override.map(|x| x.side_effect).unwrap_or(true);
+
+            let return_value = if side_effect {
+                match (move || -> Result<$ret_t> { $code })() {
+                    Ok(r) => {
+                        if r == -1 {
+                            debug!(concat!(stringify!($name), " -> Ok(-1) {:?}"), ::errno::errno());
+                        } else {
+                            trace!(concat!(stringify!($name), " -> Ok({})"), r);
+                            ::errno::set_errno(old_errno);
+                        }
+                        r
+                    },
+                    Err(e) => {
+                        if e == 0 {
+                            debug!(concat!(stringify!($name), " -> Err(0) {:?}"), ::errno::errno());
+                        } else {
+                            debug!(concat!(stringify!($name), " -> Err({})"), e);
+                            ::errno::set_errno(::errno::Errno(e));
+                        }
+                        -1
+                    }
+                }
+            } else {
+                0
+            };
+
+            if let Some(fn_override) = fn_override {
+                if let Some(errno) = fn_override.set_errno {
+                    ::errno::set_errno(::errno::Errno(errno));
+                }
+                if let Some(ret) = fn_override.return_value {
+                    ret as _
+                } else {
+                    return_value
+                }
+            } else {
+                return_value
             }
         }
     };

@@ -11,14 +11,18 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate bincode;
+extern crate serde_json;
 
 extern crate errno;
 
 extern crate fnv;
 
+extern crate rand;
+
 mod internal_stat;
 #[macro_use]
 mod shared;
+mod overrides;
 mod permissions;
 pub use permissions::*;
 mod files;

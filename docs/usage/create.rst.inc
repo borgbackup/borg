@@ -25,6 +25,8 @@ optional arguments
         | only display items with the given status characters
     ``--json``
         | output stats as JSON (implies --stats)
+    ``--no-cache-sync``
+        | experimental: do not synchronize the cache. Implies --no-files-cache.
 
 :ref:`common_options`
     |

@@ -429,6 +429,17 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
   end
 
+  config.vm.define "stretch64" do |b|
+    b.vm.box = "debian/stretch64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("stretch64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
+  end
+
   config.vm.define "jessie64" do |b|
     b.vm.box = "debian/jessie64"
     b.vm.provider :virtualbox do |v|

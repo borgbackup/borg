@@ -42,6 +42,13 @@ matrix:
           osx_image: xcode6.4
           env: TOXENV=py36
 
+before_install:
+- |
+    git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(AUTHORS|README\.rst|^(docs)/)' || {
+      echo "Only docs were updated, stopping build process."
+      exit
+    }
+
 install:
     - git fetch --unshallow --tags
     - ./.travis/install.sh

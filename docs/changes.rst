@@ -155,13 +155,25 @@ Compatibility notes:
 - Repositories in the "authenticated" mode are now treated as the unencrypted
   repositories they are.
 
+- The client-side temporary repository cache now holds unencrypted data for better speed.
+
+- borg init: removed the short form of --append-only (-a).
+
+- borg upgrade: removed the short form of --inplace (-i).
 
 New features:
 
-- integrity checking for important files used by borg:
+- reimplemented the RepositoryCache, size-limited caching of decrypted repo
+  contents, integrity checked via xxh64. #2515
+- reduced space usage of chunks.archive.d. Existing caches are migrated during
+  a cache sync. #235 #2638
+- integrity checking using xxh64 for important files used by borg, #1101:
 
   - repository: index and hints files
-  - cache: chunks and files caches, archive.chunks.d
+  - cache: chunks and files caches, chunks.archive.d
+- improve cache sync speed, #1729
+- create: new --no-cache-sync option
+- add repository mandatory feature flags infrastructure, #1806
 - Verify most operations against SecurityManager. Location, manifest timestamp
   and key types are now checked for almost all non-debug commands. #2487
 - implement storage quotas, #2517
@@ -170,6 +182,11 @@ New features:
 - borg export-tar, #2519
 - list: --json-lines instead of --json for archive contents, #2439
 - add --debug-profile option (and also "borg debug convert-profile"), #2473
+- implement --glob-archives/-a, #2448
+- normalize authenticated key modes for better naming consistency:
+
+  - rename "authenticated" to "authenticated-blake2" (uses blake2b)
+  - implement "authenticated" mode (uses hmac-sha256)
 
 Fixes:
 
@@ -179,19 +196,35 @@ Fixes:
   error message when parsing fails.
 - mount: check whether llfuse is installed before asking for passphrase, #2540
 - mount: do pre-mount checks before opening repository, #2541
-- FUSE: fix crash if empty (None) xattr is read, #2534
+- fuse:
+
+  - fix crash if empty (None) xattr is read, #2534
+  - fix read(2) caching data in metadata cache
+  - fix negative uid/gid crash (fix crash when mounting archives
+    of external drives made on cygwin), #2674
+  - redo ItemCache, on top of object cache
+  - use decrypted cache
+  - remove unnecessary normpaths
 - serve: ignore --append-only when initializing a repository (borg init), #2501
+- serve: fix incorrect type of exception_short for Errors, #2513
 - fix --exclude and --exclude-from recursing into directories, #2469
 - init: don't allow creating nested repositories, #2563
 - --json: fix encryption[mode] not being the cmdline name
 - remote: propagate Error.traceback correctly
-- serve: fix incorrect type of exception_short for Errors, #2513
 - fix remote logging and progress, #2241
 
   - implement --debug-topic for remote servers
   - remote: restore "Remote:" prefix (as used in 1.0.x)
   - rpc negotiate: enable v3 log protocol only for supported clients
   - fix --progress and logging in general for remote
+- fix parse_version, add tests, #2556
+- repository: truncate segments (and also some other files) before unlinking, #2557
+- recreate: keep timestamps as in original archive, #2384
+- recreate: if single archive is not processed, exit 2
+- patterns: don't recurse with ! / --exclude for pf:, #2509
+- cache sync: fix n^2 behaviour in lookup_name
+- extract: don't write to disk with --stdout (affected non-regular-file items), #2645
+- hashindex: implement KeyError, more tests
 
 Other changes:
 
@@ -205,31 +238,66 @@ Other changes:
 - support common options on mid-level commands (e.g. borg *key* export)
 - make --progress a common option
 - increase DEFAULT_SEGMENTS_PER_DIR to 1000
+- chunker: fix invalid use of types (function only used by tests)
+- chunker: don't do uint32_t >> 32
+- fuse:
 
+  - add instrumentation (--debug and SIGUSR1/SIGINFO)
+  - reduced memory usage for repository mounts by lazily instantiating archives
+  - improved archive load times
+- info: use CacheSynchronizer & HashIndex.stats_against (better performance)
 - docs:
 
   - init: document --encryption as required
   - security: OpenSSL usage
   - security: used implementations; note python libraries
   - security: security track record of OpenSSL and msgpack
-  - quotas: local repo disclaimer
-  - quotas: clarify compatbility; only relevant to serve side
+  - patterns: document denial of service (regex, wildcards)
+  - init: note possible denial of service with "none" mode
+  - init: document SHA extension is supported in OpenSSL and thus SHA is
+    faster on AMD Ryzen than blake2b.
   - book: use A4 format, new builder option format.
   - book: create appendices
   - data structures: explain repository compaction
   - data structures: add chunk layout diagram
   - data structures: integrity checking
+  - data structures: demingle cache and repo index
   - Attic FAQ: separate section for attic stuff
   - FAQ: I get an IntegrityError or similar - what now?
+  - FAQ: Can I use Borg on SMR hard drives?, #2252
+  - FAQ: specify "using inline shell scripts"
   - add systemd warning regarding placeholders, #2543
   - xattr: document API
   - add docs/misc/borg-data-flow data flow chart
   - debugging facilities
   - README: how to help the project, #2550
   - README: add bountysource badge, #2558
+  - fresh new theme + tweaking
   - logo: vectorized (PDF and SVG) versions
   - frontends: use headlines - you can link to them
-  - sphinx: disable smartypants, avoids mangled Unicode options like "—exclude"
+  - mark --pattern, --patterns-from as experimental
+  - highlight experimental features in online docs
+  - remove regex based pattern examples, #2458
+  - nanorst for "borg help TOPIC" and --help
+  - split deployment
+  - deployment: hosting repositories
+  - deployment: automated backups to a local hard drive
+  - development: vagrant, windows10 requirements
+  - development: update docs remarks
+  - split usage docs, #2627
+  - usage: avoid bash highlight, [options] instead of <options>
+  - usage: add benchmark page
+  - helpers: truncate_and_unlink doc
+  - don't suggest to leak BORG_PASSPHRASE
+  - internals: columnize rather long ToC [webkit fixup]
+    internals: manifest & feature flags
+  - internals: more HashIndex details
+  - internals: fix ASCII art equations
+  - internals: edited obj graph related sections a bit
+  - internals: layers image + description
+  - fix way too small figures in pdf
+  - index: disable syntax highlight (bash)
+  - improve options formatting, fix accidental block quotes
 
 - testing / checking:
 
@@ -240,12 +308,18 @@ Other changes:
   - testsuite.archiver: normalise pytest.raises vs. assert_raises
   - add test for preserved intermediate folder permissions, #2477
   - key: add round-trip test
+  - remove attic dependency of the tests, #2505
+  - enable remote tests on cygwin
+  - tests: suppress tar's future timestamp warning
+  - cache sync: add more refcount tests
+  - repository: add tests, including corruption tests
 
 - vagrant:
 
   - control VM cpus and pytest workers via env vars VMCPUS and XDISTN
   - update cleaning workdir
   - fix openbsd shell
+  - add OpenIndiana
 
 - packaging:
 

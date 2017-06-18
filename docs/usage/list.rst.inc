@@ -67,66 +67,58 @@ See the "borg help patterns" command for more help on exclude patterns.
 
 The following keys are available for ``--format``:
 
- - NEWLINE: OS dependent line separator
- - NL: alias of NEWLINE
- - NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath
- - SPACE
- - TAB
- - CR
- - LF
+- NEWLINE: OS dependent line separator
+- NL: alias of NEWLINE
+- NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath
+- SPACE
+- TAB
+- CR
+- LF
 
 Keys for listing repository archives:
 
- - archive, name: archive name interpreted as text (might be missing non-text characters, see barchive)
- - barchive: verbatim archive name, can contain any character except NUL
- - time: time of creation of the archive
- - id: internal ID of the archive
+- archive, name: archive name interpreted as text (might be missing non-text characters, see barchive)
+- barchive: verbatim archive name, can contain any character except NUL
+- time: time of creation of the archive
+- id: internal ID of the archive
 
 Keys for listing archive files:
 
- - type
- - mode
- - uid
- - gid
- - user
- - group
- - path: path interpreted as text (might be missing non-text characters, see bpath)
- - bpath: verbatim POSIX path, can contain any character except NUL
- - source: link target for links (identical to linktarget)
- - linktarget
- - flags
+- type
+- mode
+- uid
+- gid
+- user
+- group
+- path: path interpreted as text (might be missing non-text characters, see bpath)
+- bpath: verbatim POSIX path, can contain any character except NUL
+- source: link target for links (identical to linktarget)
+- linktarget
+- flags
 
- - size
- - csize: compressed size
- - dsize: deduplicated size
- - dcsize: deduplicated compressed size
- - num_chunks: number of chunks in this file
- - unique_chunks: number of unique chunks in this file
+- size
+- csize: compressed size
+- dsize: deduplicated size
+- dcsize: deduplicated compressed size
+- num_chunks: number of chunks in this file
+- unique_chunks: number of unique chunks in this file
 
- - mtime
- - ctime
- - atime
- - isomtime
- - isoctime
- - isoatime
+- mtime
+- ctime
+- atime
+- isomtime
+- isoctime
+- isoatime
 
- - blake2b
- - blake2s
- - md5
- - sha1
- - sha224
- - sha256
- - sha384
- - sha3_224
- - sha3_256
- - sha3_384
- - sha3_512
- - sha512
- - shake_128
- - shake_256
+- md5
+- sha1
+- sha224
+- sha256
+- sha384
+- sha512
 
- - archiveid
- - archivename
- - extra: prepends {source} with " -> " for soft links and " link to " for hard links
+- archiveid
+- archivename
+- extra: prepends {source} with " -> " for soft links and " link to " for hard links
 
- - health: either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)
+- health: either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)

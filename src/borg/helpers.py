@@ -1507,13 +1507,13 @@ class BaseFormatter:
 
     @staticmethod
     def keys_help():
-        return " - NEWLINE: OS dependent line separator\n" \
-               " - NL: alias of NEWLINE\n" \
-               " - NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath\n" \
-               " - SPACE\n" \
-               " - TAB\n" \
-               " - CR\n" \
-               " - LF"
+        return "- NEWLINE: OS dependent line separator\n" \
+               "- NL: alias of NEWLINE\n" \
+               "- NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath\n" \
+               "- SPACE\n" \
+               "- TAB\n" \
+               "- CR\n" \
+               "- LF"
 
 
 class ArchiveFormatter(BaseFormatter):
@@ -1535,10 +1535,10 @@ class ArchiveFormatter(BaseFormatter):
 
     @staticmethod
     def keys_help():
-        return " - archive, name: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
-               " - barchive: verbatim archive name, can contain any character except NUL\n" \
-               " - time: time of creation of the archive\n" \
-               " - id: internal ID of the archive"
+        return "- archive, name: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
+               "- barchive: verbatim archive name, can contain any character except NUL\n" \
+               "- time: time of creation of the archive\n" \
+               "- id: internal ID of the archive"
 
 
 class ItemFormatter(BaseFormatter):
@@ -1590,7 +1590,7 @@ class ItemFormatter(BaseFormatter):
         for group in cls.KEY_GROUPS:
             for key in group:
                 keys.remove(key)
-                text = " - " + key
+                text = "- " + key
                 if key in cls.KEY_DESCRIPTIONS:
                     text += ": " + cls.KEY_DESCRIPTIONS[key]
                 help.append(text)

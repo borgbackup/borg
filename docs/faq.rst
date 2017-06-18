@@ -355,12 +355,12 @@ Thus:
 - have media at another place
 - have a relatively recent backup on your media
 
-How do I report security issue with |project_name|?
----------------------------------------------------
+How do I report a security issue with Borg?
+-------------------------------------------
 
-Send a private email to the :ref:`security-contact` if you think you
-have discovered a security issue. Please disclose security issues
-responsibly.
+Send a private email to the :ref:`security contact <security-contact>`
+if you think you have discovered a security issue.
+Please disclose security issues responsibly.
 
 Common issues
 #############

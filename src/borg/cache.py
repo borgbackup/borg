@@ -1060,7 +1060,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         assert len(self.chunks) == num_chunks
         # LocalCache does not contain the manifest, either.
         del self.chunks[self.manifest.MANIFEST_ID]
-        duration = perf_counter() - t0
+        duration = perf_counter() - t0 or 0.01
         pi.finish()
         logger.debug('AdHocCache: downloaded %d chunk IDs in %.2f s (%d requests), ~%s/s',
                      num_chunks, duration, num_requests, format_file_size(num_chunks * 34 / duration))

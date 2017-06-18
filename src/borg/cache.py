@@ -656,6 +656,8 @@ class LocalCache(CacheStatsMixin):
             else:
                 fetch_ids = all_missing_ids
 
+            # This is potentially a rather expensive operation, but it's hard to tell at this point
+            # if it's a problem in practice (hence the experimental status of --no-cache-sync).
             for id_, data in zip(fetch_ids, decrypted_repository.repository.get_many(fetch_ids)):
                 entry = chunk_idx[id_]._replace(csize=len(data))
                 chunk_idx[id_] = entry

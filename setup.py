@@ -274,7 +274,7 @@ class build_usage(Command):
         if 'create' in choices:
             common_options = [group for group in choices['create']._action_groups if group.title == 'Common options'][0]
             with open('docs/usage/common-options.rst.inc', 'w') as doc:
-                self.write_options_group(common_options, doc, False)
+                self.write_options_group(common_options, doc, False, base_indent=0)
 
         return is_subcommand
 
@@ -294,7 +294,7 @@ class build_usage(Command):
             else:
                 self.write_options_group(group, fp)
 
-    def write_options_group(self, group, fp, with_title=True):
+    def write_options_group(self, group, fp, with_title=True, base_indent=4):
         def is_positional_group(group):
             return any(not o.option_strings for o in group._group_actions)
 
@@ -303,7 +303,7 @@ class build_usage(Command):
             return '\n'.join('| ' + line for line in text.splitlines())
 
         def shipout(text):
-            fp.write(textwrap.indent('\n'.join(text), ' ' * 4))
+            fp.write(textwrap.indent('\n'.join(text), ' ' * base_indent))
 
         if not group._group_actions:
             return

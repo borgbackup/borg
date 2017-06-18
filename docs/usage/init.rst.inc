@@ -15,7 +15,7 @@ positional arguments
 optional arguments
     ``-e``, ``--encryption``
         | select encryption key mode **(required)**
-    ``-a``, ``--append-only``
+    ``--append-only``
         | create an append-only mode repository
     ``--storage-quota``
         | Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
@@ -72,15 +72,22 @@ the encryption/decryption key or other secrets.
 Encryption modes
 ++++++++++++++++
 
+.. nanorst: inline-fill
+
 +----------+---------------+------------------------+--------------------------+
 | Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
 |          | no auth       | but authenticated      | and authenticated        |
 +----------+---------------+------------------------+--------------------------+
-| SHA-256  | none          | authenticated          | repokey, keyfile         |
+| SHA-256  | none          | `authenticated`        | repokey                  |
+|          |               |                        | keyfile                  |
 +----------+---------------+------------------------+--------------------------+
-| BLAKE2b  | n/a           | authenticated-blake2   | repokey-blake2,          |
-|          |               |                        | keyfile-blake2           |
+| BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`         |
+|          |               |                        | `keyfile-blake2`         |
 +----------+---------------+------------------------+--------------------------+
+
+.. nanorst: inline-replace
+
+`Marked modes` are new in Borg 1.1 and are not backwards-compatible with Borg 1.0.x.
 
 On modern Intel/AMD CPUs (except very cheap ones), AES is usually
 hardware-accelerated.
@@ -114,7 +121,8 @@ This mode is new and *not* compatible with Borg 1.0.x.
 
 `none` mode uses no encryption and no authentication. It uses SHA256 as chunk
 ID hash. Not recommended, rather consider using an authenticated or
-authenticated/encrypted mode.
+authenticated/encrypted mode. This mode has possible denial-of-service issues
+when running ``borg create`` on contents controlled by an attacker.
 Use it only for new repositories where no encryption is wanted **and** when compatibility
 with 1.0.x is important. If compatibility with 1.0.x is not important, use
 `authenticated-blake2` or `authenticated` instead.

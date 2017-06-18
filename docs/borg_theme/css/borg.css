@@ -94,9 +94,37 @@ h1 {
     border-right: 2px solid #4e4a4a;;
 }
 
-table.docutils td,
-table.docutils th {
+table.docutils:not(.footnote) td,
+table.docutils:not(.footnote) th {
     padding: .2em;
+}
+
+table.docutils:not(.footnote) {
+    border-collapse: collapse;
+    border: none;
+}
+
+table.docutils:not(.footnote) td,
+table.docutils:not(.footnote) th {
+    border: 1px solid #ddd;
+}
+
+table.docutils:not(.footnote) tr:first-child th {
+    border-top: 0;
+}
+
+table.docutils:not(.footnote) tr:last-child td {
+    border-bottom: 0;
+}
+
+table.docutils:not(.footnote) tr td:first-child,
+table.docutils:not(.footnote) tr th:first-child {
+    border-left: 0;
+}
+
+table.docutils:not(.footnote) tr td:last-child,
+table.docutils:not(.footnote) tr th:last-child {
+    border-right: 0;
 }
 
 code,

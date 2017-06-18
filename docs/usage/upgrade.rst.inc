@@ -15,7 +15,7 @@ positional arguments
 optional arguments
     ``-n``, ``--dry-run``
         | do not change repository
-    ``-i``, ``--inplace``
+    ``--inplace``
         | rewrite repository in place, with no chance of going back to older
         |                                versions of the repository.
     ``--force``

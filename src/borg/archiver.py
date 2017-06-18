@@ -1857,7 +1857,7 @@ class Archiver:
     helptext['patterns'] = textwrap.dedent('''
         File patterns support these styles: fnmatch, shell, regular expressions,
         path prefixes and path full-matches. By default, fnmatch is used for
-        `--exclude` patterns and shell-style is used for the experimental `--pattern`
+        ``--exclude`` patterns and shell-style is used for the experimental ``--pattern``
         option.
 
         If followed by a colon (':') the first two characters of a pattern are used as a
@@ -1866,8 +1866,7 @@ class Archiver:
         two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
-
-            This is the default style for --exclude and --exclude-from.
+            This is the default style for ``--exclude`` and ``--exclude-from``.
             These patterns use a variant of shell pattern syntax, with '\*' matching
             any number of characters, '?' matching any single character, '[...]'
             matching any single character specified, including ranges, and '[!...]'
@@ -1882,7 +1881,6 @@ class Archiver:
             separator, a '\*' is appended before matching is attempted.
 
         Shell-style patterns, selector `sh:`
-
             This is the default style for --pattern and --patterns-from.
             Like fnmatch patterns these are similar to shell patterns. The difference
             is that the pattern may include `**/` for matching zero or more directory
@@ -1890,7 +1888,6 @@ class Archiver:
             exception of any path separator.
 
         Regular expressions, selector `re:`
-
             Regular expressions similar to those found in Perl are supported. Unlike
             shell patterns regular expressions are not required to match the complete
             path and any substring match is sufficient. It is strongly recommended to
@@ -1901,12 +1898,10 @@ class Archiver:
             the re module <https://docs.python.org/3/library/re.html>`_.
 
         Path prefix, selector `pp:`
-
             This pattern style is useful to match whole sub-directories. The pattern
             `pp:/data/bar` matches `/data/bar` and everything therein.
 
         Path full-match, selector `pf:`
-
             This pattern style is useful to match whole paths.
             This is kind of a pseudo pattern as it can not have any variable or
             unspecified parts - the full, precise path must be given.
@@ -1930,11 +1925,11 @@ class Archiver:
             Further, ensure that `sh:` and `fm:` patterns only contain a handful of
             wildcards at most.
 
-        Exclusions can be passed via the command line option `--exclude`. When used
+        Exclusions can be passed via the command line option ``--exclude``. When used
         from within a shell the patterns should be quoted to protect them from
         expansion.
 
-        The `--exclude-from` option permits loading exclusion patterns from a text
+        The ``--exclude-from`` option permits loading exclusion patterns from a text
         file with one pattern per line. Lines empty or starting with the number sign
         ('#') after removing whitespace on both ends are ignored. The optional style
         selector prefix is also supported for patterns loaded from a file. Due to
@@ -1974,7 +1969,7 @@ class Archiver:
         .. container:: experimental
 
             A more general and easier to use way to define filename matching patterns exists
-            with the experimental `--pattern` and `--patterns-from` options. Using these, you
+            with the experimental ``--pattern`` and ``--patterns-from`` options. Using these, you
             may specify the backup roots (starting points) and patterns for inclusion/exclusion.
             A root path starts with the prefix `R`, followed by a path (a plain path, not a
             file pattern). An include rule starts with the prefix +, an exclude rule starts
@@ -1983,15 +1978,15 @@ class Archiver:
             path. The first matching pattern is used so if an include pattern matches before
             an exclude pattern, the file is backed up.
 
-            Note that the default pattern style for `--pattern` and `--patterns-from` is
+            Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
             shell style (`sh:`), so those patterns behave similar to rsync include/exclude
             patterns. The pattern style can be set via the `P` prefix.
 
-            Patterns (`--pattern`) and excludes (`--exclude`) from the command line are
-            considered first (in the order of appearance). Then patterns from `--patterns-from`
-            are added. Exclusion patterns from `--exclude-from` files are appended last.
+            Patterns (``--pattern``) and excludes (``--exclude``) from the command line are
+            considered first (in the order of appearance). Then patterns from ``--patterns-from``
+            are added. Exclusion patterns from ``--exclude-from`` files are appended last.
 
-            An example `--patterns-from` file could look like that::
+            An example ``--patterns-from`` file could look like that::
 
                 # "sh:" pattern style is the default, so the following line is not needed:
                 P sh
@@ -2006,49 +2001,39 @@ class Archiver:
                 # don't backup the other home directories
                 - /home/*\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
-        Repository (or Archive) URLs, --prefix and --remote-path values support these
+        Repository (or Archive) URLs, ``--prefix`` and ``--remote-path`` values support these
         placeholders:
 
         {hostname}
-
             The (short) hostname of the machine.
 
         {fqdn}
-
             The full name of the machine.
 
         {now}
-
             The current local date and time, by default in ISO-8601 format.
             You can also supply your own `format string <https://docs.python.org/3.4/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
         {utcnow}
-
             The current UTC date and time, by default in ISO-8601 format.
             You can also supply your own `format string <https://docs.python.org/3.4/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
         {user}
-
             The user name (or UID, if no name is available) of the user running borg.
 
         {pid}
-
             The current process ID.
 
         {borgversion}
-
             The version of borg, e.g.: 1.0.8rc1
 
         {borgmajor}
-
             The version of borg, only the major version, e.g.: 1
 
         {borgminor}
-
             The version of borg, only major and minor version, e.g.: 1.0
 
         {borgpatch}
-
             The version of borg, only major, minor and patch version, e.g.: 1.0.8
 
         If literal curly braces need to be used, double them for escaping::
@@ -2071,20 +2056,26 @@ class Archiver:
             double all percent signs (``{hostname}-{now:%Y-%m-%d_%H:%M:%S}``
             becomes ``{hostname}-{now:%%Y-%%m-%%d_%%H:%%M:%%S}``).\n\n''')
     helptext['compression'] = textwrap.dedent('''
+        It is no problem to mix different compression methods in one repo,
+        deduplication is done on the source data chunks (not on the compressed
+        or encrypted data).
+
+        If some specific chunk was once compressed and stored into the repo, creating
+        another backup that also uses this chunk will not change the stored chunk.
+        So if you use different compression specs for the backups, whichever stores a
+        chunk first determines its compression. See also borg recreate.
+
         Compression is lz4 by default. If you want something else, you have to specify what you want.
 
         Valid compression specifiers are:
 
         none
-
             Do not compress.
 
         lz4
-
             Use lz4 compression. High speed, low compression. (default)
 
         zlib[,L]
-
             Use zlib ("gz") compression. Medium speed, medium compression.
             If you do not explicitely give the compression level L (ranging from 0
             to 9), it will use level 6.
@@ -2092,7 +2083,6 @@ class Archiver:
             overhead) is usually pointless, you better use "none" compression.
 
         lzma[,L]
-
             Use lzma ("xz") compression. Low speed, high compression.
             If you do not explicitely give the compression level L (ranging from 0
             to 9), it will use level 6.
@@ -2101,7 +2091,6 @@ class Archiver:
             lots of CPU cycles and RAM.
 
         auto,C[,L]
-
             Use a built-in heuristic to decide per chunk whether to compress or not.
             The heuristic tries with lz4 whether the data is compressible.
             For incompressible data, it will not use compression (uses "none").
@@ -2114,18 +2103,7 @@ class Archiver:
             borg create --compression zlib REPO::ARCHIVE data
             borg create --compression zlib,1 REPO::ARCHIVE data
             borg create --compression auto,lzma,6 REPO::ARCHIVE data
-            borg create --compression auto,lzma ...
-
-        General remarks:
-
-        It is no problem to mix different compression methods in one repo,
-        deduplication is done on the source data chunks (not on the compressed
-        or encrypted data).
-
-        If some specific chunk was once compressed and stored into the repo, creating
-        another backup that also uses this chunk will not change the stored chunk.
-        So if you use different compression specs for the backups, whichever stores a
-        chunk first determines its compression. See also borg recreate.\n\n''')
+            borg create --compression auto,lzma ...\n\n''')
 
     def do_help(self, parser, commands, args):
         if not args.topic:

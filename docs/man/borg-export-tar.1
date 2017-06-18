@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXPORT-TAR 1 "2017-05-17" "" "borg backup tool"
+.TH BORG-EXPORT-TAR 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-export-tar \- Export archive contents as a tarball
 .
@@ -39,7 +39,7 @@ This command creates a tarball from an archive.
 .sp
 When giving \(aq\-\(aq as the output FILE, Borg will write a tar stream to standard output.
 .sp
-By default (\-\-tar\-filter=auto) Borg will detect whether the FILE should be compressed
+By default (\fB\-\-tar\-filter=auto\fP) Borg will detect whether the FILE should be compressed
 based on its file extension and pipe the tarball through an appropriate filter
 before writing it to FILE:
 .INDENT 0.0
@@ -51,7 +51,7 @@ before writing it to FILE:
 \&.tar.xz: xz
 .UNINDENT
 .sp
-Alternatively a \-\-tar\-filter program may be explicitly specified. It should
+Alternatively a \fB\-\-tar\-filter\fP program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered
 tar stream to stdout.
 .sp
@@ -62,7 +62,7 @@ BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
 Timestamp resolution is limited to whole seconds, not the nanosecond resolution
 otherwise supported by Borg.
 .sp
-A \-\-sparse option (as found in borg extract) is not supported.
+A \fB\-\-sparse\fP option (as found in borg extract) is not supported.
 .sp
 By default the entire archive is extracted but a subset of files and directories
 can be selected by passing a list of \fBPATHs\fP as arguments.
@@ -103,10 +103,10 @@ exclude paths matching PATTERN
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
 .BI \-\-pattern \ PATTERN
-include/exclude paths matching PATTERN
+experimental: include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-read include/exclude patterns from PATTERNFILE, one per line
+experimental: read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .BI \-\-strip\-components \ NUMBER
 Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.

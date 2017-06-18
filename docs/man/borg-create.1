@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-05-17" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -54,7 +54,7 @@ In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 .sp
 To speed up pulling backups over sshfs and similar network file systems which do
-not provide correct inode information the \-\-ignore\-inode flag can be used. This
+not provide correct inode information the \fB\-\-ignore\-inode\fP flag can be used. This
 potentially decreases reliability of change detection, while avoiding always reading
 all files on these file systems.
 .sp
@@ -63,7 +63,7 @@ creation of a new archive to ensure fast operation. This is because the file cac
 is used to determine changed files quickly uses absolute filenames.
 If this is not possible, consider creating a bind mount to a stable location.
 .sp
-The \-\-progress option shows (from left to right) Original, Compressed and Deduplicated
+The \fB\-\-progress\fP option shows (from left to right) Original, Compressed and Deduplicated
 (O, C and D, respectively), then the Number of files (N) processed so far, followed by
 the currently processed path.
 .sp
@@ -98,6 +98,9 @@ only display items with the given status characters
 .TP
 .B \-\-json
 output stats as JSON (implies \-\-stats)
+.TP
+.B \-\-no\-cache\-sync
+experimental: do not synchronize the cache. Implies \-\-no\-files\-cache.
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -118,10 +121,10 @@ exclude directories that are tagged by containing a filesystem object with the g
 if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
 .TP
 .BI \-\-pattern \ PATTERN
-include/exclude paths matching PATTERN
+experimental: include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-read include/exclude patterns from PATTERNFILE, one per line
+experimental: read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -181,11 +184,7 @@ $ borg create /path/to/repo::my\-files \e
     \-\-exclude \(aq*.pyc\(aq
 
 # Backup home directories excluding image thumbnails (i.e. only
-# /home/*/.thumbnails is excluded, not /home/*/*/.thumbnails)
-$ borg create /path/to/repo::my\-files /home \e
-    \-\-exclude \(aqre:^/home/[^/]+/\e.thumbnails/\(aq
-
-# Do the same using a shell\-style pattern
+# /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
 $ borg create /path/to/repo::my\-files /home \e
     \-\-exclude \(aqsh:/home/*/.thumbnails\(aq
 
@@ -238,8 +237,8 @@ $ borg create /path/to/repo::daily\-projectA\-{now:%Y\-%m\-%d} projectA
 .UNINDENT
 .SH NOTES
 .sp
-The \-\-exclude patterns are not like tar. In tar \-\-exclude .bundler/gems will
-exclude foo/.bundler/gems. In borg it will not, you need to use \-\-exclude
+The \fB\-\-exclude\fP patterns are not like tar. In tar \fB\-\-exclude\fP .bundler/gems will
+exclude foo/.bundler/gems. In borg it will not, you need to use \fB\-\-exclude\fP
 \(aq*/.bundler/gems\(aq to get the same effect. See \fBborg help patterns\fP for
 more information.
 .sp

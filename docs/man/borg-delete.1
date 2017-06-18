@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2017-05-17" "" "borg backup tool"
+.TH BORG-DELETE 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .
@@ -66,7 +66,10 @@ work slower, but using less space
 .INDENT 0.0
 .TP
 .B \-P\fP,\fB  \-\-prefix
-only consider archive names starting with this prefix
+only consider archive names starting with this prefix.
+.TP
+.B \-a\fP,\fB  \-\-glob\-archives
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .B \-\-sort\-by
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

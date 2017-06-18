@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2017-05-17" "" "borg backup tool"
+.TH BORG-LIST 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -61,16 +61,19 @@ specify format for file listing
 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
 .TP
 .B \-\-json
-Only valid for listing repository contents. Format output as JSON. The form of \-\-format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
+Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
 .TP
 .B \-\-json\-lines
-Only valid for listing archive contents. Format output as JSON Lines. The form of \-\-format is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 .UNINDENT
 .SS filters
 .INDENT 0.0
 .TP
 .B \-P\fP,\fB  \-\-prefix
-only consider archive names starting with this prefix
+only consider archive names starting with this prefix.
+.TP
+.B \-a\fP,\fB  \-\-glob\-archives
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .B \-\-sort\-by
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -100,10 +103,10 @@ exclude directories that are tagged by containing a filesystem object with the g
 if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
 .TP
 .BI \-\-pattern \ PATTERN
-include/exclude paths matching PATTERN
+experimental: include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-read include/exclude patterns from PATTERNFILE, one per line
+experimental: read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -138,9 +141,7 @@ drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
 .UNINDENT
 .SH NOTES
 .sp
-The following keys are available for \-\-format:
-.INDENT 0.0
-.INDENT 3.5
+The following keys are available for \fB\-\-format\fP:
 .INDENT 0.0
 .IP \(bu 2
 NEWLINE: OS dependent line separator
@@ -157,12 +158,8 @@ CR
 .IP \(bu 2
 LF
 .UNINDENT
-.UNINDENT
-.UNINDENT
 .sp
 Keys for listing repository archives:
-.INDENT 0.0
-.INDENT 3.5
 .INDENT 0.0
 .IP \(bu 2
 archive, name: archive name interpreted as text (might be missing non\-text characters, see barchive)
@@ -173,12 +170,8 @@ time: time of creation of the archive
 .IP \(bu 2
 id: internal ID of the archive
 .UNINDENT
-.UNINDENT
-.UNINDENT
 .sp
 Keys for listing archive files:
-.INDENT 0.0
-.INDENT 3.5
 .INDENT 0.0
 .IP \(bu 2
 type
@@ -246,8 +239,6 @@ archivename
 extra: prepends {source} with " \-> " for soft links and " link to " for hard links
 .IP \(bu 2
 health: either "healthy" (file ok) or "broken" (if file has all\-zero replacement chunks)
-.UNINDENT
-.UNINDENT
 .UNINDENT
 .SH SEE ALSO
 .sp

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DIFF 1 "2017-05-17" "" "borg backup tool"
+.TH BORG-DIFF 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-diff \- Diff contents of two archives
 .
@@ -47,7 +47,7 @@ are compared, which is very fast.
 .sp
 For archives prior to Borg 1.1 chunk contents are compared by default.
 If you did not create the archives with different chunker params,
-pass \-\-same\-chunker\-params.
+pass \fB\-\-same\-chunker\-params\fP\&.
 Note that the chunker params changed from Borg 0.xx to 1.0.
 .sp
 See the output of the "borg help patterns" command for more help on exclude patterns.
@@ -97,10 +97,10 @@ exclude directories that are tagged by containing a filesystem object with the g
 if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
 .TP
 .BI \-\-pattern \ PATTERN
-include/exclude paths matching PATTERN
+experimental: include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-read include/exclude patterns from PATTERNFILE, one per line
+experimental: read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

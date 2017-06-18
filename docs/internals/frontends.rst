@@ -504,6 +504,7 @@ Errors
 
 Operations
     - cache.begin_transaction
+    - cache.download_chunks, appears with ``borg create --no-cache-sync``
     - cache.commit
     - cache.sync
 

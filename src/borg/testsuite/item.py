@@ -154,6 +154,11 @@ def test_item_file_size():
         ChunkListEntry(csize=1, size=2000, id=None),
     ])
     assert item.get_size() == 3000
+    with pytest.raises(AssertionError):
+        item.get_size(compressed=True, memorize=True)
+    assert item.get_size(compressed=True) == 2
+    item.get_size(memorize=True)
+    assert item.size == 3000
 
 
 def test_item_file_size_no_chunks():

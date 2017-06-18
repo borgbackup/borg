@@ -504,7 +504,7 @@ class Archiver:
         t0_monotonic = time.monotonic()
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
-                       lock_wait=self.lock_wait) as cache:
+                       lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
@@ -2826,6 +2826,8 @@ class Archiver:
                                help='only display items with the given status characters')
         subparser.add_argument('--json', action='store_true',
                                help='output stats as JSON (implies --stats)')
+        subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
+                               help='experimental: do not synchronize the cache. Implies --no-files-cache.')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='patterns',

@@ -44,6 +44,7 @@ matrix:
 
 before_install:
 - |
+    echo Checking whether $TRAVIS_COMMIT_RANGE changed only docs
     git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(AUTHORS|README\.rst|^(docs)/)' || {
       echo "Only docs were updated, stopping build process."
       exit

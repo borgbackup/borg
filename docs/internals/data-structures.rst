@@ -6,6 +6,10 @@
 Data structures and file formats
 ================================
 
+This page documents the internal data structures and storage
+mechanisms of Borg. It is partly based on `mailing list
+discussion about internals`_ and also on static code analysis.
+
 .. todo:: Clarify terms, perhaps create a glossary.
           ID (client?) vs. key (repository?),
           chunks (blob of data in repo?) vs. object (blob of data in repo, referred to from another object?),

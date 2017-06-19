@@ -1262,7 +1262,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         @contextmanager
         def patch_setxattr(error):
-            if test_wrapper_detected():
+            # if test_wrapper_detected():
+            if False:
                 overrides = test_wrapper_overrides.copy()
                 for fn in setxattr_functions:
                     overrides[fn] = {

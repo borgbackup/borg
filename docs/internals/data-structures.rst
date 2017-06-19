@@ -17,7 +17,7 @@ Repository
 
 .. Some parts of this description were taken from the Repository docstring
 
-|project_name| stores its data in a `Repository`, which is a filesystem-based
+Borg stores its data in a `Repository`, which is a file system based
 transactional key-value store. Thus the repository does not know about
 the concept of archives or items.
 

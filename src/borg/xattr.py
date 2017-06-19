@@ -84,7 +84,7 @@ if libc_name is None:
 # TODO: If that's the case then we can make Borg fakeroot-xattr-compatible on these as well.
 TESTWRAPPER = False
 # Actually not fakeroot specific.
-# True if anything is replacing xattr functions.
+# Should be True if anything is replacing xattr functions, such as test-wrapper.
 XATTR_FAKEROOT = False
 if sys.platform.startswith('darwin'):
     LD_PRELOAD = os.environ.get('DYLD_INSERT_LIBRARIES', '')

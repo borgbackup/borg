@@ -169,11 +169,15 @@ fn main() {
         },
         None => lib_path.into_os_string(),
     };
-    let mut command = Command::new(args.next().unwrap_or_else(|| "sh".to_string()))
+    let mut command = Command::new(args.next().unwrap_or_else(|| "sh".to_string()));
+    let mut command = command
         .args(args)
         .env(LIB_INJECT_ENV, inject_path)
-        .env("TEST_WRAPPER_SOCKET", &socket_path)
-        .spawn().expect("Failed to execute child process");
+        .env("TEST_WRAPPER_SOCKET", &socket_path);
+    if cfg!(target_os = "macos") {
+        command.env("DYLD_FORCE_FLAT_NAMESPACE", "1");
+    }
+    let mut command = command.spawn().expect("Failed to execute child process");
     thread::spawn(move || {
         let exit_code = command.wait().expect("Failed to manage child process");
         fs::remove_file(socket_path).expect("Failed to clean up Unix socket");

@@ -43,6 +43,7 @@ pub fn get_overrides() -> RwLockReadGuard<'static, FnvHashMap<String, Override>>
         }
     }
     {
+        debug!("New overrides detected: {:?}", override_env);
         let mut last_override_env = LAST_OVERRIDE_ENV.write().unwrap();
         let mut last_overrides = LAST_OVERRIDES.write().unwrap();
         // Keep both write locks alive to avoid a race condition

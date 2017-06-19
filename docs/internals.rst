@@ -4,9 +4,8 @@
 Internals
 =========
 
-This page documents the internal data structures and storage
-mechanisms of |project_name|. It is partly based on `mailing list
-discussion about internals`_ and also on static code analysis.
+The internals chapter describes and analyses most of the inner workings
+of Borg.
 
 Borg uses a low-level, key-value store, the :ref:`repository`, and
 implements a more complex data structure on top of it, which is made

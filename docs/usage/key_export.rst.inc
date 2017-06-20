@@ -19,8 +19,10 @@ optional arguments
     --qr-html     Create an html file suitable for printing and later type-in or qr scan
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

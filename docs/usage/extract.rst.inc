@@ -27,8 +27,10 @@ optional arguments
     --sparse          create holes in output sparse file from all-zero chunks
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

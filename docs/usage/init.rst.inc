@@ -18,8 +18,10 @@ optional arguments
     --storage-quota      Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

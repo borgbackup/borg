@@ -12,8 +12,10 @@ MOUNTPOINT
     mountpoint of the filesystem to umount
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

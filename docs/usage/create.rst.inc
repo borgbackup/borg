@@ -23,8 +23,10 @@ optional arguments
     --no-cache-sync    experimental: do not synchronize the cache. Implies --no-files-cache.
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Exclusion options
     -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN

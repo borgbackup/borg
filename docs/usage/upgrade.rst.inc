@@ -21,8 +21,10 @@ optional arguments
     --disable-tam     Disable manifest authentication (in key and cache)
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

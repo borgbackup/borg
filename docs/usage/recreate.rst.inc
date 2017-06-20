@@ -21,8 +21,10 @@ optional arguments
     -s, --stats     print statistics at end
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Exclusion options
     -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN

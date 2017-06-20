@@ -22,8 +22,10 @@ optional arguments
     --json-lines    Only valid for listing archive contents. Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 filters
     -P, --prefix            only consider archive names starting with this prefix.

@@ -290,8 +290,7 @@ class build_usage(Command):
     def write_options(self, parser, fp):
         for group in parser._action_groups:
             if group.title == 'Common options':
-                fp.write('\n\n:ref:`common_options`\n')
-                fp.write('    |')
+                fp.write('\n\n.. class:: borg-common-opt-ref\n\n:ref:`common_options`\n')
             else:
                 self.write_options_group(group, fp)
 

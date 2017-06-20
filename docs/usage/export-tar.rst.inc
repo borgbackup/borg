@@ -26,8 +26,10 @@ optional arguments
     --strip-components NUMBER         Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

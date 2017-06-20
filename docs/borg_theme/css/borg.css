@@ -169,3 +169,7 @@ cite {
     font-style: normal;
     text-decoration: underline;
 }
+
+.borg-common-opt-ref {
+    font-weight: bold;
+}

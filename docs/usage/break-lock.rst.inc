@@ -12,8 +12,10 @@ REPOSITORY
     repository for which to break the locks
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

@@ -18,8 +18,10 @@ optional arguments
     --paper     interactively import from a backup done with ``--paper``
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

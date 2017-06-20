@@ -16,8 +16,10 @@ optional arguments
     --json     format output as JSON
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 filters
     -P, --prefix            only consider archive names starting with this prefix.

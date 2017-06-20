@@ -14,8 +14,10 @@ PATH
     path were to create benchmark input data
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

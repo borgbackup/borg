@@ -22,8 +22,10 @@ optional arguments
     --sort     Sort the output lines by file path.
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 Exclusion options
     -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN

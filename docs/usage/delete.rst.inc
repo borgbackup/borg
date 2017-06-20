@@ -19,8 +19,10 @@ optional arguments
     --save-space    work slower, but using less space
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 filters
     -P, --prefix            only consider archive names starting with this prefix.

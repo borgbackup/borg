@@ -19,8 +19,10 @@ optional arguments
     -o     Extra mount options
 
 
+.. class:: borg-common-opt-ref
+
 :ref:`common_options`
-    |
+
 
 filters
     -P, --prefix            only consider archive names starting with this prefix.

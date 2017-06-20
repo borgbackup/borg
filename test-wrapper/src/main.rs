@@ -8,6 +8,7 @@
 use std::env;
 use std::fs;
 use std::thread;
+use std::mem;
 use std::borrow::Borrow;
 use std::sync::RwLock;
 use std::process::{self, Command};
@@ -17,6 +18,7 @@ use std::path::PathBuf;
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, ErrorKind};
 use std::collections::hash_map;
+use std::sync::Mutex;
 
 use std::os::unix::net::{UnixListener, UnixStream};
 
@@ -93,7 +95,8 @@ struct FileId(dev_t, ino_t);
 
 #[derive(Debug, Deserialize)]
 enum Message {
-    Remove(FileId),
+    BeginRemove(FileId),
+    FinishRemove(FileId, bool),
     XattrsGet(FileId, Vec<u8>),
     XattrsSet(FileId, Vec<u8>, Vec<u8>, c_int),
     XattrsDelete(FileId, Vec<u8>),
@@ -115,6 +118,8 @@ struct FileEntry {
 
 lazy_static! {
     static ref DATABASE: RwLock<FnvHashMap<FileId, FileEntry>> = RwLock::new(Default::default());
+    // Items for which removal is in progress
+    static ref LIMBO: Mutex<FnvHashMap<FileId, FileEntry>> = Mutex::new(Default::default());
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -212,8 +217,49 @@ fn main() {
                     _ => trace!("{:?}", message),
                 }
                 match message {
-                    Message::Remove(id) => {
-                        DATABASE.write().unwrap().remove(&id);
+                    Message::BeginRemove(id) => {
+                        let res = {
+                            let mut database = DATABASE.write().unwrap();
+                            if let Some(file) = database.remove(&id) {
+                                let mut limbo = LIMBO.lock().unwrap();
+                                match limbo.entry(id) {
+                                    hash_map::Entry::Vacant(entry) => {
+                                        entry.insert(file);
+                                        true
+                                    }
+                                    _ => false
+                                }
+                            } else {
+                                false
+                            }
+                        };
+                        reply(&mut writer, &res);
+                    }
+                    Message::FinishRemove(id, success) => {
+                        {
+                            let mut limbo = LIMBO.lock().unwrap();
+                            if success {
+                                limbo.remove(&id);
+                            } else {
+                                let mut database = DATABASE.write().unwrap();
+                                if let Some(mut file) = limbo.remove(&id) {
+                                    match database.entry(id) {
+                                        hash_map::Entry::Vacant(entry) => {
+                                            entry.insert(file);
+                                        }
+                                        hash_map::Entry::Occupied(mut entry) => {
+                                            let entry = entry.get_mut();
+                                            file.xattrs.extend(mem::replace(&mut entry.xattrs, FnvHashMap::default()).into_iter());
+                                            entry.xattrs = file.xattrs;
+                                            entry.mode_and_mask = entry.mode_and_mask.or(file.mode_and_mask);
+                                            entry.owner = entry.owner.or(file.owner);
+                                            entry.group = entry.group.or(file.group);
+                                            entry.rdev = entry.rdev.or(file.rdev);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         reply(&mut writer, &0);
                     }
                     Message::XattrsGet(id, attr) => {

@@ -90,7 +90,8 @@ impl<'a> From<&'a libc::stat64> for FileId {
 #[derive(Debug, Serialize)]
 #[allow(dead_code)] // not all variants are used on all platforms
 pub enum Message<'a> {
-    Remove(FileId),
+    BeginRemove(FileId),
+    FinishRemove(FileId, bool),
     XattrsGet(FileId, &'a [u8]),
     XattrsSet(FileId, &'a [u8], &'a [u8], c_int),
     XattrsDelete(FileId, &'a [u8]),

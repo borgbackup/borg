@@ -8,17 +8,16 @@ borg key export
 
     borg [common options] key export [options] REPOSITORY PATH
 
-positional arguments
-    REPOSITORY
+REPOSITORY
 
-    PATH
-        where to store the backup
+PATH
+    where to store the backup
+
 
 optional arguments
-    ``--paper``
-        | Create an export suitable for printing and later type-in
-    ``--qr-html``
-        | Create an html file suitable for printing and later type-in or qr scan
+    --paper       Create an export suitable for printing and later type-in
+    --qr-html     Create an html file suitable for printing and later type-in or qr scan
+
 
 :ref:`common_options`
     |

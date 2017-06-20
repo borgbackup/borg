@@ -8,11 +8,11 @@ borg rename
 
     borg [common options] rename [options] ARCHIVE NEWNAME
 
-positional arguments
-    ARCHIVE
-        archive to rename
-    NEWNAME
-        the new archive name to use
+ARCHIVE
+    archive to rename
+NEWNAME
+    the new archive name to use
+
 
 :ref:`common_options`
     |

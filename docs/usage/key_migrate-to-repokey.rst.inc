@@ -8,8 +8,8 @@ borg key migrate-to-repokey
 
     borg [common options] key migrate-to-repokey [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
+REPOSITORY
+
 
 
 :ref:`common_options`

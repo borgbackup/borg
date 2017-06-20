@@ -8,15 +8,15 @@ borg key import
 
     borg [common options] key import [options] REPOSITORY PATH
 
-positional arguments
-    REPOSITORY
+REPOSITORY
 
-    PATH
-        path to the backup
+PATH
+    path to the backup
+
 
 optional arguments
-    ``--paper``
-        | interactively import from a backup done with ``--paper``
+    --paper     interactively import from a backup done with ``--paper``
+
 
 :ref:`common_options`
     |

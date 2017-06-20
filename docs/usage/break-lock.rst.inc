@@ -8,9 +8,9 @@ borg break-lock
 
     borg [common options] break-lock [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
-        repository for which to break the locks
+REPOSITORY
+    repository for which to break the locks
+
 
 :ref:`common_options`
     |

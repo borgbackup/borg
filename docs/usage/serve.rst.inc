@@ -8,15 +8,14 @@ borg serve
 
     borg [common options] serve [options]
 
+
+
 optional arguments
-    ``--restrict-to-path PATH``
-        | restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub-directories is granted implicitly; PATH doesn't need to directly point to a repository.
-    ``--restrict-to-repository PATH``
-        | restrict repository access. Only the repository located at PATH (no sub-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike --restrict-to-path sub-directories are not accessible; PATH needs to directly point at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
-    ``--append-only``
-        | only allow appending to repository segment files
-    ``--storage-quota``
-        | Override storage quota of the repository (e.g. 5G, 1.5T). When a new repository is initialized, sets the storage quota on the new repository as well. Default: no quota.
+    --restrict-to-path PATH    restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub-directories is granted implicitly; PATH doesn't need to directly point to a repository.
+    --restrict-to-repository PATH    restrict repository access. Only the repository located at PATH (no sub-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike --restrict-to-path sub-directories are not accessible; PATH needs to directly point at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
+    --append-only       only allow appending to repository segment files
+    --storage-quota     Override storage quota of the repository (e.g. 5G, 1.5T). When a new repository is initialized, sets the storage quota on the new repository as well. Default: no quota.
+
 
 :ref:`common_options`
     |

@@ -8,13 +8,13 @@ borg with-lock
 
     borg [common options] with-lock [options] REPOSITORY COMMAND ARGS
 
-positional arguments
-    REPOSITORY
-        repository to lock
-    COMMAND
-        command to run
-    ARGS
-        command arguments
+REPOSITORY
+    repository to lock
+COMMAND
+    command to run
+ARGS
+    command arguments
+
 
 :ref:`common_options`
     |

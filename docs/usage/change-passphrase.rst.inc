@@ -8,8 +8,8 @@ borg change-passphrase
 
     borg [common options] change-passphrase [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
+REPOSITORY
+
 
 
 :ref:`common_options`

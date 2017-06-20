@@ -8,29 +8,23 @@ borg export-tar
 
     borg [common options] export-tar [options] ARCHIVE FILE PATH
 
-positional arguments
-    ARCHIVE
-        archive to export
-    FILE
-        output tar file. "-" to write to stdout instead.
-    PATH
-        paths to extract; patterns are supported
+ARCHIVE
+    archive to export
+FILE
+    output tar file. "-" to write to stdout instead.
+PATH
+    paths to extract; patterns are supported
+
 
 optional arguments
-    ``--tar-filter``
-        | filter program to pipe data through
-    ``--list``
-        | output verbose list of items (files, dirs, ...)
-    ``-e PATTERN``, ``--exclude PATTERN``
-        | exclude paths matching PATTERN
-    ``--exclude-from EXCLUDEFILE``
-        | read exclude patterns from EXCLUDEFILE, one per line
-    ``--pattern PATTERN``
-        | experimental: include/exclude paths matching PATTERN
-    ``--patterns-from PATTERNFILE``
-        | experimental: read include/exclude patterns from PATTERNFILE, one per line
-    ``--strip-components NUMBER``
-        | Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
+    --tar-filter                      filter program to pipe data through
+    --list                            output verbose list of items (files, dirs, ...)
+    -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
+    --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
+    --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
+    --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+    --strip-components NUMBER         Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
+
 
 :ref:`common_options`
     |

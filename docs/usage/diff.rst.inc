@@ -8,40 +8,32 @@ borg diff
 
     borg [common options] diff [options] REPO_ARCHIVE1 ARCHIVE2 PATH
 
-positional arguments
-    REPO_ARCHIVE1
-        repository location and ARCHIVE1 name
-    ARCHIVE2
-        ARCHIVE2 name (no repository location allowed)
-    PATH
-        paths of items inside the archives to compare; patterns are supported
+REPO_ARCHIVE1
+    repository location and ARCHIVE1 name
+ARCHIVE2
+    ARCHIVE2 name (no repository location allowed)
+PATH
+    paths of items inside the archives to compare; patterns are supported
+
 
 optional arguments
-    ``--numeric-owner``
-        | only consider numeric user and group identifiers
-    ``--same-chunker-params``
-        | Override check of chunker parameters.
-    ``--sort``
-        | Sort the output lines by file path.
+    --numeric-owner    only consider numeric user and group identifiers
+    --same-chunker-params    Override check of chunker parameters.
+    --sort     Sort the output lines by file path.
+
 
 :ref:`common_options`
     |
 
 Exclusion options
-    ``-e PATTERN``, ``--exclude PATTERN``
-        | exclude paths matching PATTERN
-    ``--exclude-from EXCLUDEFILE``
-        | read exclude patterns from EXCLUDEFILE, one per line
-    ``--exclude-caches``
-        | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
-    ``--exclude-if-present NAME``
-        | exclude directories that are tagged by containing a filesystem object with the given NAME
-    ``--keep-exclude-tags``, ``--keep-tag-files``
-        | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
-    ``--pattern PATTERN``
-        | experimental: include/exclude paths matching PATTERN
-    ``--patterns-from PATTERNFILE``
-        | experimental: read include/exclude patterns from PATTERNFILE, one per line
+    -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
+    --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
+    --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
+    --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
+    --keep-exclude-tags, --keep-tag-files    if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
+    --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
+    --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+
 
 Description
 ~~~~~~~~~~~

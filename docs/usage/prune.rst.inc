@@ -8,46 +8,33 @@ borg prune
 
     borg [common options] prune [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
-        repository to prune
+REPOSITORY
+    repository to prune
+
 
 optional arguments
-    ``-n``, ``--dry-run``
-        | do not change repository
-    ``--force``
-        | force pruning of corrupted archives
-    ``-s``, ``--stats``
-        | print statistics for the deleted archive
-    ``--list``
-        | output verbose list of archives it keeps/prunes
-    ``--keep-within WITHIN``
-        | keep all archives within this time interval
-    ``--keep-last``, ``--keep-secondly``
-        | number of secondly archives to keep
-    ``--keep-minutely``
-        | number of minutely archives to keep
-    ``-H``, ``--keep-hourly``
-        | number of hourly archives to keep
-    ``-d``, ``--keep-daily``
-        | number of daily archives to keep
-    ``-w``, ``--keep-weekly``
-        | number of weekly archives to keep
-    ``-m``, ``--keep-monthly``
-        | number of monthly archives to keep
-    ``-y``, ``--keep-yearly``
-        | number of yearly archives to keep
-    ``--save-space``
-        | work slower, but using less space
+    -n, --dry-run         do not change repository
+    --force               force pruning of corrupted archives
+    -s, --stats           print statistics for the deleted archive
+    --list                output verbose list of archives it keeps/prunes
+    --keep-within WITHIN    keep all archives within this time interval
+    --keep-last, --keep-secondly    number of secondly archives to keep
+    --keep-minutely       number of minutely archives to keep
+    -H, --keep-hourly     number of hourly archives to keep
+    -d, --keep-daily      number of daily archives to keep
+    -w, --keep-weekly     number of weekly archives to keep
+    -m, --keep-monthly    number of monthly archives to keep
+    -y, --keep-yearly     number of yearly archives to keep
+    --save-space          work slower, but using less space
+
 
 :ref:`common_options`
     |
 
 filters
-    ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix.
-    ``-a``, ``--glob-archives``
-        | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+    -P, --prefix            only consider archive names starting with this prefix.
+    -a, --glob-archives     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+
 
 Description
 ~~~~~~~~~~~

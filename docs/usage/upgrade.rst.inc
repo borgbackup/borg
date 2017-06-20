@@ -8,22 +8,18 @@ borg upgrade
 
     borg [common options] upgrade [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
-        path to the repository to be upgraded
+REPOSITORY
+    path to the repository to be upgraded
+
 
 optional arguments
-    ``-n``, ``--dry-run``
-        | do not change repository
-    ``--inplace``
-        | rewrite repository in place, with no chance of going back to older
-        |                                versions of the repository.
-    ``--force``
-        | Force upgrade
-    ``--tam``
-        | Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)
-    ``--disable-tam``
-        | Disable manifest authentication (in key and cache)
+    -n, --dry-run     do not change repository
+    --inplace         rewrite repository in place, with no chance of going back to older
+                                   versions of the repository.
+    --force           Force upgrade
+    --tam             Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)
+    --disable-tam     Disable manifest authentication (in key and cache)
+
 
 :ref:`common_options`
     |

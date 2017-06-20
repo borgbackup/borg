@@ -8,11 +8,11 @@ borg benchmark crud
 
     borg [common options] benchmark crud [options] REPO PATH
 
-positional arguments
-    REPO
-        repo to use for benchmark (must exist)
-    PATH
-        path were to create benchmark input data
+REPO
+    repo to use for benchmark (must exist)
+PATH
+    path were to create benchmark input data
+
 
 :ref:`common_options`
     |

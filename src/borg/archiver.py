@@ -3094,11 +3094,9 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='delete archive')
         subparser.set_defaults(func=self.do_delete)
-        subparser.add_argument('-s', '--stats', dest='stats',
-                               action='store_true', default=False,
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
-        subparser.add_argument('-c', '--cache-only', dest='cache_only',
-                               action='store_true', default=False,
+        subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
                                help='delete only the local cache for the given repository')
         subparser.add_argument('--force', dest='forced',
                                action='count', default=0,

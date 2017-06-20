@@ -2314,9 +2314,9 @@ class Archiver:
                               help='Output one JSON object per log line instead of formatted text.')
             add_common_option('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
                               help='wait for the lock, but max. N seconds (default: %(default)d).')
-            add_common_option('--show-version', dest='show_version', action='store_true', default=False,
+            add_common_option('--show-version', dest='show_version', action='store_true',
                               help='show/log the borg version')
-            add_common_option('--show-rc', dest='show_rc', action='store_true', default=False,
+            add_common_option('--show-rc', dest='show_rc', action='store_true',
                               help='show/log the return code (rc)')
             add_common_option('--no-files-cache', dest='cache_files', action='store_false',
                               help='do not load/update the file metadata cache used to detect unchanged files')
@@ -2327,7 +2327,7 @@ class Archiver:
             add_common_option('--remote-ratelimit', dest='remote_ratelimit', type=int, metavar='rate',
                               help='set remote network upload rate limit in kiByte/s (default: 0=unlimited)')
             add_common_option('--consider-part-files', dest='consider_part_files',
-                              action='store_true', default=False,
+                              action='store_true',
                               help='treat part files like normal files (e.g. to list/extract them)')
             add_common_option('--debug-profile', dest='debug_profile', default=None, metavar='FILE',
                               help='Write execution profile in Borg format into FILE. For local use a Python-'
@@ -3137,10 +3137,9 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='list archive or repository contents')
         subparser.set_defaults(func=self.do_list)
-        subparser.add_argument('--short', dest='short',
-                               action='store_true', default=False,
+        subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('--format', '--list-format', dest='format', type=str,
+        subparser.add_argument('--format', '--list-format', dest='format', type=str, metavar='FORMAT',
                                help='specify format for file listing '
                                     '(default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")')
         subparser.add_argument('--json', action='store_true',
@@ -3168,8 +3167,7 @@ class Archiver:
                                    metavar="PATTERN", help='exclude paths matching PATTERN')
         exclude_group.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
                                    metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
-                                   action='store_true', default=False,
+        exclude_group.add_argument('--exclude-caches', dest='exclude_caches', action='store_true',
                                    help='exclude directories that contain a CACHEDIR.TAG file ('
                                         'http://www.brynosaurus.com/cachedir/spec.html)')
         exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
@@ -3177,7 +3175,7 @@ class Archiver:
                                    help='exclude directories that are tagged by containing a filesystem object with '
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
-                                   action='store_true', default=False,
+                                   action='store_true',
                                    help='if tag objects are specified with ``--exclude-if-present``, don\'t omit the tag '
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
@@ -3231,7 +3229,7 @@ class Archiver:
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='where to mount filesystem')
         subparser.add_argument('-f', '--foreground', dest='foreground',
-                               action='store_true', default=False,
+                               action='store_true',
                                help='stay in foreground, do not daemonize')
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
@@ -3338,17 +3336,13 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='prune archives')
         subparser.set_defaults(func=self.do_prune)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run',
-                               default=False, action='store_true',
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository')
-        subparser.add_argument('--force', dest='forced',
-                               action='store_true', default=False,
+        subparser.add_argument('--force', dest='forced', action='store_true',
                                help='force pruning of corrupted archives')
-        subparser.add_argument('-s', '--stats', dest='stats',
-                               action='store_true', default=False,
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
-        subparser.add_argument('--list', dest='output_list',
-                               action='store_true', default=False,
+        subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of archives it keeps/prunes')
         subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
                                help='keep all archives within this time interval')
@@ -3368,7 +3362,6 @@ class Archiver:
                                help='number of yearly archives to keep')
         self.add_archives_filters_args(subparser, sort_by=False, first_last=False)
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               default=False,
                                help='work slower, but using less space')
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
@@ -3462,19 +3455,17 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='upgrade repository format')
         subparser.set_defaults(func=self.do_upgrade)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run',
-                               default=False, action='store_true',
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository')
-        subparser.add_argument('--inplace', dest='inplace',
-                               default=False, action='store_true',
-                               help="""rewrite repository in place, with no chance of going back to older
-                               versions of the repository.""")
+        subparser.add_argument('--inplace', dest='inplace', action='store_true',
+                               help='rewrite repository in place, with no chance of going back '
+                                    'to older versions of the repository.')
         subparser.add_argument('--force', dest='force', action='store_true',
-                               help="""Force upgrade""")
+                               help='Force upgrade')
         subparser.add_argument('--tam', dest='tam', action='store_true',
-                               help="""Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)""")
+                               help='Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).')
         subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
-                               help="""Disable manifest authentication (in key and cache)""")
+                               help='Disable manifest authentication (in key and cache).')
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
@@ -3523,16 +3514,13 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help=self.do_recreate.__doc__)
         subparser.set_defaults(func=self.do_recreate)
-        subparser.add_argument('--list', dest='output_list',
-                               action='store_true', default=False,
+        subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run',
-                               action='store_true', default=False,
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change anything')
-        subparser.add_argument('-s', '--stats', dest='stats',
-                               action='store_true', default=False,
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics at end')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
@@ -3542,7 +3530,7 @@ class Archiver:
         exclude_group.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
                                    metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
-                                   action='store_true', default=False,
+                                   action='store_true',
                                    help='exclude directories that contain a CACHEDIR.TAG file ('
                                         'http://www.brynosaurus.com/cachedir/spec.html)')
         exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
@@ -3550,7 +3538,7 @@ class Archiver:
                                    help='exclude directories that are tagged by containing a filesystem object with '
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
-                                   action='store_true', default=False,
+                                   action='store_true',
                                    help='if tag objects are specified with ``--exclude-if-present``, don\'t omit the tag '
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
@@ -3625,10 +3613,8 @@ class Archiver:
 
         subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')
-        subparser.add_argument('--epilog-only', dest='epilog_only',
-                               action='store_true', default=False)
-        subparser.add_argument('--usage-only', dest='usage_only',
-                               action='store_true', default=False)
+        subparser.add_argument('--epilog-only', dest='epilog_only', action='store_true')
+        subparser.add_argument('--usage-only', dest='usage_only', action='store_true')
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
@@ -3863,9 +3849,9 @@ class Archiver:
     def add_archives_filters_args(subparser, sort_by=True, first_last=True):
         filters_group = subparser.add_argument_group('filters', 'Archive filters can be applied to repository targets.')
         group = filters_group.add_mutually_exclusive_group()
-        group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='',
+        group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='', metavar='PREFIX',
                            help='only consider archive names starting with this prefix.')
-        group.add_argument('-a', '--glob-archives', dest='glob_archives', default=None,
+        group.add_argument('-a', '--glob-archives', dest='glob_archives', default=None, metavar='GLOB',
                            help='only consider archive names matching the glob. '
                                 'sh: rules apply, see "borg help patterns". '
                                 '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
@@ -3873,6 +3859,7 @@ class Archiver:
         if sort_by:
             sort_by_default = 'timestamp'
             filters_group.add_argument('--sort-by', dest='sort_by', type=SortBySpec, default=sort_by_default,
+                                       metavar='KEYS',
                                        help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
                                        .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
 

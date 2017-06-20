@@ -203,6 +203,17 @@ with open('README.rst', 'r') as fd:
     long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
 
 
+def format_metavar(option):
+    if option.nargs in ('*', '...'):
+        return '[%s...]' % option.metavar
+    elif option.nargs == '?':
+        return '[%s]' % option.metavar
+    elif option.nargs is None:
+        return option.metavar
+    else:
+        raise ValueError('Can\'t format metavar %s, unknown nargs %s!' % (option.metavar, option.nargs))
+
+
 class build_usage(Command):
     description = "generate usage for each command"
 
@@ -284,7 +295,7 @@ class build_usage(Command):
         for option in parser._actions:
             if option.option_strings:
                 continue
-            fp.write(' ' + option.metavar)
+            fp.write(' ' + format_metavar(option))
         fp.write('\n\n')
 
     def write_options(self, parser, fp):
@@ -645,11 +656,11 @@ class build_man(Command):
 
     def write_usage(self, write, parser):
         if any(len(o.option_strings) for o in parser._actions):
-            write(' <options> ', end='')
+            write(' [options] ', end='')
         for option in parser._actions:
             if option.option_strings:
                 continue
-            write(option.metavar, end=' ')
+            write(format_metavar(option), end=' ')
 
     def write_options(self, write, parser):
         for group in parser._action_groups:

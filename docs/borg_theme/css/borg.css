@@ -129,6 +129,7 @@ table.docutils.borg-options-table tr td {
     border-right: 0;
 }
 
+table.docutils.option-list tr td,
 table.docutils.borg-options-table tr td {
     border-left: 0;
     border-right: 0;

@@ -47,7 +47,7 @@ borg delete
     .. raw:: html
 
         <script type='text/javascript'>
-        $(window).load(function () {
+        $(document).ready(function () {
             $('.borg-options-table colgroup').remove();
         })
         </script>

@@ -1881,7 +1881,7 @@ class Archiver:
             separator, a '\*' is appended before matching is attempted.
 
         Shell-style patterns, selector `sh:`
-            This is the default style for --pattern and --patterns-from.
+            This is the default style for ``--pattern`` and ``--patterns-from``.
             Like fnmatch patterns these are similar to shell patterns. The difference
             is that the pattern may include `**/` for matching zero or more directory
             levels, `*` for matching zero or more arbitrary characters with the
@@ -2368,7 +2368,7 @@ class Archiver:
                                metavar='PATH', help='restrict repository access. Only the repository located at PATH (no sub-directories are considered) '
                                                     'is accessible. '
                                                     'Can be specified multiple times to allow the client access to several repositories. '
-                                                    'Unlike --restrict-to-path sub-directories are not accessible; '
+                                                    'Unlike ``--restrict-to-path`` sub-directories are not accessible; '
                                                     'PATH needs to directly point at a repository location. '
                                                     'PATH may be an empty directory or the last element of PATH may not exist, in which case '
                                                     'the client may initialize a repository there.')
@@ -2803,9 +2803,9 @@ class Archiver:
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
         subparser.add_argument('--json', action='store_true',
-                               help='output stats as JSON (implies --stats)')
+                               help='output stats as JSON. Implies ``--stats``.')
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
-                               help='experimental: do not synchronize the cache. Implies --no-files-cache.')
+                               help='experimental: do not synchronize the cache. Implies ``--no-files-cache``.')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
         exclude_group.add_argument('-e', '--exclude', dest='patterns',
@@ -2823,8 +2823,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
-                                        'objects themselves from the backup archive')
+                                   help='if tag objects are specified with ``--exclude-if-present``, '
+                                        'don\'t omit the tag objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
@@ -3057,8 +3057,8 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
-                                        'objects themselves from the backup archive')
+                                   help='if tag objects are specified with ``--exclude-if-present``, '
+                                        'don\'t omit the tag objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,
                                    metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
@@ -3103,7 +3103,7 @@ class Archiver:
         subparser.add_argument('--force', dest='forced',
                                action='count', default=0,
                                help='force deletion of corrupted archives, '
-                                    'use --force --force in case --force does not work.')
+                                    'use ``--force --force`` in case ``--force`` does not work.')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                default=False,
                                help='work slower, but using less space')
@@ -3141,8 +3141,8 @@ class Archiver:
                                action='store_true', default=False,
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', '--list-format', dest='format', type=str,
-                               help="""specify format for file listing
-                                (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")""")
+                               help='specify format for file listing '
+                                    '(default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")')
         subparser.add_argument('--json', action='store_true',
                                help='Only valid for listing repository contents. Format output as JSON. '
                                     'The form of ``--format`` is ignored, '
@@ -3178,7 +3178,7 @@ class Archiver:
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
                                    action='store_true', default=False,
-                                   help='if tag objects are specified with --exclude-if-present, don\'t omit the tag '
+                                   help='if tag objects are specified with ``--exclude-if-present``, don\'t omit the tag '
                                         'objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
                                    action=ArgparsePatternAction,

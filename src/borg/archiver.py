@@ -2893,6 +2893,11 @@ class Archiver:
 
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
+
+        .. note::
+
+            Currently, extract always writes into the current working directory ("."),
+            so make sure you ``cd`` to the right place before calling ``borg extract``.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,

@@ -219,9 +219,10 @@ fn main() {
                 match message {
                     Message::BeginRemove(id) => {
                         let res = {
+                            // Ordering important to avoid a deadlock
+                            let mut limbo = LIMBO.lock().unwrap();
                             let mut database = DATABASE.write().unwrap();
                             if let Some(file) = database.remove(&id) {
-                                let mut limbo = LIMBO.lock().unwrap();
                                 match limbo.entry(id) {
                                     hash_map::Entry::Vacant(entry) => {
                                         entry.insert(file);

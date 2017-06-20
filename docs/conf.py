@@ -105,8 +105,16 @@ html_theme_path = guzzle_sphinx_theme.html_theme_path()
 html_theme = 'guzzle_sphinx_theme'
 
 
+def set_rst_settings(app):
+    app.env.settings.update({
+        'field_name_limit': 0,
+        'option_limit': 0,
+    })
+
+
 def setup(app):
     app.add_stylesheet('css/borg.css')
+    app.connect('builder-inited', set_rst_settings)
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

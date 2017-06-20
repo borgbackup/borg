@@ -109,7 +109,8 @@ table.docutils:not(.footnote) th {
     border: 1px solid #ddd;
 }
 
-table.docutils:not(.footnote) tr:first-child th {
+table.docutils:not(.footnote) tr:first-child th,
+table.docutils:not(.footnote) tr:first-child td {
     border-top: 0;
 }
 
@@ -118,15 +119,18 @@ table.docutils:not(.footnote) tr:last-child td {
 }
 
 table.docutils:not(.footnote) tr td:first-child,
-table.docutils:not(.footnote) tr th:first-child {
+table.docutils:not(.footnote) tr th:first-child,
+table.docutils.option-list tr td {
     border-left: 0;
 }
 
 table.docutils:not(.footnote) tr td:last-child,
-table.docutils:not(.footnote) tr th:last-child {
+table.docutils:not(.footnote) tr th:last-child,
+table.docutils.option-list tr td {
     border-right: 0;
 }
 
+kbd, /* used in usage pages for options */
 code,
 .rst-content tt.literal,
 .rst-content tt.literal,
@@ -139,6 +143,22 @@ p .literal span {
     padding: 0;
     color: black; /* slight contrast with #404040 of regular text */
     background: none;
+}
+
+kbd {
+    box-shadow: none;
+    line-height: 23px;
+    word-wrap: normal;
+    font-size: 15px;
+    font-family: Consolas, monospace;
+}
+
+kbd .option {
+    white-space: nowrap;
+}
+
+table.docutils.option-list td.option-group {
+    min-width: 10em;
 }
 
 cite {

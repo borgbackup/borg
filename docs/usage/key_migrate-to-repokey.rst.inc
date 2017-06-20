@@ -8,14 +8,38 @@ borg key migrate-to-repokey
 
     borg [common options] key migrate-to-repokey [options] REPOSITORY
 
-REPOSITORY
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+--+
+    | **positional arguments**                                                  |
+    +-------------------------------------------------------+----------------+--+
+    |                                                       | ``REPOSITORY`` |  |
+    +-------------------------------------------------------+----------------+--+
+    | **optional arguments**                                                    |
+    +-------------------------------------------------------+----------------+--+
+    | .. class:: borg-common-opt-ref                                            |
+    |                                                                           |
+    | :ref:`common_options`                                                     |
+    +-------------------------------------------------------+----------------+--+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY
 
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

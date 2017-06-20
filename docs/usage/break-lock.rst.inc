@@ -8,14 +8,38 @@ borg break-lock
 
     borg [common options] break-lock [options] REPOSITORY
 
-REPOSITORY
-    repository for which to break the locks
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+    | **positional arguments**                                                                                         |
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+    |                                                       | ``REPOSITORY`` | repository for which to break the locks |
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+    | **optional arguments**                                                                                           |
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                   |
+    |                                                                                                                  |
+    | :ref:`common_options`                                                                                            |
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY
+        repository for which to break the locks
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

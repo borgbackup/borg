@@ -8,20 +8,48 @@ borg key import
 
     borg [common options] key import [options] REPOSITORY PATH
 
-REPOSITORY
+.. only:: html
 
-PATH
-    path to the backup
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+----------------------------------------------------------+
+    | **positional arguments**                                                                                                          |
+    +-------------------------------------------------------+----------------+----------------------------------------------------------+
+    |                                                       | ``REPOSITORY`` |                                                          |
+    +-------------------------------------------------------+----------------+----------------------------------------------------------+
+    |                                                       | ``PATH``       | path to the backup                                       |
+    +-------------------------------------------------------+----------------+----------------------------------------------------------+
+    | **optional arguments**                                                                                                            |
+    +-------------------------------------------------------+----------------+----------------------------------------------------------+
+    |                                                       | ``--paper``    | interactively import from a backup done with ``--paper`` |
+    +-------------------------------------------------------+----------------+----------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                    |
+    |                                                                                                                                   |
+    | :ref:`common_options`                                                                                                             |
+    +-------------------------------------------------------+----------------+----------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY
+
+    PATH
+        path to the backup
 
 
-optional arguments
-    --paper     interactively import from a backup done with ``--paper``
+    optional arguments
+        --paper     interactively import from a backup done with ``--paper``
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

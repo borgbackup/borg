@@ -8,20 +8,50 @@ borg init
 
     borg [common options] init [options] REPOSITORY
 
-REPOSITORY
-    repository to create
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                       |
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+    |                                                       | ``REPOSITORY``           | repository to create                                                        |
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                         |
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+    |                                                       | ``-e``, ``--encryption`` | select encryption key mode **(required)**                                   |
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+    |                                                       | ``--append-only``        | create an append-only mode repository                                       |
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+    |                                                       | ``--storage-quota``      | Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota. |
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                 |
+    |                                                                                                                                                                |
+    | :ref:`common_options`                                                                                                                                          |
+    +-------------------------------------------------------+--------------------------+-----------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY
+        repository to create
 
 
-optional arguments
-    -e, --encryption     select encryption key mode **(required)**
-    --append-only        create an append-only mode repository
-    --storage-quota      Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
+    optional arguments
+        -e, --encryption     select encryption key mode **(required)**
+        --append-only        create an append-only mode repository
+        --storage-quota      Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

@@ -8,16 +8,42 @@ borg benchmark crud
 
     borg [common options] benchmark crud [options] REPO PATH
 
-REPO
-    repo to use for benchmark (must exist)
-PATH
-    path were to create benchmark input data
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------+------------------------------------------+
+    | **positional arguments**                                                                                    |
+    +-------------------------------------------------------+----------+------------------------------------------+
+    |                                                       | ``REPO`` | repo to use for benchmark (must exist)   |
+    +-------------------------------------------------------+----------+------------------------------------------+
+    |                                                       | ``PATH`` | path were to create benchmark input data |
+    +-------------------------------------------------------+----------+------------------------------------------+
+    | **optional arguments**                                                                                      |
+    +-------------------------------------------------------+----------+------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                              |
+    |                                                                                                             |
+    | :ref:`common_options`                                                                                       |
+    +-------------------------------------------------------+----------+------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPO
+        repo to use for benchmark (must exist)
+    PATH
+        path were to create benchmark input data
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

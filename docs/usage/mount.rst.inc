@@ -8,28 +8,70 @@ borg mount
 
     borg [common options] mount [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT
 
-REPOSITORY_OR_ARCHIVE
-    repository/archive to mount
-MOUNTPOINT
-    where to mount filesystem
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                                                     |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``REPOSITORY_OR_ARCHIVE``   | repository/archive to mount                                                                                                                            |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``MOUNTPOINT``              | where to mount filesystem                                                                                                                              |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                                                                                                       |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-f``, ``--foreground``    | stay in foreground, do not daemonize                                                                                                                   |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-o``                      | Extra mount options                                                                                                                                    |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                               |
+    |                                                                                                                                                                                                                                              |
+    | :ref:`common_options`                                                                                                                                                                                                                        |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **filters**                                                                                                                                                                                                                                  |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-P``, ``--prefix``        | only consider archive names starting with this prefix.                                                                                                 |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-a``, ``--glob-archives`` | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive. |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--sort-by``               | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp                                                       |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--first N``               | consider first N archives after other filters were applied                                                                                             |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--last N``                | consider last N archives after other filters were applied                                                                                              |
+    +-------------------------------------------------------+-----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY_OR_ARCHIVE
+        repository/archive to mount
+    MOUNTPOINT
+        where to mount filesystem
 
 
-optional arguments
-    -f, --foreground    stay in foreground, do not daemonize
-    -o     Extra mount options
+    optional arguments
+        -f, --foreground    stay in foreground, do not daemonize
+        -o     Extra mount options
 
 
-.. class:: borg-common-opt-ref
+    :ref:`common_options`
+        |
 
-:ref:`common_options`
-
-
-filters
-    -P, --prefix            only consider archive names starting with this prefix.
-    -a, --glob-archives     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
-    --sort-by               Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
-    --first N               consider first N archives after other filters were applied
-    --last N                consider last N archives after other filters were applied
+    filters
+        -P, --prefix            only consider archive names starting with this prefix.
+        -a, --glob-archives     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+        --sort-by               Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+        --first N               consider first N archives after other filters were applied
+        --last N                consider last N archives after other filters were applied
 
 
 Description

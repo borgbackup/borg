@@ -32,7 +32,7 @@ two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
     separator, a '\*' is appended before matching is attempted.
 
 Shell-style patterns, selector `sh:`
-    This is the default style for --pattern and --patterns-from.
+    This is the default style for ``--pattern`` and ``--patterns-from``.
     Like fnmatch patterns these are similar to shell patterns. The difference
     is that the pattern may include `**/` for matching zero or more directory
     levels, `*` for matching zero or more arbitrary characters with the

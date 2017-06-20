@@ -8,23 +8,58 @@ borg upgrade
 
     borg [common options] upgrade [options] REPOSITORY
 
-REPOSITORY
-    path to the repository to be upgraded
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                      |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``REPOSITORY``        | path to the repository to be upgraded                                                                                         |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                                                                        |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-n``, ``--dry-run`` | do not change repository                                                                                                      |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--inplace``         | rewrite repository in place, with no chance of going back to older                                                            |
+    |                                                       |                       |                                versions of the repository.                                                                    |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--force``           | Force upgrade                                                                                                                 |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--tam``             | Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)                                                      |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--disable-tam``     | Disable manifest authentication (in key and cache)                                                                            |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                |
+    |                                                                                                                                                                                                               |
+    | :ref:`common_options`                                                                                                                                                                                         |
+    +-------------------------------------------------------+-----------------------+-------------------------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY
+        path to the repository to be upgraded
 
 
-optional arguments
-    -n, --dry-run     do not change repository
-    --inplace         rewrite repository in place, with no chance of going back to older
-                                   versions of the repository.
-    --force           Force upgrade
-    --tam             Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)
-    --disable-tam     Disable manifest authentication (in key and cache)
+    optional arguments
+        -n, --dry-run     do not change repository
+        --inplace         rewrite repository in place, with no chance of going back to older
+                                       versions of the repository.
+        --force           Force upgrade
+        --tam             Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)
+        --disable-tam     Disable manifest authentication (in key and cache)
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

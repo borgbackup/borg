@@ -3591,9 +3591,11 @@ class Archiver:
         for its termination, release the lock and return the user command's return
         code as borg's return code.
 
-        Note: if you copy a repository with the lock held, the lock will be present in
-              the copy, obviously. Thus, before using borg on the copy, you need to
-              use "borg break-lock" on it.
+        .. note::
+
+            If you copy a repository with the lock held, the lock will be present in
+            the copy, obviously. Thus, before using borg on the copy, you need to
+            use "borg break-lock" on it.
         """)
         subparser = subparsers.add_parser('with-lock', parents=[common_parser], add_help=False,
                                           description=self.do_with_lock.__doc__,

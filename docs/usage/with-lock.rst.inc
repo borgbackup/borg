@@ -8,18 +8,44 @@ borg with-lock
 
     borg [common options] with-lock [options] REPOSITORY COMMAND ARGS
 
-REPOSITORY
-    repository to lock
-COMMAND
-    command to run
-ARGS
-    command arguments
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+--------------------+
+    | **positional arguments**                                                                    |
+    +-------------------------------------------------------+----------------+--------------------+
+    |                                                       | ``REPOSITORY`` | repository to lock |
+    +-------------------------------------------------------+----------------+--------------------+
+    |                                                       | ``COMMAND``    | command to run     |
+    +-------------------------------------------------------+----------------+--------------------+
+    |                                                       | ``ARGS``       | command arguments  |
+    +-------------------------------------------------------+----------------+--------------------+
+    | .. class:: borg-common-opt-ref                                                              |
+    |                                                                                             |
+    | :ref:`common_options`                                                                       |
+    +-------------------------------------------------------+----------------+--------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY
+        repository to lock
+    COMMAND
+        command to run
+    ARGS
+        command arguments
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

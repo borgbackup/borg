@@ -119,15 +119,33 @@ table.docutils:not(.footnote) tr:last-child td {
 }
 
 table.docutils:not(.footnote) tr td:first-child,
-table.docutils:not(.footnote) tr th:first-child,
-table.docutils.option-list tr td {
+table.docutils:not(.footnote) tr th:first-child {
     border-left: 0;
 }
 
 table.docutils:not(.footnote) tr td:last-child,
 table.docutils:not(.footnote) tr th:last-child,
-table.docutils.option-list tr td {
+table.docutils.borg-options-table tr td {
     border-right: 0;
+}
+
+table.docutils.option-list tr td,
+table.docutils.borg-options-table tr td {
+    border-left: 0;
+    border-right: 0;
+}
+
+table.docutils.borg-options-table tr td:first-child:not([colspan="3"]) {
+    border-top: 0;
+    border-bottom: 0;
+}
+
+.borg-options-table td[colspan="3"] p {
+    margin: 0;
+}
+
+.borg-options-table {
+    width: 100%;
 }
 
 kbd, /* used in usage pages for options */
@@ -153,12 +171,12 @@ kbd {
     font-family: Consolas, monospace;
 }
 
-kbd .option {
+.borg-options-table tr td:nth-child(2) .pre {
     white-space: nowrap;
 }
 
-table.docutils.option-list td.option-group {
-    min-width: 10em;
+.borg-options-table tr td:first-child {
+    width: 2em;
 }
 
 cite {

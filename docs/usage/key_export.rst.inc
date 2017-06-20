@@ -8,21 +8,51 @@ borg key export
 
     borg [common options] key export [options] REPOSITORY PATH
 
-REPOSITORY
+.. only:: html
 
-PATH
-    where to store the backup
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                        |
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+    |                                                       | ``REPOSITORY`` |                                                                        |
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+    |                                                       | ``PATH``       | where to store the backup                                              |
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                          |
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+    |                                                       | ``--paper``    | Create an export suitable for printing and later type-in               |
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+    |                                                       | ``--qr-html``  | Create an html file suitable for printing and later type-in or qr scan |
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                  |
+    |                                                                                                                                                 |
+    | :ref:`common_options`                                                                                                                           |
+    +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY
+
+    PATH
+        where to store the backup
 
 
-optional arguments
-    --paper       Create an export suitable for printing and later type-in
-    --qr-html     Create an html file suitable for printing and later type-in or qr scan
+    optional arguments
+        --paper       Create an export suitable for printing and later type-in
+        --qr-html     Create an html file suitable for printing and later type-in or qr scan
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

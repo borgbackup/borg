@@ -288,11 +288,110 @@ class build_usage(Command):
         fp.write('\n\n')
 
     def write_options(self, parser, fp):
+        def is_positional_group(group):
+            return any(not o.option_strings for o in group._group_actions)
+
+        # HTML output:
+        # A table using some column-spans
+
+        def html_write(s):
+            for line in s.splitlines():
+                fp.write('    ' + line + '\n')
+
+        rows = []
         for group in parser._action_groups:
             if group.title == 'Common options':
-                fp.write('\n\n.. class:: borg-common-opt-ref\n\n:ref:`common_options`\n')
+                # (no of columns used, columns, ...)
+                rows.append((1, '.. class:: borg-common-opt-ref\n\n:ref:`common_options`'))
             else:
-                self.write_options_group(group, fp)
+                if not group._group_actions:
+                    continue
+                rows.append((1, '**%s**' % group.title))
+                if is_positional_group(group):
+                    for option in group._group_actions:
+                        rows.append((3, '', '``%s``' % option.metavar, option.help or ''))
+                else:
+                    for option in group._group_actions:
+                        if option.metavar:
+                            option_fmt = '``%s ' + option.metavar + '``'
+                        else:
+                            option_fmt = '``%s``'
+                        option_str = ', '.join(option_fmt % s for s in option.option_strings)
+                        option_desc = textwrap.dedent((option.help or '') % option.__dict__)
+                        rows.append((3, '', option_str, option_desc))
+
+        fp.write('.. only:: html\n\n')
+        table = io.StringIO()
+        table.write('.. class:: borg-options-table\n\n')
+        self.rows_to_table(rows, table.write)
+        fp.write(textwrap.indent(table.getvalue(), ' ' * 4))
+
+        # LaTeX output:
+        # Regular rST option lists (irregular column widths)
+        latex_options = io.StringIO()
+        for group in parser._action_groups:
+            if group.title == 'Common options':
+                latex_options.write('\n\n:ref:`common_options`\n')
+                latex_options.write('    |')
+            else:
+                self.write_options_group(group, latex_options)
+        fp.write('\n.. only:: latex\n\n')
+        fp.write(textwrap.indent(latex_options.getvalue(), ' ' * 4))
+
+    def rows_to_table(self, rows, write):
+        def write_row_separator():
+            write('+')
+            for column_width in column_widths:
+                write('-' * (column_width + 1))
+                write('+')
+            write('\n')
+
+        # Find column count and width
+        column_count = max(columns for columns, *_ in rows)
+        column_widths = [0] * column_count
+        for columns, *cells in rows:
+            for i in range(columns):
+                # "+ 1" because we want a space between the cell contents and the delimiting "|" in the output
+                column_widths[i] = max(column_widths[i], len(cells[i]) + 1)
+
+        for columns, *cells in rows:
+            write_row_separator()
+            # If a cell contains newlines, then the row must be split up in individual rows
+            # where each cell contains no newline.
+            rowspanning_cells = []
+            original_cells = list(cells)
+            while any('\n' in cell for cell in original_cells):
+                cell_bloc = []
+                for i, cell in enumerate(original_cells):
+                    pre, _, original_cells[i] = cell.partition('\n')
+                    cell_bloc.append(pre)
+                rowspanning_cells.append(cell_bloc)
+            rowspanning_cells.append(original_cells)
+            for cells in rowspanning_cells:
+                for i, column_width in enumerate(column_widths):
+                    if i < columns:
+                        write('| ')
+                        write(cells[i].ljust(column_width))
+                    else:
+                        write('  ')
+                        write(''.ljust(column_width))
+                write('|\n')
+
+        write_row_separator()
+        # This bit of JavaScript kills the <colgroup> that is invariably inserted by docutils,
+        # but does absolutely no good here. It sets bogus column widths which cannot be overridden
+        # with CSS alone.
+        # Since this is HTML-only output, it would be possible to just generate a <table> directly,
+        # but then we'd lose rST formatting.
+        write(textwrap.dedent("""
+        .. raw:: html
+
+            <script type='text/javascript'>
+            $(window).load(function () {
+                $('.borg-options-table colgroup').remove();
+            })
+            </script>
+        """))
 
     def write_options_group(self, group, fp, with_title=True, base_indent=4):
         def is_positional_group(group):

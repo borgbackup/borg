@@ -8,14 +8,36 @@ borg umount
 
     borg [common options] umount [options] MOUNTPOINT
 
-MOUNTPOINT
-    mountpoint of the filesystem to umount
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+----------------------------------------+
+    | **positional arguments**                                                                                        |
+    +-------------------------------------------------------+----------------+----------------------------------------+
+    |                                                       | ``MOUNTPOINT`` | mountpoint of the filesystem to umount |
+    +-------------------------------------------------------+----------------+----------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                  |
+    |                                                                                                                 |
+    | :ref:`common_options`                                                                                           |
+    +-------------------------------------------------------+----------------+----------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    MOUNTPOINT
+        mountpoint of the filesystem to umount
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

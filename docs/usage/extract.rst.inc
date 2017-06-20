@@ -8,29 +8,75 @@ borg extract
 
     borg [common options] extract [options] ARCHIVE PATH
 
-ARCHIVE
-    archive to extract
-PATH
-    paths to extract; patterns are supported
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                      |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``ARCHIVE``                           | archive to extract                                                                                            |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``PATH``                              | paths to extract; patterns are supported                                                                      |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                                                                        |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--list``                            | output verbose list of items (files, dirs, ...)                                                               |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-n``, ``--dry-run``                 | do not actually change any files                                                                              |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-e PATTERN``, ``--exclude PATTERN`` | exclude paths matching PATTERN                                                                                |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--exclude-from EXCLUDEFILE``        | read exclude patterns from EXCLUDEFILE, one per line                                                          |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--pattern PATTERN``                 | experimental: include/exclude paths matching PATTERN                                                          |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--patterns-from PATTERNFILE``       | experimental: read include/exclude patterns from PATTERNFILE, one per line                                    |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--numeric-owner``                   | only obey numeric user and group identifiers                                                                  |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--strip-components NUMBER``         | Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped. |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--stdout``                          | write all extracted data to stdout                                                                            |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--sparse``                          | create holes in output sparse file from all-zero chunks                                                       |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                |
+    |                                                                                                                                                                                                               |
+    | :ref:`common_options`                                                                                                                                                                                         |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(window).load(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    ARCHIVE
+        archive to extract
+    PATH
+        paths to extract; patterns are supported
 
 
-optional arguments
-    --list            output verbose list of items (files, dirs, ...)
-    -n, --dry-run     do not actually change any files
-    -e PATTERN, --exclude PATTERN    exclude paths matching PATTERN
-    --exclude-from EXCLUDEFILE    read exclude patterns from EXCLUDEFILE, one per line
-    --pattern PATTERN    experimental: include/exclude paths matching PATTERN
-    --patterns-from PATTERNFILE    experimental: read include/exclude patterns from PATTERNFILE, one per line
-    --numeric-owner    only obey numeric user and group identifiers
-    --strip-components NUMBER    Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
-    --stdout          write all extracted data to stdout
-    --sparse          create holes in output sparse file from all-zero chunks
+    optional arguments
+        --list            output verbose list of items (files, dirs, ...)
+        -n, --dry-run     do not actually change any files
+        -e PATTERN, --exclude PATTERN    exclude paths matching PATTERN
+        --exclude-from EXCLUDEFILE    read exclude patterns from EXCLUDEFILE, one per line
+        --pattern PATTERN    experimental: include/exclude paths matching PATTERN
+        --patterns-from PATTERNFILE    experimental: read include/exclude patterns from PATTERNFILE, one per line
+        --numeric-owner    only obey numeric user and group identifiers
+        --strip-components NUMBER    Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
+        --stdout          write all extracted data to stdout
+        --sparse          create holes in output sparse file from all-zero chunks
 
 
-.. class:: borg-common-opt-ref
-
-:ref:`common_options`
-
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

@@ -304,6 +304,8 @@ class build_usage(Command):
                 # (no of columns used, columns, ...)
                 rows.append((1, '.. class:: borg-common-opt-ref\n\n:ref:`common_options`'))
             else:
+                if not group._group_actions:
+                    continue
                 rows.append((1, '**%s**' % group.title))
                 if is_positional_group(group):
                     for option in group._group_actions:

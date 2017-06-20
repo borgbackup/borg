@@ -1,8 +1,3 @@
-.. include:: key_export.rst.inc
-
-
-.. include:: key_import.rst.inc
-
 .. _borg-change-passphrase:
 
 .. include:: key_change-passphrase.rst.inc
@@ -40,3 +35,7 @@ Fully automated using environment variables:
     $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change-passphrase repo
     # now "new" is the current passphrase.
 
+
+.. include:: key_export.rst.inc
+
+.. include:: key_import.rst.inc

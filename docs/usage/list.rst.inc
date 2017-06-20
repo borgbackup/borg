@@ -8,53 +8,42 @@ borg list
 
     borg [common options] list [options] REPOSITORY_OR_ARCHIVE PATH
 
-positional arguments
-    REPOSITORY_OR_ARCHIVE
-        repository/archive to list contents of
-    PATH
-        paths to list; patterns are supported
+REPOSITORY_OR_ARCHIVE
+    repository/archive to list contents of
+PATH
+    paths to list; patterns are supported
+
 
 optional arguments
-    ``--short``
-        | only print file/directory names, nothing else
-    ``--format``, ``--list-format``
-        | specify format for file listing
-        |                                 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
-    ``--json``
-        | Only valid for listing repository contents. Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
-    ``--json-lines``
-        | Only valid for listing archive contents. Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+    --short     only print file/directory names, nothing else
+    --format, --list-format    specify format for file listing
+                                    (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
+    --json      Only valid for listing repository contents. Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
+    --json-lines    Only valid for listing archive contents. Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+
+
+.. class:: borg-common-opt-ref
 
 :ref:`common_options`
-    |
+
 
 filters
-    ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix.
-    ``-a``, ``--glob-archives``
-        | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
-    ``--sort-by``
-        | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
-    ``--first N``
-        | consider first N archives after other filters were applied
-    ``--last N``
-        | consider last N archives after other filters were applied
+    -P, --prefix            only consider archive names starting with this prefix.
+    -a, --glob-archives     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+    --sort-by               Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+    --first N               consider first N archives after other filters were applied
+    --last N                consider last N archives after other filters were applied
+
 
 Exclusion options
-    ``-e PATTERN``, ``--exclude PATTERN``
-        | exclude paths matching PATTERN
-    ``--exclude-from EXCLUDEFILE``
-        | read exclude patterns from EXCLUDEFILE, one per line
-    ``--exclude-caches``
-        | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
-    ``--exclude-if-present NAME``
-        | exclude directories that are tagged by containing a filesystem object with the given NAME
-    ``--keep-exclude-tags``, ``--keep-tag-files``
-        | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
-    ``--pattern PATTERN``
-        | experimental: include/exclude paths matching PATTERN
-    ``--patterns-from PATTERNFILE``
-        | experimental: read include/exclude patterns from PATTERNFILE, one per line
+    -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
+    --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
+    --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
+    --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
+    --keep-exclude-tags, --keep-tag-files    if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
+    --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
+    --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+
 
 Description
 ~~~~~~~~~~~

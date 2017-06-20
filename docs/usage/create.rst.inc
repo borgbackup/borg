@@ -8,70 +8,52 @@ borg create
 
     borg [common options] create [options] ARCHIVE PATH
 
-positional arguments
-    ARCHIVE
-        name of archive to create (must be also a valid directory name)
-    PATH
-        paths to archive
+ARCHIVE
+    name of archive to create (must be also a valid directory name)
+PATH
+    paths to archive
+
 
 optional arguments
-    ``-n``, ``--dry-run``
-        | do not create a backup archive
-    ``-s``, ``--stats``
-        | print statistics for the created archive
-    ``--list``
-        | output verbose list of items (files, dirs, ...)
-    ``--filter STATUSCHARS``
-        | only display items with the given status characters
-    ``--json``
-        | output stats as JSON (implies --stats)
-    ``--no-cache-sync``
-        | experimental: do not synchronize the cache. Implies --no-files-cache.
+    -n, --dry-run    do not create a backup archive
+    -s, --stats     print statistics for the created archive
+    --list          output verbose list of items (files, dirs, ...)
+    --filter STATUSCHARS    only display items with the given status characters
+    --json          output stats as JSON (implies --stats)
+    --no-cache-sync    experimental: do not synchronize the cache. Implies --no-files-cache.
+
+
+.. class:: borg-common-opt-ref
 
 :ref:`common_options`
-    |
+
 
 Exclusion options
-    ``-e PATTERN``, ``--exclude PATTERN``
-        | exclude paths matching PATTERN
-    ``--exclude-from EXCLUDEFILE``
-        | read exclude patterns from EXCLUDEFILE, one per line
-    ``--exclude-caches``
-        | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
-    ``--exclude-if-present NAME``
-        | exclude directories that are tagged by containing a filesystem object with the given NAME
-    ``--keep-exclude-tags``, ``--keep-tag-files``
-        | if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
-    ``--pattern PATTERN``
-        | experimental: include/exclude paths matching PATTERN
-    ``--patterns-from PATTERNFILE``
-        | experimental: read include/exclude patterns from PATTERNFILE, one per line
+    -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
+    --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
+    --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
+    --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
+    --keep-exclude-tags, --keep-tag-files    if tag objects are specified with --exclude-if-present, don't omit the tag objects themselves from the backup archive
+    --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
+    --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+
 
 Filesystem options
-    ``-x``, ``--one-file-system``
-        | stay in the same file system and do not store mount points of other file systems
-    ``--numeric-owner``
-        | only store numeric user and group identifiers
-    ``--noatime``
-        | do not store atime into archive
-    ``--noctime``
-        | do not store ctime into archive
-    ``--ignore-inode``
-        | ignore inode data in the file metadata cache used to detect unchanged files.
-    ``--read-special``
-        | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
+    -x, --one-file-system     stay in the same file system and do not store mount points of other file systems
+    --numeric-owner           only store numeric user and group identifiers
+    --noatime                 do not store atime into archive
+    --noctime                 do not store ctime into archive
+    --ignore-inode            ignore inode data in the file metadata cache used to detect unchanged files.
+    --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
+
 
 Archive options
-    ``--comment COMMENT``
-        | add a comment text to the archive
-    ``--timestamp TIMESTAMP``
-        | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.
-    ``-c SECONDS``, ``--checkpoint-interval SECONDS``
-        | write checkpoint every SECONDS seconds (Default: 1800)
-    ``--chunker-params PARAMS``
-        | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
-    ``-C COMPRESSION``, ``--compression COMPRESSION``
-        | select compression algorithm, see the output of the "borg help compression" command for details.
+    --comment COMMENT                             add a comment text to the archive
+    --timestamp TIMESTAMP                         manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.
+    -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
+    --chunker-params PARAMS                       specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
+    -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
+
 
 Description
 ~~~~~~~~~~~

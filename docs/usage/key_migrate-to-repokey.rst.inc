@@ -8,12 +8,14 @@ borg key migrate-to-repokey
 
     borg [common options] key migrate-to-repokey [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
+REPOSITORY
 
+
+
+.. class:: borg-common-opt-ref
 
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

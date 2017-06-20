@@ -8,28 +8,26 @@ borg info
 
     borg [common options] info [options] REPOSITORY_OR_ARCHIVE
 
-positional arguments
-    REPOSITORY_OR_ARCHIVE
-        archive or repository to display information about
+REPOSITORY_OR_ARCHIVE
+    archive or repository to display information about
+
 
 optional arguments
-    ``--json``
-        | format output as JSON
+    --json     format output as JSON
+
+
+.. class:: borg-common-opt-ref
 
 :ref:`common_options`
-    |
+
 
 filters
-    ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix.
-    ``-a``, ``--glob-archives``
-        | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
-    ``--sort-by``
-        | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
-    ``--first N``
-        | consider first N archives after other filters were applied
-    ``--last N``
-        | consider last N archives after other filters were applied
+    -P, --prefix            only consider archive names starting with this prefix.
+    -a, --glob-archives     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+    --sort-by               Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+    --first N               consider first N archives after other filters were applied
+    --last N                consider last N archives after other filters were applied
+
 
 Description
 ~~~~~~~~~~~

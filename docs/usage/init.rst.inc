@@ -8,20 +8,20 @@ borg init
 
     borg [common options] init [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
-        repository to create
+REPOSITORY
+    repository to create
+
 
 optional arguments
-    ``-e``, ``--encryption``
-        | select encryption key mode **(required)**
-    ``--append-only``
-        | create an append-only mode repository
-    ``--storage-quota``
-        | Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
+    -e, --encryption     select encryption key mode **(required)**
+    --append-only        create an append-only mode repository
+    --storage-quota      Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
+
+
+.. class:: borg-common-opt-ref
 
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

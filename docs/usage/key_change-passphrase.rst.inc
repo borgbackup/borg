@@ -8,12 +8,14 @@ borg key change-passphrase
 
     borg [common options] key change-passphrase [options] REPOSITORY
 
-positional arguments
-    REPOSITORY
+REPOSITORY
 
+
+
+.. class:: borg-common-opt-ref
 
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

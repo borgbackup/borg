@@ -285,12 +285,12 @@ class build_usage(Command):
             if option.option_strings:
                 continue
             fp.write(' ' + option.metavar)
+        fp.write('\n\n')
 
     def write_options(self, parser, fp):
         for group in parser._action_groups:
             if group.title == 'Common options':
-                fp.write('\n\n:ref:`common_options`\n')
-                fp.write('    |')
+                fp.write('\n\n.. class:: borg-common-opt-ref\n\n:ref:`common_options`\n')
             else:
                 self.write_options_group(group, fp)
 
@@ -298,12 +298,13 @@ class build_usage(Command):
         def is_positional_group(group):
             return any(not o.option_strings for o in group._group_actions)
 
-        def get_help(option):
-            text = textwrap.dedent((option.help or '') % option.__dict__)
-            return '\n'.join('| ' + line for line in text.splitlines())
+        indent = ' ' * base_indent
 
-        def shipout(text):
-            fp.write(textwrap.indent('\n'.join(text), ' ' * base_indent))
+        if is_positional_group(group):
+            for option in group._group_actions:
+                fp.write(option.metavar + '\n')
+                fp.write(textwrap.indent(option.help or '', ' ' * base_indent) + '\n')
+            return
 
         if not group._group_actions:
             return
@@ -311,28 +312,22 @@ class build_usage(Command):
         if with_title:
             fp.write('\n\n')
             fp.write(group.title + '\n')
-        text = []
 
-        if is_positional_group(group):
-            for option in group._group_actions:
-                text.append(option.metavar)
-                text.append(textwrap.indent(option.help or '', ' ' * 4))
-            shipout(text)
-            return
+        opts = OrderedDict()
 
-        options = []
         for option in group._group_actions:
             if option.metavar:
-                option_fmt = '``%%s %s``' % option.metavar
+                option_fmt = '%s ' + option.metavar
             else:
-                option_fmt = '``%s``'
+                option_fmt = '%s'
             option_str = ', '.join(option_fmt % s for s in option.option_strings)
-            options.append((option_str, option))
-        for option_str, option in options:
-            help = textwrap.indent(get_help(option), ' ' * 4)
-            text.append(option_str)
-            text.append(help)
-        shipout(text)
+            option_desc = textwrap.dedent((option.help or '') % option.__dict__)
+            opts[option_str] = textwrap.indent(option_desc, ' ' * 4)
+
+        padding = len(max(opts)) + 1
+
+        for option, desc in opts.items():
+            fp.write(indent + option.ljust(padding) + desc + '\n')
 
 
 class build_man(Command):

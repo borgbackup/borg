@@ -8,12 +8,14 @@ borg umount
 
     borg [common options] umount [options] MOUNTPOINT
 
-positional arguments
-    MOUNTPOINT
-        mountpoint of the filesystem to umount
+MOUNTPOINT
+    mountpoint of the filesystem to umount
+
+
+.. class:: borg-common-opt-ref
 
 :ref:`common_options`
-    |
+
 
 Description
 ~~~~~~~~~~~

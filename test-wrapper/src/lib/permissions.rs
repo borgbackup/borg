@@ -2,72 +2,13 @@ use std::os::raw::*;
 
 use errno::errno;
 
-use libc::{self, mode_t, uid_t, gid_t, dev_t};
+use libc::{self, mode_t, uid_t, gid_t};
 
 use shared::*;
-
-trait StatBase {
-    fn get_fileid(&self) -> FileId;
-    fn set_mode(&mut self, mode: mode_t, mask: mode_t);
-    fn set_owner(&mut self, owner: uid_t);
-    fn set_group(&mut self, group: gid_t);
-    fn set_rdev(&mut self, dev: dev_t);
-}
-
-impl StatBase for libc::stat {
-    fn get_fileid(&self) -> FileId {
-        self.into()
-    }
-
-    fn set_mode(&mut self, mode: mode_t, mask: mode_t) {
-        assert_eq!(mode & !mask, 0);
-        let new_mode = mode | (self.st_mode & !mask);
-        trace!("Faking mode 0o{:o} with 0o{:o} & 0o{:o} -> 0o{:o}", self.st_mode, mode, mask, new_mode);
-        self.st_mode = new_mode;
-    }
-
-    fn set_owner(&mut self, owner: uid_t) {
-        self.st_uid = owner;
-    }
-
-    fn set_group(&mut self, group: gid_t) {
-        self.st_gid = group;
-    }
-
-    fn set_rdev(&mut self, rdev: dev_t) {
-        self.st_rdev = rdev;
-    }
-}
-
-#[cfg(target_os = "linux")]
-#[cfg(target_pointer_width = "64")]
-impl StatBase for libc::stat64 {
-    fn get_fileid(&self) -> FileId {
-        self.into()
-    }
-
-    fn set_mode(&mut self, mode: mode_t, mask: mode_t) {
-        assert_eq!(mode & !mask, 0);
-        let new_mode = mode | (self.st_mode & !mask);
-        trace!("Faking mode 0o{:o} with 0o{:o} & 0o{:o} -> 0o{:o}", self.st_mode, mode, mask, new_mode);
-        self.st_mode = new_mode;
-    }
-
-    fn set_owner(&mut self, owner: uid_t) {
-        self.st_uid = owner;
-    }
-
-    fn set_group(&mut self, group: gid_t) {
-        self.st_gid = group;
-    }
-
-    fn set_rdev(&mut self, rdev: dev_t) {
-        self.st_rdev = rdev;
-    }
-}
+use internal_stat::StatBase;
 
 fn stat_base(statbuf: &mut StatBase) {
-    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(statbuf.get_fileid()));
+    let overrides = request::<ReplyGetPermissions>(Message::GetPermissions(FileId::from_stat(statbuf)));
     if let Some((mode, mask)) = overrides.mode_and_mask {
         statbuf.set_mode(mode, mask);
     }

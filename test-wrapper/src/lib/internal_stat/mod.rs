@@ -1,5 +1,8 @@
 #![allow(non_snake_case)]
 
+mod stat_base;
+pub use self::stat_base::StatBase;
+
 #[cfg(target_os = "linux")]
 #[cfg(target_pointer_width = "64")]
 mod linux64;

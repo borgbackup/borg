@@ -59,31 +59,9 @@ pub enum NetworkLogLevel {
 #[derive(Debug, Serialize, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct FileId(dev_t, ino_t);
 
-impl From<libc::stat> for FileId {
-    fn from(stat: libc::stat) -> FileId {
-        FileId(stat.st_dev, stat.st_ino)
-    }
-}
-
-impl<'a> From<&'a libc::stat> for FileId {
-    fn from(stat: &'a libc::stat) -> FileId {
-        FileId(stat.st_dev, stat.st_ino)
-    }
-}
-
-#[cfg(target_os = "linux")]
-#[cfg(target_pointer_width = "64")]
-impl From<libc::stat64> for FileId {
-    fn from(stat: libc::stat64) -> FileId {
-        FileId(stat.st_dev, stat.st_ino)
-    }
-}
-
-#[cfg(target_os = "linux")]
-#[cfg(target_pointer_width = "64")]
-impl<'a> From<&'a libc::stat64> for FileId {
-    fn from(stat: &'a libc::stat64) -> FileId {
-        FileId(stat.st_dev, stat.st_ino)
+impl FileId {
+    pub fn from_stat(stat: &StatBase) -> FileId {
+        FileId(stat.get_dev(), stat.get_ino())
     }
 }
 
@@ -416,7 +394,7 @@ impl CPath {
                 match fd_id_cache.entry(fd) {
                     hash_map::Entry::Vacant(entry) => {
                         let stat = self.get_stat()?;
-                        let id: FileId = stat.into();
+                        let id = FileId::from_stat(&stat);
                         entry.insert(id);
                         Ok(id)
                     }
@@ -428,7 +406,7 @@ impl CPath {
                 }
             }
             _ => {
-                self.get_stat().map(|stat| FileId(stat.st_dev, stat.st_ino))
+                self.get_stat().map(|stat| FileId::from_stat(&stat))
             }
         }
     }

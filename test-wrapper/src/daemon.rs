@@ -183,6 +183,8 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
             Message::DropReference(id) => {
                 if conn_references.remove(&id) {
                     drop_ref(id);
+                } else {
+                    error!("Client {} tried to remove already removed file {:?}", conn_num, id);
                 }
                 reply(&mut writer, &0);
             }

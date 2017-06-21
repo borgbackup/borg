@@ -15,4 +15,4 @@ fi
 
 source ~/.venv/bin/activate
 
-test-wrapper/target/release/test-wrapper tox -r
+RUST_LOG=warn test-wrapper/target/release/test-wrapper tox -r

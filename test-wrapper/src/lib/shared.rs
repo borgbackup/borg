@@ -428,26 +428,20 @@ impl CPath {
         ret
     }
 
-    fn get_id_internal(&self, trace: bool) -> Result<FileId> {
+    pub fn get_id(&self) -> Result<FileId> {
         match *self {
             CPath::FileDescriptor(fd) => {
                 let fd_id_cache = &mut FD_ID_CACHE.lock().unwrap();
                 match fd_id_cache.entry(fd) {
                     hash_map::Entry::Vacant(entry) => {
-                        let stat = if trace {
-                            self.get_stat()?
-                        } else {
-                            self.get_stat_notrace()?
-                        };
+                        let stat = self.get_stat()?;
                         let id = FileId::from_stat(&stat);
                         entry.insert(id);
                         Ok(id)
                     }
                     hash_map::Entry::Occupied(entry) => {
                         let id = entry.get();
-                        if trace {
-                            trace!("get_id FD {} -> cached {:?}", fd, id);
-                        }
+                        trace!("get_id FD {} -> cached {:?}", fd, id);
                         Ok(id.clone())
                     }
                 }
@@ -456,14 +450,6 @@ impl CPath {
                 self.get_stat().map(|stat| FileId::from_stat(&stat))
             }
         }
-    }
-
-    pub fn get_id(&self) -> Result<FileId> {
-        self.get_id_internal(true)
-    }
-
-    pub fn get_id_notrace(&self) -> Result<FileId> {
-        self.get_id_internal(false)
     }
 }
 

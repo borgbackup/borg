@@ -36,19 +36,18 @@ wrap! {
                 return Ok(ORIG_CLOSE(fd));
             }
         }
-        let id = CPath::from_fd(fd).get_id_notrace();
-        FD_ID_CACHE.lock().unwrap().remove(&fd);
         let ret = ORIG_CLOSE(fd);
         if ret != -1 {
-            if let Ok(id) = id {
+            if let Some(id) = FD_ID_CACHE.lock().unwrap().remove(&fd) {
                 let mut file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
                 if let Some(count) = file_ref_counts.get_mut(&id) {
                     if *count == 0 {
                         warn!("Tried to drop ref to file with no references");
-                    }
-                    *count = count.saturating_sub(1);
-                    if *count == 0 {
-                        let _ = message(Message::DropReference(id));
+                    } else {
+                        *count -= 1;
+                        if *count == 0 {
+                            let _ = message(Message::DropReference(id));
+                        }
                     }
                 }
             }

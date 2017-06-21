@@ -453,9 +453,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.readlink('input/link1') == 'somewhere'
 
-    # Search for O_NOATIME there: https://www.gnu.org/software/hurd/contributing.html - we just
-    # skip the test on Hurd, it is not critical anyway, just testing a performance optimization.
-    @pytest.mark.skipif(sys.platform == 'gnu0', reason="O_NOATIME is strangely broken on GNU Hurd")
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     def test_atime(self):
         def has_noatime(some_file):

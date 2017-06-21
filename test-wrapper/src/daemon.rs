@@ -4,7 +4,6 @@ use std::io::prelude::*;
 use std::sync::RwLock;
 use std::io::{BufReader, BufWriter, ErrorKind};
 use std::collections::hash_map;
-use std::sync::atomic::{self, AtomicBool};
 
 use std::os::unix::net::UnixStream;
 
@@ -84,7 +83,7 @@ pub struct FileEntry {
     group: Option<gid_t>,
     rdev: Option<dev_t>,
     reference_count: u32,
-    deletion_ready: AtomicBool,
+    deletion_ready: bool,
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -114,11 +113,10 @@ fn drop_ref(id: FileId) {
         hash_map::Entry::Occupied(mut entry) => {
             let should_drop = {
                 let file = entry.get_mut();
-                file.reference_count -= 1;
-                file.reference_count == 0 && *file.deletion_ready.get_mut()
+                file.reference_count = file.reference_count.saturating_sub(1);
+                file.reference_count == 0 && file.deletion_ready
             };
             if should_drop {
-                atomic::fence(atomic::Ordering::Acquire);
                 entry.remove();
             }
         }
@@ -154,9 +152,19 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
         match message {
             Message::ReadyDeletion(id) => {
                 {
-                    let database = DATABASE.read().unwrap();
-                    if let Some(file) = database.get(&id) {
-                        file.deletion_ready.store(true, atomic::Ordering::Relaxed);
+                    let mut database = DATABASE.write().unwrap();
+                    match database.entry(id) {
+                        hash_map::Entry::Occupied(mut entry) => {
+                            let should_remove = {
+                                let file = entry.get_mut();
+                                file.deletion_ready = true;
+                                file.reference_count == 0
+                            };
+                            if should_remove {
+                                entry.remove();
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 reply(&mut writer, &0);

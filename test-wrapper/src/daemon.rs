@@ -113,6 +113,9 @@ fn drop_ref(id: FileId) {
         hash_map::Entry::Occupied(mut entry) => {
             let should_drop = {
                 let file = entry.get_mut();
+                if file.reference_count == 0 {
+                    warn!("Tried to drop ref to file with no references");
+                }
                 file.reference_count = file.reference_count.saturating_sub(1);
                 file.reference_count == 0 && file.deletion_ready
             };

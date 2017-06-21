@@ -43,6 +43,9 @@ wrap! {
             if let Ok(id) = id {
                 let mut file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
                 if let Some(count) = file_ref_counts.get_mut(&id) {
+                    if *count == 0 {
+                        warn!("Tried to drop ref to file with no references");
+                    }
                     *count = count.saturating_sub(1);
                     if *count == 0 {
                         let _ = message(Message::DropReference(id));

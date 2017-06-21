@@ -3,23 +3,22 @@ use std::mem;
 use std::process;
 use std::result;
 use std::os::raw::*;
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::io::prelude::*;
 use std::io::{self, BufReader, BufWriter};
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use std::collections::hash_map;
 use std::borrow::Borrow;
 use std::fmt::{self, Debug};
 use std::ops::Deref;
-use std::cell::RefCell;
 
 use std::os::unix::net::UnixStream;
+use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use libc::{self, mode_t, uid_t, gid_t, dev_t};
 use serde::de::DeserializeOwned;
 use bincode::{self, deserialize_from, serialize_into};
 use fnv::FnvHashMap;
-use rand;
 
 use internal_stat::*;
 
@@ -68,8 +67,9 @@ impl FileId {
 #[derive(Debug, Serialize)]
 #[allow(dead_code)] // not all variants are used on all platforms
 pub enum Message<'a> {
-    BeginRemove(FileId),
-    FinishRemove(FileId, bool),
+    ReadyDeletion(FileId),
+    Reference(FileId),
+    DropReference(FileId),
     XattrsGet(FileId, &'a [u8]),
     XattrsSet(FileId, &'a [u8], &'a [u8], c_int),
     XattrsDelete(FileId, &'a [u8]),
@@ -82,12 +82,32 @@ pub enum Message<'a> {
 
 pub type Result<T> = ::std::result::Result<T, c_int>;
 
+lazy_static! {
+    static ref ORIG_DUP: unsafe extern fn(fd: c_int) -> c_int = unsafe {
+        mem::transmute(libc::dlsym(libc::RTLD_NEXT, CString::new("dup").unwrap().as_ptr()))
+    };
+
+    pub static ref DAEMON_STREAM_FDS: RwLock<(c_int, c_int)> = RwLock::new((-1, -1));
+}
+
 fn create_daemon_stream() -> (BufReader<UnixStream>, BufWriter<UnixStream>) {
     let socket = UnixStream::connect(env::var("TEST_WRAPPER_SOCKET")
             .expect("libtestwrapper preloaded, but TEST_WRAPPER_SOCKET environment variable not passed"))
         .expect("Failed to connect to test-wrapper daemon");
-    let reader = BufReader::new(socket.try_clone().expect("Failed to clone Unix socket"));
+    let reader = unsafe {
+        let reader_socket_fd = ORIG_DUP(socket.as_raw_fd());
+        if reader_socket_fd == -1 {
+            panic!("Error duplicating socket: {:?}", io::Error::last_os_error())
+        }
+        BufReader::new(UnixStream::from_raw_fd(reader_socket_fd))
+    };
     (reader, BufWriter::new(socket))
+}
+
+fn update_daemon_stream_fds(stream: &(BufReader<UnixStream>, BufWriter<UnixStream>)) {
+    let mut fds = DAEMON_STREAM_FDS.write().unwrap();
+    fds.0 = stream.0.get_ref().as_raw_fd();
+    fds.1 = stream.1.get_ref().as_raw_fd();
 }
 
 lazy_static! {
@@ -95,12 +115,14 @@ lazy_static! {
         unsafe {
            libc::pthread_atfork(None, None, Some(new_daemon_stream));
         }
-        Mutex::new(create_daemon_stream())
+        let stream = create_daemon_stream();
+        update_daemon_stream_fds(&stream);
+        Mutex::new(stream)
     };
-}
 
-extern "C" fn new_daemon_stream() {
-    *DAEMON_STREAM.lock().unwrap() = create_daemon_stream();
+    pub static ref FD_ID_CACHE: Mutex<FnvHashMap<c_int, FileId>> = Mutex::new(Default::default());
+
+    pub static ref FILE_REF_COUNTS: Mutex<FnvHashMap<FileId, u32>> = Mutex::new(Default::default());
 }
 
 pub fn daemon_error(err: &io::Error) -> ! {
@@ -131,6 +153,20 @@ pub fn bincode_result<T>(result: result::Result<T, Box<bincode::ErrorKind>>) -> 
             } else {
                 panic!("Error messaging daemon: {:?}", err);
             }
+        }
+    }
+}
+
+extern "C" fn new_daemon_stream() {
+    let mut daemon_stream = DAEMON_STREAM.lock().unwrap();
+    *daemon_stream = create_daemon_stream();
+    update_daemon_stream_fds(daemon_stream.deref());
+    let file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
+    for (&file, &count) in file_ref_counts.iter() {
+        if count > 0 {
+            bincode_result(serialize_into(&mut daemon_stream.1, &Message::Reference(file), bincode::Infinite));
+            daemon_result(daemon_stream.1.flush());
+            bincode_result(deserialize_from::<_, c_int, _>(&mut daemon_stream.0, bincode::Infinite));
         }
     }
 }
@@ -192,12 +228,22 @@ macro_rules! trace {
 }
 
 macro_rules! define_dlsym_fn {
-    ($name:ident, _; $( $arg_t:ty ),*; $ret_t:ty) => {};
+    (regular $name:ident, _; $( $arg_t:ty ),*; $ret_t:ty) => {};
 
-    ($name:ident, $orig_name:ident; $( $arg_t:ty ),*; $ret_t:ty) => {
+    (notrace $name:ident, _; $( $arg_t:ty ),*; $ret_t:ty) => {};
+
+    (regular $name:ident, $orig_name:ident; $( $arg_t:ty ),*; $ret_t:ty) => {
         lazy_static! {
             static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
                 trace!("Finding original {}", stringify!($name));
+                ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
+            };
+        }
+    };
+
+    (notrace $name:ident, $orig_name:ident; $( $arg_t:ty ),*; $ret_t:ty) => {
+        lazy_static! {
+            static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
                 ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
             };
         }
@@ -220,17 +266,13 @@ macro_rules! __wrap_maybe_ident {
     };
 }
 
-thread_local! {
-    pub static THREAD_WEAK_RNG: RefCell<rand::XorShiftRng> = RefCell::new(rand::weak_rng());
-}
-
 macro_rules! __wrap_fn {
     ( $( [ $attr:meta ] ),* ; unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
         $( #[ $attr ] )*
         #[no_mangle]
         pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
             trace!(concat!(stringify!($name), $( __wrap_arg_string!($arg_n) ),*), $( __wrap_maybe_ident!($arg_n) ),*);
-            define_dlsym_fn!($name, $orig_name; $( $arg_t ),*; $ret_t);
+            define_dlsym_fn!(regular $name, $orig_name; $( $arg_t ),*; $ret_t);
             let old_errno = ::errno::errno();
 
             let overrides = ::overrides::get_overrides();
@@ -238,9 +280,7 @@ macro_rules! __wrap_fn {
             let override_inv_prob = fn_override.map(|x| x.inverse_probability);
             if let Some(inv_prob) = override_inv_prob {
                 if inv_prob > 1 {
-                    let should_override = ::shared::THREAD_WEAK_RNG.with(|rng| {
-                        ::rand::Rng::gen_weighted_bool(&mut *rng.borrow_mut(), inv_prob)
-                    });
+                    let should_override = ::rand::Rng::gen_weighted_bool(&mut ::rand::thread_rng(), inv_prob);
                     if !should_override {
                         fn_override = None;
                     }
@@ -292,7 +332,7 @@ macro_rules! __wrap_fn {
         $( #[ $attr ] )*
         #[no_mangle]
         pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
-            define_dlsym_fn!($name, $orig_name; $( $arg_t ),*; $ret_t);
+            define_dlsym_fn!(notrace $name, $orig_name; $( $arg_t ),*; $ret_t);
 
             let old_errno = ::errno::errno();
             match (move || -> Result<$ret_t> { $code })() {
@@ -326,10 +366,6 @@ macro_rules! wrap {
     };
 }
 
-lazy_static! {
-    pub static ref FD_ID_CACHE: Mutex<FnvHashMap<c_int, FileId>> = Mutex::new(Default::default());
-}
-
 pub enum CPath {
     FileDescriptor(c_int),
     Path(*const c_char, bool),
@@ -349,7 +385,7 @@ impl CPath {
         CPath::PathAt(dfd, path, flags)
     }
 
-    pub fn get_stat(&self) -> Result<NativeStat> {
+    pub fn get_stat_notrace(&self) -> Result<NativeStat> {
         unsafe {
             let ret = match *self {
                 CPath::FileDescriptor(fd) => {
@@ -382,25 +418,36 @@ impl CPath {
                     }
                 }
             };
-            trace!("get_stat {:?} -> {:?}", self, ret.map(|stat| (stat.st_dev, stat.st_ino)));
             ret
         }
     }
 
-    pub fn get_id(&self) -> Result<FileId> {
+    pub fn get_stat(&self) -> Result<NativeStat> {
+        let ret = self.get_stat_notrace();
+        trace!("get_stat {:?} -> {:?}", self, ret.map(|stat| (stat.st_dev, stat.st_ino)));
+        ret
+    }
+
+    fn get_id_internal(&self, trace: bool) -> Result<FileId> {
         match *self {
             CPath::FileDescriptor(fd) => {
                 let fd_id_cache = &mut FD_ID_CACHE.lock().unwrap();
                 match fd_id_cache.entry(fd) {
                     hash_map::Entry::Vacant(entry) => {
-                        let stat = self.get_stat()?;
+                        let stat = if trace {
+                            self.get_stat()?
+                        } else {
+                            self.get_stat_notrace()?
+                        };
                         let id = FileId::from_stat(&stat);
                         entry.insert(id);
                         Ok(id)
                     }
                     hash_map::Entry::Occupied(entry) => {
                         let id = entry.get();
-                        trace!("get_id FD {} -> cached {:?}", fd, id);
+                        if trace {
+                            trace!("get_id FD {} -> cached {:?}", fd, id);
+                        }
                         Ok(id.clone())
                     }
                 }
@@ -409,6 +456,14 @@ impl CPath {
                 self.get_stat().map(|stat| FileId::from_stat(&stat))
             }
         }
+    }
+
+    pub fn get_id(&self) -> Result<FileId> {
+        self.get_id_internal(true)
+    }
+
+    pub fn get_id_notrace(&self) -> Result<FileId> {
+        self.get_id_internal(false)
     }
 }
 
@@ -423,5 +478,25 @@ impl Debug for CPath {
                 write!(f, "DFD {} + {:?} (flags: 0x{:x})", dfd, CStr::from_ptr(path), flags)
             },
         }
+    }
+}
+
+pub fn inc_file_ref_count(id: FileId) -> Result<()> {
+    let mut file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
+    let is_new = match file_ref_counts.entry(id) {
+        hash_map::Entry::Vacant(entry) => {
+            entry.insert(1);
+            true
+        }
+        hash_map::Entry::Occupied(mut entry) => {
+            let entry = entry.get_mut();
+            *entry += 1;
+            *entry == 1
+        }
+    };
+    if is_new {
+        message(Message::Reference(id))
+    } else {
+        Ok(())
     }
 }

@@ -27,6 +27,8 @@ mod permissions;
 pub use permissions::*;
 mod files;
 pub use files::*;
+mod file_descriptors;
+pub use file_descriptors::*;
 mod creation;
 pub use creation::*;
 

@@ -31,6 +31,8 @@ MAX_INFLIGHT = 100
 
 def os_write(fd, data):
     """os.write wrapper so we do not lose data for partial writes."""
+    # TODO: this issue is fixed in cygwin since at least 2.8.0, remove this
+    #       wrapper / workaround when this version is considered ancient.
     # This is happening frequently on cygwin due to its small pipe buffer size of only 64kiB
     # and also due to its different blocking pipe behaviour compared to Linux/*BSD.
     # Neither Linux nor *BSD ever do partial writes on blocking pipes, unless interrupted by a

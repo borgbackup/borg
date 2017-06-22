@@ -49,7 +49,7 @@ from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
-from .helpers import prune_within, prune_split
+from .helpers import interval, prune_within, prune_split
 from .helpers import timestamp
 from .helpers import get_cache_dir
 from .helpers import Manifest
@@ -3347,7 +3347,7 @@ class Archiver:
                                help='print statistics for the deleted archive')
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of archives it keeps/prunes')
-        subparser.add_argument('--keep-within', dest='within', type=str, metavar='WITHIN',
+        subparser.add_argument('--keep-within', dest='within', type=interval, metavar='INTERVAL',
                                help='keep all archives within this time interval')
         subparser.add_argument('--keep-last', '--keep-secondly', dest='secondly', type=int, default=0,
                                help='number of secondly archives to keep')

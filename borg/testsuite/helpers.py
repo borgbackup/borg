@@ -1,4 +1,5 @@
 import hashlib
+from argparse import ArgumentTypeError
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 from io import StringIO
@@ -11,7 +12,7 @@ import msgpack.fallback
 import time
 
 from ..helpers import Location, format_file_size, format_timedelta, format_line, PlaceholderError, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, get_keys_dir, get_security_dir, Statistics, is_slow_msgpack, \
+    within_range, prune_within, prune_split, get_cache_dir, get_keys_dir, get_security_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
@@ -665,15 +666,48 @@ class PruneSplitTestCase(BaseTestCase):
 
 
 class PruneWithinTestCase(BaseTestCase):
+    def test_with_range(self):
+        self.assert_equal(within_range('1H'), 1)
+        self.assert_equal(within_range('1d'), 24)
+        self.assert_equal(within_range('1w'), 168)
+        self.assert_equal(within_range('1m'), 744)
+        self.assert_equal(within_range('1y'), 8760)
 
-    def test(self):
+
+    def test_with_range_prefix(self):
+        with pytest.raises(ArgumentTypeError) as exc:
+            within_range('H')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected --keep-within prefix "": expected an integer greater than 0',))
+        with pytest.raises(ArgumentTypeError) as exc:
+            within_range('-1d')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected --keep-within prefix "-1": expected an integer greater than 0',))
+        with pytest.raises(ArgumentTypeError) as exc:
+            within_range('food')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected --keep-within prefix "foo": expected an integer greater than 0',))
+
+
+    def test_with_range_suffix(self):
+        with pytest.raises(ArgumentTypeError) as exc:
+            within_range('5')
+        self.assert_equal(
+            exc.value.args,
+            ("Unexpected --keep-within suffix \"5\": expected one of ['H', 'd', 'w', 'm', 'y']",))
+
+
+    def test_prune_within(self):
 
         def subset(lst, indices):
             return {lst[i] for i in indices}
 
         def dotest(test_archives, within, indices):
             for ta in test_archives, reversed(test_archives):
-                self.assert_equal(set(prune_within(ta, within)),
+                self.assert_equal(set(prune_within(ta, within_range(within))),
                                   subset(test_archives, indices))
 
         # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours

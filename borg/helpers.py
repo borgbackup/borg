@@ -279,15 +279,32 @@ class Manifest:
         return archives
 
 
-def prune_within(archives, within):
+def within_range(s):
+    """Convert a string representing a valid 'within' range to a number of hours."""
     multiplier = {'H': 1, 'd': 24, 'w': 24 * 7, 'm': 24 * 31, 'y': 24 * 365}
+
+    if s.endswith(tuple(multiplier.keys())):
+        number = s[:-1]
+        suffix = s[-1]
+    else:
+        # range suffixes in ascending multiplier order
+        ranges = [ k for k, v in sorted(multiplier.items(), key=lambda t: t[1]) ]
+        raise argparse.ArgumentTypeError(
+            'Unexpected --keep-within suffix "%s": expected one of %s' % (s[-1], ranges))
+
     try:
-        hours = int(within[:-1]) * multiplier[within[-1]]
-    except (KeyError, ValueError):
-        # I don't like how this displays the original exception too:
-        raise argparse.ArgumentTypeError('Unable to parse --keep-within option: "%s"' % within)
-    if hours <= 0:
-        raise argparse.ArgumentTypeError('Number specified using --keep-within option must be positive')
+        hours = int(number) * multiplier[suffix]
+    except ValueError:
+        hours = None    # swallow the string to int ValueError stack trace
+
+    if hours is None or hours <= 0:
+        raise argparse.ArgumentTypeError(
+            'Unexpected --keep-within number "%s": expected an integer greater than 0' % number)
+
+    return hours
+
+
+def prune_within(archives, hours):
     target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
     return [a for a in archives if a.ts > target]
 

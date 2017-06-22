@@ -39,6 +39,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
 else
     pip install virtualenv
     sudo apt-get update
+    sudo apt-get install -y fakeroot
     sudo apt-get install -y liblz4-dev
     sudo apt-get install -y libacl1-dev
     sudo apt-get install -y libfuse-dev fuse pkg-config  # optional, for FUSE support

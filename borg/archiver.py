@@ -21,7 +21,7 @@ import collections
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, \
-    get_cache_dir, prune_within, prune_split, \
+    get_cache_dir, prune_within, prune_split, check_python, \
     Manifest, NoManifestError, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper, set_ec, \
@@ -293,7 +293,7 @@ class Archiver:
                 path = os.path.normpath(path)
                 if args.one_file_system:
                     try:
-                        restrict_dev = os.lstat(path).st_dev
+                        restrict_dev = os.stat(path, follow_symlinks=False).st_dev
                     except OSError as e:
                         self.print_warning('%s: %s', path, e)
                         continue
@@ -346,7 +346,7 @@ class Archiver:
 
         try:
             with backup_io():
-                st = os.lstat(path)
+                st = os.stat(path, follow_symlinks=False)
             if (st.st_ino, st.st_dev) in skip_inodes:
                 return
             # Entering a new filesystem?
@@ -2079,13 +2079,17 @@ class Archiver:
         update_excludes(args)
         return args
 
+    def prerun_checks(self, logger):
+        check_python()
+        check_extension_modules()
+
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
         # This works around http://bugs.python.org/issue9351
         func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
         setup_logging(level=args.log_level, is_serve=func == self.do_serve)  # do not use loggers before this!
-        check_extension_modules()
+        self.prerun_checks(logger)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         return set_ec(func(args))

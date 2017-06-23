@@ -32,7 +32,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
 .. note::
     The examples above use the ``restrict`` directive. This does automatically
     block potential dangerous ssh features, even when they are added in a future
-    update. Thus, this option should be prefered.
+    update. Thus, this option should be preferred.
     
     If you're using openssh-server < 7.2, however, you have to explicitly specify
     the ssh features to restrict and cannot simply use the restrict option as it

@@ -39,6 +39,12 @@ import msgpack.fallback
 
 import socket
 
+
+# to use a safe, limited unpacker, we need to set a upper limit to the archive count in the manifest.
+# this does not mean that you can always really reach that number, because it also needs to be less than
+# MAX_DATA_SIZE or it will trigger the check for that.
+MAX_ARCHIVES = 400000
+
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N
 EXIT_SUCCESS = 0  # everything done, no problems
@@ -254,6 +260,10 @@ class Manifest:
             prev_ts = datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
             incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
             self.timestamp = max(incremented, datetime.utcnow().isoformat())
+        # include checks for limits as enforced by limited unpacker (used by load())
+        assert len(self.archives) <= MAX_ARCHIVES
+        assert all(len(name) <= 255 for name in self.archives)
+        assert len(self.item_keys) <= 100
         m = {
             'version': 1,
             'archives': StableDict((name, StableDict(archive)) for name, archive in self.archives.items()),

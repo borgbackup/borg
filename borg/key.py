@@ -16,6 +16,8 @@ logger = create_logger()
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from .crypto import hkdf_hmac_sha512
 from .compress import Compressor, CNONE
+from . import remote
+
 
 PREFIX = b'\0' * 8
 
@@ -155,9 +157,9 @@ class KeyBase:
             logger.warning('Manifest authentication DISABLED.')
             tam_required = False
         data = bytearray(data)
-        # Since we don't trust these bytes we use the slower Python unpacker,
-        # which is assumed to have a lower probability of security issues.
-        unpacked = msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
+        unpacker = remote.get_limited_unpacker('manifest')
+        unpacker.feed(data)
+        unpacked = unpacker.unpack()
         if b'tam' not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())

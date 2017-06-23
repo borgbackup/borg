@@ -123,7 +123,7 @@ class TestTAM:
             key.unpack_and_verify_manifest(blob)
 
         blob = b'\xc1\xc1\xc1'
-        with pytest.raises(msgpack.UnpackException):
+        with pytest.raises((ValueError, msgpack.UnpackException)):
             key.unpack_and_verify_manifest(blob)
 
     def test_missing_when_required(self, key):

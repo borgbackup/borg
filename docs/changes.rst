@@ -133,12 +133,21 @@ Version 1.0.11rc1 (not released yet)
 
 Bug fixes:
 
-- extract: warning for unextracted big extended attributes, #2258
-- extract: also create parent dir for device files, if needed.
-- extract: don't write to disk with --stdout, #2645
+- performance: rebuild hashtable if we have too little empty buckets, #2246
+- Archive: allocate zeros when needed, #2308
+  fixes huge memory usage of mount (8 MiB × number of archives)
+- IPv6 address support
+  also: Location: more informative exception when parsing fails
+- borg single-file binary: use pyinstaller v3.2.1, #2396
+  this fixes that the prelink cronjob on some distros kills the
+  borg binary by stripping away parts of it.
+- extract:
+
+  - warning for unextracted big extended attributes, #2258
+  - also create parent dir for device files, if needed.
+  - don't write to disk with --stdout, #2645
 - archive check: detect and fix missing all-zero replacement chunks, #2180
 - fix (de)compression exceptions, #2224 #2221
-- performance: rebuild hashtable if we have too little empty buckets, #2246
 - files cache: update inode number, #2226
 - borg rpc: use limited msgpack.Unpacker (security precaution), #2139
 - Location: accept //servername/share/path
@@ -146,23 +155,18 @@ Bug fixes:
 - create: handle BackupOSError on a per-path level in one spot
 - fix error msg, there is no --keep-last in borg 1.0.x, #2282
 - clamp (nano)second values to unproblematic range, #2304
-- FUSE: fix st_blocks to be an integer (not float) value
-- FUSE: fix negative uid/gid crash (they could come into archives e.g. when
-  backing up external drives under cygwin), #2674
-- FUSE: fix crash if empty (None) xattr is read
-- mount: do pre-mount checks before opening repository
-- mount: check llfuse is installed before asking for passphrase
+- fuse / borg mount:
+
+  - fix st_blocks to be an integer (not float) value
+  - fix negative uid/gid crash (they could come into archives e.g. when
+    backing up external drives under cygwin), #2674
+  - fix crash if empty (None) xattr is read
+  - do pre-mount checks before opening repository
+  - check llfuse is installed before asking for passphrase
 - borg rename: expand placeholders, #2386
-- use pyinstaller v3.2.1, #2396
-  this fixes that the prelink cronjob on some distros kills the
-  borg binary by stripping away parts of it.
-- serve: fix forced command lines containing BORG_ env vars
+- borg serve: fix forced command lines containing BORG_ env vars
 - fix error msg, it is --keep-within, not --within
 - fix borg key/debug/benchmark crashing without subcommand, #2240
-- Archive: allocate zeros when needed, #2308
-  fixes huge memory usage of mount (8 MiB × number of archives)
-- IPv6 address support
-  also: Location: more informative exception when parsing fails
 
 New features:
 

@@ -14,8 +14,6 @@ prefix "foo" if you do not also want to match "foobar".
 It is strongly recommended to always run ``prune -v --list --dry-run ...``
 first so you will see what it would do without it actually doing anything.
 
-There is also a visualized prune example in ``docs/misc/prune-example.txt``.
-
 ::
 
     # Keep 7 end of day and 4 additional end of week archives.
@@ -33,3 +31,8 @@ There is also a visualized prune example in ``docs/misc/prune-example.txt``.
     # Keep all backups in the last 10 days, 4 additional end of week archives,
     # and an end of month archive for every month:
     $ borg prune -v --list --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /path/to/repo
+
+There is also a visualized prune example in ``docs/misc/prune-example.txt``.
+
+.. include:: misc/prune-example.txt
+    :literal:

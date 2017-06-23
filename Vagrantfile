@@ -149,7 +149,7 @@ def packages_netbsd
     ln -s /usr/pkg/lib/liblz4* /usr/local/opt/lz4/lib/
     touch /etc/openssl/openssl.cnf  # avoids a flood of "can't open ..."
     mozilla-rootcerts install
-    pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse
+    pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse pkg
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
     pkg_add python34 py34-setuptools
@@ -286,7 +286,7 @@ def install_borg(fuse)
   EOF
   if fuse
     script += <<-EOF
-      # by using [fuse], setup.py can handle different fuse requirements:
+      # by using [fuse], setup.py can handle different FUSE requirements:
       pip install -e .[fuse]
     EOF
   else

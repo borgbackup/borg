@@ -162,7 +162,7 @@ class BaseTestCase(unittest.TestCase):
             fuse = s1.st_dev != s2.st_dev
             attrs = ['st_uid', 'st_gid', 'st_rdev']
             if not fuse or not os.path.isdir(path1):
-                # dir nlink is always 1 on our fuse filesystem
+                # dir nlink is always 1 on our FUSE filesystem
                 attrs.append('st_nlink')
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]

@@ -1266,7 +1266,7 @@ class Archiver:
         try:
             import borg.fuse
         except ImportError as e:
-            self.print_error('borg mount not available: loading fuse support failed [ImportError: %s]' % str(e))
+            self.print_error('borg mount not available: loading FUSE support failed [ImportError: %s]' % str(e))
             return self.exit_code
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
@@ -1285,7 +1285,7 @@ class Archiver:
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)
             except RuntimeError:
-                # Relevant error message already printed to stderr by fuse
+                # Relevant error message already printed to stderr by FUSE
                 self.exit_code = EXIT_ERROR
         return self.exit_code
 

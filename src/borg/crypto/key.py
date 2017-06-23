@@ -24,6 +24,7 @@ from ..helpers import get_keys_dir, get_security_dir
 from ..helpers import bin_to_hex
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
+from .. import remote
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 
@@ -216,9 +217,9 @@ class KeyBase:
             logger.warning('Manifest authentication DISABLED.')
             tam_required = False
         data = bytearray(data)
-        # Since we don't trust these bytes we use the slower Python unpacker,
-        # which is assumed to have a lower probability of security issues.
-        unpacked = msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
+        unpacker = remote.get_limited_unpacker('manifest')
+        unpacker.feed(data)
+        unpacked = unpacker.unpack()
         if b'tam' not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())

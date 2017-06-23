@@ -351,6 +351,10 @@ class Manifest:
             prev_ts = self.last_timestamp
             incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
             self.timestamp = max(incremented, datetime.utcnow().isoformat())
+        # include checks for limits as enforced by limited unpacker (used by load())
+        assert len(self.archives) <= MAX_ARCHIVES
+        assert all(len(name) <= 255 for name in self.archives)
+        assert len(self.item_keys) <= 100
         manifest = ManifestItem(
             version=1,
             archives=StableDict(self.archives.get_raw_dict()),

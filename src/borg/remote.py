@@ -20,6 +20,7 @@ import msgpack
 
 from . import __version__
 from .compress import LZ4
+from .constants import *  # NOQA
 from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
 from .helpers import get_home_dir
@@ -28,6 +29,7 @@ from .helpers import replace_placeholders
 from .helpers import sysinfo
 from .helpers import format_file_size
 from .helpers import truncate_and_unlink
+from .helpers import StableDict
 from .logger import create_logger, setup_logging
 from .repository import Repository, MAX_OBJECT_SIZE, LIST_SCAN_LIMIT
 from .version import parse_version, format_version
@@ -81,8 +83,16 @@ def get_limited_unpacker(kind):
         args.update(dict(max_array_len=LIST_SCAN_LIMIT,  # result list from repo.list() / .scan()
                          max_map_len=100,  # misc. result dicts
                          ))
+    elif kind == 'manifest':
+        args.update(dict(use_list=True,  # default value
+                         max_array_len=100,  # ITEM_KEYS ~= 22
+                         max_map_len=MAX_ARCHIVES,  # list of archives
+                         max_str_len=255,  # archive name
+                         object_hook=StableDict,
+                         unicode_errors='surrogateescape',
+                         ))
     else:
-        raise ValueError('kind must be "server" or "client"')
+        raise ValueError('kind must be "server", "client" or "manifest"')
     return msgpack.Unpacker(**args)
 
 

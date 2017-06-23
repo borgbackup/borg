@@ -23,7 +23,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     # Use key options to disable unneeded and potentially dangerous SSH functionality.
     # This will help to secure an automated remote backup system.
     $ cat ~/.ssh/authorized_keys
-    command="borg serve --restrict-to-path /path/to/repo",no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc ssh-rsa AAAAB3[...]
+    command="borg serve --restrict-to-path /path/to/repo",restrict ssh-rsa AAAAB3[...]
 
     # Set a BORG_XXX environment variable on the "borg serve" side
     $ cat ~/.ssh/authorized_keys

@@ -32,7 +32,8 @@ first so you will see what it would do without it actually doing anything.
     # and an end of month archive for every month:
     $ borg prune -v --list --keep-within=10d --keep-weekly=4 --keep-monthly=-1 /path/to/repo
 
-There is also a visualized prune example in ``docs/misc/prune-example.txt``.
+There is also a visualized prune example in ``docs/misc/prune-example.txt``:
 
-.. include:: misc/prune-example.txt
+.. highlight:: none
+.. include:: ../misc/prune-example.txt
     :literal:

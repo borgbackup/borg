@@ -29,7 +29,7 @@ SSH access to safe operations only.
 
 ::
 
-  restrict,command="borg serve --restrict-to-repository /home/<user>/repository"
+  command="borg serve --restrict-to-repository /home/<user>/repository",restrict
   <key type> <key> <key host>
 
 .. note:: The text shown above needs to be written on a **single** line!

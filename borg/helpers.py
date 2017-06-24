@@ -279,8 +279,8 @@ class Manifest:
         return archives
 
 
-def within_range(s):
-    """Convert a string representing a valid 'within' range to a number of hours."""
+def interval(s):
+    """Convert a string representing a valid interval to a number of hours."""
     multiplier = {'H': 1, 'd': 24, 'w': 24 * 7, 'm': 24 * 31, 'y': 24 * 365}
 
     if s.endswith(tuple(multiplier.keys())):
@@ -288,18 +288,18 @@ def within_range(s):
         suffix = s[-1]
     else:
         # range suffixes in ascending multiplier order
-        ranges = [ k for k, v in sorted(multiplier.items(), key=lambda t: t[1]) ]
+        ranges = [k for k, v in sorted(multiplier.items(), key=lambda t: t[1])]
         raise argparse.ArgumentTypeError(
-            'Unexpected --keep-within suffix "%s": expected one of %s' % (s[-1], ranges))
+            'Unexpected interval time unit "%s": expected one of %s' % (s[-1], ranges))
 
     try:
         hours = int(number) * multiplier[suffix]
     except ValueError:
-        hours = None    # swallow the string to int ValueError stack trace
+        hours = -1      # swallow the string to int ValueError stack trace
 
-    if hours is None or hours <= 0:
+    if hours <= 0:
         raise argparse.ArgumentTypeError(
-            'Unexpected --keep-within number "%s": expected an integer greater than 0' % number)
+            'Unexpected interval number "%s": expected an integer greater than 0' % number)
 
     return hours
 

@@ -21,7 +21,7 @@ import collections
 from . import __version__
 from .helpers import Error, location_validator, archivename_validator, format_line, format_time, format_file_size, \
     parse_pattern, PathPrefixPattern, to_localtime, timestamp, safe_timestamp, bin_to_hex, \
-    get_cache_dir, within_range, prune_within, prune_split, check_python, \
+    get_cache_dir, interval, prune_within, prune_split, check_python, \
     Manifest, NoManifestError, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     dir_is_tagged, bigint_to_int, ChunkerParams, CompressionSpec, PrefixSpec, is_slow_msgpack, yes, sysinfo, \
     EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, log_multi, PatternMatcher, ErrorIgnoringTextIOWrapper, set_ec, \
@@ -1717,7 +1717,7 @@ class Archiver:
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of archives it keeps/prunes. Requires -v/--verbose.')
-        subparser.add_argument('--keep-within', dest='within', type=within_range, metavar='WITHIN',
+        subparser.add_argument('--keep-within', dest='within', type=interval, metavar='INTERVAL',
                                help='keep all archives within this time interval')
         subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,
                                help='number of hourly archives to keep')

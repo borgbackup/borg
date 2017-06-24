@@ -193,7 +193,7 @@ def packages_cygwin(version)
     REM --- Install build version of CygWin in a subfolder
     set OURPATH=%cd%
     set CYGBUILD="C:\\cygwin\\CygWin"
-    set CYGMIRROR=ftp://mirrors.kernel.org/sourceware/cygwin/
+    set CYGMIRROR=http://mirrors.kernel.org/sourceware/cygwin/
     set BASEPKGS=openssh,rsync
     set BUILDPKGS=python3,python3-setuptools,python-devel,binutils,gcc-g++,libopenssl,openssl-devel,git,make,liblz4-devel,liblz4_1,curl
     %CYGSETUP% -q -B -o -n -R %CYGBUILD% -L -D -s %CYGMIRROR% -P %BASEPKGS%,%BUILDPKGS%

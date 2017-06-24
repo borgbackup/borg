@@ -205,11 +205,11 @@ def packages_cygwin(version)
 
     echo "alias mkdir='mkdir -p'" > ~/.profile
     echo "export CYGWIN_ROOT=/cygdrive/c/cygwin/CygWin" >> ~/.profile
-    echo 'export PATH=$PATH:$CYGWIN_ROOT/bin' >> ~/.profile
+    echo 'export PATH=$CYGWIN_ROOT/bin:$PATH' >> ~/.profile
 
     echo '' > ~/.bash_profile
 
-    cmd.exe /c 'setx /m PATH "%PATH%;C:\\cygwin\\CygWin\\bin"'
+    cmd.exe /c 'setx /m PATH "C:\\cygwin\\CygWin\\bin;%PATH%"'
     source ~/.profile
     cd /cygdrive/c/cygwin && cmd.exe /c install.bat
 

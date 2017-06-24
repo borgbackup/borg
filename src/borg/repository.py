@@ -34,8 +34,6 @@ TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
 
-LIST_SCAN_LIMIT = 100000  # repo.list() / .scan() result count limit the borg client uses
-
 FreeSpace = partial(defaultdict, int)
 
 
@@ -1411,7 +1409,4 @@ class LoggedIO:
         return self.segment - 1  # close_segment() increments it
 
 
-# MAX_OBJECT_SIZE = <20 MiB (MAX_DATA_SIZE) + 41 bytes for a Repository PUT header, which consists of
-# a 1 byte tag ID, 4 byte CRC, 4 byte size and 32 bytes for the ID.
-MAX_OBJECT_SIZE = MAX_DATA_SIZE + LoggedIO.put_header_fmt.size
-assert MAX_OBJECT_SIZE == 20971520 == 20 * 1024 * 1024
+assert LoggedIO.put_header_fmt.size == 41  # see constants.MAX_OBJECT_SIZE

@@ -145,6 +145,35 @@ def check_extension_modules():
         raise ExtensionModuleError
 
 
+def get_limited_unpacker(kind):
+    """return a limited Unpacker because we should not trust msgpack data received from remote"""
+    args = dict(use_list=False,  # return tuples, not lists
+                max_bin_len=0,  # not used
+                max_ext_len=0,  # not used
+                max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE),
+                max_str_len=MAX_OBJECT_SIZE,  # a chunk or other repo object
+                )
+    if kind == 'server':
+        args.update(dict(max_array_len=100,  # misc. cmd tuples
+                         max_map_len=100,  # misc. cmd dicts
+                         ))
+    elif kind == 'client':
+        args.update(dict(max_array_len=LIST_SCAN_LIMIT,  # result list from repo.list() / .scan()
+                         max_map_len=100,  # misc. result dicts
+                         ))
+    elif kind == 'manifest':
+        args.update(dict(use_list=True,  # default value
+                         max_array_len=100,  # ITEM_KEYS ~= 22
+                         max_map_len=MAX_ARCHIVES,  # list of archives
+                         max_str_len=255,  # archive name
+                         object_hook=StableDict,
+                         unicode_errors='surrogateescape',
+                         ))
+    else:
+        raise ValueError('kind must be "server", "client" or "manifest"')
+    return msgpack.Unpacker(**args)
+
+
 ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
 
 

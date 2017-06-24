@@ -21,10 +21,10 @@ from ..helpers import StableDict
 from ..helpers import Error, IntegrityError
 from ..helpers import yes
 from ..helpers import get_keys_dir, get_security_dir
+from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
-from .. import remote
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 
@@ -217,7 +217,7 @@ class KeyBase:
             logger.warning('Manifest authentication DISABLED.')
             tam_required = False
         data = bytearray(data)
-        unpacker = remote.get_limited_unpacker('manifest')
+        unpacker = get_limited_unpacker('manifest')
         unpacker.feed(data)
         unpacked = unpacker.unpack()
         if b'tam' not in unpacked:

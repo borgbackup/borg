@@ -219,7 +219,7 @@ end
 
 def install_cygwin_venv
   return <<-EOF
-      easy_install-3.4 pip
+      python3 -m ensurepip -U --default-pip
       pip install virtualenv
   EOF
 end

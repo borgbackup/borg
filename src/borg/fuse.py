@@ -201,7 +201,7 @@ class ItemCache:
 
 
 class FuseOperations(llfuse.Operations):
-    """Export archive as a fuse filesystem
+    """Export archive as a FUSE filesystem
     """
     # mount options
     allow_damaged_files = False
@@ -310,7 +310,7 @@ class FuseOperations(llfuse.Operations):
         return ino
 
     def process_archive(self, archive_name, prefix=[]):
-        """Build fuse inode hierarchy from archive metadata
+        """Build FUSE inode hierarchy from archive metadata
         """
         self.file_versions = {}  # for versions mode: original path -> version
         t0 = time.perf_counter()

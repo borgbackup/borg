@@ -326,7 +326,7 @@ class ArchiverTestCaseBase(BaseTestCase):
             os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         self.create_regular_file('fusexattr', size=1)
         if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-            # ironically, due to the way how fakeroot works, comparing fuse file xattrs to orig file xattrs
+            # ironically, due to the way how fakeroot works, comparing FUSE file xattrs to orig file xattrs
             # will FAIL if fakeroot supports xattrs, thus we only set the xattr if XATTR_FAKEROOT is False.
             # This is because fakeroot with xattr-support does not propagate xattrs of the underlying file
             # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file

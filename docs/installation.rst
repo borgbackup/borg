@@ -321,7 +321,7 @@ FUSE for OS X, which is available as a pre-release_.
 FreeBSD
 ++++++++
 Listed below are packages you will need to install |project_name|, its dependencies,
-and commands to make fuse work for using the mount command.
+and commands to make FUSE work for using the mount command.
 
 ::
 

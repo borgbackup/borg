@@ -199,7 +199,7 @@ Fixes:
   error message when parsing fails.
 - mount: check whether llfuse is installed before asking for passphrase, #2540
 - mount: do pre-mount checks before opening repository, #2541
-- fuse:
+- FUSE:
 
   - fix crash if empty (None) xattr is read, #2534
   - fix read(2) caching data in metadata cache
@@ -243,7 +243,7 @@ Other changes:
 - increase DEFAULT_SEGMENTS_PER_DIR to 1000
 - chunker: fix invalid use of types (function only used by tests)
 - chunker: don't do uint32_t >> 32
-- fuse:
+- FUSE:
 
   - add instrumentation (--debug and SIGUSR1/SIGINFO)
   - reduced memory usage for repository mounts by lazily instantiating archives
@@ -651,8 +651,8 @@ Other changes:
 
 - tests:
 
-  - fuse tests: catch ENOTSUP on freebsd
-  - fuse tests: test troublesome xattrs last
+  - FUSE tests: catch ENOTSUP on freebsd
+  - FUSE tests: test troublesome xattrs last
   - fix byte range error in test, #1740
   - use monkeypatch to set env vars, but only on pytest based tests.
   - point XDG_*_HOME to temp dirs for tests, #1714
@@ -824,7 +824,7 @@ Other changes:
   - upgrade OSXfuse / FUSE for macOS to 3.5.3
   - remove llfuse from tox.ini at a central place
   - do not try to install llfuse on centos6
-  - fix fuse test for darwin, #1546
+  - fix FUSE test for darwin, #1546
   - add windows virtual machine with cygwin
   - Vagrantfile cleanup / code deduplication
 
@@ -1033,8 +1033,8 @@ Other changes:
 - vagrant / tests:
 
   - no chown when rsyncing (fixes boxes w/o vagrant group)
-  - fix fuse permission issues on linux/freebsd, #1544
-  - skip fuse test for borg binary + fakeroot
+  - fix FUSE permission issues on linux/freebsd, #1544
+  - skip FUSE test for borg binary + fakeroot
   - ignore security.selinux xattrs, fixes tests on centos, #1735
 
 
@@ -1099,7 +1099,7 @@ Other changes:
   - upgrade OSXfuse / FUSE for macOS to 3.5.2
   - update Debian Wheezy boxes, #1686
   - openbsd / netbsd: use own boxes, fixes misc rsync installation and
-    fuse/llfuse related testing issues, #1695 #1696 #1670 #1671 #1728
+    FUSE/llfuse related testing issues, #1695 #1696 #1670 #1671 #1728
 - docs:
 
   - add docs for "key export" and "key import" commands, #1641
@@ -1120,10 +1120,10 @@ Other changes:
   - clarify FAQ regarding backup of virtual machines, #1672
 - tests:
 
-  - work around fuse xattr test issue with recent fakeroot
+  - work around FUSE xattr test issue with recent fakeroot
   - simplify repo/hashindex tests
-  - travis: test fuse-enabled borg, use trusty to have a recent FUSE
-  - re-enable fuse tests for RemoteArchiver (no deadlocks any more)
+  - travis: test FUSE-enabled borg, use trusty to have a recent FUSE
+  - re-enable FUSE tests for RemoteArchiver (no deadlocks any more)
   - clean env for pytest based tests, #1714
   - fuse_mount contextmanager: accept any options
 
@@ -1264,7 +1264,7 @@ Other changes:
   - xenial64: use user "ubuntu", not "vagrant" (as usual), #1331
 - tests:
 
-  - fix fuse tests on OS X, #1433
+  - fix FUSE tests on OS X, #1433
 - docs:
 
   - FAQ: add backup using stable filesystem names recommendation
@@ -1325,7 +1325,7 @@ Other changes:
 - tests:
 
   - add more FUSE tests, #1284
-  - deduplicate fuse (u)mount code
+  - deduplicate FUSE (u)mount code
   - fix borg binary test issues, #862
 - docs:
 
@@ -1700,7 +1700,7 @@ Other changes:
   - fix order in release process
   - updated usage docs and other minor / cosmetic fixes
   - verified borg examples in docs, #644
-  - freebsd dependency installation and fuse configuration, #649
+  - freebsd dependency installation and FUSE configuration, #649
   - add example how to restore a raw device, #671
   - add a hint about the dev headers needed when installing from source
   - add examples for delete (and handle delete after list, before prune), #656
@@ -2545,7 +2545,7 @@ Version 0.7
 
 - Ported to FreeBSD
 - Improved documentation
-- Experimental: Archives mountable as fuse filesystems.
+- Experimental: Archives mountable as FUSE filesystems.
 - The "user." prefix is no longer stripped from xattrs on Linux
 
 

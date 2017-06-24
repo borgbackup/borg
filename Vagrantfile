@@ -201,7 +201,6 @@ def packages_cygwin(version)
     regtool set /HKLM/SYSTEM/CurrentControlSet/Services/OpenSSHd/ImagePath "C:\\cygwin\\CygWin\\bin\\cygrunsrv.exe"
     bash -c "ssh-host-config --no"
     ' > /cygdrive/c/cygwin/install.bat
-    cd /cygdrive/c/cygwin && cmd.exe /c install.bat
 
     echo "alias mkdir='mkdir -p'" > ~/.profile
     echo "export CYGWIN_ROOT=/cygdrive/c/cygwin/CygWin" >> ~/.profile
@@ -211,6 +210,8 @@ def packages_cygwin(version)
 
     cmd.exe /c 'setx /m PATH "%PATH%;C:\\cygwin\\CygWin\\bin"'
     source ~/.profile
+    cd /cygdrive/c/cygwin && cmd.exe /c install.bat
+
     echo 'db_home: windows' > $CYGWIN_ROOT/etc/nsswitch.conf
   EOF
 end

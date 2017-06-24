@@ -16,7 +16,7 @@ logger = create_logger()
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from .crypto import hkdf_hmac_sha512
 from .compress import Compressor, CNONE
-from . import remote
+from .helpers import get_limited_unpacker
 
 
 PREFIX = b'\0' * 8
@@ -157,7 +157,7 @@ class KeyBase:
             logger.warning('Manifest authentication DISABLED.')
             tam_required = False
         data = bytearray(data)
-        unpacker = remote.get_limited_unpacker('manifest')
+        unpacker = get_limited_unpacker('manifest')
         unpacker.feed(data)
         unpacked = unpacker.unpack()
         if b'tam' not in unpacked:

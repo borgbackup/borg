@@ -200,6 +200,7 @@ def packages_cygwin(version)
     cd /d C:\\cygwin\\CygWin\\bin
     regtool set /HKLM/SYSTEM/CurrentControlSet/Services/OpenSSHd/ImagePath "C:\\cygwin\\CygWin\\bin\\cygrunsrv.exe"
     bash -c "ssh-host-config --no"
+    bash -c "chown sshd_server /cygdrive/c/cygwin/CygWin/var/empty"
     ' > /cygdrive/c/cygwin/install.bat
 
     echo "alias mkdir='mkdir -p'" > ~/.profile

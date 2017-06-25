@@ -665,7 +665,7 @@ class PruneSplitTestCase(BaseTestCase):
         dotest(test_archives, 0, [], [])
 
 
-class PruneWithinTestCase(BaseTestCase):
+class IntervalTestCase(BaseTestCase):
     def test_interval(self):
         self.assert_equal(interval('1H'), 1)
         self.assert_equal(interval('1d'), 24)
@@ -697,6 +697,8 @@ class PruneWithinTestCase(BaseTestCase):
             exc.value.args,
             ("Unexpected interval time unit \"5\": expected one of ['H', 'd', 'w', 'm', 'y']",))
 
+
+class PruneWithinTestCase(BaseTestCase):
     def test_prune_within(self):
 
         def subset(lst, indices):

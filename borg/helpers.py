@@ -290,12 +290,12 @@ def interval(s):
         # range suffixes in ascending multiplier order
         ranges = [k for k, v in sorted(multiplier.items(), key=lambda t: t[1])]
         raise argparse.ArgumentTypeError(
-            'Unexpected interval time unit "%s": expected one of %s' % (s[-1], ranges))
+            'Unexpected interval time unit "%s": expected one of %r' % (s[-1], ranges))
 
     try:
         hours = int(number) * multiplier[suffix]
     except ValueError:
-        hours = -1      # swallow the string to int ValueError stack trace
+        hours = -1
 
     if hours <= 0:
         raise argparse.ArgumentTypeError(

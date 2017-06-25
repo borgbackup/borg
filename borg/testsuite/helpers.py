@@ -1,4 +1,5 @@
 import hashlib
+from argparse import ArgumentTypeError
 from time import mktime, strptime
 from datetime import datetime, timezone, timedelta
 from io import StringIO
@@ -11,7 +12,7 @@ import msgpack.fallback
 import time
 
 from ..helpers import Location, format_file_size, format_timedelta, format_line, PlaceholderError, make_path_safe, \
-    prune_within, prune_split, get_cache_dir, get_keys_dir, get_security_dir, Statistics, is_slow_msgpack, \
+    interval, prune_within, prune_split, get_cache_dir, get_keys_dir, get_security_dir, Statistics, is_slow_msgpack, \
     yes, TRUISH, FALSISH, DEFAULTISH, \
     StableDict, int_to_bigint, bigint_to_int, parse_timestamp, CompressionSpec, ChunkerParams, \
     ProgressIndicatorPercent, ProgressIndicatorEndless, load_excludes, parse_pattern, \
@@ -664,16 +665,48 @@ class PruneSplitTestCase(BaseTestCase):
         dotest(test_archives, 0, [], [])
 
 
-class PruneWithinTestCase(BaseTestCase):
+class IntervalTestCase(BaseTestCase):
+    def test_interval(self):
+        self.assert_equal(interval('1H'), 1)
+        self.assert_equal(interval('1d'), 24)
+        self.assert_equal(interval('1w'), 168)
+        self.assert_equal(interval('1m'), 744)
+        self.assert_equal(interval('1y'), 8760)
 
-    def test(self):
+    def test_interval_time_unit(self):
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('H')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected interval number "": expected an integer greater than 0',))
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('-1d')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected interval number "-1": expected an integer greater than 0',))
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('food')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected interval number "foo": expected an integer greater than 0',))
+
+    def test_interval_number(self):
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('5')
+        self.assert_equal(
+            exc.value.args,
+            ("Unexpected interval time unit \"5\": expected one of ['H', 'd', 'w', 'm', 'y']",))
+
+
+class PruneWithinTestCase(BaseTestCase):
+    def test_prune_within(self):
 
         def subset(lst, indices):
             return {lst[i] for i in indices}
 
         def dotest(test_archives, within, indices):
             for ta in test_archives, reversed(test_archives):
-                self.assert_equal(set(prune_within(ta, within)),
+                self.assert_equal(set(prune_within(ta, interval(within))),
                                   subset(test_archives, indices))
 
         # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours

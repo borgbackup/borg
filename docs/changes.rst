@@ -167,6 +167,8 @@ Bug fixes:
 - borg serve: fix forced command lines containing BORG_ env vars
 - fix error msg, it is --keep-within, not --within
 - fix borg key/debug/benchmark crashing without subcommand, #2240
+- chunker: fix invalid use of types, don't do uint32_t >> 32
+- document follow_symlinks requirements, check libc, #2507
 
 New features:
 
@@ -188,6 +190,7 @@ Other changes:
 - be more clear that this is a "beyond repair" case, #2427
 - key file names: limit to 100 characters and remove colons from host name
 - upgrade FUSE for macOS to 3.5.8, #2346
+- split up parsing and filtering for --keep-within, better error message, #2610
 - docs:
 
   - fix caskroom link, #2299
@@ -212,7 +215,10 @@ Other changes:
 - tests:
 
   - remove attic dependency of the tests, #2505
-  - enhance travis setuptools_scm situation
+  - travis:
+
+    - enhance travis setuptools_scm situation
+    - install fakeroot for Linux
   - add test for borg delete --force
   - enable remote tests on cygwin (the cygwin issue that caused these tests
     to break was fixed in cygwin at least since cygwin 2.8, maybe even since

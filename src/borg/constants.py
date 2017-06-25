@@ -31,6 +31,22 @@ DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 # the header, and the total size was set to 20 MiB).
 MAX_DATA_SIZE = 20971479
 
+# MAX_OBJECT_SIZE = <20 MiB (MAX_DATA_SIZE) + 41 bytes for a Repository PUT header, which consists of
+# a 1 byte tag ID, 4 byte CRC, 4 byte size and 32 bytes for the ID.
+MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see LoggedIO.put_header_fmt.size assertion in repository module
+assert MAX_OBJECT_SIZE == 20971520 == 20 * 1024 * 1024
+
+# borg.remote read() buffer size
+BUFSIZE = 10 * 1024 * 1024
+
+# to use a safe, limited unpacker, we need to set a upper limit to the archive count in the manifest.
+# this does not mean that you can always really reach that number, because it also needs to be less than
+# MAX_DATA_SIZE or it will trigger the check for that.
+MAX_ARCHIVES = 400000
+
+# repo.list() / .scan() result count limit the borg client uses
+LIST_SCAN_LIMIT = 100000
+
 DEFAULT_SEGMENTS_PER_DIR = 1000
 
 CHUNK_MIN_EXP = 19  # 2**19 == 512kiB

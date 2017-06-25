@@ -200,24 +200,26 @@ def packages_cygwin(version)
     cd /d C:\\cygwin\\CygWin\\bin
     regtool set /HKLM/SYSTEM/CurrentControlSet/Services/OpenSSHd/ImagePath "C:\\cygwin\\CygWin\\bin\\cygrunsrv.exe"
     bash -c "ssh-host-config --no"
+    bash -c "chown sshd_server /cygdrive/c/cygwin/CygWin/var/empty"
     ' > /cygdrive/c/cygwin/install.bat
-    cd /cygdrive/c/cygwin && cmd.exe /c install.bat
 
     echo "alias mkdir='mkdir -p'" > ~/.profile
     echo "export CYGWIN_ROOT=/cygdrive/c/cygwin/CygWin" >> ~/.profile
-    echo 'export PATH=$PATH:$CYGWIN_ROOT/bin' >> ~/.profile
+    echo 'export PATH=$CYGWIN_ROOT/bin:$PATH' >> ~/.profile
 
     echo '' > ~/.bash_profile
 
-    cmd.exe /c 'setx /m PATH "%PATH%;C:\\cygwin\\CygWin\\bin"'
+    cmd.exe /c 'setx /m PATH "C:\\cygwin\\CygWin\\bin;%PATH%"'
     source ~/.profile
+    cd /cygdrive/c/cygwin && cmd.exe /c install.bat
+
     echo 'db_home: windows' > $CYGWIN_ROOT/etc/nsswitch.conf
   EOF
 end
 
 def install_cygwin_venv
   return <<-EOF
-      easy_install-3.4 pip
+      python3 -m ensurepip -U --default-pip
       pip install virtualenv
   EOF
 end

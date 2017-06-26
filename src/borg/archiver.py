@@ -2366,6 +2366,31 @@ class Archiver:
             exclude_group = subparser.add_argument_group('Exclusion options')
             define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
 
+        def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
+            filters_group = subparser.add_argument_group('filters',
+                                                         'Archive filters can be applied to repository targets.')
+            group = filters_group.add_mutually_exclusive_group()
+            group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='', metavar='PREFIX',
+                               help='only consider archive names starting with this prefix.')
+            group.add_argument('-a', '--glob-archives', dest='glob_archives', default=None, metavar='GLOB',
+                               help='only consider archive names matching the glob. '
+                                    'sh: rules apply, see "borg help patterns". '
+                                    '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
+
+            if sort_by:
+                sort_by_default = 'timestamp'
+                filters_group.add_argument('--sort-by', dest='sort_by', type=SortBySpec, default=sort_by_default,
+                                           metavar='KEYS',
+                                           help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
+                                           .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
+
+            if first_last:
+                group = filters_group.add_mutually_exclusive_group()
+                group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
+                                   help='consider first N archives after other filters were applied')
+                group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
+                                   help='consider last N archives after other filters were applied')
+
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
         parser.common_options = self.CommonOptions(define_common_options,
@@ -2600,7 +2625,7 @@ class Archiver:
                                help='attempt to repair any inconsistencies found')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
-        self.add_archives_filters_args(subparser)
+        define_archive_filters_group(subparser)
 
         subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
                                           description="Manage a keyfile or repokey of a repository",
@@ -3050,7 +3075,7 @@ class Archiver:
         subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
-        self.add_archives_filters_args(subparser)
+        define_archive_filters_group(subparser)
 
         list_epilog = process_epilog("""
         This command lists the contents of a repository or an archive.
@@ -3099,7 +3124,7 @@ class Archiver:
                                help='repository/archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
-        self.add_archives_filters_args(subparser)
+        define_archive_filters_group(subparser)
         define_exclusion_group(subparser, tag_files=True)
 
         mount_epilog = process_epilog("""
@@ -3151,7 +3176,7 @@ class Archiver:
                                help='stay in foreground, do not daemonize')
         subparser.add_argument('-o', dest='options', type=str,
                                help='Extra mount options')
-        self.add_archives_filters_args(subparser)
+        define_archive_filters_group(subparser)
 
         umount_epilog = process_epilog("""
         This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
@@ -3191,7 +3216,7 @@ class Archiver:
                                help='archive or repository to display information about')
         subparser.add_argument('--json', action='store_true',
                                help='format output as JSON')
-        self.add_archives_filters_args(subparser)
+        define_archive_filters_group(subparser)
 
         break_lock_epilog = process_epilog("""
         This command breaks the repository and cache locks.
@@ -3278,7 +3303,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        self.add_archives_filters_args(subparser, sort_by=False, first_last=False)
+        define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
@@ -3742,31 +3767,6 @@ class Archiver:
         subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
 
         return parser
-
-    @staticmethod
-    def add_archives_filters_args(subparser, sort_by=True, first_last=True):
-        filters_group = subparser.add_argument_group('filters', 'Archive filters can be applied to repository targets.')
-        group = filters_group.add_mutually_exclusive_group()
-        group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='', metavar='PREFIX',
-                           help='only consider archive names starting with this prefix.')
-        group.add_argument('-a', '--glob-archives', dest='glob_archives', default=None, metavar='GLOB',
-                           help='only consider archive names matching the glob. '
-                                'sh: rules apply, see "borg help patterns". '
-                                '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
-
-        if sort_by:
-            sort_by_default = 'timestamp'
-            filters_group.add_argument('--sort-by', dest='sort_by', type=SortBySpec, default=sort_by_default,
-                                       metavar='KEYS',
-                                       help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
-                                       .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
-
-        if first_last:
-            group = filters_group.add_mutually_exclusive_group()
-            group.add_argument('--first', dest='first', metavar='N', default=0, type=int,
-                               help='consider first N archives after other filters were applied')
-            group.add_argument('--last', dest='last', metavar='N', default=0, type=int,
-                               help='consider last N archives after other filters were applied')
 
     def get_args(self, argv, cmd):
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""

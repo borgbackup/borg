@@ -128,8 +128,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.0.11rc1 (not released yet)
-------------------------------------
+Version 1.0.11rc1 (2017-06-27)
+------------------------------
 
 Bug fixes:
 
@@ -229,7 +229,9 @@ Other changes:
     to break was fixed in cygwin at least since cygwin 2.8, maybe even since
     2.7.0).
   - remove skipping the noatime tests on GNU/Hurd, #2710
-
+  - fix borg import issue, add comment, #2718
+  - include attic.tar.gz when installing the package
+    also: add include_package_data=True
 
 Version 1.0.10 (2017-02-13)
 ---------------------------

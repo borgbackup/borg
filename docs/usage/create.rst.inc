@@ -38,13 +38,16 @@ borg create
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
-      -s, --stats           print statistics for the created archive
+      --remote-path PATH    use PATH as borg executable on the remote (default:
+                            "borg")
+      -s, --stats           print statistics for the created archive. Requires
+                            -v/--verbose.
       -p, --progress        show progress display while creating the archive,
                             showing Original, Compressed and Deduplicated sizes,
                             followed by the Number of files seen and the path
                             being processed, default: False
-      --list                output verbose list of items (files, dirs, ...)
+      --list                output verbose list of items (files, dirs, ...).
+                            Requires -v/--verbose.
       --filter STATUSCHARS  only display items with the given status characters
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN
@@ -84,9 +87,12 @@ Description
 ~~~~~~~~~~~
 
 This command creates a backup archive containing all files found while recursively
-traversing all paths specified. When giving '-' as path, borg will read data
-from standard input and create a file 'stdin' in the created archive from that
-data.
+traversing all paths specified. Paths are added to the archive as they are given,
+that means if relative paths are desired, the command has to be run from the correct
+directory.
+
+When giving '-' as path, borg will read data from standard input and create a
+file 'stdin' in the created archive from that data.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -102,6 +108,11 @@ To speed up pulling backups over sshfs and similar network file systems which do
 not provide correct inode information the --ignore-inode flag can be used. This
 potentially decreases reliability of change detection, while avoiding always reading
 all files on these file systems.
+
+The mount points of filesystems or filesystem snapshots should be the same for every
+creation of a new archive to ensure fast operation. This is because the file cache that
+is used to determine changed files quickly uses absolute filenames.
+If this is not possible, consider creating a bind mount to a stable location.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.

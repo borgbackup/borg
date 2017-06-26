@@ -9,7 +9,7 @@ borg prune
     usage: borg prune [-h] [--critical] [--error] [--warning] [--info] [--debug]
                       [--lock-wait N] [--show-rc] [--no-files-cache] [--umask M]
                       [--remote-path PATH] [-n] [--force] [-s] [--list]
-                      [--keep-within WITHIN] [-H HOURLY] [-d DAILY] [-w WEEKLY]
+                      [--keep-within INTERVAL] [-H HOURLY] [-d DAILY] [-w WEEKLY]
                       [-m MONTHLY] [-y YEARLY] [-P PREFIX] [--save-space]
                       [REPOSITORY]
     
@@ -31,12 +31,16 @@ borg prune
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
+      --remote-path PATH    use PATH as borg executable on the remote (default:
+                            "borg")
       -n, --dry-run         do not change repository
       --force               force pruning of corrupted archives
-      -s, --stats           print statistics for the deleted archive
-      --list                output verbose list of archives it keeps/prunes
-      --keep-within WITHIN  keep all archives within this time interval
+      -s, --stats           print statistics for the deleted archive. Requires
+                            -v/--verbose.
+      --list                output verbose list of archives it keeps/prunes.
+                            Requires -v/--verbose.
+      --keep-within INTERVAL
+                            keep all archives within this time interval
       -H HOURLY, --keep-hourly HOURLY
                             number of hourly archives to keep
       -d DAILY, --keep-daily DAILY

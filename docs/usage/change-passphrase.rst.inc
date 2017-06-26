@@ -30,7 +30,8 @@ borg change-passphrase
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
+      --remote-path PATH    use PATH as borg executable on the remote (default:
+                            "borg")
     
 Description
 ~~~~~~~~~~~

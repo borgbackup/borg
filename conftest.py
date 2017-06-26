@@ -4,8 +4,6 @@ import sys
 
 import pytest
 
-import borg.cache
-
 # needed to get pretty assertion failures in unit tests:
 if hasattr(pytest, 'register_assert_rewrite'):
     pytest.register_assert_rewrite('borg.testsuite')
@@ -26,6 +24,9 @@ try:
     import borg
 except ImportError:
     sys.path = original_path
+
+# note: if anything from borg needs to be imported, do it below this line.
+import borg.cache
 
 
 @pytest.fixture(autouse=True)

@@ -150,6 +150,7 @@ Bug fixes:
 - fix (de)compression exceptions, #2224 #2221
 - files cache: update inode number, #2226
 - borg rpc: use limited msgpack.Unpacker (security precaution), #2139
+- Manifest: use limited msgpack.Unpacker (security precaution), #2175
 - Location: accept //servername/share/path
 - fix ChunkIndex.__contains__ assertion  for big-endian archs (harmless)
 - create: handle BackupOSError on a per-path level in one spot
@@ -172,6 +173,7 @@ Bug fixes:
 
 New features:
 
+- added BORG_PASSCOMMAND environment variable, #2573
 - add minimal version of in repository mandatory feature flags, #2134
 
   This should allow us to make sure older borg versions can be cleanly
@@ -212,6 +214,9 @@ Other changes:
     cryptohash for dedupe, so people don't worry, #2390
   - add hint about chunker params to borg upgrade docs, #2421
   - clarify borg upgrade docs, #2436
+  - quickstart: delete problematic BORG_PASSPRHASE use, #2623
+  - faq: specify "using inline shell scripts"
+  - document pattern denial of service, #2624
 - tests:
 
   - remove attic dependency of the tests, #2505

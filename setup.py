@@ -270,8 +270,10 @@ setup(
             'borg = borg.archiver:main',
         ]
     },
+    include_package_data=True,
     package_data={
-        'borg': ['paperkey.html']
+        'borg': ['paperkey.html'],
+        'borg.testsuite': ['attic.tar.gz'],
     },
     cmdclass=cmdclass,
     ext_modules=ext_modules,

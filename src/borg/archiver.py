@@ -2367,7 +2367,7 @@ class Archiver:
             define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
 
         def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
-            filters_group = subparser.add_argument_group('filters',
+            filters_group = subparser.add_argument_group('Archive filters',
                                                          'Archive filters can be applied to repository targets.')
             group = filters_group.add_mutually_exclusive_group()
             group.add_argument('-P', '--prefix', dest='prefix', type=PrefixSpec, default='', metavar='PREFIX',

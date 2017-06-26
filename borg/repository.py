@@ -14,19 +14,17 @@ from .logger import create_logger
 logger = create_logger()
 
 from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent, bin_to_hex
+from .helpers import LIST_SCAN_LIMIT, MAX_OBJECT_SIZE, MAX_DATA_SIZE
 from .hashindex import NSIndex
 from .locking import Lock, LockError, LockErrorT
 from .lrucache import LRUCache
 from .platform import sync_dir
 
-MAX_OBJECT_SIZE = 20 * 1024 * 1024
 MAGIC = b'BORG_SEG'
 MAGIC_LEN = len(MAGIC)
 TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
-
-LIST_SCAN_LIMIT = 10000  # repo.list() / .scan() result count limit the borg client uses
 
 
 class Repository:
@@ -860,4 +858,4 @@ class LoggedIO:
                     sync_dir(dirname)
 
 
-MAX_DATA_SIZE = MAX_OBJECT_SIZE - LoggedIO.put_header_fmt.size
+assert LoggedIO.put_header_fmt.size == 41  # see helpers.MAX_OBJECT_SIZE

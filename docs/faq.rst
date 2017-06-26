@@ -123,15 +123,16 @@ none.
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
 
-The encryption passphrase can be specified programmatically using the
-`BORG_PASSPHRASE` environment variable. This is convenient when setting up
-automated encrypted backups. Another option is to use
-key file based encryption with a blank passphrase. See
-:ref:`encrypted_repos` for more details.
+The encryption passphrase or a command to retrieve the passphrase can be
+specified programmatically using the `BORG_PASSPHRASE` or `BORG_PASSCOMMAND`
+environment variables. This is convenient when setting up automated encrypted
+backups. Another option is to use key file based encryption with a blank passphrase.
+See :ref:`encrypted_repos` for more details.
 
 .. _password_env:
 .. note:: Be careful how you set the environment; using the ``env``
           command, a ``system()`` call or using inline shell scripts
+          (e.g. ``BORG_PASSPHRASE=hunter12 borg ...``)
           might expose the credentials in the process list directly
           and they will be readable to all users on a system. Using
           ``export`` in a shell script file should be safe, however, as

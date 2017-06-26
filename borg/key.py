@@ -2,6 +2,8 @@ from binascii import hexlify, a2b_base64, b2a_base64
 import configparser
 import getpass
 import os
+import shlex
+import subprocess
 import sys
 import textwrap
 from hmac import HMAC, compare_digest
@@ -16,12 +18,18 @@ logger = create_logger()
 from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blocks
 from .crypto import hkdf_hmac_sha512
 from .compress import Compressor, CNONE
+from .helpers import get_limited_unpacker
+
 
 PREFIX = b'\0' * 8
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE is incorrect"""
+    """passphrase supplied in BORG_PASSPHRASE or by BORG_PASSCOMMAND is incorrect."""
+
+
+class PasscommandFailure(Error):
+    """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
 
 
 class PasswordRetriesExceeded(Error):
@@ -155,9 +163,9 @@ class KeyBase:
             logger.warning('Manifest authentication DISABLED.')
             tam_required = False
         data = bytearray(data)
-        # Since we don't trust these bytes we use the slower Python unpacker,
-        # which is assumed to have a lower probability of security issues.
-        unpacked = msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
+        unpacker = get_limited_unpacker('manifest')
+        unpacker.feed(data)
+        unpacked = unpacker.unpack()
         if b'tam' not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
@@ -301,10 +309,29 @@ class AESKeyBase(KeyBase):
 
 class Passphrase(str):
     @classmethod
-    def env_passphrase(cls, default=None):
-        passphrase = os.environ.get('BORG_PASSPHRASE', default)
+    def _env_passphrase(cls, env_var, default=None):
+        passphrase = os.environ.get(env_var, default)
         if passphrase is not None:
             return cls(passphrase)
+
+    @classmethod
+    def env_passphrase(cls, default=None):
+        passphrase = cls._env_passphrase('BORG_PASSPHRASE', default)
+        if passphrase is not None:
+            return passphrase
+        passphrase = cls.env_passcommand()
+        if passphrase is not None:
+            return passphrase
+
+    @classmethod
+    def env_passcommand(cls, default=None):
+        passcommand = os.environ.get('BORG_PASSCOMMAND', None)
+        if passcommand is not None:
+            try:
+                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True)
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                raise PasscommandFailure(e)
+            return cls(passphrase.rstrip('\n'))
 
     @classmethod
     def getpass(cls, prompt):

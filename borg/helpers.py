@@ -39,6 +39,26 @@ import msgpack.fallback
 
 import socket
 
+# 20 MiB minus 41 bytes for a Repository header (because the "size" field in the Repository includes
+# the header, and the total size was set to 20 MiB).
+MAX_DATA_SIZE = 20971479
+
+# MAX_OBJECT_SIZE = <20 MiB (MAX_DATA_SIZE) + 41 bytes for a Repository PUT header, which consists of
+# a 1 byte tag ID, 4 byte CRC, 4 byte size and 32 bytes for the ID.
+MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see LoggedIO.put_header_fmt.size assertion in repository module
+assert MAX_OBJECT_SIZE == 20971520 == 20 * 1024 * 1024
+
+# borg.remote read() buffer size
+BUFSIZE = 10 * 1024 * 1024
+
+# to use a safe, limited unpacker, we need to set a upper limit to the archive count in the manifest.
+# this does not mean that you can always really reach that number, because it also needs to be less than
+# MAX_DATA_SIZE or it will trigger the check for that.
+MAX_ARCHIVES = 400000
+
+# repo.list() / .scan() result count limit the borg client uses
+LIST_SCAN_LIMIT = 10000
+
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N
 EXIT_SUCCESS = 0  # everything done, no problems
@@ -137,6 +157,35 @@ def check_extension_modules():
         raise ExtensionModuleError
     if platform.API_VERSION != '1.0_01':
         raise ExtensionModuleError
+
+
+def get_limited_unpacker(kind):
+    """return a limited Unpacker because we should not trust msgpack data received from remote"""
+    args = dict(use_list=False,  # return tuples, not lists
+                max_bin_len=0,  # not used
+                max_ext_len=0,  # not used
+                max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE),
+                max_str_len=MAX_OBJECT_SIZE,  # a chunk or other repo object
+                )
+    if kind == 'server':
+        args.update(dict(max_array_len=100,  # misc. cmd tuples
+                         max_map_len=100,  # misc. cmd dicts
+                         ))
+    elif kind == 'client':
+        args.update(dict(max_array_len=LIST_SCAN_LIMIT,  # result list from repo.list() / .scan()
+                         max_map_len=100,  # misc. result dicts
+                         ))
+    elif kind == 'manifest':
+        args.update(dict(use_list=True,  # default value
+                         max_array_len=100,  # ITEM_KEYS ~= 22
+                         max_map_len=MAX_ARCHIVES,  # list of archives
+                         max_str_len=255,  # archive name
+                         object_hook=StableDict,
+                         unicode_errors='surrogateescape',
+                         ))
+    else:
+        raise ValueError('kind must be "server", "client" or "manifest"')
+    return msgpack.Unpacker(**args)
 
 
 class Manifest:
@@ -254,6 +303,10 @@ class Manifest:
             prev_ts = datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
             incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
             self.timestamp = max(incremented, datetime.utcnow().isoformat())
+        # include checks for limits as enforced by limited unpacker (used by load())
+        assert len(self.archives) <= MAX_ARCHIVES
+        assert all(len(name) <= 255 for name in self.archives)
+        assert len(self.item_keys) <= 100
         m = {
             'version': 1,
             'archives': StableDict((name, StableDict(archive)) for name, archive in self.archives.items()),

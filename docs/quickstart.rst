@@ -112,6 +112,11 @@ certain number of old archives::
     #!/bin/sh
     REPOSITORY=username@remoteserver.com:backup
 
+    # Setting this, so you won't be asked for your repository passphrase:
+    export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
+    # or this to ask an external program to supply the passphrase:
+    export BORG_PASSCOMMAND='pass show backup'
+
     # Backup all of /home and /var/www except a few
     # excluded directories
     borg create -v --stats                          \
@@ -149,8 +154,8 @@ may be surprised that the following ``export`` has no effect on your command::
    export BORG_PASSPHRASE='complicated & long'
    sudo ./yourborgwrapper.sh  # still prompts for password
 
-For more information, see sudo(8) man page. Hint: see ``env_keep`` in
-sudoers(5), or try ``sudo BORG_PASSPHRASE='yourphrase' borg`` syntax.
+For more information, refer to the sudo(8) man page and ``env_keep`` in
+the sudoers(5) man page.
 
 .. Tip::
     To debug what your borg process is actually seeing, find its PID

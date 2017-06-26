@@ -2491,12 +2491,12 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to create')
-        subparser.add_argument('-e', '--encryption', dest='encryption', required=True,
+        subparser.add_argument('-e', '--encryption', dest='encryption', required=True, metavar='MODE',
                                choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
                                help='select encryption key mode **(required)**')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
-        subparser.add_argument('--storage-quota', dest='storage_quota', default=None,
+        subparser.add_argument('--storage-quota', dest='storage_quota', default=None, metavar='QUOTA',
                                type=parse_storage_quota,
                                help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
 
@@ -2557,20 +2557,15 @@ class Archiver:
                                type=location_validator(),
                                help='repository or archive to check consistency of')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
-                               default=False,
                                help='only perform repository checks')
         subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
-                               default=False,
                                help='only perform archives checks')
         subparser.add_argument('--verify-data', dest='verify_data', action='store_true',
-                               default=False,
                                help='perform cryptographic archive data integrity verification '
                                     '(conflicts with ``--repository-only``)')
         subparser.add_argument('--repair', dest='repair', action='store_true',
-                               default=False,
                                help='attempt to repair any inconsistencies found')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               default=False,
                                help='work slower, but using less space')
         self.add_archives_filters_args(subparser)
 
@@ -2613,10 +2608,8 @@ class Archiver:
         subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
                                help='where to store the backup')
         subparser.add_argument('--paper', dest='paper', action='store_true',
-                               default=False,
                                help='Create an export suitable for printing and later type-in')
         subparser.add_argument('--qr-html', dest='qr', action='store_true',
-                               default=False,
                                help='Create an html file suitable for printing and later type-in or qr scan')
 
         key_import_epilog = process_epilog("""
@@ -2638,7 +2631,6 @@ class Archiver:
         subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
                                help='path to the backup')
         subparser.add_argument('--paper', dest='paper', action='store_true',
-                               default=False,
                                help='interactively import from a backup done with ``--paper``')
 
         change_passphrase_epilog = process_epilog("""
@@ -2790,15 +2782,11 @@ class Archiver:
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
 
-        subparser.add_argument('-n', '--dry-run', dest='dry_run',
-                               action='store_true', default=False,
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not create a backup archive')
-
-        subparser.add_argument('-s', '--stats', dest='stats',
-                               action='store_true', default=False,
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the created archive')
-        subparser.add_argument('--list', dest='output_list',
-                               action='store_true', default=False,
+        subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
                                help='only display items with the given status characters')
@@ -2808,47 +2796,38 @@ class Archiver:
                                help='experimental: do not synchronize the cache. Implies ``--no-files-cache``.')
 
         exclude_group = subparser.add_argument_group('Exclusion options')
-        exclude_group.add_argument('-e', '--exclude', dest='patterns',
-                                   type=parse_exclude_pattern, action='append',
-                                   metavar="PATTERN", help='exclude paths matching PATTERN')
-        exclude_group.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
-                                   metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
-                                   action='store_true', default=False,
+        exclude_group.add_argument('-e', '--exclude', metavar='PATTERN', dest='patterns',
+                                   type=parse_exclude_pattern, action='append', help='exclude paths matching PATTERN')
+        exclude_group.add_argument('--exclude-from', metavar='EXCLUDEFILE', action=ArgparseExcludeFileAction,
+                                   help='read exclude patterns from EXCLUDEFILE, one per line')
+        exclude_group.add_argument('--exclude-caches', dest='exclude_caches', action='store_true',
                                    help='exclude directories that contain a CACHEDIR.TAG file ('
                                         'http://www.brynosaurus.com/cachedir/spec.html)')
-        exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
-                                   metavar='NAME', action='append', type=str,
+        exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present', metavar='NAME',
+                                   action='append', type=str,
                                    help='exclude directories that are tagged by containing a filesystem object with '
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
-                                   action='store_true', default=False,
+                                   action='store_true',
                                    help='if tag objects are specified with ``--exclude-if-present``, '
                                         'don\'t omit the tag objects themselves from the backup archive')
-        exclude_group.add_argument('--pattern',
-                                   action=ArgparsePatternAction,
-                                   metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
-        exclude_group.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                                   metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
+        exclude_group.add_argument('--pattern', metavar='PATTERN', action=ArgparsePatternAction,
+                                   help='experimental: include/exclude paths matching PATTERN')
+        exclude_group.add_argument('--patterns-from', metavar='PATTERNFILE', action=ArgparsePatternFileAction,
+                                   help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
 
         fs_group = subparser.add_argument_group('Filesystem options')
-        fs_group.add_argument('-x', '--one-file-system', dest='one_file_system',
-                              action='store_true', default=False,
+        fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
                               help='stay in the same file system and do not store mount points of other file systems')
-        fs_group.add_argument('--numeric-owner', dest='numeric_owner',
-                              action='store_true', default=False,
+        fs_group.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                               help='only store numeric user and group identifiers')
-        fs_group.add_argument('--noatime', dest='noatime',
-                              action='store_true', default=False,
+        fs_group.add_argument('--noatime', dest='noatime', action='store_true',
                               help='do not store atime into archive')
-        fs_group.add_argument('--noctime', dest='noctime',
-                              action='store_true', default=False,
+        fs_group.add_argument('--noctime', dest='noctime', action='store_true',
                               help='do not store ctime into archive')
-        fs_group.add_argument('--ignore-inode', dest='ignore_inode',
-                              action='store_true', default=False,
+        fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
-        fs_group.add_argument('--read-special', dest='read_special',
-                              action='store_true', default=False,
+        fs_group.add_argument('--read-special', dest='read_special', action='store_true',
                               help='open and read block and char device files as well as FIFOs as if they were '
                                    'regular files. Also follows symlinks pointing to these kinds of files.')
 
@@ -2860,16 +2839,15 @@ class Archiver:
                                    metavar='TIMESTAMP',
                                    help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
                                         'alternatively, give a reference file/directory.')
-        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                                   type=int, default=1800, metavar='SECONDS',
+        archive_group.add_argument('-c', '--checkpoint-interval', metavar='SECONDS', dest='checkpoint_interval',
+                                   type=int, default=1800,
                                    help='write checkpoint every SECONDS seconds (Default: 1800)')
-        archive_group.add_argument('--chunker-params', dest='chunker_params',
+        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   metavar='PARAMS',
                                    help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
-        archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=CompressionSpec('lz4'), metavar='COMPRESSION',
+        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'),
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
 
@@ -2905,32 +2883,28 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
-        subparser.add_argument('--list', dest='output_list',
-                               action='store_true', default=False,
+        subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run',
-                               default=False, action='store_true',
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not actually change any files')
-        subparser.add_argument('-e', '--exclude', dest='patterns',
+        subparser.add_argument('-e', '--exclude', metavar='PATTERN', dest='patterns',
                                type=parse_exclude_pattern, action='append',
-                               metavar="PATTERN", help='exclude paths matching PATTERN')
-        subparser.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
-                               metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
-        subparser.add_argument('--pattern', action=ArgparsePatternAction,
-                               metavar="PATTERN", help='experimental: include/exclude paths matching PATTERN')
-        subparser.add_argument('--patterns-from', action=ArgparsePatternFileAction,
-                               metavar='PATTERNFILE', help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
-        subparser.add_argument('--numeric-owner', dest='numeric_owner',
-                               action='store_true', default=False,
+                               help='exclude paths matching PATTERN')
+        subparser.add_argument('--exclude-from', metavar='EXCLUDEFILE', action=ArgparseExcludeFileAction,
+                               help='read exclude patterns from EXCLUDEFILE, one per line')
+        subparser.add_argument('--pattern', metavar='PATTERN', action=ArgparsePatternAction,
+                               help='experimental: include/exclude paths matching PATTERN')
+        subparser.add_argument('--patterns-from', metavar='PATTERNFILE', action=ArgparsePatternFileAction,
+                               help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
+        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                                help='only obey numeric user and group identifiers')
-        subparser.add_argument('--strip-components', dest='strip_components',
-                               type=int, default=0, metavar='NUMBER',
-                               help='Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.')
-        subparser.add_argument('--stdout', dest='stdout',
-                               action='store_true', default=False,
+        subparser.add_argument('--strip-components', metavar='NUMBER', dest='strip_components',
+                               type=int, default=0,
+                               help='Remove the specified number of leading path elements. Pathnames with fewer '
+                                    'elements will be silently skipped.')
+        subparser.add_argument('--stdout', dest='stdout', action='store_true',
                                help='write all extracted data to stdout')
-        subparser.add_argument('--sparse', dest='sparse',
-                               action='store_true', default=False,
+        subparser.add_argument('--sparse', dest='sparse', action='store_true',
                                help='create holes in output sparse file from all-zero chunks')
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
@@ -2981,8 +2955,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_export_tar)
         subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
                                help='filter program to pipe data through')
-        subparser.add_argument('--list', dest='output_list',
-                               action='store_true', default=False,
+        subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-e', '--exclude', dest='patterns',
                                type=parse_exclude_pattern, action='append',
@@ -3028,14 +3001,11 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='find differences in archive contents')
         subparser.set_defaults(func=self.do_diff)
-        subparser.add_argument('--numeric-owner', dest='numeric_owner',
-                               action='store_true', default=False,
+        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                                help='only consider numeric user and group identifiers')
-        subparser.add_argument('--same-chunker-params', dest='same_chunker_params',
-                               action='store_true', default=False,
+        subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
                                help='Override check of chunker parameters.')
-        subparser.add_argument('--sort', dest='sort',
-                               action='store_true', default=False,
+        subparser.add_argument('--sort', dest='sort', action='store_true',
                                help='Sort the output lines by file path.')
         subparser.add_argument('location', metavar='REPO_ARCHIVE1',
                                type=location_validator(archive=True),
@@ -3053,7 +3023,7 @@ class Archiver:
         exclude_group.add_argument('--exclude-from', action=ArgparseExcludeFileAction,
                                    metavar='EXCLUDEFILE', help='read exclude patterns from EXCLUDEFILE, one per line')
         exclude_group.add_argument('--exclude-caches', dest='exclude_caches',
-                                   action='store_true', default=False,
+                                   action='store_true',
                                    help='exclude directories that contain a CACHEDIR.TAG file ('
                                         'http://www.brynosaurus.com/cachedir/spec.html)')
         exclude_group.add_argument('--exclude-if-present', dest='exclude_if_present',
@@ -3061,7 +3031,7 @@ class Archiver:
                                    help='exclude directories that are tagged by containing a filesystem object with '
                                         'the given NAME')
         exclude_group.add_argument('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
-                                   action='store_true', default=False,
+                                   action='store_true',
                                    help='if tag objects are specified with ``--exclude-if-present``, '
                                         'don\'t omit the tag objects themselves from the backup archive')
         exclude_group.add_argument('--pattern',
@@ -3108,7 +3078,6 @@ class Archiver:
                                help='force deletion of corrupted archives, '
                                     'use ``--force --force`` in case ``--force`` does not work.')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               default=False,
                                help='work slower, but using less space')
         subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),

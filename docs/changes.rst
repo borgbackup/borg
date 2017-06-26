@@ -133,36 +133,66 @@ Version 1.0.11rc1 (not released yet)
 
 Bug fixes:
 
-- extract: warning for unextracted big extended attributes, #2258
+- performance: rebuild hashtable if we have too little empty buckets, #2246
+- Archive: allocate zeros when needed, #2308
+  fixes huge memory usage of mount (8 MiB × number of archives)
+- IPv6 address support
+  also: Location: more informative exception when parsing fails
+- borg single-file binary: use pyinstaller v3.2.1, #2396
+  this fixes that the prelink cronjob on some distros kills the
+  borg binary by stripping away parts of it.
+- extract:
+
+  - warning for unextracted big extended attributes, #2258
+  - also create parent dir for device files, if needed.
+  - don't write to disk with --stdout, #2645
 - archive check: detect and fix missing all-zero replacement chunks, #2180
 - fix (de)compression exceptions, #2224 #2221
-- performance: rebuild hashtable if we have too little empty buckets, #2246
 - files cache: update inode number, #2226
 - borg rpc: use limited msgpack.Unpacker (security precaution), #2139
+- Manifest: use limited msgpack.Unpacker (security precaution), #2175
 - Location: accept //servername/share/path
 - fix ChunkIndex.__contains__ assertion  for big-endian archs (harmless)
 - create: handle BackupOSError on a per-path level in one spot
 - fix error msg, there is no --keep-last in borg 1.0.x, #2282
 - clamp (nano)second values to unproblematic range, #2304
-- FUSE: fix st_blocks to be an integer (not float) value
+- fuse / borg mount:
+
+  - fix st_blocks to be an integer (not float) value
+  - fix negative uid/gid crash (they could come into archives e.g. when
+    backing up external drives under cygwin), #2674
+  - fix crash if empty (None) xattr is read
+  - do pre-mount checks before opening repository
+  - check llfuse is installed before asking for passphrase
 - borg rename: expand placeholders, #2386
-- use pyinstaller v3.2.1, #2396
-  this fixes that the prelink cronjob on some distros kills the
-  borg binary by stripping away parts of it.
-- serve: fix forced command lines containing BORG_ env vars
+- borg serve: fix forced command lines containing BORG_ env vars
 - fix error msg, it is --keep-within, not --within
 - fix borg key/debug/benchmark crashing without subcommand, #2240
-- Archive: allocate zeros when needed, #2308
-  fixes huge memory usage of mount (8 MiB × number of archives)
-- extract: also create parent dir for device files, if needed.
+- chunker: fix invalid use of types, don't do uint32_t >> 32
+- document follow_symlinks requirements, check libc, #2507
 
 New features:
 
-- new options --pattern and --patterns-from, #1406
+- added BORG_PASSCOMMAND environment variable, #2573
+- add minimal version of in repository mandatory feature flags, #2134
+
+  This should allow us to make sure older borg versions can be cleanly
+  prevented from doing operations that are no longer safe because of
+  repository format evolution. This allows more fine grained control than
+  just incrementing the manifest version. So for example a change that
+  still allows new archives to be created but would corrupt the repository
+  when an old version tries to delete an archive or check the repository
+  would add the new feature to the check and delete set but leave it out
+  of the write set.
 - borg delete --force --force to delete severely corrupted archives, #1975
 
 Other changes:
 
+- embrace y2038 issue to support 32bit platforms
+- be more clear that this is a "beyond repair" case, #2427
+- key file names: limit to 100 characters and remove colons from host name
+- upgrade FUSE for macOS to 3.5.8, #2346
+- split up parsing and filtering for --keep-within, better error message, #2610
 - docs:
 
   - fix caskroom link, #2299
@@ -174,10 +204,31 @@ Other changes:
   - development: new branching model in git repository
   - kill api page
   - added FAQ section about backing up root partition
+  - add bountysource badge, #2558
+  - create empty docs.txt reequirements, #2694
+  - README: how to help the project
+  - note -v/--verbose requirement on affected options, #2542
+  - document borg init behaviour via append-only borg serve, #2440
+  - be clear about what buzhash is used for (chunking) and want it is not
+    used for (deduplication)- also say already in the readme that we use a
+    cryptohash for dedupe, so people don't worry, #2390
+  - add hint about chunker params to borg upgrade docs, #2421
+  - clarify borg upgrade docs, #2436
+  - quickstart: delete problematic BORG_PASSPRHASE use, #2623
+  - faq: specify "using inline shell scripts"
+  - document pattern denial of service, #2624
 - tests:
 
-  - enhance travis setuptools_scm situation
+  - remove attic dependency of the tests, #2505
+  - travis:
+
+    - enhance travis setuptools_scm situation
+    - install fakeroot for Linux
   - add test for borg delete --force
+  - enable remote tests on cygwin (the cygwin issue that caused these tests
+    to break was fixed in cygwin at least since cygwin 2.8, maybe even since
+    2.7.0).
+  - remove skipping the noatime tests on GNU/Hurd, #2710
 
 
 Version 1.0.10 (2017-02-13)

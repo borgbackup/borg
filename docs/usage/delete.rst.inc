@@ -30,11 +30,14 @@ borg delete
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
+      --remote-path PATH    use PATH as borg executable on the remote (default:
+                            "borg")
       -p, --progress        show progress display while deleting a single archive
-      -s, --stats           print statistics for the deleted archive
+      -s, --stats           print statistics for the deleted archive. Requires
+                            -v/--verbose.
       -c, --cache-only      delete only the local cache for the given repository
-      --force               force deletion of corrupted archives
+      --force               force deletion of corrupted archives, use --force
+                            --force in case --force does not work.
       --save-space          work slower, but using less space
     
 Description

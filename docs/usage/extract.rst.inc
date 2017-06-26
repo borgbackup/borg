@@ -32,8 +32,10 @@ borg extract
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
-      --list                output verbose list of items (files, dirs, ...)
+      --remote-path PATH    use PATH as borg executable on the remote (default:
+                            "borg")
+      --list                output verbose list of items (files, dirs, ...).
+                            Requires -v/--verbose.
       -n, --dry-run         do not actually change any files
       -e PATTERN, --exclude PATTERN
                             exclude paths matching PATTERN

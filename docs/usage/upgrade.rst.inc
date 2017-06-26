@@ -30,7 +30,8 @@ borg upgrade
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
+      --remote-path PATH    use PATH as borg executable on the remote (default:
+                            "borg")
       -p, --progress        show progress display while upgrading the repository
       -n, --dry-run         do not change repository
       -i, --inplace         rewrite repository in place, with no chance of going
@@ -43,7 +44,20 @@ borg upgrade
 Description
 ~~~~~~~~~~~
 
-Upgrade an existing Borg repository.
+Upgrade an existing, local Borg repository.
+
+When you do not need borg upgrade
++++++++++++++++++++++++++++++++++
+
+Not every change requires that you run ``borg upgrade``.
+
+You do **not** need to run it when:
+
+- moving your repository to a different place
+- upgrading to another point release (like 1.0.x to 1.0.y),
+  except when noted otherwise in the changelog
+- upgrading from 1.0.x to 1.1.x,
+  except when noted otherwise in the changelog
 
 Borg 1.x.y upgrades
 +++++++++++++++++++
@@ -75,8 +89,13 @@ helps with converting Borg 0.xx to 1.0.
 
 Currently, only LOCAL repositories can be upgraded (issue #465).
 
-It will change the magic strings in the repository's segments
-to match the new Borg magic strings. The keyfiles found in
+Please note that ``borg create`` (since 1.0.0) uses bigger chunks by
+default than old borg or attic did, so the new chunks won't deduplicate
+with the old chunks in the upgraded repository.
+See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.
+
+``borg upgrade`` will change the magic strings in the repository's
+segments to match the new Borg magic strings. The keyfiles found in
 $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
 copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 

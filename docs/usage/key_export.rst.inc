@@ -31,7 +31,8 @@ borg key export
       --no-files-cache      do not load/update the file metadata cache used to
                             detect unchanged files
       --umask M             set umask to M (local and remote, default: 0077)
-      --remote-path PATH    set remote path to executable (default: "borg")
+      --remote-path PATH    use PATH as borg executable on the remote (default:
+                            "borg")
       --paper               Create an export suitable for printing and later type-
                             in
       --qr-html             Create an html file suitable for printing and later

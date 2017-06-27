@@ -623,15 +623,13 @@ class LocalCache(CacheStatsMixin):
             # due to hash table "resonance".
             master_index_capacity = int(len(self.cache.repository) / ChunkIndex.MAX_LOAD_FACTOR)
             if archive_ids:
-                chunk_idx = None if not self.enabled else ChunkIndex(master_index_capacity)
+                chunk_idx = ChunkIndex(master_index_capacity)
                 pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
                                               msg='%3.0f%% Syncing chunks cache. Processing archive %s',
                                               msgid='cache.sync')
                 chunks_archives = self.get_chunks_archives(archive_ids)
                 for chunks_archive in chunks_archives:
                     pi.show(info=[remove_surrogates(chunks_archive.name)])
-                    if not self.enabled:
-                        chunk_idx = chunk_idx or ChunkIndex(master_index_capacity)
                     archive_chunk_idx = chunks_archive.procure_index(decrypted_repository, cache_sync_stats)
                     if self.chunks_archive_enabled:
                         self.fetch_missing_csize(decrypted_repository, archive_chunk_idx, cache_sync_stats)

@@ -411,14 +411,22 @@ class Archiver:
             yield path
             shutil.rmtree(path)
 
-        for msg, count, size, random in [
-            ('Z-BIG', 10, 100000000, False),
-            ('R-BIG', 10, 100000000, True),
-            ('Z-MEDIUM', 1000, 1000000, False),
-            ('R-MEDIUM', 1000, 1000000, True),
-            ('Z-SMALL', 10000, 10000, False),
-            ('R-SMALL', 10000, 10000, True),
-        ]:
+        if '_BORG_BENCHMARK_CRUD_TEST' in os.environ:
+            tests = [
+                ('Z-TEST', 1, 1, False),
+                ('R-TEST', 1, 1, True),
+            ]
+        else:
+            tests = [
+                ('Z-BIG', 10, 100000000, False),
+                ('R-BIG', 10, 100000000, True),
+                ('Z-MEDIUM', 1000, 1000000, False),
+                ('R-MEDIUM', 1000, 1000000, True),
+                ('Z-SMALL', 10000, 10000, False),
+                ('R-SMALL', 10000, 10000, True),
+            ]
+
+        for msg, count, size, random in tests:
             with test_files(args.path, count, size, random) as path:
                 dt_create, dt_update, dt_extract, dt_delete = measurement_run(args.location.canonical_path(), path)
             total_size_MB = count * size / 1e06
@@ -429,6 +437,8 @@ class Archiver:
             print(fmt % ('R', msg, total_size_MB / dt_extract, count, file_size_formatted, content, dt_extract))
             print(fmt % ('U', msg, total_size_MB / dt_update, count, file_size_formatted, content, dt_update))
             print(fmt % ('D', msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
+
+        return 0
 
     @with_repository(fake='dry_run', exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest=None, key=None):

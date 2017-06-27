@@ -2607,6 +2607,30 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert '_meta' in result
         assert '_items' in result
 
+    def test_debug_refcount_obj(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('debug', 'refcount-obj', self.repository_location, '0' * 64).strip()
+        assert output == 'object 0000000000000000000000000000000000000000000000000000000000000000 not found [info from chunks cache].'
+
+        create_json = json.loads(self.cmd('create', '--json', self.repository_location + '::test', 'input'))
+        archive_id = create_json['archive']['id']
+        output = self.cmd('debug', 'refcount-obj', self.repository_location, archive_id).strip()
+        assert output == 'object ' + archive_id + ' has 1 referrers [info from chunks cache].'
+
+        # Invalid IDs do not abort or return an error
+        output = self.cmd('debug', 'refcount-obj', self.repository_location, '124', 'xyza').strip()
+        assert output == 'object id 124 is invalid.\nobject id xyza is invalid.'
+
+    def test_debug_info(self):
+        output = self.cmd('debug', 'info')
+        assert 'CRC implementation' in output
+        assert 'Python' in output
+
+    def test_benchmark_crud(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with environment_variable(_BORG_BENCHMARK_CRUD_TEST='YES'):
+            self.cmd('benchmark', 'crud', self.repository_location, self.input_path)
+
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
 

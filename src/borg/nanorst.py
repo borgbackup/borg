@@ -1,6 +1,7 @@
 import io
-import os
 import sys
+
+from .helpers import is_terminal
 
 
 class TextPecker:
@@ -205,7 +206,7 @@ def rst_to_terminal(rst, references=None, destination=sys.stdout):
     If *destination* is a file-like object connected to a terminal,
     enrich text with suitable ANSI escapes. Otherwise return plain text.
     """
-    if hasattr(destination, 'isatty') and destination.isatty() and (sys.platform != 'win32' or 'ANSICON' in os.environ):
+    if is_terminal(destination):
         rst_state_hook = ansi_escapes
     else:
         rst_state_hook = None

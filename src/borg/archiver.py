@@ -341,7 +341,7 @@ class Archiver:
             if not args.path:
                 self.print_error("input file to import key from expected")
                 return EXIT_ERROR
-            if not os.path.exists(args.path):
+            if args.path != '-' and not os.path.exists(args.path):
                 self.print_error("input file does not exist: " + args.path)
                 return EXIT_ERROR
             manager.import_keyfile(args)
@@ -2695,7 +2695,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
         subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
-                               help='path to the backup')
+                               help='path to the backup (\'-\' to read from stdin)')
         subparser.add_argument('--paper', dest='paper', action='store_true',
                                help='interactively import from a backup done with ``--paper``')
 

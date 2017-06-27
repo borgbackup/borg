@@ -8,7 +8,9 @@ ITEM_KEYS = frozenset(['path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'ha
 REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
-ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
+ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'num_files',
+                          'cmdline', 'hostname', 'username',
+                          'time', 'time_end',
                           'comment', 'chunker_params',
                           'recreate_cmdline', 'recreate_source_id', 'recreate_args'])
 

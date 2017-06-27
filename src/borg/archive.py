@@ -457,6 +457,7 @@ Utilization of max. archive size: {csize_max:.0%}
             'name': name,
             'comment': comment or '',
             'items': self.items_buffer.chunks,
+            'num_files': self.stats.nfiles,
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
             'username': getuser(),

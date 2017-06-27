@@ -45,7 +45,7 @@ has_lchflags = hasattr(os, 'lchflags')
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
-def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
+def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', **kw):
     if fork:
         try:
             if exe is None:
@@ -54,7 +54,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
                 borg = (exe, )
             elif not isinstance(exe, tuple):
                 raise ValueError('exe must be None, a tuple or a str')
-            output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT)
+            output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT, input=input)
             ret = 0
         except subprocess.CalledProcessError as e:
             output = e.output
@@ -63,7 +63,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, **kw):
     else:
         stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
         try:
-            sys.stdin = StringIO()
+            sys.stdin = StringIO(input.decode())
             sys.stdout = sys.stderr = output = StringIO()
             if archiver is None:
                 archiver = Archiver()
@@ -1501,6 +1501,51 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
  1: 616263 646566 676869 6a6b6c 6d6e6f 707172 - 6d
  2: 737475 - 88
 """
+
+    def test_key_import_paperkey(self):
+        repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'
+        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        self._set_repository_id(self.repository_path, unhexlify(repo_id))
+
+        key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
+        with open(key_file, 'w') as fd:
+            fd.write(KeyfileKey.FILE_ID + ' ' + repo_id + '\n')
+            fd.write(b2a_base64(b'abcdefghijklmnopqrstu').decode())
+
+        typed_input = (
+            b'2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41  02\n'   # Forgot to type "-"
+            b'2 / e29442 3506da 4e1ea7  25f62a 5a3d41 - 02\n'   # Forgot to type second "/"
+            b'2 / e29442 3506da 4e1ea7 / 25f62a 5a3d42 - 02\n'  # Typo (..42 not ..41)
+            b'2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02\n'  # Correct! Congratulations
+            b'616263 646566 676869 6a6b6c 6d6e6f 707172 - 6d\n'
+            b'\n\n'  # Abort [yN] => N
+            b'737475 88\n'  # missing "-"
+            b'73747i - 88\n'  # typo
+            b'73747 - 88\n'  # missing nibble
+            b'73 74 75  -  89\n'  # line checksum mismatch
+            b'00a1 - 88\n'  # line hash collision - overall hash mismatch, have to start over
+
+            b'2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02\n'
+            b'616263 646566 676869 6a6b6c 6d6e6f 707172 - 6d\n'
+            b'73 74 75  -  88\n'
+        )
+
+        # In case that this has to change, here is a quick way to find a colliding line hash:
+        #
+        # from hashlib import sha256
+        # hash_fn = lambda x: sha256(b'\x00\x02' + x).hexdigest()[:2]
+        # for i in range(1000):
+        #     if hash_fn(i.to_bytes(2, byteorder='big')) == '88':  # 88 = line hash
+        #         print(i.to_bytes(2, 'big'))
+        #         break
+
+        self.cmd('key', 'import', '--paper', self.repository_location, input=typed_input)
+
+        # Test abort paths
+        typed_input = b'\ny\n'
+        self.cmd('key', 'import', '--paper', self.repository_location, input=typed_input)
+        typed_input = b'2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02\n\ny\n'
+        self.cmd('key', 'import', '--paper', self.repository_location, input=typed_input)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

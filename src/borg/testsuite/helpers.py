@@ -28,6 +28,7 @@ from ..helpers import swidth_slice
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
 from ..helpers import popen_with_error_handling
+from ..helpers import open_file_or_stdin
 
 from . import BaseTestCase, FakeInputs
 
@@ -942,3 +943,8 @@ class TestPopenWithErrorHandling:
     def test_shell(self):
         with pytest.raises(AssertionError):
             popen_with_error_handling('', shell=True)
+
+
+def test_open_file_or_stdin():
+    assert open_file_or_stdin('-', 'r') is sys.stdin
+    assert open_file_or_stdin('-', 'rb') is sys.stdin.buffer

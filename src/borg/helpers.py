@@ -2162,3 +2162,17 @@ def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
     except PermissionError:
         logger.error('%spermission denied: %s', log_prefix, command[0])
         return
+
+
+def open_file_or_stdin(path, mode):
+    if path == '-':
+        if 'b' in mode:
+            return sys.stdin.buffer
+        else:
+            return sys.stdin
+    else:
+        return open(path, mode)
+
+
+def is_terminal(fd=sys.stdout):
+    return hasattr(fd, 'isatty') and fd.isatty() and (sys.platform != 'win32' or 'ANSICON' in os.environ)

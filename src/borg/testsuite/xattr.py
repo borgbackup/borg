@@ -2,7 +2,9 @@ import os
 import tempfile
 import unittest
 
-from ..xattr import is_enabled, getxattr, setxattr, listxattr, buffer
+import pytest
+
+from ..xattr import is_enabled, getxattr, setxattr, listxattr, buffer, split_lstring
 from . import BaseTestCase
 
 
@@ -58,3 +60,13 @@ class XattrTestCase(BaseTestCase):
         got_value = getxattr(self.tmpfile.name, 'user.big')
         self.assert_equal(value, got_value)
         self.assert_equal(len(buffer), 128)
+
+
+@pytest.mark.parametrize('lstring, splitted', (
+    (b'', []),
+    (b'\x00', [b'']),
+    (b'\x01a', [b'a']),
+    (b'\x01a\x02cd', [b'a', b'cd']),
+))
+def test_split_lstring(lstring, splitted):
+    assert split_lstring(lstring) == splitted

@@ -40,7 +40,7 @@ def format_version(version):
     while True:
         part = next(it)
         if part >= 0:
-            f += str(part)
+            f.append(str(part))
         elif part == -1:
             break
         else:

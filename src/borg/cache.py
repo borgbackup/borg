@@ -780,18 +780,30 @@ class LocalCache(CacheStatsMixin):
             except FileNotFoundError:
                 pass
 
-        def build_index(self, decrypted_repository, chunk_idx, cache_sync_stats):
+        def build_index(self, decrypted_repository, chunk_idx, cache_sync_stats=None, detailed_pi=None):
+            processed_item_metadata_bytes = 0
+            processed_item_metadata_chunks = 0
             csize, data = decrypted_repository.get(self.id)
             chunk_idx.add(self.id, 1, len(data), csize)
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
             sync = CacheSynchronizer(chunk_idx)
+            if detailed_pi:
+                detailed_pi.total = len(archive.items)
             for item_id, (csize, data) in zip(archive.items, decrypted_repository.get_many(archive.items)):
                 chunk_idx.add(item_id, 1, len(data), csize)
-                cache_sync_stats.processed_item_metadata_bytes += len(data)
-                cache_sync_stats.processed_item_metadata_chunks += 1
+                processed_item_metadata_bytes += len(data)
+                processed_item_metadata_chunks += 1
                 sync.feed(data)
+                if detailed_pi:
+                    detailed_pi.show(increase=1)
+            if detailed_pi:
+                detailed_pi.finish()
+            if cache_sync_stats:
+                cache_sync_stats.processed_item_metadata_bytes += processed_item_metadata_bytes
+                cache_sync_stats.processed_item_metadata_chunks += processed_item_metadata_chunks
+            return sync
 
         def write_index(self, chunk_idx, cache_sync_stats):
             assert len(chunk_idx)
@@ -835,7 +847,7 @@ class LocalCache(CacheStatsMixin):
             self.write_index(archive_chunk_idx, cache_sync_stats)
             return archive_chunk_idx
 
-        def procure_index(self, decrypted_repository, cache_sync_stats=None):
+        def procure_index(self, decrypted_repository, cache_sync_stats=None, detailed_pi=None):
             cache_sync_stats = cache_sync_stats or LocalCache.CacheSyncStats()
             try:
                 index = self.read_index(cache_sync_stats)
@@ -845,7 +857,7 @@ class LocalCache(CacheStatsMixin):
                 return index
 
             index = ChunkIndex()
-            self.build_index(decrypted_repository, index, cache_sync_stats)
+            self.build_index(decrypted_repository, index, cache_sync_stats, detailed_pi=detailed_pi)
             return index
 
     def check_cache_compatibility(self):

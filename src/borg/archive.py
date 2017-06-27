@@ -366,13 +366,14 @@ class Archive:
     def duration_from_meta(self):
         return format_timedelta(self.ts_end - self.ts)
 
-    def info(self):
+    def info(self, decrypted_repository=None):
+        assert decrypted_repository or self.create
         if self.create:
             stats = self.stats
             start = self.start.replace(tzinfo=timezone.utc)
             end = self.end.replace(tzinfo=timezone.utc)
         else:
-            stats = self.calc_stats(self.cache)
+            stats = self.calc_stats(self.cache, decrypted_repository)
             start = self.ts
             end = self.ts_end
         info = {
@@ -477,24 +478,19 @@ Utilization of max. archive size: {csize_max:.0%}
         self.repository.commit()
         self.cache.commit()
 
-    def calc_stats(self, cache):
-        def add(id):
-            entry = cache.chunks[id]
-            archive_index.add(id, 1, entry.size, entry.csize)
-
-        archive_index = ChunkIndex()
-        sync = CacheSynchronizer(archive_index)
-        add(self.id)
+    def calc_stats(self, cache, decrypted_repository):
         pi = ProgressIndicatorPercent(total=len(self.metadata.items), msg='Calculating statistics... %3d%%')
-        for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
-            pi.show(increase=1)
-            add(id)
-            data = self.key.decrypt(id, chunk)
-            sync.feed(data)
+        chunks_archive = self.cache.chunks_archive_manager.get_chunks_archive(self)
+        if 'num_files' in self.metadata:
+            num_files = self.metadata.num_files
+            archive_index = chunks_archive.procure_index(decrypted_repository, detailed_pi=pi)
+        else:
+            archive_index = ChunkIndex()
+            sync = chunks_archive.build_index(decrypted_repository, archive_index, detailed_pi=pi)
+            num_files = sync.num_files
         stats = Statistics()
         stats.osize, stats.csize, unique_size, stats.usize, unique_chunks, chunks = archive_index.stats_against(cache.chunks)
-        stats.nfiles = sync.num_files
-        pi.finish()
+        stats.nfiles = num_files
         return stats
 
     @contextmanager

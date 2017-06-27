@@ -2621,6 +2621,11 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         output = self.cmd('debug', 'refcount-obj', self.repository_location, '124', 'xyza').strip()
         assert output == 'object id 124 is invalid.\nobject id xyza is invalid.'
 
+    def test_debug_info(self):
+        output = self.cmd('debug', 'info')
+        assert 'CRC implementation' in output
+        assert 'Python' in output
+
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
 

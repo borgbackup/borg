@@ -3,6 +3,10 @@
 
 # Automated creation of testing environments / binaries on misc. platforms
 
+$cpus = Integer(ENV.fetch('VMCPUS', '4'))  # create VMs with that many cpus
+$xdistn = Integer(ENV.fetch('XDISTN', '4'))  # dispatch tests to that many pytest workers
+$wmem = $xdistn * 256 # give the VM additional memory for workers [MB]
+
 def packages_prepare_wheezy
   return <<-EOF
       # debian 7 wheezy does not have lz4, but it is available from wheezy-backports:
@@ -208,7 +212,7 @@ def install_cygwin_venv
 end
 
 def install_pyenv(boxname)
-  return <<-EOF
+  script = <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
     echo 'export PATH="$HOME/.pyenv/bin:/vagrant/borg:$PATH"' >> ~/.bash_profile
     echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
@@ -216,6 +220,8 @@ def install_pyenv(boxname)
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
     echo 'export LANG=en_US.UTF-8' >> ~/.bash_profile
   EOF
+  script += "echo 'export XDISTN=%d' >> ~/.bash_profile\n" % [$xdistn]
+  return script
 end
 
 def fix_pyenv_darwin(boxname)
@@ -346,14 +352,14 @@ Vagrant.configure(2) do |config|
 
   config.vm.provider :virtualbox do |v|
     #v.gui = true
-    v.cpus = 1
+    v.cpus = $cpus
   end
 
   # Linux
   config.vm.define "centos7_64" do |b|
     b.vm.box = "centos/7"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1024 + $wmem
     end
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos7_64")
@@ -365,6 +371,9 @@ Vagrant.configure(2) do |config|
 
   config.vm.define "centos6_32" do |b|
     b.vm.box = "centos6-32"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 768 + $wmem
+    end
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
@@ -376,7 +385,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "centos6_64" do |b|
     b.vm.box = "centos6-64"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1024 + $wmem
     end
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
@@ -389,7 +398,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "xenial64" do |b|
     b.vm.box = "ubuntu/xenial64"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1024 + $wmem
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
@@ -400,7 +409,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "trusty64" do |b|
     b.vm.box = "ubuntu/trusty64"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1024 + $wmem
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
@@ -408,10 +417,21 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
   end
 
+  config.vm.define "stretch64" do |b|
+    b.vm.box = "debian/stretch64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("stretch64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
+  end
+
   config.vm.define "jessie64" do |b|
     b.vm.box = "debian/jessie64"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1024 + $wmem
     end
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jessie64")
@@ -421,6 +441,9 @@ Vagrant.configure(2) do |config|
 
   config.vm.define "wheezy32" do |b|
     b.vm.box = "boxcutter/debian7-i386"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 768 + $wmem
+    end
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
@@ -434,6 +457,9 @@ Vagrant.configure(2) do |config|
 
   config.vm.define "wheezy64" do |b|
     b.vm.box = "boxcutter/debian7"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")
@@ -449,6 +475,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "darwin64" do |b|
     b.vm.box = "jhcook/yosemite-clitools"
     b.vm.provider :virtualbox do |v|
+      v.memory = 1536 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       # Adjust CPU settings according to
@@ -474,7 +501,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "freebsd64" do |b|
     b.vm.box = "freebsd/FreeBSD-10.3-RELEASE"
     b.vm.provider :virtualbox do |v|
-      v.memory = 1536
+      v.memory = 1024 + $wmem
     end
     b.ssh.shell = "sh"
     b.vm.provision "install system packages", :type => :shell, :inline => packages_freebsd
@@ -490,8 +517,9 @@ Vagrant.configure(2) do |config|
   config.vm.define "openbsd64" do |b|
     b.vm.box = "openbsd60-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1024 + $wmem
     end
+    b.ssh.shell = "sh"
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
@@ -501,7 +529,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "netbsd64" do |b|
     b.vm.box = "netbsd70-64"
     b.vm.provider :virtualbox do |v|
-      v.memory = 768
+      v.memory = 1024 + $wmem
     end
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
@@ -521,7 +549,7 @@ Vagrant.configure(2) do |config|
     b.ssh.insert_key = false
 
     b.vm.provider :virtualbox do |v|
-      v.memory = 2048
+      v.memory = 1536 + $wmem
       #v.gui = true
     end
 

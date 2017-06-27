@@ -317,7 +317,10 @@ class build_usage(Command):
             else:
                 if not group._group_actions:
                     continue
-                rows.append((1, '**%s**' % group.title))
+                group_header = '**%s**' % group.title
+                if group.description:
+                    group_header += ' — ' + group.description
+                rows.append((1, group_header))
                 if is_positional_group(group):
                     for option in group._group_actions:
                         rows.append((3, '', '``%s``' % option.metavar, option.help or ''))

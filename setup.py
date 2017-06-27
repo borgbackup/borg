@@ -776,7 +776,6 @@ setup(
     ],
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    include_package_data=True,
     zip_safe=False,
     entry_points={
         'console_scripts': [
@@ -784,8 +783,10 @@ setup(
             'borgfs = borg.archiver:main',
         ]
     },
+    include_package_data=True,
     package_data={
-        'borg': ['paperkey.html']
+        'borg': ['paperkey.html'],
+        'borg.testsuite': ['attic.tar.gz'],
     },
     cmdclass=cmdclass,
     ext_modules=ext_modules,

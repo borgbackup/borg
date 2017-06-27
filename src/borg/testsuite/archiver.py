@@ -2626,6 +2626,11 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'CRC implementation' in output
         assert 'Python' in output
 
+    def test_benchmark_crud(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with environment_variable(_BORG_BENCHMARK_CRUD_TEST='YES'):
+            self.cmd('benchmark', 'crud', self.repository_location, self.input_path)
+
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
 

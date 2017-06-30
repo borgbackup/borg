@@ -1,6 +1,16 @@
 <div class="sidebar-block">
   <div class="sidebar-toc">
-    {% set toctree = toctree(maxdepth=3, collapse=True, includehidden=True) %}
+    {# Restrict the sidebar toc depth to two levels while generating command usage pages.
+       This avoids superfluous entries for each "Description" and "Examples" heading. #}
+    {% if pagename.startswith("usage/") and pagename not in (
+      "usage/general", "usage/help", "usage/debug", "usage/notes",
+    ) %}
+      {% set maxdepth = 2 %}
+    {% else %}
+      {% set maxdepth = 3 %}
+    {% endif %}
+
+    {% set toctree = toctree(maxdepth=maxdepth, collapse=True) %}
     {% if toctree %}
       {{ toctree }}
     {% else %}

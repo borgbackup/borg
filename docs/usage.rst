@@ -31,8 +31,6 @@ Usage
    </script>
 
 .. toctree::
-   :hidden:
-
    usage/general
 
    usage/init

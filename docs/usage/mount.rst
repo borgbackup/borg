@@ -5,26 +5,35 @@
 Examples
 ~~~~~~~~
 
-borg mount
-++++++++++
 ::
 
-    $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
+    # Mounting the repository shows all archives.
+    # Archives are loaded lazily, expect some delay when navigating to an archive
+    # for the first time.
+    $ borg mount /path/to/repo /tmp/mymountpoint
     $ ls /tmp/mymountpoint
-    bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
+    root-2016-02-14 root-2016-02-15
     $ borg umount /tmp/mymountpoint
 
-::
+    # Mounting a specific archive is possible as well.
+    $ borg mount /path/to/repo::root-2016-02-15 /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt
+    root  sbin  srv  tmp  usr  var
+    $ borg umount /tmp/mymountpoint
 
+    # The experimental versions view merges all archives in the repository
+    # and provides a versioned view on files.
     $ borg mount -o versions /path/to/repo /tmp/mymountpoint
     $ ls -l /tmp/mymountpoint/home/user/doc.txt/
     total 24
     -rw-rw-r-- 1 user group 12357 Aug 26 21:19 doc.txt.cda00bc9
     -rw-rw-r-- 1 user group 12204 Aug 26 21:04 doc.txt.fa760f28
-    $ fusermount -u /tmp/mymountpoint
+    $ borg umount /tmp/mymountpoint
 
 borgfs
 ++++++
+
 ::
 
     $ echo '/mnt/backup /tmp/myrepo fuse.borgfs defaults,noauto 0 0' >> /etc/fstab

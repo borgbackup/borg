@@ -219,18 +219,18 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, *, glob=None, sort_by=(), first=None, last=None, reverse=False):
+    def list(self, *, glob=None, match_end=r'\Z', sort_by=(), first=None, last=None, reverse=False):
         """
         Return list of ArchiveInfo instances according to the parameters.
 
-        First match *glob*, then *sort_by*. Apply *first* and *last* filters,
-        and possibly *reverse* the list.
+        First match *glob* (considering *match_end*), then *sort_by*.
+        Apply *first* and *last* filters, and then possibly *reverse* the list.
 
         *sort_by* is a list of sort keys applied in reverse order.
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError('sort_by must be a sequence of str')
-        regex = re.compile(shellpattern.translate(glob or '*'))
+        regex = re.compile(shellpattern.translate(glob or '*', match_end=match_end))
         archives = [x for x in self.values() if regex.match(x.name) is not None]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))

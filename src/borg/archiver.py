@@ -1476,8 +1476,11 @@ class Archiver:
             return self.exit_code
         if args.prefix:
             args.glob_archives = args.prefix + '*'
-        archives_checkpoints = manifest.archives.list(glob=args.glob_archives, sort_by=['ts'], reverse=True)
-        is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
+        checkpoint_re = r'\.checkpoint(\.\d+)?'
+        archives_checkpoints = manifest.archives.list(glob=args.glob_archives,
+                                                      match_end=r'(%s)?\Z' % checkpoint_re,
+                                                      sort_by=['ts'], reverse=True)
+        is_checkpoint = re.compile(r'(%s)\Z' % checkpoint_re).search
         checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
         # keep the latest checkpoint, if there is no later non-checkpoint archive
         if archives_checkpoints and checkpoints and archives_checkpoints[0] is checkpoints[0]:

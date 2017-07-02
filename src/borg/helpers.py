@@ -236,7 +236,7 @@ class Archives(abc.MutableMapping):
         if first:
             archives = archives[:first]
         elif last:
-            archives = archives[len(archives) - last:]
+            archives = archives[max(len(archives) - last, 0):]
         return archives
 
     def list_considering(self, args):
@@ -398,6 +398,14 @@ class Manifest:
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+
+
+def positive_int_validator(value):
+    """argparse type for positive integers"""
+    int_value = int(value)
+    if int_value <= 0:
+        raise argparse.ArgumentTypeError('A positive integer is required: %s' % value)
+    return int_value
 
 
 def interval(s):

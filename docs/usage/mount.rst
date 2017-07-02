@@ -22,13 +22,13 @@ Examples
     root  sbin  srv  tmp  usr  var
     $ borg umount /tmp/mymountpoint
 
-    # The experimental versions view merges all archives in the repository
+    # The experimental "versions view" merges all archives in the repository
     # and provides a versioned view on files.
     $ borg mount -o versions /path/to/repo /tmp/mymountpoint
     $ ls -l /tmp/mymountpoint/home/user/doc.txt/
     total 24
-    -rw-rw-r-- 1 user group 12357 Aug 26 21:19 doc.txt.cda00bc9
-    -rw-rw-r-- 1 user group 12204 Aug 26 21:04 doc.txt.fa760f28
+    -rw-rw-r-- 1 user group 12357 Aug 26 21:19 doc.cda00bc9.txt
+    -rw-rw-r-- 1 user group 12204 Aug 26 21:04 doc.fa760f28.txt
     $ borg umount /tmp/mymountpoint
 
 borgfs

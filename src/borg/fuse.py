@@ -351,7 +351,10 @@ class FuseOperations(llfuse.Operations):
                 # add intermediate directory with same name as filename
                 path_fname = name.rsplit(b'/', 1)
                 name += b'/' + path_fname[-1]
-            return name + os.fsencode('.%08x' % version)
+            # keep original extension at end to avoid confusing tools
+            name, ext = os.path.splitext(name)
+            version_enc = os.fsencode('.%08x' % version)
+            return name + version_enc + ext
 
         if self.versions and not is_dir:
             parent = self.process_inner(name, parent)

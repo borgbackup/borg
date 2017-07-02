@@ -219,11 +219,14 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, sort_by=(), reverse=False, glob=None, first=None, last=None):
+    def list(self, *, glob=None, sort_by=(), first=None, last=None, reverse=False):
         """
-        Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        Returns list of borg.helpers.ArchiveInfo instances.
-        sort_by can be a list of sort keys, they are applied in reverse order.
+        Return list of ArchiveInfo instances according to the parameters.
+
+        First match *glob*, then *sort_by*. Apply *first* and *last* filters,
+        and possibly *reverse* the list.
+
+        *sort_by* is a list of sort keys applied in reverse order.
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError('sort_by must be a sequence of str')
@@ -231,12 +234,12 @@ class Archives(abc.MutableMapping):
         archives = [x for x in self.values() if regex.match(x.name) is not None]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))
-        if reverse:
-            archives.reverse()
         if first:
             archives = archives[:first]
         elif last:
             archives = archives[max(len(archives) - last, 0):]
+        if reverse:
+            archives.reverse()
         return archives
 
     def list_considering(self, args):

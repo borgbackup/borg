@@ -9,7 +9,6 @@ import time
 from collections import defaultdict
 from signal import SIGINT
 from distutils.version import LooseVersion
-from zlib import adler32
 
 import llfuse
 import msgpack
@@ -17,7 +16,9 @@ import msgpack
 from .logger import create_logger
 logger = create_logger()
 
+from .crypto.low_level import blake2b_128
 from .archive import Archive
+from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
 from .item import Item
 from .lrucache import LRUCache
@@ -240,13 +241,14 @@ class FuseOperations(llfuse.Operations):
         if self.args.location.archive:
             self.process_archive(self.args.location.archive)
         else:
+            self.versions_index = FuseVersionsIndex()
             archive_names = (x.name for x in self.manifest.archives.list_considering(self.args))
             for archive_name in archive_names:
                 if self.versions:
                     # process archives immediately
                     self.process_archive(archive_name)
                 else:
-                    # lazy load archives, create archive placeholder inode
+                    # lazily load archives, create archive placeholder inode
                     archive_inode = self._create_dir(parent=1)
                     self.contents[1][os.fsencode(archive_name)] = archive_inode
                     self.pending_archives[archive_inode] = archive_name
@@ -339,12 +341,19 @@ class FuseOperations(llfuse.Operations):
         logger.debug('fuse: process_archive completed in %.1f s for archive %s', duration, archive.name)
 
     def process_leaf(self, name, item, parent, prefix, is_dir, item_inode):
-        def file_version(item):
+        def file_version(item, path):
             if 'chunks' in item:
-                ident = 0
-                for chunkid, _, _ in item.chunks:
-                    ident = adler32(chunkid, ident)
-                return ident
+                file_id = blake2b_128(path)
+                current_version, previous_id = self.versions_index.get(file_id, (0, None))
+
+                chunk_ids = [chunk_id for chunk_id, _, _ in item.chunks]
+                contents_id = blake2b_128(b''.join(chunk_ids))
+
+                if contents_id != previous_id:
+                    current_version += 1
+                    self.versions_index[file_id] = current_version, contents_id
+
+                return current_version
 
         def make_versioned_name(name, version, add_dir=False):
             if add_dir:
@@ -353,16 +362,16 @@ class FuseOperations(llfuse.Operations):
                 name += b'/' + path_fname[-1]
             # keep original extension at end to avoid confusing tools
             name, ext = os.path.splitext(name)
-            version_enc = os.fsencode('.%08x' % version)
+            version_enc = os.fsencode('.%05d' % version)
             return name + version_enc + ext
 
         if self.versions and not is_dir:
             parent = self.process_inner(name, parent)
-            version = file_version(item)
+            path = os.fsencode(item.path)
+            version = file_version(item, path)
             if version is not None:
                 # regular file, with contents - maybe a hardlink master
                 name = make_versioned_name(name, version)
-                path = os.fsencode(item.path)
                 self.file_versions[path] = version
 
         path = item.path

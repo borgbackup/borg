@@ -2101,11 +2101,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.fuse_mount(self.repository_location, mountpoint, '-o', 'versions'):
             path = os.path.join(mountpoint, 'input', 'test')  # filename shows up as directory ...
             files = os.listdir(path)
-            assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxxxxx in there
+            assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxx in there
             assert {b'first', b'second'} == {open(os.path.join(path, f), 'rb').read() for f in files}
             if are_hardlinks_supported():
-                st1 = os.stat(os.path.join(mountpoint, 'input', 'hardlink1', 'hardlink1.00000000'))
-                st2 = os.stat(os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00000000'))
+                st1 = os.stat(os.path.join(mountpoint, 'input', 'hardlink1', 'hardlink1.00001'))
+                st2 = os.stat(os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001'))
                 assert st1.st_ino == st2.st_ino
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')

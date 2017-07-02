@@ -131,13 +131,13 @@ class MandatoryFeatureUnsupported(Error):
 
 def check_extension_modules():
     from . import platform, compress, item
-    if hashindex.API_VERSION != '1.1_06':
+    if hashindex.API_VERSION != '1.1_07':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError
     if compress.API_VERSION != '1.1_03':
         raise ExtensionModuleError
-    if borg.crypto.low_level.API_VERSION != '1.1_01':
+    if borg.crypto.low_level.API_VERSION != '1.1_02':
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != '1.1_01':
         raise ExtensionModuleError

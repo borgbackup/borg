@@ -6,16 +6,21 @@ import os
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
+from libc.string cimport memcpy
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
-from cpython.bytes cimport PyBytes_FromStringAndSize
+from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_CheckExact, PyBytes_GET_SIZE, PyBytes_AS_STRING
 
-API_VERSION = '1.1_06'
+API_VERSION = '1.1_07'
 
 
 cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
+
+    ctypedef struct FuseVersionsElement:
+        uint32_t version
+        char hash[16]
 
     HashIndex *hashindex_read(object file_py, int permit_compact) except *
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
@@ -74,11 +79,13 @@ cdef class IndexBase:
     cdef HashIndex *index
     cdef int key_size
 
+    _key_size = 32
+
     MAX_LOAD_FACTOR = HASH_MAX_LOAD
     MAX_VALUE = _MAX_VALUE
 
-    def __cinit__(self, capacity=0, path=None, key_size=32, permit_compact=False):
-        self.key_size = key_size
+    def __cinit__(self, capacity=0, path=None, permit_compact=False):
+        self.key_size = self._key_size
         if path:
             if isinstance(path, (str, bytes)):
                 with open(path, 'rb') as fd:
@@ -151,6 +158,36 @@ cdef class IndexBase:
 
     def compact(self):
         return hashindex_compact(self.index)
+
+
+cdef class FuseVersionsIndex(IndexBase):
+    # 4 byte version + 16 byte file contents hash
+    value_size = 20
+    _key_size = 16
+
+    def __getitem__(self, key):
+        cdef FuseVersionsElement *data
+        assert len(key) == self.key_size
+        data = <FuseVersionsElement *>hashindex_get(self.index, <char *>key)
+        if data == NULL:
+            raise KeyError(key)
+        return _le32toh(data.version), PyBytes_FromStringAndSize(data.hash, 16)
+
+    def __setitem__(self, key, value):
+        cdef FuseVersionsElement data
+        assert len(key) == self.key_size
+        data.version = value[0]
+        assert data.version <= _MAX_VALUE, "maximum number of versions reached"
+        if not PyBytes_CheckExact(value[1]) or PyBytes_GET_SIZE(value[1]) != 16:
+            raise TypeError("Expected bytes of length 16 for second value")
+        memcpy(data.hash, PyBytes_AS_STRING(value[1]), 16)
+        data.version = _htole32(data.version)
+        if not hashindex_set(self.index, <char *>key, <void *> &data):
+            raise Exception('hashindex_set failed')
+
+    def __contains__(self, key):
+        assert len(key) == self.key_size
+        return hashindex_get(self.index, <char *>key) != NULL
 
 
 cdef class NSIndex(IndexBase):

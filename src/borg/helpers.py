@@ -219,11 +219,14 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, sort_by=(), reverse=False, glob=None, first=None, last=None):
+    def list(self, *, glob=None, sort_by=(), first=None, last=None, reverse=False):
         """
-        Inexpensive Archive.list_archives replacement if we just need .name, .id, .ts
-        Returns list of borg.helpers.ArchiveInfo instances.
-        sort_by can be a list of sort keys, they are applied in reverse order.
+        Return list of ArchiveInfo instances according to the parameters.
+
+        First match *glob*, then *sort_by*. Apply *first* and *last* filters,
+        and possibly *reverse* the list.
+
+        *sort_by* is a list of sort keys applied in reverse order.
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError('sort_by must be a sequence of str')
@@ -231,10 +234,13 @@ class Archives(abc.MutableMapping):
         archives = [x for x in self.values() if regex.match(x.name) is not None]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))
-        if reverse or last:
+        if first:
+            archives = archives[:first]
+        elif last:
+            archives = archives[max(len(archives) - last, 0):]
+        if reverse:
             archives.reverse()
-        n = first or last or len(archives)
-        return archives[:n]
+        return archives
 
     def list_considering(self, args):
         """
@@ -395,6 +401,14 @@ class Manifest:
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+
+
+def positive_int_validator(value):
+    """argparse type for positive integers"""
+    int_value = int(value)
+    if int_value <= 0:
+        raise argparse.ArgumentTypeError('A positive integer is required: %s' % value)
+    return int_value
 
 
 def interval(s):

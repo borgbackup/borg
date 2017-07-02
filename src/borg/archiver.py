@@ -44,7 +44,7 @@ from .crypto.key import key_creator, tam_required_file, tam_required, RepoKey, P
 from .crypto.keymanager import KeyManager
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
-from .helpers import location_validator, archivename_validator, ChunkerParams
+from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
@@ -2394,9 +2394,9 @@ class Archiver:
 
             if first_last:
                 group = filters_group.add_mutually_exclusive_group()
-                group.add_argument('--first', metavar='N', dest='first', default=0, type=int,
+                group.add_argument('--first', metavar='N', dest='first', default=0, type=positive_int_validator,
                                    help='consider first N archives after other filters were applied')
-                group.add_argument('--last', metavar='N', dest='last', default=0, type=int,
+                group.add_argument('--last', metavar='N', dest='last', default=0, type=positive_int_validator,
                                    help='consider last N archives after other filters were applied')
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',

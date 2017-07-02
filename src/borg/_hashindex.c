@@ -280,7 +280,7 @@ hashindex_read(PyObject *file_py, int permit_compact)
 {
     Py_ssize_t length, buckets_length, bytes_read;
     Py_buffer header_buffer;
-    PyObject *header_bytes, *length_object, *bucket_bytes;
+    PyObject *header_bytes, *length_object, *bucket_bytes, *tmp;
     HashHeader *header;
     HashIndex *index = NULL;
 
@@ -307,7 +307,8 @@ hashindex_read(PyObject *file_py, int permit_compact)
      * Hash the header
      * If the header is corrupted this bails before doing something stupid (like allocating 3.8 TB of memory)
      */
-    Py_XDECREF(PyObject_CallMethod(file_py, "hash_part", "s", "HashHeader"));
+    tmp = PyObject_CallMethod(file_py, "hash_part", "s", "HashHeader");
+    Py_XDECREF(tmp);
     if(PyErr_Occurred()) {
         if(PyErr_ExceptionMatches(PyExc_AttributeError)) {
             /* Be able to work with regular file objects which do not have a hash_part method. */
@@ -329,7 +330,8 @@ hashindex_read(PyObject *file_py, int permit_compact)
         goto fail_decref_header;
     }
 
-    Py_XDECREF(PyObject_CallMethod(file_py, "seek", "ni", (Py_ssize_t)sizeof(HashHeader), SEEK_SET));
+    tmp = PyObject_CallMethod(file_py, "seek", "ni", (Py_ssize_t)sizeof(HashHeader), SEEK_SET);
+    Py_XDECREF(tmp);
     if(PyErr_Occurred()) {
         goto fail_decref_header;
     }
@@ -479,7 +481,7 @@ hashindex_free(HashIndex *index)
 static void
 hashindex_write(HashIndex *index, PyObject *file_py)
 {
-    PyObject *length_object, *buckets_view;
+    PyObject *length_object, *buckets_view, *tmp;
     Py_ssize_t length;
     Py_ssize_t buckets_length = (Py_ssize_t)index->num_buckets * index->bucket_size;
     HashHeader header = {
@@ -507,7 +509,8 @@ hashindex_write(HashIndex *index, PyObject *file_py)
     /*
      * Hash the header
      */
-    Py_XDECREF(PyObject_CallMethod(file_py, "hash_part", "s", "HashHeader"));
+    tmp = PyObject_CallMethod(file_py, "hash_part", "s", "HashHeader");
+    Py_XDECREF(tmp);
     if(PyErr_Occurred()) {
         if(PyErr_ExceptionMatches(PyExc_AttributeError)) {
             /* Be able to work with regular file objects which do not have a hash_part method. */

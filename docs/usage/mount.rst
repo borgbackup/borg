@@ -31,6 +31,11 @@ Examples
     -rw-rw-r-- 1 user group 12204 Aug 26 21:04 doc.fa760f28.txt
     $ borg umount /tmp/mymountpoint
 
+    # Archive filters are supported.
+    # These are especially handy for the "versions view",
+    # which does not support lazy processing of archives.
+    $ borg mount -o versions --glob-archives '*-my-home' --last 10 /path/to/repo /tmp/mymountpoint
+
 borgfs
 ++++++
 

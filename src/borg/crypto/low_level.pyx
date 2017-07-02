@@ -6,6 +6,7 @@ from math import ceil
 
 from libc.stdlib cimport malloc, free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
+from cpython.bytes cimport PyBytes_FromStringAndSize
 
 API_VERSION = '1.1_01'
 
@@ -201,19 +202,18 @@ cdef class AES:
 
 
 def hmac_sha256(key, data):
-    md = bytes(32)
     cdef Py_buffer data_buf = ro_buffer(data)
     cdef const unsigned char *key_ptr = key
     cdef int key_len = len(key)
-    cdef unsigned char *md_ptr = md
+    cdef unsigned char md[32]
     try:
         with nogil:
-            rc = HMAC(EVP_sha256(), key_ptr, key_len, <const unsigned char*> data_buf.buf, data_buf.len, md_ptr, NULL)
-        if rc != md_ptr:
+            rc = HMAC(EVP_sha256(), key_ptr, key_len, <const unsigned char*> data_buf.buf, data_buf.len, md, NULL)
+        if rc != md:
             raise Exception('HMAC(EVP_sha256) failed')
     finally:
         PyBuffer_Release(&data_buf)
-    return md
+    return PyBytes_FromStringAndSize(<char*> &md[0], 32)
 
 
 cdef blake2b_update_from_buffer(blake2b_state *state, obj):
@@ -232,8 +232,7 @@ def blake2b_256(key, data):
     if blake2b_init(&state, 32) == -1:
         raise Exception('blake2b_init() failed')
 
-    md = bytes(32)
-    cdef unsigned char *md_ptr = md
+    cdef unsigned char md[32]
     cdef unsigned char *key_ptr = key
 
     # This is secure, because BLAKE2 is not vulnerable to length-extension attacks (unlike SHA-1/2, MD-5 and others).
@@ -246,11 +245,11 @@ def blake2b_256(key, data):
         raise Exception('blake2b_update() failed')
     blake2b_update_from_buffer(&state, data)
 
-    rc = blake2b_final(&state, md_ptr, 32)
+    rc = blake2b_final(&state, &md[0], 32)
     if rc == -1:
         raise Exception('blake2b_final() failed')
 
-    return md
+    return PyBytes_FromStringAndSize(<char*> &md[0], 32)
 
 
 def hkdf_hmac_sha512(ikm, salt, info, output_length):

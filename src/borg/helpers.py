@@ -231,10 +231,13 @@ class Archives(abc.MutableMapping):
         archives = [x for x in self.values() if regex.match(x.name) is not None]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))
-        if reverse or last:
+        if reverse:
             archives.reverse()
-        n = first or last or len(archives)
-        return archives[:n]
+        if first:
+            archives = archives[:first]
+        elif last:
+            archives = archives[len(archives) - last:]
+        return archives
 
     def list_considering(self, args):
         """

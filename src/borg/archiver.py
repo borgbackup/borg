@@ -1474,12 +1474,9 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        archives_checkpoints = manifest.archives.list(sort_by=['ts'], reverse=True)  # just a ArchiveInfo list
         if args.prefix:
             args.glob_archives = args.prefix + '*'
-        if args.glob_archives:
-            regex = re.compile(shellpattern.translate(args.glob_archives))
-            archives_checkpoints = [arch for arch in archives_checkpoints if regex.match(arch.name) is not None]
+        archives_checkpoints = manifest.archives.list(glob=args.glob_archives, sort_by=['ts'], reverse=True)
         is_checkpoint = re.compile(r'\.checkpoint(\.\d+)?$').search
         checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
         # keep the latest checkpoint, if there is no later non-checkpoint archive

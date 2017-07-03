@@ -8,7 +8,7 @@ from libc.stdlib cimport malloc, free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
-API_VERSION = '1.1_01'
+API_VERSION = '1.1_02'
 
 
 cdef extern from "../algorithms/blake2-libselect.h":
@@ -250,6 +250,25 @@ def blake2b_256(key, data):
         raise Exception('blake2b_final() failed')
 
     return PyBytes_FromStringAndSize(<char*> &md[0], 32)
+
+
+def blake2b_128(data):
+    cdef blake2b_state state
+    cdef unsigned char md[16]
+    cdef unsigned char *data_ptr = data
+
+    if blake2b_init(&state, 16) == -1:
+        raise Exception('blake2b_init() failed')
+
+    rc = blake2b_update(&state, data_ptr, len(data))
+    if rc == -1:
+        raise Exception('blake2b_update() failed')
+
+    rc = blake2b_final(&state, &md[0], 16)
+    if rc == -1:
+        raise Exception('blake2b_final() failed')
+
+    return PyBytes_FromStringAndSize(<char*> &md[0], 16)
 
 
 def hkdf_hmac_sha512(ikm, salt, info, output_length):

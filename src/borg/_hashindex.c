@@ -695,3 +695,11 @@ hashindex_size(HashIndex *index)
 {
     return sizeof(HashHeader) + index->num_buckets * index->bucket_size;
 }
+
+/*
+ * Used by the FuseVersionsIndex.
+ */
+typedef struct {
+    uint32_t version;
+    char hash[16];
+} __attribute__((__packed__)) FuseVersionsElement;

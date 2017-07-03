@@ -466,7 +466,7 @@ class Repository:
             try:
                 with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
                     hints = msgpack.unpack(fd)
-            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError, FileIntegrityError) as e:
+            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError, FileIntegrityError) as e:  # XXX other exceptions?
                 logger.warning('Repository hints file missing or corrupted, trying to recover: %s', e)
                 if not isinstance(e, FileNotFoundError):
                     os.unlink(hints_path)

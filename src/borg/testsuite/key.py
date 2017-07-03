@@ -331,7 +331,7 @@ class TestTAM:
             key.unpack_and_verify_manifest(blob)
 
         blob = b'\xc1\xc1\xc1'
-        with pytest.raises((ValueError, msgpack.UnpackException)):
+        with pytest.raises((ValueError, msgpack.UnpackException)):  # XXX other exceptions?
             key.unpack_and_verify_manifest(blob)
 
     def test_missing_when_required(self, key):

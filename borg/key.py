@@ -481,7 +481,9 @@ class KeyfileKeyBase(AESKeyBase):
         return False
 
     def decrypt_key_file(self, data, passphrase):
-        d = msgpack.unpackb(data)
+        unpacker = get_limited_unpacker('key')
+        unpacker.feed(data)
+        d = unpacker.unpack()
         assert d[b'version'] == 1
         assert d[b'algorithm'] == b'sha256'
         key = passphrase.kdf(d[b'salt'], d[b'iterations'], 32)

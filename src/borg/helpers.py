@@ -1787,9 +1787,10 @@ class ItemFormatter(BaseFormatter):
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def get_item_data(self, item):
+        item_data = {}
+        item_data.update(self.item_data)
         mode = stat.filemode(item.mode)
         item_type = mode[0]
-        item_data = self.item_data
 
         source = item.get('source', '')
         extra = ''

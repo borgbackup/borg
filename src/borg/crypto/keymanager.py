@@ -4,7 +4,7 @@ import textwrap
 from binascii import unhexlify, a2b_base64, b2a_base64
 from hashlib import sha256
 
-from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, open_file_or_stdin
+from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, dash_open
 from ..repository import Repository
 
 from .key import KeyfileKey, KeyfileNotFoundError, KeyBlobStorage, identify_key
@@ -130,7 +130,7 @@ class KeyManager:
     def import_keyfile(self, args):
         file_id = KeyfileKey.FILE_ID
         first_line = file_id + ' ' + bin_to_hex(self.repository.id) + '\n'
-        with open_file_or_stdin(args.path, 'r') as fd:
+        with dash_open(args.path, 'r') as fd:
             file_first_line = fd.read(len(first_line))
             if file_first_line != first_line:
                 if not file_first_line.startswith(file_id):

@@ -173,7 +173,7 @@ def get_limited_unpacker(kind):
         args.update(dict(use_list=True,  # default value
                          max_array_len=0,  # not used
                          max_map_len=10,  # EncryptedKey dict
-                         max_str_len=1000,  # inner key data
+                         max_str_len=4000,  # inner key data
                          object_hook=StableDict,
                          unicode_errors='surrogateescape',
                          ))

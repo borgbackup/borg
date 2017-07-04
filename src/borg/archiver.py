@@ -1323,7 +1323,7 @@ class Archiver:
             if args.json_lines:
                 self.print_error('The --json-lines option is only valid for listing archive contents, not archives.')
                 return self.exit_code
-            return self._list_repository(args, manifest, write)
+            return self._list_repository(args, repository, manifest, key, write)
 
     def _list_archive(self, args, repository, manifest, key, write):
         matcher = self.build_matcher(args.patterns, args.paths)
@@ -1351,14 +1351,14 @@ class Archiver:
 
         return self.exit_code
 
-    def _list_repository(self, args, manifest, write):
+    def _list_repository(self, args, repository, manifest, key, write):
         if args.format is not None:
             format = args.format
         elif args.short:
             format = "{archive}{NL}"
         else:
             format = "{archive:<36} {time} [{id}]{NL}"
-        formatter = ArchiveFormatter(format)
+        formatter = ArchiveFormatter(format, repository, manifest, key, json=args.json)
 
         output_data = []
 

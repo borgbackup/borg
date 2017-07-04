@@ -291,7 +291,9 @@ class Archive:
         self.hard_links = {}
         self.stats = Statistics(output_json=log_json)
         self.show_progress = progress
-        self.name = name
+        self.name = name  # overwritten later with name from archive metadata
+        self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
+        self.comment = None
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
         self.noatime = noatime
@@ -340,6 +342,7 @@ class Archive:
         self.metadata = self._load_meta(self.id)
         self.metadata.cmdline = [safe_decode(arg) for arg in self.metadata.cmdline]
         self.name = self.metadata.name
+        self.comment = self.metadata.get('comment', '')
 
     @property
     def ts(self):

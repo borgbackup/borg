@@ -1581,28 +1581,107 @@ class BaseFormatter:
 
 
 class ArchiveFormatter(BaseFormatter):
+    KEY_DESCRIPTIONS = {
+        'name': 'archive name interpreted as text (might be missing non-text characters, see barchive)',
+        'archive': 'archive name interpreted as text (might be missing non-text characters, see barchive)',
+        'barchive': 'verbatim archive name, can contain any character except NUL',
+        'comment': 'archive comment interpreted as text (might be missing non-text characters, see bcomment)',
+        'bcomment': 'verbatim archive comment, can contain any character except NUL',
+        'time': 'time (start) of creation of the archive',
+        # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
+        'start': 'time (start) of creation of the archive',
+        'end': 'time (end) of creation of the archive',
+        'id': 'internal ID of the archive',
+    }
+    KEY_GROUPS = (
+        ('name', 'archive', 'barchive', 'comment', 'bcomment', 'id'),
+        ('time', 'start', 'end'),
+    )
 
-    def __init__(self, format):
-        self.format = partial_format(format, self.FIXED_KEYS)
+    @classmethod
+    def available_keys(cls):
+        fake_archive_info = ArchiveInfo('archivename', b'\1'*32, datetime(1970, 1, 1, tzinfo=timezone.utc))
+        formatter = cls('', None, None, None)
+        keys = []
+        keys.extend(formatter.call_keys.keys())
+        keys.extend(formatter.get_item_data(fake_archive_info).keys())
+        return keys
 
-    def get_item_data(self, archive):
-        return {
-            # *name* is the key used by borg-info for the archive name, this makes the formats more compatible
-            'name': remove_surrogates(archive.name),
-            'barchive': archive.name,
-            'archive': remove_surrogates(archive.name),
-            'id': bin_to_hex(archive.id),
-            'time': format_time(to_localtime(archive.ts)),
-            # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
-            'start': format_time(to_localtime(archive.ts)),
+    @classmethod
+    def keys_help(cls):
+        help = []
+        keys = cls.available_keys()
+        for key in cls.FIXED_KEYS:
+            keys.remove(key)
+
+        for group in cls.KEY_GROUPS:
+            for key in group:
+                keys.remove(key)
+                text = "- " + key
+                if key in cls.KEY_DESCRIPTIONS:
+                    text += ": " + cls.KEY_DESCRIPTIONS[key]
+                help.append(text)
+            help.append("")
+        assert not keys, str(keys)
+        return "\n".join(help)
+
+    def __init__(self, format, repository, manifest, key, *, json=False):
+        self.repository = repository
+        self.manifest = manifest
+        self.key = key
+        self.name = None
+        self.id = None
+        self._archive = None
+        self.json = json
+        static_keys = {}  # here could be stuff on repo level, above archive level
+        static_keys.update(self.FIXED_KEYS)
+        self.format = partial_format(format, static_keys)
+        self.format_keys = {f[1] for f in Formatter().parse(format)}
+        self.call_keys = {
+            'comment': partial(self.get_comment, rs=True),
+            'bcomment': partial(self.get_comment, rs=False),
+            'end': self.get_ts_end,
         }
+        self.used_call_keys = set(self.call_keys) & self.format_keys
+        if self.json:
+            self.item_data = {}
+            self.format_item = self.format_item_json
+        else:
+            self.item_data = static_keys
 
-    @staticmethod
-    def keys_help():
-        return "- archive, name: archive name interpreted as text (might be missing non-text characters, see barchive)\n" \
-               "- barchive: verbatim archive name, can contain any character except NUL\n" \
-               "- time: time of creation of the archive\n" \
-               "- id: internal ID of the archive"
+    def format_item_json(self, item):
+        return json.dumps(self.get_item_data(item)) + '\n'
+
+    def get_item_data(self, archive_info):
+        self.name = archive_info.name
+        self.id = archive_info.id
+        item_data = {}
+        item_data.update(self.item_data)
+        item_data.update({
+            'name': remove_surrogates(archive_info.name),
+            'archive': remove_surrogates(archive_info.name),
+            'barchive': archive_info.name,
+            'id': bin_to_hex(archive_info.id),
+            'time': format_time(to_localtime(archive_info.ts)),
+            'start': format_time(to_localtime(archive_info.ts)),
+        })
+        for key in self.used_call_keys:
+            item_data[key] = self.call_keys[key]()
+        return item_data
+
+    @property
+    def archive(self):
+        """lazy load / update loaded archive"""
+        if self._archive is None or self._archive.id != self.id:
+            from .archive import Archive
+            self._archive = Archive(self.repository, self.key, self.manifest, self.name)
+        return self._archive
+
+    def get_comment(self, rs):
+        return remove_surrogates(self.archive.comment) if rs else self.archive.comment
+
+    def get_ts_end(self):
+        return format_time(to_localtime(self.archive.ts_end))
 
 
 class ItemFormatter(BaseFormatter):

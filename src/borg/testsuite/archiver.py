@@ -1791,8 +1791,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_list_repository_format(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test-1', src_dir)
-        self.cmd('create', self.repository_location + '::test-2', src_dir)
+        self.cmd('create', '--comment', 'comment 1', self.repository_location + '::test-1', src_dir)
+        self.cmd('create', '--comment', 'comment 2', self.repository_location + '::test-2', src_dir)
         output_1 = self.cmd('list', self.repository_location)
         output_2 = self.cmd('list', '--format', '{archive:<36} {time} [{id}]{NL}', self.repository_location)
         self.assertEqual(output_1, output_2)
@@ -1800,6 +1800,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assertEqual(output_1, 'test-1\ntest-2\n')
         output_1 = self.cmd('list', '--format', '{barchive}/', self.repository_location)
         self.assertEqual(output_1, 'test-1/test-2/')
+        output_3 = self.cmd('list', '--format', '{name} {comment}{NL}', self.repository_location)
+        self.assert_in('test-1 comment 1\n', output_3)
+        self.assert_in('test-2 comment 2\n', output_3)
 
     def test_list_hash(self):
         self.create_regular_file('empty_file', size=0)

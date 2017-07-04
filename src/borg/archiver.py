@@ -1666,7 +1666,13 @@ class Archiver:
             # we exit with the return code we get from the subprocess
             return subprocess.call([args.command] + args.args)
         finally:
-            repository.rollback()
+            # we need to commit the "no change" operation we did to the manifest
+            # because it created a new segment file in the repository. if we would
+            # roll back, the same file would be later used otherwise (for other content).
+            # that would be bad if somebody uses rsync with ignore-existing (or
+            # any other mechanism relying on existing segment data not changing).
+            # see issue #1867.
+            repository.commit()
 
     def do_debug_info(self, args):
         """display system information for debugging / bug reports"""

@@ -597,7 +597,9 @@ class KeyfileKeyBase(AESKeyBase):
         return False
 
     def decrypt_key_file(self, data, passphrase):
-        data = msgpack.unpackb(data)
+        unpacker = get_limited_unpacker('key')
+        unpacker.feed(data)
+        data = unpacker.unpack()
         enc_key = EncryptedKey(internal_dict=data)
         assert enc_key.version == 1
         assert enc_key.algorithm == 'sha256'

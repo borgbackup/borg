@@ -65,6 +65,7 @@ from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
 from .helpers import ChunkIteratorFileWrapper
 from .helpers import popen_with_error_handling
+from .helpers import dash_open
 from .nanorst import rst_to_terminal
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
@@ -778,10 +779,8 @@ class Archiver:
         else:
             filter = args.tar_filter
 
-        if args.tarfile == '-':
-            tarstream, tarstream_close = sys.stdout.buffer, False
-        else:
-            tarstream, tarstream_close = open(args.tarfile, 'wb'), True
+        tarstream = dash_open(args.tarfile, 'wb')
+        tarstream_close = args.tarfile != '-'
 
         if filter:
             # When we put a filter between us and the final destination,
@@ -1743,11 +1742,8 @@ class Archiver:
             fd.write('\n')
             fd.write('    ]\n}\n')
 
-        if args.path == '-':
-            output(sys.stdout)
-        else:
-            with open(args.path, 'w') as fd:
-                output(fd)
+        with dash_open(args.path, 'w') as fd:
+            output(fd)
         return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
@@ -1758,11 +1754,8 @@ class Archiver:
 
         meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
 
-        if args.path == '-':
-            json.dump(meta, sys.stdout, indent=4)
-        else:
-            with open(args.path, 'w') as fd:
-                json.dump(meta, fd, indent=4)
+        with dash_open(args.path, 'w') as fd:
+            json.dump(meta, fd, indent=4)
         return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)

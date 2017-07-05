@@ -156,14 +156,10 @@ checkpoints and treated in special ways.
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
-Backup speed is increased by not reprocessing files that are already part of
-existing archives and weren't modified. Normally, detecting file modifications
-will take inode information into consideration. This is problematic for files
-located on sshfs and similar network file systems which do not provide stable
-inode numbers, such files will always be considered modified. The
-``--ignore-inode`` flag can be used to prevent this and improve performance.
-This flag will reduce reliability of change detection however, with files
-considered unmodified as long as their size and modification time are unchanged.
+To speed up pulling backups over sshfs and similar network file systems which do
+not provide correct inode information the ``--ignore-inode`` flag can be used. This
+potentially decreases reliability of change detection, while avoiding always reading
+all files on these file systems.
 
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that

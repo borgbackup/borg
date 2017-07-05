@@ -128,12 +128,33 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.0.11 (2017-07-xx)
+---------------------------
+
+Bug fixes:
+
+- use limited unpacker for outer key (security precaution), #2174
+- fix paperkey import bug
+
+Other changes:
+
+- change --checkpoint-interval default from 600s to 1800s, #2841.
+  this improves efficiency for big repositories a lot.
+- docs: fix OpenSUSE command and add OpenSUSE section
+- tests: add tests for split_lstring and paperkey
+- vagrant:
+
+  - fix openbsd shell
+  - backport cpu/ram setup from master
+  - add stretch64 VM
+
 Version 1.0.11rc1 (2017-06-27)
 ------------------------------
 
 Bug fixes:
 
-- performance: rebuild hashtable if we have too little empty buckets, #2246
+- performance: rebuild hashtable if we have too few empty buckets, #2246.
+  this fixes some sporadic, but severe performance breakdowns.
 - Archive: allocate zeros when needed, #2308
   fixes huge memory usage of mount (8 MiB × number of archives)
 - IPv6 address support

@@ -134,6 +134,71 @@ Changelog
 Version 1.1.0rc1 (unreleased)
 -----------------------------
 
+Compatibility notes:
+
+- delete: removed short option for --cache-only
+
+New features:
+
+- support borg list repo --format {comment} {bcomment} {end}, #2081
+- key import: allow reading from stdin, #2760
+
+Fixes:
+
+- with-lock: avoid creating segment files that might be overwritten later, #1867
+- prune: fix checkpoints processing with --glob-archives
+- FUSE: versions view: keep original file extension at end, #2769
+- fix --last, --first: do not accept values <= 0,
+  fix reversed archive ordering with --last
+- include testsuite data (attic.tar.gz) when installing the package
+- use limited unpacker for outer key, for manifest (both security precautions),
+  #2174 #2175
+- fix bashism in shell scripts, #2820, #2816
+- cleanup endianness detection, create _endian.h,
+  fixes build on alpine linux, #2809
+- fix crash with --no-cache-sync (give known chunk size to chunk_incref), #2853
+
+Other changes:
+
+- FUSE: versions view: linear numbering by archive time
+- split up interval parsing from filtering for --keep-within, #2610
+- add a basic .editorconfig, #2734
+- use archive creation time as mtime for FUSE mount, #2834
+- upgrade FUSE for macOS (osxfuse) from 3.5.8 to 3.6.3, #2706
+- hashindex: speed up by replacing modulo with "if" to check for wraparound
+- coala checker / pylint: fixed requirements and .coafile, more ignores
+- borg upgrade: name backup directories as 'before-upgrade', #2811
+- add .mailmap
+- some minor changes suggested by lgtm.com
+- docs:
+
+  - better explanation of the --ignore-inode option relevance, #2800
+  - fix openSUSE command and add openSUSE section
+  - simplify ssh authorized_keys file using "restrict", add legacy note, #2121
+  - mount: show usage of archive filters
+  - mount: add repository example, #2462
+  - info: update and add examples, #2765
+  - prune: include example
+  - improved style / formatting
+  - improved/fixed segments_per_dir docs
+  - recreate: fix wrong "remove unwanted files" example
+  - reference list of status chars in borg recreate --filter description
+  - update source-install docs about doc build dependencies, #2795
+  - cleanup installation docs
+  - file system requirements, update segs per dir
+  - fix checkpoints/parts reference in FAQ, #2859
+- code:
+
+  - hashindex: don't pass side effect into macro
+  - crypto low_level: don't mutate local bytes()
+  - use dash_open function to open file or "-" for stdin/stdout
+  - archiver: argparse cleanup / refactoring
+  - shellpattern: add match_end arg
+- tests: added some additional unit tests, some fixes, #2700 #2710
+- vagrant: fix setup of cygwin, add Debian 9 "stretch"
+- travis: don't perform full travis build on docs-only changes, #2531
+
+
 Version 1.1.0b6 (2017-06-18)
 ----------------------------
 

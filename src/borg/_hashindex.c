@@ -10,29 +10,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if defined (__SVR4) && defined (__sun)
-#include <sys/isa_defs.h>
-#endif
-
-#if (defined(BYTE_ORDER) && (BYTE_ORDER == BIG_ENDIAN)) ||  \
-    (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || \
-    (defined(_BIG_ENDIAN) && defined(__SVR4)&&defined(__sun))
-#define BORG_BIG_ENDIAN 1
-#elif (defined(BYTE_ORDER) && (BYTE_ORDER == LITTLE_ENDIAN)) || \
-      (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)) || \
-      (defined(_LITTLE_ENDIAN) && defined(__SVR4)&&defined(__sun))
-#define BORG_BIG_ENDIAN 0
-#else
-#error Unknown byte order
-#endif
-
-#if BORG_BIG_ENDIAN
-#define _le32toh(x) __builtin_bswap32(x)
-#define _htole32(x) __builtin_bswap32(x)
-#else
-#define _le32toh(x) (x)
-#define _htole32(x) (x)
-#endif
+#include "_endian.h"
 
 #define MAGIC "BORG_IDX"
 #define MAGIC_LEN 8

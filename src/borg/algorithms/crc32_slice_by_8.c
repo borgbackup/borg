@@ -9,6 +9,8 @@
 // size_t
 #include <stddef.h>
 
+#include "../_endian.h"
+
 /// compute CRC32 (Slicing-by-8 algorithm), unroll inner loop 4 times
 uint32_t crc32_4x8bytes(const void* data, size_t length, uint32_t previousCrc32);
 
@@ -22,23 +24,6 @@ uint32_t crc32_4x8bytes(const void* data, size_t length, uint32_t previousCrc32)
 
 /// zlib's CRC32 polynomial
 const uint32_t Polynomial = 0xEDB88320;
-
-/// swap endianness
-#if defined (__SVR4) && defined (__sun)
-#include <sys/isa_defs.h>
-#endif
-
-#if (defined(BYTE_ORDER)&&(BYTE_ORDER == BIG_ENDIAN)) ||  \
-    (defined(_BIG_ENDIAN)&&defined(__SVR4)&&defined(__sun))
-#define _le32toh(x) __builtin_bswap32(x)
-#define BORG_BIG_ENDIAN
-#elif (defined(BYTE_ORDER)&&(BYTE_ORDER == LITTLE_ENDIAN)) || \
-      (defined(_LITTLE_ENDIAN)&&defined(__SVR4)&&defined(__sun))
-#define _le32toh(x) (x)
-#define BORG_LITTLE_ENDIAN
-#else
-#error Unknown byte order
-#endif
 
 // //////////////////////////////////////////////////////////
 // constants
@@ -358,7 +343,7 @@ uint32_t crc32_slice_by_8(const void* data, size_t length, uint32_t previousCrc3
     size_t unrolling;
     for (unrolling = 0; unrolling < Unroll; unrolling++)
     {
-#ifdef BORG_BIG_ENDIAN
+#if BORG_BIG_ENDIAN
       uint32_t one = *current++ ^ _le32toh(crc);
       uint32_t two = *current++;
       crc = Crc32Lookup[0][ two      & 0xFF] ^

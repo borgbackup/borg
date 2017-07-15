@@ -424,9 +424,9 @@ While we try not to break master, there are no guarantees on anything. ::
     source borg-env/bin/activate   # always before using!
 
     # install borg + dependencies into virtualenv
-    pip install sphinx  # optional, to build the docs
     cd borg
     pip install -r requirements.d/development.txt
+    pip install -r requirements.d/docs.txt  # optional, to build the docs
     pip install -r requirements.d/fuse.txt  # optional, for FUSE support
     pip install -e .  # in-place editable mode
 

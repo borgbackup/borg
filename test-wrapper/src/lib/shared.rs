@@ -3,7 +3,7 @@ use std::mem;
 use std::process;
 use std::result;
 use std::os::raw::*;
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::io::prelude::*;
 use std::io::{self, BufReader, BufWriter};
 use std::sync::Mutex;
@@ -14,7 +14,6 @@ use std::ops::Deref;
 use std::cell::Cell;
 
 use std::os::unix::net::UnixStream;
-use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use libc::{self, mode_t, uid_t, gid_t, dev_t};
 use serde::de::DeserializeOwned;
@@ -83,23 +82,11 @@ pub enum Message<'a> {
 
 pub type Result<T> = ::std::result::Result<T, c_int>;
 
-lazy_static! {
-    static ref ORIG_DUP: unsafe extern fn(fd: c_int) -> c_int = unsafe {
-        mem::transmute(libc::dlsym(libc::RTLD_NEXT, CString::new("dup").unwrap().as_ptr()))
-    };
-}
-
 fn create_daemon_stream() -> (BufReader<UnixStream>, BufWriter<UnixStream>) {
     let socket = UnixStream::connect(env::var("TEST_WRAPPER_SOCKET")
             .expect("libtestwrapper preloaded, but TEST_WRAPPER_SOCKET environment variable not passed"))
         .expect("Failed to connect to test-wrapper daemon");
-    let reader = unsafe {
-        let reader_socket_fd = ORIG_DUP(socket.as_raw_fd());
-        if reader_socket_fd == -1 {
-            panic!("Error duplicating socket: {:?}", io::Error::last_os_error())
-        }
-        BufReader::new(UnixStream::from_raw_fd(reader_socket_fd))
-    };
+    let reader = BufReader::new(socket.try_clone().expect("Failed to clone unix socket"));
     (reader, BufWriter::new(socket))
 }
 

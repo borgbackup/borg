@@ -3391,7 +3391,7 @@ class Archiver:
 
         Unless ``--inplace`` is specified, the upgrade process first
         creates a backup copy of the repository, in
-        REPOSITORY.upgrade-DATETIME, using hardlinks. This takes
+        REPOSITORY.before-upgrade-DATETIME, using hardlinks. This takes
         longer than in place upgrades, but is much safer and gives
         progress information (as opposed to ``cp -al``). Once you are
         satisfied with the conversion, you can safely destroy the

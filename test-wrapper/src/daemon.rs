@@ -4,6 +4,7 @@ use std::io::prelude::*;
 use std::sync::RwLock;
 use std::io::{BufReader, BufWriter, ErrorKind};
 use std::collections::hash_map;
+use std::fmt::Debug;
 
 use std::os::unix::net::UnixStream;
 
@@ -101,8 +102,15 @@ lazy_static! {
     static ref DATABASE: RwLock<FnvHashMap<FileId, FileEntry>> = RwLock::new(Default::default());
 }
 
-fn reply<T: Serialize>(writer: &mut BufWriter<UnixStream>, obj: &T) {
+fn reply<T: Serialize + Debug>(writer: &mut BufWriter<UnixStream>, obj: &T) {
+    trace!("Reply: {:?}", obj);
     serialize_into(writer, obj, bincode::Infinite)
+        .expect("Failed to write reply to client socket");
+    writer.flush().expect("IO Error flushing client socket");
+}
+
+fn reply_zero(writer: &mut BufWriter<UnixStream>) {
+    serialize_into(writer, &0, bincode::Infinite)
         .expect("Failed to write reply to client socket");
     writer.flush().expect("IO Error flushing client socket");
 }
@@ -150,38 +158,32 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
         };
         match message {
             Message::Log(_, _) => {},
-            _ => trace!("{:?}", message),
+            _ => trace!("Client {}: {:?}", conn_num, message),
         }
         match message {
             Message::ReadyDeletion(id) => {
-                {
-                    let mut database = DATABASE.write().unwrap();
-                    match database.entry(id) {
-                        hash_map::Entry::Occupied(mut entry) => {
-                            let should_remove = {
-                                let file = entry.get_mut();
-                                file.deletion_ready = true;
-                                file.reference_count == 0
-                            };
-                            if should_remove {
-                                entry.remove();
-                            }
+                let mut database = DATABASE.write().unwrap();
+                match database.entry(id) {
+                    hash_map::Entry::Occupied(mut entry) => {
+                        let should_remove = {
+                            let file = entry.get_mut();
+                            file.deletion_ready = true;
+                            file.reference_count == 0
+                        };
+                        if should_remove {
+                            entry.remove();
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
-                reply(&mut writer, &0);
             }
             Message::Reference(id) => {
-                {
-                    let mut database = DATABASE.write().unwrap();
-                    if conn_references.insert(id) {
-                        database.entry(id).or_insert_with(Default::default).reference_count += 1;
-                    } else {
-                        error!("Client {} double referenced {:?}", conn_num, id);
-                    }
+                let mut database = DATABASE.write().unwrap();
+                if conn_references.insert(id) {
+                    database.entry(id).or_insert_with(Default::default).reference_count += 1;
+                } else {
+                    error!("Client {} double referenced {:?}", conn_num, id);
                 }
-                reply(&mut writer, &0);
             }
             Message::DropReference(id) => {
                 if conn_references.remove(&id) {
@@ -189,7 +191,6 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
                 } else {
                     error!("Client {} tried to remove already removed file {:?}", conn_num, id);
                 }
-                reply(&mut writer, &0);
             }
             Message::XattrsGet(id, attr) => {
                 {
@@ -202,36 +203,31 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
                     }
                 }
                 reply(&mut writer, &ReplyXattrsGet(None));
+                continue;
             }
             Message::XattrsSet(id, attr, value, flags) => {
-                {
-                    let mut database = DATABASE.write().unwrap();
-                    let file = database.entry(id).or_insert_with(FileEntry::default);
-                    if file.xattrs.contains_key(&attr) {
-                        if XATTR_CREATE != 0 && flags & XATTR_CREATE == XATTR_CREATE {
-                            reply(&mut writer, &libc::EEXIST);
-                            continue;
-                        }
-                    } else if XATTR_REPLACE != 0 && flags & XATTR_REPLACE == XATTR_REPLACE {
-                        reply(&mut writer, &libc::ENOATTR);
+                let mut database = DATABASE.write().unwrap();
+                let file = database.entry(id).or_insert_with(FileEntry::default);
+                if file.xattrs.contains_key(&attr) {
+                    if XATTR_CREATE != 0 && flags & XATTR_CREATE == XATTR_CREATE {
+                        reply(&mut writer, &libc::EEXIST);
                         continue;
                     }
-                    file.xattrs.insert(attr, value);
+                } else if XATTR_REPLACE != 0 && flags & XATTR_REPLACE == XATTR_REPLACE {
+                    reply(&mut writer, &libc::ENOATTR);
+                    continue;
                 }
-                reply(&mut writer, &0);
+                file.xattrs.insert(attr, value);
             }
             Message::XattrsDelete(id, attr) => {
-                {
-                    let mut database = DATABASE.write().unwrap();
-                    let file = database.entry(id);
-                    match file {
-                        hash_map::Entry::Occupied(mut entry) => {
-                            entry.get_mut().xattrs.remove(&attr);
-                        }
-                        _ => {}
+                let mut database = DATABASE.write().unwrap();
+                let file = database.entry(id);
+                match file {
+                    hash_map::Entry::Occupied(mut entry) => {
+                        entry.get_mut().xattrs.remove(&attr);
                     }
+                    _ => {}
                 }
-                reply(&mut writer, &0);
             }
             Message::XattrsList(id) => {
                 let database = DATABASE.read().unwrap();
@@ -241,57 +237,52 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
                 } else {
                     reply(&mut writer, &ReplyXattrsList(&[]));
                 }
+                continue;
             }
             Message::OverrideMode(id, mode, mask, rdev) => {
                 debug_assert_eq!(mode & !mask, 0);
-                {
-                    let mut database = DATABASE.write().unwrap();
-                    let file = database.entry(id);
-                    match file {
-                        hash_map::Entry::Occupied(mut entry) => {
-                            let file = entry.get_mut();
-                            file.xattrs.clear();
-                            if let Some((old_mode, old_mask)) = file.mode_and_mask {
-                                file.mode_and_mask = Some((mode | (old_mode & !mask), mask | old_mask));
-                            } else {
-                                file.mode_and_mask = Some((mode, mask));
-                            }
-                            file.rdev = rdev.or(file.rdev);
+                let mut database = DATABASE.write().unwrap();
+                let file = database.entry(id);
+                match file {
+                    hash_map::Entry::Occupied(mut entry) => {
+                        let file = entry.get_mut();
+                        file.xattrs.clear();
+                        if let Some((old_mode, old_mask)) = file.mode_and_mask {
+                            file.mode_and_mask = Some((mode | (old_mode & !mask), mask | old_mask));
+                        } else {
+                            file.mode_and_mask = Some((mode, mask));
                         }
-                        hash_map::Entry::Vacant(entry) => {
-                            let mut file_entry = FileEntry::default();
-                            file_entry.mode_and_mask = Some((mode, mask));
-                            file_entry.rdev = rdev;
-                            entry.insert(file_entry);
-                        }
+                        file.rdev = rdev.or(file.rdev);
+                    }
+                    hash_map::Entry::Vacant(entry) => {
+                        let mut file_entry = FileEntry::default();
+                        file_entry.mode_and_mask = Some((mode, mask));
+                        file_entry.rdev = rdev;
+                        entry.insert(file_entry);
                     }
                 }
-                reply(&mut writer, &0);
             }
             Message::OverrideOwner(id, uid, gid) => {
-                {
-                    let mut database = DATABASE.write().unwrap();
-                    let file = database.entry(id);
-                    match file {
-                        hash_map::Entry::Occupied(mut entry) => {
-                            let file = entry.get_mut();
-                            file.xattrs.clear();
-                            if let Some(uid) = uid {
-                                file.owner = Some(uid);
-                            }
-                            if let Some(gid) = gid {
-                                file.group = Some(gid);
-                            }
+                let mut database = DATABASE.write().unwrap();
+                let file = database.entry(id);
+                match file {
+                    hash_map::Entry::Occupied(mut entry) => {
+                        let file = entry.get_mut();
+                        file.xattrs.clear();
+                        if let Some(uid) = uid {
+                            file.owner = Some(uid);
                         }
-                        hash_map::Entry::Vacant(entry) => {
-                            let mut file_entry = FileEntry::default();
-                            file_entry.owner = uid;
-                            file_entry.group = gid;
-                            entry.insert(file_entry);
+                        if let Some(gid) = gid {
+                            file.group = Some(gid);
                         }
                     }
+                    hash_map::Entry::Vacant(entry) => {
+                        let mut file_entry = FileEntry::default();
+                        file_entry.owner = uid;
+                        file_entry.group = gid;
+                        entry.insert(file_entry);
+                    }
                 }
-                reply(&mut writer, &0);
             }
             Message::GetPermissions(id) => {
                 let response = {
@@ -306,12 +297,13 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
                     }
                 };
                 reply(&mut writer, &response);
+                continue;
             }
             Message::Log(log_level, message) => {
                 log!(log_level.into(), "Client {}: {}", conn_num, message);
-                reply(&mut writer, &0);
             }
         }
+        reply_zero(&mut writer);
     }
     for id in conn_references {
         drop_ref(id);

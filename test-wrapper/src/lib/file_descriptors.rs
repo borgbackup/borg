@@ -29,13 +29,7 @@ fn base_dup(oldfd: c_int, newfd: c_int) -> Result<()> {
 }
 
 wrap! {
-    !notrace unsafe fn close:ORIG_CLOSE(fd: c_int) -> c_int {
-        {
-            let daemon_stream_fds = DAEMON_STREAM_FDS.read().unwrap();
-            if fd == daemon_stream_fds.0 || fd == daemon_stream_fds.1 {
-                return Ok(ORIG_CLOSE(fd));
-            }
-        }
+    unsafe fn close:ORIG_CLOSE(fd: c_int) -> c_int {
         let ret = ORIG_CLOSE(fd);
         if ret != -1 {
             if let Some(id) = FD_ID_CACHE.lock().unwrap().remove(&fd) {
@@ -55,7 +49,7 @@ wrap! {
         Ok(ret)
     }
 
-    !notrace unsafe fn dup:ORIG_DUP(oldfd: c_int) -> c_int {
+    unsafe fn dup:ORIG_DUP(oldfd: c_int) -> c_int {
         let ret = ORIG_DUP(oldfd);
         if ret >= 0 {
             let _ = base_dup(oldfd, ret);
@@ -63,7 +57,7 @@ wrap! {
         Ok(ret)
     }
 
-    !notrace unsafe fn dup2:ORIG_DUP2(oldfd: c_int, newfd: c_int) -> c_int {
+    unsafe fn dup2:ORIG_DUP2(oldfd: c_int, newfd: c_int) -> c_int {
         let ret = ORIG_DUP2(oldfd, newfd);
         if ret != -1 {
             let _ = base_dup(oldfd, newfd);
@@ -71,7 +65,7 @@ wrap! {
         Ok(ret)
     }
 
-    !notrace unsafe fn dup3:ORIG_DUP3(oldfd: c_int, newfd: c_int, flags: c_int) -> c_int {
+    unsafe fn dup3:ORIG_DUP3(oldfd: c_int, newfd: c_int, flags: c_int) -> c_int {
         let ret = ORIG_DUP3(oldfd, newfd, flags);
         if ret != -1 {
             let _ = base_dup(oldfd, newfd);
@@ -79,7 +73,7 @@ wrap! {
         Ok(ret)
     }
 
-    !notrace unsafe fn fcntl:ORIG_FCNTL(fd: c_int, cmd: c_int, arg: c_int) -> c_int {
+    unsafe fn fcntl:ORIG_FCNTL(fd: c_int, cmd: c_int, arg: c_int) -> c_int {
         let ret = ORIG_FCNTL(fd, cmd, arg);
         if cmd == libc::F_DUPFD || cmd == libc::F_DUPFD_CLOEXEC {
             if ret >= 0 {

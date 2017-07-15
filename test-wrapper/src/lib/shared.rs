@@ -6,11 +6,12 @@ use std::os::raw::*;
 use std::ffi::{CStr, CString};
 use std::io::prelude::*;
 use std::io::{self, BufReader, BufWriter};
-use std::sync::{Mutex, RwLock};
+use std::sync::Mutex;
 use std::collections::hash_map;
 use std::borrow::Borrow;
 use std::fmt::{self, Debug};
 use std::ops::Deref;
+use std::cell::Cell;
 
 use std::os::unix::net::UnixStream;
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -86,8 +87,6 @@ lazy_static! {
     static ref ORIG_DUP: unsafe extern fn(fd: c_int) -> c_int = unsafe {
         mem::transmute(libc::dlsym(libc::RTLD_NEXT, CString::new("dup").unwrap().as_ptr()))
     };
-
-    pub static ref DAEMON_STREAM_FDS: RwLock<(c_int, c_int)> = RwLock::new((-1, -1));
 }
 
 fn create_daemon_stream() -> (BufReader<UnixStream>, BufWriter<UnixStream>) {
@@ -104,19 +103,12 @@ fn create_daemon_stream() -> (BufReader<UnixStream>, BufWriter<UnixStream>) {
     (reader, BufWriter::new(socket))
 }
 
-fn update_daemon_stream_fds(stream: &(BufReader<UnixStream>, BufWriter<UnixStream>)) {
-    let mut fds = DAEMON_STREAM_FDS.write().unwrap();
-    fds.0 = stream.0.get_ref().as_raw_fd();
-    fds.1 = stream.1.get_ref().as_raw_fd();
-}
-
 lazy_static! {
-    static ref DAEMON_STREAM: Mutex<(BufReader<UnixStream>, BufWriter<UnixStream>)> = {
+    pub static ref DAEMON_STREAM: Mutex<(BufReader<UnixStream>, BufWriter<UnixStream>)> = {
         unsafe {
            libc::pthread_atfork(None, None, Some(new_daemon_stream));
         }
         let stream = create_daemon_stream();
-        update_daemon_stream_fds(&stream);
         Mutex::new(stream)
     };
 
@@ -158,17 +150,20 @@ pub fn bincode_result<T>(result: result::Result<T, Box<bincode::ErrorKind>>) -> 
 }
 
 extern "C" fn new_daemon_stream() {
-    let mut daemon_stream = DAEMON_STREAM.lock().unwrap();
-    *daemon_stream = create_daemon_stream();
-    update_daemon_stream_fds(daemon_stream.deref());
-    let file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
-    for (&file, &count) in file_ref_counts.iter() {
-        if count > 0 {
-            bincode_result(serialize_into(&mut daemon_stream.1, &Message::Reference(file), bincode::Infinite));
-            daemon_result(daemon_stream.1.flush());
-            bincode_result(deserialize_from::<_, c_int, _>(&mut daemon_stream.0, bincode::Infinite));
+    let old_reentrant = REENTRANT.with(|c| c.replace(true));
+    {
+        let mut daemon_stream = DAEMON_STREAM.lock().unwrap();
+        *daemon_stream = create_daemon_stream();
+        let file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
+        for (&file, &count) in file_ref_counts.iter() {
+            if count > 0 {
+                bincode_result(serialize_into(&mut daemon_stream.1, &Message::Reference(file), bincode::Infinite));
+                daemon_result(daemon_stream.1.flush());
+                bincode_result(deserialize_from::<_, c_int, _>(&mut daemon_stream.0, bincode::Infinite));
+            }
         }
     }
+    REENTRANT.with(|c| c.set(old_reentrant));
 }
 
 pub fn request<T: DeserializeOwned>(message: Message) -> T {
@@ -188,6 +183,10 @@ pub fn message(message: Message) -> Result<()> {
         0 => Ok(()),
         e => Err(e),
     }
+}
+
+thread_local! {
+    pub static REENTRANT: Cell<bool> = Cell::new(false);
 }
 
 // TODO pass on line numbers and file to daemon
@@ -227,29 +226,6 @@ macro_rules! trace {
     }
 }
 
-macro_rules! define_dlsym_fn {
-    (regular $name:ident, _; $( $arg_t:ty ),*; $ret_t:ty) => {};
-
-    (notrace $name:ident, _; $( $arg_t:ty ),*; $ret_t:ty) => {};
-
-    (regular $name:ident, $orig_name:ident; $( $arg_t:ty ),*; $ret_t:ty) => {
-        lazy_static! {
-            static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
-                trace!("Finding original {}", stringify!($name));
-                ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
-            };
-        }
-    };
-
-    (notrace $name:ident, $orig_name:ident; $( $arg_t:ty ),*; $ret_t:ty) => {
-        lazy_static! {
-            static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
-                ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
-            };
-        }
-    };
-}
-
 macro_rules! __wrap_arg_string {
     ( _ ) => { ", _{}" };
 
@@ -267,12 +243,22 @@ macro_rules! __wrap_maybe_ident {
 }
 
 macro_rules! __wrap_fn {
-    ( $( [ $attr:meta ] ),* ; unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
+    ( $( [ $attr:meta ] ),* ; unsafe fn $name:ident : $orig_name:ident ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
         $( #[ $attr ] )*
         #[no_mangle]
         pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
+            lazy_static! {
+                static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
+                    trace!("Finding original {}", stringify!($name));
+                    ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
+                };
+            }
+
+            if REENTRANT.with(|c| c.replace(true)) {
+                return $orig_name($( $arg_n ),*);
+            }
+
             trace!(concat!(stringify!($name), $( __wrap_arg_string!($arg_n) ),*), $( __wrap_maybe_ident!($arg_n) ),*);
-            define_dlsym_fn!(regular $name, $orig_name; $( $arg_t ),*; $ret_t);
             let old_errno = ::errno::errno();
 
             let overrides = ::overrides::get_overrides();
@@ -313,6 +299,7 @@ macro_rules! __wrap_fn {
                 0
             };
 
+            REENTRANT.with(|c| c.set(false));
             if let Some(fn_override) = fn_override {
                 if let Some(errno) = fn_override.set_errno {
                     ::errno::set_errno(::errno::Errno(errno));
@@ -327,29 +314,14 @@ macro_rules! __wrap_fn {
             }
         }
     };
+}
 
-    ( $( [ $attr:meta ] ),* ; !notrace unsafe fn $name:ident : $orig_name:tt ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
-        $( #[ $attr ] )*
-        #[no_mangle]
-        pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
-            define_dlsym_fn!(notrace $name, $orig_name; $( $arg_t ),*; $ret_t);
-
-            let old_errno = ::errno::errno();
-            match (move || -> Result<$ret_t> { $code })() {
-                Ok(r) => {
-                    if r != -1 {
-                        ::errno::set_errno(old_errno);
-                    }
-                    r
-                },
-                Err(e) => {
-                    if e != 0 {
-                        ::errno::set_errno(::errno::Errno(e));
-                    }
-                    -1
-                }
-            }
-        }
+macro_rules! __wrap_fn_ident {
+    ( $( [ $attr:meta ] ),* ; $( ! $modifier:ident )* unsafe fn $name:ident : _ ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
+        __wrap_fn!( $( [ $attr ] ),* ; $( ! $modifier )* unsafe fn $name : ORIG_NAME( $( $arg_n : $arg_t ),*) -> $ret_t $code );
+    };
+    ( $( [ $attr:meta ] ),* ; $( ! $modifier:ident )* unsafe fn $name:ident : $orig_name:ident ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
+        __wrap_fn!( $( [ $attr ] ),* ; $( ! $modifier )* unsafe fn $name : $orig_name( $( $arg_n : $arg_t ),*) -> $ret_t $code );
     };
 }
 
@@ -361,7 +333,7 @@ macro_rules! wrap {
         )*
     } => {
         $(
-            __wrap_fn!( $( [ $attr ] ),* ; $( ! $modifier )* unsafe fn $name : $orig_name( $( $arg_n : $arg_t ),*) -> $ret_t $code );
+            __wrap_fn_ident!( $( [ $attr ] ),* ; $( ! $modifier )* unsafe fn $name : $orig_name( $( $arg_n : $arg_t ),*) -> $ret_t $code );
         )*
     };
 }

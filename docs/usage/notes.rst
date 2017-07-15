@@ -5,14 +5,14 @@ Here are misc. notes about topics that are maybe not covered in enough detail in
 
 .. _chunker-params:
 
---chunker-params
-~~~~~~~~~~~~~~~~
+``--chunker-params``
+~~~~~~~~~~~~~~~~~~~~
 
 The chunker params influence how input files are cut into pieces (chunks)
 which are then considered for deduplication. They also have a big impact on
 resource usage (RAM and disk space) as the amount of resources needed is
 (also) determined by the total amount of chunks in the repository (see
-`Indexes / Caches memory usage` for details).
+:ref:`cache-memory-usage` for details).
 
 ``--chunker-params=10,23,16,4095`` results in a fine-grained deduplication|
 and creates a big amount of chunks and thus uses a lot of resources to manage
@@ -50,8 +50,8 @@ a new repository when changing chunker params.
 For more details, see :ref:`chunker_details`.
 
 
---umask
-~~~~~~~
+``--umask``
+~~~~~~~~~~~
 
 If you use ``--umask``, make sure that all repository-modifying borg commands
 (create, delete, prune) that access the repository in question use the same
@@ -60,8 +60,8 @@ If you use ``--umask``, make sure that all repository-modifying borg commands
 If multiple machines access the same repository, this should hold true for all
 of them.
 
---read-special
-~~~~~~~~~~~~~~
+``--read-special``
+~~~~~~~~~~~~~~~~~~
 
 The ``--read-special`` option is special - you do not want to use it for normal
 full-filesystem backups, but rather after carefully picking some targets for it.

@@ -36,7 +36,7 @@ borg key export :: --qr-code file.html # this creates a nice HTML, but when you 
 < remove comment >
 < let there: borg check > --paper # this is a "manual input"-only backup (but it is also included in the --qr-code option)
 
-## MAINTAINANCE ##
+## MAINTENANCE ##
 # Sometimes backups get broken or we want a regular "checkup" that everything is okay…
 borg check -v ::
 

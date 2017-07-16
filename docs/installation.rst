@@ -25,35 +25,6 @@ There are different ways to install |project_name|:
 Pre-Installation Considerations
 -------------------------------
 
-Repository File System
-~~~~~~~~~~~~~~~~~~~~~~
-
-- |project_name| stores data only 3 directory levels deep and uses short file and
-  directory names.
-- |project_name| requires read and write permissions on the repository file system.
-- |project_name| stores backup metadata and data into so-called segment files. The 
-  target size of these files and also the count of these files per directory is set 
-  in the :ref:`config-file`.
-- |project_name| uses a generic and very portable mkdir-based `locking`_ mechanism.
-  POSIX locks, NFS locks, windows file locks, lockf(), flock() and hardlinks are
-  **not** used.
-- Hardlinks are only required when performing an in-place upgrade of an Attic
-  repository. 
-- A journaling file system is strongly recommended. More information can be
-  found in :ref:`file-systems`.
-- |project_name| requires the following file system operations:
-
-  - create, open, read, write, seek, close, rename, delete
-  - link - when upgrading an Attic repo in-place
-  - listdir, stat
-  - fsync on files and directories to ensure data is written onto storage media
-    (some file systems do not support fsync on directories, which Borg accommodates for)
-
-:ref:`data-structures` contains additional information about how |project_name|
-manages data.
-
-.. _locking: https://en.wikipedia.org/wiki/File_locking#Lock_files
-
 (G)LIBC requirements
 --------------------
 

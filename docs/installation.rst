@@ -20,26 +20,6 @@ There are different ways to install |project_name|:
     have the latest code or use revision control (each release is
     tagged).
 
-.. _installation-requirements:
-
-Pre-Installation Considerations
--------------------------------
-
-(G)LIBC requirements
---------------------
-
-Borg uses some filesytem functions from Python's `os` standard library module
-with `follow_symlinks=False`. These are implemented since quite a while with
-the non-symlink-following (g)libc functions like e.g. `lstat` or `lutimes`
-(not: `stat` or `utimes`).
-
-Some stoneage systems (like RHEL/CentOS 5) and also Python interpreter binaries
-compiled to be able to run on such systems (like Python installed via Anaconda)
-might miss these functions and Borg won't be able to work correctly.
-This issue will be detected early and Borg will abort with a fatal error.
-
-For the Borg binaries, there are additional (g)libc requirements, see below.
-
 .. _distribution-package:
 
 Distribution Package
@@ -110,8 +90,8 @@ Standalone Binary
 |project_name| binaries (generated with `pyinstaller`_) are available
 on the releases_ page for the following platforms:
 
-* **Linux**: glibc >= 2.13 (ok for most supported Linux releases). Maybe older
-  glibc versions also work, if they are compatible to 2.13.
+* **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
+  Older glibc releases are untested and may not work.
 * **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 
@@ -214,6 +194,14 @@ For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
 From Source
 -----------
 
+.. note::
+
+  Some older Linux systems (like RHEL/CentOS 5) and Python interpreter binaries
+  compiled to be able to run on such systems (like Python installed via Anaconda)
+  might miss functions required by Borg.
+
+  This issue will be detected early and Borg will abort with a fatal error.
+
 Dependencies
 ~~~~~~~~~~~~
 
@@ -224,7 +212,7 @@ following dependencies first:
   the default Python version on most systems, it is usually available as an
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
-* libacl_ (that pulls in libattr_ also), both plus development headers.
+* libacl_ (which depends on libattr_), both plus development headers.
 * liblz4_, plus development headers.
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
@@ -232,7 +220,8 @@ following dependencies first:
 * optionally libb2_. If it is not found a bundled implementation is used instead.
 
 If you have troubles finding the right package names, have a look at the
-distribution specific sections below and also at the Vagrantfile in our repo.
+distribution specific sections below or the Vagrantfile in the git repository,
+which contains installation scripts for a number of operating systems.
 
 In the following, the steps needed to install the dependencies are listed for a
 selection of platforms. If your distribution is not covered by these

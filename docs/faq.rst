@@ -274,14 +274,15 @@ Security
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
 
-The encryption passphrase or a command to retrieve the passphrase can be
-specified programmatically using the `BORG_PASSPHRASE` or `BORG_PASSCOMMAND`
-environment variables. This is convenient when setting up automated encrypted
-backups. Another option is to use key file based encryption with a blank passphrase.
-See :ref:`encrypted_repos` for more details.
+There are several ways to specify a passphrase without human intervention:
 
-.. _password_env:
-.. note:: Be careful how you set the environment; using the ``env``
+Setting ``BORG_PASSPHRASE``
+  The passphrase can be specified using the ``BORG_PASSPHRASE`` enviroment variable.
+  This is often the simplest option, but can be insecure if the script that sets it
+  is world-readable.
+
+  .. _password_env:
+  .. note:: Be careful how you set the environment; using the ``env``
           command, a ``system()`` call or using inline shell scripts
           (e.g. ``BORG_PASSPHRASE=hunter12 borg ...``)
           might expose the credentials in the process list directly
@@ -290,6 +291,83 @@ See :ref:`encrypted_repos` for more details.
           the environment of a process is `accessible only to that
           user
           <https://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
+
+Using ``BORG_PASSCOMMAND`` with a properly permissioned file
+  Another option is to create a file with a password in it in your home
+  directory and use permissions to keep anyone else from reading it. For
+  example, first create a key::
+
+    head -c 1024 /dev/urandom | base64 > ~/.borg-passphrase
+    chmod 400 ~/.borg-passphrase
+
+  Then in an automated script one can put::
+
+    export BORG_PASSCOMMAND="cat ~/.borg-passphrase"
+
+  and Borg will automatically use that passphrase.
+
+Using keyfile-based encryption with a blank passphrase
+  It is possible to encrypt your repository in ``keyfile`` mode instead of the default
+  ``repokey`` mode and use a blank passphrase for the key file. See :ref:`encrypted_repos`
+  for more details.
+
+Using ``BORG_PASSCOMMAND`` with MacOS Keychain
+  MacOS has a native manager for secrets (such as passphrases) which is safer
+  than just using a file as it is encrypted at rest and unlocked manually
+  (fortunately, the login keyring automatically unlocks when you login). With
+  the built-in ``security`` command, you can access it from the command line,
+  making it useful for ``BORG_PASSCOMMAND``.
+
+  First generate a passphrase and use ``security`` to save it to your login
+  (default) keychain::
+
+    security add-generic-password -D secret -U -a $USER -s borg-passphrase -w $(head -c 1024 /dev/urandom | base64)
+
+  In your backup script retrieve it in the ``BORG_PASSCOMMAND``::
+
+    export BORG_PASSCOMMAND="security find-generic-password -a $USER -s borg-passphrase"
+
+Using ``BORG_PASSCOMMAND`` with GNOME Keyring
+  GNOME also has a keyring daemon that can be used to store a Borg passphrase.
+  First ensure ``libsecret-tools``, ``gnome-keyring`` and ``libpam-gnome-keyring``
+  are installed. If ``libpam-gnome-keyring`` wasn't already installed, ensure it
+  runs on login::
+
+    sudo sh -c "echo session optional pam_gnome_keyring.so auto_start >> /etc/pam.d/login"
+    sudo sh -c "echo password optional pam_gnome_keyring.so >> /etc/pam.d/passwd"
+    # you may need to relogin afterwards to activate the login keyring
+
+  Then add a secret to the login keyring::
+
+    head -c 1024 /dev/urandom | base64 | secret-tool store borg-repository repo-name --label="Borg Passphrase"
+
+  If a dialog box pops up prompting you to pick a password for a new keychain, use your
+  login password. If there is a checkbox for automatically unlocking on login, check it
+  to allow backups without any user intervention whatsoever.
+
+  Once the secret is saved, retrieve it in a backup script using ``BORG_PASSCOMMAND``::
+
+    export BORG_PASSCOMMAND="secret-tool lookup borg-repository repo-name"
+
+  .. note:: For this to automatically unlock the keychain it must be run
+    in the ``dbus`` session of an unlocked terminal; for example, running a backup
+    script as a ``cron`` job might not work unless you also ``export DISPLAY=:0``
+    so ``secret-tool`` can pick up your open session. `It gets even more complicated`__
+    when you are running the tool as a different user (e.g. running a backup as root
+    with the password stored in the user keyring).
+
+__ https://github.com/borgbackup/borg/pull/2837#discussion_r127641330
+
+Using ``BORG_PASSCOMMAND`` with KWallet
+  KDE also has a keychain feature in the form of KWallet. The command-line tool
+  ``kwalletcli`` can be used to store and retrieve secrets. Ensure ``kwalletcli``
+  is installed, generate a passphrase, and store it in your "wallet"::
+
+    head -c 1024 /dev/urandom | base64 | kwalletcli -Pe borg-passphrase -f Passwords
+
+  Once the secret is saved, retrieve it in a backup script using ``BORG_PASSCOMMAND``::
+
+    export BORG_PASSCOMMAND="kwalletcli -e borg-passphrase -f Passwords"
 
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------
@@ -675,7 +753,7 @@ Here's a (incomplete) list of some major changes:
 * uses fadvise to not spoil / blow up the fs cache
 * better error messages / exception handling
 * better logging, screen output, progress indication
-* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
+* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, MacOS
 
 Please read the :ref:`changelog` (or ``docs/changes.rst`` in the source distribution) for more
 information.

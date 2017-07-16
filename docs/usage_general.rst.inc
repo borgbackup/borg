@@ -360,21 +360,21 @@ Network (only for client/server operation):
 Support for file metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Besides regular file and directory structures, |project_name| can preserve
+Besides regular file and directory structures, Borg can preserve
 
-* Symlinks (stored as symlink, the symlink is not followed)
-* Special files:
+* symlinks (stored as symlink, the symlink is not followed)
+* special files:
 
-  * Character and block device files (restored via mknod)
+  * character and block device files (restored via mknod)
   * FIFOs ("named pipes")
-  * Special file *contents* can be backed up in ``--read-special`` mode.
+  * special file *contents* can be backed up in ``--read-special`` mode.
     By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
-* Hardlinked regular files, devices, FIFOs (considering all items in the same archive)
-* Timestamps in nanosecond precision: mtime, atime, ctime
-* Permissions:
+* hardlinked regular files, devices, FIFOs (considering all items in the same archive)
+* timestamps in nanosecond precision: mtime, atime, ctime
+* permissions:
 
   * IDs of owning user and owning group
-  * Names of owning user and owning group (if the IDs can be resolved)
+  * names of owning user and owning group (if the IDs can be resolved)
   * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
 
 On some platforms additional features are supported:
@@ -385,11 +385,7 @@ On some platforms additional features are supported:
 | Platform         | ACLs     | xattr     | Flags      |
 |                  | [#acls]_ | [#xattr]_ | [#flags]_  |
 +==================+==========+===========+============+
-| Linux x86        | Yes      | Yes       | Yes [1]_   |
-+------------------+          |           |            |
-| Linux PowerPC    |          |           |            |
-+------------------+          |           |            |
-| Linux ARM        |          |           |            |
+| Linux            | Yes      | Yes       | Yes [1]_   |
 +------------------+----------+-----------+------------+
 | Mac OS X         | Yes      | Yes       | Yes (all)  |
 +------------------+----------+-----------+            |
@@ -405,9 +401,6 @@ On some platforms additional features are supported:
 +------------------+----------+-----------+------------+
 | Windows (cygwin) | No [4]_  | No        | No         |
 +------------------+----------+-----------+------------+
-
-Some Distributions (e.g. Debian) run additional tests after each release, these
-are not reflected here.
 
 Other Unix-like operating systems may work as well, but have not been tested at all.
 

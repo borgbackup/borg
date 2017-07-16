@@ -48,7 +48,7 @@ borg prune --list --keep-last 1 --dry-run
 ## RESTORE ##
 
 # When you want to see the diff between two archives use this command.
-# E.g. what happened between the  first two backups?
+# E.g. what happened between the first two backups?
 borg diff ::backup1 backup2
 # Ah, we added a file, right…
 

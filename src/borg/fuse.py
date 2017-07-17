@@ -242,16 +242,15 @@ class FuseOperations(llfuse.Operations):
             self.process_archive(self.args.location.archive)
         else:
             self.versions_index = FuseVersionsIndex()
-            archive_names = (x.name for x in self.manifest.archives.list_considering(self.args))
-            for archive_name in archive_names:
+            for archive in self.manifest.archives.list_considering(self.args):
                 if self.versions:
                     # process archives immediately
-                    self.process_archive(archive_name)
+                    self.process_archive(archive.name)
                 else:
                     # lazily load archives, create archive placeholder inode
-                    archive_inode = self._create_dir(parent=1)
-                    self.contents[1][os.fsencode(archive_name)] = archive_inode
-                    self.pending_archives[archive_inode] = archive_name
+                    archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
+                    self.contents[1][os.fsencode(archive.name)] = archive_inode
+                    self.pending_archives[archive_inode] = archive.name
 
     def sig_info_handler(self, sig_no, stack):
         logger.debug('fuse: %d synth inodes, %d edges (%s)',
@@ -303,11 +302,15 @@ class FuseOperations(llfuse.Operations):
         finally:
             llfuse.close(umount)
 
-    def _create_dir(self, parent):
+    def _create_dir(self, parent, mtime=None):
         """Create directory
         """
         ino = self.allocate_inode()
-        self.items[ino] = self.default_dir
+        if mtime is not None:
+            self.items[ino] = Item(**self.default_dir.as_dict())
+            self.items[ino].mtime = mtime
+        else:
+            self.items[ino] = self.default_dir
         self.parent[ino] = parent
         return ino
 
@@ -375,7 +378,7 @@ class FuseOperations(llfuse.Operations):
                 self.file_versions[path] = version
 
         path = item.path
-        del item.path  # safe some space
+        del item.path  # save some space
         if 'source' in item and hardlinkable(item.mode):
             # a hardlink, no contents, <source> is the hardlink master
             source = os.fsencode(item.source)

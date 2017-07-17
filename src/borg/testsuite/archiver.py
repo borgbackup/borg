@@ -2975,7 +2975,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         # a b'acl'=None key-value pair.
         # This bug can still live on in Borg repositories (through borg upgrade).
         class Attic013Item:
-            def as_dict():
+            def as_dict(self):
                 return {
                     # These are required
                     b'path': '1234',
@@ -2994,7 +2994,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
                 archive = Archive(repository, key, manifest, '0.13', cache=cache, create=True)
-                archive.items_buffer.add(Attic013Item)
+                archive.items_buffer.add(Attic013Item())
                 archive.save()
         self.cmd('check', self.repository_location, exit_code=0)
         self.cmd('list', self.repository_location + '::0.13', exit_code=0)

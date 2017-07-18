@@ -172,6 +172,7 @@ class KeyManager:
                         (id_lines, id_repoid, id_complete_checksum) = data.split('/')
                     except ValueError:
                         print("the id line must contain exactly three '/', try again")
+                        continue
                     if sha256_truncated(data.lower().encode('ascii'), 2) != checksum:
                         print('line checksum did not match, try same line again')
                         continue

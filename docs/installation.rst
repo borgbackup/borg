@@ -62,6 +62,9 @@ FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archi
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  N/A
+OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
+OpenIndiana  `OpenIndiana hipster repository`_             ``pkg install borg``
+openSUSE     `openSUSE official repository`_               ``zypper in borgbackup``
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
 Raspbian     `Raspbian testing`_                           ``apt install borgbackup``
 Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbackup``
@@ -255,6 +258,20 @@ Install the dependencies with development headers::
     sudo dnf install gcc gcc-c++
     sudo dnf install fuse-devel fuse pkgconfig         # optional, for FUSE support
 
+openSUSE Tumbleweed / Leap
+++++++++++++++++++++++++++
+
+Install the dependencies automatically using zypper::
+
+    sudo zypper source-install --build-deps-only borgbackup
+
+Alternatively, you can enumerate all build dependencies in the command line::
+
+    sudo zypper install python3 python3-devel \
+    libacl-devel liblz4-devel openssl-devel \
+    python3-Cython python3-Sphinx python3-msgpack-python \
+    python3-pytest python3-setuptools python3-setuptools_scm \
+    python3-sphinx_rtd_theme python3-llfuse gcc gcc-c++
 
 Mac OS X
 ++++++++

@@ -3391,7 +3391,7 @@ class Archiver:
 
         Unless ``--inplace`` is specified, the upgrade process first
         creates a backup copy of the repository, in
-        REPOSITORY.upgrade-DATETIME, using hardlinks. This takes
+        REPOSITORY.before-upgrade-DATETIME, using hardlinks. This takes
         longer than in place upgrades, but is much safer and gives
         progress information (as opposed to ``cp -al``). Once you are
         satisfied with the conversion, you can safely destroy the
@@ -3469,8 +3469,8 @@ class Archiver:
         subparser.set_defaults(func=self.do_recreate)
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
-                               help='only display items with the given status characters')
+        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
+                               help='only display items with the given status characters (listed in borg create --help)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change anything')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',

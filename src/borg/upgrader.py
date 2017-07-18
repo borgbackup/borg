@@ -35,7 +35,7 @@ class AtticRepositoryUpgrader(Repository):
         with self:
             backup = None
             if not inplace:
-                backup = '{}.upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
+                backup = '{}.before-upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
                 logger.info('making a hardlink copy in %s', backup)
                 if not dryrun:
                     shutil.copytree(self.path, backup, copy_function=os.link)

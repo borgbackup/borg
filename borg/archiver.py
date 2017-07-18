@@ -1428,8 +1428,8 @@ class Archiver:
                                action='store_true', default=False,
                                help='keep tag files of excluded caches/directories')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                               type=int, default=300, metavar='SECONDS',
-                               help='write checkpoint every SECONDS seconds (Default: 300)')
+                               type=int, default=1800, metavar='SECONDS',
+                               help='write checkpoint every SECONDS seconds (Default: 1800)')
         subparser.add_argument('-x', '--one-file-system', dest='one_file_system',
                                action='store_true', default=False,
                                help='stay in same file system')

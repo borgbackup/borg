@@ -185,7 +185,7 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
+                 checkpoint_interval=1800, numeric_owner=False, noatime=False, noctime=False, progress=False,
                  chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None):
         self.cwd = os.getcwd()
         self.key = key

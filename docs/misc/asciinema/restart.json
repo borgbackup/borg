@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "width": 80,
+  "height": 24,
+  "duration": 23.420655,
+  "command": null,
+  "title": null,
+  "env": {
+    "TERM": "xterm-256color",
+    "SHELL": "/bin/zsh"
+  },
+  "stdout": [
+    [
+      0.192943,
+      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                               \r \r"
+    ],
+    [
+      0.001029,
+      "\u001b]7;file://FedRocks/home/rugk/Software/contributions/borg/docs/misc/asciinema\u0007"
+    ],
+    [
+      0.000807,
+      "\u001b]7;file://FedRocks/home/rugk/Software/contributions/borg/docs/misc/asciinema\u0007"
+    ],
+    [
+      0.000167,
+      "\u001b]2;rugk@FedRocks: ~/Software/contributions/borg/docs/misc/asciinema\u0007\u001b]1;..isc/asciinema\u0007"
+    ],
+    [
+      0.020329,
+      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J\u001b[32mrugk@FedRocks:\u001b[01;34mmisc/asciinema \u001b[31m‹asciinema*›\u001b[00m\u001b[00m$ \u001b[K"
+    ],
+    [
+      4.3e-05,
+      "\u001b[?1h\u001b="
+    ],
+    [
+      0.000239,
+      "\u001b[?2004h"
+    ],
+    [
+      1.28231,
+      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m\u001b[90m That's it, but of course there is m\u001b[90mo\u001b[90mre to explore, so have a look at the docs.\\n\u001b[39m\u001b[K\u001b[A\b"
+    ],
+    [
+      0.891437,
+      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+    ],
+    [
+      0.288257,
+      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mr\u001b[0m\u001b[39m\u001b[90me\u001b[90mp\u001b[90ml\u001b[90ma\u001b[90mc\u001b[90me\u001b[90m \u001b[90md\u001b[90ma\u001b[90mt\u001b[90ma\u001b[39m\u001b[K\u001b[1B\r\u001b[K\u001b[A\u001b[46C"
+    ],
+    [
+      0.145249,
+      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+    ],
+    [
+      0.560462,
+      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30ms\u001b[0m\u001b[39m\u001b[39m \u001b[39m \u001b[39m \u001b[39m \u001b[39m \u001b[39m \u001b[39m \u001b[39m \u001b[39m \u001b[9D"
+    ],
+    [
+      0.224176,
+      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+    ],
+    [
+      0.073047,
+      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+    ],
+    [
+      0.123635,
+      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
+    ],
+    [
+      0.129951,
+      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+    ],
+    [
+      1.577771,
+      "\u001b[?2004l\u001b[1B\r"
+    ],
+    [
+      0.001776,
+      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                               \r \r"
+    ],
+    [
+      0.002656,
+      "\u001b]7;file://FedRocks/home/rugk/Software/contributions/borg/docs/misc/asciinema\u0007"
+    ],
+    [
+      0.002468,
+      "\u001b]7;file://FedRocks/home/rugk/Software/contributions/borg/docs/misc/asciinema\u0007"
+    ],
+    [
+      0.000216,
+      "\u001b]2;rugk@FedRocks: ~/Software/contributions/borg/docs/misc/asciinema\u0007\u001b]1;..isc/asciinema\u0007"
+    ],
+    [
+      0.037828,
+      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J\u001b[32mrugk@FedRocks:\u001b[01;34mmisc/asciinema \u001b[31m‹asciinema*›\u001b[00m\u001b[00m$ \u001b[K"
+    ],
+    [
+      2.6e-05,
+      "\u001b[?1h\u001b="
+    ],
+    [
+      0.00052,
+      "\u001b[?2004h"
+    ],
+    [
+      3.145941,
+      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m\u001b[90m That's it, but of course there is m\u001b[90mo\u001b[90mre to explore, so have a look at the docs.\\n\u001b[39m\u001b[K\u001b[A\b"
+    ],
+    [
+      0.84792,
+      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+    ],
+    [
+      0.223524,
+      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30m \u001b[0m\u001b[39m\u001b[K\u001b[1B\r\u001b[K\u001b[A\u001b[46C"
+    ],
+    [
+      5.934852,
+      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30m!\u001b[0m\u001b[39m"
+    ],
+    [
+      1.042808,
+      "\b\u001b[1m\u001b[30m!\u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
+    ],
+    [
+      0.195688,
+      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+    ],
+    [
+      0.40621,
+      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+    ],
+    [
+      0.263813,
+      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+    ],
+    [
+      0.087475,
+      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+    ],
+    [
+      0.090176,
+      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
+    ],
+    [
+      0.12059,
+      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+    ],
+    [
+      2.588215,
+      "\u001b[?1l\u001b>"
+    ],
+    [
+      0.00055,
+      "\u001b[?2004l\u001b[1B\r"
+    ],
+    [
+      0.000692,
+      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                               \r \r"
+    ],
+    [
+      0.00127,
+      "\u001b]7;file://FedRocks/home/rugk/Software/contributions/borg/docs/misc/asciinema\u0007"
+    ],
+    [
+      0.000885,
+      "\u001b]7;file://FedRocks/home/rugk/Software/contributions/borg/docs/misc/asciinema\u0007"
+    ],
+    [
+      0.000103,
+      "\u001b]2;rugk@FedRocks: ~/Software/contributions/borg/docs/misc/asciinema\u0007\u001b]1;..isc/asciinema\u0007"
+    ],
+    [
+      0.016022,
+      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J\u001b[32mrugk@FedRocks:\u001b[01;34mmisc/asciinema \u001b[31m‹asciinema*›\u001b[00m\u001b[00m$ \u001b[K"
+    ],
+    [
+      9.1e-05,
+      "\u001b[?1h\u001b="
+    ],
+    [
+      0.000294,
+      "\u001b[?2004h"
+    ],
+    [
+      2.866792,
+      "\u001b[?2004l\r\r\n"
+    ]
+  ]
+}

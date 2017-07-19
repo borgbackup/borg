@@ -91,7 +91,6 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 
     # some helpers and error handling:
     info() { printf "\n%s %s\n\n" "$( date )" "$*" >&2; }
-    # OR: info() { echo; echo "$( date ) $*" >&2; echo; }
     trap 'echo $( date ) Backup interrupted >&2; exit 2' INT TERM
 
     info "Starting backup"

@@ -47,7 +47,7 @@ from ..helpers import bin_to_hex
 from ..helpers import MAX_S
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
-from ..item import Item
+from ..item import Item, ItemDiff
 from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
@@ -3402,12 +3402,12 @@ def test_get_args():
     assert args.func == archiver.do_serve
 
 
-def test_compare_chunk_contents():
+def test_chunk_content_equal():
     def ccc(a, b):
         chunks_a = [data for data in a]
         chunks_b = [data for data in b]
-        compare1 = Archiver.compare_chunk_contents(iter(chunks_a), iter(chunks_b))
-        compare2 = Archiver.compare_chunk_contents(iter(chunks_b), iter(chunks_a))
+        compare1 = ItemDiff._chunk_content_equal(iter(chunks_a), iter(chunks_b))
+        compare2 = ItemDiff._chunk_content_equal(iter(chunks_b), iter(chunks_a))
         assert compare1 == compare2
         return compare1
     assert ccc([

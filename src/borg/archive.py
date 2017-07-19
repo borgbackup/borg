@@ -5,12 +5,13 @@ import socket
 import stat
 import sys
 import time
+from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from functools import partial
 from getpass import getuser
 from io import BytesIO
-from itertools import groupby
+from itertools import groupby, zip_longest
 from shutil import get_terminal_size
 
 import msgpack
@@ -40,7 +41,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
-from .item import Item, ArchiveItem
+from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
@@ -819,34 +820,14 @@ Utilization of max. archive size: {csize_max:.0%}
             # Was this EPERM due to the O_NOATIME flag? Try again without it:
             return os.open(path, flags_normal)
 
-    def compare_archives(archive1, archive2, matcher):
+    @staticmethod
+    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False):
+        """
+        Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
 
-        def fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2):
-            chunks1 = archive1.pipeline.fetch_many(chunk_ids1)
-            chunks2 = archive2.pipeline.fetch_many(chunk_ids2)
-            return self.compare_chunk_contents(chunks1, chunks2)
-
-        def sum_chunk_size(item, consider_ids=None):
-            if item.get('deleted'):
-                size = None
-            else:
-                if consider_ids is not None:  # consider only specific chunks
-                    size = sum(chunk.size for chunk in item.chunks if chunk.id in consider_ids)
-                else:  # consider all chunks
-                    size = item.get_size()
-            return size
-
-        def get_owner(item):
-            if args.numeric_owner:
-                return item.uid, item.gid
-            else:
-                return item.user, item.group
-
-        def get_mode(item):
-            if 'mode' in item:
-                return stat.filemode(item.mode)
-            else:
-                return [None]
+        :param matcher: PatternMatcher class to restrict results to only matching paths.
+        :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
+        """
 
         def hardlink_master_seen(item):
             return 'source' not in item or not hardlinkable(item.mode) or item.source in hardlink_masters
@@ -861,93 +842,66 @@ Utilization of max. archive size: {csize_max:.0%}
         def has_hardlink_master(item, hardlink_masters):
             return hardlinkable(item.mode) and item.get('source') in hardlink_masters
 
-        def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
-            """
-            Compare two items with identical paths.
-            :param deleted: Whether one of the items has been deleted
-            """
-            changes = []
-
+        def compare_items(item1, item2):
             if has_hardlink_master(item1, hardlink_masters):
                 item1 = hardlink_masters[item1.source][0]
-
             if has_hardlink_master(item2, hardlink_masters):
                 item2 = hardlink_masters[item2.source][1]
+            return ItemDiff(item1, item2,
+                            archive1.pipeline.fetch_many([c.id for c in item1.get('chunks', [])]),
+                            archive2.pipeline.fetch_many([c.id for c in item2.get('chunks', [])]),
+                            can_compare_chunk_ids=can_compare_chunk_ids)
 
-            if get_mode(item1)[0] == 'l' or get_mode(item2)[0] == 'l':
-                changes.append(compare_link(item1, item2))
-
-            if 'chunks' in item1 and 'chunks' in item2:
-                changes.append(compare_content(path, item1, item2))
-
-            if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
-                changes.append(compare_directory(item1, item2))
-
-            if not deleted:
-                changes.append(compare_owner(item1, item2))
-                changes.append(compare_mode(item1, item2))
-
-            changes = [x for x in changes if x]
-            if changes:
-                output_line = (remove_surrogates(path), ' '.join(changes))
-
-                if args.sort:
-                    output.append(output_line)
-                else:
-                    print_output(output_line)
-
-        def compare_or_defer(item1, item2):
+        def defer_if_necessary(item1, item2):
+            """Adds item tuple to deferred if necessary and returns True, if items were deferred"""
             update_hardlink_masters(item1, item2)
-            if not hardlink_master_seen(item1) or not hardlink_master_seen(item2):
+            defer = not hardlink_master_seen(item1) or not hardlink_master_seen(item2)
+            if defer:
                 deferred.append((item1, item2))
-            else:
-                compare_items(output, item1.path, item1, item2, hardlink_masters)
+            return defer
 
-        orphans_archive1 = collections.OrderedDict()
-        orphans_archive2 = collections.OrderedDict()
+        orphans_archive1 = OrderedDict()
+        orphans_archive2 = OrderedDict()
         deferred = []
         hardlink_masters = {}
-        output = []
 
         for item1, item2 in zip_longest(
                 archive1.iter_items(lambda item: matcher.match(item.path)),
                 archive2.iter_items(lambda item: matcher.match(item.path)),
         ):
             if item1 and item2 and item1.path == item2.path:
-                compare_or_defer(item1, item2)
+                if not defer_if_necessary(item1, item2):
+                    yield (item1.path, compare_items(item1, item2))
                 continue
             if item1:
                 matching_orphan = orphans_archive2.pop(item1.path, None)
                 if matching_orphan:
-                    compare_or_defer(item1, matching_orphan)
+                    if not defer_if_necessary(item1, matching_orphan):
+                        yield (item1.path, compare_items(item1, matching_orphan))
                 else:
                     orphans_archive1[item1.path] = item1
             if item2:
                 matching_orphan = orphans_archive1.pop(item2.path, None)
                 if matching_orphan:
-                    compare_or_defer(matching_orphan, item2)
+                    if not defer_if_necessary(matching_orphan, item2):
+                        yield (matching_orphan.path, compare_items(matching_orphan, item2))
                 else:
                     orphans_archive2[item2.path] = item2
         # At this point orphans_* contain items that had no matching partner in the other archive
-        deleted_item = Item(
-            deleted=True,
-            chunks=[],
-            mode=0,
-        )
         for added in orphans_archive2.values():
             path = added.path
-            deleted_item.path = path
+            deleted_item = Item.create_deleted(path)
             update_hardlink_masters(deleted_item, added)
-            compare_items(output, path, deleted_item, added, hardlink_masters, deleted=True)
+            yield (path, compare_items(deleted_item, added))
         for deleted in orphans_archive1.values():
             path = deleted.path
-            deleted_item.path = path
+            deleted_item = Item.create_deleted(path)
             update_hardlink_masters(deleted, deleted_item)
-            compare_items(output, path, deleted, deleted_item, hardlink_masters, deleted=True)
+            yield (path, compare_items(deleted, deleted_item))
         for item1, item2 in deferred:
             assert hardlink_master_seen(item1)
             assert hardlink_master_seen(item2)
-            compare_items(output, item1.path, item1, item2, hardlink_masters)
+            yield (path, compare_items(item1, item2))
 
 
 class MetadataCollector:

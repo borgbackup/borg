@@ -940,8 +940,8 @@ class Archiver:
     def do_diff(self, args, repository, manifest, key, archive):
         """Diff contents of two archives"""
 
-        def print_output(line):
-            print("{:<19} {}".format(line[1], line[0]))
+        def print_output(diff, path):
+            print("{:<19} {}".format(diff, path))
 
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2,
@@ -956,10 +956,15 @@ class Archiver:
 
         matcher = self.build_matcher(args.patterns, args.paths)
 
-        compare_archives(archive1, archive2, matcher)
+        diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids)
+        # Conversion to string and filtering for diff.equal to save memory if sorting
+        diffs = ((path, str(diff)) for path, diff in diffs if not diff.equal)
 
-        for line in sorted(output):
-            print_output(line)
+        if args.sort:
+            diffs = sorted(diffs)
+
+        for path, diff in diffs:
+            print_output(diff, path)
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)

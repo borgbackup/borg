@@ -358,3 +358,85 @@ class ManifestItem(PropDict):
     timestamp = PropDict._make_property('timestamp', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     config = PropDict._make_property('config', dict)
     item_keys = PropDict._make_property('item_keys', tuple)
+
+    def compare_link(item1, item2):
+        # These are the simple link cases. For special cases, e.g. if a
+        # regular file is replaced with a link or vice versa, it is
+        # indicated in compare_mode instead.
+        if item1.get('deleted'):
+            return 'added link'
+        elif item2.get('deleted'):
+            return 'removed link'
+        elif 'source' in item1 and 'source' in item2 and item1.source != item2.source:
+            return 'changed link'
+
+def compare_content(path, item1, item2):
+    if contents_changed(item1, item2):
+        if item1.get('deleted'):
+            return 'added {:>13}'.format(format_file_size(sum_chunk_size(item2)))
+        if item2.get('deleted'):
+            return 'removed {:>11}'.format(format_file_size(sum_chunk_size(item1)))
+        if not can_compare_chunk_ids:
+            return 'modified'
+        chunk_ids1 = {c.id for c in item1.chunks}
+        chunk_ids2 = {c.id for c in item2.chunks}
+        added_ids = chunk_ids2 - chunk_ids1
+        removed_ids = chunk_ids1 - chunk_ids2
+        added = sum_chunk_size(item2, added_ids)
+        removed = sum_chunk_size(item1, removed_ids)
+        return '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
+                                    format_file_size(-removed, precision=1, sign=True))
+
+    def compare_directory(item1, item2):
+        if item2.get('deleted') and not item1.get('deleted'):
+            return 'removed directory'
+        elif item1.get('deleted') and not item2.get('deleted'):
+            return 'added directory'
+
+    def compare_owner(item1, item2):
+        user1, group1 = get_owner(item1)
+        user2, group2 = get_owner(item2)
+        if user1 != user2 or group1 != group2:
+            return '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2)
+
+    def compare_mode(item1, item2):
+        if item1.mode != item2.mode:
+            return '[{} -> {}]'.format(get_mode(item1), get_mode(item2))
+
+    def contents_changed(item1, item2):
+        if can_compare_chunk_ids:
+            return item1.chunks != item2.chunks
+        else:
+            if sum_chunk_size(item1) != sum_chunk_size(item2):
+                return True
+            else:
+                chunk_ids1 = [c.id for c in item1.chunks]
+                chunk_ids2 = [c.id for c in item2.chunks]
+                return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
+
+    @staticmethod
+    def compare_chunk_contents(chunks1, chunks2):
+        """Compare two chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`)"""
+        end = object()
+        alen = ai = 0
+        blen = bi = 0
+        while True:
+            if not alen - ai:
+                a = next(chunks1, end)
+                if a is end:
+                    return not blen - bi and next(chunks2, end) is end
+                a = memoryview(a)
+                alen = len(a)
+                ai = 0
+            if not blen - bi:
+                b = next(chunks2, end)
+                if b is end:
+                    return not alen - ai and next(chunks1, end) is end
+                b = memoryview(b)
+                blen = len(b)
+                bi = 0
+            slicelen = min(alen - ai, blen - bi)
+            if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
+                return False
+            ai += slicelen
+            bi += slicelen

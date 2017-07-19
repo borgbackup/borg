@@ -196,33 +196,6 @@ class Archiver:
                 logging.getLogger('borg.output.list').info("%1s %s", status, remove_surrogates(path))
 
     @staticmethod
-    def compare_chunk_contents(chunks1, chunks2):
-        """Compare two chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`)"""
-        end = object()
-        alen = ai = 0
-        blen = bi = 0
-        while True:
-            if not alen - ai:
-                a = next(chunks1, end)
-                if a is end:
-                    return not blen - bi and next(chunks2, end) is end
-                a = memoryview(a)
-                alen = len(a)
-                ai = 0
-            if not blen - bi:
-                b = next(chunks2, end)
-                if b is end:
-                    return not alen - ai and next(chunks1, end) is end
-                b = memoryview(b)
-                blen = len(b)
-                bi = 0
-            slicelen = min(alen - ai, blen - bi)
-            if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
-                return False
-            ai += slicelen
-            bi += slicelen
-
-    @staticmethod
     def build_matcher(inclexcl_patterns, include_paths):
         matcher = PatternMatcher()
         matcher.add_inclexcl(inclexcl_patterns)
@@ -966,195 +939,9 @@ class Archiver:
     @with_archive
     def do_diff(self, args, repository, manifest, key, archive):
         """Diff contents of two archives"""
-        def fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2):
-            chunks1 = archive1.pipeline.fetch_many(chunk_ids1)
-            chunks2 = archive2.pipeline.fetch_many(chunk_ids2)
-            return self.compare_chunk_contents(chunks1, chunks2)
-
-        def sum_chunk_size(item, consider_ids=None):
-            if item.get('deleted'):
-                size = None
-            else:
-                if consider_ids is not None:  # consider only specific chunks
-                    size = sum(chunk.size for chunk in item.chunks if chunk.id in consider_ids)
-                else:  # consider all chunks
-                    size = item.get_size()
-            return size
-
-        def get_owner(item):
-            if args.numeric_owner:
-                return item.uid, item.gid
-            else:
-                return item.user, item.group
-
-        def get_mode(item):
-            if 'mode' in item:
-                return stat.filemode(item.mode)
-            else:
-                return [None]
-
-        def has_hardlink_master(item, hardlink_masters):
-            return hardlinkable(item.mode) and item.get('source') in hardlink_masters
-
-        def compare_link(item1, item2):
-            # These are the simple link cases. For special cases, e.g. if a
-            # regular file is replaced with a link or vice versa, it is
-            # indicated in compare_mode instead.
-            if item1.get('deleted'):
-                return 'added link'
-            elif item2.get('deleted'):
-                return 'removed link'
-            elif 'source' in item1 and 'source' in item2 and item1.source != item2.source:
-                return 'changed link'
-
-        def contents_changed(item1, item2):
-            if can_compare_chunk_ids:
-                return item1.chunks != item2.chunks
-            else:
-                if sum_chunk_size(item1) != sum_chunk_size(item2):
-                    return True
-                else:
-                    chunk_ids1 = [c.id for c in item1.chunks]
-                    chunk_ids2 = [c.id for c in item2.chunks]
-                    return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
-
-        def compare_content(path, item1, item2):
-            if contents_changed(item1, item2):
-                if item1.get('deleted'):
-                    return 'added {:>13}'.format(format_file_size(sum_chunk_size(item2)))
-                if item2.get('deleted'):
-                    return 'removed {:>11}'.format(format_file_size(sum_chunk_size(item1)))
-                if not can_compare_chunk_ids:
-                    return 'modified'
-                chunk_ids1 = {c.id for c in item1.chunks}
-                chunk_ids2 = {c.id for c in item2.chunks}
-                added_ids = chunk_ids2 - chunk_ids1
-                removed_ids = chunk_ids1 - chunk_ids2
-                added = sum_chunk_size(item2, added_ids)
-                removed = sum_chunk_size(item1, removed_ids)
-                return '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
-                                            format_file_size(-removed, precision=1, sign=True))
-
-        def compare_directory(item1, item2):
-            if item2.get('deleted') and not item1.get('deleted'):
-                return 'removed directory'
-            elif item1.get('deleted') and not item2.get('deleted'):
-                return 'added directory'
-
-        def compare_owner(item1, item2):
-            user1, group1 = get_owner(item1)
-            user2, group2 = get_owner(item2)
-            if user1 != user2 or group1 != group2:
-                return '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2)
-
-        def compare_mode(item1, item2):
-            if item1.mode != item2.mode:
-                return '[{} -> {}]'.format(get_mode(item1), get_mode(item2))
-
-        def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
-            """
-            Compare two items with identical paths.
-            :param deleted: Whether one of the items has been deleted
-            """
-            changes = []
-
-            if has_hardlink_master(item1, hardlink_masters):
-                item1 = hardlink_masters[item1.source][0]
-
-            if has_hardlink_master(item2, hardlink_masters):
-                item2 = hardlink_masters[item2.source][1]
-
-            if get_mode(item1)[0] == 'l' or get_mode(item2)[0] == 'l':
-                changes.append(compare_link(item1, item2))
-
-            if 'chunks' in item1 and 'chunks' in item2:
-                changes.append(compare_content(path, item1, item2))
-
-            if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
-                changes.append(compare_directory(item1, item2))
-
-            if not deleted:
-                changes.append(compare_owner(item1, item2))
-                changes.append(compare_mode(item1, item2))
-
-            changes = [x for x in changes if x]
-            if changes:
-                output_line = (remove_surrogates(path), ' '.join(changes))
-
-                if args.sort:
-                    output.append(output_line)
-                else:
-                    print_output(output_line)
 
         def print_output(line):
             print("{:<19} {}".format(line[1], line[0]))
-
-        def compare_archives(archive1, archive2, matcher):
-            def hardlink_master_seen(item):
-                return 'source' not in item or not hardlinkable(item.mode) or item.source in hardlink_masters
-
-            def is_hardlink_master(item):
-                return item.get('hardlink_master', True) and 'source' not in item
-
-            def update_hardlink_masters(item1, item2):
-                if is_hardlink_master(item1) or is_hardlink_master(item2):
-                    hardlink_masters[item1.path] = (item1, item2)
-
-            def compare_or_defer(item1, item2):
-                update_hardlink_masters(item1, item2)
-                if not hardlink_master_seen(item1) or not hardlink_master_seen(item2):
-                    deferred.append((item1, item2))
-                else:
-                    compare_items(output, item1.path, item1, item2, hardlink_masters)
-
-            orphans_archive1 = collections.OrderedDict()
-            orphans_archive2 = collections.OrderedDict()
-            deferred = []
-            hardlink_masters = {}
-            output = []
-
-            for item1, item2 in zip_longest(
-                    archive1.iter_items(lambda item: matcher.match(item.path)),
-                    archive2.iter_items(lambda item: matcher.match(item.path)),
-            ):
-                if item1 and item2 and item1.path == item2.path:
-                    compare_or_defer(item1, item2)
-                    continue
-                if item1:
-                    matching_orphan = orphans_archive2.pop(item1.path, None)
-                    if matching_orphan:
-                        compare_or_defer(item1, matching_orphan)
-                    else:
-                        orphans_archive1[item1.path] = item1
-                if item2:
-                    matching_orphan = orphans_archive1.pop(item2.path, None)
-                    if matching_orphan:
-                        compare_or_defer(matching_orphan, item2)
-                    else:
-                        orphans_archive2[item2.path] = item2
-            # At this point orphans_* contain items that had no matching partner in the other archive
-            deleted_item = Item(
-                deleted=True,
-                chunks=[],
-                mode=0,
-            )
-            for added in orphans_archive2.values():
-                path = added.path
-                deleted_item.path = path
-                update_hardlink_masters(deleted_item, added)
-                compare_items(output, path, deleted_item, added, hardlink_masters, deleted=True)
-            for deleted in orphans_archive1.values():
-                path = deleted.path
-                deleted_item.path = path
-                update_hardlink_masters(deleted, deleted_item)
-                compare_items(output, path, deleted, deleted_item, hardlink_masters, deleted=True)
-            for item1, item2 in deferred:
-                assert hardlink_master_seen(item1)
-                assert hardlink_master_seen(item2)
-                compare_items(output, item1.path, item1, item2, hardlink_masters)
-
-            for line in sorted(output):
-                print_output(line)
 
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2,
@@ -1170,6 +957,9 @@ class Archiver:
         matcher = self.build_matcher(args.patterns, args.paths)
 
         compare_archives(archive1, archive2, matcher)
+
+        for line in sorted(output):
+            print_output(line)
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)

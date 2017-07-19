@@ -365,9 +365,9 @@ class ManifestItem(PropDict):
         # indicated in compare_mode instead.
         if item1.get('deleted'):
             return 'added link'
-        elif item2.get('deleted'):
+        if item2.get('deleted'):
             return 'removed link'
-        elif 'source' in item1 and 'source' in item2 and item1.source != item2.source:
+        if 'source' in item1 and 'source' in item2 and item1.source != item2.source:
             return 'changed link'
 
 def compare_content(path, item1, item2):
@@ -390,7 +390,7 @@ def compare_content(path, item1, item2):
     def compare_directory(item1, item2):
         if item2.get('deleted') and not item1.get('deleted'):
             return 'removed directory'
-        elif item1.get('deleted') and not item2.get('deleted'):
+        if item1.get('deleted') and not item2.get('deleted'):
             return 'added directory'
 
     def compare_owner(item1, item2):
@@ -406,13 +406,11 @@ def compare_content(path, item1, item2):
     def contents_changed(item1, item2):
         if can_compare_chunk_ids:
             return item1.chunks != item2.chunks
-        else:
-            if sum_chunk_size(item1) != sum_chunk_size(item2):
-                return True
-            else:
-                chunk_ids1 = [c.id for c in item1.chunks]
-                chunk_ids2 = [c.id for c in item2.chunks]
-                return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
+        if sum_chunk_size(item1) != sum_chunk_size(item2):
+            return True
+        chunk_ids1 = [c.id for c in item1.chunks]
+        chunk_ids2 = [c.id for c in item2.chunks]
+        return not fetch_and_compare_chunks(chunk_ids1, chunk_ids2, archive1, archive2)
 
     @staticmethod
     def compare_chunk_contents(chunks1, chunks2):

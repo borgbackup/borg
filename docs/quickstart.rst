@@ -90,8 +90,8 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     export BORG_PASSCOMMAND='pass show backup'
 
     # some helpers and error handling:
-    function info  () { echo -e "\n"`date` $@"\n" >&2; }
-    trap "echo `date` Backup interrupted >&2; exit 2" SIGINT SIGTERM
+    info() { printf "\n%s %s\n\n" "$( date )" "$*" >&2; }
+    trap 'echo $( date ) Backup interrupted >&2; exit 2' INT TERM
 
     info "Starting backup"
 
@@ -135,7 +135,8 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 
     prune_exit=$?
 
-    global_exit=$(( ${backup_exit} >  ${prune_exit} ? ${backup_exit} : ${prune_exit} ))
+    # use highest exit code as global exit code
+    global_exit=$(( backup_exit > prune_exit ? backup_exit : prune_exit ))
 
     if [ ${global_exit} -eq 1 ];
     then

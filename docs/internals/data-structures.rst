@@ -60,8 +60,8 @@ and looks like this::
 
     [repository]
     version = 1
-    segments_per_dir = 10000
-    max_segment_size = 5242880
+    segments_per_dir = 1000
+    max_segment_size = 524288000
     id = 57d6c1d52ce76a836b532b0e42e677dec6af9fca3673db511279358828a21ed6
 
 This is where the ``repository.id`` is stored. It is a unique

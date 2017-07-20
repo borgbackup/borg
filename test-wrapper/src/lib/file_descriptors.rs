@@ -1,5 +1,7 @@
 use std::mem;
+
 use std::os::raw::*;
+use std::os::unix::io::AsRawFd;
 
 use libc;
 
@@ -30,6 +32,16 @@ fn base_dup(oldfd: c_int, newfd: c_int) -> Result<()> {
 
 wrap! {
     unsafe fn close:ORIG_CLOSE(fd: c_int) -> c_int {
+        {
+            let daemon_stream = DAEMON_STREAM.lock().unwrap();
+            if daemon_stream.0.get_ref().as_raw_fd() == fd || daemon_stream.1.get_ref().as_raw_fd() == fd{
+                // For whatever, reason, Python has a habbit of closing our stream
+                // We don't have to worry about closing it ourself because:
+                // - lazy_static never calls drop
+                // - REENTRANT means ORIG_CLOSE gets used for replacing in atfork
+                return Ok(0);
+            }
+        }
         let ret = ORIG_CLOSE(fd);
         if ret != -1 {
             if let Some(id) = FD_ID_CACHE.lock().unwrap().remove(&fd) {

@@ -95,7 +95,9 @@ lazy_static! {
         unsafe {
            libc::pthread_atfork(None, None, Some(new_daemon_stream));
         }
+        let old_reentrant = REENTRANT.with(|c| c.replace(true));
         let stream = create_daemon_stream();
+        REENTRANT.with(|c| c.set(old_reentrant));
         Mutex::new(stream)
     };
 
@@ -236,7 +238,6 @@ macro_rules! __wrap_fn {
         pub unsafe extern "C" fn $name($( $arg_n: $arg_t ),*) -> $ret_t {
             lazy_static! {
                 static ref $orig_name: extern fn($( $arg_t ),*) -> $ret_t = unsafe {
-                    trace!("Finding original {}", stringify!($name));
                     ::std::mem::transmute(::libc::dlsym(::libc::RTLD_NEXT, ::std::ffi::CString::new(stringify!($name)).unwrap().as_ptr()))
                 };
             }

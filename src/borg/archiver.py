@@ -2513,7 +2513,7 @@ class Archiver:
         hardware-accelerated.
         BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs
         (except AMD Ryzen and future CPUs with SHA extensions),
-        which makes `authenticated-blake2` faster than `none` and `authenticated`.
+        which makes `authenticated-blake2` faster than `authenticated`.
 
         On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
         than BLAKE2b-256 there. NEON accelerates AES as well.

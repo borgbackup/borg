@@ -88,7 +88,10 @@ Segments
 ~~~~~~~~
 
 Objects referenced by a key are stored inline in files (`segments`) of approx.
-500 MB size in numbered subdirectories of ``repo/data``.
+500 MB size in numbered subdirectories of ``repo/data``. The number of segments
+per directory is controlled by the value of ``segments_per_dir``. If you change
+this value in a non-empty repository, you may also need to relocate the segment
+files manually.
 
 A segment starts with a magic number (``BORG_SEG`` as an eight byte ASCII string),
 followed by a number of log entries. Each log entry consists of:

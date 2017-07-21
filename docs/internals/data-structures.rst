@@ -60,8 +60,8 @@ and looks like this::
 
     [repository]
     version = 1
-    segments_per_dir = 10000
-    max_segment_size = 5242880
+    segments_per_dir = 1000
+    max_segment_size = 524288000
     id = 57d6c1d52ce76a836b532b0e42e677dec6af9fca3673db511279358828a21ed6
 
 This is where the ``repository.id`` is stored. It is a unique
@@ -88,7 +88,10 @@ Segments
 ~~~~~~~~
 
 Objects referenced by a key are stored inline in files (`segments`) of approx.
-500 MB size in numbered subdirectories of ``repo/data``.
+500 MB size in numbered subdirectories of ``repo/data``. The number of segments
+per directory is controlled by the value of ``segments_per_dir``. If you change
+this value in a non-empty repository, you may also need to relocate the segment
+files manually.
 
 A segment starts with a magic number (``BORG_SEG`` as an eight byte ASCII string),
 followed by a number of log entries. Each log entry consists of:

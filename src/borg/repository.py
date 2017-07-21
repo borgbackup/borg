@@ -642,7 +642,8 @@ class Repository:
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:
                 logger.debug('complete_xfer: deleting unused segment %d', segment)
-                assert self.segments.pop(segment) == 0, 'Corrupted segment reference count - corrupted index or hints'
+                count = self.segments.pop(segment)
+                assert count == 0, 'Corrupted segment reference count - corrupted index or hints'
                 self.io.delete_segment(segment)
                 del self.compact[segment]
             unused = []

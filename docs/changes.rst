@@ -128,7 +128,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.0.11 (2017-07-xx)
+Version 1.0.11 (2017-07-21)
 ---------------------------
 
 Bug fixes:

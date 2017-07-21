@@ -59,7 +59,7 @@ borg create
                             exclude directories that contain the specified file
       --keep-tag-files      keep tag files of excluded caches/directories
       -c SECONDS, --checkpoint-interval SECONDS
-                            write checkpoint every SECONDS seconds (Default: 300)
+                            write checkpoint every SECONDS seconds (Default: 1800)
       -x, --one-file-system
                             stay in same file system
       --numeric-owner       only store numeric user and group identifiers

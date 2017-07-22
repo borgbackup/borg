@@ -111,6 +111,8 @@ Are there other known limitations?
   :ref:`borg_info` shows how large (relative to the maximum size) existing
   archives are.
 
+.. _checkpoints_parts:
+
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
 
@@ -149,6 +151,21 @@ these files, but you can make them considered by giving the option
 really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
+
+How can I backup huge file(s) over a unstable connection?
+---------------------------------------------------------
+
+This is not a problem any more.
+
+For more details, see :ref:`checkpoints_parts`.
+
+How can I restore huge file(s) over an unstable connection?
+-----------------------------------------------------------
+
+If you can not manage to extract the whole big file in one go, you can extract
+all the part files and manually concatenate them together.
+
+For more details, see :ref:`checkpoints_parts`.
 
 Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
 ---------------------------------------------------------------------------------------
@@ -423,17 +440,6 @@ This has some pros and cons, though:
   your local chunks cache was lost somehow.
 
 The long term plan to improve this is called "borgception", see :issue:`474`.
-
-How can I backup huge file(s) over a unstable connection?
----------------------------------------------------------
-
-This is not a problem any more, see previous FAQ item.
-
-How can I restore huge file(s) over an unstable connection?
------------------------------------------------------------
-
-If you can not manage to extract the whole big file in one go, you can extract
-all the part files (see above) and manually concatenate them together.
 
 Can I backup my root partition (/) with Borg?
 ---------------------------------------------

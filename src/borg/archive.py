@@ -936,7 +936,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 # if we created part files, we have referenced all chunks from the part files,
                 # but we also will reference the same chunks also from the final, complete file:
                 for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, stats)
+                    cache.chunk_incref(chunk.id, stats, size_=chunk.size)
 
     def process_stdin(self, path, cache):
         uid, gid = 0, 0

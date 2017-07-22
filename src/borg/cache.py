@@ -877,7 +877,7 @@ class LocalCache(CacheStatsMixin):
                             id, stored_size, size))
         return refcount
 
-    def chunk_incref(self, id, stats):
+    def chunk_incref(self, id, stats, size_=None):
         if not self.txn_active:
             self.begin_txn()
         count, size, csize = self.chunks.incref(id)

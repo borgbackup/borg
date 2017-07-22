@@ -155,14 +155,14 @@ that option under any normal circumstances.
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
 
-This is not a problem any more.
+This is not a problem anymore.
 
 For more details, see :ref:`checkpoints_parts`.
 
 How can I restore huge file(s) over an unstable connection?
 -----------------------------------------------------------
 
-If you can not manage to extract the whole big file in one go, you can extract
+If you cannot manage to extract the whole big file in one go, you can extract
 all the part files and manually concatenate them together.
 
 For more details, see :ref:`checkpoints_parts`.

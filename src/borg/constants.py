@@ -34,7 +34,7 @@ MAX_DATA_SIZE = 20971479
 # MAX_OBJECT_SIZE = <20 MiB (MAX_DATA_SIZE) + 41 bytes for a Repository PUT header, which consists of
 # a 1 byte tag ID, 4 byte CRC, 4 byte size and 32 bytes for the ID.
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see LoggedIO.put_header_fmt.size assertion in repository module
-assert MAX_OBJECT_SIZE == 20971520 == 20 * 1024 * 1024
+assert MAX_OBJECT_SIZE == 20 * 1024 * 1024
 
 # borg.remote read() buffer size
 BUFSIZE = 10 * 1024 * 1024

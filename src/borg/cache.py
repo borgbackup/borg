@@ -1002,10 +1002,10 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         if not self._txn_active:
             self._begin_txn()
         count, size, csize = self.chunks.incref(id)
-        stats.update(size or size_, csize, False)
         # When size is 0 and size_ is not given, then this chunk has not been locally visited yet (seen_chunk with
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
         assert size or size_
+        stats.update(size or size_, csize, False)
         return ChunkListEntry(id, size or size_, csize)
 
     def chunk_decref(self, id, stats, wait=True):

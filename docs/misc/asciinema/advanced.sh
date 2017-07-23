@@ -1,7 +1,7 @@
 # For the pro users, here are some advanced features of borg, so you can impress your friends. ;)
 # Note: This screencast was made with borg version 1.1.0 – older or newer borg version may behave differently.
 
-# First of all, we can use several envorimental variables for borg.
+# First of all, we can use several environmental variables for borg.
 # E.g. we do not want to type in our repo path and password again and again…
 export BORG_REPO='/media/backup/borgdemo'
 export BORG_PASSPHRASE='1234'
@@ -40,10 +40,10 @@ borg key export :: --qr-code file.html # this creates a nice HTML, but when you 
 # Sometimes backups get broken or we want a regular "checkup" that everything is okay…
 borg check -v ::
 
-# Next problem: Usually you do not have indefite disk space. So you may need to prune your archive…
+# Next problem: Usually you do not have infinite disk space. So you may need to prune your archive…
 # You can tune this in every detail. See the docs for details. Here only a simple example:
 borg prune --list --keep-last 1 --dry-run
-# When actually execute it in a script, you have to use it without the --dry-run option, of course.
+# When actually executing it in a script, you have to use it without the --dry-run option, of course.
 
 ## RESTORE ##
 

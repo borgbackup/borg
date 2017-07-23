@@ -176,7 +176,7 @@
     ],
     [
       0.333349,
-      "\b\u001b[1m \u001b[1mof all, we can use several envorimental variables for borg.\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mof all, we can use several environmental variables for borg.\u001b[0m\u001b[39m"
     ],
     [
       1.115007,
@@ -4721,7 +4721,7 @@
     ],
     [
       0.372203,
-      "\b\u001b[1mo\u001b[1mblem: Usually you do not have indefite disk space. So you may need\u001b[1m \u001b[1mto prune your archive…\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1mo\u001b[1mblem: Usually you do not have infinite disk space. So you may need\u001b[1m \u001b[1mto prune your archive…\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       1.956234,
@@ -5105,7 +5105,7 @@
     ],
     [
       0.157309,
-      "\b\u001b[1mc\u001b[1mtually execute it in a script, you have to use it without the --dry\u001b[1m-\u001b[1mrun option, of course.\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1mc\u001b[1mtually executing it in a script, you have to use it without the --dry\u001b[1m-\u001b[1mrun option, of course.\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       2.08243,

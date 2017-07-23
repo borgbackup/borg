@@ -131,7 +131,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.0rc1 (unreleased)
+Version 1.1.0rc1 (2017-07-24)
 -----------------------------
 
 Compatibility notes:

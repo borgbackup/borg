@@ -6,7 +6,7 @@ borg change-passphrase
 ----------------------
 .. code-block:: none
 
-    borg [common options] change-passphrase [options] REPOSITORY
+    borg [common options] change-passphrase [options] [REPOSITORY]
 
 .. only:: html
 

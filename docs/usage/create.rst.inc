@@ -6,7 +6,7 @@ borg create
 -----------
 .. code-block:: none
 
-    borg [common options] create [options] ARCHIVE PATH
+    borg [common options] create [options] ARCHIVE [PATH...]
 
 .. only:: html
 
@@ -27,7 +27,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--list``                                        | output verbose list of items (files, dirs, ...)                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--filter STATUSCHARS``                          | only display items with the given status characters                                                                                               |
+    |                                                       | ``--filter STATUSCHARS``                          | only display items with the given status characters (see description)                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--json``                                        | output stats as JSON. Implies ``--stats``.                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -43,15 +43,15 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-from EXCLUDEFILE``                    | read exclude patterns from EXCLUDEFILE, one per line                                                                                              |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--pattern PATTERN``                             | experimental: include/exclude paths matching PATTERN                                                                                              |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--patterns-from PATTERNFILE``                   | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                        |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-caches``                              | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)                                              |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-if-present NAME``                     | exclude directories that are tagged by containing a filesystem object with the given NAME                                                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--keep-exclude-tags``, ``--keep-tag-files``     | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                         |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--pattern PATTERN``                             | experimental: include/exclude paths matching PATTERN                                                                                              |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--patterns-from PATTERNFILE``                   | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -71,7 +71,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--comment COMMENT``                             | add a comment text to the archive                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--timestamp TIMESTAMP``                         | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.                |
+    |                                                       | ``--timestamp TIMESTAMP``                         | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). Alternatively, give a reference file/directory.                |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -100,7 +100,7 @@ borg create
         -n, --dry-run    do not create a backup archive
         -s, --stats     print statistics for the created archive
         --list          output verbose list of items (files, dirs, ...)
-        --filter STATUSCHARS    only display items with the given status characters
+        --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
         --no-cache-sync    experimental: do not synchronize the cache. Implies ``--no-files-cache``.
 
@@ -111,11 +111,11 @@ borg create
     Exclusion options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
+        --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
+        --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
         --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags, --keep-tag-files    if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
-        --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
-        --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
 
 
     Filesystem options
@@ -129,7 +129,7 @@ borg create
 
     Archive options
         --comment COMMENT                             add a comment text to the archive
-        --timestamp TIMESTAMP                         manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.
+        --timestamp TIMESTAMP                         manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). Alternatively, give a reference file/directory.
         -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
         --chunker-params PARAMS                       specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
@@ -156,10 +156,14 @@ checkpoints and treated in special ways.
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
-To speed up pulling backups over sshfs and similar network file systems which do
-not provide correct inode information the ``--ignore-inode`` flag can be used. This
-potentially decreases reliability of change detection, while avoiding always reading
-all files on these file systems.
+Backup speed is increased by not reprocessing files that are already part of
+existing archives and weren't modified. Normally, detecting file modifications
+will take inode information into consideration. This is problematic for files
+located on sshfs and similar network file systems which do not provide stable
+inode numbers, such files will always be considered modified. The
+``--ignore-inode`` flag can be used to prevent this and improve performance.
+This flag will reduce reliability of change detection however, with files
+considered unmodified as long as their size and modification time are unchanged.
 
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that

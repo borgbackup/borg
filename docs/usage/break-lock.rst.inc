@@ -6,7 +6,7 @@ borg break-lock
 ---------------
 .. code-block:: none
 
-    borg [common options] break-lock [options] REPOSITORY
+    borg [common options] break-lock [options] [REPOSITORY]
 
 .. only:: html
 

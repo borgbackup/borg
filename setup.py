@@ -368,12 +368,12 @@ class build_usage(Command):
                 # "+ 1" because we want a space between the cell contents and the delimiting "|" in the output
                 column_widths[i] = max(column_widths[i], len(cells[i]) + 1)
 
-        for columns, *cells in rows:
+        for columns, *original_cells in rows:
             write_row_separator()
             # If a cell contains newlines, then the row must be split up in individual rows
             # where each cell contains no newline.
             rowspanning_cells = []
-            original_cells = list(cells)
+            original_cells = list(original_cells)
             while any('\n' in cell for cell in original_cells):
                 cell_bloc = []
                 for i, cell in enumerate(original_cells):

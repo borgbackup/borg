@@ -172,11 +172,11 @@ backup_io = BackupIO()
 def backup_io_iter(iterator):
     backup_io.op = 'read'
     while True:
-        try:
-            with backup_io:
+        with backup_io:
+            try:
                 item = next(iterator)
-        except StopIteration:
-            return
+            except StopIteration:
+                return
         yield item
 
 

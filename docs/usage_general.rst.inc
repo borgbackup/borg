@@ -242,7 +242,7 @@ and readable after one of the failures mentioned above occurred, run
 - At least three directory levels with short names
 - Typically, file sizes up to a few hundred MB.
   Large repositories may require large files (>2 GB).
-- Up to 10000 files per directory
+- Up to 1000 files per directory (10000 for repositories initialized with Borg 1.0)
 - mkdir(2) should be atomic, since it is used for locking
 - Hardlinks are needed for :ref:`borg_upgrade` ``--inplace``
 

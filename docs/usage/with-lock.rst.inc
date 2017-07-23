@@ -6,7 +6,7 @@ borg with-lock
 --------------
 .. code-block:: none
 
-    borg [common options] with-lock [options] REPOSITORY COMMAND ARGS
+    borg [common options] with-lock [options] REPOSITORY COMMAND [ARGS...]
 
 .. only:: html
 
@@ -57,6 +57,8 @@ running in the repo), then execute the given command as a subprocess and wait
 for its termination, release the lock and return the user command's return
 code as borg's return code.
 
-Note: if you copy a repository with the lock held, the lock will be present in
-      the copy, obviously. Thus, before using borg on the copy, you need to
-      use "borg break-lock" on it.
+.. note::
+
+    If you copy a repository with the lock held, the lock will be present in
+    the copy, obviously. Thus, before using borg on the copy, you need to
+    use "borg break-lock" on it.

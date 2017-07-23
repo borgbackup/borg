@@ -6,7 +6,7 @@ borg key import
 ---------------
 .. code-block:: none
 
-    borg [common options] key import [options] REPOSITORY PATH
+    borg [common options] key import [options] [REPOSITORY] [PATH]
 
 .. only:: html
 
@@ -17,7 +17,7 @@ borg key import
     +-------------------------------------------------------+----------------+----------------------------------------------------------+
     |                                                       | ``REPOSITORY`` |                                                          |
     +-------------------------------------------------------+----------------+----------------------------------------------------------+
-    |                                                       | ``PATH``       | path to the backup                                       |
+    |                                                       | ``PATH``       | path to the backup ('-' to read from stdin)              |
     +-------------------------------------------------------+----------------+----------------------------------------------------------+
     | **optional arguments**                                                                                                            |
     +-------------------------------------------------------+----------------+----------------------------------------------------------+
@@ -41,7 +41,7 @@ borg key import
     REPOSITORY
 
     PATH
-        path to the backup
+        path to the backup ('-' to read from stdin)
 
 
     optional arguments

@@ -20,55 +20,6 @@ There are different ways to install |project_name|:
     have the latest code or use revision control (each release is
     tagged).
 
-.. _installation-requirements:
-
-Pre-Installation Considerations
--------------------------------
-
-Repository File System
-~~~~~~~~~~~~~~~~~~~~~~
-
-- |project_name| stores data only 3 directory levels deep and uses short file and
-  directory names.
-- |project_name| requires read and write permissions on the repository file system.
-- |project_name| stores backup metadata and data into so-called segment files. The 
-  target size of these files and also the count of these files per directory is set 
-  in the :ref:`config-file`.
-- |project_name| uses a generic and very portable mkdir-based `locking`_ mechanism.
-  POSIX locks, NFS locks, windows file locks, lockf(), flock() and hardlinks are
-  **not** used.
-- Hardlinks are only required when performing an in-place upgrade of an Attic
-  repository. 
-- A journaling file system is strongly recommended. More information can be
-  found in :ref:`file-systems`.
-- |project_name| requires the following file system operations:
-
-  - create, open, read, write, seek, close, rename, delete
-  - link - when upgrading an Attic repo in-place
-  - listdir, stat
-  - fsync on files and directories to ensure data is written onto storage media
-    (some file systems do not support fsync on directories, which Borg accommodates for)
-
-:ref:`data-structures` contains additional information about how |project_name|
-manages data.
-
-.. _locking: https://en.wikipedia.org/wiki/File_locking#Lock_files
-
-(G)LIBC requirements
---------------------
-
-Borg uses some filesytem functions from Python's `os` standard library module
-with `follow_symlinks=False`. These are implemented since quite a while with
-the non-symlink-following (g)libc functions like e.g. `lstat` or `lutimes`
-(not: `stat` or `utimes`).
-
-Some stoneage systems (like RHEL/CentOS 5) and also Python interpreter binaries
-compiled to be able to run on such systems (like Python installed via Anaconda)
-might miss these functions and Borg won't be able to work correctly.
-This issue will be detected early and Borg will abort with a fatal error.
-
-For the Borg binaries, there are additional (g)libc requirements, see below.
-
 .. _distribution-package:
 
 Distribution Package
@@ -139,8 +90,8 @@ Standalone Binary
 |project_name| binaries (generated with `pyinstaller`_) are available
 on the releases_ page for the following platforms:
 
-* **Linux**: glibc >= 2.13 (ok for most supported Linux releases). Maybe older
-  glibc versions also work, if they are compatible to 2.13.
+* **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
+  Older glibc releases are untested and may not work.
 * **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 
@@ -166,82 +117,18 @@ the old version using the same steps as shown above.
 .. _pyinstaller: http://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases
 
-.. _platforms:
-
-Features & platforms
---------------------
-
-Besides regular file and directory structures, |project_name| can preserve
-
-* Symlinks (stored as symlink, the symlink is not followed)
-* Special files:
-
-  * Character and block device files (restored via mknod)
-  * FIFOs ("named pipes")
-  * Special file *contents* can be backed up in ``--read-special`` mode.
-    By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
-* Hardlinked regular files, devices, FIFOs (considering all items in the same archive)
-* Timestamps in nanosecond precision: mtime, atime, ctime
-* Permissions:
-
-  * IDs of owning user and owning group
-  * Names of owning user and owning group (if the IDs can be resolved)
-  * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
-
-On some platforms additional features are supported:
-
-.. Yes/No's are grouped by reason/mechanism/reference.
-
-+------------------+----------+-----------+------------+
-| Platform         | ACLs     | xattr     | Flags      |
-|                  | [#acls]_ | [#xattr]_ | [#flags]_  |
-+==================+==========+===========+============+
-| Linux x86        | Yes      | Yes       | Yes [1]_   |
-+------------------+          |           |            |
-| Linux PowerPC    |          |           |            |
-+------------------+          |           |            |
-| Linux ARM        |          |           |            |
-+------------------+----------+-----------+------------+
-| Mac OS X         | Yes      | Yes       | Yes (all)  |
-+------------------+----------+-----------+            |
-| FreeBSD          | Yes      | Yes       |            |
-+------------------+----------+-----------+            |
-| OpenBSD          | n/a      | n/a       |            |
-+------------------+----------+-----------+            |
-| NetBSD           | n/a      | No [2]_   |            |
-+------------------+----------+-----------+------------+
-| Solaris 11       | No [3]_              | n/a        |
-+------------------+                      |            |
-| OpenIndiana      |                      |            |
-+------------------+----------+-----------+------------+
-| Windows (cygwin) | No [4]_  | No        | No         |
-+------------------+----------+-----------+------------+
-
-Some Distributions (e.g. Debian) run additional tests after each release, these
-are not reflected here.
-
-Other Unix-like operating systems may work as well, but have not been tested at all.
-
-Note that most of the platform-dependent features also depend on the file system.
-For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
-
-.. [1] Only "nodump", "immutable", "compressed" and "append" are supported.
-    Feature request :issue:`618` for more flags.
-.. [2] Feature request :issue:`1332`
-.. [3] Feature request :issue:`1337`
-.. [4] Cygwin tries to map NTFS ACLs to permissions with varying degress of success.
-
-.. [#acls] The native access control list mechanism of the OS. This normally limits access to
-    non-native ACLs. For example, NTFS ACLs aren't completely accessible on Linux with ntfs-3g.
-.. [#xattr] extended attributes; key-value pairs attached to a file, mainly used by the OS.
-    This includes resource forks on Mac OS X.
-.. [#flags] aka *BSD flags*. The Linux set of flags [1]_ is portable across platforms.
-    The BSDs define additional flags.
-
 .. _source-install:
 
 From Source
 -----------
+
+.. note::
+
+  Some older Linux systems (like RHEL/CentOS 5) and Python interpreter binaries
+  compiled to be able to run on such systems (like Python installed via Anaconda)
+  might miss functions required by Borg.
+
+  This issue will be detected early and Borg will abort with a fatal error.
 
 Dependencies
 ~~~~~~~~~~~~
@@ -253,7 +140,7 @@ following dependencies first:
   the default Python version on most systems, it is usually available as an
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
-* libacl_ (that pulls in libattr_ also), both plus development headers.
+* libacl_ (which depends on libattr_), both plus development headers.
 * liblz4_, plus development headers.
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
@@ -261,7 +148,8 @@ following dependencies first:
 * optionally libb2_. If it is not found a bundled implementation is used instead.
 
 If you have troubles finding the right package names, have a look at the
-distribution specific sections below and also at the Vagrantfile in our repo.
+distribution specific sections below or the Vagrantfile in the git repository,
+which contains installation scripts for a number of operating systems.
 
 In the following, the steps needed to install the dependencies are listed for a
 selection of platforms. If your distribution is not covered by these

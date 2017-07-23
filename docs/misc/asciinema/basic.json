@@ -11,10 +11,6 @@
   },
   "stdout": [
     [
-      0.190605,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
       0.000155,
       "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
     ],
@@ -28,31 +24,31 @@
     ],
     [
       0.468833,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.413214,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.440799,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mH\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mH\u001b[0m\u001b[39m"
     ],
     [
       0.155436,
-      "\b\u001b[1m\u001b[30mH\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1mH\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.153888,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1mr\u001b[0m\u001b[39m"
     ],
     [
       0.145046,
-      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1mr\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.191005,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30m you'll see some basic commands to start working with borg.\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1m you'll see some basic commands to start working with borg.\u001b[0m\u001b[39m"
     ],
     [
       0.328571,
@@ -80,35 +76,35 @@
     ],
     [
       0.553943,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.254153,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.205346,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mN\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mN\u001b[0m\u001b[39m"
     ],
     [
       0.164037,
-      "\b\u001b[1m\u001b[30mN\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mN\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.198817,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.157487,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.348855,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30m:\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1m:\u001b[0m\u001b[39m"
     ],
     [
       0.308837,
-      "\b\u001b[1m\u001b[30m:\u001b[1m\u001b[30m This teaser screencast was made with borg version 1.1.0 – older or n\u001b[1m\u001b[30me\u001b[1m\u001b[30mwer borg version may behave differently.\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1m:\u001b[1m This teaser screencast was made with borg version 1.1.0 – older or n\u001b[1me\u001b[1mwer borg version may behave differently.\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       0.760183,
@@ -136,27 +132,27 @@
     ],
     [
       0.617302,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.269944,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.231147,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mB\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
     ],
     [
       0.157768,
-      "\b\u001b[1m\u001b[30mB\u001b[1m\u001b[30mu\u001b[0m\u001b[39m"
+      "\b\u001b[1mB\u001b[1mu\u001b[0m\u001b[39m"
     ],
     [
       0.145012,
-      "\b\u001b[1m\u001b[30mu\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1mu\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.360132,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m let's start.\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m let's start.\u001b[0m\u001b[39m"
     ],
     [
       0.808076,
@@ -212,51 +208,31 @@
     ],
     [
       0.326924,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.245919,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.173421,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mF\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mF\u001b[0m\u001b[39m"
     ],
     [
       0.121947,
-      "\b\u001b[1m\u001b[30mF\u001b[1m\u001b[30mi\u001b[0m\u001b[39m"
-    ],
-    [
-      0.016539,
-      "\b\u001b[1m\u001b[30mi\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.192797,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.674486,
-      "\b\b\u001b[1m\u001b[30mo\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
-    ],
-    [
-      0.139086,
-      "\b\b\u001b[1m\u001b[30mi\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
-    ],
-    [
-      0.136753,
-      "\b\u001b[1m\u001b[30mi\u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
+      "\b\u001b[1mF\u001b[1mi\u001b[0m\u001b[39m"
     ],
     [
       0.196316,
-      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1mi\u001b[1mr\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.224037,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.323925,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m of all, you can always get help:\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m of all, you can always get help:\u001b[0m\u001b[39m"
     ],
     [
       0.738987,
@@ -368,35 +344,35 @@
     ],
     [
       1.509225,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.593308,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.334291,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mT\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mT\u001b[0m\u001b[39m"
     ],
     [
       0.170683,
-      "\b\u001b[1m\u001b[30mT\u001b[1m\u001b[30mh\u001b[0m\u001b[39m"
+      "\b\u001b[1mT\u001b[1mh\u001b[0m\u001b[39m"
     ],
     [
       0.07295,
-      "\b\u001b[1m\u001b[30mh\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1mh\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.184509,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.136032,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.250718,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30m are a lot of commands, so better we start with a few:\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1m are a lot of commands, so better we start with a few:\u001b[0m\u001b[39m"
     ],
     [
       1.088446,
@@ -424,35 +400,35 @@
     ],
     [
       0.921744,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.276219,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.204903,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mL\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mL\u001b[0m\u001b[39m"
     ],
     [
       0.137064,
-      "\b\u001b[1m\u001b[30mL\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1mL\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.16386,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.340061,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m'\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m'\u001b[0m\u001b[39m"
     ],
     [
       0.115905,
-      "\b\u001b[1m\u001b[30m'\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1m'\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.213255,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30m create a repo on an external drive:\u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1m create a repo on an external drive:\u001b[0m\u001b[39m"
     ],
     [
       1.086717,
@@ -512,14 +488,6 @@
     ],
     [
       0.258375,
-      "t"
-    ],
-    [
-      0.463563,
-      "\b \b"
-    ],
-    [
-      0.711442,
       "t"
     ],
     [
@@ -712,75 +680,75 @@
     ],
     [
       2.49308,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.308744,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.256774,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mT\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mT\u001b[0m\u001b[39m"
     ],
     [
       0.157732,
-      "\b\u001b[1m\u001b[30mT\u001b[1m\u001b[30mh\u001b[0m\u001b[39m"
+      "\b\u001b[1mT\u001b[1mh\u001b[0m\u001b[39m"
     ],
     [
       0.127107,
-      "\b\u001b[1m\u001b[30mh\u001b[1m\u001b[30mi\u001b[0m\u001b[39m"
+      "\b\u001b[1mh\u001b[1mi\u001b[0m\u001b[39m"
     ],
     [
       0.178449,
-      "\b\u001b[1m\u001b[30mi\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1mi\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.179372,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.181341,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mz\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mz\u001b[0m\u001b[39m"
     ],
     [
       0.09962,
-      "\b\u001b[1m\u001b[30mz\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1mz\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.173341,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.324426,
-      "\b\b\u001b[1m\u001b[30ms\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
+      "\b\b\u001b[1ms\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
     ],
     [
       0.147968,
-      "\b\b\u001b[1m\u001b[30mz\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
+      "\b\b\u001b[1mz\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
     ],
     [
       0.106317,
-      "\b\b\u001b[1m\u001b[30m \u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
+      "\b\b\u001b[1m \u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
     ],
     [
       0.383584,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mu\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mu\u001b[0m\u001b[39m"
     ],
     [
       0.103361,
-      "\b\u001b[1m\u001b[30mu\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1mu\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.155066,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.133308,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.23615,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30m the repokey encryption. You may look at \"borg help init\" or the \u001b[1m\u001b[30mo\u001b[1m\u001b[30mnline doc at https://borgbackup.readthedocs.io/ for other modes.\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1ms\u001b[1m the repokey encryption. You may look at \"borg help init\" or the \u001b[1mo\u001b[1mnline doc at https://borgbackup.readthedocs.io/ for other modes.\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       1.159159,
@@ -832,51 +800,51 @@
     ],
     [
       1.17234,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.575706,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.205759,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mS\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mS\u001b[0m\u001b[39m"
     ],
     [
       0.343517,
-      "\b\u001b[1m\u001b[30mS\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mS\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.245497,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.218486,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mn\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mn\u001b[0m\u001b[39m"
     ],
     [
       0.171258,
-      "\b\u001b[1m\u001b[30mn\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mn\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.146364,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mw\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mw\u001b[0m\u001b[39m"
     ],
     [
       0.25775,
-      "\b\u001b[1m\u001b[30mw\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mw\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.271708,
-      "\b\b\u001b[1m\u001b[30mw\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
+      "\b\b\u001b[1mw\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
     ],
     [
       0.213838,
-      "\b\u001b[1m\u001b[30mw\u001b[1m\u001b[30m,\u001b[0m\u001b[39m"
+      "\b\u001b[1mw\u001b[1m,\u001b[0m\u001b[39m"
     ],
     [
       0.422324,
-      "\b\u001b[1m\u001b[30m,\u001b[1m\u001b[30m let's create our first (compressed) backup.\u001b[0m\u001b[39m"
+      "\b\u001b[1m,\u001b[1m let's create our first (compressed) backup.\u001b[0m\u001b[39m"
     ],
     [
       0.561514,
@@ -1584,31 +1552,31 @@
     ],
     [
       1.403148,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.918581,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.361872,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mT\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mT\u001b[0m\u001b[39m"
     ],
     [
       0.12148,
-      "\b\u001b[1m\u001b[30mT\u001b[1m\u001b[30mh\u001b[0m\u001b[39m"
+      "\b\u001b[1mT\u001b[1mh\u001b[0m\u001b[39m"
     ],
     [
       0.21559,
-      "\b\u001b[1m\u001b[30mh\u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+      "\b\u001b[1mh\u001b[1ma\u001b[0m\u001b[39m"
     ],
     [
       0.152309,
-      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1ma\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.941741,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m's nice, so far.\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m's nice, so far.\u001b[0m\u001b[39m"
     ],
     [
       1.005262,
@@ -1636,39 +1604,39 @@
     ],
     [
       2.564637,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.34769,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.160447,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mS\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mS\u001b[0m\u001b[39m"
     ],
     [
       0.153165,
-      "\b\u001b[1m\u001b[30mS\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mS\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.17514,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.198658,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30ml\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1ml\u001b[0m\u001b[39m"
     ],
     [
       0.204631,
-      "\b\u001b[1m\u001b[30ml\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1ml\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.250815,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       1.190059,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m's add a new file…\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m's add a new file…\u001b[0m\u001b[39m"
     ],
     [
       1.216941,
@@ -1932,11 +1900,11 @@
     ],
     [
       0.206019,
-      "\u001b[50D\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mS\u001b[1m\u001b[30mo\u001b[1m\u001b[30m \u001b[1m\u001b[30ml\u001b[1m\u001b[30me\u001b[1m\u001b[30mt\u001b[1m\u001b[30m'\u001b[1m\u001b[30ms\u001b[1m\u001b[30m \u001b[1m\u001b[30ma\u001b[1m\u001b[30md\u001b[1m\u001b[30md\u001b[1m\u001b[30m \u001b[1m\u001b[30ma\u001b[1m\u001b[30m \u001b[1m\u001b[30mn\u001b[1m\u001b[30me\u001b[1m\u001b[30mw\u001b[1m\u001b[30m \u001b[1m\u001b[30mf\u001b[1m\u001b[30mi\u001b[1m\u001b[30ml\u001b[1m\u001b[30me\u001b[1m\u001b[30m…\u001b[0m\u001b[39m   \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24D"
+      "\u001b[50D\u001b[1m#\u001b[1m \u001b[1mS\u001b[1mo\u001b[1m \u001b[1ml\u001b[1me\u001b[1mt\u001b[1m'\u001b[1ms\u001b[1m \u001b[1ma\u001b[1md\u001b[1md\u001b[1m \u001b[1ma\u001b[1m \u001b[1mn\u001b[1me\u001b[1mw\u001b[1m \u001b[1mf\u001b[1mi\u001b[1ml\u001b[1me\u001b[1m…\u001b[0m\u001b[39m   \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24D"
     ],
     [
       0.251309,
-      "\u001b[24D\u001b[1m\u001b[30mT\u001b[1m\u001b[30mh\u001b[1m\u001b[30ma\u001b[1m\u001b[30mt\u001b[1m\u001b[30m'\u001b[1m\u001b[30ms\u001b[1m\u001b[30m \u001b[1m\u001b[30mn\u001b[1m\u001b[30mi\u001b[1m\u001b[30mc\u001b[1m\u001b[30me\u001b[1m\u001b[30m,\u001b[1m\u001b[30m \u001b[1m\u001b[30ms\u001b[1m\u001b[30mo\u001b[1m\u001b[30m \u001b[1m\u001b[30mf\u001b[1m\u001b[30ma\u001b[1m\u001b[30mr\u001b[1m\u001b[30m.\u001b[0m\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \b\b\b\b"
+      "\u001b[24D\u001b[1mT\u001b[1mh\u001b[1ma\u001b[1mt\u001b[1m'\u001b[1ms\u001b[1m \u001b[1mn\u001b[1mi\u001b[1mc\u001b[1me\u001b[1m,\u001b[1m \u001b[1ms\u001b[1mo\u001b[1m \u001b[1mf\u001b[1ma\u001b[1mr\u001b[1m.\u001b[0m\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \b\b\b\b"
     ],
     [
       0.372268,
@@ -2152,27 +2120,27 @@
     ],
     [
       1.922718,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.225243,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.166756,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mW\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mW\u001b[0m\u001b[39m"
     ],
     [
       0.162323,
-      "\b\u001b[1m\u001b[30mW\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mW\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.097757,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mw\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mw\u001b[0m\u001b[39m"
     ],
     [
       0.265877,
-      "\b\u001b[1m\u001b[30mw\u001b[1m\u001b[30m, this was a lot faster!\u001b[0m\u001b[39m"
+      "\b\u001b[1mw\u001b[1m, this was a lot faster!\u001b[0m\u001b[39m"
     ],
     [
       0.789811,
@@ -2200,31 +2168,31 @@
     ],
     [
       1.15181,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.234049,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.209548,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mN\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mN\u001b[0m\u001b[39m"
     ],
     [
       0.168421,
-      "\b\u001b[1m\u001b[30mN\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mN\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.232312,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.201133,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30mi\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1mi\u001b[0m\u001b[39m"
     ],
     [
       0.338758,
-      "\b\u001b[1m\u001b[30mi\u001b[1m\u001b[30mce the \"Deduplicated size\" in \"This archive\"?\u001b[0m\u001b[39m"
+      "\b\u001b[1mi\u001b[1mce the \"Deduplicated size\" in \"This archive\"?\u001b[0m\u001b[39m"
     ],
     [
       2.236964,
@@ -2252,43 +2220,43 @@
     ],
     [
       2.51909,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.240091,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.216793,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mB\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
     ],
     [
       0.192027,
-      "\b\u001b[1m\u001b[30mB\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mB\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.138706,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mr\u001b[0m\u001b[39m"
     ],
     [
       0.129501,
-      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30mg\u001b[0m\u001b[39m"
+      "\b\u001b[1mr\u001b[1mg\u001b[0m\u001b[39m"
     ],
     [
       0.536844,
-      "\b\u001b[1m\u001b[30mg\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mg\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.143314,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mr\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mr\u001b[0m\u001b[39m"
     ],
     [
       0.138384,
-      "\b\u001b[1m\u001b[30mr\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1mr\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.197658,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30mcognized that most files did not change and deduplicated them.\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1mcognized that most files did not change and deduplicated them.\u001b[0m\u001b[39m"
     ],
     [
       1.432604,
@@ -2340,51 +2308,51 @@
     ],
     [
       0.447325,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.257975,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.210602,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mB\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
     ],
     [
       0.182148,
-      "\b\u001b[1m\u001b[30mB\u001b[1m\u001b[30mu\u001b[0m\u001b[39m"
+      "\b\u001b[1mB\u001b[1mu\u001b[0m\u001b[39m"
     ],
     [
       0.159923,
-      "\b\u001b[1m\u001b[30mu\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1mu\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.165905,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.175925,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mw\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mw\u001b[0m\u001b[39m"
     ],
     [
       0.116184,
-      "\b\u001b[1m\u001b[30mw\u001b[1m\u001b[30mh\u001b[0m\u001b[39m"
+      "\b\u001b[1mw\u001b[1mh\u001b[0m\u001b[39m"
     ],
     [
       0.125029,
-      "\b\u001b[1m\u001b[30mh\u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+      "\b\u001b[1mh\u001b[1ma\u001b[0m\u001b[39m"
     ],
     [
       0.110311,
-      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1ma\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.26718,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.393846,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mhappens, when we move a dir and create a new backup?\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mhappens, when we move a dir and create a new backup?\u001b[0m\u001b[39m"
     ],
     [
       1.840157,
@@ -2616,19 +2584,19 @@
     ],
     [
       0.208181,
-      "\u001b[54D\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mB\u001b[1m\u001b[30mu\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[1m\u001b[30mw\u001b[1m\u001b[30mh\u001b[1m\u001b[30ma\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[1m\u001b[30mh\u001b[1m\u001b[30ma\u001b[1m\u001b[30mp\u001b[1m\u001b[30mp\u001b[1m\u001b[30me\u001b[1m\u001b[30mn\u001b[1m\u001b[30ms\u001b[1m\u001b[30m,\u001b[1m\u001b[30m \u001b[1m\u001b[30mw\u001b[1m\u001b[30mh\u001b[1m\u001b[30me\u001b[1m\u001b[30mn\u001b[1m\u001b[30m \u001b[1m\u001b[30mw\u001b[1m\u001b[30me\u001b[24m\u001b[1m\u001b[30m \u001b[24m\u001b[1m\u001b[30mm\u001b[24m\u001b[1m\u001b[30mo\u001b[24m\u001b[1m\u001b[30mv\u001b[24m\u001b[1m\u001b[30me\u001b[24m\u001b[1m\u001b[30m \u001b[24m\u001b[1m\u001b[30ma\u001b[24m\u001b[1m\u001b[30m \u001b[24m\u001b[1m\u001b[30md\u001b[24m\u001b[1m\u001b[30mi\u001b[24m\u001b[1m\u001b[30mr\u001b[24m\u001b[1m\u001b[30m \u001b[24m\u001b[1m\u001b[30ma\u001b[24m\u001b[1m\u001b[30mn\u001b[24m\u001b[1m\u001b[30md\u001b[24m\u001b[1m\u001b[30m \u001b[24m\u001b[1m\u001b[30mc\u001b[24m\u001b[1m\u001b[30mr\u001b[24m\u001b[1m\u001b[30me\u001b[24m\u001b[1m\u001b[30ma\u001b[24m\u001b[1m\u001b[30mt\u001b[24m\u001b[1m\u001b[30me\u001b[24m\u001b[1m\u001b[30m \u001b[24m\u001b[1m\u001b[30ma\u001b[24m\u001b[1m\u001b[30m \u001b[24m\u001b[1m\u001b[30mn\u001b[24m\u001b[1m\u001b[30me\u001b[1m\u001b[30mw backup?\u001b[0m\u001b[39m"
+      "\u001b[54D\u001b[1m#\u001b[1m \u001b[1mB\u001b[1mu\u001b[1mt\u001b[1m \u001b[1mw\u001b[1mh\u001b[1ma\u001b[1mt\u001b[1m \u001b[1mh\u001b[1ma\u001b[1mp\u001b[1mp\u001b[1me\u001b[1mn\u001b[1ms\u001b[1m,\u001b[1m \u001b[1mw\u001b[1mh\u001b[1me\u001b[1mn\u001b[1m \u001b[1mw\u001b[1me\u001b[24m\u001b[1m \u001b[24m\u001b[1mm\u001b[24m\u001b[1mo\u001b[24m\u001b[1mv\u001b[24m\u001b[1me\u001b[24m\u001b[1m \u001b[24m\u001b[1ma\u001b[24m\u001b[1m \u001b[24m\u001b[1md\u001b[24m\u001b[1mi\u001b[24m\u001b[1mr\u001b[24m\u001b[1m \u001b[24m\u001b[1ma\u001b[24m\u001b[1mn\u001b[24m\u001b[1md\u001b[24m\u001b[1m \u001b[24m\u001b[1mc\u001b[24m\u001b[1mr\u001b[24m\u001b[1me\u001b[24m\u001b[1ma\u001b[24m\u001b[1mt\u001b[24m\u001b[1me\u001b[24m\u001b[1m \u001b[24m\u001b[1ma\u001b[24m\u001b[1m \u001b[24m\u001b[1mn\u001b[24m\u001b[1me\u001b[1mw backup?\u001b[0m\u001b[39m"
     ],
     [
       0.2399,
-      "\u001b[60D\u001b[1m\u001b[30mo\u001b[1m\u001b[30mr\u001b[1m\u001b[30mg\u001b[1m\u001b[30m \u001b[1m\u001b[30mr\u001b[1m\u001b[30me\u001b[1m\u001b[30mc\u001b[1m\u001b[30mo\u001b[1m\u001b[30mg\u001b[1m\u001b[30mn\u001b[1m\u001b[30mi\u001b[1m\u001b[30mz\u001b[1m\u001b[30me\u001b[1m\u001b[30md\u001b[1m\u001b[30m \u001b[1m\u001b[30mt\u001b[1m\u001b[30mh\u001b[1m\u001b[30ma\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[1m\u001b[30mm\u001b[1m\u001b[30mo\u001b[1m\u001b[30ms\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[1m\u001b[30mf\u001b[1m\u001b[30mi\u001b[1m\u001b[30ml\u001b[1m\u001b[30me\u001b[1m\u001b[30ms\u001b[1m\u001b[30m \u001b[1m\u001b[30md\u001b[1m\u001b[30mi\u001b[1m\u001b[30md\u001b[1m\u001b[30m \u001b[1m\u001b[30mn\u001b[1m\u001b[30mo\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[1m\u001b[30mc\u001b[1m\u001b[30mh\u001b[1m\u001b[30ma\u001b[1m\u001b[30mn\u001b[1m\u001b[30mg\u001b[1m\u001b[30me\u001b[1m\u001b[30m \u001b[1m\u001b[30ma\u001b[1m\u001b[30mn\u001b[1m\u001b[30md\u001b[1m\u001b[30m \u001b[1m\u001b[30md\u001b[1m\u001b[30me\u001b[1m\u001b[30md\u001b[1m\u001b[30mu\u001b[1m\u001b[30mp\u001b[1m\u001b[30ml\u001b[1m\u001b[30mi\u001b[1m\u001b[30mc\u001b[1m\u001b[30ma\u001b[1m\u001b[30mt\u001b[1m\u001b[30med them.\u001b[0m\u001b[39m"
+      "\u001b[60D\u001b[1mo\u001b[1mr\u001b[1mg\u001b[1m \u001b[1mr\u001b[1me\u001b[1mc\u001b[1mo\u001b[1mg\u001b[1mn\u001b[1mi\u001b[1mz\u001b[1me\u001b[1md\u001b[1m \u001b[1mt\u001b[1mh\u001b[1ma\u001b[1mt\u001b[1m \u001b[1mm\u001b[1mo\u001b[1ms\u001b[1mt\u001b[1m \u001b[1mf\u001b[1mi\u001b[1ml\u001b[1me\u001b[1ms\u001b[1m \u001b[1md\u001b[1mi\u001b[1md\u001b[1m \u001b[1mn\u001b[1mo\u001b[1mt\u001b[1m \u001b[1mc\u001b[1mh\u001b[1ma\u001b[1mn\u001b[1mg\u001b[1me\u001b[1m \u001b[1ma\u001b[1mn\u001b[1md\u001b[1m \u001b[1md\u001b[1me\u001b[1md\u001b[1mu\u001b[1mp\u001b[1ml\u001b[1mi\u001b[1mc\u001b[1ma\u001b[1mt\u001b[1med them.\u001b[0m\u001b[39m"
     ],
     [
       0.227963,
-      "\u001b[69D\u001b[1m\u001b[30mN\u001b[1m\u001b[30mo\u001b[1m\u001b[30mt\u001b[1m\u001b[30mi\u001b[1m\u001b[30mc\u001b[1m\u001b[30me\u001b[1m\u001b[30m \u001b[1m\u001b[30mt\u001b[1m\u001b[30mh\u001b[1m\u001b[30me\u001b[1m\u001b[30m \u001b[1m\u001b[30m\"\u001b[1m\u001b[30mD\u001b[2C\u001b[0m\u001b[39m\u001b[39P\u001b[10C\u001b[1m\u001b[30ms\u001b[1m\u001b[30mi\u001b[1m\u001b[30mz\u001b[1m\u001b[30me\u001b[1m\u001b[30m\"\u001b[1m\u001b[30m in \"This archive\"?\u001b[0m\u001b[39m                    \u001b[20D"
+      "\u001b[69D\u001b[1mN\u001b[1mo\u001b[1mt\u001b[1mi\u001b[1mc\u001b[1me\u001b[1m \u001b[1mt\u001b[1mh\u001b[1me\u001b[1m \u001b[1m\"\u001b[1mD\u001b[2C\u001b[0m\u001b[39m\u001b[39P\u001b[10C\u001b[1ms\u001b[1mi\u001b[1mz\u001b[1me\u001b[1m\"\u001b[1m in \"This archive\"?\u001b[0m\u001b[39m                    \u001b[20D"
     ],
     [
       0.344233,
-      "\u001b[49D\u001b[1m\u001b[30mW\u001b[1m\u001b[30mo\u001b[1m\u001b[30mw\u001b[1m\u001b[30m,\u001b[1m\u001b[30m \u001b[1m\u001b[30mt\u001b[1m\u001b[30mh\u001b[1m\u001b[30mi\u001b[1m\u001b[30ms\u001b[1m\u001b[30m \u001b[1m\u001b[30mw\u001b[1m\u001b[30ma\u001b[1m\u001b[30ms\u001b[1m\u001b[30m \u001b[1m\u001b[30ma\u001b[1m\u001b[30m \u001b[1m\u001b[30ml\u001b[1m\u001b[30mo\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[1m\u001b[30mf\u001b[1m\u001b[30ma\u001b[1m\u001b[30ms\u001b[1m\u001b[30mt\u001b[1m\u001b[30me\u001b[1m\u001b[30mr\u001b[1m\u001b[30m!\u001b[0m\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[22D"
+      "\u001b[49D\u001b[1mW\u001b[1mo\u001b[1mw\u001b[1m,\u001b[1m \u001b[1mt\u001b[1mh\u001b[1mi\u001b[1ms\u001b[1m \u001b[1mw\u001b[1ma\u001b[1ms\u001b[1m \u001b[1ma\u001b[1m \u001b[1ml\u001b[1mo\u001b[1mt\u001b[1m \u001b[1mf\u001b[1ma\u001b[1ms\u001b[1mt\u001b[1me\u001b[1mr\u001b[1m!\u001b[0m\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[22D"
     ],
     [
       0.396096,
@@ -3000,35 +2968,35 @@
     ],
     [
       1.509372,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.261334,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.25826,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mS\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mS\u001b[0m\u001b[39m"
     ],
     [
       0.162616,
-      "\b\u001b[1m\u001b[30mS\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1mS\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.27891,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30mi\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1mi\u001b[0m\u001b[39m"
     ],
     [
       0.174723,
-      "\b\u001b[1m\u001b[30mi\u001b[1m\u001b[30ml\u001b[0m\u001b[39m"
+      "\b\u001b[1mi\u001b[1ml\u001b[0m\u001b[39m"
     ],
     [
       0.124142,
-      "\b\u001b[1m\u001b[30ml\u001b[1m\u001b[30ml\u001b[0m\u001b[39m"
+      "\b\u001b[1ml\u001b[1ml\u001b[0m\u001b[39m"
     ],
     [
       1.012371,
-      "\b\u001b[1m\u001b[30ml\u001b[1m\u001b[30m quite fast…\u001b[0m\u001b[39m"
+      "\b\u001b[1ml\u001b[1m quite fast…\u001b[0m\u001b[39m"
     ],
     [
       0.74493,
@@ -3060,55 +3028,55 @@
     ],
     [
       2.038818,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.861519,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       2.235116,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mB\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
     ],
     [
       0.20981,
-      "\b\u001b[1m\u001b[30mB\u001b[1m\u001b[30mu\u001b[0m\u001b[39m"
+      "\b\u001b[1mB\u001b[1mu\u001b[0m\u001b[39m"
     ],
     [
       0.216676,
-      "\b\u001b[1m\u001b[30mu\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1mu\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.72822,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       1.094756,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mw\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mw\u001b[0m\u001b[39m"
     ],
     [
       0.315528,
-      "\b\u001b[1m\u001b[30mw\u001b[1m\u001b[30mh\u001b[0m\u001b[39m"
+      "\b\u001b[1mw\u001b[1mh\u001b[0m\u001b[39m"
     ],
     [
       0.23713,
-      "\b\u001b[1m\u001b[30mh\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1mh\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.286805,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30mn\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1mn\u001b[0m\u001b[39m"
     ],
     [
       0.638764,
-      "\b\u001b[1m\u001b[30mn\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mn\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.81778,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30my\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1my\u001b[0m\u001b[39m"
     ],
     [
       0.245269,
-      "\b\u001b[1m\u001b[30my\u001b[1m\u001b[30mou look at the \"deduplicated file size\" again, you see that borg\u001b[1m\u001b[30m \u001b[1m\u001b[30malso recognized that only the dir and not the files changed in this backup.\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1my\u001b[1mou look at the \"deduplicated file size\" again, you see that borg\u001b[1m \u001b[1malso recognized that only the dir and not the files changed in this backup.\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       2.34618,
@@ -3136,43 +3104,43 @@
     ],
     [
       3.418707,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.275819,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.2004,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mN\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mN\u001b[0m\u001b[39m"
     ],
     [
       0.172829,
-      "\b\u001b[1m\u001b[30mN\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mN\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.308378,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mw\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mw\u001b[0m\u001b[39m"
     ],
     [
       0.703684,
-      "\b\u001b[1m\u001b[30mw\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mw\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.8183,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30ml\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1ml\u001b[0m\u001b[39m"
     ],
     [
       0.193322,
-      "\b\u001b[1m\u001b[30ml\u001b[1m\u001b[30me\u001b[0m\u001b[39m"
+      "\b\u001b[1ml\u001b[1me\u001b[0m\u001b[39m"
     ],
     [
       0.18438,
-      "\b\u001b[1m\u001b[30me\u001b[1m\u001b[30mt\u001b[0m\u001b[39m"
+      "\b\u001b[1me\u001b[1mt\u001b[0m\u001b[39m"
     ],
     [
       0.389996,
-      "\b\u001b[1m\u001b[30mt\u001b[1m\u001b[30m's look into a repo.\u001b[0m\u001b[39m"
+      "\b\u001b[1mt\u001b[1m's look into a repo.\u001b[0m\u001b[39m"
     ],
     [
       0.857879,
@@ -3328,31 +3296,31 @@
     ],
     [
       5.582312,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.371134,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.184918,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mY\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mY\u001b[0m\u001b[39m"
     ],
     [
       0.177123,
-      "\b\u001b[1m\u001b[30mY\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mY\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.148041,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mu\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mu\u001b[0m\u001b[39m"
     ],
     [
       0.461676,
-      "\b\u001b[1m\u001b[30mu\u001b[1m\u001b[30m'\u001b[0m\u001b[39m"
+      "\b\u001b[1mu\u001b[1m'\u001b[0m\u001b[39m"
     ],
     [
       0.668888,
-      "\b\u001b[1m\u001b[30m'\u001b[1m\u001b[30mll see a list of all backups.\u001b[0m\u001b[39m"
+      "\b\u001b[1m'\u001b[1mll see a list of all backups.\u001b[0m\u001b[39m"
     ],
     [
       0.876235,
@@ -3380,55 +3348,55 @@
     ],
     [
       2.475491,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.382591,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.23474,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mY\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mY\u001b[0m\u001b[39m"
     ],
     [
       0.210269,
-      "\b\u001b[1m\u001b[30mY\u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1mY\u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.196151,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mu\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mu\u001b[0m\u001b[39m"
     ],
     [
       0.460253,
-      "\b\u001b[1m\u001b[30mu\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mu\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.305764,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mc\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mc\u001b[0m\u001b[39m"
     ],
     [
       0.184098,
-      "\b\u001b[1m\u001b[30mc\u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+      "\b\u001b[1mc\u001b[1ma\u001b[0m\u001b[39m"
     ],
     [
       0.212534,
-      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30mn\u001b[0m\u001b[39m"
+      "\b\u001b[1ma\u001b[1mn\u001b[0m\u001b[39m"
     ],
     [
       0.305097,
-      "\b\u001b[1m\u001b[30mn\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mn\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.163485,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1ma\u001b[0m\u001b[39m"
     ],
     [
       0.194803,
-      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30ml\u001b[0m\u001b[39m"
+      "\b\u001b[1ma\u001b[1ml\u001b[0m\u001b[39m"
     ],
     [
       0.282791,
-      "\b\u001b[1m\u001b[30ml\u001b[1m\u001b[30mso use the same command to look into an archive. But we better f\u001b[1m\u001b[30mi\u001b[1m\u001b[30mlter the output here:\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1ml\u001b[1mso use the same command to look into an archive. But we better f\u001b[1mi\u001b[1mlter the output here:\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       2.679252,
@@ -3712,23 +3680,23 @@
     ],
     [
       2.222435,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.269828,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.211035,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mO\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mO\u001b[0m\u001b[39m"
     ],
     [
       0.184712,
-      "\b\u001b[1m\u001b[30mO\u001b[1m\u001b[30mh\u001b[0m\u001b[39m"
+      "\b\u001b[1mO\u001b[1mh\u001b[0m\u001b[39m"
     ],
     [
       0.374912,
-      "\b\u001b[1m\u001b[30mh\u001b[1m\u001b[30m, we found our picture. Now extract it:\u001b[0m\u001b[39m"
+      "\b\u001b[1mh\u001b[1m, we found our picture. Now extract it:\u001b[0m\u001b[39m"
     ],
     [
       1.545747,
@@ -4040,35 +4008,35 @@
     ],
     [
       4.506682,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.287992,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.13604,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mA\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mA\u001b[0m\u001b[39m"
     ],
     [
       0.132241,
-      "\b\u001b[1m\u001b[30mA\u001b[1m\u001b[30mn\u001b[0m\u001b[39m"
+      "\b\u001b[1mA\u001b[1mn\u001b[0m\u001b[39m"
     ],
     [
       0.115152,
-      "\b\u001b[1m\u001b[30mn\u001b[1m\u001b[30md\u001b[0m\u001b[39m"
+      "\b\u001b[1mn\u001b[1md\u001b[0m\u001b[39m"
     ],
     [
       0.190449,
-      "\b\u001b[1m\u001b[30md\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1md\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.168765,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mc\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mc\u001b[0m\u001b[39m"
     ],
     [
       0.248816,
-      "\b\u001b[1m\u001b[30mc\u001b[1m\u001b[30mheck that it's the same:\u001b[0m\u001b[39m"
+      "\b\u001b[1mc\u001b[1mheck that it's the same:\u001b[0m\u001b[39m"
     ],
     [
       1.093037,
@@ -4348,7 +4316,7 @@
     ],
     [
       3.579542,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.624347,
@@ -4380,51 +4348,51 @@
     ],
     [
       0.726522,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.358332,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.183839,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mA\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mA\u001b[0m\u001b[39m"
     ],
     [
       0.150451,
-      "\b\u001b[1m\u001b[30mA\u001b[1m\u001b[30mn\u001b[0m\u001b[39m"
+      "\b\u001b[1mA\u001b[1mn\u001b[0m\u001b[39m"
     ],
     [
       0.128839,
-      "\b\u001b[1m\u001b[30mn\u001b[1m\u001b[30md\u001b[0m\u001b[39m"
+      "\b\u001b[1mn\u001b[1md\u001b[0m\u001b[39m"
     ],
     [
       0.583652,
-      "\b\u001b[1m\u001b[30md\u001b[1m\u001b[30m,\u001b[0m\u001b[39m"
+      "\b\u001b[1md\u001b[1m,\u001b[0m\u001b[39m"
     ],
     [
       0.152149,
-      "\b\u001b[1m\u001b[30m,\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m,\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.240696,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mo\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mo\u001b[0m\u001b[39m"
     ],
     [
       0.130032,
-      "\b\u001b[1m\u001b[30mo\u001b[1m\u001b[30mf\u001b[0m\u001b[39m"
+      "\b\u001b[1mo\u001b[1mf\u001b[0m\u001b[39m"
     ],
     [
       0.306901,
-      "\b\u001b[1m\u001b[30mf\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mf\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.181176,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30mc\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1mc\u001b[0m\u001b[39m"
     ],
     [
       0.271007,
-      "\b\u001b[1m\u001b[30mc\u001b[1m\u001b[30mourse, we can also create remote repos via ssh when borg is setup\u001b[1m\u001b[30m \u001b[1m\u001b[30mthere. This command creates a new remote repo in a subdirectory called \"demo\"\u001b[1m\u001b[30m:\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1mc\u001b[1mourse, we can also create remote repos via ssh when borg is setup\u001b[1m \u001b[1mthere. This command creates a new remote repo in a subdirectory called \"demo\"\u001b[1m:\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       2.040444,
@@ -4619,22 +4587,6 @@
       "e"
     ],
     [
-      0.127691,
-      "e"
-    ],
-    [
-      0.748849,
-      "\b \b"
-    ],
-    [
-      0.145697,
-      "\b \b"
-    ],
-    [
-      0.534734,
-      "e"
-    ],
-    [
       0.223755,
       "m"
     ],
@@ -4771,34 +4723,6 @@
       "\r\n"
     ],
     [
-      0.100366,
-      "Remote: Borg 1.0.9: exception in RPC call:\r\nRemote: Traceback (most recent call last):\r\nRemote:   File \"/usr/lib/python3/dist-packages/borg/remote.py\", line 108, in serve\r\nRemote:     raise InvalidRPCMethod(method)\r\n"
-    ],
-    [
-      0.033002,
-      "Remote: borg.remote.InvalidRPCMethod: get_free_nonceRemote: \r\n"
-    ],
-    [
-      0.020659,
-      "Remote: Platform: Linux privbpi 4.4.66-bananian #2 SMP Sat May 6 19:26:50 UTC 2017 armv7l\r\n"
-    ],
-    [
-      1.3e-05,
-      "Remote: Linux: debian 9.0 \r\nRemote: Borg: 1.0.9  Python: CPython 3.5.3\r\nRemote: PID: 22739  CWD: /media/extdisk/borg-backup\r\n"
-    ],
-    [
-      7e-06,
-      "Remote: sys.argv: ['/usr/bin/borg', 'serve', '--restrict-to-path', '/media/extdisk/borg-backup/demo']\r\nRemote: SSH_ORIGINAL_COMMAND: 'borg serve --umask=077'\r\n"
-    ],
-    [
-      0.039387,
-      "Remote: \r\n"
-    ],
-    [
-      3.3e-05,
-      "Please upgrade to borg version 1.1+ on the server for safer AES-CTR nonce handling.\r\n"
-    ],
-    [
       1.950077,
       "\r\nBy default repositories initialized with this version will produce security\r\nerrors if written to with an older version (up to and including Borg 1.0.8).\r\n\r\nIf you want to use these older versions, you can disable the check by running:\r\nborg upgrade --disable-tam 'ssh://borgdemo@remoteserver.example/./demo'\r\n\r\nSee https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability for details about the security implications.\r\n"
     ],
@@ -4820,31 +4744,31 @@
     ],
     [
       0.82377,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.662248,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.610999,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mE\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mE\u001b[0m\u001b[39m"
     ],
     [
       0.267513,
-      "\b\u001b[1m\u001b[30mE\u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+      "\b\u001b[1mE\u001b[1ma\u001b[0m\u001b[39m"
     ],
     [
       0.185698,
-      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30ms\u001b[0m\u001b[39m"
+      "\b\u001b[1ma\u001b[1ms\u001b[0m\u001b[39m"
     ],
     [
       0.161855,
-      "\b\u001b[1m\u001b[30ms\u001b[1m\u001b[30my\u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1my\u001b[0m\u001b[39m"
     ],
     [
       0.46273,
-      "\b\u001b[1m\u001b[30my\u001b[1m\u001b[30m, isn't it? That's all you need to know for basic usage.\u001b[0m\u001b[39m"
+      "\b\u001b[1my\u001b[1m, isn't it? That's all you need to know for basic usage.\u001b[0m\u001b[39m"
     ],
     [
       1.861984,
@@ -4872,23 +4796,23 @@
     ],
     [
       1.009133,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.240205,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.217287,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mI\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mI\u001b[0m\u001b[39m"
     ],
     [
       0.163888,
-      "\b\u001b[1m\u001b[30mI\u001b[1m\u001b[30mf\u001b[0m\u001b[39m"
+      "\b\u001b[1mI\u001b[1mf\u001b[0m\u001b[39m"
     ],
     [
       0.349458,
-      "\b\u001b[1m\u001b[30mf\u001b[1m\u001b[30m you want to see more, have a look at the screencast showing the \"advanc\u001b[1m\u001b[30me\u001b[1m\u001b[30md usage\".\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1mf\u001b[1m you want to see more, have a look at the screencast showing the \"advanc\u001b[1me\u001b[1md usage\".\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       2.780664,
@@ -4916,31 +4840,31 @@
     ],
     [
       1.119856,
-      "\u001b[1m\u001b[30m#\u001b[0m\u001b[39m"
+      "\u001b[1m#\u001b[0m\u001b[39m"
     ],
     [
       0.281915,
-      "\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.244389,
-      "\b\b\u001b[1m\u001b[30m#\u001b[1m\u001b[30m \u001b[1m\u001b[30mI\u001b[0m\u001b[39m"
+      "\b\b\u001b[1m#\u001b[1m \u001b[1mI\u001b[0m\u001b[39m"
     ],
     [
       0.143064,
-      "\b\u001b[1m\u001b[30mI\u001b[1m\u001b[30mn\u001b[0m\u001b[39m"
+      "\b\u001b[1mI\u001b[1mn\u001b[0m\u001b[39m"
     ],
     [
       0.171731,
-      "\b\u001b[1m\u001b[30mn\u001b[1m\u001b[30m \u001b[0m\u001b[39m"
+      "\b\u001b[1mn\u001b[1m \u001b[0m\u001b[39m"
     ],
     [
       0.139438,
-      "\b\u001b[1m\u001b[30m \u001b[1m\u001b[30ma\u001b[0m\u001b[39m"
+      "\b\u001b[1m \u001b[1ma\u001b[0m\u001b[39m"
     ],
     [
       0.388834,
-      "\b\u001b[1m\u001b[30ma\u001b[1m\u001b[30mny case, enjoy using borg!\u001b[0m\u001b[39m"
+      "\b\u001b[1ma\u001b[1mny case, enjoy using borg!\u001b[0m\u001b[39m"
     ],
     [
       1.502218,

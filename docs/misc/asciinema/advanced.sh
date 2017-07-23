@@ -23,7 +23,7 @@ sudo dd if=/dev/loop0 bs=10M | borg create --progress --stats ::specialbackup -
 
 # Let's continue with some simple things:
 ## USEFUL COMMANDS ##
-# You can show some informaion about an archive. You can even do it without needing to specify the archive name:
+# You can show some information about an archive. You can even do it without needing to specify the archive name:
 borg info :: --last 1
 
 # So let's rename our last archive:
@@ -53,7 +53,7 @@ borg diff ::backup1 backup2
 # Ah, we added a file, right…
 
 # There are also other ways to extract the data.
-# E.g. as a tar archive
+# E.g. as a tar archive.
 borg export-tar --progress ::backup2 backup.tar.gz
 ls -l
 

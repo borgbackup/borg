@@ -877,12 +877,12 @@ class LocalCache(CacheStatsMixin):
                             id, stored_size, size))
         return refcount
 
-    def chunk_incref(self, id, stats, size_=None):
+    def chunk_incref(self, id, stats, size=None):
         if not self.txn_active:
             self.begin_txn()
-        count, size, csize = self.chunks.incref(id)
-        stats.update(size, csize, False)
-        return ChunkListEntry(id, size, csize)
+        count, _size, csize = self.chunks.incref(id)
+        stats.update(_size, csize, False)
+        return ChunkListEntry(id, _size, csize)
 
     def chunk_decref(self, id, stats, wait=True):
         if not self.txn_active:
@@ -979,7 +979,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         size = len(chunk)
         refcount = self.seen_chunk(id, size)
         if refcount:
-            return self.chunk_incref(id, stats, size_=size)
+            return self.chunk_incref(id, stats, size=size)
         data = self.key.encrypt(chunk)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
@@ -998,15 +998,15 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
             self.chunks[id] = entry._replace(size=size)
         return entry.refcount
 
-    def chunk_incref(self, id, stats, size_=None):
+    def chunk_incref(self, id, stats, size=None):
         if not self._txn_active:
             self._begin_txn()
-        count, size, csize = self.chunks.incref(id)
-        # When size is 0 and size_ is not given, then this chunk has not been locally visited yet (seen_chunk with
+        count, _size, csize = self.chunks.incref(id)
+        # When _size is 0 and size is not given, then this chunk has not been locally visited yet (seen_chunk with
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
-        assert size or size_
-        stats.update(size or size_, csize, False)
-        return ChunkListEntry(id, size or size_, csize)
+        assert _size or size
+        stats.update(_size or size, csize, False)
+        return ChunkListEntry(id, _size or size, csize)
 
     def chunk_decref(self, id, stats, wait=True):
         if not self._txn_active:

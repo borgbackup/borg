@@ -66,11 +66,12 @@ from .helpers import replace_placeholders
 from .helpers import ChunkIteratorFileWrapper
 from .helpers import popen_with_error_handling
 from .helpers import dash_open
+from .helpers import umount
 from .nanorst import rst_to_terminal
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
 from .item import Item
-from .platform import get_flags, umount, get_process_id, SyncFile
+from .platform import get_flags, get_process_id, SyncFile
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 from .selftest import selftest

@@ -2277,3 +2277,10 @@ def dash_open(path, mode):
 
 def is_terminal(fd=sys.stdout):
     return hasattr(fd, 'isatty') and fd.isatty() and (sys.platform != 'win32' or 'ANSICON' in os.environ)
+
+
+def umount(mountpoint):
+    try:
+        return subprocess.call(['fusermount', '-u', mountpoint])
+    except FileNotFoundError:
+        return subprocess.call(['umount', mountpoint])

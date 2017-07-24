@@ -258,7 +258,3 @@ class SyncFile(BaseSyncFile):
         # tell the OS that it does not need to cache what we just wrote,
         # avoids spoiling the cache for the OS and other processes.
         safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
-
-
-def umount(mountpoint):
-    return subprocess.call(['fusermount', '-u', mountpoint])

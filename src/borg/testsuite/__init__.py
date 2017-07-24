@@ -12,7 +12,8 @@ import uuid
 import unittest
 
 from ..xattr import get_all
-from ..platform import get_flags, umount
+from ..platform import get_flags
+from ..helpers import umount
 from .. import platform
 
 # Note: this is used by borg.selftest, do not use or import py.test functionality here.

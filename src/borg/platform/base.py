@@ -183,11 +183,6 @@ def swidth(s):
     return len(s)
 
 
-def umount(mountpoint):
-    """un-mount the FUSE filesystem mounted at <mountpoint>"""
-    return 0  # dummy, see also posix module
-
-
 def get_process_id():
     """
     Return identification tuple (hostname, pid, thread_id) for 'us'. If this is a FUSE process, then the PID will be

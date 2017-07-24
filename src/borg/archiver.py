@@ -1415,7 +1415,7 @@ class Archiver:
                 Duration: {duration}
                 Number of files: {stats[nfiles]}
                 Command line: {command_line}
-                Utilization of max. archive size: {limits[max_archive_size]:.0%}
+                Utilization of maximum supported archive size: {limits[max_archive_size]:.0%}
                 ------------------------------------------------------------------------------
                                        Original size      Compressed size    Deduplicated size
                 This archive:   {stats[original_size]:>20s} {stats[compressed_size]:>20s} {stats[deduplicated_size]:>20s}
@@ -3211,9 +3211,14 @@ class Archiver:
         are meaning different things:
 
         This archive / deduplicated size = amount of data stored ONLY for this archive
-                                         = unique chunks of this archive.
+        = unique chunks of this archive.
         All archives / deduplicated size = amount of data stored in the repo
-                                         = all chunks in the repository.
+        = all chunks in the repository.
+
+        Borg archives can only contain a limited amount of file metadata.
+        The size of an archive relative to this limit depends on a number of factors,
+        mainly the number of files, the lengths of paths and other metadata stored for files.
+        This is shown as *utilization of maximum supported archive size*.
         """)
         subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_info.__doc__,

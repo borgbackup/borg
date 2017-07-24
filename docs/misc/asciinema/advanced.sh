@@ -1,7 +1,7 @@
 # For the pro users, here are some advanced features of borg, so you can impress your friends. ;)
 # Note: This screencast was made with borg version 1.1.0 – older or newer borg version may behave differently.
 
-# First of all, we can use several environmental variables for borg.
+# First of all, we can use several environment variables for borg.
 # E.g. we do not want to type in our repo path and password again and again…
 export BORG_REPO='/media/backup/borgdemo'
 export BORG_PASSPHRASE='1234'

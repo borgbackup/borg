@@ -2800,7 +2800,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                     repository.delete(killed_chunk.id)
                     break
             else:
-                self.assert_true(False)  # should not happen
+                self.fail('should not happen')
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -2818,7 +2818,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                         self.assert_not_in(killed_chunk, item.chunks)
                         break
                 else:
-                    self.assert_true(False)  # should not happen
+                    self.fail('should not happen')
         # do a fresh backup (that will include the killed chunk)
         with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
             self.create_src_archive('archive3')
@@ -2835,7 +2835,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                         self.assert_equal(valid_chunks, item.chunks)
                         break
                 else:
-                    self.assert_true(False)  # should not happen
+                    self.fail('should not happen')
         # list is also all-healthy again
         output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
         self.assert_not_in('broken#', output)

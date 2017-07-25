@@ -22,7 +22,7 @@ cdef extern from "_hashindex.c":
         uint32_t version
         char hash[16]
 
-    HashIndex *hashindex_read(object file_py, int permit_compact) except *
+    HashIndex *hashindex_read(object file_py, int permit_compact) except NULL
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
     int hashindex_len(HashIndex *index)
@@ -92,7 +92,6 @@ cdef class IndexBase:
                     self.index = hashindex_read(fd, permit_compact)
             else:
                 self.index = hashindex_read(path, permit_compact)
-            assert self.index, 'hashindex_read() returned NULL with no exception set'
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
             if not self.index:

@@ -1504,7 +1504,7 @@
     ],
     [
       7.2e-05,
-      "Utilization of max. archive size: 0%\r\n------------------------------------------------------------------------------\r\n"
+      "Utilization of maximum supported archive size: 0%\r\n------------------------------------------------------------------------------\r\n"
     ],
     [
       4.7e-05,
@@ -2072,7 +2072,7 @@
     ],
     [
       8.3e-05,
-      "Utilization of max. archive size: 0%\r\n------------------------------------------------------------------------------\r\n"
+      "Utilization of maximum supported archive size: 0%\r\n------------------------------------------------------------------------------\r\n"
     ],
     [
       7e-06,
@@ -2912,7 +2912,7 @@
     ],
     [
       2.6e-05,
-      "Utilization of max. archive size: 0%\r\n"
+      "Utilization of maximum supported archive size: 0%\r\n"
     ],
     [
       2.1e-05,

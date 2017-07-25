@@ -1316,7 +1316,7 @@
     ],
     [
       8.8e-05,
-      "Utilization of max. archive size: 0%\r\n"
+      "Utilization of maximum supported archive size: 0%\r\n"
     ],
     [
       7e-05,
@@ -2060,7 +2060,7 @@
     ],
     [
       2.5e-05,
-      "Utilization of max. archive size: 0%\r\n"
+      "Utilization of maximum supported archive size: 0%\r\n"
     ],
     [
       2.4e-05,
@@ -2716,7 +2716,7 @@
     ],
     [
       2.2e-05,
-      "Utilization of max. archive size: 0%\r\n"
+      "Utilization of maximum supported archive size: 0%\r\n"
     ],
     [
       7.3e-05,
@@ -3181,7 +3181,7 @@
     ],
     [
       0.693043,
-      "Archive name: specialbackup\r\nArchive fingerprint: 68e942cc4a48402e48ba87f4887c24e5b9fe06e881b0ca241c791810a108bec0\r\nComment: \r\nHostname: tux\r\nUsername: rugk\r\nTime (start): Sun, 2017-07-16 18:52:58\r\nTime (end): Sun, 2017-07-16 18:53:05\r\nDuration: 6.99 seconds\r\nNumber of files: 1\r\nCommand line: borg create --progress --stats ::specialbackup -\r\nUtilization of max. archive size: 0%\r\n------------------------------------------------------------------------------\r\n                       Original size      Compressed size    Deduplicated size\r\nThis archive:              629.15 MB              2.47 MB            234.02 kB\r\nAll archives:                2.50 GB              1.87 GB            570.15 MB\r\n\r\n                       Unique chunks         Total chunks\r\nChunk index:                    1032                 3380\r\n"
+      "Archive name: specialbackup\r\nArchive fingerprint: 68e942cc4a48402e48ba87f4887c24e5b9fe06e881b0ca241c791810a108bec0\r\nComment: \r\nHostname: tux\r\nUsername: rugk\r\nTime (start): Sun, 2017-07-16 18:52:58\r\nTime (end): Sun, 2017-07-16 18:53:05\r\nDuration: 6.99 seconds\r\nNumber of files: 1\r\nCommand line: borg create --progress --stats ::specialbackup -\r\nUtilization of maximum supported archive size: 0%\r\n------------------------------------------------------------------------------\r\n                       Original size      Compressed size    Deduplicated size\r\nThis archive:              629.15 MB              2.47 MB            234.02 kB\r\nAll archives:                2.50 GB              1.87 GB            570.15 MB\r\n\r\n                       Unique chunks         Total chunks\r\nChunk index:                    1032                 3380\r\n"
     ],
     [
       0.045207,
@@ -3577,7 +3577,7 @@
     ],
     [
       0.689879,
-      "Archive name: backup-block-device\r\nArchive fingerprint: 5fd9732b4809252742a7cb3fadf2a971dd6371afd11a07944c0b5803d57c240f\r\nComment: \r\nHostname: tux\r\nUsername: rugk\r\nTime (start): Sun, 2017-07-16 18:52:58\r\nTime (end): Sun, 2017-07-16 18:53:05\r\nDuration: 6.99 seconds\r\nNumber of files: 1\r\nCommand line: borg create --progress --stats ::specialbackup -\r\nUtilization of max. archive size: 0%\r\n------------------------------------------------------------------------------\r\n                       Original size      Compressed size    Deduplicated size\r\nThis archive:              629.15 MB              2.47 MB            234.04 kB\r\nAll archives:                2.50 GB              1.87 GB            570.15 MB\r\n\r\n                       Unique chunks         Total chunks\r\nChunk index:                    1032                 3380\r\n"
+      "Archive name: backup-block-device\r\nArchive fingerprint: 5fd9732b4809252742a7cb3fadf2a971dd6371afd11a07944c0b5803d57c240f\r\nComment: \r\nHostname: tux\r\nUsername: rugk\r\nTime (start): Sun, 2017-07-16 18:52:58\r\nTime (end): Sun, 2017-07-16 18:53:05\r\nDuration: 6.99 seconds\r\nNumber of files: 1\r\nCommand line: borg create --progress --stats ::specialbackup -\r\nUtilization of maximum supported archive size: 0%\r\n------------------------------------------------------------------------------\r\n                       Original size      Compressed size    Deduplicated size\r\nThis archive:              629.15 MB              2.47 MB            234.04 kB\r\nAll archives:                2.50 GB              1.87 GB            570.15 MB\r\n\r\n                       Unique chunks         Total chunks\r\nChunk index:                    1032                 3380\r\n"
     ],
     [
       0.044772,

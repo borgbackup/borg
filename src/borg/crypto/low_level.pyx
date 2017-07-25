@@ -373,9 +373,9 @@ cdef class AES256_CTR_BASE:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        self.blocks = 0  # how many AES blocks got encrypted with this IV?
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
+        self.blocks = 0  # how many AES blocks got encrypted with this IV?
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
@@ -645,9 +645,9 @@ cdef class _AEAD_BASE:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        self.blocks = 0  # number of cipher blocks encrypted with this IV
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
+        self.blocks = 0  # number of cipher blocks encrypted with this IV
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
@@ -809,9 +809,9 @@ cdef class AES:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        self.blocks = 0  # number of cipher blocks encrypted with this IV
         for i in range(self.iv_len):
             self.iv[i] = iv[i]
+        self.blocks = 0  # number of cipher blocks encrypted with this IV
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call

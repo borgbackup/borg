@@ -16,3 +16,6 @@ Examples
     # export a gzipped tar, but instead of storing it on disk,
     # upload it to a remote site using curl.
     $ borg export-tar ... --tar-filter="gzip" - | curl --data-binary @- https://somewhere/to/POST
+
+    # remote extraction via "tarpipe"
+    $ borg export-tar /path/to/repo::Monday - | ssh somewhere "cd extracted; tar x"

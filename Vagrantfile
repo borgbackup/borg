@@ -36,7 +36,7 @@ def packages_debianoid
     # for building python:
     apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
     # filesystem drivers
-    apt-get install -y ntfs-3g openssh-server sshfs xfsprogs samba cifs-utils
+    apt-get install -y ntfs-3g openssh-server sshfs xfsprogs btrfs-tools samba cifs-utils
     # this way it works on older dists (like ubuntu 12.04) also:
     # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
     # newer versions are not compatible with py 3.2 any more.
@@ -61,7 +61,7 @@ def packages_redhatted
     # for building python:
     yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel
     # filesystem drivers
-    yum install -y ntfs-3g openssh fuse-sshfs xfsprogs samba cifs-utils ntfsprogs
+    yum install -y ntfs-3g openssh fuse-sshfs xfsprogs btrfs-tools samba cifs-utils ntfsprogs
     #yum install -y python-pip
     #pip install virtualenv
     touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile

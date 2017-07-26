@@ -14,7 +14,7 @@ blue_out=$(tput setaf 4)
 red_out=$(tput setaf 1)
 normal_out=$(tput sgr0)
 
-testing_partition_size=192M
+testing_partition_size=256M
 root_testing_dir="/var/tmp/borg-tests" # Also hardcoded in server configs in this directory
 mkdir -p "$root_testing_dir/rootfs"
 if [[ "$(uname -s)" == "Darwin" ]]; then

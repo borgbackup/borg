@@ -87,9 +87,12 @@ while read filesystem; do
       ;;
     ext4 | xfs | btrfs)
       truncate -s "$testing_partition_size" "$root_testing_dir/$filesystem"
-      force_option="-f"
       if [[ "$filesystem" == "ext4" ]]; then
         force_option="-F"
+      elif [[ "$filesystem" == "btrfs" ]]; then
+        force_option=""
+      else
+        force_option="-f"
       fi
       "mkfs.$filesystem" "$force_option" "$root_testing_dir/$filesystem" || error "$filesystem"
       mkdir "$mount_base/$filesystem"

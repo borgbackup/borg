@@ -196,3 +196,7 @@ cite {
 .sidebar-toc ul li.toctree-l3 a {
     padding-right: 25px;
 }
+
+#common-options .option {
+    white-space: nowrap;
+}

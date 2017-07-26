@@ -134,23 +134,10 @@ import struct
 
 _int = struct.Struct('>I')
 _long = struct.Struct('>Q')
-_2long = struct.Struct('>QQ')
 
 bytes_to_int = lambda x, offset=0: _int.unpack_from(x, offset)[0]
 bytes_to_long = lambda x, offset=0: _long.unpack_from(x, offset)[0]
 long_to_bytes = lambda x: _long.pack(x)
-
-
-def bytes16_to_int(b, offset=0):
-    h, l = _2long.unpack_from(b, offset)
-    return (h << 64) + l
-
-
-def int_to_bytes16(i):
-    max_uint64 = 0xffffffffffffffff
-    l = i & max_uint64
-    h = (i >> 64) & max_uint64
-    return _2long.pack(h, l)
 
 
 def num_cipher_blocks(length, blocksize=16):

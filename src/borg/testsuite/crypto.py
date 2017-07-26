@@ -2,7 +2,7 @@ from binascii import hexlify, unhexlify
 
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_GCM, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
                                IntegrityError, blake2b_256, hmac_sha256, openssl10
-from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes, bytes16_to_int, int_to_bytes16
+from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 
 from . import BaseTestCase
@@ -19,12 +19,6 @@ class CryptoTestCase(BaseTestCase):
     def test_bytes_to_long(self):
         self.assert_equal(bytes_to_long(b'\0\0\0\0\0\0\0\1'), 1)
         self.assert_equal(long_to_bytes(1), b'\0\0\0\0\0\0\0\1')
-
-    def test_bytes16_to_int(self):
-        self.assert_equal(bytes16_to_int(b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1'), 1)
-        self.assert_equal(int_to_bytes16(1), b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1')
-        self.assert_equal(bytes16_to_int(b'\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0\0'), 2 ** 64)
-        self.assert_equal(int_to_bytes16(2 ** 64), b'\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0\0')
 
     def test_UNENCRYPTED(self):
         iv = b''  # any IV is ok, it just must be set and not None

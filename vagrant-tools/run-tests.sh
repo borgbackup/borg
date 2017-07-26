@@ -1,3 +1,4 @@
+set -e
 . ~/.bash_profile
 cd /vagrant/borg/borg
 . ../borg-env/bin/activate
@@ -81,7 +82,7 @@ while read filesystem; do
   case "$filesystem" in
     tmpfs)
       continue  # TODO runs out of memory
-      mkdir "$mount_base/tmpfs"
+      mkdir -p "$mount_base/tmpfs"
       mount -t tmpfs tmpfs "$mount_base/tmpfs" -o "size=$testing_partition_size" || error tmpfs
       directories+=("$mount_base/tmpfs")
       ;;
@@ -95,16 +96,16 @@ while read filesystem; do
         force_option="-f"
       fi
       "mkfs.$filesystem" "$force_option" "$root_testing_dir/$filesystem" || error "$filesystem"
-      mkdir "$mount_base/$filesystem"
+      mkdir -p "$mount_base/$filesystem"
       mount -t "$filesystem" "$root_testing_dir/$filesystem" "$mount_base/$filesystem" || error "$filesystem"
       directories+=("$mount_base/$filesystem")
       ;;
     cifs)
       continue  # TODO breaks py.test
-      mkdir "$root_testing_dir/cifs"
+      mkdir -p "$root_testing_dir/cifs"
       chown nobody "$root_testing_dir/cifs" # guest == nobody user
       smbd -D -s vagrant-tools/smb.conf
-      mkdir "$mount_base/cifs"
+      mkdir -p "$mount_base/cifs"
       # smbd exits before startup
       if which nc > /dev/null && [[ "$(readlink "$(which nc)")" != "ncat" ]]; then
         while ! nc -z localhost 10445; do
@@ -127,11 +128,11 @@ done <<< "$filesystems"
 if [[ "$fuse_supported" ]]; then
   if which sshfs > /dev/null; then
     continue  # TODO atime/teardown issues
-    mkdir "$root_testing_dir/sshfs"
+    mkdir -p "$root_testing_dir/sshfs"
     chown "$ssh_user" "$root_testing_dir/sshfs"
     ssh-keygen -t rsa -b 2048 -C 'borgbackup@github.com' -N '' -f "$root_testing_dir/ssh_key"
     "$(which sshd)" -f vagrant-tools/sshd_config
-    mkdir "$mount_base/sshfs"
+    mkdir -p "$mount_base/sshfs"
     sshfs "$ssh_user@localhost:$root_testing_dir/sshfs" "$mount_base/sshfs" \
       -p 10022 \
       -o "IdentityFile=$root_testing_dir/ssh_key" \
@@ -143,7 +144,7 @@ if [[ "$fuse_supported" ]]; then
     continue  # TODO mode/atime/teardown issues
     truncate -s 128M "$root_testing_dir/ntfs" # NTFS requires a larger partition size than most filesystems
     mkfs.ntfs -F "$root_testing_dir/ntfs" || error NTFS
-    mkdir "$mount_base/ntfs"
+    mkdir -p "$mount_base/ntfs"
     ntfs-3g "$root_testing_dir/ntfs" "$mount_base/ntfs" || error NTFS
     directories+=("BORG_TESTS_IGNORE_MODES=$mount_base/ntfs")
   fi

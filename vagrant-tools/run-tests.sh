@@ -126,8 +126,7 @@ while read filesystem; do
 done <<< "$filesystems"
 
 if [[ "$fuse_supported" ]]; then
-  if which sshfs > /dev/null; then
-    continue  # TODO atime/teardown issues
+  if false; then  # which sshfs > /dev/null  # TODO atime/teardown issues
     mkdir -p "$root_testing_dir/sshfs"
     chown "$ssh_user" "$root_testing_dir/sshfs"
     ssh-keygen -t rsa -b 2048 -C 'borgbackup@github.com' -N '' -f "$root_testing_dir/ssh_key"
@@ -140,8 +139,7 @@ if [[ "$fuse_supported" ]]; then
       || error SSHFS
     directories+=("$mount_base/sshfs")
   fi
-  if which ntfs-3g > /dev/null; then
-    continue  # TODO mode/atime/teardown issues
+  if false; then  # which ntfs-3g > /dev/null  # TODO mode/atime/teardown issues
     truncate -s 128M "$root_testing_dir/ntfs" # NTFS requires a larger partition size than most filesystems
     mkfs.ntfs -F "$root_testing_dir/ntfs" || error NTFS
     mkdir -p "$mount_base/ntfs"

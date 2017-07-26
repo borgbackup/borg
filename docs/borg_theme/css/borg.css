@@ -191,3 +191,8 @@ cite {
 .borg-common-opt-ref {
     font-weight: bold;
 }
+
+.sidebar-toc ul li.toctree-l2 a,
+.sidebar-toc ul li.toctree-l3 a {
+    padding-right: 25px;
+}

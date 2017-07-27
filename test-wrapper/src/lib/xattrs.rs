@@ -128,7 +128,7 @@ wrap! {
         base_get(CPath::from_path(path, flags & libc::XATTR_NOFOLLOW != libc::XATTR_NOFOLLOW), name, dest, size)
     }
 
-    unsafe fn fgetxattr:_(fd: c_int, name: *const c_char, dest: *mut c_void, size: usize, position: u32, _: c_int) -> isize {
+    unsafe fn fgetxattr:_(fd: c_int, name: *const c_char, dest: *mut c_void, size: usize, position: u32, flags: c_int) -> isize {
         if position != 0 {
             return Err(libc::EINVAL);
         }
@@ -139,7 +139,7 @@ wrap! {
         base_list(CPath::from_path(path, flags & libc::XATTR_NOFOLLOW != libc::XATTR_NOFOLLOW), dest, size)
     }
 
-    unsafe fn flistxattr:_(fd: c_int, dest: *mut c_char, size: usize, _: c_int) -> isize {
+    unsafe fn flistxattr:_(fd: c_int, dest: *mut c_char, size: usize, flags: c_int) -> isize {
         base_list(CPath::from_fd(fd), dest, size)
     }
 }

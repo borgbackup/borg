@@ -181,24 +181,28 @@ thread_local! {
 // TODO pass on line numbers and file to daemon
 // Maybe configure lib and daemon separately too
 
+#[allow(unused_macros)]
 macro_rules! error {
     ($( $x:tt )*) => {
         let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Error, format!($( $x )*).as_str()));
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! warn {
     ($( $x:tt )*) => {
         let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Warn, format!($( $x )*).as_str()));
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! info {
     ($( $x:tt )*) => {
         let _ = ::shared::message(::shared::Message::Log(::shared::NetworkLogLevel::Info, format!($( $x )*).as_str()));
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! debug {
     ($( $x:tt )*) => {
         if cfg!(debug_assertions) {
@@ -207,6 +211,7 @@ macro_rules! debug {
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! trace {
     ($( $x:tt )*) => {
         if cfg!(debug_assertions) {
@@ -231,6 +236,7 @@ macro_rules! __wrap_maybe_ident {
     };
 }
 
+// TODO allow _ for argument
 macro_rules! __wrap_fn {
     ( $( [ $attr:meta ] ),* ; unsafe fn $name:ident : $orig_name:ident ($( $arg_n:tt : $arg_t:ty ),*) -> $ret_t:ty $code:block ) => {
         $( #[ $attr ] )*

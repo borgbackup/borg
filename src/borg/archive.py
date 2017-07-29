@@ -808,12 +808,6 @@ Utilization of max. archive size: {csize_max:.0%}
             logger.warning('borg check --repair is required to free all space.')
 
     @staticmethod
-    def list_archives(repository, key, manifest, cache=None):
-        # expensive! see also Manifest.list_archive_infos.
-        for name in manifest.archives:
-            yield Archive(repository, key, manifest, name, cache=cache)
-
-    @staticmethod
     def _open_rb(path):
         try:
             # if we have O_NOATIME, this likely will succeed if we are root or owner of file:

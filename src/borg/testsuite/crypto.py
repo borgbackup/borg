@@ -1,6 +1,6 @@
 from binascii import hexlify, unhexlify
 
-from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_GCM, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
+from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
                                IntegrityError, blake2b_256, hmac_sha256, openssl10
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
@@ -97,10 +97,7 @@ class CryptoTestCase(BaseTestCase):
         data = b'foo' * 10
         header = b'\x23'
         tests = [
-            # ciphersuite class, exp_mac, exp_cdata
-            (AES256_GCM,
-             b'66a438843aa41a087d6a7ed1dc1f3c4c',
-             b'5bbb40be14e4bcbfc75715b77b1242d590d2bf9f7f8a8a910b4469888689', )
+            # (ciphersuite class, exp_mac, exp_cdata)
         ]
         if not openssl10:
             tests += [
@@ -144,10 +141,7 @@ class CryptoTestCase(BaseTestCase):
         data = b'foo' * 10
         header = b'\x12\x34\x56'
         tests = [
-            # ciphersuite class, exp_mac, exp_cdata
-            (AES256_GCM,
-             b'4fb0e5b0a0bca57527352cc6240e7cca',
-             b'5bbb40be14e4bcbfc75715b77b1242d590d2bf9f7f8a8a910b4469888689', )
+            # (ciphersuite class, exp_mac, exp_cdata)
         ]
         if not openssl10:
             tests += [

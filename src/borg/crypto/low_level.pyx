@@ -67,7 +67,6 @@ cdef extern from "openssl/evp.h":
         pass
 
     const EVP_CIPHER *EVP_aes_256_ctr()
-    const EVP_CIPHER *EVP_aes_256_gcm()
     const EVP_CIPHER *EVP_aes_256_ocb()
     const EVP_CIPHER *EVP_chacha20_poly1305()
 
@@ -223,8 +222,8 @@ cdef class AES256_CTR_BASE:
     cdef unsigned char iv[16]
     cdef long long blocks
 
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         if OPENSSL_VERSION_NUMBER < 0x10000000:
             raise ValueError('AES CTR requires OpenSSL >= 1.0.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 
@@ -252,12 +251,15 @@ cdef class AES256_CTR_BASE:
 
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
-                     const unsigned char *mac_buf):
+                     unsigned char *mac_buf):
         raise NotImplementedError
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,
-                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+                    unsigned char *mac_buf, const unsigned char *mac_wanted):
+        """
+        Calculate MAC of *data1*, *data2*, write result to *mac_buf*, and verify against *mac_wanted.*
+        """
         raise NotImplementedError
 
     def encrypt(self, data, header=b'', iv=None):
@@ -401,7 +403,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
 
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
-                     const unsigned char *mac_buf):
+                     unsigned char *mac_buf):
         if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
             raise CryptoError('HMAC_Init_ex failed')
         if not HMAC_Update(self.hmac_ctx, data1, data1_len):
@@ -413,7 +415,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,
-                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+                    unsigned char *mac_buf, const unsigned char *mac_wanted):
         self.mac_compute(data1, data1_len, data2, data2_len, mac_buf)
         if CRYPTO_memcmp(mac_buf, mac_wanted, self.mac_len):
             raise IntegrityError('MAC Authentication failed')
@@ -435,7 +437,7 @@ cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
 
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
-                     const unsigned char *mac_buf):
+                     unsigned char *mac_buf):
         cdef blake2b_state state
         cdef int rc
         rc = blake2b_init(&state, self.mac_len)
@@ -455,7 +457,7 @@ cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,
-                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+                    unsigned char *mac_buf, const unsigned char *mac_wanted):
         self.mac_compute(data1, data1_len, data2, data2_len, mac_buf)
         if CRYPTO_memcmp(mac_buf, mac_wanted, self.mac_len):
             raise IntegrityError('MAC Authentication failed')
@@ -478,8 +480,8 @@ cdef class _AEAD_BASE:
     cdef unsigned char iv[12]
     cdef long long blocks
 
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         """check whether library requirements for this ciphersuite are satisfied"""
         raise NotImplemented  # override / implement in child class
 
@@ -668,21 +670,9 @@ cdef class _CHACHA_BASE(_AEAD_BASE):
         super().__init__(*args, **kwargs)
 
 
-cdef class AES256_GCM(_AES_BASE):
-    @staticmethod
-    def requirements_check():
-        if OPENSSL_VERSION_NUMBER < 0x10001040:
-            raise ValueError('AES GCM requires OpenSSL >= 1.0.1d. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
-
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
-        self.requirements_check()
-        self.cipher = EVP_aes_256_gcm
-        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
-
-
 cdef class AES256_OCB(_AES_BASE):
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 
@@ -693,8 +683,8 @@ cdef class AES256_OCB(_AES_BASE):
 
 
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 

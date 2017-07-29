@@ -6,7 +6,12 @@ from .helpers import safe_encode, safe_decode
 from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 
-API_VERSION = '1.1_02'
+cdef extern from "_item.c":
+    object _object_to_optr(object obj)
+    object _optr_to_object(object bytes)
+
+
+API_VERSION = '1.1_03'
 
 
 class PropDict:
@@ -226,6 +231,26 @@ class Item(PropDict):
             if memorize and having_chunks:
                 setattr(self, attr, size)
         return size
+
+    def to_optr(self):
+        """
+        Return an "object pointer" (optr), an opaque bag of bytes.
+        The return value is effectively a reference to this object
+        that can be passed exactly once to Item.from_optr to get this
+        object back.
+
+        to_optr/from_optr must be used symmetrically,
+        don't call from_optr multiple times.
+
+        This object can't be deallocated after a call to to_optr()
+        until from_optr() is called.
+        """
+        return _object_to_optr(self)
+
+    @classmethod
+    def from_optr(self, optr):
+        return _optr_to_object(optr)
+
 
 
 class EncryptedKey(PropDict):

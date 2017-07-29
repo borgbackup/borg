@@ -222,8 +222,8 @@ cdef class AES256_CTR_BASE:
     cdef unsigned char iv[16]
     cdef long long blocks
 
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         if OPENSSL_VERSION_NUMBER < 0x10000000:
             raise ValueError('AES CTR requires OpenSSL >= 1.0.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 
@@ -480,8 +480,8 @@ cdef class _AEAD_BASE:
     cdef unsigned char iv[12]
     cdef long long blocks
 
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         """check whether library requirements for this ciphersuite are satisfied"""
         raise NotImplemented  # override / implement in child class
 
@@ -671,8 +671,8 @@ cdef class _CHACHA_BASE(_AEAD_BASE):
 
 
 cdef class AES256_OCB(_AES_BASE):
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 
@@ -683,8 +683,8 @@ cdef class AES256_OCB(_AES_BASE):
 
 
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
-    @staticmethod
-    def requirements_check():
+    @classmethod
+    def requirements_check(cls):
         if OPENSSL_VERSION_NUMBER < 0x10100000:
             raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 

@@ -431,6 +431,7 @@ class LocalCache(CacheStatsMixin):
 
         self.path = cache_dir(repository, path)
         self.security_manager = SecurityManager(repository)
+        self.chunks_archive_manager = self.ChunksArchiveManager(self)
         self.cache_config = CacheConfig(self.repository, self.path, lock_wait)
 
         # Warn user before sending data to a never seen before unencrypted repository
@@ -448,7 +449,7 @@ class LocalCache(CacheStatsMixin):
             self.update_compatibility()
 
             if sync and self.manifest.id != self.cache_config.manifest_id:
-                self.sync()
+                self.chunks = self.chunks_archive_manager.sync(self.chunks)
                 self.commit()
         except:
             self.close()
@@ -577,34 +578,135 @@ class LocalCache(CacheStatsMixin):
         self.txn_active = False
         self._do_open()
 
-    def sync(self):
-        """Re-synchronize chunks cache with repository.
-
+    class ChunksArchiveManager:
+        """
         Maintains a directory with known backup archive indexes, so it only
         needs to fetch infos from repo and build a chunk index once per backup
         archive.
+
         If out of sync, missing archive indexes get added, outdated indexes
         get removed and a new master chunks index is built by merging all
         archive indexes.
         """
-        archive_path = os.path.join(self.path, 'chunks.archive.d')
-        # An index of chunks whose size had to be fetched
-        chunks_fetched_size_index = ChunkIndex()
-        # Instrumentation
-        processed_item_metadata_bytes = 0
-        processed_item_metadata_chunks = 0
-        compact_chunks_archive_saved_space = 0
-        fetched_chunks_for_csize = 0
-        fetched_bytes_for_csize = 0
 
-        def mkpath(id, suffix=''):
+        def __init__(self, cache):
+            self.cache = cache
+            self.archive_path = os.path.join(cache.path, 'chunks.archive.d')
+            # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
+            # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
+            self.chunks_archive_enabled = not os.path.isdir(self.archive_path)
+            # An index of chunks whose size had to be fetched
+            self.chunks_fetched_size_index = ChunkIndex()
+
+        def sync(self, chunks):
+            # The cache can be used by a command that e.g. only checks against Manifest.Operation.WRITE,
+            # which does not have to include all flags from Manifest.Operation.READ.
+            # Since the sync will attempt to read archives, check compatibility with Manifest.Operation.READ.
+            self.cache.manifest.check_repository_compatibility((Manifest.Operation.READ,))
+
+            self.cache.begin_txn()
+            with cache_if_remote(self.cache.repository, decrypted_cache=self.cache.key) as decrypted_repository:
+                self.legacy_cleanup()
+                return self.create_master_idx(decrypted_repository, chunks)
+
+        def create_master_idx(self, decrypted_repository, chunk_idx):
+            logger.info('Synchronizing chunks cache...')
+            cache_sync_stats = LocalCache.CacheSyncStats()
+            cached_ids = self.cached_archives()
+            archive_ids = self.repo_archives()
+            logger.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.',
+                len(archive_ids), len(cached_ids),
+                len(cached_ids - archive_ids), len(archive_ids - cached_ids))
+            # deallocates old hashindex, creates empty hashindex:
+            chunk_idx.clear()
+            self.cleanup_outdated(cached_ids - archive_ids)
+            # Explicitly set the initial hash table capacity to avoid performance issues
+            # due to hash table "resonance".
+            master_index_capacity = int(len(self.cache.repository) / ChunkIndex.MAX_LOAD_FACTOR)
+            if archive_ids:
+                chunk_idx = ChunkIndex(master_index_capacity)
+                pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
+                                              msg='%3.0f%% Syncing chunks cache. Processing archive %s',
+                                              msgid='cache.sync')
+                chunks_archives = self.get_chunks_archives(archive_ids)
+                for chunks_archive in chunks_archives:
+                    pi.show(info=[remove_surrogates(chunks_archive.name)])
+                    archive_chunk_idx = chunks_archive.procure_index(decrypted_repository, cache_sync_stats)
+                    if self.chunks_archive_enabled:
+                        self.fetch_missing_csize(decrypted_repository, archive_chunk_idx, cache_sync_stats)
+                        chunks_archive.write_index(archive_chunk_idx, cache_sync_stats)
+                    chunk_idx.merge(archive_chunk_idx)
+                if not self.chunks_archive_enabled:
+                    self.fetch_missing_csize(decrypted_repository, chunk_idx, cache_sync_stats)
+                pi.finish()
+                logger.debug('Cache sync: had to fetch %s (%d chunks) because no archive had a csize set for them '
+                             '(due to --no-cache-sync)',
+                             format_file_size(cache_sync_stats.fetched_bytes_for_csize),
+                             cache_sync_stats.fetched_chunks_for_csize)
+                logger.debug('Cache sync: processed %s (%d chunks) of metadata',
+                             format_file_size(cache_sync_stats.processed_item_metadata_bytes),
+                             cache_sync_stats.processed_item_metadata_chunks)
+                logger.debug('Cache sync: compact chunks.archive.d storage saved %s bytes',
+                             format_file_size(cache_sync_stats.compact_chunks_archive_saved_space))
+            return chunk_idx
+
+        def legacy_cleanup(self):
+            """bring old cache dirs into the desired state (cleanup and adapt)"""
+            try:
+                os.unlink(os.path.join(self.cache.path, 'chunks.archive'))
+            except:
+                pass
+            try:
+                os.unlink(os.path.join(self.cache.path, 'chunks.archive.tmp'))
+            except:
+                pass
+            try:
+                os.mkdir(self.archive_path)
+            except:
+                pass
+
+        def cleanup_outdated(self, ids):
+            for id in ids:
+                self.cleanup_cached_archive(id)
+
+        def cleanup_cached_archive(self, id, cleanup_compact=True):
+            try:
+                os.unlink(self.mkpath(id))
+                os.unlink(self.mkpath(id) + '.integrity')
+            except FileNotFoundError:
+                pass
+            if not cleanup_compact:
+                return
+            try:
+                os.unlink(self.mkpath(id, suffix='.compact'))
+                os.unlink(self.mkpath(id, suffix='.compact') + '.integrity')
+            except FileNotFoundError:
+                pass
+
+        def mkpath(self, id, suffix=''):
+            """Return path for *id* (bytes)."""
             id_hex = bin_to_hex(id)
-            path = os.path.join(archive_path, id_hex + suffix)
+            path = os.path.join(self.archive_path, id_hex + suffix)
             return path
 
-        def cached_archives():
-            if self.do_cache:
-                fns = os.listdir(archive_path)
+        def get_chunks_archives(self, archive_ids):
+            # Pass once over all archives and build a mapping from ids to names.
+            # The easier approach, doing a similar loop for each archive, has
+            # square complexity and does about a dozen million functions calls
+            # with 1100 archives (which takes 30s CPU seconds _alone_).
+            chunks_archives = []
+            for info in self.cache.manifest.archives.list():
+                if info.id in archive_ids:
+                    chunks_archives.append(LocalCache.ChunksArchive(self, info.id, info.name))
+            assert len(chunks_archives) == len(archive_ids)
+            return chunks_archives
+
+        def get_chunks_archive(self, archive):
+            return LocalCache.ChunksArchive(self, archive.id, archive.name)
+
+        def cached_archives(self):
+            if self.chunks_archive_enabled:
+                fns = os.listdir(self.archive_path)
                 # filenames with 64 hex digits == 256bit,
                 # or compact indices which are 64 hex digits + ".compact"
                 return set(unhexlify(fn) for fn in fns if len(fn) == 64) | \
@@ -612,42 +714,21 @@ class LocalCache(CacheStatsMixin):
             else:
                 return set()
 
-        def repo_archives():
-            return set(info.id for info in self.manifest.archives.list())
+        def repo_archives(self):
+            return set(info.id for info in self.cache.manifest.archives.list())
 
-        def cleanup_outdated(ids):
-            for id in ids:
-                cleanup_cached_archive(id)
-
-        def cleanup_cached_archive(id, cleanup_compact=True):
-            try:
-                os.unlink(mkpath(id))
-                os.unlink(mkpath(id) + '.integrity')
-            except FileNotFoundError:
-                pass
-            if not cleanup_compact:
-                return
-            try:
-                os.unlink(mkpath(id, suffix='.compact'))
-                os.unlink(mkpath(id, suffix='.compact') + '.integrity')
-            except FileNotFoundError:
-                pass
-
-        def fetch_missing_csize(chunk_idx):
+        def fetch_missing_csize(self, decrypted_repository, chunk_idx, cache_sync_stats):
             """
             Archives created with AdHocCache will have csize=0 in all chunk list entries whose
             chunks were already in the repository.
 
             Scan *chunk_idx* for entries where csize=0 and fill in the correct information.
             """
-            nonlocal fetched_chunks_for_csize
-            nonlocal fetched_bytes_for_csize
-
             all_missing_ids = chunk_idx.zero_csize_ids()
             fetch_ids = []
-            if len(chunks_fetched_size_index):
+            if len(self.chunks_fetched_size_index):
                 for id_ in all_missing_ids:
-                    already_fetched_entry = chunks_fetched_size_index.get(id_)
+                    already_fetched_entry = self.chunks_fetched_size_index.get(id_)
                     if already_fetched_entry:
                         entry = chunk_idx[id_]._replace(csize=already_fetched_entry.csize)
                         assert entry.size == already_fetched_entry.size, 'Chunk size mismatch'
@@ -662,52 +743,92 @@ class LocalCache(CacheStatsMixin):
             for id_, data in zip(fetch_ids, decrypted_repository.repository.get_many(fetch_ids)):
                 entry = chunk_idx[id_]._replace(csize=len(data))
                 chunk_idx[id_] = entry
-                chunks_fetched_size_index[id_] = entry
-                fetched_chunks_for_csize += 1
-                fetched_bytes_for_csize += len(data)
+                self.chunks_fetched_size_index[id_] = entry
+                cache_sync_stats.fetched_chunks_for_csize += 1
+                cache_sync_stats.fetched_bytes_for_csize += len(data)
 
-        def fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx):
-            nonlocal processed_item_metadata_bytes
-            nonlocal processed_item_metadata_chunks
-            csize, data = decrypted_repository.get(archive_id)
-            chunk_idx.add(archive_id, 1, len(data), csize)
+    class CacheSyncStats:
+        processed_item_metadata_bytes = 0
+        processed_item_metadata_chunks = 0
+        compact_chunks_archive_saved_space = 0
+        fetched_chunks_for_csize = 0
+        fetched_bytes_for_csize = 0
+
+    class ChunksArchive:
+        def __init__(self, manager, id, name):
+            self.manager = manager
+            self.id = id
+            self.name = name
+
+        def mkpath(self, *, suffix=''):
+            """Return path for *id* (bytes)."""
+            id_hex = bin_to_hex(self.id)
+            path = os.path.join(self.manager.archive_path, id_hex + suffix)
+            return path
+
+        def cleanup(self, *, cleanup_compact=True):
+            """Delete cached index, if any."""
+            try:
+                os.unlink(self.mkpath())
+                os.unlink(self.mkpath(suffix='.integrity'))
+            except FileNotFoundError:
+                pass
+            if not cleanup_compact:
+                return
+            try:
+                os.unlink(self.mkpath(suffix='.compact'))
+                os.unlink(self.mkpath(suffix='.compact.integrity'))
+            except FileNotFoundError:
+                pass
+
+        def build_index(self, decrypted_repository, chunk_idx, cache_sync_stats=None, detailed_pi=None):
+            processed_item_metadata_bytes = 0
+            processed_item_metadata_chunks = 0
+            csize, data = decrypted_repository.get(self.id)
+            chunk_idx.add(self.id, 1, len(data), csize)
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version != 1:
                 raise Exception('Unknown archive metadata version')
             sync = CacheSynchronizer(chunk_idx)
+            if detailed_pi:
+                detailed_pi.total = len(archive.items)
             for item_id, (csize, data) in zip(archive.items, decrypted_repository.get_many(archive.items)):
                 chunk_idx.add(item_id, 1, len(data), csize)
                 processed_item_metadata_bytes += len(data)
                 processed_item_metadata_chunks += 1
                 sync.feed(data)
-            if self.do_cache:
-                fetch_missing_csize(chunk_idx)
-                write_archive_index(archive_id, chunk_idx)
+                if detailed_pi:
+                    detailed_pi.show(increase=1)
+            if detailed_pi:
+                detailed_pi.finish()
+            if cache_sync_stats:
+                cache_sync_stats.processed_item_metadata_bytes += processed_item_metadata_bytes
+                cache_sync_stats.processed_item_metadata_chunks += processed_item_metadata_chunks
+            return sync
 
-        def write_archive_index(archive_id, chunk_idx):
-            nonlocal compact_chunks_archive_saved_space
-            compact_chunks_archive_saved_space += chunk_idx.compact()
-            fn = mkpath(archive_id, suffix='.compact')
-            fn_tmp = mkpath(archive_id, suffix='.tmp')
+        def write_index(self, chunk_idx, cache_sync_stats):
+            assert len(chunk_idx)
+            cache_sync_stats.compact_chunks_archive_saved_space += chunk_idx.compact()
+            fn = self.mkpath(suffix='.compact')
+            fn_tmp = self.mkpath(suffix='.tmp')
             try:
                 with DetachedIntegrityCheckedFile(path=fn_tmp, write=True,
-                                                  filename=bin_to_hex(archive_id) + '.compact') as fd:
+                                                  filename=bin_to_hex(self.id) + '.compact') as fd:
                     chunk_idx.write(fd)
             except Exception:
                 truncate_and_unlink(fn_tmp)
             else:
                 os.rename(fn_tmp, fn)
 
-        def read_archive_index(archive_id, archive_name):
-            archive_chunk_idx_path = mkpath(archive_id)
-            logger.info("Reading cached archive chunk index for %s ...", archive_name)
+        def read_index(self, cache_sync_stats):
+            archive_chunk_idx_path = self.mkpath()
             try:
                 try:
                     # Attempt to load compact index first
                     with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path + '.compact', write=False) as fd:
                         archive_chunk_idx = ChunkIndex.read(fd, permit_compact=True)
                     # In case a non-compact index exists, delete it.
-                    cleanup_cached_archive(archive_id, cleanup_compact=False)
+                    self.cleanup(cleanup_compact=False)
                     # Compact index read - return index, no conversion necessary (below).
                     return archive_chunk_idx
                 except FileNotFoundError:
@@ -715,108 +836,30 @@ class LocalCache(CacheStatsMixin):
                     with DetachedIntegrityCheckedFile(path=archive_chunk_idx_path, write=False) as fd:
                         archive_chunk_idx = ChunkIndex.read(fd)
             except FileIntegrityError as fie:
-                logger.error('Cached archive chunk index of %s is corrupted: %s', archive_name, fie)
+                logger.error('Cached archive chunk index of %s is corrupted: %s', self.name, fie)
                 # Delete corrupted index, set warning. A new index must be build.
-                cleanup_cached_archive(archive_id)
+                self.cleanup()
                 set_ec(EXIT_WARNING)
                 return None
 
             # Convert to compact index. Delete the existing index first.
-            logger.debug('Found non-compact index for %s, converting to compact.', archive_name)
-            cleanup_cached_archive(archive_id)
-            write_archive_index(archive_id, archive_chunk_idx)
+            logger.debug('Found non-compact index for %s, converting to compact.', self.name)
+            self.cleanup()
+            self.write_index(archive_chunk_idx, cache_sync_stats)
             return archive_chunk_idx
 
-        def get_archive_ids_to_names(archive_ids):
-            # Pass once over all archives and build a mapping from ids to names.
-            # The easier approach, doing a similar loop for each archive, has
-            # square complexity and does about a dozen million functions calls
-            # with 1100 archives (which takes 30s CPU seconds _alone_).
-            archive_names = {}
-            for info in self.manifest.archives.list():
-                if info.id in archive_ids:
-                    archive_names[info.id] = info.name
-            assert len(archive_names) == len(archive_ids)
-            return archive_names
-
-        def create_master_idx(chunk_idx):
-            logger.info('Synchronizing chunks cache...')
-            cached_ids = cached_archives()
-            archive_ids = repo_archives()
-            logger.info('Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.',
-                len(archive_ids), len(cached_ids),
-                len(cached_ids - archive_ids), len(archive_ids - cached_ids))
-            # deallocates old hashindex, creates empty hashindex:
-            chunk_idx.clear()
-            cleanup_outdated(cached_ids - archive_ids)
-            # Explicitly set the initial hash table capacity to avoid performance issues
-            # due to hash table "resonance".
-            master_index_capacity = int(len(self.repository) / ChunkIndex.MAX_LOAD_FACTOR)
-            if archive_ids:
-                chunk_idx = None if not self.do_cache else ChunkIndex(master_index_capacity)
-                pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
-                                              msg='%3.0f%% Syncing chunks cache. Processing archive %s',
-                                              msgid='cache.sync')
-                archive_ids_to_names = get_archive_ids_to_names(archive_ids)
-                for archive_id, archive_name in archive_ids_to_names.items():
-                    pi.show(info=[remove_surrogates(archive_name)])
-                    if self.do_cache:
-                        if archive_id in cached_ids:
-                            archive_chunk_idx = read_archive_index(archive_id, archive_name)
-                            if archive_chunk_idx is None:
-                                cached_ids.remove(archive_id)
-                        if archive_id not in cached_ids:
-                            # Do not make this an else branch; the FileIntegrityError exception handler
-                            # above can remove *archive_id* from *cached_ids*.
-                            logger.info('Fetching and building archive index for %s ...', archive_name)
-                            archive_chunk_idx = ChunkIndex()
-                            fetch_and_build_idx(archive_id, decrypted_repository, archive_chunk_idx)
-                        logger.info("Merging into master chunks index ...")
-                        chunk_idx.merge(archive_chunk_idx)
-                    else:
-                        chunk_idx = chunk_idx or ChunkIndex(master_index_capacity)
-                        logger.info('Fetching archive index for %s ...', archive_name)
-                        fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
-                if not self.do_cache:
-                    fetch_missing_csize(chunk_idx)
-                pi.finish()
-                logger.debug('Cache sync: had to fetch %s (%d chunks) because no archive had a csize set for them '
-                             '(due to --no-cache-sync)',
-                             format_file_size(fetched_bytes_for_csize), fetched_chunks_for_csize)
-                logger.debug('Cache sync: processed %s (%d chunks) of metadata',
-                             format_file_size(processed_item_metadata_bytes), processed_item_metadata_chunks)
-                logger.debug('Cache sync: compact chunks.archive.d storage saved %s bytes',
-                             format_file_size(compact_chunks_archive_saved_space))
-            logger.info('Done.')
-            return chunk_idx
-
-        def legacy_cleanup():
-            """bring old cache dirs into the desired state (cleanup and adapt)"""
+        def procure_index(self, decrypted_repository, cache_sync_stats=None, detailed_pi=None):
+            cache_sync_stats = cache_sync_stats or LocalCache.CacheSyncStats()
             try:
-                os.unlink(os.path.join(self.path, 'chunks.archive'))
-            except:
-                pass
-            try:
-                os.unlink(os.path.join(self.path, 'chunks.archive.tmp'))
-            except:
-                pass
-            try:
-                os.mkdir(archive_path)
-            except:
-                pass
+                index = self.read_index(cache_sync_stats)
+            except FileNotFoundError:
+                index = None
+            if index:
+                return index
 
-        # The cache can be used by a command that e.g. only checks against Manifest.Operation.WRITE,
-        # which does not have to include all flags from Manifest.Operation.READ.
-        # Since the sync will attempt to read archives, check compatibility with Manifest.Operation.READ.
-        self.manifest.check_repository_compatibility((Manifest.Operation.READ, ))
-
-        self.begin_txn()
-        with cache_if_remote(self.repository, decrypted_cache=self.key) as decrypted_repository:
-            legacy_cleanup()
-            # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
-            # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
-            self.do_cache = os.path.isdir(archive_path)
-            self.chunks = create_master_idx(self.chunks)
+            index = ChunkIndex()
+            self.build_index(decrypted_repository, index, cache_sync_stats, detailed_pi=detailed_pi)
+            return index
 
     def check_cache_compatibility(self):
         my_features = Manifest.SUPPORTED_REPO_FEATURES

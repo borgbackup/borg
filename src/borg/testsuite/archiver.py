@@ -3197,9 +3197,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
 
         # Cache sync notices corrupted archive chunks, but automatically recovers.
         out = self.cmd('create', '-v', self.repository_location + '::test3', 'input', exit_code=1)
-        assert 'Reading cached archive chunk index for test1' in out
         assert 'Cached archive chunk index of test1 is corrupted' in out
-        assert 'Fetching and building archive index for test1' in out
 
     def test_old_version_interfered(self):
         # Modify the main manifest ID without touching the manifest ID in the integrity section.

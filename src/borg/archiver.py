@@ -1379,11 +1379,12 @@ class Archiver:
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
         if any((args.location.archive, args.first, args.last, args.prefix, args.glob_archives)):
-            return self._info_archives(args, repository, manifest, key, cache)
+            with cache_if_remote(repository, decrypted_cache=key) as decrypted_repository:
+                return self._info_archives(args, repository, manifest, key, cache, decrypted_repository)
         else:
             return self._info_repository(args, repository, manifest, key, cache)
 
-    def _info_archives(self, args, repository, manifest, key, cache):
+    def _info_archives(self, args, repository, manifest, key, cache, decrypted_repository):
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
@@ -1399,7 +1400,7 @@ class Archiver:
         for i, archive_name in enumerate(archive_names, 1):
             archive = Archive(repository, key, manifest, archive_name, cache=cache,
                               consider_part_files=args.consider_part_files)
-            info = archive.info()
+            info = archive.info(decrypted_repository)
             if args.json:
                 output_data.append(info)
             else:

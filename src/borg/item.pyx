@@ -1,12 +1,12 @@
 import stat
 from collections import namedtuple
 
-from .constants import ITEM_KEYS
+from .constants import ITEM_KEYS, ARCHIVE_KEYS
 from .helpers import safe_encode, safe_decode
 from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 
-API_VERSION = '1.1_02'
+API_VERSION = '1.1_03'
 
 
 class PropDict:
@@ -289,16 +289,14 @@ class ArchiveItem(PropDict):
     If a ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
-                  'comment', 'chunker_params',
-                  'recreate_cmdline', 'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',
-                  }  # str-typed keys
+    VALID_KEYS = ARCHIVE_KEYS
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     version = PropDict._make_property('version', int)
     name = PropDict._make_property('name', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     items = PropDict._make_property('items', list)
+    num_files = PropDict._make_property('num_files', int)
     cmdline = PropDict._make_property('cmdline', list)  # list of s-e-str
     hostname = PropDict._make_property('hostname', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     username = PropDict._make_property('username', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)

@@ -14,9 +14,8 @@ NONCE_SPACE_RESERVATION = 2**28  # This in units of AES blocksize (16 bytes)
 
 
 class NonceManager:
-    def __init__(self, repository, enc_cipher, manifest_nonce):
+    def __init__(self, repository, manifest_nonce):
         self.repository = repository
-        self.enc_cipher = enc_cipher
         self.end_of_nonce_reservation = None
         self.manifest_nonce = manifest_nonce
         self.nonce_file = os.path.join(get_security_dir(self.repository.id_str), 'nonce')
@@ -47,7 +46,15 @@ class NonceManager:
     def commit_repo_nonce_reservation(self, next_unreserved, start_nonce):
         self.repository.commit_nonce_reservation(next_unreserved, start_nonce)
 
-    def ensure_reservation(self, nonce_space_needed):
+    def ensure_reservation(self, nonce, nonce_space_needed):
+        """
+        Call this before doing encryption, give current, yet unused, integer IV as <nonce>
+        and the amount of subsequent (counter-like) IVs needed as <nonce_space_needed>.
+        Return value is the IV (counter) integer you shall use for encryption.
+
+        Note: this method may return the <nonce> you gave, if a reservation for it exists or
+              can be established, so make sure you give a unused nonce.
+        """
         # Nonces may never repeat, even if a transaction aborts or the system crashes.
         # Therefore a part of the nonce space is reserved before any nonce is used for encryption.
         # As these reservations are committed to permanent storage before any nonce is used, this protects
@@ -64,24 +71,17 @@ class NonceManager:
 
         if self.end_of_nonce_reservation:
             # we already got a reservation, if nonce_space_needed still fits everything is ok
-            next_nonce = int.from_bytes(self.enc_cipher.iv, byteorder='big')
+            next_nonce = nonce
             assert next_nonce <= self.end_of_nonce_reservation
             if next_nonce + nonce_space_needed <= self.end_of_nonce_reservation:
-                return
+                return next_nonce
 
         repo_free_nonce = self.get_repo_free_nonce()
         local_free_nonce = self.get_local_free_nonce()
         free_nonce_space = max(x for x in (repo_free_nonce, local_free_nonce, self.manifest_nonce, self.end_of_nonce_reservation) if x is not None)
         reservation_end = free_nonce_space + nonce_space_needed + NONCE_SPACE_RESERVATION
         assert reservation_end < MAX_REPRESENTABLE_NONCE
-        if self.end_of_nonce_reservation is None:
-            # initialization, reset the encryption cipher to the start of the reservation
-            self.enc_cipher.reset(None, free_nonce_space.to_bytes(16, byteorder='big'))
-        else:
-            # expand existing reservation if possible
-            if free_nonce_space != self.end_of_nonce_reservation:
-                # some other client got an interleaved reservation, skip partial space in old reservation to avoid overlap
-                self.enc_cipher.reset(None, free_nonce_space.to_bytes(16, byteorder='big'))
         self.commit_repo_nonce_reservation(reservation_end, repo_free_nonce)
         self.commit_local_nonce_reservation(reservation_end, local_free_nonce)
         self.end_of_nonce_reservation = reservation_end
+        return free_nonce_space

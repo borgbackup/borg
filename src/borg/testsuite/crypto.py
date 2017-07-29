@@ -1,8 +1,10 @@
 from binascii import hexlify, unhexlify
 
-from ..crypto.low_level import AES, bytes_to_long, bytes_to_int, long_to_bytes, hmac_sha256, blake2b_256
-from ..crypto.low_level import increment_iv, bytes16_to_int, int_to_bytes16
+from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_GCM, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
+                               IntegrityError, blake2b_256, hmac_sha256, openssl10
+from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
+
 from . import BaseTestCase
 
 # Note: these tests are part of the self test, do not use or import py.test functionality here.
@@ -18,42 +20,168 @@ class CryptoTestCase(BaseTestCase):
         self.assert_equal(bytes_to_long(b'\0\0\0\0\0\0\0\1'), 1)
         self.assert_equal(long_to_bytes(1), b'\0\0\0\0\0\0\0\1')
 
-    def test_bytes16_to_int(self):
-        self.assert_equal(bytes16_to_int(b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1'), 1)
-        self.assert_equal(int_to_bytes16(1), b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1')
-        self.assert_equal(bytes16_to_int(b'\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0\0'), 2 ** 64)
-        self.assert_equal(int_to_bytes16(2 ** 64), b'\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0\0')
+    def test_UNENCRYPTED(self):
+        iv = b''  # any IV is ok, it just must be set and not None
+        data = b'data'
+        header = b'header'
+        cs = UNENCRYPTED(None, None, iv, header_len=6)
+        envelope = cs.encrypt(data, header=header)
+        self.assert_equal(envelope, header + data)
+        got_data = cs.decrypt(envelope)
+        self.assert_equal(got_data, data)
 
-    def test_increment_iv(self):
-        iv0 = b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0'
-        iv1 = b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1'
-        iv2 = b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\2'
-        self.assert_equal(increment_iv(iv0, 0), iv0)
-        self.assert_equal(increment_iv(iv0, 1), iv1)
-        self.assert_equal(increment_iv(iv0, 2), iv2)
-        iva = b'\0\0\0\0\0\0\0\0\xff\xff\xff\xff\xff\xff\xff\xff'
-        ivb = b'\0\0\0\0\0\0\0\1\x00\x00\x00\x00\x00\x00\x00\x00'
-        ivc = b'\0\0\0\0\0\0\0\1\x00\x00\x00\x00\x00\x00\x00\x01'
-        self.assert_equal(increment_iv(iva, 0), iva)
-        self.assert_equal(increment_iv(iva, 1), ivb)
-        self.assert_equal(increment_iv(iva, 2), ivc)
-        self.assert_equal(increment_iv(iv0, 2**64), ivb)
-
-    def test_aes(self):
-        key = b'X' * 32
+    def test_AES256_CTR_HMAC_SHA256(self):
+        # this tests the layout as in attic / borg < 1.2 (1 type byte, no aad)
+        mac_key = b'Y' * 32
+        enc_key = b'X' * 32
+        iv = 0
         data = b'foo' * 10
-        # encrypt
-        aes = AES(is_encrypt=True, key=key)
-        self.assert_equal(bytes_to_long(aes.iv, 8), 0)
-        cdata = aes.encrypt(data)
+        header = b'\x42'
+        # encrypt-then-mac
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv, header_len=1, aad_offset=1)
+        hdr_mac_iv_cdata = cs.encrypt(data, header=header)
+        hdr = hdr_mac_iv_cdata[0:1]
+        mac = hdr_mac_iv_cdata[1:33]
+        iv = hdr_mac_iv_cdata[33:41]
+        cdata = hdr_mac_iv_cdata[41:]
+        self.assert_equal(hexlify(hdr), b'42')
+        self.assert_equal(hexlify(mac), b'af90b488b0cc4a8f768fe2d6814fa65aec66b148135e54f7d4d29a27f22f57a8')
+        self.assert_equal(hexlify(iv), b'0000000000000000')
         self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
-        self.assert_equal(bytes_to_long(aes.iv, 8), 2)
-        # decrypt
-        aes = AES(is_encrypt=False, key=key)
-        self.assert_equal(bytes_to_long(aes.iv, 8), 0)
-        pdata = aes.decrypt(cdata)
+        self.assert_equal(cs.next_iv(), 2)
+        # auth-then-decrypt
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
+        pdata = cs.decrypt(hdr_mac_iv_cdata)
         self.assert_equal(data, pdata)
-        self.assert_equal(bytes_to_long(aes.iv, 8), 2)
+        self.assert_equal(cs.next_iv(), 2)
+        # auth-failure due to corruption (corrupted data)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
+        hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:41] + b'\0' + hdr_mac_iv_cdata[42:]
+        self.assert_raises(IntegrityError,
+                           lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
+
+    def test_AES256_CTR_HMAC_SHA256_aad(self):
+        mac_key = b'Y' * 32
+        enc_key = b'X' * 32
+        iv = 0
+        data = b'foo' * 10
+        header = b'\x12\x34\x56'
+        # encrypt-then-mac
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv, header_len=3, aad_offset=1)
+        hdr_mac_iv_cdata = cs.encrypt(data, header=header)
+        hdr = hdr_mac_iv_cdata[0:3]
+        mac = hdr_mac_iv_cdata[3:35]
+        iv = hdr_mac_iv_cdata[35:43]
+        cdata = hdr_mac_iv_cdata[43:]
+        self.assert_equal(hexlify(hdr), b'123456')
+        self.assert_equal(hexlify(mac), b'7659a915d9927072ef130258052351a17ef882692893c3850dd798c03d2dd138')
+        self.assert_equal(hexlify(iv), b'0000000000000000')
+        self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
+        self.assert_equal(cs.next_iv(), 2)
+        # auth-then-decrypt
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
+        pdata = cs.decrypt(hdr_mac_iv_cdata)
+        self.assert_equal(data, pdata)
+        self.assert_equal(cs.next_iv(), 2)
+        # auth-failure due to corruption (corrupted aad)
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
+        hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
+        self.assert_raises(IntegrityError,
+                           lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
+
+    def test_AE(self):
+        # used in legacy-like layout (1 type byte, no aad)
+        mac_key = None
+        enc_key = b'X' * 32
+        iv = 0
+        data = b'foo' * 10
+        header = b'\x23'
+        tests = [
+            # ciphersuite class, exp_mac, exp_cdata
+            (AES256_GCM,
+             b'66a438843aa41a087d6a7ed1dc1f3c4c',
+             b'5bbb40be14e4bcbfc75715b77b1242d590d2bf9f7f8a8a910b4469888689', )
+        ]
+        if not openssl10:
+            tests += [
+                (AES256_OCB,
+                 b'b6909c23c9aaebd9abbe1ff42097652d',
+                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
+                (CHACHA20_POLY1305,
+                 b'fd08594796e0706cde1e8b461e3e0555',
+                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
+            ]
+        for cs_cls, exp_mac, exp_cdata in tests:
+            # print(repr(cs_cls))
+            # encrypt/mac
+            cs = cs_cls(mac_key, enc_key, iv, header_len=1, aad_offset=1)
+            hdr_mac_iv_cdata = cs.encrypt(data, header=header)
+            hdr = hdr_mac_iv_cdata[0:1]
+            mac = hdr_mac_iv_cdata[1:17]
+            iv = hdr_mac_iv_cdata[17:29]
+            cdata = hdr_mac_iv_cdata[29:]
+            self.assert_equal(hexlify(hdr), b'23')
+            self.assert_equal(hexlify(mac), exp_mac)
+            self.assert_equal(hexlify(iv), b'000000000000000000000000')
+            self.assert_equal(hexlify(cdata), exp_cdata)
+            self.assert_equal(cs.next_iv(), 1)
+            # auth/decrypt
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            pdata = cs.decrypt(hdr_mac_iv_cdata)
+            self.assert_equal(data, pdata)
+            self.assert_equal(cs.next_iv(), 1)
+            # auth-failure due to corruption (corrupted data)
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:29] + b'\0' + hdr_mac_iv_cdata[30:]
+            self.assert_raises(IntegrityError,
+                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
+
+    def test_AEAD(self):
+        # test with aad
+        mac_key = None
+        enc_key = b'X' * 32
+        iv = 0
+        data = b'foo' * 10
+        header = b'\x12\x34\x56'
+        tests = [
+            # ciphersuite class, exp_mac, exp_cdata
+            (AES256_GCM,
+             b'4fb0e5b0a0bca57527352cc6240e7cca',
+             b'5bbb40be14e4bcbfc75715b77b1242d590d2bf9f7f8a8a910b4469888689', )
+        ]
+        if not openssl10:
+            tests += [
+                (AES256_OCB,
+                 b'f2748c412af1c7ead81863a18c2c1893',
+                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
+                (CHACHA20_POLY1305,
+                 b'b7e7c9a79f2404e14f9aad156bf091dd',
+                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
+            ]
+        for cs_cls, exp_mac, exp_cdata in tests:
+            # print(repr(cs_cls))
+            # encrypt/mac
+            cs = cs_cls(mac_key, enc_key, iv, header_len=3, aad_offset=1)
+            hdr_mac_iv_cdata = cs.encrypt(data, header=header)
+            hdr = hdr_mac_iv_cdata[0:3]
+            mac = hdr_mac_iv_cdata[3:19]
+            iv = hdr_mac_iv_cdata[19:31]
+            cdata = hdr_mac_iv_cdata[31:]
+            self.assert_equal(hexlify(hdr), b'123456')
+            self.assert_equal(hexlify(mac), exp_mac)
+            self.assert_equal(hexlify(iv), b'000000000000000000000000')
+            self.assert_equal(hexlify(cdata), exp_cdata)
+            self.assert_equal(cs.next_iv(), 1)
+            # auth/decrypt
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            pdata = cs.decrypt(hdr_mac_iv_cdata)
+            self.assert_equal(data, pdata)
+            self.assert_equal(cs.next_iv(), 1)
+            # auth-failure due to corruption (corrupted aad)
+            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
+            self.assert_raises(IntegrityError,
+                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
     def test_hmac_sha256(self):
         # RFC 4231 test vectors

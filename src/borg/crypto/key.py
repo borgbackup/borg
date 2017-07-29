@@ -11,7 +11,7 @@ from hmac import HMAC, compare_digest
 
 import msgpack
 
-from borg.logger import create_logger
+from ..logger import create_logger
 
 logger = create_logger()
 
@@ -25,10 +25,10 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
-from .nonces import NonceManager
-from .low_level import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 
-PREFIX = b'\0' * 8
+from .nonces import NonceManager
+from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
+from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
 
 
 class PassphraseWrong(Error):
@@ -352,47 +352,30 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
-    MAC = hmac_sha256
+    CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
     logically_encrypted = True
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
-        self.nonce_manager.ensure_reservation(num_aes_blocks(len(data)))
-        self.enc_cipher.reset()
-        data = b''.join((self.enc_cipher.iv[8:], self.enc_cipher.encrypt(data)))
-        assert (self.MAC is blake2b_256 and len(self.enc_hmac_key) == 128 or
-                self.MAC is hmac_sha256 and len(self.enc_hmac_key) == 32)
-        hmac = self.MAC(self.enc_hmac_key, data)
-        return b''.join((self.TYPE_STR, hmac, data))
+        next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(),
+                                                        self.cipher.block_count(len(data)))
+        return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
     def decrypt(self, id, data, decompress=True):
         if not (data[0] == self.TYPE or
             data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
             id_str = bin_to_hex(id) if id is not None else '(unknown)'
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
-        data_view = memoryview(data)
-        hmac_given = data_view[1:33]
-        assert (self.MAC is blake2b_256 and len(self.enc_hmac_key) == 128 or
-                self.MAC is hmac_sha256 and len(self.enc_hmac_key) == 32)
-        hmac_computed = memoryview(self.MAC(self.enc_hmac_key, data_view[33:]))
-        if not compare_digest(hmac_computed, hmac_given):
-            id_str = bin_to_hex(id) if id is not None else '(unknown)'
-            raise IntegrityError('Chunk %s: Encryption envelope checksum mismatch' % id_str)
-        self.dec_cipher.reset(iv=PREFIX + data[33:41])
-        payload = self.dec_cipher.decrypt(data_view[41:])
+        try:
+            payload = self.cipher.decrypt(data)
+        except IntegrityError as e:
+            raise IntegrityError("Chunk %s: Could not decrypt [%s]" % (bin_to_hex(id), str(e)))
         if not decompress:
             return payload
         data = self.decompress(payload)
         self.assert_id(id, data)
         return data
-
-    def extract_nonce(self, payload):
-        if not (payload[0] == self.TYPE or
-            payload[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            raise IntegrityError('Manifest: Invalid encryption envelope')
-        nonce = bytes_to_long(payload[33:41])
-        return nonce
 
     def init_from_random_data(self, data=None):
         if data is None:
@@ -405,10 +388,21 @@ class AESKeyBase(KeyBase):
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, manifest_nonce=0):
-        self.enc_cipher = AES(is_encrypt=True, key=self.enc_key, iv=manifest_nonce.to_bytes(16, byteorder='big'))
-        self.nonce_manager = NonceManager(self.repository, self.enc_cipher, manifest_nonce)
-        self.dec_cipher = AES(is_encrypt=False, key=self.enc_key)
+    def init_ciphers(self, manifest_data=None):
+        self.cipher = self.CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
+        if manifest_data is None:
+            nonce = 0
+        else:
+            if not (manifest_data[0] == self.TYPE or
+                    manifest_data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+                raise IntegrityError('Manifest: Invalid encryption envelope')
+            # manifest_blocks is a safe upper bound on the amount of cipher blocks needed
+            # to encrypt the manifest. depending on the ciphersuite and overhead, it might
+            # be a bit too high, but that does not matter.
+            manifest_blocks = num_cipher_blocks(len(manifest_data))
+            nonce = self.cipher.extract_iv(manifest_data) + manifest_blocks
+        self.cipher.set_iv(nonce)
+        self.nonce_manager = NonceManager(self.repository, nonce)
 
 
 class Passphrase(str):
@@ -528,8 +522,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
             key.init(repository, passphrase)
             try:
                 key.decrypt(None, manifest_data)
-                num_blocks = num_aes_blocks(len(manifest_data) - 41)
-                key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
+                key.init_ciphers(manifest_data)
                 key._passphrase = passphrase
                 return key
             except IntegrityError:
@@ -568,8 +561,7 @@ class KeyfileKeyBase(AESKeyBase):
         else:
             if not key.load(target, passphrase):
                 raise PassphraseWrong
-        num_blocks = num_aes_blocks(len(manifest_data) - 41)
-        key.init_ciphers(key.extract_nonce(manifest_data) + num_blocks)
+        key.init_ciphers(manifest_data)
         key._passphrase = passphrase
         return key
 
@@ -604,7 +596,7 @@ class KeyfileKeyBase(AESKeyBase):
         assert enc_key.version == 1
         assert enc_key.algorithm == 'sha256'
         key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
-        data = AES(is_encrypt=False, key=key).decrypt(enc_key.data)
+        data = AES(key, b'\0'*16).decrypt(enc_key.data)
         if hmac_sha256(key, data) == enc_key.hash:
             return data
 
@@ -613,7 +605,7 @@ class KeyfileKeyBase(AESKeyBase):
         iterations = PBKDF2_ITERATIONS
         key = passphrase.kdf(salt, iterations, 32)
         hash = hmac_sha256(key, data)
-        cdata = AES(is_encrypt=True, key=key).encrypt(data)
+        cdata = AES(key, b'\0'*16).encrypt(data)
         enc_key = EncryptedKey(
             version=1,
             salt=salt,
@@ -772,7 +764,7 @@ class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
     STORAGE = KeyBlobStorage.KEYFILE
 
     FILE_ID = 'BORG_KEY'
-    MAC = blake2b_256
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
 class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
@@ -781,7 +773,7 @@ class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
     ARG_NAME = 'repokey-blake2'
     STORAGE = KeyBlobStorage.REPO
 
-    MAC = blake2b_256
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
 class AuthenticatedKeyBase(RepoKey):
@@ -799,16 +791,9 @@ class AuthenticatedKeyBase(RepoKey):
         super().save(target, passphrase)
         self.logically_encrypted = False
 
-    def extract_nonce(self, payload):
-        # This is called during set-up of the AES ciphers we're not actually using for this
-        # key. Therefore the return value of this method doesn't matter; it's just around
-        # to not have it crash should key identification be run against a very small chunk
-        # by "borg check" when the manifest is lost. (The manifest is always large enough
-        # to have the original method read some garbage from bytes 33-41). (Also, the return
-        # value must be larger than the 41 byte bloat of the original format).
-        if payload[0] != self.TYPE:
+    def init_ciphers(self, manifest_data=None):
+        if manifest_data is not None and manifest_data[0] != self.TYPE:
             raise IntegrityError('Manifest: Invalid encryption envelope')
-        return 42
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
@@ -816,7 +801,8 @@ class AuthenticatedKeyBase(RepoKey):
 
     def decrypt(self, id, data, decompress=True):
         if data[0] != self.TYPE:
-            raise IntegrityError('Chunk %s: Invalid envelope' % bin_to_hex(id))
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError('Chunk %s: Invalid envelope' % id_str)
         payload = memoryview(data)[1:]
         if not decompress:
             return payload

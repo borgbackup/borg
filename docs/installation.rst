@@ -142,6 +142,7 @@ following dependencies first:
 * OpenSSL_ >= 1.0.0, plus development headers.
 * libacl_ (which depends on libattr_), both plus development headers.
 * liblz4_, plus development headers.
+* ZeroMQ_ >= 4.0.0, plus development headers.
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
   archive as a FUSE filesystem. See setup.py about the version requirements.
@@ -169,6 +170,7 @@ Install the dependencies with development headers::
     libssl-dev openssl \
     libacl1-dev libacl1 \
     liblz4-dev liblz4-1 \
+    libzmq3-dev libzmq3 \
     build-essential
     sudo apt-get install libfuse-dev fuse pkg-config    # optional, for FUSE support
 
@@ -178,6 +180,8 @@ group, log out and log in again.
 
 Fedora / Korora
 +++++++++++++++
+
+.. todo:: Add zeromq
 
 Install the dependencies with development headers::
 
@@ -191,6 +195,8 @@ Install the dependencies with development headers::
 
 openSUSE Tumbleweed / Leap
 ++++++++++++++++++++++++++
+
+.. todo:: Add zeromq
 
 Install the dependencies automatically using zypper::
 
@@ -207,6 +213,8 @@ Alternatively, you can enumerate all build dependencies in the command line::
 Mac OS X
 ++++++++
 
+.. todo:: Add zeromq
+
 Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
 
@@ -222,7 +230,10 @@ FUSE for OS X, which is available as a pre-release_.
 
 FreeBSD
 ++++++++
-Listed below are packages you will need to install |project_name|, its dependencies,
+
+.. todo:: Add zeromq
+
+Listed below are packages you will need to install Borg, its dependencies,
 and commands to make FUSE work for using the mount command.
 
 ::
@@ -252,6 +263,8 @@ Cygwin
 .. note::
     Running under Cygwin is experimental and has only been tested with Cygwin
     (x86-64) v2.5.2. Remote repositories are known broken, local repositories should work.
+
+.. todo:: Add zeromq
 
 Use the Cygwin installer to install the dependencies::
 

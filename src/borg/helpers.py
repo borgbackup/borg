@@ -1967,72 +1967,9 @@ def consume(iterator, n=None):
         # advance to the empty slice starting at position n
         next(islice(iterator, n, n), None)
 
-# GenericDirEntry, scandir_generic (c) 2012 Ben Hoyt
-# from the python-scandir package (3-clause BSD license, just like us, so no troubles here)
-# note: simplified version
-
-
-class GenericDirEntry:
-    __slots__ = ('name', '_scandir_path', '_path')
-
-    def __init__(self, scandir_path, name):
-        self._scandir_path = scandir_path
-        self.name = name
-        self._path = None
-
-    @property
-    def path(self):
-        if self._path is None:
-            self._path = os.path.join(self._scandir_path, self.name)
-        return self._path
-
-    def stat(self, follow_symlinks=True):
-        assert not follow_symlinks
-        return os.stat(self.path, follow_symlinks=follow_symlinks)
-
-    def _check_type(self, type):
-        st = self.stat(False)
-        return stat.S_IFMT(st.st_mode) == type
-
-    def is_dir(self, follow_symlinks=True):
-        assert not follow_symlinks
-        return self._check_type(stat.S_IFDIR)
-
-    def is_file(self, follow_symlinks=True):
-        assert not follow_symlinks
-        return self._check_type(stat.S_IFREG)
-
-    def is_symlink(self):
-        return self._check_type(stat.S_IFLNK)
-
-    def inode(self):
-        st = self.stat(False)
-        return st.st_ino
-
-    def __repr__(self):
-        return '<{0}: {1!r}>'.format(self.__class__.__name__, self.path)
-
-
-def scandir_generic(path='.'):
-    """Like os.listdir(), but yield DirEntry objects instead of returning a list of names."""
-    for name in sorted(os.listdir(path)):
-        yield GenericDirEntry(path, name)
-
-
-try:
-    from os import scandir
-except ImportError:
-    # TODO: we removed official support for Python 3.4, so we could drop this.
-    try:
-        # Try python-scandir on Python 3.4
-        from scandir import scandir
-    except ImportError:
-        # If python-scandir is not installed, then use a version that is just as slow as listdir.
-        scandir = scandir_generic
-
 
 def scandir_inorder(path='.'):
-    return sorted(scandir(path), key=lambda dirent: dirent.inode())
+    return sorted(os.scandir(path), key=lambda dirent: dirent.inode())
 
 
 def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comments=True):

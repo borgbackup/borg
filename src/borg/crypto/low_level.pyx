@@ -251,12 +251,15 @@ cdef class AES256_CTR_BASE:
 
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
-                     const unsigned char *mac_buf):
+                     unsigned char *mac_buf):
         raise NotImplementedError
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,
-                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+                    unsigned char *mac_buf, const unsigned char *mac_wanted):
+        """
+        Calculate MAC of *data1*, *data2*, write result to *mac_buf*, and verify against *mac_wanted.*
+        """
         raise NotImplementedError
 
     def encrypt(self, data, header=b'', iv=None):
@@ -400,7 +403,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
 
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
-                     const unsigned char *mac_buf):
+                     unsigned char *mac_buf):
         if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
             raise CryptoError('HMAC_Init_ex failed')
         if not HMAC_Update(self.hmac_ctx, data1, data1_len):
@@ -412,7 +415,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,
-                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+                    unsigned char *mac_buf, const unsigned char *mac_wanted):
         self.mac_compute(data1, data1_len, data2, data2_len, mac_buf)
         if CRYPTO_memcmp(mac_buf, mac_wanted, self.mac_len):
             raise IntegrityError('MAC Authentication failed')
@@ -434,7 +437,7 @@ cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
 
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
-                     const unsigned char *mac_buf):
+                     unsigned char *mac_buf):
         cdef blake2b_state state
         cdef int rc
         rc = blake2b_init(&state, self.mac_len)
@@ -454,7 +457,7 @@ cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,
-                    const unsigned char *mac_buf, const unsigned char *mac_wanted):
+                    unsigned char *mac_buf, const unsigned char *mac_wanted):
         self.mac_compute(data1, data1_len, data2, data2_len, mac_buf)
         if CRYPTO_memcmp(mac_buf, mac_wanted, self.mac_len):
             raise IntegrityError('MAC Authentication failed')

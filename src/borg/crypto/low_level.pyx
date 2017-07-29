@@ -67,7 +67,6 @@ cdef extern from "openssl/evp.h":
         pass
 
     const EVP_CIPHER *EVP_aes_256_ctr()
-    const EVP_CIPHER *EVP_aes_256_gcm()
     const EVP_CIPHER *EVP_aes_256_ocb()
     const EVP_CIPHER *EVP_chacha20_poly1305()
 
@@ -666,18 +665,6 @@ cdef class _CHACHA_BASE(_AEAD_BASE):
     def __init__(self, *args, **kwargs):
         self.cipher_blk_len = 64
         super().__init__(*args, **kwargs)
-
-
-cdef class AES256_GCM(_AES_BASE):
-    @staticmethod
-    def requirements_check():
-        if OPENSSL_VERSION_NUMBER < 0x10001040:
-            raise ValueError('AES GCM requires OpenSSL >= 1.0.1d. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
-
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
-        self.requirements_check()
-        self.cipher = EVP_aes_256_gcm
-        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class AES256_OCB(_AES_BASE):

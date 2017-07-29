@@ -21,10 +21,6 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     brew install Caskroom/cask/osxfuse
 
     case "${TOXENV}" in
-        py34)
-            pyenv install 3.4.5
-            pyenv global 3.4.5
-            ;;
         py35)
             pyenv install 3.5.2
             pyenv global 3.5.2

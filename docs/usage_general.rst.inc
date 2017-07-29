@@ -215,7 +215,7 @@ Please note:
   (e.g. mode 600, root:root).
 
 
-.. _INI: https://docs.python.org/3.4/library/logging.config.html#configuration-file-format
+.. _INI: https://docs.python.org/3.5/library/logging.config.html#configuration-file-format
 
 .. _file-systems:
 

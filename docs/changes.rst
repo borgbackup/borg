@@ -131,6 +131,16 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.2.0dev0 (not released yet)
+------------------------------------
+
+Compatibility notes:
+
+- dropped support and testing for Python 3.4, minimum requirement is 3.5.0.
+  In case your OS does not provide Python >= 3.5, consider using our binary,
+  which does not need an external Python interpreter.
+
+
 Version 1.1.0rc1 (2017-07-24)
 -----------------------------
 

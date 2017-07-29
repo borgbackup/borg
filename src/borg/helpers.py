@@ -2022,6 +2022,7 @@ def scandir_generic(path='.'):
 try:
     from os import scandir
 except ImportError:
+    # TODO: we removed official support for Python 3.4, so we could drop this.
     try:
         # Try python-scandir on Python 3.4
         from scandir import scandir

@@ -136,7 +136,7 @@ Dependencies
 To install |project_name| from a source package (including pip), you have to install the
 following dependencies first:
 
-* `Python 3`_ >= 3.4.0, plus development headers. Even though Python 3 is not
+* `Python 3`_ >= 3.5.0, plus development headers. Even though Python 3 is not
   the default Python version on most systems, it is usually available as an
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
@@ -181,7 +181,7 @@ group, log out and log in again.
 Fedora / Korora
 +++++++++++++++
 
-.. todo:: Add zeromq
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Install the dependencies with development headers::
 
@@ -196,7 +196,7 @@ Install the dependencies with development headers::
 openSUSE Tumbleweed / Leap
 ++++++++++++++++++++++++++
 
-.. todo:: Add zeromq
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Install the dependencies automatically using zypper::
 
@@ -213,7 +213,7 @@ Alternatively, you can enumerate all build dependencies in the command line::
 Mac OS X
 ++++++++
 
-.. todo:: Add zeromq
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
@@ -231,7 +231,7 @@ FUSE for OS X, which is available as a pre-release_.
 FreeBSD
 ++++++++
 
-.. todo:: Add zeromq
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Listed below are packages you will need to install Borg, its dependencies,
 and commands to make FUSE work for using the mount command.
@@ -264,7 +264,7 @@ Cygwin
     Running under Cygwin is experimental and has only been tested with Cygwin
     (x86-64) v2.5.2. Remote repositories are known broken, local repositories should work.
 
-.. todo:: Add zeromq
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Use the Cygwin installer to install the dependencies::
 

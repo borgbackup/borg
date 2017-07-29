@@ -128,6 +128,7 @@ def packages_openbsd
     pkg_add lz4
     pkg_add git  # no fakeroot
     pkg_add py3-setuptools
+    # TODO: python 3.5 or 3.6
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python
     easy_install-3.4 pip
@@ -152,6 +153,7 @@ def packages_netbsd
     pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse pkg
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
+    # TODO: python 3.5 or 3.6
     pkg_add python34 py34-setuptools
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
@@ -164,6 +166,7 @@ end
 def packages_openindiana
   return <<-EOF
     #pkg update  # XXX needs separate provisioning step + reboot
+    # TODO python 3.5 or 3.6
     pkg install python-34 clang-3.4 lz4 git
     python3 -m ensurepip
     pip3 install -U setuptools pip wheel virtualenv
@@ -246,7 +249,6 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
     pyenv install 3.5.3  # binary build, use latest 3.5.x release
@@ -330,8 +332,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.4.0 3.5.0 3.6.0
-      pyenv local 3.4.0 3.5.0 3.6.0
+      pyenv global 3.5.0 3.6.0
+      pyenv local 3.5.0 3.6.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then

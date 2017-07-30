@@ -175,7 +175,7 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key
         """
 
-    def encrypt(self, chunk):
+    def encrypt(self, chunk, compress=True):
         pass
 
     def decrypt(self, id, data, decompress=True):
@@ -275,8 +275,8 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, chunk, compress=True):
+        data = self.compressor.compress(chunk) if compress else chunk
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -356,8 +356,8 @@ class AESKeyBase(KeyBase):
 
     logically_encrypted = True
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, chunk, compress=True):
+        data = self.compressor.compress(chunk) if compress else chunk
         next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(),
                                                         self.cipher.block_count(len(data)))
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
@@ -795,8 +795,8 @@ class AuthenticatedKeyBase(RepoKey):
         if manifest_data is not None and manifest_data[0] != self.TYPE:
             raise IntegrityError('Manifest: Invalid encryption envelope')
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, chunk, compress=True):
+        data = self.compressor.compress(chunk) if compress else chunk
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):

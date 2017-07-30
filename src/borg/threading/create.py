@@ -391,3 +391,28 @@ class CompressionService(ThreadedService):
             size = len(chunk.buffer).to_bytes(4, sys.byteorder)
             compressed = self.compressor.compress(chunk.buffer)
             self.output.send_multipart([ctx, n, compressed, id, size], copy=False)
+
+
+class EncryptionService(ThreadedService):
+    INPUT = 'inproc://encryption'
+
+    pure = False
+
+    def __init__(self, key, zmq_context=None):
+        super().__init__(zmq_context)
+        self.key = key
+
+    def init(self):
+        super().init()
+        self.input = self.context.socket(zmq.PULL)
+        self.output = self.context.socket(zmq.PUSH)
+
+        self.poller.register(self.input)
+        self.input.bind(self.INPUT)
+        self.output.connect(RepositoryService.INPUT)
+
+    def events(self, poll_events):
+        if self.input in poll_events:
+            ctx, n, chunk, id, size = self.input.recv_multipart(copy=False)
+            encrypted = self.key.encrypt(chunk, compress=False)
+            self.output.send_multipart([ctx, n, encrypted, id, size], copy=False)

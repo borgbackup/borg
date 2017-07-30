@@ -24,7 +24,9 @@ setup_logging()
 from borg.testsuite import has_lchflags, has_llfuse
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported
 from borg.testsuite.platform import fakeroot_detected, are_acls_working
-from borg import xattr
+import borg
+
+borg.testing = True
 
 
 @pytest.fixture(autouse=True)

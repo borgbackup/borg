@@ -1,13 +1,14 @@
 import os
+import faulthandler
 import resource
 import signal
-import sys
 import threading
 import time
 import traceback
 
 import zmq
 
+import borg
 from ..logger import create_logger
 
 logger = create_logger(__name__)
@@ -52,9 +53,18 @@ class ThreadedService(threading.Thread):
             logger.debug('%s %.2fs user, %.2fs sys, %.2fs wall, %d%%', self.name, ru.ru_utime, ru.ru_stime, td, rel)
         except Exception:
             # Leading newline to clear any progress output
-            logger.error('\n--- Critical error in thread %s ---', self.name)
-            logger.error(traceback.format_exc())
-            logger.error('--- Aborting application ---\n')
+            message = '\n--- Critical error in thread %s ---\n%s--- Aborting application ---\n' % (self.name, traceback.format_exc())
+            if borg.testing and os.path.exists('/dev/tty'):
+                # When running under py.test, the output is usually wrapped under two-levels of output capturing
+                # (one level by py.test itself, which is easily disabled, and another level by exec_cmd).
+                # This makes it kinda annoying to get at this information; so in this case just dump it on the TTY.
+                with open('/dev/tty', 'w') as fd:
+                    fd.write(message)
+                    faulthandler.dump_traceback(fd)
+                    # Disable faulthandler now to avoid doubling the traceback
+                    faulthandler.disable()
+            else:
+                logger.error(message)
             # Abort! Abort! Abort!
             os.kill(os.getpid(), signal.SIGABRT)
 

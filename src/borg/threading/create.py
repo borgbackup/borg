@@ -53,8 +53,8 @@ class FilesCacheService(ThreadedService):
         socket = zmq.Context.instance().socket(zmq.PUSH)
         socket.connect(FilesCacheService.INPUT)
 
-        def process_file(item, path):
-            socket.send_multipart([item.to_optr(), path.encode()])
+        def process_file(item):
+            socket.send(item.to_optr())
 
         return process_file
 
@@ -86,17 +86,16 @@ class FilesCacheService(ThreadedService):
             self.reply_hardlink_master()
 
     def process_file(self):
-        item_optr, path = self.input.recv_multipart()
-        item = Item.from_optr(item_optr)
+        item = Item.from_optr(self.input.recv())
 
-        st = os.stat(path)
+        st = os.stat(item.original_path)
 
         # Is it a hard link?
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if source is not None:
                 item.source = source
-                item.update(self.metadata.stat_attrs(st, path))
+                item.update(self.metadata.stat_attrs(st, item.original_path))
                 item.status = 'h'  # regular file, hardlink (to already seen inodes)
                 self.add_item(item)
                 return
@@ -106,7 +105,7 @@ class FilesCacheService(ThreadedService):
         # read-special mode, but we better play safe as this was wrong in the past:
         is_special_file = is_special(st.st_mode)
         if not is_special_file:
-            path_hash = self.id_hash(os.path.join(self.cwd, path))
+            path_hash = self.id_hash(os.path.join(self.cwd, safe_encode(item.original_path)))
             id_list = self.file_known_and_unchanged(path_hash, st)
             if id_list is not None:
                 item.chunks = id_list
@@ -125,7 +124,7 @@ class FilesCacheService(ThreadedService):
             # Only chunkify the file if needed
             item.status = 'A'
             item.chunks = []
-            self.output.send_multipart([b'FILE' + item.to_optr(), path])
+            self.output.send_multipart([b'FILE' + item.to_optr(), item.original_path.encode()])
         else:
             self.add_item(item)
 
@@ -475,17 +474,20 @@ class ItemHandler(ThreadedService):
     CHUNK_INPUT = 'inproc://item-handler/chunks'
     FINISHED_INPUT = 'inproc://item-handler/finished'
 
-    def __init__(self, metadata_collector: MetadataCollector, zmq_context=None):
+    def __init__(self, metadata_collector: MetadataCollector, id_hash, zmq_context=None):
         super().__init__(zmq_context)
         self.metadata = metadata_collector
+        self.id_hash = id_hash
         self.items_in_progress = {}
         self.add_item = ItemBufferService.get_add_item()
         self.add_hardlink_master = FilesCacheService.get_add_hardlink_master()
+        self.cwd = safe_encode(os.getcwd())
 
     def init(self):
         super().init()
         self.chunk_input = self.socket(zmq.PULL, self.CHUNK_INPUT)
         self.finished_chunking_file = self.socket(zmq.PULL, self.FINISHED_INPUT)
+        self.memorize_file = self.socket(zmq.PUSH, ChunksCacheService.MEMORIZE)
 
     def events(self, poll_events):
         if self.chunk_input in poll_events:
@@ -526,6 +528,13 @@ class ItemHandler(ThreadedService):
             item.update(self.metadata.stat_attrs(st, item.original_path))
             if item.get('hardlink_master'):
                 self.add_hardlink_master(st, item.path)
+
+            if 'chunks' in item:
+                path_hash = self.id_hash(os.path.join(self.cwd, safe_encode(item.original_path)))
+                self.memorize_file.send_multipart([
+                    path_hash,
+                    struct.pack('=qqq', st.st_ino, st.st_size, st.st_mtime_ns)
+                ] + [c[0] for c in item.chunks])
 
             self.add_item(item)
 
@@ -764,7 +773,7 @@ class FilesystemObjectProcessors:
         # XXX ignore_inode is initialization-time, move to FilesCacheService
         item = Item(path=make_path_safe(path))
         item.original_path = path
-        self._process_file(item, path)
+        self._process_file(item)
         self.num_items += 1
         return 'async'
 
@@ -783,7 +792,7 @@ class CreateArchivePipeline:
         self.compressor = CompressionService(compr_spec)
         self.encryption = EncryptionService(key)
         self.repository = RepositoryService(repository)
-        self.item_handler = ItemHandler(self.metadata_collector)
+        self.item_handler = ItemHandler(self.metadata_collector, key.id_hash)
         self.item_buffer = ItemBufferService(key, archive,
                                              archive_data=archive_data,
                                              cache_control=self.chunks_cache.control,

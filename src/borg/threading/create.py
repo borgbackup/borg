@@ -243,7 +243,7 @@ class ChunksCacheService(ThreadedService):
     # PULL: (ctx, n, id, csize, size)
     CHUNK_SAVED = 'inproc://cache/chunk-saved'
 
-    # REP: path_hash, packed_st -> (ChunkListEntry, ...) or (,) if file not known
+    # REP: path_hash, packed_st -> (ChunkListEntry, ...) or '0' if file not known
     FILE_KNOWN = 'inproc://cache/file-known'
 
     MEMORIZE = 'inproc://cache/memorize-file'
@@ -312,6 +312,9 @@ class ChunksCacheService(ThreadedService):
 
     def handle_control(self, opcode, args):
         if opcode == self.CONTROL_COMMIT:
+            # The manifest ends up in the cache because it is pushed through the regular chunk processing
+            # pipeline (compression -> encryption -> repository -> cache.route_chunk -> ...).
+            del self.cache.chunks[Manifest.MANIFEST_ID]
             self.cache.commit()
             logger.debug('Cache committed.')
             self.control_sock.send(b'ok')

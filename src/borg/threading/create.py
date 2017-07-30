@@ -185,3 +185,29 @@ class ChunkerService(ThreadedService):
                 self.output.send_multipart([ctx, n.to_bytes(8, sys.byteorder), chunk], copy=True)
                 n += 1
         self.finished_output.send_multipart([ctx, n.to_bytes(8, sys.byteorder)])
+
+
+class IdHashService(ThreadedService):
+    # PULL: (ctx, n, chunk)
+    INPUT = 'inproc://id-hash'
+
+    pure = False
+
+    def __init__(self, id_hash, zmq_context=None):
+        super().__init__(zmq_context)
+        self.id_hash = id_hash
+
+    def init(self):
+        super().init()
+        self.input = self.context.socket(zmq.PULL)
+        self.output = self.context.socket(zmq.PUSH)
+
+        self.poller.register(self.input)
+        self.output.connect(ChunksCacheService.INPUT)
+        self.input.bind(self.INPUT)
+
+    def events(self, poll_events):
+        if self.input in poll_events:
+            ctx, n, chunk = self.input.recv_multipart(copy=False)
+            id = self.id_hash(chunk.buffer)
+            self.output.send_multipart([ctx, n, chunk, id], copy=False)

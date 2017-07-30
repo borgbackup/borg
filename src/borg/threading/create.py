@@ -6,8 +6,7 @@ import sys
 import zmq
 
 from . import ThreadedService
-from ..archive import Archive
-from ..archive import is_special
+from ..archive import Archive, Statistics, is_special
 from ..helpers import safe_encode
 from ..item import Item
 
@@ -211,3 +210,158 @@ class IdHashService(ThreadedService):
             ctx, n, chunk = self.input.recv_multipart(copy=False)
             id = self.id_hash(chunk.buffer)
             self.output.send_multipart([ctx, n, chunk, id], copy=False)
+
+
+class ChunksCacheService(ThreadedService):
+    # PULL: (ctx, n, chunk, id)
+    INPUT = 'inproc://cache'
+
+    # PULL: (ctx, n, id, csize, size)
+    CHUNK_SAVED = 'inproc://cache/chunk-saved'
+
+    # REP: path_hash, packed_st -> (ChunkListEntry, ...) or (,) if file not known
+    FILE_KNOWN = 'inproc://cache/file-known'
+
+    MEMORIZE = 'inproc://cache/memorize-file'
+
+    CONTROL_COMMIT = b'COMMIT'
+
+    @classmethod
+    def get_file_known_and_unchanged(cls):
+        socket = zmq.Context.instance().socket(zmq.REQ)
+        socket.connect(cls.FILE_KNOWN)
+
+        def file_known_and_unchanged(path_hash, st):
+            """
+            *path_hash* is the id_hash of the file to be queried; st is a standard os.stat_result.
+            Returns None, for a changed or unknown files, or a chunk ID list.
+            """
+            packed_st = struct.pack('=qqq', st.st_ino, st.st_size, st.st_mtime_ns)
+            socket.send_multipart([path_hash, packed_st])
+            response = socket.recv_multipart()
+            if not response:
+                return
+            chunks_list = []
+            for entry in response:
+                # could/should use ChunkListEntry here?
+                if entry == b'0':
+                    return None
+                if entry:
+                    chunks_list.append(struct.unpack('=32sLL', entry))
+            return chunks_list
+
+        return file_known_and_unchanged
+
+    class StatResult:
+        st_mode = stat.S_IFREG
+        st_ino = st_size = st_mtime_ns = 0
+
+    def __init__(self, backend_cache, zmq_context=None):
+        super().__init__(zmq_context)
+        self.cache = backend_cache
+        self.stats = Statistics()
+        self.st = self.StatResult()
+
+    def init(self):
+        super().init()
+        self.input = self.context.socket(zmq.PULL)
+        self.chunk_saved = self.context.socket(zmq.PULL)
+        self.memorize = self.context.socket(zmq.PULL)
+        self.file_known = self.context.socket(zmq.REP)
+
+        self.output_new = self.context.socket(zmq.PUSH)
+        self.file_chunk_output = self.context.socket(zmq.PUSH)
+        self.meta_chunk_output = self.context.socket(zmq.PUSH)
+        self.output_release_chunk = self.context.socket(zmq.PUSH)
+
+        self.poller.register(self.input)
+        self.poller.register(self.chunk_saved)
+        self.poller.register(self.memorize)
+        self.poller.register(self.file_known)
+        self.input.bind(self.INPUT)
+        self.chunk_saved.bind(self.CHUNK_SAVED)
+        self.memorize.bind(self.MEMORIZE)
+        self.file_known.bind(self.FILE_KNOWN)
+        self.output_new.connect(CompressionService.INPUT)
+        self.file_chunk_output.connect(ItemHandler.CHUNK_INPUT)
+        self.meta_chunk_output.connect(ItemBufferService.CHUNK_INPUT)
+        self.output_release_chunk.connect(ChunkerService.RELEASE_CHUNK)
+
+    def events(self, poll_events):
+        if self.input in poll_events:
+            self.route_chunk()
+        if self.chunk_saved in poll_events:
+            self.add_new_saved_chunk()
+        if self.memorize in poll_events:
+            self.memorize_file()
+        if self.file_known in poll_events:
+            self.respond_file_known()
+        self.stats.show_progress(dt=0.2)
+
+    def handle_control(self, opcode, args):
+        if opcode == self.CONTROL_COMMIT:
+            self.cache.commit()
+            self.control_sock.send(b'ok')
+            return
+        super().handle_control(opcode, args)
+
+    def output_chunk_list_entry(self, ctx, n, chunk_list_entry):
+        if ctx.startswith(b'FILE'):
+            self.file_chunk_output.send_multipart([ctx[4:], n, chunk_list_entry])
+        elif ctx.startswith(b'META'):
+            self.meta_chunk_output.send_multipart([ctx, n, chunk_list_entry])
+        else:
+            raise ValueError('Unknown context prefix: ' + repr(ctx[4:]))
+
+    def route_chunk(self):
+        ctx, n, chunk, id = self.input.recv_multipart(copy=False)
+        id = id.bytes
+        if self.cache.seen_chunk(id):
+            chunk_list_entry = struct.pack('=32sLL', *self.cache.chunk_incref(id, self.stats))
+            self.output_chunk_list_entry(ctx, n, chunk_list_entry)
+            if len(chunk) >= ChunkerService.LARGE_CHUNK_TRESHOLD:
+                self.output_release_chunk.send(len(chunk).to_bytes(4, sys.byteorder))
+        else:
+            self.output_new.send_multipart([ctx, n, chunk, id], copy=False)
+
+    def add_new_saved_chunk(self):
+        ctx, n, id, sizes = self.chunk_saved.recv_multipart()
+        csize, size = struct.unpack('=LL', sizes)
+        if size >= ChunkerService.LARGE_CHUNK_TRESHOLD:
+            self.output_release_chunk.send(size.to_bytes(4, sys.byteorder))
+        self.cache.chunks.chunks.add(id, 1, size, csize)
+        # Depending on how long chunk processing takes we may issue the same chunk multiple times, so it will
+        # be stored a few times and reported here a few times. This is unproblematic, since these are compacted
+        # away by the Repository.
+        # However, this also ensures that the system is always in a forward-consistent state,
+        # i.e. items are not added until all their chunks were fully processes.
+        # Forward-consistency makes everything much simpler.
+        refcount = self.cache.seen_chunk(id)
+        self.stats.update(size, csize, refcount == 1)
+        chunk_list_entry = struct.pack('=32sLL', id, size, csize)
+        self.output_chunk_list_entry(ctx, n, chunk_list_entry)
+
+    def respond_file_known(self):
+        path_hash, st = self.file_known.recv_multipart()
+        self.st.st_ino, self.st.st_size, self.st.st_mtime_ns = struct.unpack('=qqq', st)
+
+        ids = self.cache.file_known_and_unchanged(path_hash, self.st)
+
+        if ids is None:
+            self.file_known.send(b'0')
+            return
+
+        if not all(self.cache.seen_chunk(id) for id in ids):
+            self.file_known.send(b'0')
+            return
+
+        chunk_list = [struct.pack('=32sLL', *self.cache.chunk_incref(id, self.stats)) for id in ids]
+        if chunk_list:
+            self.file_known.send_multipart(chunk_list)
+        else:
+            self.file_known.send(b'')
+
+    def memorize_file(self):
+        path_hash, st, *ids = self.memorize.recv_multipart()
+        self.st.st_ino, self.st.st_size, self.st.st_mtime_ns = struct.unpack('=qqq', st)
+        self.cache.memorize_file(path_hash, self.st, ids)

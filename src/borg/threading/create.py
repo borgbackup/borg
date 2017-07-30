@@ -7,6 +7,7 @@ import zmq
 
 from . import ThreadedService
 from ..archive import Archive, Statistics, is_special
+from ..archive import MetadataCollector
 from ..helpers import safe_encode
 from ..item import Item
 
@@ -307,7 +308,7 @@ class ChunksCacheService(ThreadedService):
 
     def output_chunk_list_entry(self, ctx, n, chunk_list_entry):
         if ctx.startswith(b'FILE'):
-            self.file_chunk_output.send_multipart([ctx[4:], n, chunk_list_entry])
+            self.file_chunk_output.send_multipart([ctx, n, chunk_list_entry])
         elif ctx.startswith(b'META'):
             self.meta_chunk_output.send_multipart([ctx, n, chunk_list_entry])
         else:
@@ -462,3 +463,69 @@ class RepositoryService(ThreadedService):
 
     def api_reply(self):
         pass
+
+
+class ItemHandler(ThreadedService):
+    CHUNK_INPUT = 'inproc://item-handler/chunks'
+    FINISHED_INPUT = 'inproc://item-handler/finished'
+
+    def __init__(self, metadata_collector: MetadataCollector, zmq_context=None):
+        super().__init__(zmq_context)
+        self.metadata = metadata_collector
+
+    def init(self):
+        super().init()
+        self.chunk_input = self.context.socket(zmq.PULL)
+        self.finished_chunking_file = self.context.socket(zmq.PULL)
+
+        self.items_in_progress = {}
+
+        self.chunk_input.bind(self.CHUNK_INPUT)
+        self.finished_chunking_file.bind(self.FINISHED_INPUT)
+
+        self.poller.register(self.chunk_input)
+        self.poller.register(self.finished_chunking_file)
+
+        self.add_item = ItemBufferService.get_add_item()
+        self.add_hardlink_master = FilesCacheService.get_add_hardlink_master()
+
+    def events(self, poll_events):
+        if self.chunk_input in poll_events:
+            self.process_chunk()
+        if self.finished_chunking_file in poll_events:
+            self.set_item_finished()
+
+    def process_chunk(self):
+        ctx, chunk_index, chunk_list_entry = self.chunk_input.recv_multipart()
+        assert ctx.startswith(b'FILE')
+        item_optr = ctx[4:]
+        if item_optr not in self.items_in_progress:
+            self.items_in_progress[item_optr] = Item.from_optr(item_optr)
+        item = self.items_in_progress[item_optr]
+        chunk_index = int.from_bytes(chunk_index, sys.byteorder)
+        if chunk_index >= len(item.chunks):
+            item.chunks.extend([None] * (chunk_index - len(item.chunks) + 1))
+        item.chunks[chunk_index] = struct.unpack('=32sLL', chunk_list_entry)
+        self.check_item_done(item_optr, item)
+
+    def set_item_finished(self):
+        ctx, num_chunks = self.finished_chunking_file.recv_multipart()
+        assert ctx.startswith(b'FILE')
+        item_optr = ctx[4:]
+        if item_optr not in self.items_in_progress:
+            self.items_in_progress[item_optr] = Item.from_optr(item_optr)
+        item = self.items_in_progress[item_optr]
+        num_chunks = int.from_bytes(num_chunks, sys.byteorder)
+        item.num_chunks = num_chunks
+        self.check_item_done(item_optr, item)
+
+    def check_item_done(self, item_optr, item):
+        if getattr(item, 'num_chunks', None) == len(item.chunks) and all(item.chunks):
+            del self.items_in_progress[item_optr]
+
+            st = os.stat(item.original_path)
+            item.update(self.metadata.stat_attrs(st, item.original_path))
+            if item.get('hardlink_master'):
+                self.add_hardlink_master(item)
+
+            self.add_item(item)

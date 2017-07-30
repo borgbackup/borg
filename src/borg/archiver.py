@@ -487,7 +487,8 @@ class Archiver:
                     restrict_dev = st.st_dev
                 else:
                     restrict_dev = None
-                self._process(pipeline.fso, cache, matcher, args.exclude_caches, args.exclude_if_present,
+                self._process(pipeline.fso if not dry_run else None,
+                              cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_exclude_tags, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run, st=st)
             if not dry_run:

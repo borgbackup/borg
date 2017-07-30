@@ -624,6 +624,13 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
         self.num_items += 1
         if 'chunks' in item:
             self.archive.stats.nfiles += 1
+        try:
+            # XXX This is the sledgehammer approach of getting rid of these, see comment in Item
+            del item.original_path
+            del item.status
+            del item.num_chunks
+        except AttributeError:
+            pass
         self.add(item)
 
     def write_chunk(self, chunk):

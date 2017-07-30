@@ -141,7 +141,6 @@ class Item(PropDict):
     We must never re-use this key. See test_attic013_acl_bug for details.
     """
 
-    # TODO: Make it so that original_path, status, num_chunks are not stored in the created archives
     # TODO: Ideally, a separate mechanism that also caters to runtime-only attributes like "deleted" as well.
     VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', 'original_path', 'status', 'num_chunks'}  # str-typed keys
 

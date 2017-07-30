@@ -144,7 +144,7 @@ def detect_lz4(prefixes):
         filename = os.path.join(prefix, 'include', 'lz4.h')
         if os.path.exists(filename):
             with open(filename, 'r') as fd:
-                if 'LZ4_decompress_safe' in fd.read():
+                if 'LZ4_compress_default' in fd.read():  # requires lz4 >= r129
                     return prefix
 
 

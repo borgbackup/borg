@@ -141,7 +141,7 @@ following dependencies first:
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
 * libacl_ (which depends on libattr_), both plus development headers.
-* liblz4_, plus development headers.
+* liblz4_ >= r129 (1.7.0), plus development headers.
 * ZeroMQ_ >= 4.0.0, plus development headers.
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an

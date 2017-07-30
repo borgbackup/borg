@@ -527,7 +527,7 @@ class ItemHandler(ThreadedService):
             if item.get('hardlink_master'):
                 self.add_hardlink_master(st, item.path)
 
-            if 'chunks' in item:
+            if 'chunks' in item and not is_special(item.mode):
                 path_hash = self.id_hash(os.path.join(self.cwd, safe_encode(item.original_path)))
                 self.memorize_file.send_multipart([
                     path_hash,

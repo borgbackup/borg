@@ -556,7 +556,7 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
 
         return add_item
 
-    def __init__(self, key, archive, archive_data, cache_control, repository_control,
+    def __init__(self, key, archive, archive_data, cache_control, repository_control, print_file_status,
                  push_chunk_url=IdHashService.INPUT, compress_url=CompressionService.INPUT):
         super().__init__(key)
         self.archive = archive
@@ -565,6 +565,7 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
         self.compress_url = compress_url
         self.cache_control = cache_control
         self.repository_control = repository_control
+        self.print_file_status = print_file_status
 
         self.num_items = 0
         self.save_after_item_no = None
@@ -628,6 +629,8 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
         self.num_items += 1
         if 'chunks' in item:
             self.archive.stats.nfiles += 1
+        if 'status' in item:
+            self.print_file_status(item.status, item.original_path)
         try:
             # XXX This is the sledgehammer approach of getting rid of these, see comment in Item
             del item.original_path
@@ -763,11 +766,12 @@ class FilesystemObjectProcessors:
         item.original_path = path
         self._process_file(item, path)
         self.num_items += 1
+        return 'async'
 
 
 class CreateArchivePipeline:
     def __init__(self, *, repository, key, cache, archive, compr_spec, archive_data,
-                 metadata_collector):
+                 metadata_collector, print_file_status):
         # Explicitly create Context with no IO threads, so any attempt at networking will fail.
         zmq.Context.instance(io_threads=0)
         self.metadata_collector = metadata_collector
@@ -783,7 +787,8 @@ class CreateArchivePipeline:
         self.item_buffer = ItemBufferService(key, archive,
                                              archive_data=archive_data,
                                              cache_control=self.chunks_cache.control,
-                                             repository_control=self.repository.control,)
+                                             repository_control=self.repository.control,
+                                             print_file_status=print_file_status)
 
         self.fso = FilesystemObjectProcessors(
             metadata_collector=self.metadata_collector,

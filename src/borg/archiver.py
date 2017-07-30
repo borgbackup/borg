@@ -532,7 +532,8 @@ class Archiver:
                                                      comment=args.comment,
                                                      timestamp=args.timestamp,
                                                  ),
-                                                 compr_spec=args.compression, metadata_collector=metadata_collector)
+                                                 compr_spec=args.compression, metadata_collector=metadata_collector,
+                                                 print_file_status=self.print_file_status)
                 archive.items_buffer = pipeline.item_buffer
                 with pipeline:
                     create_inner(archive, cache, pipeline)
@@ -656,7 +657,7 @@ class Archiver:
             else:
                 status = '-'  # dry run, item was not backed up
 
-        if not recurse_excluded_dir:
+        if not recurse_excluded_dir and status != 'async':
             self.print_file_status(status, path)
 
     @staticmethod

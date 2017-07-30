@@ -1,10 +1,13 @@
 import enum
 import os
+import signal
 import socket
 import stat
 import struct
 import sys
 import time
+import traceback
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from getpass import getuser
 
@@ -14,9 +17,16 @@ from . import ThreadedService
 from ..archive import Archive, Statistics, is_special
 from ..archive import ChunkBuffer
 from ..archive import MetadataCollector
+from ..archive import backup_io
+from ..chunker import Chunker
 from ..helpers import Manifest
+from ..helpers import make_path_safe
 from ..helpers import safe_encode
+from ..helpers import  uid2user, gid2group
 from ..item import ArchiveItem, Item
+from ..logger import create_logger
+
+logger = create_logger(__name__)
 
 
 class FilesCacheService(ThreadedService):
@@ -35,6 +45,8 @@ class FilesCacheService(ThreadedService):
     INPUT = 'inproc://files-cache'
     # PULL: (stat_data, safe_path)
     HARDLINK = 'inproc://files-cache/hardlink'
+    # REP: (stat_data) -> (safe_path)
+    GET_HARDLINK_MASTER = 'inproc://files-cache/get-hardlink-master'
 
     @classmethod
     def get_process_file(cls):
@@ -59,14 +71,17 @@ class FilesCacheService(ThreadedService):
         super().init()
         self.input = self.context.socket(zmq.PULL)
         self.hardlink = self.context.socket(zmq.PULL)
+        self.get_hardlink_master = self.context.socket(zmq.REP)
         self.output = self.context.socket(zmq.PUSH)
 
         self.add_item = ItemBufferService.get_add_item()
         self.file_known_and_unchanged = ChunksCacheService.get_file_known_and_unchanged()
 
         self.poller.register(self.input)
+        self.poller.register(self.get_hardlink_master)
         self.output.connect(self.chunker_url)
         self.input.bind(self.INPUT)
+        self.get_hardlink_master.bind(self.GET_HARDLINK_MASTER)
         self.hardlink.bind(self.HARDLINK)
 
     def events(self, poll_events):
@@ -74,6 +89,8 @@ class FilesCacheService(ThreadedService):
             self.process_file()
         if self.hardlink in poll_events:
             self.add_hardlink_master()
+        if self.get_hardlink_master in poll_events:
+            self.reply_hardlink_master()
 
     def process_file(self):
         item_optr, path = self.input.recv_multipart()
@@ -131,11 +148,28 @@ class FilesCacheService(ThreadedService):
         socket = zmq.Context.instance().socket(zmq.PUSH)
         socket.connect(cls.HARDLINK)
 
-        def add_hardlink_master(item):
-            stat_data = struct.pack('=qq', item.st_ino, item.st_dev)
-            socket.send_multipart([stat_data, item.path.encode()])
+        def add_hardlink_master(st, path):
+            stat_data = struct.pack('=qq', st.st_ino, st.st_dev)
+            socket.send_multipart([stat_data, path.encode()])
 
         return add_hardlink_master
+
+    def reply_hardlink_master(self):
+        stat_data = self.get_hardlink_master.recv()
+        st_ino, st_dev = struct.unpack('=qq', stat_data)
+        # path can't be empty, thus empty path = no hardlink master found.
+        self.get_hardlink_master.send(self.hard_links.get((st_ino, st_dev), '').encode())
+
+    @classmethod
+    def get_get_hardlink_master(cls):
+        socket = zmq.Context.instance().socket(zmq.REQ)
+        socket.connect(cls.GET_HARDLINK_MASTER)
+
+        def get_hardlink_master(st):
+            stat_data = struct.pack('=qq', st.st_ino, st.st_dev)
+            return socket.send(stat_data).decode() or None
+
+        return get_hardlink_master
 
 
 class ChunkerService(ThreadedService):
@@ -148,9 +182,9 @@ class ChunkerService(ThreadedService):
 
     pure = False
 
-    def __init__(self, chunker, zmq_context=None):
+    def __init__(self, chunker_seed, chunker_params, zmq_context=None):
         super().__init__(zmq_context)
-        self.chunker = chunker
+        self.chunker = Chunker(chunker_seed, *chunker_params)
         self.mem_budget = self.MEM_BUDGET
 
     def init(self):
@@ -265,10 +299,11 @@ class ChunksCacheService(ThreadedService):
         st_mode = stat.S_IFREG
         st_ino = st_size = st_mtime_ns = 0
 
-    def __init__(self, backend_cache, zmq_context=None):
+    def __init__(self, backend_cache, stats=None, zmq_context=None):
         super().__init__(zmq_context)
         self.cache = backend_cache
-        self.stats = Statistics()
+        self.cache.begin_txn()
+        self.stats = stats or Statistics()
         self.st = self.StatResult()
 
     def init(self):
@@ -310,6 +345,7 @@ class ChunksCacheService(ThreadedService):
     def handle_control(self, opcode, args):
         if opcode == self.CONTROL_COMMIT:
             self.cache.commit()
+            logger.debug('Cache committed.')
             self.control_sock.send(b'ok')
             return
         super().handle_control(opcode, args)
@@ -327,18 +363,19 @@ class ChunksCacheService(ThreadedService):
         id = id.bytes
         if self.cache.seen_chunk(id):
             chunk_list_entry = struct.pack('=32sLL', *self.cache.chunk_incref(id, self.stats))
-            self.output_chunk_list_entry(ctx, n, chunk_list_entry)
+            self.output_chunk_list_entry(bytes(ctx), bytes(n), chunk_list_entry)
             if len(chunk) >= ChunkerService.LARGE_CHUNK_TRESHOLD:
                 self.output_release_chunk.send(len(chunk).to_bytes(4, sys.byteorder))
         else:
             self.output_new.send_multipart([ctx, n, chunk, id], copy=False)
 
     def add_new_saved_chunk(self):
-        ctx, n, id, sizes = self.chunk_saved.recv_multipart()
-        csize, size = struct.unpack('=LL', sizes)
+        ctx, n, id, size, csize = self.chunk_saved.recv_multipart()
+        size = int.from_bytes(size, sys.byteorder)
+        csize = int.from_bytes(csize, sys.byteorder)
         if size >= ChunkerService.LARGE_CHUNK_TRESHOLD:
             self.output_release_chunk.send(size.to_bytes(4, sys.byteorder))
-        self.cache.chunks.chunks.add(id, 1, size, csize)
+        self.cache.chunks.add(id, 1, size, csize)
         # Depending on how long chunk processing takes we may issue the same chunk multiple times, so it will
         # be stored a few times and reported here a few times. This is unproblematic, since these are compacted
         # away by the Repository.
@@ -424,7 +461,7 @@ class EncryptionService(ThreadedService):
         if self.input in poll_events:
             ctx, n, chunk, id, size = self.input.recv_multipart(copy=False)
             encrypted = self.key.encrypt(chunk, compress=False)
-            self.output.send_multipart([ctx, n, encrypted, id, size, len(encrypted)], copy=False)
+            self.output.send_multipart([ctx, n, encrypted, id, size, len(encrypted).to_bytes(4, sys.byteorder)], copy=False)
 
 
 class RepositoryService(ThreadedService):
@@ -459,6 +496,7 @@ class RepositoryService(ThreadedService):
     def handle_control(self, opcode, args):
         if opcode == self.CONTROL_COMMIT:
             self.repository.commit()
+            logger.debug('Repository committed.')
             self.control_sock.send(b'OK')
         else:
             super().handle_control(opcode, args)
@@ -535,7 +573,7 @@ class ItemHandler(ThreadedService):
             st = os.stat(item.original_path)
             item.update(self.metadata.stat_attrs(st, item.original_path))
             if item.get('hardlink_master'):
-                self.add_hardlink_master(item)
+                self.add_hardlink_master(st, item.path)
 
             self.add_item(item)
 
@@ -566,10 +604,11 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
 
         return add_item
 
-    def __init__(self, key, archive, cache_control, repository_control,
+    def __init__(self, key, archive, archive_data, cache_control, repository_control,
                  push_chunk_url=IdHashService.INPUT, compress_url=CompressionService.INPUT):
         super().__init__(key)
         self.archive = archive
+        self.archive_data = archive_data
         self.push_chunk_url = push_chunk_url
         self.compress_url = compress_url
         self.cache_control = cache_control
@@ -603,20 +642,25 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
             ctx, n, chunk_list_entry = self.chunk_added.recv_multipart()
             chunk_id, *_ = struct.unpack('=32sLL', chunk_list_entry)
             if self.state == self.States.WAITING_FOR_ARCHIVE_ITEM and ctx == self.ARCHIVE_ITEM_CTX:
+                logger.debug('Archive saved, updating manifest.')
                 self.update_manifest(chunk_id)
             elif self.state == self.States.WAITING_FOR_MANIFEST and ctx == self.MANIFEST_CTX:
+                logger.debug('Manifest saved, initiating repository and cache commits.')
                 self.commit()
             else:
                 assert ctx == b'META'
                 n = int.from_bytes(n, sys.byteorder)
+                assert self.chunks[n] is None
                 self.chunks[n] = chunk_id
         if self.state == self.States.WAITING_FOR_ITEMS and self.num_items == self.save_after_item_no:
             # Got all items, flush (no-op if nothing buffered)
+            logger.debug('Last item for archive save added, flushing chunk buffer.')
             self.flush(flush=True)
             self.state = self.States.WAITING_FOR_ARCHIVE_CHUNKS
         if self.state == self.States.WAITING_FOR_ARCHIVE_CHUNKS and self.is_complete():
             # If we're complete we can go ahead and make the archive item,
             # update the manifest and commit.
+            logger.debug('Archive chunks flushed, saving archive.')
             self.save_archive()
 
     def handle_control(self, opcode, args):
@@ -625,63 +669,40 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
             assert self.state == self.States.WAITING_FOR_SAVE
             self.state = self.States.WAITING_FOR_ITEMS
             self.save_after_item_no = int.from_bytes(args[0], sys.byteorder)
+            logger.debug('Received save command at item %d.', self.save_after_item_no)
             # Reply is sent _after_ it's done (blocking the main thread until then).
         else:
             super().handle_control(opcode, args)
 
-    def save(self, fso_processors):
-        num_items = fso_processors.num_items
+    def save(self, pipeline):
+        num_items = pipeline.fso.num_items
         self.control(self.CONTROL_SAVE, num_items.to_bytes(8, sys.byteorder))
 
     def pack_and_add_item(self):
         item = Item.from_optr(self.add_item.recv())
         self.num_items += 1
+        if 'chunks' in item:
+            self.archive.stats.nfiles += 1
         self.add(item)
 
     def write_chunk(self, chunk):
         ctx = b'META'
         n = len(self.chunks).to_bytes(8, sys.byteorder)
-        self.push_chunk.send_multipart([ctx, n, chunk.data])
+        self.push_chunk.send_multipart([ctx, n, chunk])
         return None  # we'll fill the ID later in
 
     def is_complete(self):
         return all(self.chunks)
 
-    def save_archive(self, name=None, comment=None, timestamp=None, additional_metadata=None):
-        # XXX largely copied from Archive.save
-        name = name or self.name
-        if name in self.archive.manifest.archives:
-            raise Archive.AlreadyExists(name)
-        duration = timedelta(seconds=time.monotonic() - self.archive.start_monotonic)
-        if timestamp is None:
-            end = datetime.utcnow()
-            start = end - duration
-        else:
-            end = timestamp
-            start = timestamp - duration
-        self.start = start
-        metadata = {
-            'version': 1,
-            'name': name,
-            'comment': comment or '',
-            'items': self.chunks,
-            'cmdline': sys.argv,
-            'hostname': socket.gethostname(),
-            'username': getuser(),
-            'time': start.isoformat(),
-            'time_end': end.isoformat(),
-            'chunker_params': self.archive.chunker_params,
-        }
-        metadata.update(additional_metadata or {})
-        metadata = ArchiveItem(metadata)
-        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
+    def save_archive(self):
+        data = self.archive.pack_archive_item(**self.archive_data)
         self.push_chunk.send_multipart([self.ARCHIVE_ITEM_CTX, b'', data])
         self.state = self.States.WAITING_FOR_ARCHIVE_ITEM
 
     def update_manifest(self, archive_item_id):
-        self.archive.manifest.archives[self.archive.name] = (archive_item_id, self.start.isoformat())
-        manifest_data = self.archive.manifest.get_data()
-        self.archive.manifest.id = self.key.id_hash(manifest_data)
+        self.archive.id = archive_item_id
+        self.archive.manifest.archives[self.archive.name] = (archive_item_id, self.archive.start.isoformat())
+        manifest_data = self.archive.manifest.pack()
         self.compress_chunk.send_multipart([self.MANIFEST_CTX, b'', manifest_data, Manifest.MANIFEST_ID])
         self.state = self.States.WAITING_FOR_MANIFEST
 
@@ -690,4 +711,159 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
         self.cache_control(ChunksCacheService.CONTROL_COMMIT)
         self.state = self.States.WAITING_FOR_SAVE
         # Notify main thread that we're done here.
+        logger.debug('Data committed, unblocking main thread.')
         self.control_sock.send(b'OK')
+
+# TODO checkpoints (via main thread, extension of CONTROL_SAVE w/ explicit archive name)
+# TODO in-file checkpoints (IBS tells IH to emit part-file items for all in-flight items)
+# TODO borg create --list
+
+
+class FilesystemObjectProcessors:
+    def __init__(self, *, metadata_collector,
+                 add_item, process_file, get_hardlink_master, add_hardlink_master):
+        self.metadata_collector = metadata_collector
+        self.add_item = add_item
+        # TODO: In theory, the hardlink masters of files and other stuff can't intersect,
+        #       so it would be possible, with some additional checking of FS object types
+        #       (to avoid races - they are present currently as well, so maybe even without),
+        #       to have separate hard_links dicts for them.
+        self.get_hardlink_master = get_hardlink_master
+        self.add_hardlink_master = add_hardlink_master
+        self._process_file = process_file
+
+        self.hard_links = {}
+        self.cwd = os.getcwd()
+
+        self.num_items = 0
+
+    @contextmanager
+    def create_helper(self, path, st, status=None, hardlinkable=True):
+        safe_path = make_path_safe(path)
+        item = Item(path=safe_path)
+        hardlink_master = False
+        hardlinked = hardlinkable and st.st_nlink > 1
+        if hardlinked:
+            source = self.get_hardlink_master(st)
+            if source is not None:
+                item.source = source
+                status = 'h'  # hardlink (to already seen inodes)
+            else:
+                hardlink_master = True
+        yield item, status, hardlinked, hardlink_master
+        # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
+        self.add_item(item)
+        self.num_items += 1
+        # ... and added to the archive, so we can remember it to refer to it later in the archive:
+        if hardlink_master:
+            self.add_hardlink_master(st, safe_path)
+
+    def process_dir(self, path, st):
+        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+            item.update(self.metadata_collector.stat_attrs(st, path))
+            return status
+
+    def process_fifo(self, path, st):
+        with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
+            item.update(self.metadata_collector.stat_attrs(st, path))
+            return status
+
+    def process_dev(self, path, st, dev_type):
+        with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
+            item.rdev = st.st_rdev
+            item.update(self.metadata_collector.stat_attrs(st, path))
+            return status
+
+    def process_symlink(self, path, st):
+        # note: using hardlinkable=False because we can not support hardlinked symlinks,
+        #       due to the dual-use of item.source, see issue #2343:
+        with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+            with backup_io('readlink'):
+                source = os.readlink(path)
+            item.source = source
+            if st.st_nlink > 1:
+                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
+            item.update(self.metadata_collector.stat_attrs(st, path))
+            return status
+
+    def process_stdin(self, path, cache):
+        # TODO implement
+        uid, gid = 0, 0
+        t = int(time.time()) * 1000000000
+        item = Item(
+            path=path,
+            mode=0o100660,  # regular file, ug=rw
+            uid=uid, user=uid2user(uid),
+            gid=gid, group=gid2group(gid),
+            mtime=t, atime=t, ctime=t,
+        )
+        fd = sys.stdin.buffer  # binary
+        raise NotImplementedError
+        self.process_file_chunks(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd)))
+        item.get_size(memorize=True)
+        self.stats.nfiles += 1
+        self.add_item(item)
+        return 'i'  # stdin
+
+    def process_file(self, path, st, cache, ignore_inode=False):
+        # XXX ignore_inode is initialization-time, move to FilesCacheService
+        item = Item(path=make_path_safe(path))
+        item.original_path = path
+        self._process_file(item, path)
+        self.num_items += 1
+
+
+class CreateArchivePipeline:
+    def __init__(self, *, repository, key, cache, archive, compr_spec, archive_data,
+                 metadata_collector):
+        # Explicitly create Context with no IO threads, so any attempt at networking will fail.
+        zmq.Context.instance(io_threads=0)
+        self.metadata_collector = metadata_collector
+
+        self.files_cache = FilesCacheService(key.id_hash, self.metadata_collector)
+        self.chunker = ChunkerService(key.chunk_seed, archive.chunker_params)
+        self.id_hash = IdHashService(key.id_hash)
+        self.chunks_cache = ChunksCacheService(cache, archive.stats)
+        self.compressor = CompressionService(compr_spec)
+        self.encryption = EncryptionService(key)
+        self.repository = RepositoryService(repository)
+        self.item_handler = ItemHandler(self.metadata_collector)
+        self.item_buffer = ItemBufferService(key, archive,
+                                             archive_data=archive_data,
+                                             cache_control=self.chunks_cache.control,
+                                             repository_control=self.repository.control,)
+
+        self.fso = FilesystemObjectProcessors(
+            metadata_collector=self.metadata_collector,
+            add_item=self.item_buffer.get_add_item(),
+            process_file=self.files_cache.get_process_file(),
+            get_hardlink_master=self.files_cache.get_get_hardlink_master(),
+            add_hardlink_master=self.files_cache.get_add_hardlink_master())
+
+        self.services = [
+            self.files_cache, self.chunker, self.id_hash,
+            self.chunks_cache, self.compressor, self.encryption,
+            self.repository, self.item_handler, self.item_buffer,
+        ]
+
+    def save(self):
+        self.item_buffer.save(self)
+
+    def __enter__(self):
+        for service in self.services:
+            service.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val:
+            logger.error('--- Critical error ---')
+            traceback.print_exc()
+            os.kill(os.getpid(), signal.SIGABRT)
+        else:
+            logger.debug('Joining threads...')
+            for service in self.services:
+                logger.debug('Terminating %s', service.__class__.__name__)
+                service.control(ThreadedService.CONTROL_DIE)
+                logger.debug('Joining %s', service.__class__.__name__)
+                service.join()
+            logger.debug('Joined all %d threads.', len(self.services))

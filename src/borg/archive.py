@@ -53,8 +53,9 @@ flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
 
 class Statistics:
 
-    def __init__(self, output_json=False):
+    def __init__(self, output_json=False, progress=False):
         self.output_json = output_json
+        self.progress = progress
         self.osize = self.csize = self.usize = self.nfiles = 0
         self.last_progress = 0  # timestamp when last progress was shown
 
@@ -94,6 +95,8 @@ class Statistics:
         return format_file_size(self.csize)
 
     def show_progress(self, item=None, final=False, stream=None, dt=None):
+        if not self.progress:
+            return
         now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
             self.last_progress = now
@@ -291,7 +294,7 @@ class Archive:
         self.cache = cache
         self.manifest = manifest
         self.hard_links = {}
-        self.stats = Statistics(output_json=log_json)
+        self.stats = Statistics(output_json=log_json, progress=progress)
         self.show_progress = progress
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
@@ -439,11 +442,14 @@ Utilization of max. archive size: {csize_max:.0%}
         del self.manifest.archives[self.checkpoint_name]
         self.cache.chunk_decref(self.id, self.stats)
 
-    def save(self, name=None, comment=None, timestamp=None, additional_metadata=None):
+    def _check_name(self, name):
         name = name or self.name
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
-        self.items_buffer.flush(flush=True)
+        return name
+
+    def pack_archive_item(self, name=None, comment=None, timestamp=None, additional_metadata=None):
+        name = self._check_name(name)
         duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
             self.end = datetime.utcnow()
@@ -470,10 +476,17 @@ Utilization of max. archive size: {csize_max:.0%}
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
+        return data
+
+    def save(self, name=None, comment=None, timestamp=None, additional_metadata=None):
+        name = self._check_name(name)
+        self.items_buffer.flush(flush=True)
+        data = self.pack_archive_item(name, comment, timestamp, additional_metadata)
         self.id = self.key.id_hash(data)
         self.cache.add_chunk(self.id, data, self.stats)
         while self.repository.async_response(wait=True) is not None:
             pass
+        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data, unicode_errors='surrogateescape'))
         self.manifest.archives[name] = (self.id, metadata.time)
         self.manifest.write()
         self.repository.commit()
@@ -920,141 +933,6 @@ class ChunksProcessor:
                 # but we also will reference the same chunks also from the final, complete file:
                 for chunk in item.chunks:
                     cache.chunk_incref(chunk.id, stats, size=chunk.size)
-
-
-class FilesystemObjectProcessors:
-    # When ported to threading, then this doesn't need chunker, cache, key any more.
-    # write_checkpoint should then be in the item buffer,
-    # and process_file becomes a callback passed to __init__.
-
-    def __init__(self, *, metadata_collector, cache, key,
-                 add_item, process_file_chunks,
-                 chunker_params):
-        self.metadata_collector = metadata_collector
-        self.cache = cache
-        self.key = key
-        self.add_item = add_item
-        self.process_file_chunks = process_file_chunks
-
-        self.hard_links = {}
-        self.stats = Statistics()  # threading: done by cache (including progress)
-        self.cwd = os.getcwd()
-        self.chunker = Chunker(key.chunk_seed, *chunker_params)
-
-    @contextmanager
-    def create_helper(self, path, st, status=None, hardlinkable=True):
-        safe_path = make_path_safe(path)
-        item = Item(path=safe_path)
-        hardlink_master = False
-        hardlinked = hardlinkable and st.st_nlink > 1
-        if hardlinked:
-            source = self.hard_links.get((st.st_ino, st.st_dev))
-            if source is not None:
-                item.source = source
-                status = 'h'  # hardlink (to already seen inodes)
-            else:
-                hardlink_master = True
-        yield item, status, hardlinked, hardlink_master
-        # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
-        self.add_item(item)
-        # ... and added to the archive, so we can remember it to refer to it later in the archive:
-        if hardlink_master:
-            self.hard_links[(st.st_ino, st.st_dev)] = safe_path
-
-    def process_dir(self, path, st):
-        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            return status
-
-    def process_fifo(self, path, st):
-        with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            return status
-
-    def process_dev(self, path, st, dev_type):
-        with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
-            item.rdev = st.st_rdev
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            return status
-
-    def process_symlink(self, path, st):
-        # note: using hardlinkable=False because we can not support hardlinked symlinks,
-        #       due to the dual-use of item.source, see issue #2343:
-        with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
-            with backup_io('readlink'):
-                source = os.readlink(path)
-            item.source = source
-            if st.st_nlink > 1:
-                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            return status
-
-    def process_stdin(self, path, cache):
-        uid, gid = 0, 0
-        t = int(time.time()) * 1000000000
-        item = Item(
-            path=path,
-            mode=0o100660,  # regular file, ug=rw
-            uid=uid, user=uid2user(uid),
-            gid=gid, group=gid2group(gid),
-            mtime=t, atime=t, ctime=t,
-        )
-        fd = sys.stdin.buffer  # binary
-        self.process_file_chunks(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd)))
-        item.get_size(memorize=True)
-        self.stats.nfiles += 1
-        self.add_item(item)
-        return 'i'  # stdin
-
-    def process_file(self, path, st, cache, ignore_inode=False):
-        with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
-            is_special_file = is_special(st.st_mode)
-            if not hardlinked or hardlink_master:
-                if not is_special_file:
-                    path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                    ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
-                else:
-                    # in --read-special mode, we may be called for special files.
-                    # there should be no information in the cache about special files processed in
-                    # read-special mode, but we better play safe as this was wrong in the past:
-                    path_hash = ids = None
-                first_run = not cache.files and cache.do_files
-                if first_run:
-                    logger.debug('Processing files ...')
-                chunks = None
-                if ids is not None:
-                    # Make sure all ids are available
-                    for id_ in ids:
-                        if not cache.seen_chunk(id_):
-                            break
-                    else:
-                        chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
-                        status = 'U'  # regular file, unchanged
-                else:
-                    status = 'A'  # regular file, added
-                item.hardlink_master = hardlinked
-                item.update(self.metadata_collector.stat_simple_attrs(st))
-                # Only chunkify the file if needed
-                if chunks is not None:
-                    item.chunks = chunks
-                else:
-                    with backup_io('open'):
-                        fh = Archive._open_rb(path)
-                    with os.fdopen(fh, 'rb') as fd:
-                        self.process_file_chunks(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)))
-                    if not is_special_file:
-                        # we must not memorize special files, because the contents of e.g. a
-                        # block or char device will change without its mtime/size/inode changing.
-                        cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
-                    status = status or 'M'  # regular file, modified (if not 'A' already)
-                self.stats.nfiles += 1
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            item.get_size(memorize=True)
-            if is_special_file:
-                # we processed a special file like a regular file. reflect that in mode,
-                # so it can be extracted / accessed in FUSE mount like a regular file:
-                item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-            return status
 
 
 def valid_msgpacked_dict(d, keys_serialized):

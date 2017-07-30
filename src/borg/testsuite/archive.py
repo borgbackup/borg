@@ -16,7 +16,7 @@ from ..item import Item, ArchiveItem
 
 @pytest.fixture()
 def stats():
-    stats = Statistics()
+    stats = Statistics(progress=True)
     stats.update(20, 10, unique=True)
     return stats
 

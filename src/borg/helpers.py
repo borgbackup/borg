@@ -383,7 +383,7 @@ class Manifest:
                 result[operation.decode()] = set([feature.decode() for feature in requirements[b'mandatory']])
         return result
 
-    def write(self):
+    def pack(self):
         from .item import ManifestItem
         if self.key.tam_required:
             self.config[b'tam_required'] = True
@@ -408,6 +408,10 @@ class Manifest:
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
+        return data
+
+    def write(self):
+        data = self.pack()
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
 
 

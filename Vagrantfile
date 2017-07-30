@@ -139,7 +139,7 @@ end
 def packages_netbsd
   return <<-EOF
     hostname netbsd  # the box we use has an invalid hostname
-    PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/6.1.5/All/"
+    PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/7.0.1/All"
     export PKG_PATH
     pkg_add mozilla-rootcerts lz4 git bash
     chsh -s bash vagrant

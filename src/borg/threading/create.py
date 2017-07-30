@@ -1,15 +1,12 @@
 import enum
 import os
 import signal
-import socket
 import stat
 import struct
 import sys
 import time
 import traceback
 from contextlib import contextmanager
-from datetime import datetime, timedelta
-from getpass import getuser
 
 import zmq
 
@@ -22,7 +19,7 @@ from ..chunker import Chunker
 from ..helpers import Manifest
 from ..helpers import make_path_safe
 from ..helpers import safe_encode
-from ..helpers import  uid2user, gid2group
+from ..helpers import uid2user, gid2group
 from ..item import ArchiveItem, Item
 from ..logger import create_logger
 
@@ -47,6 +44,8 @@ class FilesCacheService(ThreadedService):
     HARDLINK = 'inproc://files-cache/hardlink'
     # REP: (stat_data) -> (safe_path)
     GET_HARDLINK_MASTER = 'inproc://files-cache/get-hardlink-master'
+
+    st_inodev = struct.Struct('=qq')
 
     @classmethod
     def get_process_file(cls):
@@ -131,7 +130,7 @@ class FilesCacheService(ThreadedService):
     def add_hardlink_master(self):
         # Called by ItemHandler when a file is done and has the hardlink_master flag set
         stat_data, safe_path = self.hardlink.recv_multipart()
-        st_ino, st_dev = struct.unpack('=qq', stat_data)
+        st_ino, st_dev = self.st_inodev.unpack(stat_data)
         # Add the hard link reference *after* the file has been added to the archive.
         self.hard_links[st_ino, st_dev] = safe_path.decode()
 
@@ -141,14 +140,14 @@ class FilesCacheService(ThreadedService):
         socket.connect(cls.HARDLINK)
 
         def add_hardlink_master(st, path):
-            stat_data = struct.pack('=qq', st.st_ino, st.st_dev)
+            stat_data = cls.st_inodev.pack(st.st_ino, st.st_dev)
             socket.send_multipart([stat_data, path.encode()])
 
         return add_hardlink_master
 
     def reply_hardlink_master(self):
         stat_data = self.get_hardlink_master.recv()
-        st_ino, st_dev = struct.unpack('=qq', stat_data)
+        st_ino, st_dev = self.st_inodev.unpack(stat_data)
         # path can't be empty, thus empty path = no hardlink master found.
         self.get_hardlink_master.send(self.hard_links.get((st_ino, st_dev), '').encode())
 
@@ -158,7 +157,7 @@ class FilesCacheService(ThreadedService):
         socket.connect(cls.GET_HARDLINK_MASTER)
 
         def get_hardlink_master(st):
-            stat_data = struct.pack('=qq', st.st_ino, st.st_dev)
+            stat_data = cls.st_inodev.pack(st.st_ino, st.st_dev)
             return socket.send(stat_data).decode() or None
 
         return get_hardlink_master
@@ -762,8 +761,9 @@ class FilesystemObjectProcessors:
             mtime=t, atime=t, ctime=t,
         )
         fd = sys.stdin.buffer  # binary
+
         raise NotImplementedError
-        self.process_file_chunks(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd)))
+
         item.get_size(memorize=True)
         self.stats.nfiles += 1
         self.add_item(item)

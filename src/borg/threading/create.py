@@ -312,9 +312,6 @@ class ChunksCacheService(ThreadedService):
 
     def handle_control(self, opcode, args):
         if opcode == self.CONTROL_COMMIT:
-            # The manifest ends up in the cache because it is pushed through the regular chunk processing
-            # pipeline (compression -> encryption -> repository -> cache.route_chunk -> ...).
-            del self.cache.chunks[Manifest.MANIFEST_ID]
             self.cache.commit()
             logger.debug('Cache committed.')
             self.control_sock.send(b'ok')
@@ -346,15 +343,19 @@ class ChunksCacheService(ThreadedService):
         csize = int.from_bytes(csize, sys.byteorder)
         if size >= ChunkerService.LARGE_CHUNK_TRESHOLD:
             self.output_release_chunk.send(size.to_bytes(4, sys.byteorder))
-        self.cache.chunks.add(id, 1, size, csize)
-        # Depending on how long chunk processing takes we may issue the same chunk multiple times, so it will
-        # be stored a few times and reported here a few times. This is unproblematic, since these are compacted
-        # away by the Repository.
-        # However, this also ensures that the system is always in a forward-consistent state,
-        # i.e. items are not added until all their chunks were fully processes.
-        # Forward-consistency makes everything much simpler.
-        refcount = self.cache.seen_chunk(id)
-        self.stats.update(size, csize, refcount == 1)
+        if ctx == ItemBufferService.MANIFEST_CTX:
+            # Avoid adding the manifest to the cache
+            assert id == Manifest.MANIFEST_ID
+        else:
+            self.cache.chunks.add(id, 1, size, csize)
+            # Depending on how long chunk processing takes we may issue the same chunk multiple times, so it will
+            # be stored a few times and reported here a few times. This is unproblematic, since these are compacted
+            # away by the Repository.
+            # However, this also ensures that the system is always in a forward-consistent state,
+            # i.e. items are not added until all their chunks were fully processes.
+            # Forward-consistency makes everything much simpler.
+            refcount = self.cache.seen_chunk(id)
+            self.stats.update(size, csize, refcount == 1)
         chunk_list_entry = struct.pack('=32sLL', id, size, csize)
         self.output_chunk_list_entry(ctx, n, chunk_list_entry)
 

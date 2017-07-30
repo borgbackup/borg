@@ -365,3 +365,29 @@ class ChunksCacheService(ThreadedService):
         path_hash, st, *ids = self.memorize.recv_multipart()
         self.st.st_ino, self.st.st_size, self.st.st_mtime_ns = struct.unpack('=qqq', st)
         self.cache.memorize_file(path_hash, self.st, ids)
+
+
+class CompressionService(ThreadedService):
+    INPUT = 'inproc://compression'
+
+    pure = False
+
+    def __init__(self, compr_spec, zmq_context=None):
+        super().__init__(zmq_context)
+        self.compressor = compr_spec.compressor
+
+    def init(self):
+        super().init()
+        self.input = self.context.socket(zmq.PULL)
+        self.output = self.context.socket(zmq.PUSH)
+
+        self.poller.register(self.input)
+        self.input.bind(self.INPUT)
+        self.output.connect(EncryptionService.INPUT)
+
+    def events(self, poll_events):
+        if self.input in poll_events:
+            ctx, n, chunk, id = self.input.recv_multipart(copy=False)
+            size = len(chunk.buffer).to_bytes(4, sys.byteorder)
+            compressed = self.compressor.compress(chunk.buffer)
+            self.output.send_multipart([ctx, n, compressed, id, size], copy=False)

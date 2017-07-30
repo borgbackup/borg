@@ -29,6 +29,7 @@ class ThreadedService(threading.Thread):
         super().__init__()
         self.context = zmq_context or zmq.Context().instance()
         self.running = True
+        self._sockets = []
 
     def control(self, opcode, *args):
         """
@@ -44,6 +45,7 @@ class ThreadedService(threading.Thread):
             t0 = time.monotonic()
             self.init()
             self.loop()
+            self.exit()
             td = time.monotonic() - t0
             ru = resource.getrusage(resource.RUSAGE_THREAD)
             rel = (ru.ru_utime + ru.ru_stime) / td * 100
@@ -61,10 +63,8 @@ class ThreadedService(threading.Thread):
         Perform initialization of the thread, before entering the main loop.
         """
         self.name = '%s-%x' % (self.__class__.__name__, self.ident)
-        self.control_sock = self.context.socket(zmq.REP)
-        self.control_sock.bind(self._control_url)
         self.poller = zmq.Poller()
-        self.poller.register(self.control_sock, zmq.POLLIN)
+        self.control_sock = self.socket(zmq.REP, self._control_url)
 
     def loop(self):
         while self.running:
@@ -75,6 +75,10 @@ class ThreadedService(threading.Thread):
                 events.pop(self.control_sock)
             self.events(events)
 
+    def exit(self):
+        for socket in self._sockets:
+            socket.close()
+
     def handle_control(self, opcode, args):
         if opcode == self.CONTROL_DIE:
             self.running = False
@@ -84,6 +88,17 @@ class ThreadedService(threading.Thread):
 
     def events(self, poll_events):
         pass
+
+    def socket(self, type, url) -> zmq.Socket:
+        socket = self.context.socket(type)
+        self._sockets.append(socket)
+        poll = type in [zmq.PULL, zmq.REP]
+        if poll:
+            self.poller.register(socket, zmq.POLLIN)
+            socket.bind(url)
+        else:
+            socket.connect(url)
+        return socket
 
     @property
     def _control_url(self):

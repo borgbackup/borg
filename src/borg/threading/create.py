@@ -69,20 +69,13 @@ class FilesCacheService(ThreadedService):
 
     def init(self):
         super().init()
-        self.input = self.context.socket(zmq.PULL)
-        self.hardlink = self.context.socket(zmq.PULL)
-        self.get_hardlink_master = self.context.socket(zmq.REP)
-        self.output = self.context.socket(zmq.PUSH)
+        self.input = self.socket(zmq.PULL, self.INPUT)
+        self.hardlink = self.socket(zmq.PULL, self.HARDLINK)
+        self.get_hardlink_master = self.socket(zmq.REP, self.GET_HARDLINK_MASTER)
+        self.output = self.socket(zmq.PUSH, self.chunker_url)
 
         self.add_item = ItemBufferService.get_add_item()
         self.file_known_and_unchanged = ChunksCacheService.get_file_known_and_unchanged()
-
-        self.poller.register(self.input)
-        self.poller.register(self.get_hardlink_master)
-        self.output.connect(self.chunker_url)
-        self.input.bind(self.INPUT)
-        self.get_hardlink_master.bind(self.GET_HARDLINK_MASTER)
-        self.hardlink.bind(self.HARDLINK)
 
     def events(self, poll_events):
         if self.input in poll_events:
@@ -138,7 +131,7 @@ class FilesCacheService(ThreadedService):
 
     def add_hardlink_master(self):
         # Called by ItemHandler when a file is done and has the hardlink_master flag set
-        stat_data, safe_path = self.input.recv_multipart()
+        stat_data, safe_path = self.hardlink.recv_multipart()
         st_ino, st_dev = struct.unpack('=qq', stat_data)
         # Add the hard link reference *after* the file has been added to the archive.
         self.hard_links[st_ino, st_dev] = safe_path.decode()
@@ -189,18 +182,10 @@ class ChunkerService(ThreadedService):
 
     def init(self):
         super().init()
-        self.input = self.context.socket(zmq.PULL)
-        self.release_chunk = self.context.socket(zmq.PULL)
-
-        self.output = self.context.socket(zmq.PUSH)
-        self.finished_output = self.context.socket(zmq.PUSH)
-
-        self.poller.register(self.input)
-        self.poller.register(self.release_chunk)
-        self.output.connect(IdHashService.INPUT)
-        self.finished_output.connect(ItemHandler.FINISHED_INPUT)
-        self.input.bind(self.INPUT)
-        self.release_chunk.bind(self.RELEASE_CHUNK)
+        self.input = self.socket(zmq.PULL, self.INPUT)
+        self.release_chunk = self.socket(zmq.PULL, self.RELEASE_CHUNK)
+        self.output = self.socket(zmq.PUSH, IdHashService.INPUT)
+        self.finished_output = self.socket(zmq.PUSH, ItemHandler.FINISHED_INPUT)
 
     def events(self, poll_events):
         if self.release_chunk in poll_events:
@@ -241,12 +226,8 @@ class IdHashService(ThreadedService):
 
     def init(self):
         super().init()
-        self.input = self.context.socket(zmq.PULL)
-        self.output = self.context.socket(zmq.PUSH)
-
-        self.poller.register(self.input)
-        self.output.connect(ChunksCacheService.INPUT)
-        self.input.bind(self.INPUT)
+        self.input = self.socket(zmq.PULL, self.INPUT)
+        self.output = self.socket(zmq.PUSH, ChunksCacheService.INPUT)
 
     def events(self, poll_events):
         if self.input in poll_events:
@@ -308,28 +289,15 @@ class ChunksCacheService(ThreadedService):
 
     def init(self):
         super().init()
-        self.input = self.context.socket(zmq.PULL)
-        self.chunk_saved = self.context.socket(zmq.PULL)
-        self.memorize = self.context.socket(zmq.PULL)
-        self.file_known = self.context.socket(zmq.REP)
+        self.input = self.socket(zmq.PULL, self.INPUT)
+        self.chunk_saved = self.socket(zmq.PULL, self.CHUNK_SAVED)
+        self.memorize = self.socket(zmq.PULL, self.MEMORIZE)
+        self.file_known = self.socket(zmq.REP, self.FILE_KNOWN)
 
-        self.output_new = self.context.socket(zmq.PUSH)
-        self.file_chunk_output = self.context.socket(zmq.PUSH)
-        self.meta_chunk_output = self.context.socket(zmq.PUSH)
-        self.output_release_chunk = self.context.socket(zmq.PUSH)
-
-        self.poller.register(self.input)
-        self.poller.register(self.chunk_saved)
-        self.poller.register(self.memorize)
-        self.poller.register(self.file_known)
-        self.input.bind(self.INPUT)
-        self.chunk_saved.bind(self.CHUNK_SAVED)
-        self.memorize.bind(self.MEMORIZE)
-        self.file_known.bind(self.FILE_KNOWN)
-        self.output_new.connect(CompressionService.INPUT)
-        self.file_chunk_output.connect(ItemHandler.CHUNK_INPUT)
-        self.meta_chunk_output.connect(ItemBufferService.CHUNK_INPUT)
-        self.output_release_chunk.connect(ChunkerService.RELEASE_CHUNK)
+        self.output_new = self.socket(zmq.PUSH, CompressionService.INPUT)
+        self.file_chunk_output = self.socket(zmq.PUSH, ItemHandler.CHUNK_INPUT)
+        self.meta_chunk_output = self.socket(zmq.PUSH, ItemBufferService.CHUNK_INPUT)
+        self.output_release_chunk = self.socket(zmq.PUSH, ChunkerService.RELEASE_CHUNK)
 
     def events(self, poll_events):
         if self.input in poll_events:
@@ -424,12 +392,8 @@ class CompressionService(ThreadedService):
 
     def init(self):
         super().init()
-        self.input = self.context.socket(zmq.PULL)
-        self.output = self.context.socket(zmq.PUSH)
-
-        self.poller.register(self.input)
-        self.input.bind(self.INPUT)
-        self.output.connect(EncryptionService.INPUT)
+        self.input = self.socket(zmq.PULL, self.INPUT)
+        self.output = self.socket(zmq.PUSH, EncryptionService.INPUT)
 
     def events(self, poll_events):
         if self.input in poll_events:
@@ -450,12 +414,8 @@ class EncryptionService(ThreadedService):
 
     def init(self):
         super().init()
-        self.input = self.context.socket(zmq.PULL)
-        self.output = self.context.socket(zmq.PUSH)
-
-        self.poller.register(self.input)
-        self.input.bind(self.INPUT)
-        self.output.connect(RepositoryService.INPUT)
+        self.input = self.socket(zmq.PULL, self.INPUT)
+        self.output = self.socket(zmq.PUSH, RepositoryService.INPUT)
 
     def events(self, poll_events):
         if self.input in poll_events:
@@ -477,15 +437,9 @@ class RepositoryService(ThreadedService):
 
     def init(self):
         super().init()
-        self.input = self.context.socket(zmq.PULL)
-        self.api = self.context.socket(zmq.REP)
-        self.output = self.context.socket(zmq.PUSH)
-
-        self.poller.register(self.input)
-        self.poller.register(self.api)
-        self.input.bind(self.INPUT)
-        self.api.bind(self.API)
-        self.output.connect(self.chunk_saved_url)
+        self.input = self.socket(zmq.PULL, self.INPUT)
+        self.api = self.socket(zmq.REP, self.API)
+        self.output = self.socket(zmq.PUSH, self.chunk_saved_url)
 
     def events(self, poll_events):
         if self.input in poll_events:
@@ -508,6 +462,8 @@ class RepositoryService(ThreadedService):
         self.output.send_multipart([ctx, n, id] + extra)
 
     def api_reply(self):
+        # TODO XXX implement API & replace Repository object in other places to avoid accessing it from multiple threads
+        #      XXX Python has no concept of ownership so this is a bit annoying to see through.
         pass
 
 
@@ -518,22 +474,14 @@ class ItemHandler(ThreadedService):
     def __init__(self, metadata_collector: MetadataCollector, zmq_context=None):
         super().__init__(zmq_context)
         self.metadata = metadata_collector
+        self.items_in_progress = {}
+        self.add_item = ItemBufferService.get_add_item()
+        self.add_hardlink_master = FilesCacheService.get_add_hardlink_master()
 
     def init(self):
         super().init()
-        self.chunk_input = self.context.socket(zmq.PULL)
-        self.finished_chunking_file = self.context.socket(zmq.PULL)
-
-        self.items_in_progress = {}
-
-        self.chunk_input.bind(self.CHUNK_INPUT)
-        self.finished_chunking_file.bind(self.FINISHED_INPUT)
-
-        self.poller.register(self.chunk_input)
-        self.poller.register(self.finished_chunking_file)
-
-        self.add_item = ItemBufferService.get_add_item()
-        self.add_hardlink_master = FilesCacheService.get_add_hardlink_master()
+        self.chunk_input = self.socket(zmq.PULL, self.CHUNK_INPUT)
+        self.finished_chunking_file = self.socket(zmq.PULL, self.FINISHED_INPUT)
 
     def events(self, poll_events):
         if self.chunk_input in poll_events:
@@ -622,18 +570,11 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
 
     def init(self):
         super().init()
-        self.add_item = self.context.socket(zmq.PULL)
-        self.chunk_added = self.context.socket(zmq.PULL)
+        self.add_item = self.socket(zmq.PULL, self.ITEM_INPUT)
+        self.chunk_added = self.socket(zmq.PULL, self.CHUNK_INPUT)
 
-        self.push_chunk = self.context.socket(zmq.PUSH)
-        self.compress_chunk = self.context.socket(zmq.PUSH)
-
-        self.poller.register(self.add_item)
-        self.poller.register(self.chunk_added)
-        self.add_item.bind(self.ITEM_INPUT)
-        self.chunk_added.bind(self.CHUNK_INPUT)
-        self.push_chunk.connect(self.push_chunk_url)
-        self.compress_chunk.connect(self.compress_url)
+        self.push_chunk = self.socket(zmq.PUSH, self.push_chunk_url)
+        self.compress_chunk = self.socket(zmq.PUSH, self.compress_url)
 
     def events(self, poll_events):
         if self.add_item in poll_events:
@@ -867,3 +808,4 @@ class CreateArchivePipeline:
                 logger.debug('Joining %s', service.__class__.__name__)
                 service.join()
             logger.debug('Joined all %d threads.', len(self.services))
+            zmq.Context.instance().destroy()

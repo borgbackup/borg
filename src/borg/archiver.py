@@ -33,10 +33,10 @@ import msgpack
 import borg
 from . import __version__
 from . import helpers
-from . import shellpattern
 from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
+from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from .cache import Cache, assert_secure
 from .constants import *  # NOQA
 from .compress import CompressionSpec
@@ -448,7 +448,7 @@ class Archiver:
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
 
-        def create_inner(archive, cache):
+        def create_inner(archive, cache, fso):
             # Add cache dir to inode_skip list
             skip_inodes = set()
             try:
@@ -468,7 +468,7 @@ class Archiver:
                     path = 'stdin'
                     if not dry_run:
                         try:
-                            status = archive.process_stdin(path, cache)
+                            status = fso.process_stdin(path, cache)
                         except BackupOSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
@@ -486,7 +486,7 @@ class Archiver:
                     restrict_dev = st.st_dev
                 else:
                     restrict_dev = None
-                self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
+                self._process(fso, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_exclude_tags, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run, st=st)
             if not dry_run:
@@ -523,12 +523,20 @@ class Archiver:
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
-                create_inner(archive, cache)
+                metadata_collector = MetadataCollector(noatime=args.noatime, noctime=args.noctime,
+                    numeric_owner=args.numeric_owner)
+                cp = ChunksProcessor(cache=cache, key=key,
+                    add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
+                    checkpoint_interval=args.checkpoint_interval)
+                fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
+                    process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
+                    chunker_params=args.chunker_params)
+                create_inner(archive, cache, fso)
         else:
-            create_inner(None, None)
+            create_inner(None, None, None)
         return self.exit_code
 
-    def _process(self, archive, cache, matcher, exclude_caches, exclude_if_present,
+    def _process(self, fso, cache, matcher, exclude_caches, exclude_if_present,
                  keep_exclude_tags, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False, st=None):
         """
@@ -566,33 +574,33 @@ class Archiver:
                     return
             if stat.S_ISREG(st.st_mode):
                 if not dry_run:
-                    status = archive.process_file(path, st, cache, self.ignore_inode)
+                    status = fso.process_file(path, st, cache, self.ignore_inode)
             elif stat.S_ISDIR(st.st_mode):
                 if recurse:
                     tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
                     if tag_paths:
                         if keep_exclude_tags and not dry_run:
-                            archive.process_dir(path, st)
+                            fso.process_dir(path, st)
                             for tag_path in tag_paths:
-                                self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                                self._process(fso, cache, matcher, exclude_caches, exclude_if_present,
                                               keep_exclude_tags, skip_inodes, tag_path, restrict_dev,
                                               read_special=read_special, dry_run=dry_run)
                         return
                 if not dry_run:
                     if not recurse_excluded_dir:
-                        status = archive.process_dir(path, st)
+                        status = fso.process_dir(path, st)
                 if recurse:
                     with backup_io('scandir'):
                         entries = helpers.scandir_inorder(path)
                     for dirent in entries:
                         normpath = os.path.normpath(dirent.path)
-                        self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
+                        self._process(fso, cache, matcher, exclude_caches, exclude_if_present,
                                       keep_exclude_tags, skip_inodes, normpath, restrict_dev,
                                       read_special=read_special, dry_run=dry_run)
             elif stat.S_ISLNK(st.st_mode):
                 if not dry_run:
                     if not read_special:
-                        status = archive.process_symlink(path, st)
+                        status = fso.process_symlink(path, st)
                     else:
                         try:
                             st_target = os.stat(path)
@@ -601,27 +609,27 @@ class Archiver:
                         else:
                             special = is_special(st_target.st_mode)
                         if special:
-                            status = archive.process_file(path, st_target, cache)
+                            status = fso.process_file(path, st_target, cache)
                         else:
-                            status = archive.process_symlink(path, st)
+                            status = fso.process_symlink(path, st)
             elif stat.S_ISFIFO(st.st_mode):
                 if not dry_run:
                     if not read_special:
-                        status = archive.process_fifo(path, st)
+                        status = fso.process_fifo(path, st)
                     else:
-                        status = archive.process_file(path, st, cache)
+                        status = fso.process_file(path, st, cache)
             elif stat.S_ISCHR(st.st_mode):
                 if not dry_run:
                     if not read_special:
-                        status = archive.process_dev(path, st, 'c')
+                        status = fso.process_dev(path, st, 'c')
                     else:
-                        status = archive.process_file(path, st, cache)
+                        status = fso.process_file(path, st, cache)
             elif stat.S_ISBLK(st.st_mode):
                 if not dry_run:
                     if not read_special:
-                        status = archive.process_dev(path, st, 'b')
+                        status = fso.process_dev(path, st, 'b')
                     else:
-                        status = archive.process_file(path, st, cache)
+                        status = fso.process_file(path, st, cache)
             elif stat.S_ISSOCK(st.st_mode):
                 # Ignore unix sockets
                 return

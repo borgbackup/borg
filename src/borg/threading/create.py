@@ -415,4 +415,50 @@ class EncryptionService(ThreadedService):
         if self.input in poll_events:
             ctx, n, chunk, id, size = self.input.recv_multipart(copy=False)
             encrypted = self.key.encrypt(chunk, compress=False)
-            self.output.send_multipart([ctx, n, encrypted, id, size], copy=False)
+            self.output.send_multipart([ctx, n, encrypted, id, size, len(encrypted)], copy=False)
+
+
+class RepositoryService(ThreadedService):
+    INPUT = 'inproc://repository/put'
+    API = 'inproc://repository'
+
+    CONTROL_COMMIT = b'COMMIT'
+
+    def __init__(self, repository, chunk_saved_url=ChunksCacheService.CHUNK_SAVED, zmq_context=None):
+        super().__init__(zmq_context)
+        self.repository = repository
+        self.chunk_saved_url = chunk_saved_url
+
+    def init(self):
+        super().init()
+        self.input = self.context.socket(zmq.PULL)
+        self.api = self.context.socket(zmq.REP)
+        self.output = self.context.socket(zmq.PUSH)
+
+        self.poller.register(self.input)
+        self.poller.register(self.api)
+        self.input.bind(self.INPUT)
+        self.api.bind(self.API)
+        self.output.connect(self.chunk_saved_url)
+
+    def events(self, poll_events):
+        if self.input in poll_events:
+            self.put()
+        if self.api in poll_events:
+            self.api_reply()
+
+    def handle_control(self, opcode, args):
+        if opcode == self.CONTROL_COMMIT:
+            self.repository.commit()
+            self.control_sock.send(b'OK')
+        else:
+            super().handle_control(opcode, args)
+
+    def put(self):
+        ctx, n, data, id, *extra = self.input.recv_multipart()
+        self.repository.put(id, data, wait=False)
+        self.repository.async_response(wait=False)
+        self.output.send_multipart([ctx, n, id] + extra)
+
+    def api_reply(self):
+        pass

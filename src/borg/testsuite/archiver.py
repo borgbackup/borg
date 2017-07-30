@@ -3276,9 +3276,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test1a', 'input')
         self.cmd('create', '--chunker-params', '16,18,17,4095', self.repository_location + '::test1b', 'input')
 
-        def do_asserts(output, archive):
+        def do_asserts(output, can_compare_ids):
             # File contents changed (deleted and replaced with a new file)
-            assert 'B input/file_replaced' in output
+            change = 'B' if can_compare_ids else '{:<19}'.format('modified')
+            assert '{} input/file_replaced'.format(change) in output
 
             # File unchanged
             assert 'input/file_unchanged' not in output
@@ -3307,9 +3308,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
-            assert '0 B input/empty' in output
+            change = '0 B' if can_compare_ids else '{:<19}'.format('modified')
+            assert '{} input/empty'.format(change) in output
             if are_hardlinks_supported():
-                assert '0 B input/hardlink_contents_changed' in output
+                assert '{} input/hardlink_contents_changed'.format(change) in output
             if are_symlinks_supported():
                 assert 'input/link_target_contents_changed' not in output
 
@@ -3336,9 +3338,9 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert 'input/hardlink_target_replaced' not in output
 
-        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), '1a')
+        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), True)
         # We expect exit_code=1 due to the chunker params warning
-        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), '1b')
+        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), False)
 
     def test_sort_option(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

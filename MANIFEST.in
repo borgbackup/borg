@@ -5,4 +5,4 @@ prune .github
 graft src
 graft docs
 prune docs/_build
-global-exclude *.py[co] *.orig *.so *.dll
+global-exclude *.pyc *.orig *.so *.dll

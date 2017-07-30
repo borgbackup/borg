@@ -1,5 +1,4 @@
 import errno
-import fcntl
 import functools
 import inspect
 import json
@@ -190,15 +189,9 @@ class RepositoryServer:  # pragma: no cover
         stdin_fd = sys.stdin.fileno()
         stdout_fd = sys.stdout.fileno()
         stderr_fd = sys.stdout.fileno()
-        # Make stdin non-blocking
-        fl = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
-        fcntl.fcntl(stdin_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-        # Make stdout blocking
-        fl = fcntl.fcntl(stdout_fd, fcntl.F_GETFL)
-        fcntl.fcntl(stdout_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
-        # Make stderr blocking
-        fl = fcntl.fcntl(stderr_fd, fcntl.F_GETFL)
-        fcntl.fcntl(stderr_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
+        os.set_blocking(stdin_fd, False)
+        os.set_blocking(stdout_fd, True)
+        os.set_blocking(stderr_fd, True)
         unpacker = get_limited_unpacker('server')
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
@@ -557,9 +550,9 @@ class RemoteRepository:
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
         self.stderr_fd = self.p.stderr.fileno()
-        fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        fcntl.fcntl(self.stdout_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdout_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        fcntl.fcntl(self.stderr_fd, fcntl.F_SETFL, fcntl.fcntl(self.stderr_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        os.set_blocking(self.stdin_fd, False)
+        os.set_blocking(self.stdout_fd, False)
+        os.set_blocking(self.stderr_fd, False)
         self.r_fds = [self.stdout_fd, self.stderr_fd]
         self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 

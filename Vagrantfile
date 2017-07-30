@@ -141,7 +141,7 @@ def packages_netbsd
     hostname netbsd  # the box we use has an invalid hostname
     PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/7.0.1/All"
     export PKG_PATH
-    pkg_add mozilla-rootcerts lz4 git bash
+    pkg_add mozilla-rootcerts lz4 git
     chsh -s bash vagrant
     mkdir -p /usr/local/opt/lz4/include
     mkdir -p /usr/local/opt/lz4/lib

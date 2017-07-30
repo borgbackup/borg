@@ -222,6 +222,7 @@ class ChunkBuffer:
     BUFFER_SIZE = 8 * 1024 * 1024
 
     def __init__(self, key, chunker_params=ITEMS_CHUNKER_PARAMS):
+        super().__init__()
         self.buffer = BytesIO()
         self.packer = msgpack.Packer(unicode_errors='surrogateescape')
         self.chunks = []

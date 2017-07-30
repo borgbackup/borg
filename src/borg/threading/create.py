@@ -1,15 +1,22 @@
+import enum
 import os
+import socket
 import stat
 import struct
 import sys
+import time
+from datetime import datetime, timedelta
+from getpass import getuser
 
 import zmq
 
 from . import ThreadedService
 from ..archive import Archive, Statistics, is_special
+from ..archive import ChunkBuffer
 from ..archive import MetadataCollector
+from ..helpers import Manifest
 from ..helpers import safe_encode
-from ..item import Item
+from ..item import ArchiveItem, Item
 
 
 class FilesCacheService(ThreadedService):
@@ -168,6 +175,7 @@ class ChunkerService(ThreadedService):
             self.chunk_file()
 
     def chunk_file(self):
+        # XXX Error handling
         ctx, path = self.input.recv_multipart()
         n = 0
         fh = Archive._open_rb(path)
@@ -523,9 +531,163 @@ class ItemHandler(ThreadedService):
         if getattr(item, 'num_chunks', None) == len(item.chunks) and all(item.chunks):
             del self.items_in_progress[item_optr]
 
+            # XXX Error handling
             st = os.stat(item.original_path)
             item.update(self.metadata.stat_attrs(st, item.original_path))
             if item.get('hardlink_master'):
                 self.add_hardlink_master(item)
 
             self.add_item(item)
+
+
+class ItemBufferService(ChunkBuffer, ThreadedService):
+    CHUNK_INPUT = 'inproc://chunk-buffer/chunks'
+    ITEM_INPUT = 'inproc://chunk-buffer/add-item'
+
+    CONTROL_SAVE = b'SAVE'
+
+    class States(enum.Enum):
+        WAITING_FOR_SAVE = 0
+        WAITING_FOR_ITEMS = 1
+        WAITING_FOR_ARCHIVE_CHUNKS = 2
+        WAITING_FOR_ARCHIVE_ITEM = 3
+        WAITING_FOR_MANIFEST = 4
+
+    ARCHIVE_ITEM_CTX = b'META_ARCHIVE_ITEM'
+    MANIFEST_CTX = b'META_MANIFEST'
+
+    @classmethod
+    def get_add_item(cls):
+        socket = zmq.Context.instance().socket(zmq.PUSH)
+        socket.connect(cls.ITEM_INPUT)
+
+        def add_item(item):
+            socket.send(item.to_optr())
+
+        return add_item
+
+    def __init__(self, key, archive, cache_control, repository_control,
+                 push_chunk_url=IdHashService.INPUT, compress_url=CompressionService.INPUT):
+        super().__init__(key)
+        self.archive = archive
+        self.push_chunk_url = push_chunk_url
+        self.compress_url = compress_url
+        self.cache_control = cache_control
+        self.repository_control = repository_control
+
+        self.num_items = 0
+        self.save_after_item_no = None
+        self.die_after_save = False
+
+        self.state = self.States.WAITING_FOR_SAVE
+
+    def init(self):
+        super().init()
+        self.add_item = self.context.socket(zmq.PULL)
+        self.chunk_added = self.context.socket(zmq.PULL)
+
+        self.push_chunk = self.context.socket(zmq.PUSH)
+        self.compress_chunk = self.context.socket(zmq.PUSH)
+
+        self.poller.register(self.add_item)
+        self.poller.register(self.chunk_added)
+        self.add_item.bind(self.ITEM_INPUT)
+        self.chunk_added.bind(self.CHUNK_INPUT)
+        self.push_chunk.connect(self.push_chunk_url)
+        self.compress_chunk.connect(self.compress_url)
+
+    def events(self, poll_events):
+        if self.add_item in poll_events:
+            self.pack_and_add_item()
+        if self.chunk_added in poll_events:
+            ctx, n, chunk_list_entry = self.chunk_added.recv_multipart()
+            chunk_id, *_ = struct.unpack('=32sLL', chunk_list_entry)
+            if self.state == self.States.WAITING_FOR_ARCHIVE_ITEM and ctx == self.ARCHIVE_ITEM_CTX:
+                self.update_manifest(chunk_id)
+            elif self.state == self.States.WAITING_FOR_MANIFEST and ctx == self.MANIFEST_CTX:
+                self.commit()
+            else:
+                assert ctx == b'META'
+                n = int.from_bytes(n, sys.byteorder)
+                self.chunks[n] = chunk_id
+        if self.state == self.States.WAITING_FOR_ITEMS and self.num_items == self.save_after_item_no:
+            # Got all items, flush (no-op if nothing buffered)
+            self.flush(flush=True)
+            self.state = self.States.WAITING_FOR_ARCHIVE_CHUNKS
+        if self.state == self.States.WAITING_FOR_ARCHIVE_CHUNKS and self.is_complete():
+            # If we're complete we can go ahead and make the archive item,
+            # update the manifest and commit.
+            self.save_archive()
+
+    def handle_control(self, opcode, args):
+        if opcode == self.CONTROL_SAVE:
+            assert len(args) == 1
+            assert self.state == self.States.WAITING_FOR_SAVE
+            self.state = self.States.WAITING_FOR_ITEMS
+            self.save_after_item_no = int.from_bytes(args[0], sys.byteorder)
+            # Reply is sent _after_ it's done (blocking the main thread until then).
+        else:
+            super().handle_control(opcode, args)
+
+    def save(self, fso_processors):
+        num_items = fso_processors.num_items
+        self.control(self.CONTROL_SAVE, num_items.to_bytes(8, sys.byteorder))
+
+    def pack_and_add_item(self):
+        item = Item.from_optr(self.add_item.recv())
+        self.num_items += 1
+        self.add(item)
+
+    def write_chunk(self, chunk):
+        ctx = b'META'
+        n = len(self.chunks).to_bytes(8, sys.byteorder)
+        self.push_chunk.send_multipart([ctx, n, chunk.data])
+        return None  # we'll fill the ID later in
+
+    def is_complete(self):
+        return all(self.chunks)
+
+    def save_archive(self, name=None, comment=None, timestamp=None, additional_metadata=None):
+        # XXX largely copied from Archive.save
+        name = name or self.name
+        if name in self.archive.manifest.archives:
+            raise Archive.AlreadyExists(name)
+        duration = timedelta(seconds=time.monotonic() - self.archive.start_monotonic)
+        if timestamp is None:
+            end = datetime.utcnow()
+            start = end - duration
+        else:
+            end = timestamp
+            start = timestamp - duration
+        self.start = start
+        metadata = {
+            'version': 1,
+            'name': name,
+            'comment': comment or '',
+            'items': self.chunks,
+            'cmdline': sys.argv,
+            'hostname': socket.gethostname(),
+            'username': getuser(),
+            'time': start.isoformat(),
+            'time_end': end.isoformat(),
+            'chunker_params': self.archive.chunker_params,
+        }
+        metadata.update(additional_metadata or {})
+        metadata = ArchiveItem(metadata)
+        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
+        self.push_chunk.send_multipart([self.ARCHIVE_ITEM_CTX, b'', data])
+        self.state = self.States.WAITING_FOR_ARCHIVE_ITEM
+
+    def update_manifest(self, archive_item_id):
+        self.archive.manifest.archives[self.archive.name] = (archive_item_id, self.start.isoformat())
+        manifest_data = self.archive.manifest.get_data()
+        self.archive.manifest.id = self.key.id_hash(manifest_data)
+        self.compress_chunk.send_multipart([self.MANIFEST_CTX, b'', manifest_data, Manifest.MANIFEST_ID])
+        self.state = self.States.WAITING_FOR_MANIFEST
+
+    def commit(self):
+        self.repository_control(RepositoryService.CONTROL_COMMIT)
+        self.cache_control(ChunksCacheService.CONTROL_COMMIT)
+        self.state = self.States.WAITING_FOR_SAVE
+        # Notify main thread that we're done here.
+        self.control_sock.send(b'OK')

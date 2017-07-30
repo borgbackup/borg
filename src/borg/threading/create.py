@@ -1,21 +1,18 @@
 import os
 import stat
 import struct
+import sys
 
 import zmq
 
 from . import ThreadedService
+from ..archive import Archive
 from ..archive import is_special
 from ..helpers import safe_encode
 from ..item import Item
 
 
 class FilesCacheService(ThreadedService):
-    INPUT = 'inproc://files-cache'
-    HARDLINK = 'inproc://files-cache/hardlink'
-    CONTROL = 'inproc://files-cache/control'
-
-    __doc__ = \
     """
     This is the first stage in the file processing pipeline.
     First, a file is checked against inodes seen so far to directly deduplicate
@@ -26,6 +23,11 @@ class FilesCacheService(ThreadedService):
     is transferred to the ItemBufferService.
     If the files cache is missed, processing continues to the ChunkerService.
     """
+
+    # PULL: (item_optr, path)
+    INPUT = 'inproc://files-cache'
+    # PULL: (stat_data, safe_path)
+    HARDLINK = 'inproc://files-cache/hardlink'
 
     @classmethod
     def get_process_file(cls):
@@ -127,3 +129,59 @@ class FilesCacheService(ThreadedService):
             socket.send_multipart([stat_data, item.path.encode()])
 
         return add_hardlink_master
+
+
+class ChunkerService(ThreadedService):
+    # PULL: (ctx, path)
+    INPUT = 'inproc://chunker'
+    RELEASE_CHUNK = 'inproc://chunker/release-chunk'
+
+    LARGE_CHUNK_TRESHOLD = 256 * 1024
+    MEM_BUDGET = 64 * 1024 * 1024
+
+    pure = False
+
+    def __init__(self, chunker, zmq_context=None):
+        super().__init__(zmq_context)
+        self.chunker = chunker
+        self.mem_budget = self.MEM_BUDGET
+
+    def init(self):
+        super().init()
+        self.input = self.context.socket(zmq.PULL)
+        self.release_chunk = self.context.socket(zmq.PULL)
+
+        self.output = self.context.socket(zmq.PUSH)
+        self.finished_output = self.context.socket(zmq.PUSH)
+
+        self.poller.register(self.input)
+        self.poller.register(self.release_chunk)
+        self.output.connect(IdHashService.INPUT)
+        self.finished_output.connect(ItemHandler.FINISHED_INPUT)
+        self.input.bind(self.INPUT)
+        self.release_chunk.bind(self.RELEASE_CHUNK)
+
+    def events(self, poll_events):
+        if self.release_chunk in poll_events:
+            self.mem_budget += int.from_bytes(self.release_chunk.recv(), sys.byteorder)
+        if self.input in poll_events:
+            self.chunk_file()
+
+    def chunk_file(self):
+        ctx, path = self.input.recv_multipart()
+        n = 0
+        fh = Archive._open_rb(path)
+        with os.fdopen(fh, 'rb') as fd:
+            for chunk in self.chunker.chunkify(fd, fh):
+                # Important bit right here: The chunker gives us a memoryview of it's *internal* buffer,
+                # so as soon as we return control back to it (via next() via iteration), it will start
+                # copying new stuff into it's internal buffer. Therefore we need to make a copy here.
+
+                if len(chunk) >= self.LARGE_CHUNK_TRESHOLD:
+                    self.mem_budget -= len(chunk)
+                    while self.mem_budget <= 0:
+                        self.mem_budget += int.from_bytes(self.release_chunk.recv(), sys.byteorder)
+
+                self.output.send_multipart([ctx, n.to_bytes(8, sys.byteorder), chunk], copy=True)
+                n += 1
+        self.finished_output.send_multipart([ctx, n.to_bytes(8, sys.byteorder)])

@@ -1,4 +1,5 @@
 import stat
+import struct
 from collections import namedtuple
 
 from .constants import ITEM_KEYS
@@ -11,7 +12,7 @@ cdef extern from "_item.c":
     object _optr_to_object(object bytes)
 
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.1_04'
 
 
 class PropDict:
@@ -122,7 +123,20 @@ class PropDict:
         return property(_get, _set, _del, doc=doc)
 
 
-ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+_ChunkListEntry = namedtuple('_ChunkListEntry', 'id size csize')
+
+
+class ChunkListEntry(_ChunkListEntry):
+    __slots__ = ()
+    format = struct.Struct('=32sLL')
+
+    def pack(self):
+        return self.format.pack(*self)
+
+    @classmethod
+    def unpack(cls, data: bytes):
+        return cls(*cls.format.unpack(data))
+
 
 class Item(PropDict):
     """

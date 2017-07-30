@@ -20,7 +20,7 @@ from ..helpers import Manifest
 from ..helpers import make_path_safe
 from ..helpers import safe_encode
 from ..helpers import uid2user, gid2group
-from ..item import ArchiveItem, Item
+from ..item import ArchiveItem, Item, ChunkListEntry
 from ..logger import create_logger
 
 logger = create_logger(__name__)
@@ -265,11 +265,10 @@ class ChunksCacheService(ThreadedService):
                 return
             chunks_list = []
             for entry in response:
-                # could/should use ChunkListEntry here?
                 if entry == b'0':
                     return None
                 if entry:
-                    chunks_list.append(struct.unpack('=32sLL', entry))
+                    chunks_list.append(ChunkListEntry.unpack(entry))
             return chunks_list
 
         return file_known_and_unchanged
@@ -328,7 +327,7 @@ class ChunksCacheService(ThreadedService):
         ctx, n, chunk, id = self.input.recv_multipart(copy=False)
         id = id.bytes
         if self.cache.seen_chunk(id):
-            chunk_list_entry = struct.pack('=32sLL', *self.cache.chunk_incref(id, self.stats))
+            chunk_list_entry = self.cache.chunk_incref(id, self.stats).pack()
             self.output_chunk_list_entry(bytes(ctx), bytes(n), chunk_list_entry)
             if len(chunk) >= ChunkerService.LARGE_CHUNK_TRESHOLD:
                 self.output_release_chunk.send(len(chunk).to_bytes(4, sys.byteorder))
@@ -354,8 +353,8 @@ class ChunksCacheService(ThreadedService):
             # Forward-consistency makes everything much simpler.
             refcount = self.cache.seen_chunk(id)
             self.stats.update(size, csize, refcount == 1)
-        chunk_list_entry = struct.pack('=32sLL', id, size, csize)
-        self.output_chunk_list_entry(ctx, n, chunk_list_entry)
+        chunk_list_entry = ChunkListEntry(id, size, csize)
+        self.output_chunk_list_entry(ctx, n, chunk_list_entry.pack())
 
     def respond_file_known(self):
         path_hash, st = self.file_known.recv_multipart()
@@ -371,7 +370,7 @@ class ChunksCacheService(ThreadedService):
             self.file_known.send(b'0')
             return
 
-        chunk_list = [struct.pack('=32sLL', *self.cache.chunk_incref(id, self.stats)) for id in ids]
+        chunk_list = [self.cache.chunk_incref(id, self.stats).pack() for id in ids]
         if chunk_list:
             self.file_known.send_multipart(chunk_list)
         else:
@@ -504,7 +503,7 @@ class ItemHandler(ThreadedService):
         chunk_index = int.from_bytes(chunk_index, sys.byteorder)
         if chunk_index >= len(item.chunks):
             item.chunks.extend([None] * (chunk_index - len(item.chunks) + 1))
-        item.chunks[chunk_index] = struct.unpack('=32sLL', chunk_list_entry)
+        item.chunks[chunk_index] = ChunkListEntry.unpack(chunk_list_entry)
         self.check_item_done(item_optr, item)
 
     def set_item_finished(self):
@@ -594,7 +593,7 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
             self.pack_and_add_item()
         if self.chunk_added in poll_events:
             ctx, n, chunk_list_entry = self.chunk_added.recv_multipart()
-            chunk_id, *_ = struct.unpack('=32sLL', chunk_list_entry)
+            chunk_id = ChunkListEntry.unpack(chunk_list_entry).id
             if self.state == self.States.WAITING_FOR_ARCHIVE_ITEM and ctx == self.ARCHIVE_ITEM_CTX:
                 logger.debug('Archive saved, updating manifest.')
                 self.update_manifest(chunk_id)

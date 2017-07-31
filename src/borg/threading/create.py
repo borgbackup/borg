@@ -4,12 +4,12 @@ import signal
 import stat
 import struct
 import sys
-import time
 import traceback
 from contextlib import contextmanager
 
 import zmq
 
+from borg.remote import InvalidRPCMethod
 from . import ThreadedService
 from ..archive import Archive, Statistics, is_special
 from ..archive import ChunkBuffer
@@ -19,7 +19,6 @@ from ..chunker import Chunker
 from ..helpers import Manifest
 from ..helpers import make_path_safe
 from ..helpers import safe_encode
-from ..helpers import uid2user, gid2group
 from ..item import ArchiveItem, Item, ChunkListEntry
 from ..logger import create_logger
 
@@ -427,9 +426,10 @@ class EncryptionService(ThreadedService):
 
 class RepositoryService(ThreadedService):
     INPUT = 'inproc://repository/put'
-    API = 'inproc://repository'
 
     CONTROL_COMMIT = b'COMMIT'
+    CONTROL_GET_FREE_NONCE = b'GET_FREE_NONCE'
+    CONTROL_COMMIT_NONCE_RESERVATION = b'COMMIT_NONCE_RESERVATION'
 
     def __init__(self, repository, chunk_saved_url=ChunksCacheService.CHUNK_SAVED, zmq_context=None):
         super().__init__(zmq_context)
@@ -439,20 +439,27 @@ class RepositoryService(ThreadedService):
     def init(self):
         super().init()
         self.input = self.socket(zmq.PULL, self.INPUT)
-        self.api = self.socket(zmq.REP, self.API)
         self.output = self.socket(zmq.PUSH, self.chunk_saved_url)
 
     def events(self, poll_events):
         if self.input in poll_events:
             self.put()
-        if self.api in poll_events:
-            self.api_reply()
 
     def handle_control(self, opcode, args):
         if opcode == self.CONTROL_COMMIT:
             self.repository.commit()
             logger.debug('Repository committed.')
-            self.control_sock.send(b'OK')
+            self.control_sock.send(b'ok')
+        elif opcode == self.CONTROL_GET_FREE_NONCE:
+            try:
+                self.control_sock.send(self.repository.get_free_nonce().to_bytes(8, sys.byteorder))
+            except InvalidRPCMethod:
+                self.control_sock.send(b'')
+        elif opcode == self.CONTROL_COMMIT_NONCE_RESERVATION:
+            next_unreserved = int.from_bytes(args[0], sys.byteorder)
+            start_nonce = int.from_bytes(args[1], sys.byteorder)
+            self.repository.commit_nonce_reservation(next_unreserved, start_nonce)
+            self.control_sock.send(b'ok')
         else:
             super().handle_control(opcode, args)
 
@@ -462,10 +469,23 @@ class RepositoryService(ThreadedService):
         self.repository.async_response(wait=False)
         self.output.send_multipart([ctx, n, id] + extra)
 
-    def api_reply(self):
-        # TODO XXX implement API & replace Repository object in other places to avoid accessing it from multiple threads
-        #      XXX Python has no concept of ownership so this is a bit annoying to see through.
-        pass
+    def get_repository_client(self):
+        class RepositoryClient:
+            @staticmethod
+            def get_free_nonce():
+                result, = self.control(self.CONTROL_GET_FREE_NONCE)
+                if result == b'':
+                    raise InvalidRPCMethod()
+                else:
+                    return int.from_bytes(result, sys.byteorder)
+
+            @staticmethod
+            def commit_nonce_reservation(next_unreserved, start_nonce):
+                self.control(self.CONTROL_COMMIT_NONCE_RESERVATION,
+                             next_unreserved.to_bytes(8, sys.byteorder),
+                             start_nonce.to_bytes(8, sys.byteorder))
+
+        return RepositoryClient
 
 
 class ItemHandler(ThreadedService):
@@ -749,24 +769,7 @@ class FilesystemObjectProcessors:
             return status
 
     def process_stdin(self, path, cache):
-        # TODO implement
-        uid, gid = 0, 0
-        t = int(time.time()) * 1000000000
-        item = Item(
-            path=path,
-            mode=0o100660,  # regular file, ug=rw
-            uid=uid, user=uid2user(uid),
-            gid=gid, group=gid2group(gid),
-            mtime=t, atime=t, ctime=t,
-        )
-        fd = sys.stdin.buffer  # binary
-
         raise NotImplementedError
-
-        item.get_size(memorize=True)
-        self.stats.nfiles += 1
-        self.add_item(item)
-        return 'i'  # stdin
 
     def process_file(self, path, st, cache, ignore_inode=False):
         # XXX ignore_inode is initialization-time, move to FilesCacheService
@@ -810,6 +813,13 @@ class CreateArchivePipeline:
             self.chunks_cache, self.compressor, self.encryption,
             self.repository, self.item_handler, self.item_buffer,
         ]
+
+        # XXX
+        archive.repository = key.repository = self.repository.get_repository_client()
+        try:
+            key.nonce_manager.repository = self.repository.get_repository_client()
+        except AttributeError:
+            pass
 
     def save(self):
         self.item_buffer.save(self)

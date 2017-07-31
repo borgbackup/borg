@@ -1,5 +1,5 @@
 # Here you'll see some basic commands to start working with borg.
-# Note: This teaser screencast was made with borg version 1.1.0 – older or newer borg version may behave differently.
+# Note: This teaser screencast was made with borg version 1.1.0 – older or newer borg versions may behave differently.
 # But let's start.
 
 # First of all, you can always get help:

@@ -45,14 +45,14 @@ from .crypto.keymanager import KeyManager
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
 from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams
-from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
+from .helpers import PrefixSpec, SortBySpec
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
 from .helpers import interval, prune_within, prune_split
 from .helpers import timestamp
 from .helpers import get_cache_dir
-from .helpers import Manifest
+from .helpers import Manifest, AI_HUMAN_SORT_KEYS
 from .helpers import hardlinkable
 from .helpers import StableDict
 from .helpers import check_python, check_extension_modules
@@ -2400,7 +2400,7 @@ class Archiver:
                 filters_group.add_argument('--sort-by', metavar='KEYS', dest='sort_by',
                                            type=SortBySpec, default=sort_by_default,
                                            help='Comma-separated list of sorting keys; valid keys are: {}; default is: {}'
-                                           .format(', '.join(HUMAN_SORT_KEYS), sort_by_default))
+                                           .format(', '.join(AI_HUMAN_SORT_KEYS), sort_by_default))
 
             if first_last:
                 group = filters_group.add_mutually_exclusive_group()

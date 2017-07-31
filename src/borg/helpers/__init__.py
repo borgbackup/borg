@@ -2,14 +2,23 @@
 This package contains all sorts of small helper / utility functionality,
 that did not fit better elsewhere.
 
-It used to be in borg/helpers.py but was split into the modules in this
+Code used to be in borg/helpers.py but was split into the modules in this
 package, which are imported into here for compatibility.
 """
 
-# misc.py is just the moved/renamed old helpers.py for an easy start.
-# over time, more and more stuff shall be moved from misc to other modules.
-from .misc import *
-
+from .checks import *  # NOQA
+from .datastruct import *  # NOQA
+from .errors import *  # NOQA
+from .fs import *  # NOQA
+from .manifest import *  # NOQA
+from .misc import *  # NOQA
+from .msgpack import *  # NOQA
+from .parseformat import *  # NOQA
+from .process import *  # NOQA
+from .progress import *  # NOQA
+from .time import *  # NOQA
+from .usergroup import *  # NOQA
+from .yes import *  # NOQA
 
 """
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a

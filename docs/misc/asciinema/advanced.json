@@ -76,7 +76,7 @@
     ],
     [
       0.276132,
-      "\b\u001b[1m:\u001b[1m This screencast was made with borg version 1.1.0 – older or newer bo\u001b[1mr\u001b[1mg version may behave differently.\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1m:\u001b[1m This screencast was made with borg version 1.1.0 – older or newer bo\u001b[1mr\u001b[1mg versions may behave differently.\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       1.063392,
@@ -1071,78 +1071,6 @@
       "s"
     ],
     [
-      0.556139,
-      " "
-    ],
-    [
-      0.90841,
-      "-"
-    ],
-    [
-      0.117065,
-      "-"
-    ],
-    [
-      0.268496,
-      "c"
-    ],
-    [
-      0.118758,
-      "o"
-    ],
-    [
-      0.13892,
-      "m"
-    ],
-    [
-      0.17322,
-      "p"
-    ],
-    [
-      0.146756,
-      "r"
-    ],
-    [
-      0.196139,
-      "e"
-    ],
-    [
-      0.249655,
-      "s"
-    ],
-    [
-      0.157202,
-      "s"
-    ],
-    [
-      0.236521,
-      "i"
-    ],
-    [
-      0.120624,
-      "o"
-    ],
-    [
-      0.175143,
-      "n"
-    ],
-    [
-      0.321073,
-      " "
-    ],
-    [
-      0.249849,
-      "l"
-    ],
-    [
-      0.281988,
-      "z"
-    ],
-    [
-      0.281179,
-      "4"
-    ],
-    [
       1.223567,
       " "
     ],
@@ -1228,7 +1156,7 @@
     ],
     [
       0.009903,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress --compression lz4 ::{user}-{now} \u001b[4mWallpaper\u001b[24m\u001b[K"
+      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress ::{user}-{now} \u001b[4mWallpaper\u001b[24m\u001b[K"
     ],
     [
       1.432747,
@@ -1240,7 +1168,7 @@
     ],
     [
       0.001309,
-      "\u001b]2;borg create --stats --progress --compression lz4 ::{user}-{now} Wallpaper\u0007\u001b]1;borg\u0007"
+      "\u001b]2;borg create --stats --progress ::{user}-{now} Wallpaper\u0007\u001b]1;borg\u0007"
     ],
     [
       0.703285,
@@ -1512,7 +1440,7 @@
     ],
     [
       0.425112,
-      "\b\u001b[1mn\u001b[1m put completly different data, with different backup settings, i\u001b[1mn\u001b[1m our backup. It will be deduplicated, anyway:\u001b[0m\u001b[39m\u001b[K"
+      "\b\u001b[1mn\u001b[1m put completely different data, with different backup settings, i\u001b[1mn\u001b[1m our backup. It will be deduplicated, anyway:\u001b[0m\u001b[39m\u001b[K"
     ],
     [
       1.421849,
@@ -2196,7 +2124,7 @@
     ],
     [
       0.174188,
-      "\b\u001b[1ms\u001b[1m backup a special file or STDIN.\u001b[0m\u001b[39m"
+      "\b\u001b[1ms\u001b[1m backup a device via STDIN.\u001b[0m\u001b[39m"
     ],
     [
       1.117059,
@@ -2296,23 +2224,15 @@
     ],
     [
       0.309668,
-      "l"
+      "s"
     ],
     [
       0.201626,
-      "o"
+      "d"
     ],
     [
       0.121565,
-      "o"
-    ],
-    [
-      0.451108,
-      "p"
-    ],
-    [
-      0.231744,
-      "0"
+      "x"
     ],
     [
       1.112764,
@@ -2556,7 +2476,7 @@
     ],
     [
       0.000824,
-      "\u001b]2;sudo dd if=/dev/loop0 bs=10M | borg create --progress --stats ::specialbackup\u0007\u001b]1;dd\u0007"
+      "\u001b]2;sudo dd if=/dev/sdx bs=10M | borg create --progress --stats ::specialbackup\u0007\u001b]1;dd\u0007"
     ],
     [
       0.023411,
@@ -3818,22 +3738,6 @@
     [
       0.416623,
       "c"
-    ],
-    [
-      0.217722,
-      "i"
-    ],
-    [
-      0.015674,
-      "o"
-    ],
-    [
-      0.786781,
-      "\b \b"
-    ],
-    [
-      0.171996,
-      "\b \b"
     ],
     [
       0.400783,
@@ -7014,14 +6918,6 @@
       "a"
     ],
     [
-      0.326832,
-      "\b \b"
-    ],
-    [
-      0.502806,
-      "a"
-    ],
-    [
       0.353976,
       "\u001b[?1l\u001b>"
     ],
@@ -7155,7 +7051,7 @@
     ],
     [
       0.485291,
-      "\b\u001b[1mn\u001b[1m even mount an archive:\u001b[0m\u001b[39m"
+      "\b\u001b[1mn\u001b[1m mount an archive or even the whole repository:\u001b[0m\u001b[39m"
     ],
     [
       1.036008,
@@ -7623,11 +7519,11 @@
     ],
     [
       0.014483,
-      "\b\b\b\b\u001b[24m/\u001b[24mt\u001b[24mm\u001b[24mpo"
+      "\b\b\b\b\u001b[24m/\u001b[24mt\u001b[24mm\u001b[24mp"
     ],
     [
       0.597766,
-      "\b\b\b\b\b\u001b[4m/\u001b[4mt\u001b[4mm\u001b[4mp\u001b[24m \b"
+      "\b\b\b\b\u001b[4m/\u001b[4mt\u001b[4mm\u001b[4mp\u001b[24m \b"
     ],
     [
       0.482551,

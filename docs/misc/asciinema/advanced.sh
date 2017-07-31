@@ -1,5 +1,5 @@
 # For the pro users, here are some advanced features of borg, so you can impress your friends. ;)
-# Note: This screencast was made with borg version 1.1.0 – older or newer borg version may behave differently.
+# Note: This screencast was made with borg version 1.1.0 – older or newer borg versions may behave differently.
 
 # First of all, we can use several environment variables for borg.
 # E.g. we do not want to type in our repo path and password again and again…
@@ -11,15 +11,14 @@ export BORG_PASSPHRASE='1234'
 ## ADVANCED CREATION ##
 
 # We can also use some placeholders in our archive name…
-borg create --stats --progress --compression lz4 ::{user}-{now} Wallpaper
+borg create --stats --progress ::{user}-{now} Wallpaper
 # Notice the backup name.
 
-# And we can put completly different data, with different backup settings, in our backup. It will be deduplicated, anyway:
+# And we can put completely different data, with different backup settings, in our backup. It will be deduplicated, anyway:
 borg create --stats --progress --compression zlib,6 --exclude ~/Downloads/big ::{user}-{now} ~/Downloads
 
-# Or let's backup a special file or STDIN.
+# Or let's backup a device via STDIN.
 sudo dd if=/dev/loop0 bs=10M | borg create --progress --stats ::specialbackup -
-# <ignore> THEORETICALLY: borg create --read-special --progress --stats ::specialbackup /dev/loop0
 
 # Let's continue with some simple things:
 ## USEFUL COMMANDS ##
@@ -57,7 +56,7 @@ borg diff ::backup1 backup2
 borg export-tar --progress ::backup2 backup.tar.gz
 ls -l
 
-# You can even mount an archive:
+# You can mount an archive or even the whole repository:
 mkdir /tmp/mount
 borg mount :: /tmp/mount
 ls -la /tmp/mount

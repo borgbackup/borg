@@ -139,9 +139,9 @@ end
 def packages_netbsd
   return <<-EOF
     hostname netbsd  # the box we use has an invalid hostname
-    PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/6.1.5/All/"
+    PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/7.0.1/All"
     export PKG_PATH
-    pkg_add mozilla-rootcerts lz4 git bash
+    pkg_add mozilla-rootcerts lz4 git
     chsh -s bash vagrant
     mkdir -p /usr/local/opt/lz4/include
     mkdir -p /usr/local/opt/lz4/lib
@@ -227,7 +227,7 @@ end
 def install_pyenv(boxname)
   script = <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
-    echo 'export PATH="$HOME/.pyenv/bin:/vagrant/borg:$PATH"' >> ~/.bash_profile
+    echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bash_profile
     echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
@@ -320,6 +320,7 @@ def build_binary_with_pyinstaller(boxname)
     . borg-env/bin/activate
     cd borg
     pyinstaller --clean --distpath=/vagrant/borg scripts/borg.exe.spec
+    echo 'export PATH="/vagrant/borg:$PATH"' >> ~/.bash_profile
   EOF
 end
 

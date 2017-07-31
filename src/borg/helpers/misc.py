@@ -34,36 +34,16 @@ from shutil import get_terminal_size
 import msgpack
 import msgpack.fallback
 
-from .logger import create_logger
+from ..logger import create_logger
 logger = create_logger()
 
 import borg.crypto.low_level
-from . import __version__ as borg_version
-from . import __version_tuple__ as borg_version_tuple
-from . import chunker
-from . import hashindex
-from . import shellpattern
-from .constants import *  # NOQA
-
-
-'''
-The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
-warning or error occurred during their operation. This is different from archiver.exit_code, which is only accessible
-from the archiver object.
-'''
-exit_code = EXIT_SUCCESS
-
-
-def set_ec(ec):
-    '''
-    Sets the exit code of the program, if an exit code higher or equal than this is set, this does nothing. This
-    makes EXIT_ERROR override EXIT_WARNING, etc..
-
-    ec: exit code to set
-    '''
-    global exit_code
-    exit_code = max(exit_code, ec)
-    return exit_code
+from .. import __version__ as borg_version
+from .. import __version_tuple__ as borg_version_tuple
+from .. import chunker
+from .. import hashindex
+from .. import shellpattern
+from ..constants import *  # NOQA
 
 
 class Error(Exception):
@@ -130,7 +110,7 @@ class MandatoryFeatureUnsupported(Error):
 
 
 def check_extension_modules():
-    from . import platform, compress, item
+    from .. import platform, compress, item
     if hashindex.API_VERSION != '1.1_07':
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
@@ -323,9 +303,9 @@ class Manifest:
 
     @classmethod
     def load(cls, repository, operations, key=None, force_tam_not_required=False):
-        from .item import ManifestItem
-        from .crypto.key import key_factory, tam_required_file, tam_required
-        from .repository import Repository
+        from ..item import ManifestItem
+        from ..crypto.key import key_factory, tam_required_file, tam_required
+        from ..repository import Repository
         try:
             cdata = repository.get(cls.MANIFEST_ID)
         except Repository.ObjectNotFound:
@@ -384,7 +364,7 @@ class Manifest:
         return result
 
     def write(self):
-        from .item import ManifestItem
+        from ..item import ManifestItem
         if self.key.tam_required:
             self.config[b'tam_required'] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
@@ -1332,7 +1312,7 @@ def ellipsis_truncate(msg, space):
     shorten a long string by adding ellipsis between it and return it, example:
     this_is_a_very_long_string -------> this_is..._string
     """
-    from .platform import swidth
+    from ..platform import swidth
     ellipsis_width = swidth('...')
     msg_width = swidth(msg)
     if space < 8:
@@ -1681,7 +1661,7 @@ class ArchiveFormatter(BaseFormatter):
     def archive(self):
         """lazy load / update loaded archive"""
         if self._archive is None or self._archive.id != self.id:
-            from .archive import Archive
+            from ..archive import Archive
             self._archive = Archive(self.repository, self.key, self.manifest, self.name)
         return self._archive
 
@@ -1723,7 +1703,7 @@ class ItemFormatter(BaseFormatter):
         class FakeArchive:
             fpr = name = ""
 
-        from .item import Item
+        from ..item import Item
         fake_item = Item(mode=0, path='', user='', group='', mtime=0, uid=0, gid=0)
         formatter = cls(FakeArchive, "")
         keys = []
@@ -2078,7 +2058,7 @@ def swidth_slice(string, max_width):
     *max_width* is in units of character cells (or "columns").
     Latin characters are usually one cell wide, many CJK characters are two cells wide.
     """
-    from .platform import swidth
+    from ..platform import swidth
     reverse = max_width < 0
     max_width = abs(max_width)
     if reverse:
@@ -2097,10 +2077,10 @@ def swidth_slice(string, max_width):
 
 class BorgJsonEncoder(json.JSONEncoder):
     def default(self, o):
-        from .repository import Repository
-        from .remote import RemoteRepository
-        from .archive import Archive
-        from .cache import LocalCache, AdHocCache
+        from ..repository import Repository
+        from ..remote import RemoteRepository
+        from ..archive import Archive
+        from ..cache import LocalCache, AdHocCache
         if isinstance(o, Repository) or isinstance(o, RemoteRepository):
             return {
                 'id': bin_to_hex(o.id),

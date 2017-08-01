@@ -1,9 +1,7 @@
 import os
 import faulthandler
-import resource
 import signal
 import threading
-import time
 import traceback
 
 import zmq
@@ -61,14 +59,9 @@ class ThreadedService(threading.Thread):
 
     def run(self):
         try:
-            t0 = time.monotonic()
             self.init()
             self.loop()
             self.exit()
-            td = time.monotonic() - t0
-            ru = resource.getrusage(resource.RUSAGE_THREAD)
-            rel = (ru.ru_utime + ru.ru_stime) / td * 100
-            logger.debug('%s %.2fs user, %.2fs sys, %.2fs wall, %d%%', self.name, ru.ru_utime, ru.ru_stime, td, rel)
         except Exception:
             abort('in thread %s ' % self.name)
 

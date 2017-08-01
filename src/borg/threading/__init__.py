@@ -1,6 +1,7 @@
 import os
 import faulthandler
 import signal
+import sys
 import threading
 import traceback
 
@@ -15,7 +16,7 @@ logger = create_logger(__name__)
 def abort(where=''):
     # Leading newline to clear any progress output
     message = '\n--- Critical error %s---\n%s--- Aborting application ---\n' % (where, traceback.format_exc())
-    if borg.testing and os.path.exists('/dev/tty'):
+    if borg.testing and os.path.exists('/dev/tty') and not sys.platform.startswith('darwin'):
         # When running under py.test, the output is usually wrapped under two-levels of output capturing
         # (one level by py.test itself, which is easily disabled, and another level by exec_cmd).
         # This makes it kinda annoying to get at this information; so in this case just dump it on the TTY.

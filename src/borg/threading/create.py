@@ -10,7 +10,7 @@ from contextlib import contextmanager
 import zmq
 
 from borg.remote import InvalidRPCMethod
-from . import ThreadedService
+from . import ThreadedService, abort
 from ..archive import Archive, Statistics, is_special
 from ..archive import ChunkBuffer
 from ..archive import MetadataCollector
@@ -831,9 +831,7 @@ class CreateArchivePipeline:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val:
-            logger.error('--- Critical error ---')
-            traceback.print_exc()
-            os.kill(os.getpid(), signal.SIGABRT)
+            abort()
         else:
             logger.debug('Joining threads...')
             for service in self.services:

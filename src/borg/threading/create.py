@@ -1,10 +1,8 @@
 import enum
 import os
-import signal
 import stat
 import struct
 import sys
-import traceback
 from contextlib import contextmanager
 
 import zmq
@@ -14,11 +12,12 @@ from . import ThreadedService, abort
 from ..archive import Archive, Statistics, is_special
 from ..archive import ChunkBuffer
 from ..archive import MetadataCollector
-from ..archive import backup_io
+from ..archive import BackupOSError, backup_io
 from ..chunker import Chunker
 from ..helpers import Manifest
 from ..helpers import make_path_safe
 from ..helpers import safe_encode
+from ..helpers import set_ec, EXIT_WARNING
 from ..item import ArchiveItem, Item, ChunkListEntry
 from ..logger import create_logger
 
@@ -73,6 +72,7 @@ class FilesCacheService(ThreadedService):
         self.output = self.socket(zmq.PUSH, self.chunker_url)
 
         self.add_item = ItemBufferService.get_add_item()
+        self.item_failed = ItemBufferService.get_item_failed()
         self.file_known_and_unchanged = ChunksCacheService.get_file_known_and_unchanged()
 
     def events(self, poll_events):
@@ -86,14 +86,22 @@ class FilesCacheService(ThreadedService):
     def process_file(self):
         item = Item.from_optr(self.input.recv())
 
-        st = os.stat(item.original_path)
+        try:
+            st = os.stat(item.original_path)
+        except OSError as e:
+            self.item_failed(item.original_path, e)
+            return
 
         # Is it a hard link?
         if st.st_nlink > 1:
             source = self.hard_links.get((st.st_ino, st.st_dev))
             if source is not None:
                 item.source = source
-                item.update(self.metadata.stat_attrs(st, item.original_path))
+                try:
+                    item.update(self.metadata.stat_attrs(st, item.original_path))
+                except BackupOSError as e:
+                    self.item_failed(item.original_path, e)
+                    return
                 item.status = 'h'  # regular file, hardlink (to already seen inodes)
                 self.add_item(item)
                 return
@@ -111,7 +119,11 @@ class FilesCacheService(ThreadedService):
 
         # item is a hard link and has the chunks
         item.hardlink_master = st.st_nlink > 1
-        item.update(self.metadata.stat_simple_attrs(st))
+        try:
+            item.update(self.metadata.stat_simple_attrs(st))
+        except BackupOSError as e:
+            self.item_failed(item.original_path, e)
+            return
 
         if is_special_file:
             # we processed a special file like a regular file. reflect that in mode,
@@ -176,6 +188,7 @@ class ChunkerService(ThreadedService):
         super().__init__(zmq_context)
         self.chunker = Chunker(chunker_seed, *chunker_params)
         self.mem_budget = self.MEM_BUDGET
+        self.item_failed = ItemBufferService.get_item_failed()
 
     def init(self):
         super().init()
@@ -183,6 +196,7 @@ class ChunkerService(ThreadedService):
         self.release_chunk = self.socket(zmq.PULL, self.RELEASE_CHUNK)
         self.output = self.socket(zmq.PUSH, IdHashService.INPUT)
         self.finished_output = self.socket(zmq.PUSH, ItemHandler.FINISHED_INPUT)
+        self.failed_output = self.socket(zmq.PUSH, ItemHandler.FAILED_INPUT)
 
     def events(self, poll_events):
         if self.release_chunk in poll_events:
@@ -191,23 +205,28 @@ class ChunkerService(ThreadedService):
             self.chunk_file()
 
     def chunk_file(self):
-        # XXX Error handling
         ctx, path = self.input.recv_multipart()
         n = 0
-        fh = Archive._open_rb(path)
-        with os.fdopen(fh, 'rb') as fd:
-            for chunk in self.chunker.chunkify(fd, fh):
-                # Important bit right here: The chunker gives us a memoryview of it's *internal* buffer,
-                # so as soon as we return control back to it (via next() via iteration), it will start
-                # copying new stuff into it's internal buffer. Therefore we need to make a copy here.
+        try:
+            fh = Archive._open_rb(path)
+            with os.fdopen(fh, 'rb') as fd:
+                for chunk in self.chunker.chunkify(fd, fh):
+                    if len(chunk) >= self.LARGE_CHUNK_TRESHOLD:
+                        self.mem_budget -= len(chunk)
+                        while self.mem_budget <= 0:
+                            self.mem_budget += int.from_bytes(self.release_chunk.recv(), sys.byteorder)
 
-                if len(chunk) >= self.LARGE_CHUNK_TRESHOLD:
-                    self.mem_budget -= len(chunk)
-                    while self.mem_budget <= 0:
-                        self.mem_budget += int.from_bytes(self.release_chunk.recv(), sys.byteorder)
+                    # Important bit right here: The chunker gives us a memoryview of it's *internal* buffer,
+                    # so as soon as we return control back to it (via next() via iteration), it will start
+                    # copying new stuff into it's internal buffer. Therefore we need to make a copy here.
+                    self.output.send_multipart([ctx, n.to_bytes(8, sys.byteorder), chunk], copy=True)
+                    n += 1
+        except OSError as e:
+            # Note: pyzmq has a separate exception hierarchy which does not inherit OSError.
+            self.item_failed(path.decode(), e)
+            self.failed_output.send(ctx)
+            return
 
-                self.output.send_multipart([ctx, n.to_bytes(8, sys.byteorder), chunk], copy=True)
-                n += 1
         self.finished_output.send_multipart([ctx, n.to_bytes(8, sys.byteorder)])
 
 
@@ -494,6 +513,7 @@ class RepositoryService(ThreadedService):
 class ItemHandler(ThreadedService):
     CHUNK_INPUT = 'inproc://item-handler/chunks'
     FINISHED_INPUT = 'inproc://item-handler/finished'
+    FAILED_INPUT = 'inproc://item-handler/failed'
 
     def __init__(self, metadata_collector: MetadataCollector, id_hash, zmq_context=None):
         super().__init__(zmq_context)
@@ -501,6 +521,7 @@ class ItemHandler(ThreadedService):
         self.id_hash = id_hash
         self.items_in_progress = {}
         self.add_item = ItemBufferService.get_add_item()
+        self.item_failed = ItemBufferService.get_item_failed()
         self.add_hardlink_master = FilesCacheService.get_add_hardlink_master()
         self.cwd = safe_encode(os.getcwd())
 
@@ -508,6 +529,7 @@ class ItemHandler(ThreadedService):
         super().init()
         self.chunk_input = self.socket(zmq.PULL, self.CHUNK_INPUT)
         self.finished_chunking_file = self.socket(zmq.PULL, self.FINISHED_INPUT)
+        self.failed_chunking_file = self.socket(zmq.PULL, self.FAILED_INPUT)
         self.memorize_file = self.socket(zmq.PUSH, ChunksCacheService.MEMORIZE)
 
     def events(self, poll_events):
@@ -515,6 +537,12 @@ class ItemHandler(ThreadedService):
             self.process_chunk()
         if self.finished_chunking_file in poll_events:
             self.set_item_finished()
+        if self.failed_chunking_file in poll_events:
+            ctx = self.failed_chunking_file.recv()
+            assert ctx.startswith(b'FILE')
+            item_optr = ctx[4:]
+            # If e.g. open(2) fails, then the item wouldn't be considered in-progress yet.
+            self.items_in_progress.pop(item_optr, None)
 
     def process_chunk(self):
         ctx, chunk_index, chunk_list_entry = self.chunk_input.recv_multipart()
@@ -544,9 +572,13 @@ class ItemHandler(ThreadedService):
         if getattr(item, 'num_chunks', None) == len(item.chunks) and all(item.chunks):
             del self.items_in_progress[item_optr]
 
-            # XXX Error handling
-            st = os.stat(item.original_path)
-            item.update(self.metadata.stat_attrs(st, item.original_path))
+            try:
+                st = os.stat(item.original_path)
+                item.update(self.metadata.stat_attrs(st, item.original_path))
+            except (OSError, BackupOSError) as e:
+                self.item_failed(item.original_path, e)
+                return
+
             if item.get('hardlink_master'):
                 self.add_hardlink_master(st, item.path)
 
@@ -561,8 +593,9 @@ class ItemHandler(ThreadedService):
 
 
 class ItemBufferService(ChunkBuffer, ThreadedService):
-    CHUNK_INPUT = 'inproc://chunk-buffer/chunks'
-    ITEM_INPUT = 'inproc://chunk-buffer/add-item'
+    CHUNK_INPUT = 'inproc://item-buffer/chunks'
+    ITEM_INPUT = 'inproc://item-buffer/add-item'
+    ITEM_FAILED_INPUT = 'inproc://item-buffer/item-failed'
 
     CONTROL_SAVE = b'SAVE'
 
@@ -606,6 +639,7 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
     def init(self):
         super().init()
         self.add_item = self.socket(zmq.PULL, self.ITEM_INPUT)
+        self.item_failed = self.socket(zmq.PULL, self.ITEM_FAILED_INPUT)
         self.chunk_added = self.socket(zmq.PULL, self.CHUNK_INPUT)
 
         self.push_chunk = self.socket(zmq.PUSH, self.push_chunk_url)
@@ -614,6 +648,8 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
     def events(self, poll_events):
         if self.add_item in poll_events:
             self.pack_and_add_item()
+        if self.item_failed in poll_events:
+            self.note_failed_item()
         if self.chunk_added in poll_events:
             ctx, n, chunk_list_entry = self.chunk_added.recv_multipart()
             chunk_id = ChunkListEntry.unpack(chunk_list_entry).id
@@ -670,6 +706,17 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
             pass
         self.add(item)
 
+    def note_failed_item(self):
+        # Item was processed, but didn't make it to the archive.
+        # It was of course already counted by FilesystemObjectProcessors.
+        path, msg = self.item_failed.recv_multipart()
+        path = path.decode()
+        msg = msg.decode()
+        self.num_items += 1
+        set_ec(EXIT_WARNING)
+        logger.warning('%s: %s', path, msg)
+        self.print_file_status('E', path)
+
     def write_chunk(self, chunk):
         ctx = b'META'
         n = len(self.chunks).to_bytes(8, sys.byteorder)
@@ -698,6 +745,17 @@ class ItemBufferService(ChunkBuffer, ThreadedService):
         # Notify main thread that we're done here.
         logger.debug('Data committed, unblocking main thread.')
         self.control_sock.send(b'OK')
+
+    @classmethod
+    def get_item_failed(cls):
+        socket = zmq.Context.instance().socket(zmq.PUSH)
+        socket.connect(cls.ITEM_FAILED_INPUT)
+
+        def item_failed(path, error):
+            socket.send_multipart([path.encode(), str(error).encode()])
+
+        return item_failed
+
 
 # TODO checkpoints (via main thread, extension of CONTROL_SAVE w/ explicit archive name)
 # TODO in-file checkpoints (IBS tells IH to emit part-file items for all in-flight items)

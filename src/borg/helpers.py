@@ -52,6 +52,7 @@ warning or error occurred during their operation. This is different from archive
 from the archiver object.
 '''
 exit_code = EXIT_SUCCESS
+exit_code_lock = threading.Lock()
 
 
 def set_ec(ec):
@@ -62,7 +63,8 @@ def set_ec(ec):
     ec: exit code to set
     '''
     global exit_code
-    exit_code = max(exit_code, ec)
+    with exit_code_lock:
+        exit_code = max(exit_code, ec)
     return exit_code
 
 

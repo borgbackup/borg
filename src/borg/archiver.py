@@ -534,7 +534,6 @@ class Archiver:
                                                  ),
                                                  compr_spec=args.compression, metadata_collector=metadata_collector,
                                                  print_file_status=self.print_file_status)
-                archive.items_buffer = pipeline.item_buffer
                 with pipeline:
                     create_inner(archive, cache, pipeline)
         else:

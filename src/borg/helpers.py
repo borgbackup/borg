@@ -2104,9 +2104,9 @@ class BorgJsonEncoder(json.JSONEncoder):
         from .remote import RemoteRepository
         from .archive import Archive
         from .cache import LocalCache, AdHocCache
-        if isinstance(o, Repository) or isinstance(o, RemoteRepository):
+        if hasattr(o, '_location') and hasattr(o, 'id_str'):
             return {
-                'id': bin_to_hex(o.id),
+                'id': o.id_str,
                 'location': o._location.canonical_path(),
             }
         if isinstance(o, Archive):

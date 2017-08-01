@@ -291,6 +291,7 @@ class Archive:
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
+        # TODO: Refactor to remove cache attribute, always pass it explicitly to the few methods requiring it.
         self.cache = cache
         self.manifest = manifest
         self.hard_links = {}

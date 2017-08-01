@@ -471,6 +471,9 @@ class RepositoryService(ThreadedService):
 
     def get_repository_client(self):
         class RepositoryClient:
+            id_str = self.repository.id_str
+            _location = self.repository._location
+
             @staticmethod
             def get_free_nonce():
                 result, = self.control(self.CONTROL_GET_FREE_NONCE)
@@ -814,12 +817,17 @@ class CreateArchivePipeline:
             self.repository, self.item_handler, self.item_buffer,
         ]
 
-        # XXX
+        # XXX This should be one of the major areas of refactoring
+        # XXX Reduce the degree to which god-like objects like cache/archive/repository/manifest/key are passed around.
         archive.repository = key.repository = self.repository.get_repository_client()
+        cache.repository = cache.security_manager.repository = self.repository.get_repository_client()
+        cache.manifest.repository = self.repository.get_repository_client()
         try:
             key.nonce_manager.repository = self.repository.get_repository_client()
         except AttributeError:
             pass
+
+        archive.items_buffer = self.item_buffer
 
     def save(self):
         self.item_buffer.save(self)

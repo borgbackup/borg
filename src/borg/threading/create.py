@@ -906,4 +906,3 @@ class CreateArchivePipeline:
                 logger.debug('Joining %s', service.__class__.__name__)
                 service.join()
             logger.debug('Joined all %d threads.', len(self.services))
-            zmq.Context.instance().destroy()

@@ -24,6 +24,7 @@ from unittest.mock import patch
 
 import msgpack
 import pytest
+import zmq
 
 try:
     import llfuse
@@ -108,6 +109,9 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
             return ret, output.getvalue() if binary_output else output.getvalue().decode()
         finally:
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+            # zmq_ctx_term will block until all sockets are closed, so this is an easy check to see if
+            # sockets were leaked somewhere.
+            zmq.Context.instance().term()
 
 
 def have_gnutar():

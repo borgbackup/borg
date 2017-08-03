@@ -143,7 +143,10 @@ hashindex_lookup(HashIndex *index, const void *key)
             }
             return idx;
         }
-        idx = (idx + 1) % index->num_buckets;
+        idx++;
+        if (idx >= index->num_buckets) {
+            idx -= index->num_buckets;
+        }
         if(idx == start) {
             return -1;
         }
@@ -434,7 +437,10 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
         }
         idx = hashindex_index(index, key);
         while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
-            idx = (idx + 1) % index->num_buckets;
+            idx++;
+            if (idx >= index->num_buckets){
+                idx -= index->num_buckets;
+            }
         }
         if(BUCKET_IS_EMPTY(index, idx)){
             index->num_empty--;

@@ -34,6 +34,14 @@ def packages_debianoid
   EOF
 end
 
+def packages_arch
+  return <<-EOF
+    chown vagrant.vagrant /vagrant
+    pacman --sync --noconfirm python-virtualenv python-pip
+    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
+  EOF
+end
+
 def install_pyenv(boxname)
   script = <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
@@ -201,6 +209,17 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("stretch64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
+  end
+
+  config.vm.define "arch64" do |b|
+    b.vm.box = "terrywang/archlinux"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "packages arch", :type => :shell, :privileged => true, :inline => packages_arch
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("arch64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64")
   end
 
   # TODO: create more VMs with python 3.5+ and openssl 1.1.

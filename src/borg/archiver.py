@@ -1021,18 +1021,19 @@ class Archiver:
         def compare_content(path, item1, item2):
             if contents_changed(item1, item2):
                 if item1.get('deleted'):
-                    return ('added {:>13}'.format(format_file_size(sum_chunk_size(item2))))
-                elif item2.get('deleted'):
-                    return ('removed {:>11}'.format(format_file_size(sum_chunk_size(item1))))
-                else:
-                    chunk_ids1 = {c.id for c in item1.chunks}
-                    chunk_ids2 = {c.id for c in item2.chunks}
-                    added_ids = chunk_ids2 - chunk_ids1
-                    removed_ids = chunk_ids1 - chunk_ids2
-                    added = sum_chunk_size(item2, added_ids)
-                    removed = sum_chunk_size(item1, removed_ids)
-                    return ('{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
-                                                 format_file_size(-removed, precision=1, sign=True)))
+                    return 'added {:>13}'.format(format_file_size(sum_chunk_size(item2)))
+                if item2.get('deleted'):
+                    return 'removed {:>11}'.format(format_file_size(sum_chunk_size(item1)))
+                if not can_compare_chunk_ids:
+                    return 'modified'
+                chunk_ids1 = {c.id for c in item1.chunks}
+                chunk_ids2 = {c.id for c in item2.chunks}
+                added_ids = chunk_ids2 - chunk_ids1
+                removed_ids = chunk_ids1 - chunk_ids2
+                added = sum_chunk_size(item2, added_ids)
+                removed = sum_chunk_size(item1, removed_ids)
+                return '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
+                                            format_file_size(-removed, precision=1, sign=True))
 
         def compare_directory(item1, item2):
             if item2.get('deleted') and not item1.get('deleted'):

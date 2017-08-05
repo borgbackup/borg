@@ -18,7 +18,7 @@ logger = create_logger()
 
 from .errors import Error
 from .fs import get_keys_dir
-from .time import format_time, to_localtime, safe_timestamp, safe_s
+from .time import format_time, isoformat_time, to_localtime, safe_timestamp, safe_s
 from .usergroup import uid2user
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
@@ -657,6 +657,12 @@ class ItemFormatter(BaseFormatter):
             'archiveid': archive.fpr,
         }
         static_keys.update(self.FIXED_KEYS)
+        if self.json_lines:
+            self.item_data = {}
+            self.format_item = self.format_item_json
+            self.format_time = self.format_time_json
+        else:
+            self.item_data = static_keys
         self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
@@ -676,11 +682,6 @@ class ItemFormatter(BaseFormatter):
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        if self.json_lines:
-            self.item_data = {}
-            self.format_item = self.format_item_json
-        else:
-            self.item_data = static_keys
 
     def format_item_json(self, item):
         return json.dumps(self.get_item_data(item)) + '\n'
@@ -758,7 +759,12 @@ class ItemFormatter(BaseFormatter):
         return hash.hexdigest()
 
     def format_time(self, key, item):
-        return format_time(safe_timestamp(item.get(key) or item.mtime))
+        t = self.time(key, item)
+        return format_time(t)
+
+    def format_time_json(self, key, item):
+        t = self.time(key, item)
+        return isoformat_time(t)
 
     def time(self, key, item):
         return safe_timestamp(item.get(key) or item.mtime)

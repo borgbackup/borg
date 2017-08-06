@@ -899,7 +899,7 @@ def basic_json_data(manifest, *, cache=None, extra=None):
             'mode': key.ARG_NAME,
         },
     })
-    data['repository']['last_modified'] = format_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))
+    data['repository']['last_modified'] = isoformat_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))
     if key.NAME.startswith('key file'):
         data['encryption']['keyfile'] = key.find_key()
     if cache:

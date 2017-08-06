@@ -549,6 +549,7 @@ class ArchiveFormatter(BaseFormatter):
         if self.json:
             self.item_data = {}
             self.format_item = self.format_item_json
+            self.format_time = self.format_time_json
         else:
             self.item_data = static_keys
 
@@ -565,8 +566,8 @@ class ArchiveFormatter(BaseFormatter):
             'archive': remove_surrogates(archive_info.name),
             'barchive': archive_info.name,
             'id': bin_to_hex(archive_info.id),
-            'time': format_time(to_localtime(archive_info.ts)),
-            'start': format_time(to_localtime(archive_info.ts)),
+            'time': self.format_time(archive_info.ts),
+            'start': self.format_time(archive_info.ts),
         })
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key]()
@@ -584,7 +585,15 @@ class ArchiveFormatter(BaseFormatter):
         return remove_surrogates(self.archive.comment) if rs else self.archive.comment
 
     def get_ts_end(self):
-        return format_time(to_localtime(self.archive.ts_end))
+        return self.format_time(self.archive.ts_end)
+
+    def format_time(self, ts):
+        t = to_localtime(ts)
+        return format_time(t)
+
+    def format_time_json(self, ts):
+        t = to_localtime(ts)
+        return isoformat_time(t)
 
 
 class ItemFormatter(BaseFormatter):

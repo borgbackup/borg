@@ -85,8 +85,8 @@ def test_convert_segments(attic_repo, inplace):
     :param attic_repo: a populated attic repository (fixture)
     """
     repo_path = attic_repo
-    # check should fail because of magic number
-    assert not repo_valid(repo_path)
+    with pytest.raises(Repository.AtticRepository):
+        repo_valid(repo_path)
     repository = AtticRepositoryUpgrader(repo_path, create=False)
     with repository:
         segments = [filename for i, filename in repository.io.segment_iterator()]
@@ -149,8 +149,8 @@ def test_convert_all(attic_repo, attic_key_file, inplace):
     """
     repo_path = attic_repo
 
-    # check should fail because of magic number
-    assert not repo_valid(repo_path)
+    with pytest.raises(Repository.AtticRepository):
+        repo_valid(repo_path)
 
     def stat_segment(path):
         return os.stat(os.path.join(path, 'data', '0', '0'))

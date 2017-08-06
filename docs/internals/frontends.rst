@@ -499,6 +499,8 @@ Errors
         Insufficient free space to complete transaction (required: {}, available: {}).
     Repository.InvalidRepository
         {} is not a valid repository. Check repo config.
+    Repository.AtticRepository
+        Attic repository detected. Please run "borg upgrade {}".
     Repository.ObjectNotFound
         Object with key {} not found in repository {}.
 

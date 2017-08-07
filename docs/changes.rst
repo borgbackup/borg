@@ -131,6 +131,19 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.0rc2 (not released yet)
+------------------------------------
+
+Compatibility notes:
+
+- list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
+  "isomtime" was the default but produced a verbose human format,
+  while "mtime" produced a ISO-8601-like format.
+  The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
+  and the default is now "mtime".
+  "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+
+
 Version 1.1.0rc1 (2017-07-24)
 -----------------------------
 

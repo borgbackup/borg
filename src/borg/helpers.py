@@ -139,7 +139,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if borg.crypto.low_level.API_VERSION != '1.1_02':
         raise ExtensionModuleError
-    if platform.API_VERSION != platform.OS_API_VERSION != '1.1_01':
+    if platform.API_VERSION != platform.OS_API_VERSION != '1.1_02':
         raise ExtensionModuleError
     if item.API_VERSION != '1.1_02':
         raise ExtensionModuleError
@@ -1183,7 +1183,11 @@ def make_path_safe(path):
 
 def daemonize():
     """Detach process from controlling terminal and run in background
+
+    Returns: old and new get_process_id tuples
     """
+    from .platform import get_process_id
+    old_id = get_process_id()
     pid = os.fork()
     if pid:
         os._exit(0)
@@ -1199,6 +1203,8 @@ def daemonize():
     os.dup2(fd, 0)
     os.dup2(fd, 1)
     os.dup2(fd, 2)
+    new_id = get_process_id()
+    return old_id, new_id
 
 
 class StableDict(dict):

@@ -87,9 +87,15 @@ def safe_timestamp(item_timestamp_ns):
 
 
 def format_time(t):
-    """use ISO-8601 date and time format
+    """use ISO-8601-like date and time format (human readable, with wkday and blank date/time separator)
     """
     return t.strftime('%a, %Y-%m-%d %H:%M:%S')
+
+
+def isoformat_time(t):
+    """use ISO-8601 date and time format (machine readable, no wkday, no microseconds either)
+    """
+    return t.strftime('%Y-%m-%dT%H:%M:%S')  # note: first make all datetime objects tz aware before adding %z here.
 
 
 def format_timedelta(td):

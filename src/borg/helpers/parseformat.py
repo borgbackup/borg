@@ -18,7 +18,7 @@ logger = create_logger()
 
 from .errors import Error
 from .fs import get_keys_dir
-from .time import format_time, to_localtime, safe_timestamp, safe_s
+from .time import format_time, isoformat_time, to_localtime, safe_timestamp, safe_s
 from .usergroup import uid2user
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
@@ -549,6 +549,7 @@ class ArchiveFormatter(BaseFormatter):
         if self.json:
             self.item_data = {}
             self.format_item = self.format_item_json
+            self.format_time = self.format_time_json
         else:
             self.item_data = static_keys
 
@@ -565,8 +566,8 @@ class ArchiveFormatter(BaseFormatter):
             'archive': remove_surrogates(archive_info.name),
             'barchive': archive_info.name,
             'id': bin_to_hex(archive_info.id),
-            'time': format_time(to_localtime(archive_info.ts)),
-            'start': format_time(to_localtime(archive_info.ts)),
+            'time': self.format_time(archive_info.ts),
+            'start': self.format_time(archive_info.ts),
         })
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key]()
@@ -584,7 +585,15 @@ class ArchiveFormatter(BaseFormatter):
         return remove_surrogates(self.archive.comment) if rs else self.archive.comment
 
     def get_ts_end(self):
-        return format_time(to_localtime(self.archive.ts_end))
+        return self.format_time(self.archive.ts_end)
+
+    def format_time(self, ts):
+        t = to_localtime(ts)
+        return format_time(t)
+
+    def format_time_json(self, ts):
+        t = to_localtime(ts)
+        return isoformat_time(t)
 
 
 class ItemFormatter(BaseFormatter):
@@ -657,6 +666,12 @@ class ItemFormatter(BaseFormatter):
             'archiveid': archive.fpr,
         }
         static_keys.update(self.FIXED_KEYS)
+        if self.json_lines:
+            self.item_data = {}
+            self.format_item = self.format_item_json
+            self.format_time = self.format_time_json
+        else:
+            self.item_data = static_keys
         self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
@@ -676,11 +691,6 @@ class ItemFormatter(BaseFormatter):
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        if self.json_lines:
-            self.item_data = {}
-            self.format_item = self.format_item_json
-        else:
-            self.item_data = static_keys
 
     def format_item_json(self, item):
         return json.dumps(self.get_item_data(item)) + '\n'
@@ -758,7 +768,12 @@ class ItemFormatter(BaseFormatter):
         return hash.hexdigest()
 
     def format_time(self, key, item):
-        return format_time(safe_timestamp(item.get(key) or item.mtime))
+        t = self.time(key, item)
+        return format_time(t)
+
+    def format_time_json(self, key, item):
+        t = self.time(key, item)
+        return isoformat_time(t)
 
     def time(self, key, item):
         return safe_timestamp(item.get(key) or item.mtime)
@@ -884,7 +899,7 @@ def basic_json_data(manifest, *, cache=None, extra=None):
             'mode': key.ARG_NAME,
         },
     })
-    data['repository']['last_modified'] = format_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))
+    data['repository']['last_modified'] = isoformat_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))
     if key.NAME.startswith('key file'):
         data['encryption']['keyfile'] = key.find_key()
     if cache:

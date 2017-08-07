@@ -7,4 +7,6 @@ pytest
 pytest-xdist
 pytest-cov
 pytest-benchmark
+pytest-faulthandler
+pytest-timeout
 Cython

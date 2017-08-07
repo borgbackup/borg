@@ -18,3 +18,5 @@ version metadata is obtained dynamically on installation via setuptools_scm,
 please ensure your git repo has the correct tags or you provide the version
 using SETUPTOOLS_SCM_PRETEND_VERSION in your build script.
 """ % __version__
+
+testing = False

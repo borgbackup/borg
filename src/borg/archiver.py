@@ -36,7 +36,7 @@ from . import helpers
 from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
-from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
+from .archive import MetadataCollector, ChunksProcessor
 from .cache import Cache, assert_secure
 from .constants import *  # NOQA
 from .compress import CompressionSpec
@@ -75,6 +75,7 @@ from .platform import get_flags, get_process_id, SyncFile
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 from .selftest import selftest
+from .threading.create import CreateArchivePipeline
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
 
@@ -449,7 +450,7 @@ class Archiver:
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
 
-        def create_inner(archive, cache, fso):
+        def create_inner(archive, cache, pipeline):
             # Add cache dir to inode_skip list
             skip_inodes = set()
             try:
@@ -469,7 +470,7 @@ class Archiver:
                     path = 'stdin'
                     if not dry_run:
                         try:
-                            status = fso.process_stdin(path, cache)
+                            status = pipeline.fso.process_stdin(path, cache)
                         except BackupOSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
@@ -487,11 +488,12 @@ class Archiver:
                     restrict_dev = st.st_dev
                 else:
                     restrict_dev = None
-                self._process(fso, cache, matcher, args.exclude_caches, args.exclude_if_present,
+                self._process(pipeline.fso if not dry_run else None,
+                              cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_exclude_tags, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run, st=st)
             if not dry_run:
-                archive.save(comment=args.comment, timestamp=args.timestamp)
+                pipeline.save()
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 args.stats |= args.json
@@ -526,13 +528,15 @@ class Archiver:
                                   log_json=args.log_json)
                 metadata_collector = MetadataCollector(noatime=args.noatime, noctime=args.noctime,
                     numeric_owner=args.numeric_owner)
-                cp = ChunksProcessor(cache=cache, key=key,
-                    add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
-                    checkpoint_interval=args.checkpoint_interval)
-                fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
-                    process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
-                    chunker_params=args.chunker_params)
-                create_inner(archive, cache, fso)
+                pipeline = CreateArchivePipeline(repository=repository, key=key, cache=cache, archive=archive,
+                                                 archive_data=dict(
+                                                     comment=args.comment,
+                                                     timestamp=args.timestamp,
+                                                 ),
+                                                 compr_spec=args.compression, metadata_collector=metadata_collector,
+                                                 print_file_status=self.print_file_status)
+                with pipeline:
+                    create_inner(archive, cache, pipeline)
         else:
             create_inner(None, None, None)
         return self.exit_code
@@ -653,7 +657,7 @@ class Archiver:
             else:
                 status = '-'  # dry run, item was not backed up
 
-        if not recurse_excluded_dir:
+        if not recurse_excluded_dir and status != 'async':
             self.print_file_status(status, path)
 
     @staticmethod

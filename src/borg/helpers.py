@@ -52,6 +52,7 @@ warning or error occurred during their operation. This is different from archive
 from the archiver object.
 '''
 exit_code = EXIT_SUCCESS
+exit_code_lock = threading.Lock()
 
 
 def set_ec(ec):
@@ -62,7 +63,8 @@ def set_ec(ec):
     ec: exit code to set
     '''
     global exit_code
-    exit_code = max(exit_code, ec)
+    with exit_code_lock:
+        exit_code = max(exit_code, ec)
     return exit_code
 
 
@@ -141,7 +143,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION != '1.1_01':
         raise ExtensionModuleError
-    if item.API_VERSION != '1.1_03':
+    if item.API_VERSION != '1.1_04':
         raise ExtensionModuleError
 
 
@@ -383,7 +385,7 @@ class Manifest:
                 result[operation.decode()] = set([feature.decode() for feature in requirements[b'mandatory']])
         return result
 
-    def write(self):
+    def pack(self):
         from .item import ManifestItem
         if self.key.tam_required:
             self.config[b'tam_required'] = True
@@ -408,6 +410,10 @@ class Manifest:
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
+        return data
+
+    def write(self):
+        data = self.pack()
         self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
 
 
@@ -801,7 +807,7 @@ def format_archive(archive):
     )
 
 
-class Buffer:
+class Buffer(threading.local):
     """
     provide a thread-local buffer
     """
@@ -816,13 +822,12 @@ class Buffer:
         """
         assert callable(allocator), 'must give alloc(size) function as first param'
         assert limit is None or size <= limit, 'initial size must be <= limit'
-        self._thread_local = threading.local()
         self.allocator = allocator
         self.limit = limit
         self.resize(size, init=True)
 
     def __len__(self):
-        return len(self._thread_local.buffer)
+        return len(self.buffer)
 
     def resize(self, size, init=False):
         """
@@ -834,7 +839,7 @@ class Buffer:
         if self.limit is not None and size > self.limit:
             raise Buffer.MemoryLimitExceeded(size, self.limit)
         if init or len(self) < size:
-            self._thread_local.buffer = self.allocator(size)
+            self.buffer = self.allocator(size)
 
     def get(self, size=None, init=False):
         """
@@ -843,7 +848,7 @@ class Buffer:
         """
         if size is not None:
             self.resize(size, init)
-        return self._thread_local.buffer
+        return self.buffer
 
 
 @lru_cache(maxsize=None)
@@ -2101,9 +2106,9 @@ class BorgJsonEncoder(json.JSONEncoder):
         from .remote import RemoteRepository
         from .archive import Archive
         from .cache import LocalCache, AdHocCache
-        if isinstance(o, Repository) or isinstance(o, RemoteRepository):
+        if hasattr(o, '_location') and hasattr(o, 'id_str'):
             return {
-                'id': bin_to_hex(o.id),
+                'id': o.id_str,
                 'location': o._location.canonical_path(),
             }
         if isinstance(o, Archive):

@@ -1,4 +1,5 @@
 import stat
+import struct
 from collections import namedtuple
 
 from .constants import ITEM_KEYS
@@ -11,7 +12,7 @@ cdef extern from "_item.c":
     object _optr_to_object(object bytes)
 
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.1_04'
 
 
 class PropDict:
@@ -122,7 +123,20 @@ class PropDict:
         return property(_get, _set, _del, doc=doc)
 
 
-ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+_ChunkListEntry = namedtuple('_ChunkListEntry', 'id size csize')
+
+
+class ChunkListEntry(_ChunkListEntry):
+    __slots__ = ()
+    format = struct.Struct('=32sLL')
+
+    def pack(self):
+        return self.format.pack(*self)
+
+    @classmethod
+    def unpack(cls, data: bytes):
+        return cls(*cls.format.unpack(data))
+
 
 class Item(PropDict):
     """
@@ -141,7 +155,8 @@ class Item(PropDict):
     We must never re-use this key. See test_attic013_acl_bug for details.
     """
 
-    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys
+    # TODO: Ideally, a separate mechanism that also caters to runtime-only attributes like "deleted" as well.
+    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', 'original_path', 'status', 'num_chunks'}  # str-typed keys
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
@@ -181,6 +196,9 @@ class Item(PropDict):
 
     deleted = PropDict._make_property('deleted', bool)
     nlink = PropDict._make_property('nlink', int)
+    original_path = PropDict._make_property('original_path', str)
+    status = PropDict._make_property('status', str)
+    num_chunks = PropDict._make_property('num_chunks', int)
 
     part = PropDict._make_property('part', int)
 

@@ -61,7 +61,7 @@ from . import key
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-ISO_FORMAT = '%Y-%m-%dT%H:%M:%S'
+ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_output=False, **kw):
@@ -1864,7 +1864,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['size'] == 81920
-        assert datetime.strptime(file1['isomtime'], ISO_FORMAT)  # must not raise
+        assert datetime.strptime(file1['mtime'], ISO_FORMAT)  # must not raise
 
         list_archive = self.cmd('list', '--json-lines', '--format={sha256}', self.repository_location + '::test')
         items = [json.loads(s) for s in list_archive.splitlines()]

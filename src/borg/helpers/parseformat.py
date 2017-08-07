@@ -764,7 +764,7 @@ class ItemFormatter(BaseFormatter):
         return OutputTimestamp(safe_timestamp(item.get(key) or item.mtime))
 
     def format_iso_time(self, key, item):
-        return self.format_time(key, item).to_json()
+        return self.format_time(key, item).isoformat()
 
 
 def file_status(mode):

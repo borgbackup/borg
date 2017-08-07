@@ -18,23 +18,21 @@ def swidth(s):
         return str_len
 
 
-# only determine the PID and hostname once.
-# for FUSE mounts, we fork a child process that needs to release
-# the lock made by the parent, so it needs to use the same PID for that.
-_pid = os.getpid()
+# for performance reasons, only determine the hostname once.
 # XXX this sometimes requires live internet access for issuing a DNS query in the background.
 _hostname = '%s@%s' % (socket.getfqdn(), uuid.getnode())
 
 
 def get_process_id():
     """
-    Return identification tuple (hostname, pid, thread_id) for 'us'. If this is a FUSE process, then the PID will be
-    that of the parent, not the forked FUSE child.
+    Return identification tuple (hostname, pid, thread_id) for 'us'.
+    This always returns the current pid, which might be different from before, e.g. if daemonize() was used.
 
     Note: Currently thread_id is *always* zero.
     """
     thread_id = 0
-    return _hostname, _pid, thread_id
+    pid = os.getpid()
+    return _hostname, pid, thread_id
 
 
 def process_alive(host, pid, thread):

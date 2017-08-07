@@ -22,6 +22,7 @@ from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
 from .item import Item
 from .lrucache import LRUCache
+from .remote import RemoteRepository
 
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
@@ -285,7 +286,10 @@ class FuseOperations(llfuse.Operations):
         self._create_filesystem()
         llfuse.init(self, mountpoint, options)
         if not foreground:
-            daemonize()
+            old_id, new_id = daemonize()
+            if not isinstance(self.repository_uncached, RemoteRepository):
+                # local repo and the locking process' PID just changed, migrate it:
+                self.repository_uncached.migrate_lock(old_id, new_id)
 
         # If the file system crashes, we do not want to umount because in that
         # case the mountpoint suddenly appears to become empty. This can have

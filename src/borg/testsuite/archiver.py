@@ -60,8 +60,6 @@ from . import key
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-ISO_FORMAT = '%Y-%m-%dT%H:%M:%S'
-
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_output=False, **kw):
     if fork:
@@ -1306,7 +1304,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repository = info_repo['repository']
         assert len(repository['id']) == 64
         assert 'last_modified' in repository
-        assert datetime.strptime(repository['last_modified'], ISO_FORMAT)  # must not raise
         assert info_repo['encryption']['mode'] == 'repokey'
         assert 'keyfile' not in info_repo['encryption']
         cache = info_repo['cache']
@@ -1849,11 +1846,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         list_repo = json.loads(self.cmd('list', '--json', self.repository_location))
         repository = list_repo['repository']
         assert len(repository['id']) == 64
-        assert datetime.strptime(repository['last_modified'], ISO_FORMAT)  # must not raise
+        assert 'last_modified' in repository
         assert list_repo['encryption']['mode'] == 'repokey'
         assert 'keyfile' not in list_repo['encryption']
-        archive0 = list_repo['archives'][0]
-        assert datetime.strptime(archive0['time'], ISO_FORMAT)  # must not raise
 
         list_archive = self.cmd('list', '--json-lines', self.repository_location + '::test')
         items = [json.loads(s) for s in list_archive.splitlines()]
@@ -1861,7 +1856,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['size'] == 81920
-        assert datetime.strptime(file1['isomtime'], ISO_FORMAT)  # must not raise
 
         list_archive = self.cmd('list', '--json-lines', '--format={sha256}', self.repository_location + '::test')
         items = [json.loads(s) for s in list_archive.splitlines()]

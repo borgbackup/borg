@@ -141,7 +141,8 @@ class Archiver:
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually.
         """
-        return RepositoryServer(restrict_to_paths=args.restrict_to_paths, append_only=args.append_only).serve()
+        RepositoryServer(restrict_to_paths=args.restrict_to_paths, append_only=args.append_only).serve()
+        return EXIT_SUCCESS
 
     @with_repository(create=True, exclusive=True, manifest=False)
     def do_init(self, args, repository):

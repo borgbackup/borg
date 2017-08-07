@@ -1790,7 +1790,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output_warn = self.cmd('list', '--list-format', '-', test_archive)
         self.assert_in('--list-format" has been deprecated.', output_warn)
         output_1 = self.cmd('list', test_archive)
-        output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)
+        output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}', test_archive)
         output_3 = self.cmd('list', '--format', '{mtime:%s} {path}{NL}', test_archive)
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)

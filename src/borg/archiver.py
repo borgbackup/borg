@@ -1342,7 +1342,7 @@ class Archiver:
         elif args.short:
             format = "{path}{NL}"
         else:
-            format = "{mode} {user:6} {group:6} {size:8} {isomtime} {path}{extra}{NL}"
+            format = "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"
 
         def _list_inner(cache):
             archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
@@ -3127,7 +3127,7 @@ class Archiver:
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',
                                help='specify format for file listing '
-                                    '(default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")')
+                                    '(default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")')
         subparser.add_argument('--json', action='store_true',
                                help='Only valid for listing repository contents. Format output as JSON. '
                                     'The form of ``--format`` is ignored, '

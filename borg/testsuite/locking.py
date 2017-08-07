@@ -57,6 +57,19 @@ class TestExclusiveLock:
             with pytest.raises(LockTimeout):
                 ExclusiveLock(lockpath, id=ID2, timeout=0.1).acquire()
 
+    def test_migrate_lock(self, lockpath):
+        old_id, new_id = ID1, ID2
+        assert old_id[1] != new_id[1]  # different PIDs (like when doing daemonize())
+        lock = ExclusiveLock(lockpath, id=old_id).acquire()
+        assert lock.id == old_id  # lock is for old id / PID
+        old_unique_name = lock.unique_name
+        assert lock.by_me()  # we have the lock
+        lock.migrate_lock(old_id, new_id)  # fix the lock
+        assert lock.id == new_id  # lock corresponds to the new id / PID
+        new_unique_name = lock.unique_name
+        assert lock.by_me()  # we still have the lock
+        assert old_unique_name != new_unique_name  # locking filename is different now
+
 
 class TestLock:
     def test_shared(self, lockpath):
@@ -117,6 +130,22 @@ class TestLock:
             with pytest.raises(LockTimeout):
                 Lock(lockpath, exclusive=True, id=ID2, timeout=0.1).acquire()
 
+    def test_migrate_lock(self, lockpath):
+        old_id, new_id = ID1, ID2
+        assert old_id[1] != new_id[1]  # different PIDs (like when doing daemonize())
+
+        lock = Lock(lockpath, id=old_id, exclusive=True).acquire()
+        assert lock.id == old_id
+        lock.migrate_lock(old_id, new_id)  # fix the lock
+        assert lock.id == new_id
+        lock.release()
+
+        lock = Lock(lockpath, id=old_id, exclusive=False).acquire()
+        assert lock.id == old_id
+        lock.migrate_lock(old_id, new_id)  # fix the lock
+        assert lock.id == new_id
+        lock.release()
+
 
 @pytest.fixture()
 def rosterpath(tmpdir):
@@ -144,3 +173,14 @@ class TestLockRoster:
         roster2 = LockRoster(rosterpath, id=ID2)
         roster2.modify(SHARED, REMOVE)
         assert roster2.get(SHARED) == set()
+
+    def test_migrate_lock(self, rosterpath):
+        old_id, new_id = ID1, ID2
+        assert old_id[1] != new_id[1]  # different PIDs (like when doing daemonize())
+        roster = LockRoster(rosterpath, id=old_id)
+        assert roster.id == old_id
+        roster.modify(SHARED, ADD)
+        assert roster.get(SHARED) == {old_id}
+        roster.migrate_lock(SHARED, old_id, new_id)  # fix the lock
+        assert roster.id == new_id
+        assert roster.get(SHARED) == {new_id}

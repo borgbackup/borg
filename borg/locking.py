@@ -8,17 +8,20 @@ from borg.helpers import Error, ErrorWithTraceback
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
 
-# only determine the PID and hostname once.
-# for FUSE mounts, we fork a child process that needs to release
-# the lock made by the parent, so it needs to use the same PID for that.
-_pid = os.getpid()
+# for performance reasons, only determine the hostname once.
 _hostname = socket.gethostname()
 
 
 def get_id():
-    """Get identification tuple for 'us'"""
+    """
+    Return identification tuple (hostname, pid, thread_id) for 'us'.
+    This always returns the current pid, which might be different from before, e.g. if daemonize() was used.
+
+    Note: Currently thread_id is *always* zero.
+    """
     thread_id = 0
-    return _hostname, _pid, thread_id
+    pid = os.getpid()
+    return _hostname, pid, thread_id
 
 
 class TimeoutTimer:
@@ -166,6 +169,16 @@ class ExclusiveLock:
                 os.unlink(os.path.join(self.path, name))
             os.rmdir(self.path)
 
+    def migrate_lock(self, old_id, new_id):
+        """migrate the lock ownership from old_id to new_id"""
+        assert self.id == old_id
+        new_unique_name = os.path.join(self.path, "%s.%d-%x" % new_id)
+        if self.is_locked() and self.by_me():
+            with open(new_unique_name, "wb"):
+                pass
+            os.unlink(self.unique_name)
+        self.id, self.unique_name = new_id, new_unique_name
+
 
 class LockRoster:
     """
@@ -218,6 +231,19 @@ class LockRoster:
             raise ValueError('Unknown LockRoster op %r' % op)
         roster[key] = list(list(e) for e in elements)
         self.save(roster)
+
+    def migrate_lock(self, key, old_id, new_id):
+        """migrate the lock ownership from old_id to new_id"""
+        assert self.id == old_id
+        try:
+            self.modify(key, REMOVE)
+        except KeyError:
+            # entry was not there, so no need to add a new one, but still update our id
+            self.id = new_id
+        else:
+            # old entry removed, update our id and add a updated entry
+            self.id = new_id
+            self.modify(key, ADD)
 
 
 class Lock:
@@ -321,3 +347,14 @@ class Lock:
     def break_lock(self):
         self._roster.remove()
         self._lock.break_lock()
+
+    def migrate_lock(self, old_id, new_id):
+        assert self.id == old_id
+        self.id = new_id
+        if self.is_exclusive:
+            self._lock.migrate_lock(old_id, new_id)
+            self._roster.migrate_lock(EXCLUSIVE, old_id, new_id)
+        else:
+            with self._lock:
+                self._lock.migrate_lock(old_id, new_id)
+                self._roster.migrate_lock(SHARED, old_id, new_id)

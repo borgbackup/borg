@@ -715,16 +715,19 @@ def safe_timestamp(item_timestamp_ns):
     return datetime.fromtimestamp(t_ns / 1e9)
 
 
-def format_time(t):
-    """use ISO-8601-like date and time format (human readable, with wkday and blank date/time separator)
+def format_time(ts: datetime):
     """
-    return t.strftime('%a, %Y-%m-%d %H:%M:%S')
+    Convert *ts* to a human-friendly format with textual weekday.
+    """
+    return ts.strftime('%a, %Y-%m-%d %H:%M:%S')
 
 
-def isoformat_time(t):
-    """use ISO-8601 date and time format (machine readable, no wkday, no microseconds either)
+def isoformat_time(ts: datetime):
     """
-    return t.strftime('%Y-%m-%dT%H:%M:%S')  # note: first make all datetime objects tz aware before adding %z here.
+    Format *ts* according to ISO 8601.
+    """
+    # note: first make all datetime objects tz aware before adding %z here.
+    return ts.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
 
 def format_timedelta(td):
@@ -756,8 +759,10 @@ class OutputTimestamp:
     def __str__(self):
         return '{}'.format(self)
 
-    def to_json(self):
+    def isoformat(self):
         return isoformat_time(self.ts)
+
+    to_json = isoformat
 
 
 def format_file_size(v, precision=2, sign=False):
@@ -1895,7 +1900,7 @@ class ItemFormatter(BaseFormatter):
         return OutputTimestamp(safe_timestamp(item.get(key) or item.mtime))
 
     def format_iso_time(self, key, item):
-        return self.format_time(key, item).to_json()
+        return self.format_time(key, item).isoformat()
 
 
 class ChunkIteratorFileWrapper:

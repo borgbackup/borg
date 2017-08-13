@@ -202,6 +202,16 @@ class ExclusiveLock:
                 os.unlink(os.path.join(self.path, name))
             os.rmdir(self.path)
 
+    def migrate_lock(self, old_id, new_id):
+        """migrate the lock ownership from old_id to new_id"""
+        assert self.id == old_id
+        new_unique_name = os.path.join(self.path, "%s.%d-%x" % new_id)
+        if self.is_locked() and self.by_me():
+            with open(new_unique_name, "wb"):
+                pass
+            os.unlink(self.unique_name)
+        self.id, self.unique_name = new_id, new_unique_name
+
 
 class LockRoster:
     """
@@ -270,6 +280,25 @@ class LockRoster:
             raise ValueError('Unknown LockRoster op %r' % op)
         roster[key] = list(list(e) for e in elements)
         self.save(roster)
+
+    def migrate_lock(self, key, old_id, new_id):
+        """migrate the lock ownership from old_id to new_id"""
+        assert self.id == old_id
+        # need to temporarily switch off stale lock killing as we want to
+        # rather migrate than kill them (at least the one made by old_id).
+        killing, self.kill_stale_locks = self.kill_stale_locks, False
+        try:
+            try:
+                self.modify(key, REMOVE)
+            except KeyError:
+                # entry was not there, so no need to add a new one, but still update our id
+                self.id = new_id
+            else:
+                # old entry removed, update our id and add a updated entry
+                self.id = new_id
+                self.modify(key, ADD)
+        finally:
+            self.kill_stale_locks = killing
 
 
 class Lock:
@@ -373,3 +402,14 @@ class Lock:
     def break_lock(self):
         self._roster.remove()
         self._lock.break_lock()
+
+    def migrate_lock(self, old_id, new_id):
+        assert self.id == old_id
+        self.id = new_id
+        if self.is_exclusive:
+            self._lock.migrate_lock(old_id, new_id)
+            self._roster.migrate_lock(EXCLUSIVE, old_id, new_id)
+        else:
+            with self._lock:
+                self._lock.migrate_lock(old_id, new_id)
+                self._roster.migrate_lock(SHARED, old_id, new_id)

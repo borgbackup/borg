@@ -1,26 +1,5 @@
 @import url("theme.css");
 
-/*  The Return of the Borg.
- *
- *  Have a bit green and grey and darkness (and if only in the upper left corner).
- */
-
-.wy-side-nav-search {
-    background-color: #000000 !important;
-}
-
-.wy-side-nav-search input[type="text"] {
-        border-color: #000000;
-}
-
-.wy-side-nav-search > a {
-    color: rgba(255, 255, 255, 0.5);
-}
-
-.wy-side-nav-search > div.version {
-    color: rgba(255, 255, 255, 0.5);
-}
-
 dt code {
     font-weight: normal;
 }

@@ -1164,7 +1164,7 @@
     ],
     [
       3.5e-05,
-      "\u001b[32mborg\u001b[39m create --stats --progress /media/backup/borgdemo::backup1 --compression lz4 \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
+      "\u001b[32mborg\u001b[39m create --stats --progress --compression lz4 /media/backup/borgdemo::backup1 \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
     ],
     [
       0.997225,

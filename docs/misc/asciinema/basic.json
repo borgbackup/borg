@@ -4660,7 +4660,7 @@
     ],
     [
       0.000824,
-      "\u001b]2;borg init borgdemo@remoteserver.example:./demo\u0007\u001b]1;borg\u0007"
+      "\u001b]2;borg init --encryption=repokey borgdemo@remoteserver.example:./demo\u0007\u001b]1;borg\u0007"
     ],
     [
       6.069586,

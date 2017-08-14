@@ -170,6 +170,11 @@ class Repository:
     def break_lock(self):
         Lock(os.path.join(self.path, 'lock')).break_lock()
 
+    def migrate_lock(self, old_id, new_id):
+        # note: only needed for local repos
+        if self.lock is not None:
+            self.lock.migrate_lock(old_id, new_id)
+
     def open(self, path, exclusive, lock_wait=None, lock=True):
         self.path = path
         if not os.path.isdir(path):

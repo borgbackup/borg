@@ -15,6 +15,7 @@ from .archive import Archive
 from .helpers import daemonize, bigint_to_int
 from .logger import create_logger
 from .lrucache import LRUCache
+from .remote import RemoteRepository
 logger = create_logger()
 
 
@@ -56,6 +57,7 @@ class FuseOperations(llfuse.Operations):
         super().__init__()
         self._inode_count = 0
         self.key = key
+        self.repository_uncached = repository
         self.repository = cached_repo
         self.items = {}
         self.parent = {}
@@ -92,7 +94,10 @@ class FuseOperations(llfuse.Operations):
             pass
         llfuse.init(self, mountpoint, options)
         if not foreground:
-            daemonize()
+            old_id, new_id = daemonize()
+            if not isinstance(self.repository_uncached, RemoteRepository):
+                # local repo and the locking process' PID just changed, migrate it:
+                self.repository_uncached.migrate_lock(old_id, new_id)
 
         # If the file system crashes, we do not want to umount because in that
         # case the mountpoint suddenly appears to become empty. This can have

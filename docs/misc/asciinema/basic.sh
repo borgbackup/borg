@@ -10,14 +10,14 @@ borg init --encryption=repokey /media/backup/borgdemo
 # This uses the repokey encryption. You may look at "borg help init" or the online doc at https://borgbackup.readthedocs.io/ for other modes.
 
 # So now, let's create our first (compressed) backup.
-borg create --stats --progress /media/backup/borgdemo::backup1 Wallpaper
+borg create --stats --progress --compression lz4 /media/backup/borgdemo::backup1 Wallpaper
 
 # That's nice, so far.
 # So let's add a new file…
 echo "new nice file" > Wallpaper/newfile.txt
 
 <up>
-borg create --stats --progress /media/backup/borgdemo::backup2 Wallpaper
+borg create --stats --progress --compression lz4 /media/backup/borgdemo::backup2 Wallpaper
 
 # Wow, this was a lot faster!
 # Notice the "Deduplicated size" for "This archive"!
@@ -26,7 +26,7 @@ borg create --stats --progress /media/backup/borgdemo::backup2 Wallpaper
 # But what happens, when we move a dir and create a new backup?
 mv …
 
-borg create --stats --progress /media/backup/borgdemo::backup3 Wallpaper
+borg create --stats --progress --compression lz4 /media/backup/borgdemo::backup3 Wallpaper
 
 # Still quite fast…
 # But when you look at the "deduplicated file size" again, you see that borg also recognized that only the dir and not the files changed in this backup.

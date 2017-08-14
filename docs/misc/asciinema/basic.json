@@ -975,6 +975,78 @@
       " "
     ],
     [
+      0.490303,
+      "-"
+    ],
+    [
+      0.117279,
+      "-"
+    ],
+    [
+      0.130499,
+      "c"
+    ],
+    [
+      0.146261,
+      "o"
+    ],
+    [
+      0.139848,
+      "m"
+    ],
+    [
+      0.156108,
+      "p"
+    ],
+    [
+      0.190058,
+      "r"
+    ],
+    [
+      0.166862,
+      "e"
+    ],
+    [
+      0.261225,
+      "s"
+    ],
+    [
+      0.157133,
+      "s"
+    ],
+    [
+      0.281205,
+      "i"
+    ],
+    [
+      0.142487,
+      "o"
+    ],
+    [
+      0.179023,
+      "n"
+    ],
+    [
+      0.854723,
+      " "
+    ],
+    [
+      0.580178,
+      "l"
+    ],
+    [
+      0.29757,
+      "z"
+    ],
+    [
+      0.3111,
+      "4"
+    ],
+    [
+      1.085772,
+      " "
+    ],
+    [
       0.635539,
       "\u001b[4m/\u001b[24m"
     ],
@@ -996,7 +1068,7 @@
     ],
     [
       0.010346,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress \u001b[4m/media\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
+      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress --compression lz4 \u001b[4m/media\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
     ],
     [
       0.416084,
@@ -1004,7 +1076,7 @@
     ],
     [
       0.004048,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress \u001b[4m/media/backup\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
+      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress --compression lz4 \u001b[4m/media/backup\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
     ],
     [
       0.346657,
@@ -1016,7 +1088,7 @@
     ],
     [
       0.003996,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress \u001b[4m/media/backup/borgdemo\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
+      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress --compression lz4 \u001b[4m/media/backup/borgdemo\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
     ],
     [
       1.068791,
@@ -1092,7 +1164,7 @@
     ],
     [
       3.5e-05,
-      "\u001b[32mborg\u001b[39m create --stats --progress /media/backup/borgdemo::backup1 \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
+      "\u001b[32mborg\u001b[39m create --stats --progress /media/backup/borgdemo::backup1 --compression lz4 \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
     ],
     [
       0.997225,
@@ -1108,7 +1180,7 @@
     ],
     [
       0.000917,
-      "\u001b]2;borg create --stats --progress Wallpaper\u0007\u001b]1;borg\u0007"
+      "\u001b]2;borg create --stats --progress --compression lz4 Wallpaper\u0007\u001b]1;borg\u0007"
     ],
     [
       0.630228,

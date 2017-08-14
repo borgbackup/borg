@@ -11,7 +11,7 @@ export BORG_PASSPHRASE='1234'
 ## ADVANCED CREATION ##
 
 # We can also use some placeholders in our archive name…
-borg create --stats --progress ::{user}-{now} Wallpaper
+borg create --stats --progress --compression lz4 ::{user}-{now} Wallpaper
 # Notice the backup name.
 
 # And we can put completely different data, with different backup settings, in our backup. It will be deduplicated, anyway:

@@ -19,6 +19,7 @@ ATTIC_MAGIC = b'ATTICSEG'
 class AtticRepositoryUpgrader(Repository):
     def __init__(self, *args, **kw):
         kw['lock'] = False  # do not create borg lock files (now) in attic repo
+        kw['check_segment_magic'] = False  # skip the Attic check when upgrading
         super().__init__(*args, **kw)
 
     def upgrade(self, dryrun=True, inplace=False, progress=False):

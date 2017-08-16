@@ -113,3 +113,19 @@ def format_timedelta(td):
     if td.days:
         txt = '%d days %s' % (td.days, txt)
     return txt
+
+
+class OutputTimestamp:
+    def __init__(self, ts: datetime):
+        if ts.tzinfo == timezone.utc:
+            ts = to_localtime(ts)
+        self.ts = ts
+
+    def __format__(self, format_spec):
+        return format_time(self.ts)
+
+    def __str__(self):
+        return '{}'.format(self)
+
+    def to_json(self):
+        return isoformat_time(self.ts)

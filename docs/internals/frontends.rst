@@ -209,8 +209,9 @@ Standard output
 *stdout* is different and more command-dependent than logging. Commands like :ref:`borg_info`, :ref:`borg_create`
 and :ref:`borg_list` implement a ``--json`` option which turns their regular output into a single JSON object.
 
-Dates are formatted according to ISO-8601 with the strftime format string '%a, %Y-%m-%d %H:%M:%S',
-e.g. *Sat, 2016-02-25 23:50:06*.
+Dates are formatted according to ISO-8601 in local time. Neither an explicit time zone nor microseconds
+are specified *at this time* (subject to change). The equivalent strftime format string is '%Y-%m-%dT%H:%M:%S',
+e.g. 2017-08-07T12:27:20.
 
 The root object at least contains a *repository* key with an object containing:
 
@@ -267,7 +268,7 @@ Example *borg info* output::
         },
         "repository": {
             "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "last_modified": "2017-08-07T12:27:20",
             "location": "/home/user/testrepo"
         },
         "security_dir": "/home/user/.config/borg/security/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
@@ -328,7 +329,7 @@ Example of a simple archive listing (``borg list --last 1 --json``)::
             {
                 "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
                 "name": "host-system-backup-2017-02-27",
-                "start": "Mon, 2017-02-27 21:21:52"
+                "start": "2017-08-07T12:27:20"
             }
         ],
         "encryption": {
@@ -336,7 +337,7 @@ Example of a simple archive listing (``borg list --last 1 --json``)::
         },
         "repository": {
             "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "last_modified": "2017-08-07T12:27:20",
             "location": "/home/user/repository"
         }
     }
@@ -354,14 +355,14 @@ The same archive with more information (``borg info --last 1 --json``)::
                 ],
                 "comment": "",
                 "duration": 5.641542,
-                "end": "Mon, 2017-02-27 21:21:58",
+                "end": "2017-02-27T12:27:20",
                 "hostname": "host",
                 "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
                 "limits": {
                     "max_archive_size": 0.0001330855110409714
                 },
                 "name": "host-system-backup-2017-02-27",
-                "start": "Mon, 2017-02-27 21:21:52",
+                "start": "2017-02-27T12:27:20",
                 "stats": {
                     "compressed_size": 1880961894,
                     "deduplicated_size": 2791,
@@ -387,7 +388,7 @@ The same archive with more information (``borg info --last 1 --json``)::
         },
         "repository": {
             "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "last_modified": "Mon, 2017-02-27 21:21:58",
+            "last_modified": "2017-08-07T12:27:20",
             "location": "/home/user/repository"
         }
     }
@@ -405,8 +406,8 @@ Refer to the *borg list* documentation for the available keys and their meaning.
 
 Example (excerpt) of ``borg list --json-lines``::
 
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "source": "", "linktarget": "", "flags": null, "isomtime": "Sat, 2016-05-07 19:46:01", "size": 0}
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "source": "", "linktarget": "", "flags": null, "isomtime": "Sat, 2016-05-07 19:46:01", "size": 0}
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "source": "", "linktarget": "", "flags": null, "isomtime": "2017-02-27T12:27:20", "size": 0}
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "source": "", "linktarget": "", "flags": null, "isomtime": "2017-02-27T12:27:20", "size": 0}
 
 .. _msgid:
 

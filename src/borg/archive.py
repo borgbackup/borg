@@ -32,7 +32,7 @@ from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
 from .helpers import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
-from .helpers import format_time, format_timedelta, format_file_size, file_status, FileSize
+from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
 from .helpers import StableDict
 from .helpers import bin_to_hex
@@ -381,8 +381,8 @@ class Archive:
         info = {
             'name': self.name,
             'id': self.fpr,
-            'start': format_time(to_localtime(start)),
-            'end': format_time(to_localtime(end)),
+            'start': OutputTimestamp(start),
+            'end': OutputTimestamp(end),
             'duration': (end - start).total_seconds(),
             'stats': stats.as_dict(),
             'limits': {
@@ -411,8 +411,8 @@ Number of files: {0.stats.nfiles}
 Utilization of max. archive size: {csize_max:.0%}
 '''.format(
             self,
-            start=format_time(to_localtime(self.start.replace(tzinfo=timezone.utc))),
-            end=format_time(to_localtime(self.end.replace(tzinfo=timezone.utc))),
+            start=OutputTimestamp(self.start.replace(tzinfo=timezone.utc)),
+            end=OutputTimestamp(self.end.replace(tzinfo=timezone.utc)),
             csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE)
 
     def __repr__(self):

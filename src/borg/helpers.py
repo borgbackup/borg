@@ -744,6 +744,22 @@ def format_timedelta(td):
     return txt
 
 
+class OutputTimestamp:
+    def __init__(self, ts: datetime):
+        if ts.tzinfo == timezone.utc:
+            ts = to_localtime(ts)
+        self.ts = ts
+
+    def __format__(self, format_spec):
+        return format_time(self.ts)
+
+    def __str__(self):
+        return '{}'.format(self)
+
+    def to_json(self):
+        return isoformat_time(self.ts)
+
+
 def format_file_size(v, precision=2, sign=False):
     """Format file size into a human friendly format
     """
@@ -1664,12 +1680,11 @@ class ArchiveFormatter(BaseFormatter):
         if self.json:
             self.item_data = {}
             self.format_item = self.format_item_json
-            self.format_time = self.format_time_json
         else:
             self.item_data = static_keys
 
     def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item)) + '\n'
+        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder) + '\n'
 
     def get_item_data(self, archive_info):
         self.name = archive_info.name
@@ -1703,12 +1718,7 @@ class ArchiveFormatter(BaseFormatter):
         return self.format_time(self.archive.ts_end)
 
     def format_time(self, ts):
-        t = to_localtime(ts)
-        return format_time(t)
-
-    def format_time_json(self, ts):
-        t = to_localtime(ts)
-        return isoformat_time(t)
+        return OutputTimestamp(ts)
 
 
 class ItemFormatter(BaseFormatter):
@@ -1784,7 +1794,6 @@ class ItemFormatter(BaseFormatter):
         if self.json_lines:
             self.item_data = {}
             self.format_item = self.format_item_json
-            self.format_time = self.format_time_json
         else:
             self.item_data = static_keys
         self.format = partial_format(format, static_keys)
@@ -1796,19 +1805,19 @@ class ItemFormatter(BaseFormatter):
             'dcsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.csize),
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
-            'isomtime': partial(self.format_time, 'mtime'),
-            'isoctime': partial(self.format_time, 'ctime'),
-            'isoatime': partial(self.format_time, 'atime'),
-            'mtime': partial(self.time, 'mtime'),
-            'ctime': partial(self.time, 'ctime'),
-            'atime': partial(self.time, 'atime'),
+            'isomtime': partial(self.format_iso_time, 'mtime'),
+            'isoctime': partial(self.format_iso_time, 'ctime'),
+            'isoatime': partial(self.format_iso_time, 'atime'),
+            'mtime': partial(self.format_time, 'mtime'),
+            'ctime': partial(self.format_time, 'ctime'),
+            'atime': partial(self.format_time, 'atime'),
         }
         for hash_function in hashlib.algorithms_guaranteed:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item)) + '\n'
+        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder) + '\n'
 
     def add_key(self, key, callable_with_item):
         self.call_keys[key] = callable_with_item
@@ -1883,15 +1892,10 @@ class ItemFormatter(BaseFormatter):
         return hash.hexdigest()
 
     def format_time(self, key, item):
-        t = self.time(key, item)
-        return format_time(t)
+        return OutputTimestamp(safe_timestamp(item.get(key) or item.mtime))
 
-    def format_time_json(self, key, item):
-        t = self.time(key, item)
-        return isoformat_time(t)
-
-    def time(self, key, item):
-        return safe_timestamp(item.get(key) or item.mtime)
+    def format_iso_time(self, key, item):
+        return self.format_time(key, item).to_json()
 
 
 class ChunkIteratorFileWrapper:
@@ -2204,6 +2208,8 @@ class BorgJsonEncoder(json.JSONEncoder):
             return {
                 'stats': o.stats(),
             }
+        if callable(getattr(o, 'to_json', None)):
+            return o.to_json()
         return super().default(o)
 
 
@@ -2216,7 +2222,7 @@ def basic_json_data(manifest, *, cache=None, extra=None):
             'mode': key.ARG_NAME,
         },
     })
-    data['repository']['last_modified'] = isoformat_time(to_localtime(manifest.last_timestamp.replace(tzinfo=timezone.utc)))
+    data['repository']['last_modified'] = OutputTimestamp(manifest.last_timestamp.replace(tzinfo=timezone.utc))
     if key.NAME.startswith('key file'):
         data['encryption']['keyfile'] = key.find_key()
     if cache:

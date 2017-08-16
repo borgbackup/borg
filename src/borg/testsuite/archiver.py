@@ -1325,6 +1325,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert isinstance(archive['duration'], float)
         assert len(archive['id']) == 64
         assert 'stats' in archive
+        assert datetime.strptime(archive['start'], ISO_FORMAT)
+        assert datetime.strptime(archive['end'], ISO_FORMAT)
 
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)

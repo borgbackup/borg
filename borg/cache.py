@@ -208,10 +208,16 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                 if not data:
                     break
                 u.feed(data)
-                for path_hash, item in u:
-                    item[0] += 1
-                    # in the end, this takes about 240 Bytes per file
-                    self.files[path_hash] = msgpack.packb(item)
+                try:
+                    for path_hash, item in u:
+                        item[0] += 1
+                        # in the end, this takes about 240 Bytes per file
+                        self.files[path_hash] = msgpack.packb(item)
+                except (TypeError, ValueError) as exc:
+                    logger.warning('The files cache seems corrupt, ignoring it. '
+                                   'Expect lower performance. [%s]' % str(exc))
+                    self.files = {}
+                    return
 
     def begin_txn(self):
         # Initialize transaction snapshot

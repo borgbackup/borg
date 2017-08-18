@@ -17,7 +17,7 @@ Contributions
 
 Some guidance for contributors:
 
-- discuss about changes on github issue tracker, IRC or mailing list
+- discuss changes on the GitHub issue tracker, IRC or on the mailing list
 
 - make your PRs on the ``master`` branch (see `Branching Model`_ for details)
 
@@ -29,9 +29,9 @@ Some guidance for contributors:
   - if you need to fix something after commit/push:
 
     - if there are ongoing reviews: do a fixup commit you can
-      merge into the bad commit later.
+      squash into the bad commit later.
     - if there are no ongoing reviews or you did not push the
-      bad commit yet: edit the commit to include your fix or
+      bad commit yet: amend the commit to include your fix or
       merge the fixup commit before pushing.
   - have a nice, clear, typo-free commit comment
   - if you fixed an issue, refer to it in your commit comment
@@ -39,9 +39,9 @@ Some guidance for contributors:
 
 - if you write new code, please add tests and docs for it
 
-- run the tests, fix anything that comes up
+- run the tests, fix any errors that come up
 
-- make a pull request on github
+- make a pull request on GitHub
 
 - wait for review by other developers
 
@@ -52,15 +52,15 @@ Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup :ref:`mailing_list` to the maintainers).
 
-Stable releases are maintained on maintenance branches named x.y-maint, eg.
-the maintenance branch of the 1.0.x series is 1.0-maint.
+Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
+the maintenance branch of the 1.0.x series is ``1.0-maint``.
 
-Most PRs should be made against the ``master`` branch. Only if an
+Most PRs should be filed against the ``master`` branch. Only if an
 issue affects **only** a particular maintenance branch a PR should be
-made against it directly.
+filed against it directly.
 
 While discussing / reviewing a PR it will be decided whether the
-change should be applied to maintenance branch(es). Each maintenance
+change should be applied to maintenance branches. Each maintenance
 branch has a corresponding *backport/x.y-maint* label, which will then
 be applied.
 
@@ -113,7 +113,7 @@ troublesome due to merges growing more conflict-heavy and error-prone.
 Code and issues
 ---------------
 
-Code is stored on Github, in the `Borgbackup organization
+Code is stored on GitHub, in the `Borgbackup organization
 <https://github.com/borgbackup/borg/>`_. `Issues
 <https://github.com/borgbackup/borg/issues>`_ and `pull requests
 <https://github.com/borgbackup/borg/pulls>`_ should be sent there as
@@ -222,7 +222,7 @@ parsers declared in the program and their documentation, which is
 embedded in the program (see archiver.py). These are committed to git
 for easier use by packagers downstream.
 
-When a command is added, a commandline flag changed, added or removed,
+When a command is added, a command line flag changed, added or removed,
 the usage docs need to be rebuilt as well::
 
   python setup.py build_usage
@@ -327,8 +327,8 @@ Checklist:
     git clone borg borg-clean
 
   This makes sure no uncommitted files get into the release archive.
-  It also will find if you forgot to commit something that is needed.
-  It also makes sure the vagrant machines only get committed files and
+  It will also reveal uncommitted required files.
+  Moreover, it makes sure the vagrant machines only get committed files and
   do a fresh start based on that.
 - run tox and/or binary builds on all supported platforms via vagrant,
   check for test failures
@@ -336,14 +336,14 @@ Checklist:
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign
 
-- close release milestone on Github
+- close the release milestone on GitHub
 - announce on:
 
  - Mailing list
  - Twitter (follow @ThomasJWaldmann for these tweets)
  - IRC channel (change ``/topic``)
 
-- create a Github release, include:
+- create a GitHub release, include:
 
   * standalone binaries (see above for how to create them)
 

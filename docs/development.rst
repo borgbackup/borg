@@ -17,7 +17,7 @@ Contributions
 
 Some guidance for contributors:
 
-- discuss changes on the GitHub issue tracker, IRC or on the mailing list
+- discuss changes on the GitHub issue tracker, on IRC or on the mailing list
 
 - make your PRs on the ``master`` branch (see `Branching Model`_ for details)
 
@@ -39,7 +39,7 @@ Some guidance for contributors:
 
 - if you write new code, please add tests and docs for it
 
-- run the tests, fix any errors that come up
+- run the tests, fix any issues that come up
 
 - make a pull request on GitHub
 

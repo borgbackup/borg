@@ -503,10 +503,16 @@ class LocalCache(CacheStatsMixin):
                 if not data:
                     break
                 u.feed(data)
-                for path_hash, item in u:
-                    entry = FileCacheEntry(*item)
-                    # in the end, this takes about 240 Bytes per file
-                    self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+                try:
+                    for path_hash, item in u:
+                        entry = FileCacheEntry(*item)
+                        # in the end, this takes about 240 Bytes per file
+                        self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+                except (TypeError, ValueError) as exc:
+                    logger.warning('The files cache seems corrupt, ignoring it. '
+                                   'Expect lower performance. [%s]' % str(exc))
+                    self.files = {}
+                    return
 
     def begin_txn(self):
         # Initialize transaction snapshot

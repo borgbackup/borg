@@ -126,8 +126,7 @@ class LZ4(CompressorBase):
         osize = LZ4_compressBound(isize)
         buf = buffer.get(osize)
         dest = <char *> buf
-        with nogil:
-            osize = LZ4_compress_limitedOutput(source, dest, isize, osize)
+        osize = LZ4_compress_limitedOutput(source, dest, isize, osize)
         if not osize:
             raise Exception('lz4 compress failed')
         return super().compress(dest[:osize])
@@ -150,8 +149,7 @@ class LZ4(CompressorBase):
             except MemoryError:
                 raise DecompressionError('MemoryError')
             dest = <char *> buf
-            with nogil:
-                rsize = LZ4_decompress_safe(source, dest, isize, osize)
+            rsize = LZ4_decompress_safe(source, dest, isize, osize)
             if rsize >= 0:
                 break
             if osize > 2 ** 27:  # 128MiB (should be enough, considering max. repo obj size and very good compression)

@@ -207,8 +207,7 @@ def hmac_sha256(key, data):
     cdef int key_len = len(key)
     cdef unsigned char md[32]
     try:
-        with nogil:
-            rc = HMAC(EVP_sha256(), key_ptr, key_len, <const unsigned char*> data_buf.buf, data_buf.len, md, NULL)
+        rc = HMAC(EVP_sha256(), key_ptr, key_len, <const unsigned char*> data_buf.buf, data_buf.len, md, NULL)
         if rc != md:
             raise Exception('HMAC(EVP_sha256) failed')
     finally:
@@ -219,8 +218,7 @@ def hmac_sha256(key, data):
 cdef blake2b_update_from_buffer(blake2b_state *state, obj):
     cdef Py_buffer buf = ro_buffer(obj)
     try:
-        with nogil:
-            rc = blake2b_update(state, buf.buf, buf.len)
+        rc = blake2b_update(state, buf.buf, buf.len)
         if rc == -1:
             raise Exception('blake2b_update() failed')
     finally:

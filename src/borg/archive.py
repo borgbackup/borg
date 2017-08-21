@@ -5,12 +5,13 @@ import socket
 import stat
 import sys
 import time
+from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from functools import partial
 from getpass import getuser
 from io import BytesIO
-from itertools import groupby
+from itertools import groupby, zip_longest
 from shutil import get_terminal_size
 
 import msgpack
@@ -40,7 +41,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
-from .item import Item, ArchiveItem
+from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
@@ -818,6 +819,89 @@ Utilization of max. archive size: {csize_max:.0%}
                 raise
             # Was this EPERM due to the O_NOATIME flag? Try again without it:
             return os.open(path, flags_normal)
+
+    @staticmethod
+    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False):
+        """
+        Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
+
+        :param matcher: PatternMatcher class to restrict results to only matching paths.
+        :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
+        """
+
+        def hardlink_master_seen(item):
+            return 'source' not in item or not hardlinkable(item.mode) or item.source in hardlink_masters
+
+        def is_hardlink_master(item):
+            return item.get('hardlink_master', True) and 'source' not in item
+
+        def update_hardlink_masters(item1, item2):
+            if is_hardlink_master(item1) or is_hardlink_master(item2):
+                hardlink_masters[item1.path] = (item1, item2)
+
+        def has_hardlink_master(item, hardlink_masters):
+            return hardlinkable(item.mode) and item.get('source') in hardlink_masters
+
+        def compare_items(item1, item2):
+            if has_hardlink_master(item1, hardlink_masters):
+                item1 = hardlink_masters[item1.source][0]
+            if has_hardlink_master(item2, hardlink_masters):
+                item2 = hardlink_masters[item2.source][1]
+            return ItemDiff(item1, item2,
+                            archive1.pipeline.fetch_many([c.id for c in item1.get('chunks', [])]),
+                            archive2.pipeline.fetch_many([c.id for c in item2.get('chunks', [])]),
+                            can_compare_chunk_ids=can_compare_chunk_ids)
+
+        def defer_if_necessary(item1, item2):
+            """Adds item tuple to deferred if necessary and returns True, if items were deferred"""
+            update_hardlink_masters(item1, item2)
+            defer = not hardlink_master_seen(item1) or not hardlink_master_seen(item2)
+            if defer:
+                deferred.append((item1, item2))
+            return defer
+
+        orphans_archive1 = OrderedDict()
+        orphans_archive2 = OrderedDict()
+        deferred = []
+        hardlink_masters = {}
+
+        for item1, item2 in zip_longest(
+                archive1.iter_items(lambda item: matcher.match(item.path)),
+                archive2.iter_items(lambda item: matcher.match(item.path)),
+        ):
+            if item1 and item2 and item1.path == item2.path:
+                if not defer_if_necessary(item1, item2):
+                    yield (item1.path, compare_items(item1, item2))
+                continue
+            if item1:
+                matching_orphan = orphans_archive2.pop(item1.path, None)
+                if matching_orphan:
+                    if not defer_if_necessary(item1, matching_orphan):
+                        yield (item1.path, compare_items(item1, matching_orphan))
+                else:
+                    orphans_archive1[item1.path] = item1
+            if item2:
+                matching_orphan = orphans_archive1.pop(item2.path, None)
+                if matching_orphan:
+                    if not defer_if_necessary(matching_orphan, item2):
+                        yield (matching_orphan.path, compare_items(matching_orphan, item2))
+                else:
+                    orphans_archive2[item2.path] = item2
+        # At this point orphans_* contain items that had no matching partner in the other archive
+        for added in orphans_archive2.values():
+            path = added.path
+            deleted_item = Item.create_deleted(path)
+            update_hardlink_masters(deleted_item, added)
+            yield (path, compare_items(deleted_item, added))
+        for deleted in orphans_archive1.values():
+            path = deleted.path
+            deleted_item = Item.create_deleted(path)
+            update_hardlink_masters(deleted, deleted_item)
+            yield (path, compare_items(deleted, deleted_item))
+        for item1, item2 in deferred:
+            assert hardlink_master_seen(item1)
+            assert hardlink_master_seen(item2)
+            yield (path, compare_items(item1, item2))
 
 
 class MetadataCollector:

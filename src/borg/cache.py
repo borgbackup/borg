@@ -982,7 +982,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
         assert not overwrite, 'AdHocCache does not permit overwrites — trying to use it for recreate?'
         if not self._txn_active:
-            self._begin_txn()
+            self.begin_txn()
         size = len(chunk)
         refcount = self.seen_chunk(id, size)
         if refcount:
@@ -996,7 +996,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
     def seen_chunk(self, id, size=None):
         if not self._txn_active:
-            self._begin_txn()
+            self.begin_txn()
         entry = self.chunks.get(id, ChunkIndexEntry(0, None, None))
         if entry.refcount and size and not entry.size:
             # The LocalCache has existing size information and uses *size* to make an effort at detecting collisions.
@@ -1007,7 +1007,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
     def chunk_incref(self, id, stats, size=None):
         if not self._txn_active:
-            self._begin_txn()
+            self.begin_txn()
         count, _size, csize = self.chunks.incref(id)
         # When _size is 0 and size is not given, then this chunk has not been locally visited yet (seen_chunk with
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
@@ -1018,7 +1018,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
     def chunk_decref(self, id, stats, wait=True):
         if not self._txn_active:
-            self._begin_txn()
+            self.begin_txn()
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
@@ -1037,9 +1037,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         self._txn_active = False
         del self.chunks
 
-    # Private API
-
-    def _begin_txn(self):
+    def begin_txn(self):
         self._txn_active = True
         # Explicitly set the initial hash table capacity to avoid performance issues
         # due to hash table "resonance".

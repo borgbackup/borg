@@ -96,7 +96,7 @@ files manually.
 A segment starts with a magic number (``BORG_SEG`` as an eight byte ASCII string),
 followed by a number of log entries. Each log entry consists of:
 
-* size of the entry
+* 32-bit size of the entry
 * CRC32 of the entire entry (for a PUT this includes the data)
 * entry tag: PUT, DELETE or COMMIT
 * PUT and DELETE follow this with the 32 byte key
@@ -117,6 +117,9 @@ a commit is the **transaction ID**.
 When a repository is opened any ``PUT`` or ``DELETE`` operations not
 followed by a ``COMMIT`` tag are discarded since they are part of a
 partial/uncommitted transaction.
+
+The size of individual segments is limited to 4 GiB, since the offset of entries
+within segments is stored in a 32-bit unsigned integer in the repository index.
 
 Index, hints and integrity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

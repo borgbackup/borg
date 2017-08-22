@@ -61,7 +61,7 @@ from . import key
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-ISO_FORMAT = '%Y-%m-%dT%H:%M:%S'
+ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_output=False, **kw):
@@ -1326,6 +1326,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert isinstance(archive['duration'], float)
         assert len(archive['id']) == 64
         assert 'stats' in archive
+        assert datetime.strptime(archive['start'], ISO_FORMAT)
+        assert datetime.strptime(archive['end'], ISO_FORMAT)
 
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -1788,7 +1790,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output_warn = self.cmd('list', '--list-format', '-', test_archive)
         self.assert_in('--list-format" has been deprecated.', output_warn)
         output_1 = self.cmd('list', test_archive)
-        output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}', test_archive)
+        output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}', test_archive)
         output_3 = self.cmd('list', '--format', '{mtime:%s} {path}{NL}', test_archive)
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)
@@ -1862,7 +1864,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['size'] == 81920
-        assert datetime.strptime(file1['isomtime'], ISO_FORMAT)  # must not raise
+        assert datetime.strptime(file1['mtime'], ISO_FORMAT)  # must not raise
 
         list_archive = self.cmd('list', '--json-lines', '--format={sha256}', self.repository_location + '::test')
         items = [json.loads(s) for s in list_archive.splitlines()]

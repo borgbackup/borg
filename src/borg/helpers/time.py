@@ -86,16 +86,19 @@ def safe_timestamp(item_timestamp_ns):
     return datetime.fromtimestamp(t_ns / 1e9)
 
 
-def format_time(t):
-    """use ISO-8601-like date and time format (human readable, with wkday and blank date/time separator)
+def format_time(ts: datetime):
     """
-    return t.strftime('%a, %Y-%m-%d %H:%M:%S')
+    Convert *ts* to a human-friendly format with textual weekday.
+    """
+    return ts.strftime('%a, %Y-%m-%d %H:%M:%S')
 
 
-def isoformat_time(t):
-    """use ISO-8601 date and time format (machine readable, no wkday, no microseconds either)
+def isoformat_time(ts: datetime):
     """
-    return t.strftime('%Y-%m-%dT%H:%M:%S')  # note: first make all datetime objects tz aware before adding %z here.
+    Format *ts* according to ISO 8601.
+    """
+    # note: first make all datetime objects tz aware before adding %z here.
+    return ts.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
 
 def format_timedelta(td):
@@ -113,3 +116,21 @@ def format_timedelta(td):
     if td.days:
         txt = '%d days %s' % (td.days, txt)
     return txt
+
+
+class OutputTimestamp:
+    def __init__(self, ts: datetime):
+        if ts.tzinfo == timezone.utc:
+            ts = to_localtime(ts)
+        self.ts = ts
+
+    def __format__(self, format_spec):
+        return format_time(self.ts)
+
+    def __str__(self):
+        return '{}'.format(self)
+
+    def isoformat(self):
+        return isoformat_time(self.ts)
+
+    to_json = isoformat

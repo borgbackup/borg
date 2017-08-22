@@ -1,6 +1,3 @@
-import threading
-from collections import namedtuple
-
 from .errors import Error
 
 
@@ -10,9 +7,9 @@ class StableDict(dict):
         return sorted(super().items())
 
 
-class Buffer(threading.local):
+class Buffer:
     """
-    provide a thread-local buffer
+    Provides a managed, resizable buffer.
     """
 
     class MemoryLimitExceeded(Error, OSError):

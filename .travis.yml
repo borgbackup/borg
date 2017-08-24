@@ -39,9 +39,12 @@ matrix:
 
 before_install:
 - |
-    git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(AUTHORS|README\.rst|^(docs)/)' || {
-      echo "Only docs were updated, stopping build process."
-      exit
+    test $TRAVIS_EVENT_TYPE != "pull_request" || {
+        echo Checking whether $TRAVIS_COMMIT_RANGE changed only docs
+        git diff --name-only $TRAVIS_COMMIT_RANGE | grep --quiet --invert-match --extended-regexp '(AUTHORS|README\.rst|^(docs)/)' || {
+            echo "Only docs were updated, stopping build process."
+            exit
+        }
     }
 
 install:

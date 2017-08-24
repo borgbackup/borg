@@ -445,15 +445,13 @@ Utilization of max. archive size: {csize_max:.0%}
         self.items_buffer.flush(flush=True)
         duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
-            self.end = datetime.utcnow()
-            self.start = self.end - duration
-            start = self.start
-            end = self.end
+            end = datetime.utcnow()
+            start = end - duration
         else:
-            self.end = timestamp
-            self.start = timestamp - duration
-            end = timestamp
-            start = self.start
+            end = timestamp + duration
+            start = timestamp
+        self.start = start
+        self.end = end
         metadata = {
             'version': 1,
             'name': name,

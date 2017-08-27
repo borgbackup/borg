@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PRUNE 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-PRUNE 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] prune <options> REPOSITORY
+borg [common options] prune [options] [REPOSITORY]
 .SH DESCRIPTION
 .sp
 The prune command prunes a repository by deleting all archives not matching
@@ -97,7 +97,7 @@ print statistics for the deleted archive
 .B \-\-list
 output verbose list of archives it keeps/prunes
 .TP
-.BI \-\-keep\-within \ WITHIN
+.BI \-\-keep\-within \ INTERVAL
 keep all archives within this time interval
 .TP
 .B \-\-keep\-last\fP,\fB  \-\-keep\-secondly
@@ -124,13 +124,13 @@ number of yearly archives to keep
 .B \-\-save\-space
 work slower, but using less space
 .UNINDENT
-.SS filters
+.SS Archive filters
 .INDENT 0.0
 .TP
-.B \-P\fP,\fB  \-\-prefix
+.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.B \-a\fP,\fB  \-\-glob\-archives
+.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .UNINDENT
 .SH EXAMPLES
@@ -145,8 +145,6 @@ prefix "foo" if you do not also want to match "foobar".
 .sp
 It is strongly recommended to always run \fBprune \-v \-\-list \-\-dry\-run ...\fP
 first so you will see what it would do without it actually doing anything.
-.sp
-There is also a visualized prune example in \fBdocs/misc/prune\-example.txt\fP\&.
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -167,6 +165,21 @@ $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-keep\-monthly
 # Keep all backups in the last 10 days, 4 additional end of week archives,
 # and an end of month archive for every month:
 $ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1 /path/to/repo
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+There is also a visualized prune example in \fBdocs/misc/prune\-example.txt\fP:
+.IP "System Message: ERROR/3 (docs/virtmanpage.rst:, line 140)"
+Unknown directive type "highlight".
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\&.. highlight:: none
+
 .ft P
 .fi
 .UNINDENT

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CHECK 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-CHECK 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] check <options> REPOSITORY_OR_ARCHIVE
+borg [common options] check [options] [REPOSITORY_OR_ARCHIVE]
 .SH DESCRIPTION
 .sp
 The check command verifies the consistency of a repository and the corresponding archives.
@@ -121,16 +121,16 @@ attempt to repair any inconsistencies found
 .B \-\-save\-space
 work slower, but using less space
 .UNINDENT
-.SS filters
+.SS Archive filters
 .INDENT 0.0
 .TP
-.B \-P\fP,\fB  \-\-prefix
+.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.B \-a\fP,\fB  \-\-glob\-archives
+.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
-.B \-\-sort\-by
+.BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
 .TP
 .BI \-\-first \ N

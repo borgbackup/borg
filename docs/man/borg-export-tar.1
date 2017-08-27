@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXPORT-TAR 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-EXPORT-TAR 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-export-tar \- Export archive contents as a tarball
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] export\-tar <options> ARCHIVE FILE PATH
+borg [common options] export\-tar [options] ARCHIVE FILE [PATH...]
 .SH DESCRIPTION
 .sp
 This command creates a tarball from an archive.
@@ -95,6 +95,9 @@ filter program to pipe data through
 .TP
 .B \-\-list
 output verbose list of items (files, dirs, ...)
+.UNINDENT
+.SS Exclusion options
+.INDENT 0.0
 .TP
 .BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
 exclude paths matching PATTERN
@@ -109,7 +112,7 @@ experimental: include/exclude paths matching PATTERN
 experimental: read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .BI \-\-strip\-components \ NUMBER
-Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
+Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -129,6 +132,9 @@ $ borg export\-tar testrepo::linux \-\-tar\-filter="gzip \-9" Monday.tar.gz
 # export a gzipped tar, but instead of storing it on disk,
 # upload it to a remote site using curl.
 $ borg export\-tar ... \-\-tar\-filter="gzip" \- | curl \-\-data\-binary @\- https://somewhere/to/POST
+
+# remote extraction via "tarpipe"
+$ borg export\-tar /path/to/repo::Monday \- | ssh somewhere "cd extracted; tar x"
 .ft P
 .fi
 .UNINDENT

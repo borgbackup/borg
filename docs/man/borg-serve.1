@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-SERVE 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-SERVE 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] serve <options>
+borg [common options] serve [options]
 .SH DESCRIPTION
 .sp
 This command starts a repository server process. This command is usually not used manually.
@@ -46,12 +46,12 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub\-directories is granted implicitly; PATH doesn\(aqt need to directly point to a repository.
 .TP
 .BI \-\-restrict\-to\-repository \ PATH
-restrict repository access. Only the repository located at PATH (no sub\-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \-\-restrict\-to\-path sub\-directories are not accessible; PATH needs to directly point at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
+restrict repository access. Only the repository located at PATH (no sub\-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP sub\-directories are not accessible; PATH needs to directly point at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
 .TP
 .B \-\-append\-only
 only allow appending to repository segment files
 .TP
-.B \-\-storage\-quota
+.BI \-\-storage\-quota \ QUOTA
 Override storage quota of the repository (e.g. 5G, 1.5T). When a new repository is initialized, sets the storage quota on the new repository as well. Default: no quota.
 .UNINDENT
 .SH EXAMPLES
@@ -78,13 +78,28 @@ locations like \fB/etc/environment\fP or in the forced command itself (example b
 # Use key options to disable unneeded and potentially dangerous SSH functionality.
 # This will help to secure an automated remote backup system.
 $ cat ~/.ssh/authorized_keys
-command="borg serve \-\-restrict\-to\-path /path/to/repo",no\-pty,no\-agent\-forwarding,no\-port\-forwarding,no\-X11\-forwarding,no\-user\-rc ssh\-rsa AAAAB3[...]
+command="borg serve \-\-restrict\-to\-path /path/to/repo",restrict ssh\-rsa AAAAB3[...]
 
 # Set a BORG_XXX environment variable on the "borg serve" side
 $ cat ~/.ssh/authorized_keys
 command="export BORG_XXX=value; borg serve [...]",restrict ssh\-rsa [...]
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+The examples above use the \fBrestrict\fP directive. This does automatically
+block potential dangerous ssh features, even when they are added in a future
+update. Thus, this option should be preferred.
+.sp
+If you\(aqre using openssh\-server < 7.2, however, you have to explicitly specify
+the ssh features to restrict and cannot simply use the restrict option as it
+has been introduced in v7.2. We recommend to use
+\fBno\-port\-forwarding,no\-X11\-forwarding,no\-pty,no\-agent\-forwarding,no\-user\-rc\fP
+in this case.
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

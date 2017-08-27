@@ -472,6 +472,21 @@ know a list of affected hardware.
 If you are suspicious whether your Borg repository is still consistent
 and readable after one of the failures mentioned above occurred, run
 \fBborg check \-\-verify\-data\fP to make sure it is consistent.
+Requirements for Borg repository file systems.INDENT 0.0
+.IP \(bu 2
+Long file names
+.IP \(bu 2
+At least three directory levels with short names
+.IP \(bu 2
+Typically, file sizes up to a few hundred MB.
+Large repositories may require large files (>2 GB).
+.IP \(bu 2
+Up to 1000 files per directory (10000 for repositories initialized with Borg 1.0)
+.IP \(bu 2
+mkdir(2) should be atomic, since it is used for locking
+.IP \(bu 2
+Hardlinks are needed for \fIborg_upgrade\fP \fB\-\-inplace\fP
+.UNINDENT
 .SS Units
 .sp
 To display quantities, Borg takes care of respecting the
@@ -574,6 +589,167 @@ operations used for transaction support also go over the connection. If
 you backup multiple sources to one target repository, additional traffic
 happens for cache resynchronization.
 .UNINDENT
+.SS Support for file metadata
+.sp
+Besides regular file and directory structures, Borg can preserve
+.INDENT 0.0
+.IP \(bu 2
+symlinks (stored as symlink, the symlink is not followed)
+.IP \(bu 2
+special files:
+.INDENT 2.0
+.IP \(bu 2
+character and block device files (restored via mknod)
+.IP \(bu 2
+FIFOs ("named pipes")
+.IP \(bu 2
+special file \fIcontents\fP can be backed up in \fB\-\-read\-special\fP mode.
+By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
+.UNINDENT
+.IP \(bu 2
+hardlinked regular files, devices, FIFOs (considering all items in the same archive)
+.IP \(bu 2
+timestamps in nanosecond precision: mtime, atime, ctime
+.IP \(bu 2
+permissions:
+.INDENT 2.0
+.IP \(bu 2
+IDs of owning user and owning group
+.IP \(bu 2
+names of owning user and owning group (if the IDs can be resolved)
+.IP \(bu 2
+Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
+.UNINDENT
+.UNINDENT
+.sp
+On some platforms additional features are supported:
+.\" Yes/No's are grouped by reason/mechanism/reference.
+.
+.TS
+center;
+|l|l|l|l|.
+_
+T{
+Platform
+T}	T{
+ACLs
+[5]
+T}	T{
+xattr
+[6]
+T}	T{
+Flags
+[7]
+T}
+_
+T{
+Linux
+T}	T{
+Yes
+T}	T{
+Yes
+T}	T{
+Yes [1]
+T}
+_
+T{
+Mac OS X
+T}	T{
+Yes
+T}	T{
+Yes
+T}	T{
+Yes (all)
+T}
+_
+T{
+FreeBSD
+T}	T{
+Yes
+T}	T{
+Yes
+T}
+_
+T{
+OpenBSD
+T}	T{
+n/a
+T}	T{
+n/a
+T}
+_
+T{
+NetBSD
+T}	T{
+n/a
+T}	T{
+No [2]
+T}
+_
+T{
+Solaris 11
+T}	T{
+No [3]
+T}	T{
+n/a
+T}
+_
+T{
+OpenIndiana
+T}
+_
+T{
+Windows (cygwin)
+T}	T{
+No [4]
+T}	T{
+No
+T}	T{
+No
+T}
+_
+.TE
+.sp
+Other Unix\-like operating systems may work as well, but have not been tested at all.
+.sp
+Note that most of the platform\-dependent features also depend on the file system.
+For example, ntfs\-3g on Linux isn\(aqt able to convey NTFS ACLs.
+.IP [1] 5
+Only "nodump", "immutable", "compressed" and "append" are supported.
+Feature request 
+.nf
+:issue:\(ga618\(ga
+.fi
+ for more flags.
+.IP "System Message: ERROR/3 (docs/usage_general.rst.inc:, line 410)"
+Unknown interpreted text role "issue".
+.IP [2] 5
+Feature request 
+.nf
+:issue:\(ga1332\(ga
+.fi
+
+.IP "System Message: ERROR/3 (docs/usage_general.rst.inc:, line 412)"
+Unknown interpreted text role "issue".
+.IP [3] 5
+Feature request 
+.nf
+:issue:\(ga1337\(ga
+.fi
+
+.IP "System Message: ERROR/3 (docs/usage_general.rst.inc:, line 413)"
+Unknown interpreted text role "issue".
+.IP [4] 5
+Cygwin tries to map NTFS ACLs to permissions with varying degress of success.
+.IP [5] 5
+The native access control list mechanism of the OS. This normally limits access to
+non\-native ACLs. For example, NTFS ACLs aren\(aqt completely accessible on Linux with ntfs\-3g.
+.IP [6] 5
+extended attributes; key\-value pairs attached to a file, mainly used by the OS.
+This includes resource forks on Mac OS X.
+.IP [7] 5
+aka \fIBSD flags\fP\&. The Linux set of flags [1] is portable across platforms.
+The BSDs define additional flags.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP for common command line options

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-WITH-LOCK 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-WITH-LOCK 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-with-lock \- run a user specified command with the repository lock held
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] with\-lock <options> REPOSITORY COMMAND ARGS
+borg [common options] with\-lock [options] REPOSITORY COMMAND [ARGS...]
 .SH DESCRIPTION
 .sp
 This command runs a user\-specified command while the repository lock is held.
@@ -41,11 +41,15 @@ It will first try to acquire the lock (make sure that no other operation is
 running in the repo), then execute the given command as a subprocess and wait
 for its termination, release the lock and return the user command\(aqs return
 code as borg\(aqs return code.
+.sp
+\fBNOTE:\fP
 .INDENT 0.0
-.TP
-.B Note: if you copy a repository with the lock held, the lock will be present in
-the copy, obviously. Thus, before using borg on the copy, you need to
-use "borg break\-lock" on it.
+.INDENT 3.5
+If you copy a repository with the lock held, the lock will be present in
+the copy. Thus, before using borg on the copy from a different host,
+you need to use "borg break\-lock" on the copied repository, because
+Borg is cautious and does not automatically remove stale locks made by a different host.
+.UNINDENT
 .UNINDENT
 .SH OPTIONS
 .sp

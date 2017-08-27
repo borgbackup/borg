@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] create <options> ARCHIVE PATH
+borg [common options] create [options] ARCHIVE [PATH...]
 .SH DESCRIPTION
 .sp
 This command creates a backup archive containing all files found while recursively
@@ -53,10 +53,14 @@ checkpoints and treated in special ways.
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 .sp
-To speed up pulling backups over sshfs and similar network file systems which do
-not provide correct inode information the \fB\-\-ignore\-inode\fP flag can be used. This
-potentially decreases reliability of change detection, while avoiding always reading
-all files on these file systems.
+Backup speed is increased by not reprocessing files that are already part of
+existing archives and weren\(aqt modified. Normally, detecting file modifications
+will take inode information into consideration. This is problematic for files
+located on sshfs and similar network file systems which do not provide stable
+inode numbers, such files will always be considered modified. The
+\fB\-\-ignore\-inode\fP flag can be used to prevent this and improve performance.
+This flag will reduce reliability of change detection however, with files
+considered unmodified as long as their size and modification time are unchanged.
 .sp
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that
@@ -94,13 +98,13 @@ print statistics for the created archive
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
-only display items with the given status characters
+only display items with the given status characters (see description)
 .TP
 .B \-\-json
-output stats as JSON (implies \-\-stats)
+output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
 .B \-\-no\-cache\-sync
-experimental: do not synchronize the cache. Implies \-\-no\-files\-cache.
+experimental: do not synchronize the cache. Implies \fB\-\-no\-files\-cache\fP\&.
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -111,6 +115,12 @@ exclude paths matching PATTERN
 .BI \-\-exclude\-from \ EXCLUDEFILE
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
+.TP
 .B \-\-exclude\-caches
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
 .TP
@@ -118,13 +128,7 @@ exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosauru
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
-if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
-.TP
-.BI \-\-pattern \ PATTERN
-experimental: include/exclude paths matching PATTERN
-.TP
-.BI \-\-patterns\-from \ PATTERNFILE
-experimental: read include/exclude patterns from PATTERNFILE, one per line
+if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -154,7 +158,7 @@ open and read block and char device files as well as FIFOs as if they were regul
 add a comment text to the archive
 .TP
 .BI \-\-timestamp \ TIMESTAMP
-manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). alternatively, give a reference file/directory.
+manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). Alternatively, give a reference file/directory.
 .TP
 .BI \-c \ SECONDS\fP,\fB \ \-\-checkpoint\-interval \ SECONDS
 write checkpoint every SECONDS seconds (Default: 1800)
@@ -250,6 +254,9 @@ all of its contents will be omitted from the backup.  If, however, you wish to
 only include the objects specified by \fB\-\-exclude\-if\-present\fP in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the \fB\-\-keep\-exclude\-tags\fP option.
+.sp
+Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
+in \fB\-\-list\fP output.
 .SS Item flags
 .sp
 \fB\-\-list\fP outputs a list of all files, directories and other

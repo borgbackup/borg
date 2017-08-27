@@ -307,15 +307,13 @@ Number of files: {0.stats.nfiles}'''.format(
         self.items_buffer.flush(flush=True)
         duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
-            self.end = datetime.utcnow()
-            self.start = self.end - duration
-            start = self.start
-            end = self.end
+            end = datetime.utcnow()
+            start = end - duration
         else:
-            self.end = timestamp
-            self.start = timestamp - duration
-            end = timestamp
-            start = self.start
+            end = timestamp + duration
+            start = timestamp
+        self.start = start
+        self.end = end
         metadata = StableDict({
             'version': 1,
             'name': name,

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-INIT 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-INIT 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] init <options> REPOSITORY
+borg [common options] init [options] [REPOSITORY]
 .SH DESCRIPTION
 .sp
 This command initializes an empty repository. A repository is a filesystem
@@ -178,13 +178,13 @@ repository to create
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-e\fP,\fB  \-\-encryption
+.BI \-e \ MODE\fP,\fB \ \-\-encryption \ MODE
 select encryption key mode \fB(required)\fP
 .TP
 .B \-\-append\-only
 create an append\-only mode repository
 .TP
-.B \-\-storage\-quota
+.BI \-\-storage\-quota \ QUOTA
 Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .UNINDENT
 .SH EXAMPLES

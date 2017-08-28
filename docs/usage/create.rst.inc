@@ -193,6 +193,9 @@ only include the objects specified by ``--exclude-if-present`` in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the ``--keep-exclude-tags`` option.
 
+Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
+in ``--list`` output.
+
 Item flags
 ++++++++++
 

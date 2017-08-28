@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-UPGRADE 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-UPGRADE 1 "2017-08-27" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] upgrade <options> REPOSITORY
+borg [common options] upgrade [options] [REPOSITORY]
 .SH DESCRIPTION
 .sp
 Upgrade an existing, local Borg repository.
@@ -106,7 +106,7 @@ borg delete borg
 .sp
 Unless \fB\-\-inplace\fP is specified, the upgrade process first
 creates a backup copy of the repository, in
-REPOSITORY.upgrade\-DATETIME, using hardlinks. This takes
+REPOSITORY.before\-upgrade\-DATETIME, using hardlinks. This takes
 longer than in place upgrades, but is much safer and gives
 progress information (as opposed to \fBcp \-al\fP). Once you are
 satisfied with the conversion, you can safely destroy the
@@ -133,17 +133,16 @@ path to the repository to be upgraded
 do not change repository
 .TP
 .B \-\-inplace
-rewrite repository in place, with no chance of going back to older
-versions of the repository.
+rewrite repository in place, with no chance of going back to older versions of the repository.
 .TP
 .B \-\-force
 Force upgrade
 .TP
 .B \-\-tam
-Enable manifest authentication (in key and cache) (Borg 1.0.9 and later)
+Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).
 .TP
 .B \-\-disable\-tam
-Disable manifest authentication (in key and cache)
+Disable manifest authentication (in key and cache).
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -153,7 +152,7 @@ Disable manifest authentication (in key and cache)
 .ft C
 # Upgrade the borg repository to the most recent version.
 $ borg upgrade \-v /path/to/repo
-making a hardlink copy in /path/to/repo.upgrade\-2016\-02\-15\-20:51:55
+making a hardlink copy in /path/to/repo.before\-upgrade\-2016\-02\-15\-20:51:55
 opening attic repository with borg and converting
 no key file found for repository
 converting repo index /path/to/repo/index.0

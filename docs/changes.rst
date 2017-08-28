@@ -131,8 +131,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.0rc2 (not released yet)
-------------------------------------
+Version 1.1.0rc2 (2017-08-28)
+-----------------------------
 
 Compatibility notes:
 
@@ -142,6 +142,42 @@ Compatibility notes:
   The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
   and the default is now "mtime".
   "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+
+New features:
+
+- None.
+
+Fixes:
+
+- list: fix weird mixup of mtime/isomtime
+- create --timestamp: set start time, #2957
+- ignore corrupt files cache, #2939
+- migrate locks to child PID when daemonize is used
+- fix exitcode of borg serve, #2910
+- only compare contents when chunker params match, #2899
+- umount: try fusermount, then try umount, #2863
+
+Other changes:
+
+- JSON: use a more standard ISO 8601 datetime format, #2376
+- cache: write_archive_index: truncate_and_unlink on error, #2628
+- detect non-upgraded Attic repositories, #1933
+- delete various nogil and threading related lines
+- coala / pylint related improvements
+- docs:
+
+  - renew asciinema/screencasts, #669
+  - create: document exclusion through nodump, #2949
+  - minor formatting fixes
+  - tar: tarpipe example
+  - improve "with-lock" and "info" docs, #2869
+  - detail how to use macOS/GNOME/KDE keyrings for repo passwords, #392
+- travis: only short-circuit docs-only changes for pull requests
+- vagrant:
+
+  - netbsd: bash is already installed
+  - fix netbsd version in PKG_PATH
+  - add exe location to PATH when we build an exe
 
 
 Version 1.1.0rc1 (2017-07-24)

@@ -2745,7 +2745,6 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             ['delete', path],
             ['prune', path],
             ['info', path + '::test'],
-            ['mount', path, self.tmpdir],
             ['key', 'export', path, 'exported'],
             ['key', 'import', path, 'import'],
             ['change-passphrase', path],

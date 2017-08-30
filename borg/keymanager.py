@@ -150,8 +150,11 @@ class KeyManager:
         self.store_keyblob(args)
 
     def import_paperkey(self, args):
-        # imported here because it has global side effects
-        import readline
+        try:
+            # imported here because it has global side effects
+            import readline
+        except ImportError:
+            print('Note: No line editing available due to missing readline support')
 
         repoid = bin_to_hex(self.repository.id)[:18]
         try:
@@ -159,8 +162,8 @@ class KeyManager:
                 # id line input
                 while True:
                     idline = input('id: ').replace(' ', '')
-                    if idline == "":
-                        if yes("Abort import? [yN]:"):
+                    if idline == '':
+                        if yes('Abort import? [yN]:'):
                             raise EOFError()
 
                     try:
@@ -192,8 +195,8 @@ class KeyManager:
                 while True:
                     inline = input('{0:2d}: '.format(idx))
                     inline = inline.replace(' ', '')
-                    if inline == "":
-                        if yes("Abort import? [yN]:"):
+                    if inline == '':
+                        if yes('Abort import? [yN]:'):
                             raise EOFError()
                     try:
                         (data, checksum) = inline.split('-')

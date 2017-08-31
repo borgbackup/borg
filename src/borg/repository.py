@@ -1172,11 +1172,15 @@ class LoggedIO:
         """Delete segment files left by aborted transactions
         """
         self.segment = transaction_id + 1
+        count = 0
         for segment, filename in self.segment_iterator(reverse=True):
             if segment > transaction_id:
                 truncate_and_unlink(filename)
+                count += 1
             else:
                 break
+        logger.debug('Cleaned up %d uncommitted segment files (== everything after segment %d).',
+                     count, transaction_id)
 
     def is_committed_segment(self, segment):
         """Check if segment ends with a COMMIT_TAG tag

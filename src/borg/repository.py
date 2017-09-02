@@ -1,4 +1,5 @@
 import errno
+import mmap
 import os
 import shutil
 import struct
@@ -1309,25 +1310,28 @@ class LoggedIO:
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
+        logger.info('attempting to recover ' + filename)
         if segment in self.fds:
             del self.fds[segment]
-        with open(filename, 'rb') as fd:
-            # XXX: Rather use mmap, this loads the entire segment (up to 500 MB by default) into memory.
-            data = memoryview(fd.read())
-        os.rename(filename, filename + '.beforerecover')
-        logger.info('attempting to recover ' + filename)
-        with open(filename, 'wb') as fd:
-            fd.write(MAGIC)
-            while len(data) >= self.header_fmt.size:
-                crc, size, tag = self.header_fmt.unpack(data[:self.header_fmt.size])
-                if size < self.header_fmt.size or size > len(data):
-                    data = data[1:]
-                    continue
-                if crc32(data[4:size]) & 0xffffffff != crc:
-                    data = data[1:]
-                    continue
-                fd.write(data[:size])
-                data = data[size:]
+        backup_filename = filename + '.beforerecover'
+        os.rename(filename, backup_filename)
+        with open(backup_filename, 'rb') as backup_fd:
+            # note: file must not be 0 size (windows can't create 0 size mapping)
+            with mmap.mmap(backup_fd.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                data = memoryview(mm)
+                with open(filename, 'wb') as fd:
+                    fd.write(MAGIC)
+                    while len(data) >= self.header_fmt.size:
+                        crc, size, tag = self.header_fmt.unpack(data[:self.header_fmt.size])
+                        if size < self.header_fmt.size or size > len(data):
+                            data = data[1:]
+                            continue
+                        if crc32(data[4:size]) & 0xffffffff != crc:
+                            data = data[1:]
+                            continue
+                        fd.write(data[:size])
+                        data = data[size:]
+                data.release()
 
     def read(self, segment, offset, id, read_data=True):
         """

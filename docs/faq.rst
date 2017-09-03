@@ -328,8 +328,8 @@ Using keyfile-based encryption with a blank passphrase
   ``repokey`` mode and use a blank passphrase for the key file. See :ref:`encrypted_repos`
   for more details.
 
-Using ``BORG_PASSCOMMAND`` with MacOS Keychain
-  MacOS has a native manager for secrets (such as passphrases) which is safer
+Using ``BORG_PASSCOMMAND`` with macOS Keychain
+  macOS has a native manager for secrets (such as passphrases) which is safer
   than just using a file as it is encrypted at rest and unlocked manually
   (fortunately, the login keyring automatically unlocks when you login). With
   the built-in ``security`` command, you can access it from the command line,
@@ -759,7 +759,7 @@ Here's a (incomplete) list of some major changes:
 * uses fadvise to not spoil / blow up the fs cache
 * better error messages / exception handling
 * better logging, screen output, progress indication
-* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, MacOS
+* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, macOS
 
 Please read the :ref:`changelog` (or ``docs/changes.rst`` in the source distribution) for more
 information.

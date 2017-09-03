@@ -342,7 +342,7 @@ Using ``BORG_PASSCOMMAND`` with MacOS Keychain
 
   In your backup script retrieve it in the ``BORG_PASSCOMMAND``::
 
-    export BORG_PASSCOMMAND="security find-generic-password -a $USER -s borg-passphrase"
+    export BORG_PASSCOMMAND="security find-generic-password -a $USER -s borg-passphrase -w"
 
 Using ``BORG_PASSCOMMAND`` with GNOME Keyring
   GNOME also has a keyring daemon that can be used to store a Borg passphrase.

@@ -7,21 +7,14 @@ $cpus = Integer(ENV.fetch('VMCPUS', '4'))  # create VMs with that many cpus
 $xdistn = Integer(ENV.fetch('XDISTN', '4'))  # dispatch tests to that many pytest workers
 $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
-def packages_debianoid
+def packages_debianoid(user)
   return <<-EOF
-    if id "vagrant" >/dev/null 2>&1; then
-      username='vagrant'
-      home_dir=/home/vagrant
-    else
-      username='ubuntu'
-      home_dir=/home/ubuntu
-    fi
     apt-get update
     # install all the (security and other) updates
     apt-get dist-upgrade -y
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
-    usermod -a -G fuse $username
+    usermod -a -G fuse #{user}
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
     apt-get install -y fakeroot build-essential git
@@ -30,7 +23,6 @@ def packages_debianoid
     apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
     easy_install3 'pip'
     pip3 install 'virtualenv'
-    touch $home_dir/.bash_profile ; chown $username $home_dir/.bash_profile
   EOF
 end
 
@@ -38,21 +30,17 @@ def packages_arch
   return <<-EOF
     chown vagrant.vagrant /vagrant
     pacman --sync --noconfirm python-virtualenv python-pip
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
 
 def install_pyenv(boxname)
-  script = <<-EOF
+  return <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
     echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bash_profile
     echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
-    echo 'export LANG=en_US.UTF-8' >> ~/.bash_profile
   EOF
-  script += "echo 'export XDISTN=%d' >> ~/.bash_profile\n" % [$xdistn]
-  return script
 end
 
 def fix_pyenv_darwin(boxname)
@@ -162,14 +150,13 @@ def run_tests(boxname)
   EOF
 end
 
-def fix_perms
+def fs_init(user)
   return <<-EOF
-    # . ~/.profile
-    if id "vagrant" >/dev/null 2>&1; then
-      chown -R vagrant /vagrant/borg
-    else
-      chown -R ubuntu /vagrant/borg
-    fi
+    chown -R #{user} /vagrant/borg
+    touch ~#{user}/.bash_profile ; chown #{user} ~#{user}/.bash_profile
+    echo 'export LANG=en_US.UTF-8' >> ~#{user}/.bash_profile
+    echo 'export LC_CTYPE=en_US.UTF-8' >> ~#{user}/.bash_profile
+    echo 'export XDISTN=#{$xdistn}' >> ~#{user}/.bash_profile
   EOF
 end
 
@@ -178,9 +165,6 @@ Vagrant.configure(2) do |config|
   config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"], :rsync__chown => false
   # do not let the VM access . on the host machine via the default shared folder!
   config.vm.synced_folder ".", "/vagrant", disabled: true
-
-  # fix permissions on synced folder
-  config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
 
   config.vm.provider :virtualbox do |v|
     #v.gui = true
@@ -192,7 +176,8 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("ubuntu")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("ubuntu")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
@@ -203,7 +188,8 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("stretch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
@@ -216,6 +202,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages arch", :type => :shell, :privileged => true, :inline => packages_arch
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("arch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)

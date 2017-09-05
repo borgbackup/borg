@@ -166,7 +166,7 @@ class Manifest:
 
     @property
     def last_timestamp(self):
-        return datetime.strptime(self.timestamp, ISO_FORMAT)
+        return parse_timestamp(self.timestamp, tzinfo=None)
 
     @classmethod
     def load(cls, repository, operations, key=None, force_tam_not_required=False):

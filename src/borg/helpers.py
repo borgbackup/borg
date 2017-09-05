@@ -318,7 +318,7 @@ class Manifest:
 
     @property
     def last_timestamp(self):
-        return datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
+        return datetime.strptime(self.timestamp, ISO_FORMAT)
 
     @classmethod
     def load(cls, repository, operations, key=None, force_tam_not_required=False):
@@ -525,10 +525,8 @@ def to_localtime(ts):
 
 def parse_timestamp(timestamp):
     """Parse a ISO 8601 timestamp string"""
-    if '.' in timestamp:  # microseconds might not be present
-        return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f').replace(tzinfo=timezone.utc)
-    else:
-        return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+    fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS
+    return datetime.strptime(timestamp, fmt).replace(tzinfo=timezone.utc)
 
 
 def timestamp(s):
@@ -616,7 +614,7 @@ class DatetimeWrapper:
 
     def __format__(self, format_spec):
         if format_spec == '':
-            format_spec = '%Y-%m-%dT%H:%M:%S'
+            format_spec = ISO_FORMAT_NO_USECS
         return self.dt.__format__(format_spec)
 
 
@@ -727,7 +725,7 @@ def isoformat_time(ts: datetime):
     Format *ts* according to ISO 8601.
     """
     # note: first make all datetime objects tz aware before adding %z here.
-    return ts.strftime('%Y-%m-%dT%H:%M:%S.%f')
+    return ts.strftime(ISO_FORMAT)
 
 
 def format_timedelta(td):

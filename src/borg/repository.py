@@ -540,7 +540,8 @@ class Repository:
         # Log transaction in append-only mode
         if self.append_only:
             with open(os.path.join(self.path, 'transactions'), 'a') as log:
-                print('transaction %d, UTC time %s' % (transaction_id, datetime.utcnow().isoformat()), file=log)
+                print('transaction %d, UTC time %s' % (
+                      transaction_id, datetime.utcnow().strftime(ISO_FORMAT)), file=log)
 
         # Write hints file
         hints_name = 'hints.%d' % transaction_id

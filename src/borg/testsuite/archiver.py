@@ -3035,7 +3035,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'version': 1,
                 'archives': {},
                 'config': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 
@@ -3047,7 +3047,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 

@@ -314,7 +314,7 @@ class Manifest:
         if self.timestamp is None:
             self.timestamp = datetime.utcnow().isoformat()
         else:
-            prev_ts = datetime.strptime(self.timestamp, ISO_FORMAT)
+            prev_ts = parse_timestamp(self.timestamp, tzinfo=None)
             incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
             self.timestamp = max(incremented, datetime.utcnow().isoformat())
         # include checks for limits as enforced by limited unpacker (used by load())
@@ -491,10 +491,13 @@ def to_localtime(ts):
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
-def parse_timestamp(timestamp):
+def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string"""
     fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS
-    return datetime.strptime(timestamp, fmt).replace(tzinfo=timezone.utc)
+    dt = datetime.strptime(timestamp, fmt)
+    if tzinfo is not None:
+        dt = dt.replace(tzinfo=tzinfo)
+    return dt
 
 
 def load_excludes(fh):

@@ -61,8 +61,6 @@ from . import key
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
-
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_output=False, **kw):
     if fork:

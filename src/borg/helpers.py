@@ -318,7 +318,7 @@ class Manifest:
 
     @property
     def last_timestamp(self):
-        return datetime.strptime(self.timestamp, ISO_FORMAT)
+        return parse_timestamp(self.timestamp, tzinfo=None)
 
     @classmethod
     def load(cls, repository, operations, key=None, force_tam_not_required=False):
@@ -523,10 +523,13 @@ def to_localtime(ts):
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
-def parse_timestamp(timestamp):
+def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string"""
     fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS
-    return datetime.strptime(timestamp, fmt).replace(tzinfo=timezone.utc)
+    dt = datetime.strptime(timestamp, fmt)
+    if tzinfo is not None:
+        dt = dt.replace(tzinfo=tzinfo)
+    return dt
 
 
 def timestamp(s):

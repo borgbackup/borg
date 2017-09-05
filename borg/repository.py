@@ -14,7 +14,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .helpers import Error, ErrorWithTraceback, IntegrityError, Location, ProgressIndicatorPercent, bin_to_hex
-from .helpers import LIST_SCAN_LIMIT, MAX_OBJECT_SIZE, MAX_DATA_SIZE
+from .helpers import LIST_SCAN_LIMIT, MAX_OBJECT_SIZE, MAX_DATA_SIZE, ISO_FORMAT
 from .hashindex import NSIndex
 from .locking import Lock, LockError, LockErrorT
 from .lrucache import LRUCache
@@ -273,7 +273,8 @@ class Repository:
                   os.path.join(self.path, 'index.%d' % transaction_id))
         if self.append_only:
             with open(os.path.join(self.path, 'transactions'), 'a') as log:
-                print('transaction %d, UTC time %s' % (transaction_id, datetime.utcnow().isoformat()), file=log)
+                print('transaction %d, UTC time %s' % (
+                      transaction_id, datetime.utcnow().strftime(ISO_FORMAT)), file=log)
         # Remove old indices
         current = '.%d' % transaction_id
         for name in os.listdir(self.path):

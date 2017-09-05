@@ -312,11 +312,11 @@ class Manifest:
             self.config[b'tam_required'] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().isoformat()
+            self.timestamp = datetime.utcnow().strftime(ISO_FORMAT)
         else:
             prev_ts = parse_timestamp(self.timestamp, tzinfo=None)
-            incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
-            self.timestamp = max(incremented, datetime.utcnow().isoformat())
+            incremented = (prev_ts + timedelta(microseconds=1)).strftime(ISO_FORMAT)
+            self.timestamp = max(incremented, datetime.utcnow().strftime(ISO_FORMAT))
         # include checks for limits as enforced by limited unpacker (used by load())
         assert len(self.archives) <= MAX_ARCHIVES
         assert all(len(name) <= 255 for name in self.archives)

@@ -137,7 +137,7 @@ class DatetimeWrapper:
 
     def __format__(self, format_spec):
         if format_spec == '':
-            format_spec = '%Y-%m-%dT%H:%M:%S'
+            format_spec = ISO_FORMAT_NO_USECS
         return self.dt.__format__(format_spec)
 
 

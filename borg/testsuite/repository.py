@@ -11,7 +11,7 @@ from ..hashindex import NSIndex
 from ..helpers import Location, IntegrityError
 from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod
-from ..repository import Repository, LoggedIO, TAG_DELETE, MAX_DATA_SIZE
+from ..repository import Repository, LoggedIO, TAG_DELETE, MAX_DATA_SIZE, MAGIC
 from . import BaseTestCase
 from .hashindex import H
 
@@ -150,6 +150,27 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.repository.put(H(1), b'bar2')
         self.repository.put(H(2), b'boo')
         self.repository.delete(H(3))
+
+    def test_uncommitted_garbage(self):
+        # uncommitted garbage should be no problem, it is cleaned up automatically.
+        # we just have to be careful with invalidation of cached FDs in LoggedIO.
+        self.repository.put(H(0), b'foo')
+        self.repository.commit()
+        # write some crap to a uncommitted segment file
+        last_segment = self.repository.io.get_latest_segment()
+        with open(self.repository.io.segment_filename(last_segment + 1), 'wb') as f:
+            f.write(MAGIC + b'crapcrapcrap')
+        self.repository.close()
+        # usually, opening the repo and starting a transaction should trigger a cleanup.
+        self.repository = self.open()
+        with self.repository:
+            # the next 2 lines get the FD of the crap segment file cached:
+            segment = self.repository.io.get_latest_segment()
+            self.repository.io.get_fd(segment)
+            # when the put triggers the start of a transaction, crap should be cleaned up:
+            self.repository.put(H(0), b'bar')  # this may trigger compact_segments()
+            self.repository.commit()
+        # the point here is that nothing blows up with an exception.
 
     def test_replay_of_missing_index(self):
         self.add_keys()

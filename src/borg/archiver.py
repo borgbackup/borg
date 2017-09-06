@@ -1467,6 +1467,9 @@ class Archiver:
         # the encryption key (and can operate just with encrypted data).
         data = repository.get(Manifest.MANIFEST_ID)
         repository.put(Manifest.MANIFEST_ID, data)
+        # usually, a 0 byte (open for writing) segment file would be visible in the filesystem here.
+        # we write and close this file, to rather have a valid segment file on disk, before invoking the subprocess.
+        repository.io.close_segment()
         try:
             # we exit with the return code we get from the subprocess
             return subprocess.call([args.command] + args.args)

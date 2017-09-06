@@ -1176,6 +1176,8 @@ class LoggedIO:
         count = 0
         for segment, filename in self.segment_iterator(reverse=True):
             if segment > transaction_id:
+                if segment in self.fds:
+                    del self.fds[segment]
                 truncate_and_unlink(filename)
                 count += 1
             else:
@@ -1232,6 +1234,12 @@ class LoggedIO:
             self._write_fd = SyncFile(self.segment_filename(self.segment), binary=True)
             self._write_fd.write(MAGIC)
             self.offset = MAGIC_LEN
+            if self.segment in self.fds:
+                # we may have a cached fd for a segment file we already deleted and
+                # we are writing now a new segment file to same file name. get rid of
+                # of the cached fd that still refers to the old file, so it will later
+                # get repopulated (on demand) with a fd that refers to the new file.
+                del self.fds[self.segment]
         return self._write_fd
 
     def get_fd(self, segment):

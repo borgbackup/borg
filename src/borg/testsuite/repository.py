@@ -210,6 +210,23 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         self.repository.commit()
         assert 0 not in [segment for segment, _ in self.repository.io.segment_iterator()]
 
+    def test_uncommitted_garbage(self):
+        # uncommitted garbage should be no problem, it is cleaned up automatically.
+        # we just have to be careful with invalidation of cached FDs in LoggedIO.
+        self.repository.put(H(0), b'foo')
+        self.repository.commit()
+        # write some crap to a uncommitted segment file
+        last_segment = self.repository.io.get_latest_segment()
+        with open(self.repository.io.segment_filename(last_segment + 1), 'wb') as f:
+            f.write(MAGIC + b'crapcrapcrap')
+        self.repository.close()
+        # usually, opening the repo and starting a transaction should trigger a cleanup.
+        self.repository = self.open()
+        with self.repository:
+            self.repository.put(H(0), b'bar')  # this may trigger compact_segments()
+            self.repository.commit()
+        # the point here is that nothing blows up with an exception.
+
 
 class RepositoryCommitTestCase(RepositoryTestCaseBase):
 

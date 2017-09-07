@@ -61,8 +61,6 @@ from . import key
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
-
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_output=False, **kw):
     if fork:
@@ -3037,7 +3035,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'version': 1,
                 'archives': {},
                 'config': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 
@@ -3049,7 +3047,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 

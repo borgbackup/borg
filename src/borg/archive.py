@@ -461,8 +461,8 @@ Utilization of max. archive size: {csize_max:.0%}
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
             'username': getuser(),
-            'time': start.isoformat(),
-            'time_end': end.isoformat(),
+            'time': start.strftime(ISO_FORMAT),
+            'time_end': end.strftime(ISO_FORMAT),
             'chunker_params': self.chunker_params,
         }
         metadata.update(additional_metadata or {})

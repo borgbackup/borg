@@ -216,7 +216,7 @@ class Archives(abc.MutableMapping):
         id, ts = info
         assert isinstance(id, bytes)
         if isinstance(ts, datetime):
-            ts = ts.replace(tzinfo=None).isoformat()
+            ts = ts.replace(tzinfo=None).strftime(ISO_FORMAT)
         assert isinstance(ts, str)
         ts = ts.encode()
         self._archives[name] = {b'id': id, b'time': ts}
@@ -318,7 +318,7 @@ class Manifest:
 
     @property
     def last_timestamp(self):
-        return datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.%f")
+        return parse_timestamp(self.timestamp, tzinfo=None)
 
     @classmethod
     def load(cls, repository, operations, key=None, force_tam_not_required=False):
@@ -388,11 +388,11 @@ class Manifest:
             self.config[b'tam_required'] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().isoformat()
+            self.timestamp = datetime.utcnow().strftime(ISO_FORMAT)
         else:
             prev_ts = self.last_timestamp
-            incremented = (prev_ts + timedelta(microseconds=1)).isoformat()
-            self.timestamp = max(incremented, datetime.utcnow().isoformat())
+            incremented = (prev_ts + timedelta(microseconds=1)).strftime(ISO_FORMAT)
+            self.timestamp = max(incremented, datetime.utcnow().strftime(ISO_FORMAT))
         # include checks for limits as enforced by limited unpacker (used by load())
         assert len(self.archives) <= MAX_ARCHIVES
         assert all(len(name) <= 255 for name in self.archives)
@@ -523,12 +523,13 @@ def to_localtime(ts):
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
-def parse_timestamp(timestamp):
+def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string"""
-    if '.' in timestamp:  # microseconds might not be present
-        return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f').replace(tzinfo=timezone.utc)
-    else:
-        return datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+    fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS
+    dt = datetime.strptime(timestamp, fmt)
+    if tzinfo is not None:
+        dt = dt.replace(tzinfo=tzinfo)
+    return dt
 
 
 def timestamp(s):
@@ -616,7 +617,7 @@ class DatetimeWrapper:
 
     def __format__(self, format_spec):
         if format_spec == '':
-            format_spec = '%Y-%m-%dT%H:%M:%S'
+            format_spec = ISO_FORMAT_NO_USECS
         return self.dt.__format__(format_spec)
 
 
@@ -727,7 +728,7 @@ def isoformat_time(ts: datetime):
     Format *ts* according to ISO 8601.
     """
     # note: first make all datetime objects tz aware before adding %z here.
-    return ts.strftime('%Y-%m-%dT%H:%M:%S.%f')
+    return ts.strftime(ISO_FORMAT)
 
 
 def format_timedelta(td):

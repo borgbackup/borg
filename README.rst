@@ -1,5 +1,6 @@
-|screencast|
+|screencast_basic|
 
+More screencasts: `installation`_, `advanced usage`_
 
 What is BorgBackup?
 -------------------
@@ -172,9 +173,13 @@ see ``docs/suppport.rst`` in the source distribution).
         :alt: Test Coverage
         :target: https://codecov.io/github/borgbackup/borg?branch=master
 
-.. |screencast| image:: https://asciinema.org/a/28691.png
-        :alt: BorgBackup Installation and Basic Usage
-        :target: https://asciinema.org/a/28691?autoplay=1&speed=2
+.. |screencast_basic| image:: https://asciinema.org/a/133292.png
+        :alt: BorgBackup Basic Usage
+        :target: https://asciinema.org/a/133292?autoplay=1&speed=1
+
+.. _installation: https://asciinema.org/a/133291?autoplay=1&speed=1
+
+.. _advanced usage: https://asciinema.org/a/133293?autoplay=1&speed=1
 
 .. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
         :alt: Best Practices Score

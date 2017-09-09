@@ -1375,6 +1375,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test3', 'input')
         self.cmd('delete', self.repository_location + '::test1', 'test2')
         self.cmd('extract', '--dry-run', self.repository_location + '::test3')
+        self.cmd('delete', self.repository_location, 'test3')
+        assert not self.cmd('list', self.repository_location)
 
     def test_delete_repo(self):
         self.create_regular_file('file1', size=1024 * 80)

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2017-08-27" "" "borg backup tool"
+.TH BORG-DELETE 1 "2017-09-09" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] delete [options] [TARGET]
+borg [common options] delete [options] [TARGET] [ARCHIVE...]
 .SH DESCRIPTION
 .sp
 This command deletes an archive from the repository or the complete repository.
@@ -46,6 +46,9 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .TP
 .B TARGET
 archive or repository to delete
+.TP
+.B ARCHIVE
+archives to delete
 .UNINDENT
 .SS optional arguments
 .INDENT 0.0

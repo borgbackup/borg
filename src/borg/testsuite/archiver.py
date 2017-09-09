@@ -1367,6 +1367,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_path) as repository:
             self.assert_equal(len(repository), 1)
 
+    def test_delete_multiple(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', 'input')
+        self.cmd('create', self.repository_location + '::test2', 'input')
+        self.cmd('create', self.repository_location + '::test3', 'input')
+        self.cmd('delete', self.repository_location + '::test1', 'test2')
+        self.cmd('extract', '--dry-run', self.repository_location + '::test3')
+        self.cmd('delete', self.repository_location, 'test3')
+        assert not self.cmd('list', self.repository_location)
+
     def test_delete_repo(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)

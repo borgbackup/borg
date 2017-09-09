@@ -986,7 +986,12 @@ class Archiver:
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
         """Delete an existing repository or archives"""
-        if any((args.location.archive, args.first, args.last, args.prefix, args.glob_archives)):
+        archive_filter_specified = args.first or args.last or args.prefix or args.glob_archives
+        explicit_archives_specified = args.location.archive or args.archives
+        if archive_filter_specified and explicit_archives_specified:
+            self.print_error('Mixing archive filters and explicitly named archives is not supported.')
+            return self.exit_code
+        if archive_filter_specified or explicit_archives_specified:
             return self._delete_archives(args, repository)
         else:
             return self._delete_repository(args, repository)
@@ -995,8 +1000,11 @@ class Archiver:
         """Delete archives"""
         manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
 
-        if args.location.archive:
-            archive_names = (args.location.archive,)
+        if args.location.archive or args.archives:
+            archives = list(args.archives)
+            if args.location.archive:
+                archives.insert(0, args.location.archive)
+            archive_names = tuple(archives)
         else:
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
@@ -2899,6 +2907,8 @@ class Archiver:
         subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
                                type=location_validator(),
                                help='archive or repository to delete')
+        subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
+                               help='archives to delete')
         define_archive_filters_group(subparser)
 
         list_epilog = process_epilog("""

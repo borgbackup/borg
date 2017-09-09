@@ -426,7 +426,9 @@ class Repository:
             raise exception
         self.check_free_space()
         self.log_storage_quota()
-        self.io.write_commit()
+        segment = self.io.write_commit()
+        self.segments.setdefault(segment, 0)
+        self.compact[segment] += LoggedIO.header_fmt.size
         if compact and not self.append_only:
             self.compact_segments()
         self.write_index()
@@ -676,6 +678,8 @@ class Repository:
             nonlocal unused
             # commit the new, compact, used segments
             segment = self.io.write_commit(intermediate=intermediate)
+            self.segments.setdefault(segment, 0)
+            self.compact[segment] += LoggedIO.header_fmt.size
             logger.debug('complete_xfer: wrote %scommit at segment %d', 'intermediate ' if intermediate else '', segment)
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:

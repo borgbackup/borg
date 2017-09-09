@@ -1001,7 +1001,7 @@ class Archiver:
         manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
 
         if args.location.archive or args.archives:
-            archive_names = tuple([args.location.archive] + args.archives )
+            archive_names = tuple([args.location.archive] + args.archives)
         else:
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:

@@ -131,6 +131,33 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.0rc3 (2017-09-10)
+-----------------------------
+
+New features:
+
+- delete: support naming multiple archives, #2958
+
+Fixes:
+
+- repo cleanup/write: invalidate cached FDs, #2982
+- fix datetime.isoformat() microseconds issues, #2994
+- recover_segment: use mmap(), lower memory needs, #2987
+
+Other changes:
+
+- with-lock: close segment file before invoking subprocess
+- keymanager: don't depend on optional readline module, #2976
+- docs:
+
+  - fix macOS keychain integration command
+  - show/link new screencasts in README, #2936
+  - document utf-8 locale requirement for json mode, #2273
+- vagrant: clean up shell profile init, user name, #2977
+- test_detect_attic_repo: don't test mount, #2975
+- add debug logging for repository cleanup
+
+
 Version 1.1.0rc2 (2017-08-28)
 -----------------------------
 

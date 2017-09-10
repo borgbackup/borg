@@ -39,6 +39,12 @@ import msgpack.fallback
 
 import socket
 
+# never use datetime.isoformat(), it is evil. always use one of these:
+# datetime.strftime(ISO_FORMAT)  # output always includes .microseconds
+# datetime.strftime(ISO_FORMAT_NO_USECS)  # output never includes microseconds
+ISO_FORMAT_NO_USECS = '%Y-%m-%dT%H:%M:%S'
+ISO_FORMAT = ISO_FORMAT_NO_USECS + '.%f'
+
 # 20 MiB minus 41 bytes for a Repository header (because the "size" field in the Repository includes
 # the header, and the total size was set to 20 MiB).
 MAX_DATA_SIZE = 20971479

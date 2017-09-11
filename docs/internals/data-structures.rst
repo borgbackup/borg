@@ -735,7 +735,7 @@ b) with ``create --chunker-params 19,23,21,4095`` (default):
 
   mem_usage  =  0.31GiB
 
-.. note:: There is also the ``--no-files-cache`` option to switch off the files cache.
+.. note:: There is also the ``--files-cache=disabled`` option to disable the files cache.
    You'll save some memory, but it will need to read / chunk all the files as
    it can not skip unmodified files then.
 

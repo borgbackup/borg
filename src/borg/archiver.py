@@ -45,7 +45,7 @@ from .crypto.keymanager import KeyManager
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
 from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams
-from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS
+from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS, FilesCacheMode
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
@@ -373,7 +373,7 @@ class Archiver:
             compression = '--compression=none'
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
-            rc = self.do_create(self.parse_args(['create', compression, '--no-files-cache', archive + '1', path]))
+            rc = self.do_create(self.parse_args(['create', compression, '--files-cache=disabled', archive + '1', path]))
             t_end = time.monotonic()
             dt_create = t_end - t_start
             assert rc == 0
@@ -512,6 +512,7 @@ class Archiver:
         self.output_filter = args.output_filter
         self.output_list = args.output_list
         self.ignore_inode = args.ignore_inode
+        self.files_cache_mode = args.files_cache_mode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         t0_monotonic = time.monotonic()
@@ -567,7 +568,7 @@ class Archiver:
                     return
             if stat.S_ISREG(st.st_mode):
                 if not dry_run:
-                    status = archive.process_file(path, st, cache, self.ignore_inode)
+                    status = archive.process_file(path, st, cache, self.ignore_inode, self.files_cache_mode)
             elif stat.S_ISDIR(st.st_mode):
                 if recurse:
                     tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
@@ -2157,14 +2158,17 @@ class Archiver:
 
     def preprocess_args(self, args):
         deprecations = [
-            # ('--old', '--new', 'Warning: "--old" has been deprecated. Use "--new" instead.'),
+            # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
             ('--list-format', '--format', 'Warning: "--list-format" has been deprecated. Use "--format" instead.'),
             ('--keep-tag-files', '--keep-exclude-tags', 'Warning: "--keep-tag-files" has been deprecated. Use "--keep-exclude-tags" instead.'),
+            ('--ignore-inode', None, 'Warning: "--ignore-inode" has been deprecated. Use "--files-cache=ctime,size" or "...=mtime,size" instead.'),
+            ('--no-files-cache', None, 'Warning: "--no-files-cache" has been deprecated. Use "--files-cache=disabled" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 if arg.startswith(old_name):
-                    args[i] = arg.replace(old_name, new_name)
+                    if new_name is not None:
+                        args[i] = arg.replace(old_name, new_name)
                     print(warning, file=sys.stderr)
         return args
 
@@ -2792,13 +2796,39 @@ class Archiver:
         {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
         Backup speed is increased by not reprocessing files that are already part of
-        existing archives and weren't modified. Normally, detecting file modifications
-        will take inode information into consideration. This is problematic for files
-        located on sshfs and similar network file systems which do not provide stable
-        inode numbers, such files will always be considered modified. The
-        ``--ignore-inode`` flag can be used to prevent this and improve performance.
-        This flag will reduce reliability of change detection however, with files
-        considered unmodified as long as their size and modification time are unchanged.
+        existing archives and weren't modified. The detection of unmodified files is
+        done by comparing multiple file metadata values with previous values kept in
+        the files cache.
+
+        This comparison can operate in different modes as given by ``--files-cache``:
+
+        - ctime,size,inode (default)
+        - mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+        - ctime,size (ignore the inode number)
+        - mtime,size (ignore the inode number)
+        - rechunk,ctime (all files are considered modified - rechunk, cache ctime)
+        - rechunk,mtime (all files are considered modified - rechunk, cache mtime)
+        - disabled (disable the files cache, all files considered modified - rechunk)
+
+        inode number: better safety, but often unstable on network filesystems
+
+        Normally, detecting file modifications will take inode information into
+        consideration to improve the reliability of file change detection.
+        This is problematic for files located on sshfs and similar network file
+        systems which do not provide stable inode numbers, such files will always
+        be considered modified. You can use modes without `inode` in this case to
+        improve performance, but reliability of change detection might be reduced.
+
+        ctime vs. mtime: safety vs. speed
+
+        - ctime is a rather safe way to detect changes to a file (metadata and contents)
+          as it can not be set from userspace. But, a metadata-only change will already
+          update the ctime, so there might be some unnecessary chunking/hashing even
+          without content changes. Some filesystems do not support ctime (change time).
+        - mtime usually works and only updates if file contents were changed. But mtime
+          can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+          it had before a content change happened. This can be used maliciously as well as
+          well-meant, but in both cases mtime based cache modes can be problematic.
 
         The mount points of filesystems or filesystem snapshots should be the same for every
         creation of a new archive to ensure fast operation. This is because the file cache that
@@ -2889,7 +2919,7 @@ class Archiver:
         subparser.add_argument('--json', action='store_true',
                                help='output stats as JSON. Implies ``--stats``.')
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
-                               help='experimental: do not synchronize the cache. Implies ``--no-files-cache``.')
+                               help='experimental: do not synchronize the cache. Implies not using the files cache.')
 
         define_exclusion_group(subparser, tag_files=True)
 
@@ -2904,6 +2934,9 @@ class Archiver:
                               help='do not store ctime into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
+        fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
+                              type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
+                              help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
         fs_group.add_argument('--read-special', dest='read_special', action='store_true',
                               help='open and read block and char device files as well as FIFOs as if they were '
                                    'regular files. Also follows symlinks pointing to these kinds of files.')

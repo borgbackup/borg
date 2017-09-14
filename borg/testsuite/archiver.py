@@ -25,7 +25,7 @@ from ..archiver import Archiver
 from ..cache import Cache
 from ..crypto import bytes_to_long, num_aes_blocks
 from ..helpers import Manifest, PatternMatcher, parse_pattern, EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, bin_to_hex, \
-    get_security_dir, MAX_S, MandatoryFeatureUnsupported, Location
+    get_security_dir, MAX_S, MandatoryFeatureUnsupported, Location, ISO_FORMAT
 from ..key import RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..remote import RemoteRepository, PathNotAllowed
@@ -1766,7 +1766,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'version': 1,
                 'archives': {},
                 'config': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 
@@ -1778,7 +1778,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 

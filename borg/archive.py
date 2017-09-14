@@ -17,7 +17,7 @@ import time
 from io import BytesIO
 from . import xattr
 from .helpers import Error, uid2user, user2uid, gid2group, group2gid, bin_to_hex, \
-    parse_timestamp, to_localtime, format_time, format_timedelta, remove_surrogates, \
+    parse_timestamp, to_localtime, ISO_FORMAT, format_time, format_timedelta, remove_surrogates, \
     Manifest, Statistics, decode_dict, make_path_safe, StableDict, int_to_bigint, bigint_to_int, \
     ProgressIndicatorPercent, IntegrityError, set_ec, EXIT_WARNING, safe_ns
 from .platform import acl_get, acl_set
@@ -321,8 +321,8 @@ Number of files: {0.stats.nfiles}'''.format(
             'cmdline': sys.argv,
             'hostname': socket.gethostname(),
             'username': getuser(),
-            'time': start.isoformat(),
-            'time_end': end.isoformat(),
+            'time': start.strftime(ISO_FORMAT),
+            'time_end': end.strftime(ISO_FORMAT),
         })
         data = self.key.pack_and_authenticate_metadata(metadata, context=b'archive')
         self.id = self.key.id_hash(data)

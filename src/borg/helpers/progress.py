@@ -86,7 +86,7 @@ class ProgressIndicatorBase:
             finished=finished,
             time=time.time(),
         ))
-        print(json.dumps(kwargs), file=sys.stderr)
+        print(json.dumps(kwargs), file=sys.stderr, flush=True)
 
     def finish(self):
         if self.json:

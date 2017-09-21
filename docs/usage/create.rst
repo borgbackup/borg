@@ -41,11 +41,11 @@ Examples
     # Backup a raw device (must not be active/in use/mounted at that time)
     $ dd if=/dev/sdx bs=10M | borg create /path/to/repo::my-sdx -
 
-    # No compression (default)
-    $ borg create /path/to/repo::arch ~
+    # No compression
+    $ borg create --compression none /path/to/repo::arch ~
 
-    # Super fast, low compression
-    $ borg create --compression lz4 /path/to/repo::arch ~
+    # Super fast, low compression (default)
+    $ borg create /path/to/repo::arch ~
 
     # Less fast, higher compression (N = 0..9)
     $ borg create --compression zlib,N /path/to/repo::arch ~

@@ -53,6 +53,9 @@ Examples
     # Even slower, even higher compression (lzma, N = 0..9)
     $ borg create --compression lzma,N /path/to/repo::arch ~
 
+    # Only compress compressible data with lzma,N (N = 0..9)
+    $ borg create --compression auto,lzma,N /path/to/repo::arch ~
+
     # Use short hostname, user name and current time in archive name
     $ borg create /path/to/repo::{hostname}-{user}-{now} ~
     # Similar, use the same datetime format as borg 1.1 will have as default

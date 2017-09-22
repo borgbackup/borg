@@ -292,7 +292,7 @@ Checklist:
 - announce on:
 
  - Mailing list
- - Twitter (follow @ThomasJWaldmann for these tweets)
+ - Twitter
  - IRC channel (change ``/topic``)
 
 - create a Github release, include:

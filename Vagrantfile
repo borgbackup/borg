@@ -71,9 +71,9 @@ def packages_darwin
     sudo softwareupdate --ignore iTunes
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.5.8/osxfuse-3.5.8.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.7.1/osxfuse-3.7.1.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.5.8.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.7.1.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -560,7 +560,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages cygwin", :type => :shell, :privileged => false, :inline => packages_cygwin("x86_64")
     b.vm.provision :reload
     b.vm.provision "cygwin install pip", :type => :shell, :privileged => false, :inline => install_cygwin_venv
-    b.vm.provision "cygwin build env", :type => :shell, :privileged => false, :inline => build_sys_venv("windows10")    
+    b.vm.provision "cygwin build env", :type => :shell, :privileged => false, :inline => build_sys_venv("windows10")
     b.vm.provision "cygwin install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "cygwin run tests", :type => :shell, :privileged => false, :inline => run_tests("windows10")
   end

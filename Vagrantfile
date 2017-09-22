@@ -62,9 +62,9 @@ def packages_darwin
     sudo softwareupdate --ignore iTunes
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.6.3/osxfuse-3.6.3.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.7.1/osxfuse-3.7.1.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.6.3.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.7.1.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -233,7 +233,7 @@ def install_pythons(boxname)
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.5.3  # binary build, use latest 3.5.x release
+    pyenv install 3.5.4  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -251,8 +251,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.3
-    pyenv virtualenv 3.5.3 borg-env
+    pyenv global 3.5.4
+    pyenv virtualenv 3.5.4 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end

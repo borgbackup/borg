@@ -252,9 +252,6 @@ class FuseBackend(object):
             return self._items[inode]
         except KeyError:
             return self.cache.get(inode)
-            if not isinstance(self.repository_uncached, RemoteRepository):
-                # local repo and the locking process' PID just changed, migrate it:
-                self.repository_uncached.migrate_lock(old_id, new_id)
 
     def check_pending_archive(self, inode):
         # Check if this is an archive we need to load
@@ -381,6 +378,7 @@ class FuseBackend(object):
             if name:
                 dir[name] = inode
         return inode
+
 
 class FuseOperations(llfuse.Operations, FuseBackend):
     """Export archive as a FUSE filesystem

@@ -6,6 +6,8 @@ import subprocess
 import sys
 import textwrap
 
+from .process import prepare_subprocess_env
+
 from ..constants import *  # NOQA
 
 
@@ -154,7 +156,8 @@ def dash_open(path, mode):
 
 
 def umount(mountpoint):
+    env = prepare_subprocess_env(system=True)
     try:
-        return subprocess.call(['fusermount', '-u', mountpoint])
+        return subprocess.call(['fusermount', '-u', mountpoint], env=env)
     except FileNotFoundError:
-        return subprocess.call(['umount', mountpoint])
+        return subprocess.call(['umount', mountpoint], env=env)

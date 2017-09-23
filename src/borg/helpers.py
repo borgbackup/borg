@@ -2343,7 +2343,8 @@ def is_terminal(fd=sys.stdout):
 
 
 def umount(mountpoint):
+    env = prepare_subprocess_env(system=True)
     try:
-        return subprocess.call(['fusermount', '-u', mountpoint])
+        return subprocess.call(['fusermount', '-u', mountpoint], env=env)
     except FileNotFoundError:
-        return subprocess.call(['umount', mountpoint])
+        return subprocess.call(['umount', mountpoint], env=env)

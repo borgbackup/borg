@@ -832,6 +832,16 @@ a new repository when changing chunker params.
 
 For more details, see :ref:`chunker_details`.
 
+``--noatime / --noctime``
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use these ``borg create`` options to not store the respective timestamp
+into the archive, in case you do not really need it.
+
+Besides saving a little space for the not archived timestamp, it might also
+affect metadata stream deduplication: if only this timestamp changes between
+backups and is stored into the metadata stream, the metadata stream chunks
+won't deduplicate just because of that.
 
 --umask
 ~~~~~~~

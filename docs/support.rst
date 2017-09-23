@@ -38,6 +38,15 @@ unsubscribe and where you can find the archives of the list, see the
 `mailing list homepage
 <https://mail.python.org/mailman/listinfo/borgbackup>`_.
 
+Twitter
+-------
+
+Follow @borgbackup for announcements. You can also add @borgbackup if you
+would like to get retweeted for a borg related tweet.
+
+Please understand that Twitter is not suitable for longer / more complex
+discussions - use one of the other channels for that.
+
 Bounties and Fundraisers
 ------------------------
 

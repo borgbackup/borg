@@ -23,6 +23,7 @@ from ..helpers import yes
 from ..helpers import get_keys_dir, get_security_dir
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
+from ..helpers import prepare_subprocess_env
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 from .nonces import NonceManager
@@ -431,8 +432,10 @@ class Passphrase(str):
     def env_passcommand(cls, default=None):
         passcommand = os.environ.get('BORG_PASSCOMMAND', None)
         if passcommand is not None:
+            # passcommand is a system command (not inside pyinstaller env)
+            env = prepare_subprocess_env(system=True)
             try:
-                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True)
+                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True, env=env)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
             return cls(passphrase.rstrip('\n'))

@@ -2,7 +2,7 @@ import os
 import re
 import subprocess
 from stat import S_ISLNK
-from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode
+from .helpers import posix_acl_use_stored_uid_gid, user2uid, group2gid, safe_decode, safe_encode, prepare_subprocess_env
 
 API_VERSION = '1.0_01'
 
@@ -145,4 +145,5 @@ def acl_set(path, item, numeric_owner=False):
 
 
 def umount(mountpoint):
-    return subprocess.call(['fusermount', '-u', mountpoint])
+    env = prepare_subprocess_env(system=True)
+    return subprocess.call(['fusermount', '-u', mountpoint], env=env)

@@ -10,7 +10,7 @@ from ctypes import CDLL, create_string_buffer, c_ssize_t, c_size_t, c_char_p, c_
 from ctypes.util import find_library
 from distutils.version import LooseVersion
 
-from .helpers import Buffer
+from .helpers import Buffer, prepare_subprocess_env
 
 
 try:
@@ -79,7 +79,9 @@ try:
         preloads = re.split("[ :]", LD_PRELOAD)
         for preload in preloads:
             if preload.startswith("libfakeroot"):
-                fakeroot_version = LooseVersion(subprocess.check_output(['fakeroot', '-v']).decode('ascii').split()[-1])
+                env = prepare_subprocess_env(system=True)
+                fakeroot_output = subprocess.check_output(['fakeroot', '-v'], env=env)
+                fakeroot_version = LooseVersion(fakeroot_output.decode('ascii').split()[-1])
                 if fakeroot_version >= LooseVersion("1.20.2"):
                     # 1.20.2 has been confirmed to have xattr support
                     # 1.18.2 has been confirmed not to have xattr support

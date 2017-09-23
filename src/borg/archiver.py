@@ -64,7 +64,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
 from .helpers import ChunkIteratorFileWrapper
-from .helpers import popen_with_error_handling
+from .helpers import popen_with_error_handling, prepare_subprocess_env
 from .helpers import dash_open
 from .helpers import umount
 from .nanorst import rst_to_terminal
@@ -1677,9 +1677,10 @@ class Archiver:
         # we can only do this for local repositories (with .io), though:
         if hasattr(repository, 'io'):
             repository.io.close_segment()
+        env = prepare_subprocess_env(system=True)
         try:
             # we exit with the return code we get from the subprocess
-            return subprocess.call([args.command] + args.args)
+            return subprocess.call([args.command] + args.args, env=env)
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would

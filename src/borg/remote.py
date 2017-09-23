@@ -30,6 +30,7 @@ from .helpers import replace_placeholders
 from .helpers import sysinfo
 from .helpers import format_file_size
 from .helpers import truncate_and_unlink
+from .helpers import prepare_subprocess_env
 from .logger import create_logger, setup_logging
 from .repository import Repository
 from .version import parse_version, format_version
@@ -537,21 +538,12 @@ class RemoteRepository:
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
         self.p = None
         testing = location.host == '__testsuite__'
+        # when testing, we invoke and talk to a borg process directly (no ssh).
+        # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
+        env = prepare_subprocess_env(system=not testing)
         borg_cmd = self.borg_cmd(args, testing)
-        env = dict(os.environ)
         if not testing:
             borg_cmd = self.ssh_cmd(location) + borg_cmd
-            # pyinstaller binary modifies LD_LIBRARY_PATH=/tmp/_ME... but we do not want
-            # that the system's ssh binary picks up (non-matching) libraries from there.
-            # thus we install the original LDLP, before pyinstaller has modified it:
-            lp_key = 'LD_LIBRARY_PATH'
-            lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 has this
-            if lp_orig is not None:
-                env[lp_key] = lp_orig
-            else:
-                env.pop(lp_key, None)
-        env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
-        env['BORG_VERSION'] = __version__
         logger.debug('SSH command line: %s', borg_cmd)
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()

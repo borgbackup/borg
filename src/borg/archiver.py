@@ -771,10 +771,12 @@ class Archiver:
             # The decision whether to close that or not remains the same.
             filterout = tarstream
             filterout_close = tarstream_close
+            env = prepare_subprocess_env(system=True)
             # There is no deadlock potential here (the subprocess docs warn about this), because
             # communication with the process is a one-way road, i.e. the process can never block
             # for us to do something while we block on the process for something different.
-            filterproc = popen_with_error_handling(filter, stdin=subprocess.PIPE, stdout=filterout, log_prefix='--tar-filter: ')
+            filterproc = popen_with_error_handling(filter, stdin=subprocess.PIPE, stdout=filterout,
+                                                   log_prefix='--tar-filter: ', env=env)
             if not filterproc:
                 return EXIT_ERROR
             # Always close the pipe, otherwise the filter process would not notice when we are done.

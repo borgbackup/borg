@@ -2520,6 +2520,11 @@ class Archiver:
         change_passphrase_epilog = process_epilog("""
         The key files used for repository encryption are optionally passphrase
         protected. This command can be used to change this passphrase.
+
+        Please note that this command only changes the passphrase, but not any
+        secret protected by it (like e.g. encryption/MAC keys or chunker seed).
+        Thus, changing the passphrase after passphrase and borg key got compromised
+        does not protect future (nor past) backups to the same repository.
         """)
         subparser = key_parsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
                                           description=self.do_change_passphrase.__doc__,

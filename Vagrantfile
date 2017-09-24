@@ -113,7 +113,7 @@ def install_pyinstaller()
     . borg-env/bin/activate
     git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    git checkout v3.2.1
+    git checkout v3.3-fixed
     python setup.py install
   EOF
 end

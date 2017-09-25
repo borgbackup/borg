@@ -2303,6 +2303,32 @@ def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
         return
 
 
+def prepare_subprocess_env(system, env=None):
+    """
+    Prepare the environment for a subprocess we are going to create.
+
+    :param system: True for preparing to invoke system-installed binaries,
+                   False for stuff inside the pyinstaller environment (like borg, python).
+    :param env: optionally give a environment dict here. if not given, default to os.environ.
+    :return: a modified copy of the environment
+    """
+    env = dict(env if env is not None else os.environ)
+    if system:
+        # a pyinstaller binary's bootloader modifies LD_LIBRARY_PATH=/tmp/_ME...,
+        # but we do not want that system binaries (like ssh or other) pick up
+        # (non-matching) libraries from there.
+        # thus we install the original LDLP, before pyinstaller has modified it:
+        lp_key = 'LD_LIBRARY_PATH'
+        lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 has this
+        if lp_orig is not None:
+            env[lp_key] = lp_orig
+    # security: do not give secrets to subprocess
+    env.pop('BORG_PASSPHRASE', None)
+    # for information, give borg version to the subprocess
+    env['BORG_VERSION'] = borg_version
+    return env
+
+
 def dash_open(path, mode):
     assert '+' not in mode  # the streams are either r or w, but never both
     if path == '-':
@@ -2317,7 +2343,8 @@ def is_terminal(fd=sys.stdout):
 
 
 def umount(mountpoint):
+    env = prepare_subprocess_env(system=True)
     try:
-        return subprocess.call(['fusermount', '-u', mountpoint])
+        return subprocess.call(['fusermount', '-u', mountpoint], env=env)
     except FileNotFoundError:
-        return subprocess.call(['umount', mountpoint])
+        return subprocess.call(['umount', mountpoint], env=env)

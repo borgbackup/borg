@@ -64,7 +64,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import basic_json_data, json_print
 from .helpers import replace_placeholders
 from .helpers import ChunkIteratorFileWrapper
-from .helpers import popen_with_error_handling
+from .helpers import popen_with_error_handling, prepare_subprocess_env
 from .helpers import dash_open
 from .helpers import umount
 from .nanorst import rst_to_terminal
@@ -790,10 +790,12 @@ class Archiver:
             # The decision whether to close that or not remains the same.
             filterout = tarstream
             filterout_close = tarstream_close
+            env = prepare_subprocess_env(system=True)
             # There is no deadlock potential here (the subprocess docs warn about this), because
             # communication with the process is a one-way road, i.e. the process can never block
             # for us to do something while we block on the process for something different.
-            filterproc = popen_with_error_handling(filter, stdin=subprocess.PIPE, stdout=filterout, log_prefix='--tar-filter: ')
+            filterproc = popen_with_error_handling(filter, stdin=subprocess.PIPE, stdout=filterout,
+                                                   log_prefix='--tar-filter: ', env=env)
             if not filterproc:
                 return EXIT_ERROR
             # Always close the pipe, otherwise the filter process would not notice when we are done.
@@ -1677,9 +1679,10 @@ class Archiver:
         # we can only do this for local repositories (with .io), though:
         if hasattr(repository, 'io'):
             repository.io.close_segment()
+        env = prepare_subprocess_env(system=True)
         try:
             # we exit with the return code we get from the subprocess
-            return subprocess.call([args.command] + args.args)
+            return subprocess.call([args.command] + args.args, env=env)
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would

@@ -624,10 +624,10 @@ can be accomplished with pipeviewer_:
 
 Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
 
-    #!/bin/bash
+    #!/bin/sh
         ## -q, --quiet              do not output any transfer information at all
         ## -L, --rate-limit RATE    limit transfer to RATE bytes per second
-    export RATE=307200
+    RATE=307200
     pv -q -L $RATE  | "$@"
 
 Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::

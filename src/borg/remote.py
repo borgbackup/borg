@@ -304,12 +304,12 @@ class RepositoryServer:  # pragma: no cover
         if client_data == RPC_PROTOCOL_VERSION:
             return RPC_PROTOCOL_VERSION
         # clients since 1.1.0b3 use a dict as client_data
+        # clients since 1.1.0b6 support json log format from server
         if isinstance(client_data, dict):
             self.client_version = client_data[b'client_version']
-            if client_data.get(b'client_supports_log_v3', False):
-                level = logging.getLevelName(logging.getLogger('').level)
-                setup_logging(is_serve=True, json=True, level=level)
-                logger.debug('Initialized logging system for new (v3) protocol')
+            level = logging.getLevelName(logging.getLogger('').level)
+            setup_logging(is_serve=True, json=True, level=level)
+            logger.debug('Initialized logging system for JSON-based protocol')
         else:
             self.client_version = BORG_VERSION  # seems to be newer than current version (no known old format)
 
@@ -567,7 +567,6 @@ class RemoteRepository:
             try:
                 version = self.call('negotiate', {'client_data': {
                     b'client_version': BORG_VERSION,
-                    b'client_supports_log_v3': True,
                 }})
             except ConnectionClosed:
                 raise ConnectionClosedWithHint('Is borg working on the server?') from None
@@ -1012,16 +1011,10 @@ def handle_remote_line(line):
                     # of local progress displays.
                     sys.stderr.write('Remote: ' + msg['message'] + '\r')
     elif line.startswith('$LOG '):
-        # This format is used by Borg since 1.1.0b1.
+        # This format is used by borg serve 0.xx, 1.0.x and 1.1.0b1..b5.
         # It prefixed log lines with $LOG as a marker, followed by the log level
         # and optionally a logger name, then "Remote:" as a separator followed by the original
         # message.
-        #
-        # It is the oldest format supported by these servers, so it was important to make
-        # it readable with older (1.0.x) clients.
-        #
-        # TODO: Remove this block (so it'll be handled by the "else:" below) with a Borg 1.1 RC.
-        #       Also check whether client_supports_log_v3 should be removed.
         _, level, msg = line.split(' ', 2)
         level = getattr(logging, level, logging.CRITICAL)  # str -> int
         if msg.startswith('Remote:'):

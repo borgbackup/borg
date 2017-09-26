@@ -521,6 +521,7 @@ class RemoteRepository:
         self.rx_bytes = 0
         self.tx_bytes = 0
         self.to_send = b''
+        self.stderr_received = b''  # incomplete stderr line bytes received (no \n yet)
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
         self.responses = {}
@@ -821,9 +822,16 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     if not data:
                         raise ConnectionClosed()
                     self.rx_bytes += len(data)
-                    data = data.decode('utf-8')
-                    for line in data.splitlines(keepends=True):
-                        handle_remote_line(line)
+                    # deal with incomplete lines (may appear due to block buffering)
+                    if self.stderr_received:
+                        data = self.stderr_received + data
+                        self.stderr_received = b''
+                    lines = data.splitlines(keepends=True)
+                    if lines and not lines[-1].endswith((b'\r', b'\n')):
+                        self.stderr_received = lines.pop()
+                    # now we have complete lines in <lines> and any partial line in self.stderr_received.
+                    for line in lines:
+                        handle_remote_line(line.decode('utf-8'))  # decode late, avoid partial utf-8 sequences
             if w:
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
@@ -954,6 +962,7 @@ def handle_remote_line(line):
 
     This function is remarkably complex because it handles multiple wire formats.
     """
+    assert line.endswith(('\r', '\n'))
     if line.startswith('{'):
         # This format is used by Borg since 1.1.0b6 for new-protocol clients.
         # It is the same format that is exposed by --log-json.

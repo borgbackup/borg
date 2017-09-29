@@ -7,4 +7,4 @@ pytest
 pytest-xdist
 pytest-cov
 pytest-benchmark
-Cython
+Cython!=0.27

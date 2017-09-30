@@ -117,6 +117,22 @@ def ChunkerParams(s):
     return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
 
 
+def FilesCacheMode(s):
+    ENTRIES_MAP = dict(ctime='c', mtime='m', size='s', inode='i', rechunk='r', disabled='d')
+    VALID_MODES = ('cis', 'ims', 'cs', 'ms', 'cr', 'mr', 'd')  # letters in alpha order
+    entries = set(s.strip().split(','))
+    if not entries <= set(ENTRIES_MAP):
+        raise ValueError('cache mode must be a comma-separated list of: %s' % ','.join(sorted(ENTRIES_MAP)))
+    short_entries = {ENTRIES_MAP[entry] for entry in entries}
+    mode = ''.join(sorted(short_entries))
+    if mode not in VALID_MODES:
+        raise ValueError('cache mode short must be one of: %s' % ','.join(VALID_MODES))
+    return mode
+
+
+assert FilesCacheMode(DEFAULT_FILES_CACHE_MODE_UI) == DEFAULT_FILES_CACHE_MODE  # keep these 2 values in sync!
+
+
 def partial_format(format, mapping):
     """
     Apply format.format_map(mapping) while preserving unknown keys

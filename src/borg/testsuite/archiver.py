@@ -318,8 +318,6 @@ class ArchiverTestCaseBase(BaseTestCase):
         """Create a minimal test case including all supported file types
         """
         # File
-        self.create_regular_file('empty', size=0)
-        os.utime('input/empty', (MAX_S, MAX_S))
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('flagfile', size=1024)
         # Directory
@@ -370,6 +368,8 @@ class ArchiverTestCaseBase(BaseTestCase):
             if e.errno not in (errno.EINVAL, errno.ENOSYS):
                 raise
             have_root = False
+        time.sleep(1)  # "empty" must have newer timestamp than other files
+        self.create_regular_file('empty', size=0)
         return have_root
 
 
@@ -1591,9 +1591,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         """test that various file status show expected results
 
         clearly incomplete: only tests for the weird "unchanged" status for now"""
-        now = time.time()
         self.create_regular_file('file1', size=1024 * 80)
-        os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
+        time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
@@ -1606,12 +1605,51 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
         self.assert_in("A input/file2", output)
 
+    def test_file_status_cs_cache_mode(self):
+        """test that a changed file with faked "previous" mtime still gets backed up in ctime,size cache_mode"""
+        self.create_regular_file('file1', contents=b'123')
+        time.sleep(1)  # file2 must have newer timestamps than file1
+        self.create_regular_file('file2', size=10)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--list', '--files-cache=ctime,size', self.repository_location + '::test1', 'input')
+        # modify file1, but cheat with the mtime (and atime) and also keep same size:
+        st = os.stat('input/file1')
+        self.create_regular_file('file1', contents=b'321')
+        os.utime('input/file1', ns=(st.st_atime_ns, st.st_mtime_ns))
+        # this mode uses ctime for change detection, so it should find file1 as modified
+        output = self.cmd('create', '--list', '--files-cache=ctime,size', self.repository_location + '::test2', 'input')
+        self.assert_in("A input/file1", output)
+
+    def test_file_status_ms_cache_mode(self):
+        """test that a chmod'ed file with no content changes does not get chunked again in mtime,size cache_mode"""
+        self.create_regular_file('file1', size=10)
+        time.sleep(1)  # file2 must have newer timestamps than file1
+        self.create_regular_file('file2', size=10)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--list', '--files-cache=mtime,size', self.repository_location + '::test1', 'input')
+        # change mode of file1, no content change:
+        st = os.stat('input/file1')
+        os.chmod('input/file1', st.st_mode ^ stat.S_IRWXO)  # this triggers a ctime change, but mtime is unchanged
+        # this mode uses mtime for change detection, so it should find file1 as unmodified
+        output = self.cmd('create', '--list', '--files-cache=mtime,size', self.repository_location + '::test2', 'input')
+        self.assert_in("U input/file1", output)
+
+    def test_file_status_rc_cache_mode(self):
+        """test that files get rechunked unconditionally in rechunk,ctime cache mode"""
+        self.create_regular_file('file1', size=10)
+        time.sleep(1)  # file2 must have newer timestamps than file1
+        self.create_regular_file('file2', size=10)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--list', '--files-cache=rechunk,ctime', self.repository_location + '::test1', 'input')
+        # no changes here, but this mode rechunks unconditionally
+        output = self.cmd('create', '--list', '--files-cache=rechunk,ctime', self.repository_location + '::test2', 'input')
+        self.assert_in("A input/file1", output)
+
     def test_file_status_excluded(self):
         """test that excluded paths are listed"""
 
-        now = time.time()
         self.create_regular_file('file1', size=1024 * 80)
-        os.utime('input/file1', (now - 5, now - 5))  # 5 seconds ago
+        time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=1024 * 80)
         if has_lchflags:
             self.create_regular_file('file3', size=1024 * 80)
@@ -1647,9 +1685,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'stats' in archive
 
     def test_create_topical(self):
-        now = time.time()
         self.create_regular_file('file1', size=1024 * 80)
-        os.utime('input/file1', (now-5, now-5))
+        time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         # no listing by default
@@ -2363,7 +2400,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'b' * 280)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test1', 'input')
-        self.cmd('create', self.repository_location + '::test2', 'input', '--no-files-cache')
+        self.cmd('create', self.repository_location + '::test2', 'input', '--files-cache=disabled')
         list = self.cmd('list', self.repository_location + '::test1', 'input/large_file',
                         '--format', '{num_chunks} {unique_chunks}')
         num_chunks, unique_chunks = map(int, list.split(' '))
@@ -3513,7 +3550,6 @@ class TestCommonOptions:
         add_common_option('-p', '--progress', dest='progress', action='store_true', help='foo')
         add_common_option('--lock-wait', dest='lock_wait', type=int, metavar='N', default=1,
                           help='(default: %(default)d).')
-        add_common_option('--no-files-cache', dest='no_files_cache', action='store_false', help='foo')
 
     @pytest.fixture
     def basic_parser(self):
@@ -3555,7 +3591,6 @@ class TestCommonOptions:
 
     def test_simple(self, parse_vars_from_line):
         assert parse_vars_from_line('--error') == {
-            'no_files_cache': True,
             'append': [],
             'lock_wait': 1,
             'log_level': 'error',
@@ -3563,7 +3598,6 @@ class TestCommonOptions:
         }
 
         assert parse_vars_from_line('--error', 'subcommand', '--critical') == {
-            'no_files_cache': True,
             'append': [],
             'lock_wait': 1,
             'log_level': 'critical',
@@ -3576,7 +3610,6 @@ class TestCommonOptions:
             parse_vars_from_line('--append-only', 'subcommand')
 
         assert parse_vars_from_line('--append=foo', '--append', 'bar', 'subcommand', '--append', 'baz') == {
-            'no_files_cache': True,
             'append': ['foo', 'bar', 'baz'],
             'lock_wait': 1,
             'log_level': 'warning',
@@ -3589,7 +3622,6 @@ class TestCommonOptions:
     @pytest.mark.parametrize('flag,args_key,args_value', (
         ('-p', 'progress', True),
         ('--lock-wait=3', 'lock_wait', 3),
-        ('--no-files-cache', 'no_files_cache', False),
     ))
     def test_flag_position_independence(self, parse_vars_from_line, position, flag, args_key, args_value):
         line = []
@@ -3600,7 +3632,6 @@ class TestCommonOptions:
             line.append(flag)
 
         result = {
-            'no_files_cache': True,
             'append': [],
             'lock_wait': 1,
             'log_level': 'warning',

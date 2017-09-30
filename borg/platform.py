@@ -2,6 +2,7 @@ import errno
 import os
 import subprocess
 import sys
+from .helpers import prepare_subprocess_env
 
 
 # POSIX-only, from borg 1.1 platform.base
@@ -20,7 +21,8 @@ def sync_dir(path):
 
 # most POSIX platforms (but not Linux), see also borg 1.1 platform.base
 def umount(mountpoint):
-    return subprocess.call(['umount', mountpoint])
+    env = prepare_subprocess_env(system=True)
+    return subprocess.call(['umount', mountpoint], env=env)
 
 
 if sys.platform.startswith('linux'):  # pragma: linux only

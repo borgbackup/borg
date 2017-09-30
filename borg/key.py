@@ -19,6 +19,7 @@ from .crypto import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_aes_blo
 from .crypto import hkdf_hmac_sha512
 from .compress import Compressor, CNONE
 from .helpers import get_limited_unpacker
+from .helpers import prepare_subprocess_env
 
 
 PREFIX = b'\0' * 8
@@ -327,8 +328,10 @@ class Passphrase(str):
     def env_passcommand(cls, default=None):
         passcommand = os.environ.get('BORG_PASSCOMMAND', None)
         if passcommand is not None:
+            # passcommand is a system command (not inside pyinstaller env)
+            env = prepare_subprocess_env(system=True)
             try:
-                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True)
+                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True, env=env)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
             return cls(passphrase.rstrip('\n'))

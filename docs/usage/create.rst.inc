@@ -31,7 +31,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--json``                                        | output stats as JSON. Implies ``--stats``.                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the cache. Implies ``--no-files-cache``.                                                                         |
+    |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the cache. Implies not using the files cache.                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                |
     |                                                                                                                                                                                                                                                               |
@@ -64,6 +64,8 @@ borg create
     |                                                       | ``--noctime``                                     | do not store ctime into archive                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--ignore-inode``                                | ignore inode data in the file metadata cache used to detect unchanged files.                                                                      |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special``                                | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files. |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -102,7 +104,7 @@ borg create
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
-        --no-cache-sync    experimental: do not synchronize the cache. Implies ``--no-files-cache``.
+        --no-cache-sync    experimental: do not synchronize the cache. Implies not using the files cache.
 
 
     :ref:`common_options`
@@ -124,6 +126,7 @@ borg create
         --noatime                 do not store atime into archive
         --noctime                 do not store ctime into archive
         --ignore-inode            ignore inode data in the file metadata cache used to detect unchanged files.
+        --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 
 
@@ -157,13 +160,39 @@ In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
 Backup speed is increased by not reprocessing files that are already part of
-existing archives and weren't modified. Normally, detecting file modifications
-will take inode information into consideration. This is problematic for files
-located on sshfs and similar network file systems which do not provide stable
-inode numbers, such files will always be considered modified. The
-``--ignore-inode`` flag can be used to prevent this and improve performance.
-This flag will reduce reliability of change detection however, with files
-considered unmodified as long as their size and modification time are unchanged.
+existing archives and weren't modified. The detection of unmodified files is
+done by comparing multiple file metadata values with previous values kept in
+the files cache.
+
+This comparison can operate in different modes as given by ``--files-cache``:
+
+- ctime,size,inode (default)
+- mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+- ctime,size (ignore the inode number)
+- mtime,size (ignore the inode number)
+- rechunk,ctime (all files are considered modified - rechunk, cache ctime)
+- rechunk,mtime (all files are considered modified - rechunk, cache mtime)
+- disabled (disable the files cache, all files considered modified - rechunk)
+
+inode number: better safety, but often unstable on network filesystems
+
+Normally, detecting file modifications will take inode information into
+consideration to improve the reliability of file change detection.
+This is problematic for files located on sshfs and similar network file
+systems which do not provide stable inode numbers, such files will always
+be considered modified. You can use modes without `inode` in this case to
+improve performance, but reliability of change detection might be reduced.
+
+ctime vs. mtime: safety vs. speed
+
+- ctime is a rather safe way to detect changes to a file (metadata and contents)
+  as it can not be set from userspace. But, a metadata-only change will already
+  update the ctime, so there might be some unnecessary chunking/hashing even
+  without content changes. Some filesystems do not support ctime (change time).
+- mtime usually works and only updates if file contents were changed. But mtime
+  can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+  it had before a content change happened. This can be used maliciously as well as
+  well-meant, but in both cases mtime based cache modes can be problematic.
 
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that

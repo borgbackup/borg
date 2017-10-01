@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-09-09" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-10-01" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -54,13 +54,50 @@ In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 .sp
 Backup speed is increased by not reprocessing files that are already part of
-existing archives and weren\(aqt modified. Normally, detecting file modifications
-will take inode information into consideration. This is problematic for files
-located on sshfs and similar network file systems which do not provide stable
-inode numbers, such files will always be considered modified. The
-\fB\-\-ignore\-inode\fP flag can be used to prevent this and improve performance.
-This flag will reduce reliability of change detection however, with files
-considered unmodified as long as their size and modification time are unchanged.
+existing archives and weren\(aqt modified. The detection of unmodified files is
+done by comparing multiple file metadata values with previous values kept in
+the files cache.
+.sp
+This comparison can operate in different modes as given by \fB\-\-files\-cache\fP:
+.INDENT 0.0
+.IP \(bu 2
+ctime,size,inode (default)
+.IP \(bu 2
+mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+.IP \(bu 2
+ctime,size (ignore the inode number)
+.IP \(bu 2
+mtime,size (ignore the inode number)
+.IP \(bu 2
+rechunk,ctime (all files are considered modified \- rechunk, cache ctime)
+.IP \(bu 2
+rechunk,mtime (all files are considered modified \- rechunk, cache mtime)
+.IP \(bu 2
+disabled (disable the files cache, all files considered modified \- rechunk)
+.UNINDENT
+.sp
+inode number: better safety, but often unstable on network filesystems
+.sp
+Normally, detecting file modifications will take inode information into
+consideration to improve the reliability of file change detection.
+This is problematic for files located on sshfs and similar network file
+systems which do not provide stable inode numbers, such files will always
+be considered modified. You can use modes without \fIinode\fP in this case to
+improve performance, but reliability of change detection might be reduced.
+.sp
+ctime vs. mtime: safety vs. speed
+.INDENT 0.0
+.IP \(bu 2
+ctime is a rather safe way to detect changes to a file (metadata and contents)
+as it can not be set from userspace. But, a metadata\-only change will already
+update the ctime, so there might be some unnecessary chunking/hashing even
+without content changes. Some filesystems do not support ctime (change time).
+.IP \(bu 2
+mtime usually works and only updates if file contents were changed. But mtime
+can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+it had before a content change happened. This can be used maliciously as well as
+well\-meant, but in both cases mtime based cache modes can be problematic.
+.UNINDENT
 .sp
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that
@@ -104,7 +141,7 @@ only display items with the given status characters (see description)
 output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
 .B \-\-no\-cache\-sync
-experimental: do not synchronize the cache. Implies \fB\-\-no\-files\-cache\fP\&.
+experimental: do not synchronize the cache. Implies not using the files cache.
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -147,6 +184,9 @@ do not store ctime into archive
 .TP
 .B \-\-ignore\-inode
 ignore inode data in the file metadata cache used to detect unchanged files.
+.TP
+.BI \-\-files\-cache \ MODE
+operate files cache in MODE. default: ctime,size,inode
 .TP
 .B \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
@@ -212,17 +252,20 @@ $ borg create \-\-chunker\-params 10,23,16,4095 /path/to/repo::small /smallstuff
 # Backup a raw device (must not be active/in use/mounted at that time)
 $ dd if=/dev/sdx bs=10M | borg create /path/to/repo::my\-sdx \-
 
-# No compression (default)
+# No compression (none)
+$ borg create \-\-compression none /path/to/repo::arch ~
+
+# Super fast, low compression (lz4, default)
 $ borg create /path/to/repo::arch ~
 
-# Super fast, low compression
-$ borg create \-\-compression lz4 /path/to/repo::arch ~
-
-# Less fast, higher compression (N = 0..9)
+# Less fast, higher compression (zlib, N = 0..9)
 $ borg create \-\-compression zlib,N /path/to/repo::arch ~
 
-# Even slower, even higher compression (N = 0..9)
+# Even slower, even higher compression (lzma, N = 0..9)
 $ borg create \-\-compression lzma,N /path/to/repo::arch ~
+
+# Only compress compressible data with lzma,N (N = 0..9)
+$ borg create \-\-compression auto,lzma,N /path/to/repo::arch ~
 
 # Use short hostname, user name and current time in archive name
 $ borg create /path/to/repo::{hostname}\-{user}\-{now} ~

@@ -131,6 +131,50 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+
+Version 1.1.0rc4 (2017-10-01)
+-----------------------------
+
+Compatibility notes:
+
+- A borg server >= 1.1.0rc4 does not support borg clients 1.1.0b3-b5. #3033
+- The files cache is now controlled differently and has a new default mode:
+
+  - the files cache now uses ctime by default for improved file change
+    detection safety. You can still use mtime for more speed and less safety.
+  - --ignore-inode is deprecated (use --files-cache=... without "inode")
+  - --no-files-cache is deprecated (use --files-cache=disabled)
+
+New features:
+
+- --files-cache - implement files cache mode control, #911
+  You can now control the files cache mode using this option:
+  --files-cache={ctime,mtime,size,inode,rechunk,disabled}
+  (only some combinations are supported). See the docs for details.
+
+Fixes:
+
+- remote progress/logging: deal with partial lines, #2637
+- remote progress: flush json mode output
+- fix subprocess environments, #3050 (and more)
+
+Other changes:
+
+- remove client_supports_log_v3 flag, #3033
+- exclude broken Cython 0.27(.0) in requirements, #3066
+- vagrant:
+
+  - upgrade to FUSE for macOS 3.7.1
+  - use Python 3.5.4 to build the binaries
+- docs:
+
+  - security: change-passphrase only changes the passphrase, #2990
+  - fixed/improved borg create --compression examples, #3034
+  - add note about metadata dedup and --no[ac]time, #2518
+  - twitter account @borgbackup now, better visible, #2948
+  - simplified rate limiting wrapper in FAQ
+
+
 Version 1.1.0rc3 (2017-09-10)
 -----------------------------
 

@@ -1576,14 +1576,27 @@ def prepare_subprocess_env(system, env=None):
     """
     env = dict(env if env is not None else os.environ)
     if system:
-        # a pyinstaller binary's bootloader modifies LD_LIBRARY_PATH=/tmp/_ME...,
+        # a pyinstaller binary's bootloader modifies LD_LIBRARY_PATH=/tmp/_MEIXXXXXX,
         # but we do not want that system binaries (like ssh or other) pick up
         # (non-matching) libraries from there.
         # thus we install the original LDLP, before pyinstaller has modified it:
         lp_key = 'LD_LIBRARY_PATH'
-        lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 has this
+        lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 / v3.2.1 has this
         if lp_orig is not None:
             env[lp_key] = lp_orig
+        else:
+            # We get here in 2 cases:
+            # 1. when not running a pyinstaller-made binary.
+            #    in this case, we must not kill LDLP.
+            # 2. when running a pyinstaller-made binary and there was no LDLP
+            #    in the original env (in this case, the pyinstaller bootloader
+            #    does *not* put ..._ORIG into the env either).
+            #    in this case, we must kill LDLP.
+            # The directory used by pyinstaller is created by mkdtemp("_MEIXXXXXX"),
+            # we can use that to differentiate between the cases.
+            lp = env.get(lp_key)
+            if lp is not None and re.search(r'/_MEI......', lp):
+                env.pop(lp_key)
     # security: do not give secrets to subprocess
     env.pop('BORG_PASSPHRASE', None)
     # for information, give borg version to the subprocess

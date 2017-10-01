@@ -60,6 +60,10 @@ CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (15, 19, 17, HASH_WINDOW_SIZE)
 
+# operating mode of the files cache (for fast skipping of unchanged files)
+DEFAULT_FILES_CACHE_MODE_UI = 'ctime,size,inode'
+DEFAULT_FILES_CACHE_MODE = 'cis'  # == CacheMode(DEFAULT_FILES_CACHE_MODE_UI)
+
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N
 EXIT_SUCCESS = 0  # everything done, no problems

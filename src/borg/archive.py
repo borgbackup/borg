@@ -953,13 +953,13 @@ Utilization of max. archive size: {csize_max:.0%}
         self.add_item(item)
         return 'i'  # stdin
 
-    def process_file(self, path, st, cache, ignore_inode=False):
+    def process_file(self, path, st, cache, ignore_inode=False, files_cache_mode=DEFAULT_FILES_CACHE_MODE):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
             is_special_file = is_special(st.st_mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
                     path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                    ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
+                    ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode, files_cache_mode)
                 else:
                     # in --read-special mode, we may be called for special files.
                     # there should be no information in the cache about special files processed in
@@ -992,7 +992,7 @@ Utilization of max. archive size: {csize_max:.0%}
                     if not is_special_file:
                         # we must not memorize special files, because the contents of e.g. a
                         # block or char device will change without its mtime/size/inode changing.
-                        cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
+                        cache.memorize_file(path_hash, st, [c.id for c in item.chunks], files_cache_mode)
                     status = status or 'M'  # regular file, modified (if not 'A' already)
                 self.stats.nfiles += 1
             item.update(self.stat_attrs(st, path))

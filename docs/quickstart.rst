@@ -21,14 +21,14 @@ a good amount of free space on the filesystem that has your backup repository
 (and also on ~/.cache). A few GB should suffice for most hard-drive sized
 repositories. See also :ref:`cache-memory-usage`.
 
-Borg doesn't use space reserved for root on repository disks (even when run as root),
+|project_name| doesn't use space reserved for root on repository disks (even when run as root),
 on file systems which do not support this mechanism (e.g. XFS) we recommend to
-reserve some space in Borg itself just to be safe by adjusting the
+reserve some space in |project_name| itself just to be safe by adjusting the
 ``additional_free_space`` setting in the ``[repository]`` section of a repositories
 ``config`` file. A good starting point is ``2G``.
 
 If |project_name| runs out of disk space, it tries to free as much space as it
-can while aborting the current operation safely, which allows to free more space
+can while aborting the current operation safely, which allows the user to free more space
 by deleting/pruning archives. This mechanism is not bullet-proof in some
 circumstances [1]_.
 
@@ -153,14 +153,14 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 Pitfalls with shell variables and environment variables
 -------------------------------------------------------
 
-This applies to all environment variables you want borg to see, not just
+This applies to all environment variables you want |project_name| to see, not just
 ``BORG_PASSPHRASE``. The short explanation is: always ``export`` your variable,
 and use single quotes if you're unsure of the details of your shell's expansion
 behavior. E.g.::
 
     export BORG_PASSPHRASE='complicated & long'
 
-This is because ``export`` exposes variables to subprocesses, which borg may be
+This is because ``export`` exposes variables to subprocesses, which |project_name| may be
 one of. More on ``export`` can be found in the "ENVIRONMENT" section of the
 bash(1) man page.
 

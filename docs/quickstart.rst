@@ -28,7 +28,7 @@ reserve some space in |project_name| itself just to be safe by adjusting the
 ``config`` file. A good starting point is ``2G``.
 
 If |project_name| runs out of disk space, it tries to free as much space as it
-can while aborting the current operation safely, which allows it to free more space
+can while aborting the current operation safely, which allows the user to free more space
 by deleting/pruning archives. This mechanism is not bullet-proof in some
 circumstances [1]_.
 

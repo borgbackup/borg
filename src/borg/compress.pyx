@@ -246,7 +246,7 @@ class Auto(CompressorBase):
         lz4_data = self.lz4.compress(data)
         ratio = len(lz4_data) / len(data)
         if ratio < 0.97:
-            return self.compressor, None
+            return self.compressor, lz4_data
         elif ratio < 1:
             return self.lz4, lz4_data
         else:
@@ -257,9 +257,24 @@ class Auto(CompressorBase):
 
     def compress(self, data):
         compressor, lz4_data = self._decide(data)
-        if lz4_data is None:
-            return compressor.compress(data)
+        if compressor is self.lz4:
+            # we know that trying to compress with expensive compressor is likely pointless,
+            # but lz4 managed to at least squeeze the data a bit.
+            return lz4_data
+        if compressor is self.none:
+            # we know that trying to compress with expensive compressor is likely pointless
+            # and also lz4 did not manage to squeeze the data (not even a bit).
+            uncompressed_data = compressor.compress(data)
+            return uncompressed_data
+        # if we get here, the decider decided to try the expensive compressor.
+        # we also know that lz4_data is smaller than uncompressed data.
+        exp_compressed_data = compressor.compress(data)
+        ratio = len(exp_compressed_data) / len(lz4_data)
+        if ratio < 0.99:
+            # the expensive compressor managed to squeeze the data significantly better than lz4.
+            return exp_compressed_data
         else:
+            # otherwise let's just store the lz4 data, which decompresses extremely fast.
             return lz4_data
 
     def decompress(self, data):

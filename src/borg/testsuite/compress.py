@@ -110,12 +110,18 @@ def test_compressor():
 
 
 def test_auto():
-    compressor = CompressionSpec('auto,zlib,9').compressor
+    compressor_auto_zlib = CompressionSpec('auto,zlib,9').compressor
+    compressor_lz4 = CompressionSpec('lz4').compressor
+    compressor_zlib = CompressionSpec('zlib,9').compressor
+    data = bytes(500)
+    compressed_auto_zlib = compressor_auto_zlib.compress(data)
+    compressed_lz4 = compressor_lz4.compress(data)
+    compressed_zlib = compressor_zlib.compress(data)
+    ratio = len(compressed_zlib) / len(compressed_lz4)
+    assert Compressor.detect(compressed_auto_zlib) == ZLIB if ratio < 0.99 else LZ4
 
-    compressed = compressor.compress(bytes(500))
-    assert Compressor.detect(compressed) == ZLIB
-
-    compressed = compressor.compress(b'\x00\xb8\xa3\xa2-O\xe1i\xb6\x12\x03\xc21\xf3\x8a\xf78\\\x01\xa5b\x07\x95\xbeE\xf8\xa3\x9ahm\xb1~')
+    data = b'\x00\xb8\xa3\xa2-O\xe1i\xb6\x12\x03\xc21\xf3\x8a\xf78\\\x01\xa5b\x07\x95\xbeE\xf8\xa3\x9ahm\xb1~'
+    compressed = compressor_auto_zlib.compress(data)
     assert Compressor.detect(compressed) == CNONE
 
 

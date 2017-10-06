@@ -12,7 +12,7 @@ from distutils.core import Command
 
 import textwrap
 
-min_python = (3, 4)
+min_python = (3, 5)
 my_python = sys.version_info
 
 if my_python < min_python:

@@ -37,6 +37,8 @@ extras_require = {
     # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.1.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.2 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.3 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
     'fuse': ['llfuse<2.0', ],
 }

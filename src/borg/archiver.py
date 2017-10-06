@@ -1951,7 +1951,12 @@ class Archiver:
             else:
                 commands[args.topic].print_help()
         else:
-            parser.error('No help available on %s' % (args.topic,))
+            msg_lines = []
+            msg_lines += ['No help available on %s.' % args.topic]
+            msg_lines += ['Try one of the following:']
+            msg_lines += ['    Commands: %s' % ', '.join(sorted(commands.keys()))]
+            msg_lines += ['    Topics: %s' % ', '.join(sorted(self.helptext.keys()))]
+            parser.error('\n'.join(msg_lines))
         return self.exit_code
 
     def do_subcommand_help(self, parser, args):

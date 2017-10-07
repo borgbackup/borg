@@ -653,6 +653,13 @@ class build_man(Command):
     def gen_man_page(self, name, rst):
         from docutils.writers import manpage
         from docutils.core import publish_string
+        from docutils.nodes import inline
+        from docutils.parsers.rst import roles
+
+        def issue(name, rawtext, text, lineno, inliner, options={}, content=[]):
+            return [inline(rawtext, '#' + text)], []
+
+        roles.register_local_role('issue', issue)
         # We give the source_path so that docutils can find relative includes
         # as-if the document where located in the docs/ directory.
         man_page = publish_string(source=rst, source_path='docs/virtmanpage.rst', writer=manpage.Writer())

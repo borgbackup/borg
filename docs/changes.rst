@@ -132,6 +132,24 @@ Changelog
 =========
 
 
+Version 1.1.0 (2017-10-07)
+--------------------------
+
+Fixes:
+
+- fix LD_LIBRARY_PATH restoration for subprocesses, #3077
+- "auto" compression: make sure expensive compression is actually better,
+  otherwise store lz4 compressed data we already computed.
+
+Other changes:
+
+- docs:
+
+  - FAQ: we do not implement futile attempts of ETA / progress displays
+  - manpage: fix typos, update homepage
+  - implement simple "issue" role for manpage generation, #3075
+
+
 Version 1.1.0rc4 (2017-10-01)
 -----------------------------
 

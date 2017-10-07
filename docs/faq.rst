@@ -480,6 +480,52 @@ If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
 
 
+Why does running 'borg check --repair' warn about data loss?
+------------------------------------------------------------
+
+Repair usually works for recovering data in a corrupted archive. However,
+it's impossible to predict all modes of corruption. In some very rare
+instances, such as malfunctioning storage hardware, additional repo
+corruption may occur. If you can't afford to lose the repo, it's strongly
+recommended that you perform repair on a copy of the repo.
+
+In other words, the warning is there to emphasize that |project_name|:
+  - Will perform automated routines that modify your backup repository
+  - Might not actually fix the problem you are experiencing
+  - Might, in very rare cases, further corrupt your repository
+
+In the case of malfunctioning hardware, such as a drive or USB hub
+corrupting data when read or written, it's best to diagnose and fix the
+cause of the initial corruption before attempting to repair the repo. If
+the corruption is caused by a one time event such as a power outage,
+running `borg check --repair` will fix most problems.
+
+
+Why isn't there more progress / ETA information displayed?
+----------------------------------------------------------
+
+Some borg runs take quite a bit, so it would be nice to see a progress display,
+maybe even including a ETA (expected time of "arrival" [here rather "completion"]).
+
+For some functionality, this can be done: if the total amount of work is more or
+less known, we can display progress. So check if there is a ``--progress`` option.
+
+But sometimes, the total amount is unknown (e.g. for ``borg create`` we just do
+a single pass over the filesystem, so we do not know the total file count or data
+volume before reaching the end). Adding another pass just to determine that would
+take additional time and could be incorrect, if the filesystem is changing.
+
+Even if the fs does not change and we knew count and size of all files, we still
+could not compute the ``borg create`` ETA as we do not know the amount of changed
+chunks, how the bandwidth of source and destination or system performance might
+fluctuate.
+
+You see, trying to display ETA would be futile. The borg developers prefer to
+rather not implement progress / ETA display than doing futile attempts.
+
+See also: https://xkcd.com/612/
+
+
 Requirements for the borg single-file binary, esp. (g)libc?
 -----------------------------------------------------------
 

@@ -40,7 +40,7 @@ from .archive import BackupOSError, backup_io
 from .cache import Cache, assert_secure
 from .constants import *  # NOQA
 from .compress import CompressionSpec
-from .crypto.key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
+from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .crypto.keymanager import KeyManager
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
@@ -2580,7 +2580,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', metavar='MODE', dest='encryption', required=True,
-                               choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
+                               choices=key_argument_names(),
                                help='select encryption key mode **(required)**')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')

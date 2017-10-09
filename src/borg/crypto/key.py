@@ -103,9 +103,14 @@ class KeyBlobStorage:
 def key_creator(repository, args):
     for key in AVAILABLE_KEY_TYPES:
         if key.ARG_NAME == args.encryption:
+            assert key.ARG_NAME is not None
             return key.create(repository, args)
     else:
         raise ValueError('Invalid encryption mode "%s"' % args.encryption)
+
+
+def key_argument_names():
+    return [key.ARG_NAME for key in AVAILABLE_KEY_TYPES if key.ARG_NAME]
 
 
 def identify_key(manifest_data):

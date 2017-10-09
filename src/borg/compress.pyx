@@ -241,11 +241,13 @@ class ZSTD(CompressorBase):
     Features:
          - compression levels from 1 to 22 supported
             default value is 5
-         - multithreaded support
+         - multithreaded compression support
             0: maximum cpu count
             -1..-99: maximum cpu count minus 1..99
-            0..99: defined cpu usage
+            1..99: defined cpu usage
             default value is 1
+
+    Usage: borg -C zstd,level,threads ...
 
     Warning: This is NOT THREAD SAFE IMPLEMENTATION
       It allow only ONE python context to be created.

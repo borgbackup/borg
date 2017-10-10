@@ -91,7 +91,7 @@ Easy to use
 
 Initialize a new backup repository and create a backup archive::
 
-    $ borg init /path/to/repo
+    $ borg init -e none /path/to/repo
     $ borg create /path/to/repo::Saturday1 ~/Documents
 
 Now doing another backup, just to show off the great deduplication::

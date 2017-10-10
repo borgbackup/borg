@@ -1813,7 +1813,7 @@ class ArchiveRecreater:
         target.save(comment=comment, additional_metadata={
             # keep some metadata as in original archive:
             'time': archive.metadata.time,
-            'time_end': archive.metadata.time_end,
+            'time_end': archive.metadata.get('time_end') or archive.metadata.time,
             'cmdline': archive.metadata.cmdline,
             # but also remember recreate metadata:
             'recreate_cmdline': sys.argv,

@@ -1,3 +1,4 @@
+import errno
 import os
 import os.path
 import re
@@ -141,8 +142,13 @@ def truncate_and_unlink(path):
     recover. Refer to the "File system interaction" section
     in repository.py for further explanations.
     """
-    with open(path, 'r+b') as fd:
-        fd.truncate()
+    try:
+        with open(path, 'r+b') as fd:
+            fd.truncate()
+    except OSError as err:
+        if err.errno != errno.ENOTSUP:
+            raise
+        # don't crash if the above ops are not supported.
     os.unlink(path)
 
 

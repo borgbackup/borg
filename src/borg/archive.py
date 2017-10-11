@@ -557,7 +557,7 @@ Utilization of max. archive size: {csize_max:.0%}
 
         original_path = original_path or item.path
         dest = self.cwd
-        if item.path.startswith(('/', '..')):
+        if item.path.startswith(('/', '../')):
             raise Exception('Path should be relative and local')
         path = os.path.join(dest, item.path)
         # Attempt to remove existing files, ignore errors on failure

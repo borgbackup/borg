@@ -72,8 +72,11 @@ BSD_TO_LINUX_FLAGS = {
 
 
 def set_flags(path, bsd_flags, fd=None):
-    if fd is None and stat.S_ISLNK(os.lstat(path).st_mode):
-        return
+    if fd is None:
+        st = os.stat(path, follow_symlinks=False)
+        if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
+            # see comment in get_flags()
+            return
     cdef int flags = 0
     for bsd_flag, linux_flag in BSD_TO_LINUX_FLAGS.items():
         if bsd_flags & bsd_flag:
@@ -92,6 +95,10 @@ def set_flags(path, bsd_flags, fd=None):
 
 
 def get_flags(path, st):
+    if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
+        # avoid opening devices files - trying to open non-present devices can be rather slow.
+        # avoid opening symlinks, O_NOFOLLOW would make the open() fail anyway.
+        return 0
     cdef int linux_flags
     try:
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)

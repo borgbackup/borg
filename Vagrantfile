@@ -498,9 +498,8 @@ Vagrant.configure(2) do |config|
   end
 
   # BSD
-  # note: the FreeBSD-10.3-RELEASE box needs "vagrant up" twice to start.
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd/FreeBSD-10.3-RELEASE"
+    b.vm.box = "freebsd64"  # custom FreeBSD 10.3 box. official ones are broken, #3022.
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

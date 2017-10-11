@@ -22,6 +22,21 @@ try:
 except ImportError:
     lzma = None
 
+import multiprocessing as mp
+
+"""
+python-zstandard
+https://github.com/indygreg/python-zstandard
+pip3 install zstandard
+There is also python-zstd implementation. It will not work as this offer only basic support
+"""
+
+try:
+    import zstd 
+except ImportError:
+    zstd = None
+
+
 from .helpers import Buffer, DecompressionError
 
 API_VERSION = '1.1_03'
@@ -126,7 +141,8 @@ class LZ4(CompressorBase):
         osize = LZ4_compressBound(isize)
         buf = buffer.get(osize)
         dest = <char *> buf
-        osize = LZ4_compress_limitedOutput(source, dest, isize, osize)
+        with nogil:
+            osize = LZ4_compress_limitedOutput(source, dest, isize, osize)
         if not osize:
             raise Exception('lz4 compress failed')
         return super().compress(dest[:osize])
@@ -149,7 +165,8 @@ class LZ4(CompressorBase):
             except MemoryError:
                 raise DecompressionError('MemoryError')
             dest = <char *> buf
-            rsize = LZ4_decompress_safe(source, dest, isize, osize)
+            with nogil:
+                rsize = LZ4_decompress_safe(source, dest, isize, osize)
             if rsize >= 0:
                 break
             if osize > 2 ** 27:  # 128MiB (should be enough, considering max. repo obj size and very good compression)
@@ -216,6 +233,50 @@ class ZLIB(CompressorBase):
             return zlib.decompress(data)
         except zlib.error as e:
             raise DecompressionError(str(e)) from None
+
+class ZSTD(CompressorBase):
+    """
+    zstd compression / decompression binding
+
+    Features:
+         - compression levels from 1 to 22 supported
+            default value is 5
+         - multithreaded compression support
+            0: maximum cpu count
+            -1..-99: maximum cpu count minus 1..99
+            1..99: defined cpu usage
+            default value is 1
+
+    Usage: borg -C zstd,level,threads ...
+
+    Warning: This is NOT THREAD SAFE IMPLEMENTATION
+      It allow only ONE python context to be created.
+      It should work flawless as long as borg will call ONLY ONE compression job at time.
+
+    """
+    ID = b'\x10\x00'
+    name = 'zstd'
+
+    def __init__(self, level=5, threads=1, **kwargs):
+        super().__init__(**kwargs)
+        self.level = level
+        self.threads = threads
+        if zstd is None:
+            raise ValueError('No zstd support found.')
+
+    def compress(self, data):
+        cctx = zstd.ZstdCompressor(level=self.level, threads=self.threads, write_content_size=True)
+        data = cctx.compress(bytes(data)) # not sure about that typecast but it works.
+        return super().compress(data)
+
+    def decompress(self, data):
+        dctx = zstd.ZstdDecompressor()
+        data = super().decompress(data)
+        try:
+            return dctx.decompress(bytes(data)) # not sure about taht typecast but it works.
+        except zstd.ZstdError as e:
+            raise DecompressionError(str(e)) from None
+
 
 
 class Auto(CompressorBase):
@@ -289,9 +350,10 @@ COMPRESSOR_TABLE = {
     ZLIB.name: ZLIB,
     LZMA.name: LZMA,
     Auto.name: Auto,
+    ZSTD.name: ZSTD,
 }
 # List of possible compression types. Does not include Auto, since it is a meta-Compressor.
-COMPRESSOR_LIST = [LZ4, CNONE, ZLIB, LZMA, ]  # check fast stuff first
+COMPRESSOR_LIST = [LZ4, CNONE, ZLIB, LZMA, ZSTD, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]
@@ -344,6 +406,36 @@ class CompressionSpec:
             else:
                 raise ValueError
             self.level = level
+        elif self.name in ('zstd',):
+            if count < 2:
+                level = 5  # default compression level for zstd
+                threads = 1 # default 1 thread
+            elif count == 2:
+                threads = 1 # default 1 thread
+                level = int(values[1])
+                if not 0 <= level <= 22:
+                    raise ValueError
+            elif count == 3:
+                maxcpu = mp.cpu_count() #get cpu count
+                level = int(values[1])
+                if not 0 <= level <= 22:
+                    raise ValueError
+
+                threads = int(values[2])
+
+                if threads == 0:
+                    threads=maxcpu # use maximum avaliable cpu's
+                elif threads < 0:
+                    threads = maxcpu + threads #threads is NEGATIVE ... remember !!
+                    if threads < 1: # too less cpu's
+                        raise ValueError
+                else:
+                    if threads > maxcpu: # too many cpu's
+                        raise ValueError
+            else:
+                raise ValueError
+            self.level = level
+            self.threads = threads
         elif self.name == 'auto':
             if 2 <= count <= 3:
                 compression = ','.join(values[1:])
@@ -359,5 +451,7 @@ class CompressionSpec:
             return get_compressor(self.name)
         elif self.name in ('zlib', 'lzma', ):
             return get_compressor(self.name, level=self.level)
+        elif self.name in ('zstd', ):
+            return get_compressor(self.name, level=self.level, threads=self.threads)
         elif self.name == 'auto':
             return get_compressor(self.name, compressor=self.inner.compressor)

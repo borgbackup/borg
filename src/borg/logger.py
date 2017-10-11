@@ -80,6 +80,8 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
+            borg_logger = logging.getLogger('borg')
+            borg_logger.json = json
             logger.debug('using logging configuration read from "{0}"'.format(conf_fname))
             warnings.showwarning = _log_warning
             return None

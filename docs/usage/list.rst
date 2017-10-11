@@ -19,7 +19,7 @@ Examples
     -rwxr-xr-x root   root       2140 Fri, 2015-03-27 20:24:22 bin/bzdiff
     ...
 
-    $ borg list /path/to/repo::archiveA --list-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+    $ borg list /path/to/repo::archiveA --format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 .
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code/myproject

@@ -30,3 +30,11 @@ Common options
 All Borg commands share these options:
 
 .. include:: common-options.rst.inc
+
+Examples
+~~~~~~~~
+::
+
+    # Create an archive and log: borg version, files list, return code
+    $ borg create --show-version --list --show-rc /path/to/repo::my-files files
+

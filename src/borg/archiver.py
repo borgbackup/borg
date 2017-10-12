@@ -2156,6 +2156,8 @@ class Archiver:
         parser.print_help()
         return EXIT_SUCCESS
 
+    do_maincommand_help = do_subcommand_help
+
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
@@ -2423,6 +2425,7 @@ class Archiver:
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
+        parser.set_defaults(func=functools.partial(self.do_maincommand_help, parser))
         parser.common_options = self.CommonOptions(define_common_options,
                                                    suffix_precedence=('_maincommand', '_midcommand', '_subcommand'))
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,

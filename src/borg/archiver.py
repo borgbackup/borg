@@ -2154,6 +2154,9 @@ class Archiver:
                               help='show/log the return code (rc)')
             add_common_option('--no-files-cache', dest='cache_files', action='store_false',
                               help='do not load/update the file metadata cache used to detect unchanged files')
+            add_common_option('--files-cache', metavar='MODE', dest='files_cache_mode',
+                              type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
+                              help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
             add_common_option('--umask', metavar='M', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT,
                               help='set umask to M (local and remote, default: %(default)04o)')
             add_common_option('--remote-path', metavar='PATH', dest='remote_path',
@@ -2737,9 +2740,6 @@ class Archiver:
                               help='do not store ctime into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
-        fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
-                              type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
-                              help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
         fs_group.add_argument('--read-special', dest='read_special', action='store_true',
                               help='open and read block and char device files as well as FIFOs as if they were '
                                    'regular files. Also follows symlinks pointing to these kinds of files.')

@@ -89,14 +89,19 @@ Main features
 Easy to use
 ~~~~~~~~~~~
 
-Initialize a new backup repository and create a backup archive::
+Initialize a new, password-protected backup repository and create a backup archive::
 
-    $ borg init -e none /path/to/repo
+    $ borg init -e repokey-blake2 /path/to/repo
+    Enter new passphrase:
+    Enter same passphrase again:
+    Do you want your passphrase to be displayed for verification? [yN]: N
     $ borg create /path/to/repo::Saturday1 ~/Documents
+    Enter passphrase for key /path/to/repo:
 
 Now doing another backup, just to show off the great deduplication::
 
     $ borg create -v --stats /path/to/repo::Saturday2 ~/Documents
+    Enter passphrase for key /path/to/repo:
     -----------------------------------------------------------------------------
     Archive name: Saturday2
     Archive fingerprint: 622b7c53c...

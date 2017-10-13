@@ -1523,7 +1523,7 @@ class Archiver:
             keep += prune_split(archives, '%Y', args.yearly, keep)
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
-        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+        with Cache(repository, key, manifest, do_files=False, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
             if args.output_list:
                 # set up counters for the progress display
@@ -2351,8 +2351,6 @@ class Archiver:
                               help='show/log the borg version')
             add_common_option('--show-rc', dest='show_rc', action='store_true',
                               help='show/log the return code (rc)')
-            add_common_option('--no-files-cache', dest='cache_files', action='store_false',
-                              help='do not load/update the file metadata cache used to detect unchanged files')
             add_common_option('--umask', metavar='M', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT,
                               help='set umask to M (local and remote, default: %(default)04o)')
             add_common_option('--remote-path', metavar='PATH', dest='remote_path',
@@ -2923,6 +2921,8 @@ class Archiver:
                                help='output stats as JSON. Implies ``--stats``.')
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
                                help='experimental: do not synchronize the cache. Implies not using the files cache.')
+        subparser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                               help='do not load/update the file metadata cache used to detect unchanged files')
 
         define_exclusion_group(subparser, tag_files=True)
 

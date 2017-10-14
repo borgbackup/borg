@@ -965,7 +965,9 @@ class ChunksProcessor:
         length = len(item.chunks)
         # the item should only have the *additional* chunks we processed after the last partial item:
         item.chunks = item.chunks[from_chunk:]
-        item.get_size(memorize=True)
+        # for borg recreate, we already have a size member in the source item (giving the total file size),
+        # but we consider only a part of the file here, thus we must recompute the size from the chunks:
+        item.get_size(memorize=True, from_chunks=True)
         item.path += '.borg_part_%d' % number
         item.part = number
         number += 1

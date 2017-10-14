@@ -154,7 +154,9 @@ def with_archive(method):
     @functools.wraps(method)
     def wrapper(self, args, repository, key, manifest, **kwargs):
         archive = Archive(repository, key, manifest, args.location.archive,
-                          numeric_owner=getattr(args, 'numeric_owner', False), cache=kwargs.get('cache'),
+                          numeric_owner=getattr(args, 'numeric_owner', False),
+                          nobsdflags=getattr(args, 'nobsdflags', False),
+                          cache=kwargs.get('cache'),
                           consider_part_files=args.consider_part_files, log_json=args.log_json)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
     return wrapper
@@ -485,6 +487,8 @@ class Archiver:
         self.output_filter = args.output_filter
         self.output_list = args.output_list
         self.ignore_inode = args.ignore_inode
+        self.nobsdflags = args.nobsdflags
+        self.exclude_nodump = args.exclude_nodump
         self.files_cache_mode = args.files_cache_mode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
@@ -499,7 +503,7 @@ class Archiver:
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
                 metadata_collector = MetadataCollector(noatime=args.noatime, noctime=args.noctime,
-                    numeric_owner=args.numeric_owner)
+                    nobsdflags=args.nobsdflags, numeric_owner=args.numeric_owner)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
                     checkpoint_interval=args.checkpoint_interval)
@@ -542,11 +546,12 @@ class Archiver:
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
             status = None
-            # Ignore if nodump flag is set
-            with backup_io('flags'):
-                if get_flags(path, st) & stat.UF_NODUMP:
-                    self.print_file_status('x', path)
-                    return
+            if self.exclude_nodump:
+                # Ignore if nodump flag is set
+                with backup_io('flags'):
+                    if get_flags(path, st) & stat.UF_NODUMP:
+                        self.print_file_status('x', path)
+                        return
             if stat.S_ISREG(st.st_mode):
                 if not dry_run:
                     status = fso.process_file(path, st, cache, self.ignore_inode, self.files_cache_mode)
@@ -2198,6 +2203,7 @@ class Archiver:
         def define_exclusion_group(subparser, **kwargs):
             exclude_group = subparser.add_argument_group('Exclusion options')
             define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
+            return exclude_group
 
         def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
             filters_group = subparser.add_argument_group('Archive filters',
@@ -2727,7 +2733,9 @@ class Archiver:
         subparser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                help='do not load/update the file metadata cache used to detect unchanged files')
 
-        define_exclusion_group(subparser, tag_files=True)
+        exclude_group = define_exclusion_group(subparser, tag_files=True)
+        exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',
+                                   help='exclude files flagged NODUMP')
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
@@ -2738,6 +2746,8 @@ class Archiver:
                               help='do not store atime into archive')
         fs_group.add_argument('--noctime', dest='noctime', action='store_true',
                               help='do not store ctime into archive')
+        fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
+                              help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
@@ -2804,6 +2814,8 @@ class Archiver:
                                help='do not actually change any files')
         subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                                help='only obey numeric user and group identifiers')
+        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
+                               help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
         subparser.add_argument('--stdout', dest='stdout', action='store_true',
                                help='write all extracted data to stdout')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',

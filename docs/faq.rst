@@ -682,6 +682,31 @@ the corruption is caused by a one time event such as a power outage,
 running `borg check --repair` will fix most problems.
 
 
+Why isn't there more progress / ETA information displayed?
+----------------------------------------------------------
+
+Some borg runs take quite a bit, so it would be nice to see a progress display,
+maybe even including a ETA (expected time of "arrival" [here rather "completion"]).
+
+For some functionality, this can be done: if the total amount of work is more or
+less known, we can display progress. So check if there is a ``--progress`` option.
+
+But sometimes, the total amount is unknown (e.g. for ``borg create`` we just do
+a single pass over the filesystem, so we do not know the total file count or data
+volume before reaching the end). Adding another pass just to determine that would
+take additional time and could be incorrect, if the filesystem is changing.
+
+Even if the fs does not change and we knew count and size of all files, we still
+could not compute the ``borg create`` ETA as we do not know the amount of changed
+chunks, how the bandwidth of source and destination or system performance might
+fluctuate.
+
+You see, trying to display ETA would be futile. The borg developers prefer to
+rather not implement progress / ETA display than doing futile attempts.
+
+See also: https://xkcd.com/612/
+
+
 Miscellaneous
 #############
 

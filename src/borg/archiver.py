@@ -40,7 +40,7 @@ from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProces
 from .cache import Cache, assert_secure
 from .constants import *  # NOQA
 from .compress import CompressionSpec
-from .crypto.key import key_creator, tam_required_file, tam_required, RepoKey, PassphraseKey
+from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
 from .crypto.keymanager import KeyManager
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
@@ -1326,7 +1326,7 @@ class Archiver:
             keep += prune_split(archives, '%Y', args.yearly, keep)
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
-        with Cache(repository, key, manifest, do_files=args.cache_files, lock_wait=self.lock_wait) as cache:
+        with Cache(repository, key, manifest, do_files=False, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
             if args.output_list:
                 # set up counters for the progress display
@@ -1959,6 +1959,8 @@ class Archiver:
         parser.print_help()
         return EXIT_SUCCESS
 
+    do_maincommand_help = do_subcommand_help
+
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
@@ -2152,8 +2154,6 @@ class Archiver:
                               help='show/log the borg version')
             add_common_option('--show-rc', dest='show_rc', action='store_true',
                               help='show/log the return code (rc)')
-            add_common_option('--no-files-cache', dest='cache_files', action='store_false',
-                              help='do not load/update the file metadata cache used to detect unchanged files')
             add_common_option('--umask', metavar='M', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT,
                               help='set umask to M (local and remote, default: %(default)04o)')
             add_common_option('--remote-path', metavar='PATH', dest='remote_path',
@@ -2226,6 +2226,7 @@ class Archiver:
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
+        parser.set_defaults(func=functools.partial(self.do_maincommand_help, parser))
         parser.common_options = self.CommonOptions(define_common_options,
                                                    suffix_precedence=('_maincommand', '_midcommand', '_subcommand'))
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
@@ -2383,7 +2384,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to create')
         subparser.add_argument('-e', '--encryption', metavar='MODE', dest='encryption', required=True,
-                               choices=('none', 'keyfile', 'repokey', 'keyfile-blake2', 'repokey-blake2', 'authenticated'),
+                               choices=key_argument_names(),
                                help='select encryption key mode **(required)**')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='create an append-only mode repository')
@@ -2723,6 +2724,8 @@ class Archiver:
                                help='output stats as JSON. Implies ``--stats``.')
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
                                help='experimental: do not synchronize the cache. Implies not using the files cache.')
+        subparser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
+                               help='do not load/update the file metadata cache used to detect unchanged files')
 
         define_exclusion_group(subparser, tag_files=True)
 

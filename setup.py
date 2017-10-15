@@ -12,7 +12,7 @@ from distutils.core import Command
 
 import textwrap
 
-min_python = (3, 4)
+min_python = (3, 5)
 my_python = sys.version_info
 
 if my_python < min_python:
@@ -40,6 +40,8 @@ extras_require = {
     # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.1.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.2 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.3 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
     'fuse': ['llfuse<2.0', ],
 }
@@ -655,6 +657,13 @@ class build_man(Command):
     def gen_man_page(self, name, rst):
         from docutils.writers import manpage
         from docutils.core import publish_string
+        from docutils.nodes import inline
+        from docutils.parsers.rst import roles
+
+        def issue(name, rawtext, text, lineno, inliner, options={}, content=[]):
+            return [inline(rawtext, '#' + text)], []
+
+        roles.register_local_role('issue', issue)
         # We give the source_path so that docutils can find relative includes
         # as-if the document where located in the docs/ directory.
         man_page = publish_string(source=rst, source_path='docs/virtmanpage.rst', writer=manpage.Writer())

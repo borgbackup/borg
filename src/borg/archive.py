@@ -557,7 +557,7 @@ Utilization of max. archive size: {csize_max:.0%}
 
         original_path = original_path or item.path
         dest = self.cwd
-        if item.path.startswith(('/', '..')):
+        if item.path.startswith(('/', '../')):
             raise Exception('Path should be relative and local')
         path = os.path.join(dest, item.path)
         # Attempt to remove existing files, ignore errors on failure
@@ -965,7 +965,9 @@ class ChunksProcessor:
         length = len(item.chunks)
         # the item should only have the *additional* chunks we processed after the last partial item:
         item.chunks = item.chunks[from_chunk:]
-        item.get_size(memorize=True)
+        # for borg recreate, we already have a size member in the source item (giving the total file size),
+        # but we consider only a part of the file here, thus we must recompute the size from the chunks:
+        item.get_size(memorize=True, from_chunks=True)
         item.path += '.borg_part_%d' % number
         item.part = number
         number += 1
@@ -1813,7 +1815,7 @@ class ArchiveRecreater:
         target.save(comment=comment, additional_metadata={
             # keep some metadata as in original archive:
             'time': archive.metadata.time,
-            'time_end': archive.metadata.time_end,
+            'time_end': archive.metadata.get('time_end') or archive.metadata.time,
             'cmdline': archive.metadata.cmdline,
             # but also remember recreate metadata:
             'recreate_cmdline': sys.argv,

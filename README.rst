@@ -89,9 +89,12 @@ Main features
 Easy to use
 ~~~~~~~~~~~
 
-Initialize a new backup repository and create a backup archive::
+Initialize a new backup repository (see ``borg init --help`` for encryption options)::
 
-    $ borg init /path/to/repo
+    $ borg init -e repokey /path/to/repo
+
+Create a backup archive::
+
     $ borg create /path/to/repo::Saturday1 ~/Documents
 
 Now doing another backup, just to show off the great deduplication::

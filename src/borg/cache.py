@@ -85,11 +85,11 @@ class SecurityManager:
         logger.debug('security: current location   %s', current_location)
         logger.debug('security: key type           %s', str(key.TYPE))
         logger.debug('security: manifest timestamp %s', manifest.timestamp)
-        with open(self.location_file, 'w') as fd:
+        with SaveFile(self.location_file) as fd:
             fd.write(current_location)
-        with open(self.key_type_file, 'w') as fd:
+        with SaveFile(self.key_type_file) as fd:
             fd.write(str(key.TYPE))
-        with open(self.manifest_ts_file, 'w') as fd:
+        with SaveFile(self.manifest_ts_file) as fd:
             fd.write(manifest.timestamp)
 
     def assert_location_matches(self, cache_config=None):
@@ -119,7 +119,7 @@ class SecurityManager:
                 raise Cache.RepositoryAccessAborted()
             # adapt on-disk config immediately if the new location was accepted
             logger.debug('security: updating location stored in cache and security dir')
-            with open(self.location_file, 'w') as fd:
+            with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
             if cache_config:
                 cache_config.save()
@@ -470,7 +470,7 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.create()
         ChunkIndex().write(os.path.join(self.path, 'chunks'))
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
-        with SaveFile(os.path.join(self.path, 'files'), binary=True) as fd:
+        with SaveFile(os.path.join(self.path, 'files'), binary=True):
             pass  # empty file
 
     def _do_open(self):
@@ -844,7 +844,7 @@ class LocalCache(CacheStatsMixin):
             shutil.rmtree(os.path.join(self.path, 'chunks.archive.d'))
             os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         self.chunks = ChunkIndex()
-        with open(os.path.join(self.path, 'files'), 'wb'):
+        with SaveFile(os.path.join(self.path, 'files'), binary=True):
             pass  # empty file
         self.cache_config.manifest_id = ''
         self.cache_config._config.set('cache', 'manifest', '')

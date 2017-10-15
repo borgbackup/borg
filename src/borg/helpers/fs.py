@@ -65,6 +65,15 @@ def get_cache_dir():
                 """).encode('ascii'))
     return cache_dir
 
+def get_config_dir():
+    """Determine where to store whole config"""
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
+    config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(get_home_dir(xdg_config), 'borg'))
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+        os.chmod(config_dir, stat.S_IRWXU)
+    return config_dir
+
 
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and

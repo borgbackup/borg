@@ -1,3 +1,5 @@
+.. include:: ../global.rst.inc
+
 Additional Notes
 ----------------
 
@@ -64,7 +66,7 @@ won't deduplicate just because of that.
 ``--umask``
 ~~~~~~~~~~~
 
-If you use ``--umask``, make sure that all repository-modifying borg commands
+If you use ``--umask``, make sure that all repository-modifying |project_name| commands
 (create, delete, prune) that access the repository in question use the same
 ``--umask`` value.
 
@@ -143,8 +145,8 @@ Now, let's see how to restore some LVs from such a backup. ::
 Append-only mode
 ~~~~~~~~~~~~~~~~
 
-A repository can be made "append-only", which means that Borg will never overwrite or
-delete committed data (append-only refers to the segment files, but borg will also
+A repository can be made "append-only", which means that |project_name| will never overwrite or
+delete committed data (append-only refers to the segment files, but |project_name| will also
 reject to delete the repository completely). This is useful for scenarios where a
 backup client machine backups remotely to a backup server using ``borg serve``, since
 a hacked client machine cannot delete backups on the server permanently.
@@ -152,7 +154,7 @@ a hacked client machine cannot delete backups on the server permanently.
 To activate append-only mode, edit the repository ``config`` file and add a line
 ``append_only=1`` to the ``[repository]`` section (or edit the line if it exists).
 
-In append-only mode Borg will create a transaction log in the ``transactions`` file,
+In append-only mode |project_name| will create a transaction log in the ``transactions`` file,
 where each line is a transaction and a UTC timestamp.
 
 In addition, ``borg serve`` can act as if a repository is in append-only mode with
@@ -217,21 +219,21 @@ the configuration file, it's not a "one way trip".
 Further considerations
 ++++++++++++++++++++++
 
-Append-only mode is not respected by tools other than Borg. ``rm`` still works on the
+Append-only mode is not respected by tools other than |project_name|. ``rm`` still works on the
 repository. Make sure that backup client machines only get to access the repository via
 ``borg serve``.
 
 Ensure that no remote access is possible if the repository is temporarily set to normal mode
 for e.g. regular pruning.
 
-Further protections can be implemented, but are outside of Borg's scope. For example,
+Further protections can be implemented, but are outside of |project_name|'s scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on
 new data files.
 
 SSH batch mode
 ~~~~~~~~~~~~~~
 
-When running Borg using an automated script, ``ssh`` might still ask for a password,
+When running |project_name| using an automated script, ``ssh`` might still ask for a password,
 even if there is an SSH key for the target server. Use this to make scripts more robust::
 
     export BORG_RSH='ssh -oBatchMode=yes'

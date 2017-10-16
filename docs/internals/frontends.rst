@@ -6,19 +6,19 @@
 All about JSON: How to develop frontends
 ========================================
 
-Borg does not have a public API on the Python level. That does not keep you from writing :code:`import borg`,
+|project_name| does not have a public API on the Python level. That does not keep you from writing :code:`import borg`,
 but does mean that there are no release-to-release guarantees on what you might find in that package, not
 even for point releases (1.1.x), and there is no documentation beyond the code and the internals documents.
 
-Borg does on the other hand provide an API on a command-line level. In other words, a frontend should to
+|project_name| does on the other hand provide an API on a command-line level. In other words, a frontend should to
 (for example) create a backup archive just invoke :ref:`borg_create`, give commandline parameters/options
-as needed and parse JSON output from borg.
+as needed and parse JSON output from |project_name|.
 
-Important: JSON output is expected to be UTF-8, but currently borg depends on the locale being configured
+Important: JSON output is expected to be UTF-8, but currently |project_name| depends on the locale being configured
 for that (must be a UTF-8 locale and *not* "C" or "ascii"), so that Python will choose to encode to UTF-8.
-The same applies to any inputs read by borg, they are expected to be UTF-8 encoded also.
+The same applies to any inputs read by |project_name|, they are expected to be UTF-8 encoded also.
 
-We consider this a bug (see :issue:`2273`) and might fix it later, so borg will use UTF-8 independent of
+We consider this a bug (see :issue:`2273`) and might fix it later, so |project_name| will use UTF-8 independent of
 the locale.
 
 On POSIX systems, you can usually set environment vars to choose a UTF-8 locale:
@@ -33,7 +33,7 @@ Logging
 -------
 
 Especially for graphical frontends it is important to be able to convey and reformat progress information
-in meaningful ways. The ``--log-json`` option turns the stderr stream of Borg into a stream of JSON lines,
+in meaningful ways. The ``--log-json`` option turns the stderr stream of |project_name| into a stream of JSON lines,
 where each line is a JSON object. The *type* key of the object determines its other contents.
 
 Since JSON can only encode text, any string representing a file system path may miss non-text parts.
@@ -199,11 +199,11 @@ Passphrase prompts
 ------------------
 
 Passphrase prompts should be handled differently. Use the environment variables *BORG_PASSPHRASE*
-and *BORG_NEW_PASSPHRASE* (see :ref:`env_vars` for reference) to pass passphrases to Borg, don't
+and *BORG_NEW_PASSPHRASE* (see :ref:`env_vars` for reference) to pass passphrases to |project_name|, don't
 use the interactive passphrase prompts.
 
 When setting a new passphrase (:ref:`borg_init`, :ref:`borg_key_change-passphrase`) normally
-Borg prompts whether it should display the passphrase. This can be suppressed by setting
+|project_name| prompts whether it should display the passphrase. This can be suppressed by setting
 the environment variable *BORG_DISPLAY_PASSPHRASE* to *no*.
 
 When "confronted" with an unknown repository, where the application does not know whether
@@ -236,7 +236,7 @@ id
 location
     Canonicalized repository path, thus this may be different from what is specified on the command line
 last_modified
-    Date when the repository was last modified by the Borg client
+    Date when the repository was last modified by the |project_name| client
 
 The *encryption* key, if present, contains:
 
@@ -320,10 +320,10 @@ stats
     nfiles
         Number of regular files in the archive
 limits
-    Object describing the utilization of Borg limits
+    Object describing the utilization of |project_name| limits
 
     max_archive_size
-        Float between 0 and 1 describing how large this archive is relative to the maximum size allowed by Borg
+        Float between 0 and 1 describing how large this archive is relative to the maximum size allowed by |project_name|
 command_line
     Array of strings of the command line that created the archive
 
@@ -458,7 +458,7 @@ Errors
     Buffer.MemoryLimitExceeded
         Requested buffer size {} is above the limit of {}.
     ExtensionModuleError
-        The Borg binary extension modules do not seem to be properly installed
+        The |project_name| binary extension modules do not seem to be properly installed
     IntegrityError
         Data integrity error: {}
     NoManifestError
@@ -482,7 +482,7 @@ Errors
     UnsupportedPayloadError
         Unsupported payload type {}. A newer version is required to access this repository.
     NotABorgKeyFile
-        This file is not a borg key backup, aborting.
+        This file is not a |project_name| key backup, aborting.
     RepoIdMismatch
         This key backup seems to be for a different backup repository, aborting.
     UnencryptedRepo
@@ -500,9 +500,9 @@ Errors
     PathNotAllowed
         Repository path not allowed
     RemoteRepository.RPCServerOutdated
-        Borg server is too old for {}. Required version {}
+        |project_name| server is too old for {}. Required version {}
     UnexpectedRPCDataFormatFromClient
-        Borg {}: Got unexpected RPC data format from client.
+        |project_name| {}: Got unexpected RPC data format from client.
     UnexpectedRPCDataFormatFromServer
         Got unexpected RPC data format from server:
         {}

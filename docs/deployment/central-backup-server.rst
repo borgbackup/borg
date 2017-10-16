@@ -4,7 +4,7 @@
 Central repository server with Ansible or Salt
 ==============================================
 
-This section will give an example how to setup a borg repository server for multiple
+This section will give an example how to setup a |project_name| repository server for multiple
 clients.
 
 Machines
@@ -50,7 +50,7 @@ The following folder tree layout is suggested on the repository server:
 Restrictions
 ------------
 
-Borg is instructed to restrict clients into their own paths:
+|project_name| is instructed to restrict clients into their own paths:
 ``borg serve --restrict-to-path /home/backup/repos/<client fqdn>``
 
 The client will be able to access any file or subdirectory inside of ``/home/backup/repos/<client fqdn>``
@@ -120,7 +120,7 @@ satisfied and reproducible.
 Automate setting up an repository server with the user, group, folders and
 permissions a Ansible playbook could be used. Keep in mind the playbook
 uses the Arch Linux `pacman <https://www.archlinux.org/pacman/pacman.8.html>`_
-package manager to install and keep borg up-to-date.
+package manager to install and keep |project_name| up-to-date.
 
 ::
 
@@ -210,7 +210,7 @@ for starting `borg serve` could be written. Or borg itself could be enhanced to
 autodetect it runs under SSH by checking the `SSH_ORIGINAL_COMMAND` environment
 variable. This is left open for future improvements.
 
-When extending ssh autodetection in borg no external wrapper script is necessary
+When extending ssh autodetection in |project_name| no external wrapper script is necessary
 and no other interpreter or application has to be deployed.
 
 See also

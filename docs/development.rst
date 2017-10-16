@@ -48,7 +48,7 @@ Some guidance for contributors:
 Branching model
 ---------------
 
-Borg development happens on the ``master`` branch and uses GitHub pull
+|project_name| development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup :ref:`mailing_list` to the maintainers).
 
@@ -103,7 +103,7 @@ were collected:
 
 .. rubric:: Historic model
 
-Previously (until release 1.0.10) Borg used a `"merge upwards"
+Previously (until release 1.0.10) |project_name| used a `"merge upwards"
 <https://git-scm.com/docs/gitworkflows#_merging_upwards>`_ model where
 most minor changes and fixes where committed to a maintenance branch
 (eg. 1.0-maint), and the maintenance branch(es) were regularly merged
@@ -156,7 +156,7 @@ controlled by that flag.  See ``_setup_implied_logging()`` in
 Building a development environment
 ----------------------------------
 
-First, just install borg into a virtual env as described before.
+First, just install |project_name| into a virtual env as described before.
 
 To install some additional packages needed for running the tests, activate your
 virtual env and run::
@@ -238,7 +238,7 @@ Building the docs with Sphinx
 The documentation (in reStructuredText format, .rst) is in docs/.
 
 To build the html version of it, you need to have Sphinx installed
-(in your Borg virtualenv with Python 3)::
+(in your |project_name| virtualenv with Python 3)::
 
   pip install -r requirements.d/docs.txt
 

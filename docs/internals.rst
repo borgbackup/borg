@@ -5,9 +5,9 @@ Internals
 =========
 
 The internals chapter describes and analyses most of the inner workings
-of Borg.
+of |project_name|.
 
-Borg uses a low-level, key-value store, the :ref:`repository`, and
+|project_name| uses a low-level, key-value store, the :ref:`repository`, and
 implements a more complex data structure on top of it, which is made
 up of the :ref:`manifest <manifest>`, :ref:`archives <archive>`,
 :ref:`items <item>` and data :ref:`chunks`.
@@ -29,11 +29,11 @@ hash-table of all chunks that already exist.
     :figwidth: 100%
     :width: 100%
 
-    Layers in Borg. On the very top commands are implemented, using
+    Layers in |project_name|. On the very top commands are implemented, using
     a data access layer provided by the Archive and Item classes.
     The "key" object provides both compression and authenticated
     encryption used by the data access layer. The "key" object represents
-    the sole trust boundary in Borg.
+    the sole trust boundary in |project_name|.
     The lowest layer is the repository, either accessed directly
     (Repository) or remotely (RemoteRepository).
 

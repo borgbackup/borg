@@ -1,10 +1,11 @@
 .. include:: init.rst.inc
+.. include:: ../global.rst.inc
 
 Examples
 ~~~~~~~~
 ::
 
-    # Local repository, repokey encryption, BLAKE2b (often faster, since Borg 1.1)
+    # Local repository, repokey encryption, BLAKE2b (often faster, since |project_name| 1.1)
     $ borg init --encryption=repokey-blake2 /path/to/repo
 
     # Local repository (no encryption)

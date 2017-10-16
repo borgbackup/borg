@@ -64,7 +64,7 @@ The storage quotas of repositories are completely independent. If a
 client is able to access multiple repositories, each repository
 can be filled to the specified quota.
 
-If storage quotas are used, ensure that all deployed Borg releases
+If storage quotas are used, ensure that all deployed |project_name| releases
 support storage quotas.
 
 Refer to :ref:`internals_storage_quota` for more details on storage quotas.

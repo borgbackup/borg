@@ -7,7 +7,7 @@ Data structures and file formats
 ================================
 
 This page documents the internal data structures and storage
-mechanisms of Borg. It is partly based on `mailing list
+mechanisms of |project_name|. It is partly based on `mailing list
 discussion about internals`_ and also on static code analysis.
 
 .. todo:: Clarify terms, perhaps create a glossary.
@@ -21,7 +21,7 @@ Repository
 
 .. Some parts of this description were taken from the Repository docstring
 
-Borg stores its data in a `Repository`, which is a file system based
+|project_name| stores its data in a `Repository`, which is a file system based
 transactional key-value store. Thus the repository does not know about
 the concept of archives or items.
 
@@ -158,11 +158,11 @@ such obsolete entries is called sparse, while a segment containing no such entri
 Since writing a ``DELETE`` tag does not actually delete any data and
 thus does not free disk space any log-based data store will need a
 compaction strategy (somewhat analogous to a garbage collector).
-Borg uses a simple forward compacting algorithm,
+|project_name| uses a simple forward compacting algorithm,
 which avoids modifying existing segments.
 Compaction runs when a commit is issued (unless the :ref:`append_only_mode` is active).
 One client transaction can manifest as multiple physical transactions,
-since compaction is transacted, too, and Borg does not distinguish between the two::
+since compaction is transacted, too, and |project_name| does not distinguish between the two::
 
   Perspective| Time -->
   -----------+--------------
@@ -172,11 +172,11 @@ since compaction is transacted, too, and Borg does not distinguish between the t
 The compaction algorithm requires two inputs in addition to the segments themselves:
 
 (i) Which segments are sparse, to avoid scanning all segments (impractical).
-    Further, Borg uses a conditional compaction strategy: Only those
+    Further, |project_name| uses a conditional compaction strategy: Only those
     segments that exceed a threshold sparsity are compacted.
 
     To implement the threshold condition efficiently, the sparsity has
-    to be stored as well. Therefore, Borg stores a mapping ``(segment
+    to be stored as well. Therefore, |project_name| stores a mapping ``(segment
     id,) -> (number of sparse bytes,)``.
 
     The 1.0.x series used a simpler non-conditional algorithm,
@@ -190,11 +190,11 @@ The compaction algorithm requires two inputs in addition to the segments themsel
 These two pieces of information are stored in the hints file (`hints.N`)
 next to the index (`index.N`).
 
-When loading a hints file, Borg checks the version contained in the file.
+When loading a hints file, |project_name| checks the version contained in the file.
 The 1.0.x series writes version 1 of the format (with the segments list instead
-of the mapping, mentioned above). Since Borg 1.0.4, version 2 is read as well.
+of the mapping, mentioned above). Since |project_name| 1.0.4, version 2 is read as well.
 The 1.1.x series writes version 2 of the format and reads either version.
-When reading a version 1 hints file, Borg 1.1.x will
+When reading a version 1 hints file, |project_name| 1.1.x will
 read all sparse segments to determine their sparsity.
 
 This process may take some time if a repository is kept in the append-only mode,
@@ -272,19 +272,19 @@ state).
 
 .. rubric:: Compatibility with older servers and enabling quota after-the-fact
 
-If no quota data is stored in the hints file, Borg assumes zero quota is used.
+If no quota data is stored in the hints file, |project_name| assumes zero quota is used.
 Thus, if a repository with an enabled quota is written to with an older ``borg serve``
 version that does not understand quotas, then the quota usage will be erased.
 
 The client version is irrelevant to the storage quota and has no part in it.
 The form of error messages due to exceeding quota varies with client versions.
 
-A similar situation arises when upgrading from a Borg release that did not have quotas.
-Borg will start tracking quota use from the time of the upgrade, starting at zero.
+A similar situation arises when upgrading from a |project_name| release that did not have quotas.
+|project_name| will start tracking quota use from the time of the upgrade, starting at zero.
 
 If the quota shall be enforced accurately in these cases, either
 
-- delete the ``index.N`` and ``hints.N`` files, forcing Borg to rebuild both,
+- delete the ``index.N`` and ``hints.N`` files, forcing |project_name| to rebuild both,
   re-acquiring quota data in the process, or
 - edit the msgpacked ``hints.N`` file (not recommended and thus not
   documented further).
@@ -293,7 +293,7 @@ The object graph
 ----------------
 
 On top of the simple key-value store offered by the Repository_,
-Borg builds a much more sophisticated data structure that is essentially
+|project_name| builds a much more sophisticated data structure that is essentially
 a completely encrypted object graph. Objects, such as archives_, are referenced
 by their chunk ID, which is cryptographically derived from their contents.
 More on how this helps security in :ref:`security_structural_auth`.
@@ -347,8 +347,8 @@ The *tam* key is part of the :ref:`tertiary authentication mechanism <tam_descri
 the manifest, since an ID check is not possible.
 
 *config* is a general-purpose location for additional metadata. All versions
-of Borg preserve its contents (it may have been a better place for *item_keys*,
-which is not preserved by unaware Borg versions, releases predating 1.0.4).
+of |project_name| preserve its contents (it may have been a better place for *item_keys*,
+which is not preserved by unaware |project_name| versions, releases predating 1.0.4).
 
 Feature flags
 +++++++++++++
@@ -411,28 +411,28 @@ require reading/understanding repository contents).
 Each operation can contain several sets of feature flags. Only one set,
 the *mandatory* set is currently defined.
 
-Upon reading the manifest, the Borg client has already determined which operation
+Upon reading the manifest, the |project_name| client has already determined which operation
 should be performed. If feature flags are found in the manifest, the set
 of feature flags supported by the client is compared to the mandatory set
 found in the manifest. If any unsupported flags are found (i.e. the mandatory set is
-not a subset of the features supported by the Borg client used), the operation
+not a subset of the features supported by the |project_name| client used), the operation
 is aborted with a *MandatoryFeatureUnsupported* error:
 
-    Unsupported repository feature(s) {'some_feature'}. A newer version of borg is required to access this repository.
+    Unsupported repository feature(s) {'some_feature'}. A newer version of |project_name| is required to access this repository.
 
-Older Borg releases do not have this concept and do not perform feature flags checks.
+Older |project_name| releases do not have this concept and do not perform feature flags checks.
 These can be locked out with manifest version 2. Thus, the only difference between
-manifest versions 1 and 2 is that the latter is only accepted by Borg releases
+manifest versions 1 and 2 is that the latter is only accepted by |project_name| releases
 implementing feature flags.
 
 Therefore, as soon as any mandatory feature flag is enabled in a repository,
 the manifest version must be switched to version 2 in order to lock out all
-Borg releases unaware of feature flags.
+|project_name| releases unaware of feature flags.
 
 .. _Cache feature flags:
 .. rubric:: Cache feature flags
 
-`The cache`_ does not have its separate set of feature flags. Instead, Borg stores
+`The cache`_ does not have its separate set of feature flags. Instead, |project_name| stores
 which flags were used to create or modify a cache.
 
 All mandatory manifest features from all operations are gathered in one set.
@@ -632,7 +632,7 @@ cache).
 If everything is matching and all chunks are present, the file is not read /
 chunked / hashed again (but still a file metadata item is written to the
 archive, made from fresh file metadata read from the filesystem). This is
-what makes borg so fast when processing unchanged files.
+what makes |project_name| so fast when processing unchanged files.
 
 If there is a mismatch or a chunk is missing, the file is read / chunked /
 hashed. Chunks already present in repo won't be transferred to repo again.
@@ -641,7 +641,7 @@ The inode number is stored and compared to make sure we distinguish between
 different files, as a single path may not be unique across different
 archives in different setups.
 
-Not all filesystems have stable inode numbers. If that is the case, borg can
+Not all filesystems have stable inode numbers. If that is the case, |project_name| can
 be told to ignore the inode number in the check via --ignore-inode.
 
 The age value is used for cache management. If a file is "seen" in a backup
@@ -652,7 +652,7 @@ removed. See also: :ref:`always_chunking` and :ref:`a_status_oddity`
 The files cache is a python dictionary, storing python objects, which
 generates a lot of overhead.
 
-Borg can also work without using the files cache (saves memory if you have a
+|project_name| can also work without using the files cache (saves memory if you have a
 lot of files or not much RAM free), then all files are assumed to have changed.
 This is usually much slower than with files cache.
 
@@ -730,7 +730,7 @@ For small hash tables, we start with a growth factor of 2, which comes down to
 
 E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 
-a) with ``create --chunker-params 10,23,16,4095`` (custom, like borg < 1.0 or attic):
+a) with ``create --chunker-params 10,23,16,4095`` (custom, like |project_name| < 1.0 or attic):
 
   mem_usage  =  2.8GiB
 
@@ -970,22 +970,22 @@ or repository might get damaged if multiple processes use it at the same time.
 Checksumming data structures
 ----------------------------
 
-As detailed in the previous sections, Borg generates and stores various files
+As detailed in the previous sections, |project_name| generates and stores various files
 containing important meta data, such as the repository index, repository hints,
 chunks caches and files cache.
 
 Data corruption in these files can damage the archive data in a repository,
-e.g. due to wrong reference counts in the chunks cache. Only some parts of Borg
+e.g. due to wrong reference counts in the chunks cache. Only some parts of |project_name|
 were designed to handle corrupted data structures, so a corrupted files cache
 may cause crashes or write incorrect archives.
 
-Therefore, Borg calculates checksums when writing these files and tests checksums
+Therefore, |project_name| calculates checksums when writing these files and tests checksums
 when reading them. Checksums are generally 64-bit XXH64 hashes.
 The canonical xxHash representation is used, i.e. big-endian.
 Checksums are stored as hexadecimal ASCII strings.
 
 For compatibility, checksums are not required and absent checksums do not trigger errors.
-The mechanisms have been designed to avoid false-positives when various Borg
+The mechanisms have been designed to avoid false-positives when various |project_name|
 versions are used alternately on the same repositories.
 
 Checksums are a data safety mechanism. They are not a security mechanism.
@@ -1018,9 +1018,9 @@ at the earliest possible moment.
 .. rubric:: Calculating checksums
 
 Before feeding the checksum algorithm any data, the file name (i.e. without any path)
-is mixed into the checksum, since the name encodes the context of the data for Borg.
+is mixed into the checksum, since the name encodes the context of the data for |project_name|.
 
-The various indices used by Borg have separate header and main data parts.
+The various indices used by |project_name| have separate header and main data parts.
 IntegrityCheckedFile allows to checksum them independently, which avoids
 even reading the data when the header is corrupted. When a part is signalled,
 the length of the part name is mixed into the checksum state first (encoded
@@ -1087,15 +1087,15 @@ The ``[integrity]`` section is used:
     manifest = 10e...21c
     chunks = {"algorithm": "XXH64", "digests": {"HashHeader": "eab...39e3", "final": "e2a...b24"}}
 
-The manifest ID is duplicated in the integrity section due to the way all Borg
+The manifest ID is duplicated in the integrity section due to the way all |project_name|
 versions handle the config file. Instead of creating a "new" config file from
-an internal representation containing only the data understood by Borg,
+an internal representation containing only the data understood by |project_name|,
 the config file is read in entirety (using the Python ConfigParser) and modified.
-This preserves all sections and values not understood by the Borg version
+This preserves all sections and values not understood by the |project_name| version
 modifying it.
 
 Thus, if an older versions uses a cache with integrity data, it would preserve
-the integrity section and its contents. If a integrity-aware Borg version
+the integrity section and its contents. If a integrity-aware |project_name| version
 would read this cache, it would incorrectly report checksum errors, since
 the older version did not update the checksums.
 
@@ -1129,7 +1129,7 @@ transaction ID in the file names. Integrity data is stored in a third file
         b'index': b'{"algorithm": "XXH64", "digests": {"HashHeader": "846b7315f91b8e48", "final": "cb3e26cadc173e40"}}'
     }
 
-The *version* key started at 2, the same version used for the hints. Since Borg has
+The *version* key started at 2, the same version used for the hints. Since |project_name| has
 many versioned file formats, this keeps the number of different versions in use
 a bit lower.
 
@@ -1149,5 +1149,5 @@ since that might result in a different index (due to hash-table resizing) or hin
 
 For example, using 1.1 on a repository, noticing corruption or similar issues and then running
 ``borg-1.0 check --repair``, which rewrites the index and hints, results in this situation.
-Borg 1.1 would erroneously report checksum errors in the hints and/or index files and trigger
+|project_name| 1.1 would erroneously report checksum errors in the hints and/or index files and trigger
 an automatic rebuild of these files.

@@ -1,5 +1,5 @@
 .. include:: mount.rst.inc
-
+.. include:: ../global.rst.inc
 .. include:: umount.rst.inc
 
 Examples
@@ -53,6 +53,6 @@ borgfs
 .. Note::
 
     ``borgfs`` will be automatically provided if you used a distribution
-    package, ``pip`` or ``setup.py`` to install Borg. Users of the
+    package, ``pip`` or ``setup.py`` to install |project_name|. Users of the
     standalone binary will have to manually create a symlink (see
     :ref:`pyinstaller-binary`).

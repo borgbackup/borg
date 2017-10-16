@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PLACEHOLDERS 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-PLACEHOLDERS 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-placeholders \- Details regarding placeholders
 .
@@ -32,78 +32,52 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH DESCRIPTION
 .sp
-Repository (or Archive) URLs, \-\-prefix and \-\-remote\-path values support these
+Repository (or Archive) URLs, \fB\-\-prefix\fP and \fB\-\-remote\-path\fP values support these
 placeholders:
-.sp
-{hostname}
 .INDENT 0.0
-.INDENT 3.5
+.TP
+.B {hostname}
 The (short) hostname of the machine.
-.UNINDENT
-.UNINDENT
-.sp
-{fqdn}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {fqdn}
 The full name of the machine.
-.UNINDENT
-.UNINDENT
-.sp
-{now}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {now}
 The current local date and time, by default in ISO\-8601 format.
 You can also supply your own \fI\%format string\fP, e.g. {now:%Y\-%m\-%d_%H:%M:%S}
-.UNINDENT
-.UNINDENT
-.sp
-{utcnow}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {utcnow}
 The current UTC date and time, by default in ISO\-8601 format.
 You can also supply your own \fI\%format string\fP, e.g. {utcnow:%Y\-%m\-%d_%H:%M:%S}
-.UNINDENT
-.UNINDENT
-.sp
-{user}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {user}
 The user name (or UID, if no name is available) of the user running borg.
-.UNINDENT
-.UNINDENT
-.sp
-{pid}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {pid}
 The current process ID.
-.UNINDENT
-.UNINDENT
-.sp
-{borgversion}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {borgversion}
 The version of borg, e.g.: 1.0.8rc1
-.UNINDENT
-.UNINDENT
-.sp
-{borgmajor}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {borgmajor}
 The version of borg, only the major version, e.g.: 1
-.UNINDENT
-.UNINDENT
-.sp
-{borgminor}
-.INDENT 0.0
-.INDENT 3.5
+.TP
+.B {borgminor}
 The version of borg, only major and minor version, e.g.: 1.0
-.UNINDENT
+.TP
+.B {borgpatch}
+The version of borg, only major, minor and patch version, e.g.: 1.0.8
 .UNINDENT
 .sp
-{borgpatch}
+If literal curly braces need to be used, double them for escaping:
 .INDENT 0.0
 .INDENT 3.5
-The version of borg, only major, minor and patch version, e.g.: 1.0.8
+.sp
+.nf
+.ft C
+borg create /path/to/repo::{{literal_text}}
+.ft P
+.fi
 .UNINDENT
 .UNINDENT
 .sp
@@ -118,6 +92,20 @@ borg create /path/to/repo::{hostname}\-{now:%Y\-%m\-%d_%H:%M:%S} ...
 borg prune \-\-prefix \(aq{hostname}\-\(aq ...
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+systemd uses a difficult, non\-standard syntax for command lines in unit files (refer to
+the \fIsystemd.unit(5)\fP manual page).
+.sp
+When invoking borg from unit files, pay particular attention to escaping,
+especially when using the now/utcnow placeholders, since systemd performs its own
+%\-based variable replacement even in quoted text. To avoid interference from systemd,
+double all percent signs (\fB{hostname}\-{now:%Y\-%m\-%d_%H:%M:%S}\fP
+becomes \fB{hostname}\-{now:%%Y\-%%m\-%%d_%%H:%%M:%%S}\fP).
 .UNINDENT
 .UNINDENT
 .SH AUTHOR

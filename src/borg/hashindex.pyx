@@ -6,29 +6,50 @@ import os
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
+from libc.string cimport memcpy
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
+from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
+from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_CheckExact, PyBytes_GET_SIZE, PyBytes_AS_STRING
 
-API_VERSION = '1.1_01'
+API_VERSION = '1.1_07'
 
 
 cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
 
-    HashIndex *hashindex_read(char *path)
+    ctypedef struct FuseVersionsElement:
+        uint32_t version
+        char hash[16]
+
+    HashIndex *hashindex_read(object file_py, int permit_compact) except *
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
     int hashindex_len(HashIndex *index)
     int hashindex_size(HashIndex *index)
-    int hashindex_write(HashIndex *index, char *path)
+    void hashindex_write(HashIndex *index, object file_py) except *
     void *hashindex_get(HashIndex *index, void *key)
     void *hashindex_next_key(HashIndex *index, void *key)
     int hashindex_delete(HashIndex *index, void *key)
     int hashindex_set(HashIndex *index, void *key, void *value)
+    uint64_t hashindex_compact(HashIndex *index)
     uint32_t _htole32(uint32_t v)
     uint32_t _le32toh(uint32_t v)
 
     double HASH_MAX_LOAD
+
+
+cdef extern from "cache_sync/cache_sync.c":
+    ctypedef struct CacheSyncCtx:
+        pass
+
+    CacheSyncCtx *cache_sync_init(HashIndex *chunks)
+    const char *cache_sync_error(const CacheSyncCtx *ctx)
+    uint64_t cache_sync_num_files(const CacheSyncCtx *ctx)
+    int cache_sync_feed(CacheSyncCtx *ctx, void *data, uint32_t length)
+    void cache_sync_free(CacheSyncCtx *ctx)
+
+    uint32_t _MAX_VALUE
 
 
 cdef _NoDefault = object()
@@ -50,9 +71,6 @@ AssertionError is raised instead.
 
 assert UINT32_MAX == 2**32-1
 
-# module-level constant because cdef's in classes can't have default values
-cdef uint32_t _MAX_VALUE = 2**32-1025
-
 assert _MAX_VALUE % 2 == 1
 
 
@@ -61,19 +79,20 @@ cdef class IndexBase:
     cdef HashIndex *index
     cdef int key_size
 
+    _key_size = 32
+
     MAX_LOAD_FACTOR = HASH_MAX_LOAD
     MAX_VALUE = _MAX_VALUE
 
-    def __cinit__(self, capacity=0, path=None, key_size=32):
-        self.key_size = key_size
+    def __cinit__(self, capacity=0, path=None, permit_compact=False):
+        self.key_size = self._key_size
         if path:
-            path = os.fsencode(path)
-            self.index = hashindex_read(path)
-            if not self.index:
-                if errno:
-                    PyErr_SetFromErrnoWithFilename(OSError, path)
-                    return
-                raise RuntimeError('hashindex_read failed')
+            if isinstance(path, (str, bytes)):
+                with open(path, 'rb') as fd:
+                    self.index = hashindex_read(fd, permit_compact)
+            else:
+                self.index = hashindex_read(path, permit_compact)
+            assert self.index, 'hashindex_read() returned NULL with no exception set'
         else:
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
             if not self.index:
@@ -84,13 +103,15 @@ cdef class IndexBase:
             hashindex_free(self.index)
 
     @classmethod
-    def read(cls, path):
-        return cls(path=path)
+    def read(cls, path, permit_compact=False):
+        return cls(path=path, permit_compact=permit_compact)
 
     def write(self, path):
-        path = os.fsencode(path)
-        if not hashindex_write(self.index, path):
-            raise Exception('hashindex_write failed')
+        if isinstance(path, (str, bytes)):
+            with open(path, 'wb') as fd:
+                hashindex_write(self.index, fd)
+        else:
+            hashindex_write(self.index, path)
 
     def clear(self):
         hashindex_free(self.index)
@@ -104,7 +125,12 @@ cdef class IndexBase:
 
     def __delitem__(self, key):
         assert len(key) == self.key_size
-        if not hashindex_delete(self.index, <char *>key):
+        rc = hashindex_delete(self.index, <char *>key)
+        if rc == 1:
+            return  # success
+        if rc == -1:
+            raise KeyError(key)
+        if rc == 0:
             raise Exception('hashindex_delete failed')
 
     def get(self, key, default=None):
@@ -129,6 +155,39 @@ cdef class IndexBase:
     def size(self):
         """Return size (bytes) of hash table."""
         return hashindex_size(self.index)
+
+    def compact(self):
+        return hashindex_compact(self.index)
+
+
+cdef class FuseVersionsIndex(IndexBase):
+    # 4 byte version + 16 byte file contents hash
+    value_size = 20
+    _key_size = 16
+
+    def __getitem__(self, key):
+        cdef FuseVersionsElement *data
+        assert len(key) == self.key_size
+        data = <FuseVersionsElement *>hashindex_get(self.index, <char *>key)
+        if data == NULL:
+            raise KeyError(key)
+        return _le32toh(data.version), PyBytes_FromStringAndSize(data.hash, 16)
+
+    def __setitem__(self, key, value):
+        cdef FuseVersionsElement data
+        assert len(key) == self.key_size
+        data.version = value[0]
+        assert data.version <= _MAX_VALUE, "maximum number of versions reached"
+        if not PyBytes_CheckExact(value[1]) or PyBytes_GET_SIZE(value[1]) != 16:
+            raise TypeError("Expected bytes of length 16 for second value")
+        memcpy(data.hash, PyBytes_AS_STRING(value[1]), 16)
+        data.version = _htole32(data.version)
+        if not hashindex_set(self.index, <char *>key, <void *> &data):
+            raise Exception('hashindex_set failed')
+
+    def __contains__(self, key):
+        assert len(key) == self.key_size
+        return hashindex_get(self.index, <char *>key) != NULL
 
 
 cdef class NSIndex(IndexBase):
@@ -314,6 +373,48 @@ cdef class ChunkIndex(IndexBase):
 
         return size, csize, unique_size, unique_csize, unique_chunks, chunks
 
+    def stats_against(self, ChunkIndex master_index):
+        """
+        Calculate chunk statistics of this index against *master_index*.
+
+        A chunk is counted as unique if the number of references
+        in this index matches the number of references in *master_index*.
+
+        This index must be a subset of *master_index*.
+
+        Return the same statistics tuple as summarize:
+        size, csize, unique_size, unique_csize, unique_chunks, chunks.
+        """
+        cdef uint64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
+        cdef uint32_t our_refcount, chunk_size, chunk_csize
+        cdef const uint32_t *our_values
+        cdef const uint32_t *master_values
+        cdef const void *key = NULL
+        cdef HashIndex *master = master_index.index
+
+        while True:
+            key = hashindex_next_key(self.index, key)
+            if not key:
+                break
+            our_values = <const uint32_t*> (key + self.key_size)
+            master_values = <const uint32_t*> hashindex_get(master, key)
+            if not master_values:
+                raise ValueError('stats_against: key contained in self but not in master_index.')
+            our_refcount = _le32toh(our_values[0])
+            chunk_size = _le32toh(master_values[1])
+            chunk_csize = _le32toh(master_values[2])
+
+            chunks += our_refcount
+            size += <uint64_t> chunk_size * our_refcount
+            csize += <uint64_t> chunk_csize * our_refcount
+            if our_values[0] == master_values[0]:
+                # our refcount equals the master's refcount, so this chunk is unique to us
+                unique_chunks += 1
+                unique_size += chunk_size
+                unique_csize += chunk_csize
+
+        return size, csize, unique_size, unique_csize, unique_chunks, chunks
+
     def add(self, key, refs, size, csize):
         assert len(key) == self.key_size
         cdef uint32_t[3] data
@@ -347,6 +448,22 @@ cdef class ChunkIndex(IndexBase):
                 break
             self._add(key, <uint32_t*> (key + self.key_size))
 
+    def zero_csize_ids(self):
+        cdef void *key = NULL
+        cdef uint32_t *values
+        entries = []
+        while True:
+            key = hashindex_next_key(self.index, key)
+            if not key:
+                break
+            values = <uint32_t*> (key + self.key_size)
+            refcount = _le32toh(values[0])
+            assert refcount <= _MAX_VALUE, "invalid reference count"
+            if _le32toh(values[2]) == 0:
+                # csize == 0
+                entries.append(PyBytes_FromStringAndSize(<char*> key, self.key_size))
+        return entries
+
 
 cdef class ChunkKeyIterator:
     cdef ChunkIndex idx
@@ -374,3 +491,38 @@ cdef class ChunkKeyIterator:
         cdef uint32_t refcount = _le32toh(value[0])
         assert refcount <= _MAX_VALUE, "invalid reference count"
         return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]), _le32toh(value[2]))
+
+
+cdef Py_buffer ro_buffer(object data) except *:
+    cdef Py_buffer view
+    PyObject_GetBuffer(data, &view, PyBUF_SIMPLE)
+    return view
+
+
+cdef class CacheSynchronizer:
+    cdef ChunkIndex chunks
+    cdef CacheSyncCtx *sync
+
+    def __cinit__(self, chunks):
+        self.chunks = chunks
+        self.sync = cache_sync_init(self.chunks.index)
+        if not self.sync:
+            raise Exception('cache_sync_init failed')
+
+    def __dealloc__(self):
+        if self.sync:
+            cache_sync_free(self.sync)
+
+    def feed(self, chunk):
+        cdef Py_buffer chunk_buf = ro_buffer(chunk)
+        cdef int rc
+        rc = cache_sync_feed(self.sync, chunk_buf.buf, chunk_buf.len)
+        PyBuffer_Release(&chunk_buf)
+        if not rc:
+            error = cache_sync_error(self.sync)
+            if error != NULL:
+                raise ValueError('cache_sync_feed failed: ' + error.decode('ascii'))
+
+    @property
+    def num_files(self):
+        return cache_sync_num_files(self.sync)

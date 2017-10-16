@@ -19,7 +19,10 @@ class TestLRUCache:
         assert 'b' in c
         with pytest.raises(KeyError):
             c['a']
+        assert c.get('a') is None
+        assert c.get('a', 'foo') == 'foo'
         assert c['b'] == 1
+        assert c.get('b') == 1
         assert c['c'] == 2
         c['d'] = 3
         assert len(c) == 2

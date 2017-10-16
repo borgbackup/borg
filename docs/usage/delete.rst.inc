@@ -4,38 +4,77 @@
 
 borg delete
 -----------
-::
+.. code-block:: none
 
-    borg delete <options> TARGET
+    borg [common options] delete [options] [TARGET]
 
-positional arguments
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                                                                                     |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``TARGET``                            | archive or repository to delete                                                                                                                        |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                                                                                                                                       |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-s``, ``--stats``                   | print statistics for the deleted archive                                                                                                               |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--cache-only``                      | delete only the local cache for the given repository                                                                                                   |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--force``                           | force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.                                                       |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--save-space``                      | work slower, but using less space                                                                                                                      |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                               |
+    |                                                                                                                                                                                                                                                                              |
+    | :ref:`common_options`                                                                                                                                                                                                                                                        |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                                                  |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-P PREFIX``, ``--prefix PREFIX``    | only consider archive names starting with this prefix.                                                                                                 |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-a GLOB``, ``--glob-archives GLOB`` | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive. |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--sort-by KEYS``                    | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp                                                       |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--first N``                         | consider first N archives after other filters were applied                                                                                             |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--last N``                          | consider last N archives after other filters were applied                                                                                              |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
     TARGET
         archive or repository to delete
 
-optional arguments
-    ``-p``, ``--progress``
-        | show progress display while deleting a single archive
-    ``-s``, ``--stats``
-        | print statistics for the deleted archive
-    ``-c``, ``--cache-only``
-        | delete only the local cache for the given repository
-    ``--force``
-        | force deletion of corrupted archives
-    ``--save-space``
-        | work slower, but using less space
 
-`Common options`_
-    |
+    optional arguments
+        -s, --stats     print statistics for the deleted archive
+        --cache-only    delete only the local cache for the given repository
+        --force         force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
+        --save-space    work slower, but using less space
 
-filters
-    ``-P``, ``--prefix``
-        | only consider archive names starting with this prefix
-    ``--sort-by``
-        | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
-    ``--first N``
-        | consider first N archives after other filters were applied
-    ``--last N``
-        | consider last N archives after other filters were applied
+
+    :ref:`common_options`
+        |
+
+    Archive filters
+        -P PREFIX, --prefix PREFIX        only consider archive names starting with this prefix.
+        -a GLOB, --glob-archives GLOB     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+        --sort-by KEYS                    Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+        --first N                         consider first N archives after other filters were applied
+        --last N                          consider last N archives after other filters were applied
+
 
 Description
 ~~~~~~~~~~~

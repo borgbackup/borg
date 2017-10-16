@@ -14,7 +14,7 @@ deduplicating and encrypting backup tool
 SYNOPSIS
 --------
 
-borg <command> [options] [arguments]
+borg [common options] <command> [options] [arguments]
 
 DESCRIPTION
 -----------
@@ -32,8 +32,8 @@ fully trusted targets.
 
 Borg stores a set of files in an *archive*. A *repository* is a collection
 of *archives*. The format of repositories is Borg-specific. Borg does not
-distinguish archives from each other in a any way other than their name,
-it does not matter when or where archives where created (eg. different hosts).
+distinguish archives from each other in any way other than their name,
+it does not matter when or where archives were created (e.g. different hosts).
 
 EXAMPLES
 --------
@@ -61,7 +61,7 @@ SEE ALSO
 
 `borg-compression(1)`, `borg-patterns(1)`, `borg-placeholders(1)`
 
-* Main web site https://borgbackup.readthedocs.org/
+* Main web site https://www.borgbackup.org/
 * Releases https://github.com/borgbackup/borg/releases
 * Changelog https://github.com/borgbackup/borg/blob/master/docs/changes.rst
 * GitHub https://github.com/borgbackup/borg

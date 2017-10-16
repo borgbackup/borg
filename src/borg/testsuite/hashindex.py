@@ -1,11 +1,13 @@
 import base64
 import hashlib
+import io
 import os
 import tempfile
 import zlib
 
-from ..hashindex import NSIndex, ChunkIndex
+from ..hashindex import NSIndex, ChunkIndex, ChunkIndexEntry
 from .. import hashindex
+from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from . import BaseTestCase
 
 # Note: these tests are part of the self test, do not use or import py.test functionality here.
@@ -15,6 +17,11 @@ from . import BaseTestCase
 def H(x):
     # make some 32byte long thing that depends on x
     return bytes('%-0.32d' % x, 'ascii')
+
+
+def H2(x):
+    # like H(x), but with pseudo-random distribution of the output value
+    return hashlib.sha256(H(x)).digest()
 
 
 class HashIndexTestCase(BaseTestCase):
@@ -37,6 +44,15 @@ class HashIndexTestCase(BaseTestCase):
         # Test delete
         for x in range(50):
             del idx[H(x)]
+        # Test some keys still in there
+        for x in range(50, 100):
+            assert H(x) in idx
+        # Test some keys not there any more
+        for x in range(50):
+            assert H(x) not in idx
+        # Test delete non-existing key
+        for x in range(50):
+            self.assert_raises(KeyError, idx.__delitem__, H(x))
         self.assert_equal(len(idx), 50)
         idx_name = tempfile.NamedTemporaryFile()
         idx.write(idx_name.name)
@@ -57,11 +73,11 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),
-                           'b96ec1ddabb4278cc92261ee171f7efc979dc19397cc5e89b778f05fa25bf93f')
+                           '85f72b036c692c8266e4f51ccf0cff2147204282b5e316ae508d30a448d88fef')
 
     def test_chunkindex(self):
         self._generic_test(ChunkIndex, lambda x: (x, x, x),
-                           '9d437a1e145beccc790c69e66ba94fc17bd982d83a401c9c6e524609405529d8')
+                           'c83fdf33755fc37879285f2ecfc5d1f63b97577494902126b6fb6f3e4d852488')
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS
@@ -123,6 +139,37 @@ class HashIndexTestCase(BaseTestCase):
         assert unique_csize == 100 + 200 + 300
         assert chunks == 1 + 2 + 3
         assert unique_chunks == 3
+
+
+class HashIndexExtraTestCase(BaseTestCase):
+    """These tests are separate because they should not become part of the selftest.
+    """
+    def test_chunk_indexer(self):
+        # see _hashindex.c hash_sizes, we want to be close to the max. load
+        # because interesting errors happen there.
+        key_count = int(65537 * ChunkIndex.MAX_LOAD_FACTOR) - 10
+        index = ChunkIndex(key_count)
+        all_keys = [hashlib.sha256(H(k)).digest() for k in range(key_count)]
+        # we're gonna delete 1/3 of all_keys, so let's split them 2/3 and 1/3:
+        keys, to_delete_keys = all_keys[0:(2*key_count//3)], all_keys[(2*key_count//3):]
+
+        for i, key in enumerate(keys):
+            index[key] = (i, i, i)
+        for i, key in enumerate(to_delete_keys):
+            index[key] = (i, i, i)
+
+        for key in to_delete_keys:
+            del index[key]
+        for i, key in enumerate(keys):
+            assert index[key] == (i, i, i)
+        for key in to_delete_keys:
+            assert index.get(key) is None
+
+        # now delete every key still in the index
+        for key in keys:
+            del index[key]
+        # the index should now be empty
+        assert list(index.iteritems()) == []
 
 
 class HashIndexSizeTestCase(BaseTestCase):
@@ -286,6 +333,166 @@ class HashIndexDataTestCase(BaseTestCase):
         idx2[H(3)] = 2**32 - 123456, 6, 7
         idx1.merge(idx2)
         assert idx1[H(3)] == (ChunkIndex.MAX_VALUE, 6, 7)
+
+
+class HashIndexIntegrityTestCase(HashIndexDataTestCase):
+    def write_integrity_checked_index(self, tempdir):
+        idx = self._deserialize_hashindex(self.HASHINDEX)
+        file = os.path.join(tempdir, 'idx')
+        with IntegrityCheckedFile(path=file, write=True) as fd:
+            idx.write(fd)
+        integrity_data = fd.integrity_data
+        assert 'final' in integrity_data
+        assert 'HashHeader' in integrity_data
+        return file, integrity_data
+
+    def test_integrity_checked_file(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            file, integrity_data = self.write_integrity_checked_index(tempdir)
+            with open(file, 'r+b') as fd:
+                fd.write(b'Foo')
+            with self.assert_raises(FileIntegrityError):
+                with IntegrityCheckedFile(path=file, write=False, integrity_data=integrity_data) as fd:
+                    ChunkIndex.read(fd)
+
+
+class HashIndexCompactTestCase(HashIndexDataTestCase):
+    def index(self, num_entries, num_buckets):
+        index_data = io.BytesIO()
+        index_data.write(b'BORG_IDX')
+        # num_entries
+        index_data.write(num_entries.to_bytes(4, 'little'))
+        # num_buckets
+        index_data.write(num_buckets.to_bytes(4, 'little'))
+        # key_size
+        index_data.write((32).to_bytes(1, 'little'))
+        # value_size
+        index_data.write((3 * 4).to_bytes(1, 'little'))
+
+        self.index_data = index_data
+
+    def index_from_data(self):
+        self.index_data.seek(0)
+        index = ChunkIndex.read(self.index_data)
+        return index
+
+    def index_to_data(self, index):
+        data = io.BytesIO()
+        index.write(data)
+        return data.getvalue()
+
+    def index_from_data_compact_to_data(self):
+        index = self.index_from_data()
+        index.compact()
+        compact_index = self.index_to_data(index)
+        return compact_index
+
+    def write_entry(self, key, *values):
+        self.index_data.write(key)
+        for value in values:
+            self.index_data.write(value.to_bytes(4, 'little'))
+
+    def write_empty(self, key):
+        self.write_entry(key, 0xffffffff, 0, 0)
+
+    def write_deleted(self, key):
+        self.write_entry(key, 0xfffffffe, 0, 0)
+
+    def test_simple(self):
+        self.index(num_entries=3, num_buckets=6)
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_deleted(H2(1))
+        self.write_empty(H2(2))
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+        self.write_empty(H2(5))
+
+        compact_index = self.index_from_data_compact_to_data()
+
+        self.index(num_entries=3, num_buckets=3)
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+        assert compact_index == self.index_data.getvalue()
+
+    def test_first_empty(self):
+        self.index(num_entries=3, num_buckets=6)
+        self.write_deleted(H2(1))
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_empty(H2(2))
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+        self.write_empty(H2(5))
+
+        compact_index = self.index_from_data_compact_to_data()
+
+        self.index(num_entries=3, num_buckets=3)
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+        assert compact_index == self.index_data.getvalue()
+
+    def test_last_used(self):
+        self.index(num_entries=3, num_buckets=6)
+        self.write_deleted(H2(1))
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_empty(H2(2))
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_empty(H2(5))
+        self.write_entry(H2(4), 8, 9, 10)
+
+        compact_index = self.index_from_data_compact_to_data()
+
+        self.index(num_entries=3, num_buckets=3)
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+        assert compact_index == self.index_data.getvalue()
+
+    def test_too_few_empty_slots(self):
+        self.index(num_entries=3, num_buckets=6)
+        self.write_deleted(H2(1))
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_empty(H2(2))
+        self.write_empty(H2(5))
+        self.write_entry(H2(4), 8, 9, 10)
+
+        compact_index = self.index_from_data_compact_to_data()
+
+        self.index(num_entries=3, num_buckets=3)
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+        assert compact_index == self.index_data.getvalue()
+
+    def test_empty(self):
+        self.index(num_entries=0, num_buckets=6)
+        self.write_deleted(H2(1))
+        self.write_empty(H2(0))
+        self.write_deleted(H2(3))
+        self.write_empty(H2(2))
+        self.write_empty(H2(5))
+        self.write_deleted(H2(4))
+
+        compact_index = self.index_from_data_compact_to_data()
+
+        self.index(num_entries=0, num_buckets=0)
+        assert compact_index == self.index_data.getvalue()
+
+    def test_merge(self):
+        master = ChunkIndex()
+        idx1 = ChunkIndex()
+        idx1[H(1)] = 1, 100, 100
+        idx1[H(2)] = 2, 200, 200
+        idx1[H(3)] = 3, 300, 300
+        idx1.compact()
+        assert idx1.size() == 18 + 3 * (32 + 3 * 4)
+
+        master.merge(idx1)
+        assert master[H(1)] == (1, 100, 100)
+        assert master[H(2)] == (2, 200, 200)
+        assert master[H(3)] == (3, 300, 300)
 
 
 class NSIndexTestCase(BaseTestCase):

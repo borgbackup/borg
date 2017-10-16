@@ -40,9 +40,11 @@ def testdata(request, tmpdir_factory):
         # do not use a binary zero (\0) to avoid sparse detection
         def data(size):
             return b'0' * size
-    if data_type == 'random':
+    elif data_type == 'random':
         def data(size):
             return os.urandom(size)
+    else:
+        raise ValueError("data_type must be 'random' or 'zeros'.")
     for i in range(count):
         with open(str(p.join(str(i))), "wb") as f:
             f.write(data(size))

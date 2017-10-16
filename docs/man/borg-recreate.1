@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-RECREATE 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .
@@ -32,40 +32,40 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg recreate <options> REPOSITORY_OR_ARCHIVE PATH
+borg [common options] recreate <options> REPOSITORY_OR_ARCHIVE PATH
 .SH DESCRIPTION
 .sp
 Recreate the contents of existing archives.
 .sp
 This is an \fIexperimental\fP feature. Do \fInot\fP use this on your only backup.
 .sp
-\-\-exclude, \-\-exclude\-from and PATH have the exact same semantics
-as in "borg create". If PATHs are specified the resulting archive
-will only contain files from these PATHs.
+\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP, and PATH
+have the exact same semantics as in "borg create". If PATHs are specified the
+resulting archive will only contain files from these PATHs.
 .sp
 Note that all paths in an archive are relative, therefore absolute patterns/paths
-will \fInot\fP match (\-\-exclude, \-\-exclude\-from, \-\-compression\-from, PATHs).
+will \fInot\fP match (\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, PATHs).
 .sp
-\-\-compression: all chunks seen will be stored using the given method.
+\fB\-\-recompress\fP allows to change the compression of existing data in archives.
 Due to how Borg stores compressed size information this might display
 incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
 .sp
-\-\-chunker\-params will re\-chunk all files in the archive, this can be
+\fB\-\-chunker\-params\fP will re\-chunk all files in the archive, this can be
 used to have upgraded Borg 0.xx or Attic archives deduplicate with
 Borg 1.x archives.
 .sp
-USE WITH CAUTION.
+\fBUSE WITH CAUTION.\fP
 Depending on the PATHs and patterns given, recreate can be used to permanently
 delete files from archives.
-When in doubt, use "\-\-dry\-run \-\-verbose \-\-list" to see how patterns/PATHS are
+When in doubt, use \fB\-\-dry\-run \-\-verbose \-\-list\fP to see how patterns/PATHS are
 interpreted.
 .sp
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at
 "<ARCHIVE>.recreate". The new archive will have a different archive ID.
 .sp
-With \-\-target the original archive is not replaced, instead a new archive is created.
+With \fB\-\-target\fP the original archive is not replaced, instead a new archive is created.
 .sp
 When rechunking space usage can be substantial, expect at least the entire
 deduplicated size of the archives using the previous chunker params.
@@ -92,9 +92,6 @@ output verbose list of items (files, dirs, ...)
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters
 .TP
-.B \-p\fP,\fB  \-\-progress
-show progress display while recreating archives
-.TP
 .B \-n\fP,\fB  \-\-dry\-run
 do not change anything
 .TP
@@ -114,10 +111,16 @@ read exclude patterns from EXCLUDEFILE, one per line
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
-exclude directories that are tagged by containing a filesystem object with                                          the given NAME
+exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
-keep tag objects (i.e.: arguments to \-\-exclude\-if\-present) in otherwise                                          excluded caches/directories
+if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SS Archive options
 .INDENT 0.0
@@ -137,14 +140,11 @@ manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss form
 .BI \-C \ COMPRESSION\fP,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the "borg help compression" command for details.
 .TP
-.B \-\-always\-recompress
-always recompress chunks, don\(aqt skip chunks already compressed with the same algorithm.
-.TP
-.BI \-\-compression\-from \ COMPRESSIONCONFIG
-read compression patterns from COMPRESSIONCONFIG, see the output of the "borg help compression" command for details.
+.B \-\-recompress
+recompress data chunks according to \fB\-\-compression\fP if \fIif\-different\fP\&. When \fIalways\fP, chunks that are already compressed that way are not skipped, but compressed again. Only the algorithm is considered for \fIif\-different\fP, not the compression level (if any).
 .TP
 .BI \-\-chunker\-params \ PARAMS
-specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or "default" to use the current defaults. default: 19,23,21,4095
+specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: 19,23,21,4095
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -160,7 +160,7 @@ $ borg recreate /mnt/backup \-\-chunker\-params default \-\-progress
 $ borg create /mnt/backup::archive /some/files \-\-compression lz4
 # Then compress it \- this might take longer, but the backup has already completed, so no inconsistencies
 # from a long\-running backup job.
-$ borg recreate /mnt/backup::archive \-\-compression zlib,9
+$ borg recreate /mnt/backup::archive \-\-recompress \-\-compression zlib,9
 
 # Remove unwanted files from all archives in a repository
 $ borg recreate /mnt/backup \-e /home/icke/Pictures/drunk_photos

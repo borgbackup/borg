@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2017-02-12" "" "borg backup tool"
+.TH BORG-LIST 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg list <options> REPOSITORY_OR_ARCHIVE PATH
+borg [common options] list <options> REPOSITORY_OR_ARCHIVE PATH
 .SH DESCRIPTION
 .sp
 This command lists the contents of a repository or an archive.
@@ -60,17 +60,20 @@ only print file/directory names, nothing else
 specify format for file listing
 (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
 .TP
-.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
-exclude paths matching PATTERN
+.B \-\-json
+Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
 .TP
-.BI \-\-exclude\-from \ EXCLUDEFILE
-read exclude patterns from EXCLUDEFILE, one per line
+.B \-\-json\-lines
+Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 .UNINDENT
 .SS filters
 .INDENT 0.0
 .TP
 .B \-P\fP,\fB  \-\-prefix
-only consider archive names starting with this prefix
+only consider archive names starting with this prefix.
+.TP
+.B \-a\fP,\fB  \-\-glob\-archives
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .B \-\-sort\-by
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -80,6 +83,30 @@ consider first N archives after other filters were applied
 .TP
 .BI \-\-last \ N
 consider last N archives after other filters were applied
+.UNINDENT
+.SS Exclusion options
+.INDENT 0.0
+.TP
+.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+exclude paths matching PATTERN
+.TP
+.BI \-\-exclude\-from \ EXCLUDEFILE
+read exclude patterns from EXCLUDEFILE, one per line
+.TP
+.B \-\-exclude\-caches
+exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
+.TP
+.BI \-\-exclude\-if\-present \ NAME
+exclude directories that are tagged by containing a filesystem object with the given NAME
+.TP
+.B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
+if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -114,9 +141,7 @@ drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
 .UNINDENT
 .SH NOTES
 .sp
-The following keys are available for \-\-format:
-.INDENT 0.0
-.INDENT 3.5
+The following keys are available for \fB\-\-format\fP:
 .INDENT 0.0
 .IP \(bu 2
 NEWLINE: OS dependent line separator
@@ -133,15 +158,11 @@ CR
 .IP \(bu 2
 LF
 .UNINDENT
-.UNINDENT
-.UNINDENT
 .sp
 Keys for listing repository archives:
 .INDENT 0.0
-.INDENT 3.5
-.INDENT 0.0
 .IP \(bu 2
-archive: archive name interpreted as text (might be missing non\-text characters, see barchive)
+archive, name: archive name interpreted as text (might be missing non\-text characters, see barchive)
 .IP \(bu 2
 barchive: verbatim archive name, can contain any character except NUL
 .IP \(bu 2
@@ -149,12 +170,8 @@ time: time of creation of the archive
 .IP \(bu 2
 id: internal ID of the archive
 .UNINDENT
-.UNINDENT
-.UNINDENT
 .sp
 Keys for listing archive files:
-.INDENT 0.0
-.INDENT 3.5
 .INDENT 0.0
 .IP \(bu 2
 type
@@ -183,6 +200,10 @@ size
 .IP \(bu 2
 csize: compressed size
 .IP \(bu 2
+dsize: deduplicated size
+.IP \(bu 2
+dcsize: deduplicated compressed size
+.IP \(bu 2
 num_chunks: number of chunks in this file
 .IP \(bu 2
 unique_chunks: number of unique chunks in this file
@@ -199,10 +220,6 @@ isoctime
 .IP \(bu 2
 isoatime
 .IP \(bu 2
-blake2b
-.IP \(bu 2
-blake2s
-.IP \(bu 2
 md5
 .IP \(bu 2
 sha1
@@ -213,19 +230,7 @@ sha256
 .IP \(bu 2
 sha384
 .IP \(bu 2
-sha3_224
-.IP \(bu 2
-sha3_256
-.IP \(bu 2
-sha3_384
-.IP \(bu 2
-sha3_512
-.IP \(bu 2
 sha512
-.IP \(bu 2
-shake_128
-.IP \(bu 2
-shake_256
 .IP \(bu 2
 archiveid
 .IP \(bu 2
@@ -234,8 +239,6 @@ archivename
 extra: prepends {source} with " \-> " for soft links and " link to " for hard links
 .IP \(bu 2
 health: either "healthy" (file ok) or "broken" (if file has all\-zero replacement chunks)
-.UNINDENT
-.UNINDENT
 .UNINDENT
 .SH SEE ALSO
 .sp

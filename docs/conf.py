@@ -19,8 +19,6 @@ sys.path.insert(0, os.path.abspath('../src'))
 
 from borg import __version__ as sw_version
 
-on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
-
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -51,7 +49,8 @@ copyright = '2010-2014 Jonas Borgström, 2015-2017 The Borg Collective (see AUTH
 # built documents.
 #
 # The short X.Y version.
-version = sw_version.split('-')[0]
+split_char = '+' if '+' in sw_version else '-'
+version = sw_version.split(split_char)[0]
 # The full version, including alpha/beta/rc tags.
 release = version
 
@@ -73,6 +72,10 @@ exclude_patterns = ['_build']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
+
+# The Borg docs contain no or very little Python docs.
+# Thus, the primary domain is rst.
+primary_domain = 'rst'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 #add_function_parentheses = True
@@ -96,25 +99,29 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#html_theme = ''
-if not on_rtd:  # only import and set the theme if we're building docs locally
-    import sphinx_rtd_theme
-    html_theme = 'sphinx_rtd_theme'
-    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-    html_style = 'css/borg.css'
-else:
-    html_context = {
-        'css_files': [
-            'https://media.readthedocs.org/css/sphinx_rtd_theme.css',
-            'https://media.readthedocs.org/css/readthedocs-doc-embed.css',
-            '_static/css/borg.css',
-        ],
-    }
+import guzzle_sphinx_theme
+
+html_theme_path = guzzle_sphinx_theme.html_theme_path()
+html_theme = 'guzzle_sphinx_theme'
+
+
+def set_rst_settings(app):
+    app.env.settings.update({
+        'field_name_limit': 0,
+        'option_limit': 0,
+    })
+
+
+def setup(app):
+    app.add_stylesheet('css/borg.css')
+    app.connect('builder-inited', set_rst_settings)
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+html_theme_options = {
+    'project_nav_name': 'Borg %s' % version,
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = ['_themes']
@@ -128,7 +135,7 @@ else:
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = '_static/logo.png'
+html_logo = '_static/logo.svg'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -148,13 +155,13 @@ html_last_updated_fmt = '%Y-%m-%d'
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
-#html_use_smartypants = True
+html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {
-    'index': ['sidebarlogo.html', 'sidebarusefullinks.html', 'searchbox.html'],
-    '**': ['sidebarlogo.html', 'relations.html', 'searchbox.html', 'localtoc.html', 'sidebarusefullinks.html']
+    '**': ['logo-text.html', 'searchbox.html', 'globaltoc.html'],
 }
+
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
 #html_additional_pages = {}
@@ -191,12 +198,6 @@ htmlhelp_basename = 'borgdoc'
 
 # -- Options for LaTeX output --------------------------------------------------
 
-# The paper size ('letter' or 'a4').
-#latex_paper_size = 'letter'
-
-# The font size ('10pt', '11pt' or '12pt').
-#latex_font_size = '12pt'
-
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
@@ -206,7 +207,13 @@ latex_documents = [
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-latex_logo = '_static/logo.png'
+latex_logo = '_static/logo.pdf'
+
+latex_elements = {
+    'papersize': 'a4paper',
+    'pointsize': '10pt',
+    'figure_align': 'H',
+}
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
@@ -222,7 +229,12 @@ latex_show_urls = 'footnote'
 #latex_preamble = ''
 
 # Documents to append as an appendix to all manuals.
-#latex_appendices = []
+latex_appendices = [
+    'support',
+    'resources',
+    'changes',
+    'authors',
+]
 
 # If false, no module index is generated.
 #latex_domain_indices = True
@@ -239,7 +251,13 @@ man_pages = [
          1),
 ]
 
-extensions = ['sphinx.ext.extlinks', 'sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.viewcode']
+extensions = [
+    'sphinx.ext.extlinks',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    'sphinx.ext.viewcode',
+]
 
 extlinks = {
     'issue': ('https://github.com/borgbackup/borg/issues/%s', '#'),

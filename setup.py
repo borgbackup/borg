@@ -12,7 +12,7 @@ from distutils.core import Command
 
 import textwrap
 
-min_python = (3, 4)
+min_python = (3, 5)
 my_python = sys.version_info
 
 if my_python < min_python:
@@ -22,9 +22,12 @@ if my_python < min_python:
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
-# msgpack pure python data corruption was fixed in 0.4.6.
-# Also, we might use some rather recent API features.
-install_requires = ['msgpack-python>=0.4.6', ]
+install_requires = [
+    # msgpack pure python data corruption was fixed in 0.4.6.
+    # Also, we might use some rather recent API features.
+    'msgpack-python>=0.4.6',
+    'pyzmq',
+]
 
 # note for package maintainers: if you package borgbackup for distribution,
 # please add llfuse as a *requirement* on all platforms that have a working
@@ -37,6 +40,8 @@ extras_require = {
     # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.1.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.2 (tested shortly, looks ok), needs FUSE version >= 2.8.0
+    # llfuse 1.3 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
     'fuse': ['llfuse<2.0', ],
 }
@@ -48,13 +53,15 @@ if sys.platform.startswith('freebsd'):
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
+from distutils.command.clean import clean
 
 compress_source = 'src/borg/compress.pyx'
-crypto_source = 'src/borg/crypto.pyx'
+crypto_ll_source = 'src/borg/crypto/low_level.pyx'
+crypto_helpers = 'src/borg/crypto/_crypto_helpers.c'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
-crc32_source = 'src/borg/crc32.pyx'
+checksums_source = 'src/borg/algorithms/checksums.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
@@ -62,11 +69,11 @@ platform_freebsd_source = 'src/borg/platform/freebsd.pyx'
 
 cython_sources = [
     compress_source,
-    crypto_source,
+    crypto_ll_source,
     chunker_source,
     hashindex_source,
     item_source,
-    crc32_source,
+    checksums_source,
 
     platform_posix_source,
     platform_linux_source,
@@ -87,12 +94,15 @@ try:
         def make_distribution(self):
             self.filelist.extend([
                 'src/borg/compress.c',
-                'src/borg/crypto.c',
+                'src/borg/crypto/low_level.c',
                 'src/borg/chunker.c', 'src/borg/_chunker.c',
                 'src/borg/hashindex.c', 'src/borg/_hashindex.c',
+                'src/borg/cache_sync/cache_sync.c', 'src/borg/cache_sync/sysdep.h', 'src/borg/cache_sync/unpack.h',
+                'src/borg/cache_sync/unpack_define.h', 'src/borg/cache_sync/unpack_template.h',
                 'src/borg/item.c',
-                'src/borg/crc32.c',
-                'src/borg/_crc32/crc32.c', 'src/borg/_crc32/clmul.c', 'src/borg/_crc32/slice_by_8.c',
+                'src/borg/algorithms/checksums.c',
+                'src/borg/algorithms/crc32_dispatch.c', 'src/borg/algorithms/crc32_clmul.c', 'src/borg/algorithms/crc32_slice_by_8.c',
+                'src/borg/algorithms/xxh64/xxhash.h', 'src/borg/algorithms/xxh64/xxhash.c',
                 'src/borg/platform/posix.c',
                 'src/borg/platform/linux.c',
                 'src/borg/platform/freebsd.c',
@@ -106,18 +116,18 @@ except ImportError:
             raise Exception('Cython is required to run sdist')
 
     compress_source = compress_source.replace('.pyx', '.c')
-    crypto_source = crypto_source.replace('.pyx', '.c')
+    crypto_ll_source = crypto_ll_source.replace('.pyx', '.c')
     chunker_source = chunker_source.replace('.pyx', '.c')
     hashindex_source = hashindex_source.replace('.pyx', '.c')
     item_source = item_source.replace('.pyx', '.c')
-    crc32_source = crc32_source.replace('.pyx', '.c')
+    checksums_source = checksums_source.replace('.pyx', '.c')
     platform_posix_source = platform_posix_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
-        compress_source, crypto_source, chunker_source, hashindex_source, item_source, crc32_source,
+        compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, checksums_source,
         platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
@@ -199,6 +209,17 @@ with open('README.rst', 'r') as fd:
     long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
 
 
+def format_metavar(option):
+    if option.nargs in ('*', '...'):
+        return '[%s...]' % option.metavar
+    elif option.nargs == '?':
+        return '[%s]' % option.metavar
+    elif option.nargs is None:
+        return option.metavar
+    else:
+        raise ValueError('Can\'t format metavar %s, unknown nargs %s!' % (option.metavar, option.nargs))
+
+
 class build_usage(Command):
     description = "generate usage for each command"
 
@@ -259,7 +280,7 @@ class build_usage(Command):
                               "command_": command.replace(' ', '_'),
                               "underline": '-' * len('borg ' + command)}
                     doc.write(".. _borg_{command_}:\n\n".format(**params))
-                    doc.write("borg {command}\n{underline}\n::\n\n    borg {command}".format(**params))
+                    doc.write("borg {command}\n{underline}\n.. code-block:: none\n\n    borg [common options] {command}".format(**params))
                     self.write_usage(parser, doc)
                     epilog = parser.epilog
                     parser.epilog = None
@@ -270,36 +291,139 @@ class build_usage(Command):
         if 'create' in choices:
             common_options = [group for group in choices['create']._action_groups if group.title == 'Common options'][0]
             with open('docs/usage/common-options.rst.inc', 'w') as doc:
-                self.write_options_group(common_options, doc, False)
+                self.write_options_group(common_options, doc, False, base_indent=0)
 
         return is_subcommand
 
     def write_usage(self, parser, fp):
         if any(len(o.option_strings) for o in parser._actions):
-            fp.write(' <options>')
+            fp.write(' [options]')
         for option in parser._actions:
             if option.option_strings:
                 continue
-            fp.write(' ' + option.metavar)
+            fp.write(' ' + format_metavar(option))
+        fp.write('\n\n')
 
     def write_options(self, parser, fp):
-        for group in parser._action_groups:
-            if group.title == 'Common options':
-                fp.write('\n\n`Common options`_\n')
-                fp.write('    |')
-            else:
-                self.write_options_group(group, fp)
-
-    def write_options_group(self, group, fp, with_title=True):
         def is_positional_group(group):
             return any(not o.option_strings for o in group._group_actions)
 
-        def get_help(option):
-            text = textwrap.dedent((option.help or '') % option.__dict__)
-            return '\n'.join('| ' + line for line in text.splitlines())
+        # HTML output:
+        # A table using some column-spans
 
-        def shipout(text):
-            fp.write(textwrap.indent('\n'.join(text), ' ' * 4))
+        def html_write(s):
+            for line in s.splitlines():
+                fp.write('    ' + line + '\n')
+
+        rows = []
+        for group in parser._action_groups:
+            if group.title == 'Common options':
+                # (no of columns used, columns, ...)
+                rows.append((1, '.. class:: borg-common-opt-ref\n\n:ref:`common_options`'))
+            else:
+                if not group._group_actions:
+                    continue
+                group_header = '**%s**' % group.title
+                if group.description:
+                    group_header += ' — ' + group.description
+                rows.append((1, group_header))
+                if is_positional_group(group):
+                    for option in group._group_actions:
+                        rows.append((3, '', '``%s``' % option.metavar, option.help or ''))
+                else:
+                    for option in group._group_actions:
+                        if option.metavar:
+                            option_fmt = '``%s ' + option.metavar + '``'
+                        else:
+                            option_fmt = '``%s``'
+                        option_str = ', '.join(option_fmt % s for s in option.option_strings)
+                        option_desc = textwrap.dedent((option.help or '') % option.__dict__)
+                        rows.append((3, '', option_str, option_desc))
+
+        fp.write('.. only:: html\n\n')
+        table = io.StringIO()
+        table.write('.. class:: borg-options-table\n\n')
+        self.rows_to_table(rows, table.write)
+        fp.write(textwrap.indent(table.getvalue(), ' ' * 4))
+
+        # LaTeX output:
+        # Regular rST option lists (irregular column widths)
+        latex_options = io.StringIO()
+        for group in parser._action_groups:
+            if group.title == 'Common options':
+                latex_options.write('\n\n:ref:`common_options`\n')
+                latex_options.write('    |')
+            else:
+                self.write_options_group(group, latex_options)
+        fp.write('\n.. only:: latex\n\n')
+        fp.write(textwrap.indent(latex_options.getvalue(), ' ' * 4))
+
+    def rows_to_table(self, rows, write):
+        def write_row_separator():
+            write('+')
+            for column_width in column_widths:
+                write('-' * (column_width + 1))
+                write('+')
+            write('\n')
+
+        # Find column count and width
+        column_count = max(columns for columns, *_ in rows)
+        column_widths = [0] * column_count
+        for columns, *cells in rows:
+            for i in range(columns):
+                # "+ 1" because we want a space between the cell contents and the delimiting "|" in the output
+                column_widths[i] = max(column_widths[i], len(cells[i]) + 1)
+
+        for columns, *original_cells in rows:
+            write_row_separator()
+            # If a cell contains newlines, then the row must be split up in individual rows
+            # where each cell contains no newline.
+            rowspanning_cells = []
+            original_cells = list(original_cells)
+            while any('\n' in cell for cell in original_cells):
+                cell_bloc = []
+                for i, cell in enumerate(original_cells):
+                    pre, _, original_cells[i] = cell.partition('\n')
+                    cell_bloc.append(pre)
+                rowspanning_cells.append(cell_bloc)
+            rowspanning_cells.append(original_cells)
+            for cells in rowspanning_cells:
+                for i, column_width in enumerate(column_widths):
+                    if i < columns:
+                        write('| ')
+                        write(cells[i].ljust(column_width))
+                    else:
+                        write('  ')
+                        write(''.ljust(column_width))
+                write('|\n')
+
+        write_row_separator()
+        # This bit of JavaScript kills the <colgroup> that is invariably inserted by docutils,
+        # but does absolutely no good here. It sets bogus column widths which cannot be overridden
+        # with CSS alone.
+        # Since this is HTML-only output, it would be possible to just generate a <table> directly,
+        # but then we'd lose rST formatting.
+        write(textwrap.dedent("""
+        .. raw:: html
+
+            <script type='text/javascript'>
+            $(document).ready(function () {
+                $('.borg-options-table colgroup').remove();
+            })
+            </script>
+        """))
+
+    def write_options_group(self, group, fp, with_title=True, base_indent=4):
+        def is_positional_group(group):
+            return any(not o.option_strings for o in group._group_actions)
+
+        indent = ' ' * base_indent
+
+        if is_positional_group(group):
+            for option in group._group_actions:
+                fp.write(option.metavar + '\n')
+                fp.write(textwrap.indent(option.help or '', ' ' * base_indent) + '\n')
+            return
 
         if not group._group_actions:
             return
@@ -307,28 +431,22 @@ class build_usage(Command):
         if with_title:
             fp.write('\n\n')
             fp.write(group.title + '\n')
-        text = []
 
-        if is_positional_group(group):
-            for option in group._group_actions:
-                text.append(option.metavar)
-                text.append(textwrap.indent(option.help or '', ' ' * 4))
-            shipout(text)
-            return
+        opts = OrderedDict()
 
-        options = []
         for option in group._group_actions:
             if option.metavar:
-                option_fmt = '``%%s %s``' % option.metavar
+                option_fmt = '%s ' + option.metavar
             else:
-                option_fmt = '``%s``'
+                option_fmt = '%s'
             option_str = ', '.join(option_fmt % s for s in option.option_strings)
-            options.append((option_str, option))
-        for option_str, option in options:
-            help = textwrap.indent(get_help(option), ' ' * 4)
-            text.append(option_str)
-            text.append(help)
-        shipout(text)
+            option_desc = textwrap.dedent((option.help or '') % option.__dict__)
+            opts[option_str] = textwrap.indent(option_desc, ' ' * 4)
+
+        padding = len(max(opts)) + 1
+
+        for option, desc in opts.items():
+            fp.write(indent + option.ljust(padding) + desc + '\n')
 
 
 class build_man(Command):
@@ -355,6 +473,23 @@ class build_man(Command):
     .. |project_name| replace:: Borg
 
     """)
+
+    usage_group = {
+        'break-lock': 'lock',
+        'with-lock': 'lock',
+
+        'change-passphrase': 'key',
+        'key_change-passphrase': 'key',
+        'key_export': 'key',
+        'key_import': 'key',
+        'key_migrate-to-repokey': 'key',
+
+        'export-tar': 'tar',
+
+        'benchmark_crud': 'benchmark',
+
+        'umount': 'mount',
+    }
 
     def initialize_options(self):
         pass
@@ -402,10 +537,10 @@ class build_man(Command):
             if is_intermediary:
                 subparsers = [action for action in parser._actions if 'SubParsersAction' in str(action.__class__)][0]
                 for subcommand in subparsers.choices:
-                    write('| borg', command, subcommand, '...')
+                    write('| borg', '[common options]', command, subcommand, '...')
                     self.see_also.setdefault(command, []).append('%s-%s' % (command, subcommand))
             else:
-                write('borg', command, end='')
+                write('borg', '[common options]', command, end='')
                 self.write_usage(write, parser)
             write('\n')
 
@@ -493,11 +628,15 @@ class build_man(Command):
         write()
 
     def write_examples(self, write, command):
-        with open('docs/usage.rst') as fd:
+        command = command.replace(' ', '_')
+        with open('docs/usage/%s.rst' % self.usage_group.get(command, command)) as fd:
             usage = fd.read()
-            usage_include = '.. include:: usage/%s.rst.inc' % command
+            usage_include = '.. include:: %s.rst.inc' % command
             begin = usage.find(usage_include)
             end = usage.find('.. include', begin + 1)
+            # If a command has a dedicated anchor, it will occur before the command's include.
+            if 0 < usage.find('.. _', begin + 1) < end:
+                end = usage.find('.. _', begin + 1)
             examples = usage[begin:end]
             examples = examples.replace(usage_include, '')
             examples = examples.replace('Examples\n~~~~~~~~', '')
@@ -518,6 +657,13 @@ class build_man(Command):
     def gen_man_page(self, name, rst):
         from docutils.writers import manpage
         from docutils.core import publish_string
+        from docutils.nodes import inline
+        from docutils.parsers.rst import roles
+
+        def issue(name, rawtext, text, lineno, inliner, options={}, content=[]):
+            return [inline(rawtext, '#' + text)], []
+
+        roles.register_local_role('issue', issue)
         # We give the source_path so that docutils can find relative includes
         # as-if the document where located in the docs/ directory.
         man_page = publish_string(source=rst, source_path='docs/virtmanpage.rst', writer=manpage.Writer())
@@ -526,11 +672,11 @@ class build_man(Command):
 
     def write_usage(self, write, parser):
         if any(len(o.option_strings) for o in parser._actions):
-            write(' <options> ', end='')
+            write(' [options] ', end='')
         for option in parser._actions:
             if option.option_strings:
                 continue
-            write(option.metavar, end=' ')
+            write(format_metavar(option), end=' ')
 
     def write_options(self, write, parser):
         for group in parser._action_groups:
@@ -567,57 +713,42 @@ class build_man(Command):
             write(option.ljust(padding), desc)
 
 
-class build_api(Command):
-    description = "generate a basic api.rst file based on the modules available"
-
-    user_options = [
-        ('output=', 'O', 'output directory'),
-    ]
-
-    def initialize_options(self):
+def rm(file):
+    try:
+        os.unlink(file)
+        print('rm', file)
+    except FileNotFoundError:
         pass
 
-    def finalize_options(self):
-        pass
 
+class Clean(clean):
     def run(self):
-        print("auto-generating API documentation")
-        with open("docs/api.rst", "w") as doc:
-            doc.write("""
-.. IMPORTANT: this file is auto-generated by "setup.py build_api", do not edit!
-
-
-API Documentation
-=================
-""")
-            for mod in sorted(glob('src/borg/*.py') + glob('src/borg/*.pyx')):
-                print("examining module %s" % mod)
-                mod = mod.replace('.pyx', '').replace('.py', '').replace('/', '.')
-                if "._" not in mod:
-                    doc.write("""
-.. automodule:: %s
-    :members:
-    :undoc-members:
-""" % mod)
-
+        super().run()
+        for source in cython_sources:
+            genc = source.replace('.pyx', '.c')
+            rm(genc)
+            compiled_glob = source.replace('.pyx', '.cpython*')
+            for compiled in sorted(glob(compiled_glob)):
+                rm(compiled)
 
 cmdclass = {
     'build_ext': build_ext,
-    'build_api': build_api,
     'build_usage': build_usage,
     'build_man': build_man,
-    'sdist': Sdist
+    'sdist': Sdist,
+    'clean': Clean,
 }
 
 ext_modules = []
 if not on_rtd:
     ext_modules += [
     Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
-    Extension('borg.crypto', [crypto_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
-    Extension('borg.chunker', [chunker_source]),
+    Extension('borg.crypto.low_level', [crypto_ll_source, crypto_helpers], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),
-    Extension('borg.crc32', [crc32_source]),
+    Extension('borg.chunker', [chunker_source]),
+    Extension('borg.algorithms.checksums', [checksums_source]),
+
 ]
     if not sys.platform.startswith(('win32', )):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
@@ -642,7 +773,7 @@ setup(
     license='BSD',
     platforms=['Linux', 'MacOS X', 'FreeBSD', 'OpenBSD', 'NetBSD', ],
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 2 - Pre-Alpha',
         'Environment :: Console',
         'Intended Audience :: System Administrators',
         'License :: OSI Approved :: BSD License',
@@ -653,7 +784,6 @@ setup(
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Topic :: Security :: Cryptography',
@@ -661,7 +791,6 @@ setup(
     ],
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    include_package_data=True,
     zip_safe=False,
     entry_points={
         'console_scripts': [
@@ -669,8 +798,10 @@ setup(
             'borgfs = borg.archiver:main',
         ]
     },
+    include_package_data=True,
     package_data={
-        'borg': ['paperkey.html']
+        'borg': ['paperkey.html'],
+        'borg.testsuite': ['attic.tar.gz'],
     },
     cmdclass=cmdclass,
     ext_modules=ext_modules,

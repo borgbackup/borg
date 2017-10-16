@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CHECK 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-CHECK 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg check <options> REPOSITORY_OR_ARCHIVE
+borg [common options] check <options> REPOSITORY_OR_ARCHIVE
 .SH DESCRIPTION
 .sp
 The check command verifies the consistency of a repository and the corresponding archives.
@@ -55,7 +55,7 @@ stored in the segments.
 If you use a remote repo server via ssh:, the repo check is executed on the
 repo server without causing significant network traffic.
 .IP \(bu 2
-The repository check can be skipped using the \-\-archives\-only option.
+The repository check can be skipped using the \fB\-\-archives\-only\fP option.
 .UNINDENT
 .sp
 Second, the consistency and correctness of the archive metadata is verified:
@@ -84,10 +84,10 @@ decryption and this is always done client\-side, because key access will be
 required).
 .IP \(bu 2
 The archive checks can be time consuming, they can be skipped using the
-\-\-repository\-only option.
+\fB\-\-repository\-only\fP option.
 .UNINDENT
 .sp
-The \-\-verify\-data option will perform a full integrity verification (as opposed to
+The \fB\-\-verify\-data\fP option will perform a full integrity verification (as opposed to
 checking the CRC32 of the segment) of data, which means reading the data from the
 repository, decrypting and decompressing it. This is a cryptographic verification,
 which will detect (accidental) corruption. For encrypted repositories it is
@@ -113,22 +113,22 @@ only perform repository checks
 only perform archives checks
 .TP
 .B \-\-verify\-data
-perform cryptographic archive data integrity verification (conflicts with \-\-repository\-only)
+perform cryptographic archive data integrity verification (conflicts with \fB\-\-repository\-only\fP)
 .TP
 .B \-\-repair
 attempt to repair any inconsistencies found
 .TP
 .B \-\-save\-space
 work slower, but using less space
-.TP
-.B \-p\fP,\fB  \-\-progress
-show progress display while checking
 .UNINDENT
 .SS filters
 .INDENT 0.0
 .TP
 .B \-P\fP,\fB  \-\-prefix
-only consider archive names starting with this prefix
+only consider archive names starting with this prefix.
+.TP
+.B \-a\fP,\fB  \-\-glob\-archives
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .B \-\-sort\-by
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

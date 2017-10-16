@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-IMPORT 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-KEY-IMPORT 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-key-import \- Import the repository key from backup
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg key import <options> REPOSITORY PATH
+borg [common options] key import <options> REPOSITORY PATH
 .SH DESCRIPTION
 .sp
 This command allows to restore a key previously backed up with the
@@ -56,7 +56,7 @@ path to the backup
 .INDENT 0.0
 .TP
 .B \-\-paper
-interactively import from a backup done with \-\-paper
+interactively import from a backup done with \fB\-\-paper\fP
 .UNINDENT
 .SH SEE ALSO
 .sp

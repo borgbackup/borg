@@ -80,6 +80,8 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
+            borg_logger = logging.getLogger('borg')
+            borg_logger.json = json
             logger.debug('using logging configuration read from "{0}"'.format(conf_fname))
             warnings.showwarning = _log_warning
             return None
@@ -88,7 +90,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
     # if we did not / not successfully load a logging configuration, fallback to this:
     logger = logging.getLogger('')
     handler = logging.StreamHandler(stream)
-    if is_serve:
+    if is_serve and not json:
         fmt = '$LOG %(levelname)s %(name)s Remote: %(message)s'
     else:
         fmt = '%(message)s'
@@ -97,6 +99,12 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
     borg_logger = logging.getLogger('borg')
     borg_logger.formatter = formatter
     borg_logger.json = json
+    if configured and logger.handlers:
+        # The RepositoryServer can call setup_logging a second time to adjust the output
+        # mode from text-ish is_serve to json is_serve.
+        # Thus, remove the previously installed handler, if any.
+        logger.handlers[0].close()
+        logger.handlers.clear()
     logger.addHandler(handler)
     logger.setLevel(level.upper())
     configured = True
@@ -165,24 +173,38 @@ def create_logger(name=None):
             return self.__logger.setLevel(*args, **kw)
 
         def log(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.log(*args, **kw)
 
         def exception(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.exception(*args, **kw)
 
         def debug(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.debug(*args, **kw)
 
         def info(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.info(*args, **kw)
 
         def warning(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.warning(*args, **kw)
 
         def error(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.error(*args, **kw)
 
         def critical(self, *args, **kw):
+            if 'msgid' in kw:
+                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
             return self.__logger.critical(*args, **kw)
 
     return LazyLogger(name)
@@ -190,10 +212,11 @@ def create_logger(name=None):
 
 class JsonFormatter(logging.Formatter):
     RECORD_ATTRIBUTES = (
-        'created',
         'levelname',
         'name',
         'message',
+        # msgid is an attribute we made up in Borg to expose a non-changing handle for log messages
+        'msgid',
     )
 
     # Other attributes that are not very useful but do exist:
@@ -208,6 +231,9 @@ class JsonFormatter(logging.Formatter):
         super().format(record)
         data = {
             'type': 'log_message',
+            'time': record.created,
+            'message': '',
+            'levelname': 'CRITICAL',
         }
         for attr in self.RECORD_ATTRIBUTES:
             value = getattr(record, attr, None)

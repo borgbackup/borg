@@ -77,6 +77,17 @@ def test_item_int_property():
         item.mode = "invalid"
 
 
+def test_item_bigint_property():
+    item = Item()
+    small, big = 42, 2 ** 65
+    item.atime = small
+    assert item.atime == small
+    assert item.as_dict() == {'atime': small}
+    item.atime = big
+    assert item.atime == big
+    assert item.as_dict() == {'atime': b'\0' * 8 + b'\x02'}
+
+
 def test_item_user_group_none():
     item = Item()
     item.user = None
@@ -138,13 +149,23 @@ def test_unknown_property():
 
 
 def test_item_file_size():
-    item = Item(chunks=[
+    item = Item(mode=0o100666, chunks=[
         ChunkListEntry(csize=1, size=1000, id=None),
         ChunkListEntry(csize=1, size=2000, id=None),
     ])
     assert item.get_size() == 3000
+    with pytest.raises(AssertionError):
+        item.get_size(compressed=True, memorize=True)
+    assert item.get_size(compressed=True) == 2
+    item.get_size(memorize=True)
+    assert item.size == 3000
 
 
 def test_item_file_size_no_chunks():
-    item = Item()
+    item = Item(mode=0o100666)
     assert item.get_size() == 0
+
+
+def test_item_optr():
+    item = Item()
+    assert Item.from_optr(item.to_optr()) is item

@@ -42,28 +42,25 @@ package which can be installed with the package manager.
 Distribution Source                                        Command
 ============ ============================================= =======
 Arch Linux   `[community]`_                                ``pacman -S borg``
-Debian       `jessie-backports`_, `stretch`_, `sid`_       ``apt install borgbackup``
+Debian       `Debian packages`_                            ``apt install borgbackup``
 Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
-Fedora/RHEL  `Fedora official repository`_, `EPEL`_        ``dnf install borgbackup``
+Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbackup``
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  N/A
 OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
 OpenIndiana  `OpenIndiana hipster repository`_             ``pkg install borg``
-openSUSE     `openSUSE official repository`_               ``zypper in python3-borgbackup``
+openSUSE     `openSUSE official repository`_               ``zypper in borgbackup``
 OS X         `Brew cask`_                                  ``brew cask install borgbackup``
 Raspbian     `Raspbian testing`_                           ``apt install borgbackup``
-Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbackup``
+Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbackup``
 ============ ============================================= =======
 
 .. _[community]: https://www.archlinux.org/packages/?name=borg
-.. _jessie-backports: https://packages.debian.org/jessie-backports/borgbackup
-.. _stretch: https://packages.debian.org/stretch/borgbackup
-.. _sid: https://packages.debian.org/sid/borgbackup
+.. _Debian packages: https://packages.debian.org/search?keywords=borgbackup&searchon=names&exact=1&suite=all&section=all
 .. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
-.. _EPEL: https://admin.fedoraproject.org/pkgdb/package/rpms/borgbackup/
 .. _FreeBSD ports: http://www.freshports.org/archivers/py-borgbackup/
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
@@ -73,11 +70,10 @@ Ubuntu       `16.04`_, backports (PPA): `15.10`_, `14.04`_ ``apt install borgbac
 .. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
 .. _OpenIndiana hipster repository: http://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
 .. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
-.. _Brew cask: http://caskroom.io/
+.. _Brew cask: https://caskroom.github.io/
 .. _Raspbian testing: http://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
-.. _16.04: https://launchpad.net/ubuntu/xenial/+source/borgbackup
-.. _15.10: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
-.. _14.04: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
+.. _Ubuntu packages: http://packages.ubuntu.com/xenial/borgbackup
+.. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 
 Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on
@@ -94,8 +90,8 @@ Standalone Binary
 |project_name| binaries (generated with `pyinstaller`_) are available
 on the releases_ page for the following platforms:
 
-* **Linux**: glibc >= 2.13 (ok for most supported Linux releases). Maybe older
-  glibc versions also work, if they are compatible to 2.13.
+* **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
+  Older glibc releases are untested and may not work.
 * **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 
@@ -121,82 +117,18 @@ the old version using the same steps as shown above.
 .. _pyinstaller: http://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases
 
-.. _platforms:
-
-Features & platforms
---------------------
-
-Besides regular file and directory structures, |project_name| can preserve
-
-    * Hardlinks (considering all files in the same archive)
-    * Symlinks (stored as symlink, the symlink is not followed)
-    * Special files:
-
-        * Character and block device files (restored via mknod)
-        * FIFOs ("named pipes")
-        * Special file *contents* can be backed up in ``--read-special`` mode.
-          By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
-    * Timestamps in nanosecond precision: mtime, atime, ctime
-    * Permissions:
-
-        * IDs of owning user and owning group
-        * Names of owning user and owning group (if the IDs can be resolved)
-        * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
-
-On some platforms additional features are supported:
-
-.. Yes/No's are grouped by reason/mechanism/reference.
-
-+------------------+----------+-----------+------------+
-| Platform         | ACLs     | xattr     | Flags      |
-|                  | [#acls]_ | [#xattr]_ | [#flags]_  |
-+==================+==========+===========+============+
-| Linux x86        | Yes      | Yes       | Yes [1]_   |
-+------------------+          |           |            |
-| Linux PowerPC    |          |           |            |
-+------------------+          |           |            |
-| Linux ARM        |          |           |            |
-+------------------+----------+-----------+------------+
-| Mac OS X         | Yes      | Yes       | Yes (all)  |
-+------------------+----------+-----------+            |
-| FreeBSD          | Yes      | Yes       |            |
-+------------------+----------+-----------+            |
-| OpenBSD          | n/a      | n/a       |            |
-+------------------+----------+-----------+            |
-| NetBSD           | n/a      | No [2]_   |            |
-+------------------+----------+-----------+------------+
-| Solaris 11       | No [3]_              | n/a        |
-+------------------+                      |            |
-| OpenIndiana      |                      |            |
-+------------------+----------+-----------+------------+
-| Windows (cygwin) | No [4]_  | No        | No         |
-+------------------+----------+-----------+------------+
-
-Some Distributions (e.g. Debian) run additional tests after each release, these
-are not reflected here.
-
-Other Unix-like operating systems may work as well, but have not been tested at all.
-
-Note that most of the platform-dependent features also depend on the file system.
-For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
-
-.. [1] Only "nodump", "immutable", "compressed" and "append" are supported.
-    Feature request :issue:`618` for more flags.
-.. [2] Feature request :issue:`1332`
-.. [3] Feature request :issue:`1337`
-.. [4] Cygwin tries to map NTFS ACLs to permissions with varying degress of success.
-
-.. [#acls] The native access control list mechanism of the OS. This normally limits access to
-    non-native ACLs. For example, NTFS ACLs aren't completely accessible on Linux with ntfs-3g.
-.. [#xattr] extended attributes; key-value pairs attached to a file, mainly used by the OS.
-    This includes resource forks on Mac OS X.
-.. [#flags] aka *BSD flags*. The Linux set of flags [1]_ is portable across platforms.
-    The BSDs define additional flags.
-
 .. _source-install:
 
 From Source
 -----------
+
+.. note::
+
+  Some older Linux systems (like RHEL/CentOS 5) and Python interpreter binaries
+  compiled to be able to run on such systems (like Python installed via Anaconda)
+  might miss functions required by Borg.
+
+  This issue will be detected early and Borg will abort with a fatal error.
 
 Dependencies
 ~~~~~~~~~~~~
@@ -204,19 +136,21 @@ Dependencies
 To install |project_name| from a source package (including pip), you have to install the
 following dependencies first:
 
-* `Python 3`_ >= 3.4.0, plus development headers. Even though Python 3 is not
+* `Python 3`_ >= 3.5.0, plus development headers. Even though Python 3 is not
   the default Python version on most systems, it is usually available as an
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
-* libacl_ (that pulls in libattr_ also), both plus development headers.
+* libacl_ (which depends on libattr_), both plus development headers.
 * liblz4_, plus development headers.
+* ZeroMQ_ >= 4.0.0, plus development headers.
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
   archive as a FUSE filesystem. See setup.py about the version requirements.
 * optionally libb2_. If it is not found a bundled implementation is used instead.
 
 If you have troubles finding the right package names, have a look at the
-distribution specific sections below and also at the Vagrantfile in our repo.
+distribution specific sections below or the Vagrantfile in the git repository,
+which contains installation scripts for a number of operating systems.
 
 In the following, the steps needed to install the dependencies are listed for a
 selection of platforms. If your distribution is not covered by these
@@ -236,6 +170,7 @@ Install the dependencies with development headers::
     libssl-dev openssl \
     libacl1-dev libacl1 \
     liblz4-dev liblz4-1 \
+    libzmq3-dev libzmq3 \
     build-essential
     sudo apt-get install libfuse-dev fuse pkg-config    # optional, for FUSE support
 
@@ -245,6 +180,8 @@ group, log out and log in again.
 
 Fedora / Korora
 +++++++++++++++
+
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Install the dependencies with development headers::
 
@@ -256,9 +193,27 @@ Install the dependencies with development headers::
     sudo dnf install redhat-rpm-config                 # not needed in Korora
     sudo dnf install fuse-devel fuse pkgconfig         # optional, for FUSE support
 
+openSUSE Tumbleweed / Leap
+++++++++++++++++++++++++++
+
+.. todo:: Add zeromq, use python 3.5 or 3.6
+
+Install the dependencies automatically using zypper::
+
+    sudo zypper source-install --build-deps-only borgbackup
+
+Alternatively, you can enumerate all build dependencies in the command line::
+
+    sudo zypper install python3 python3-devel \
+    libacl-devel liblz4-devel openssl-devel \
+    python3-Cython python3-Sphinx python3-msgpack-python \
+    python3-pytest python3-setuptools python3-setuptools_scm \
+    python3-sphinx_rtd_theme python3-llfuse gcc gcc-c++
 
 Mac OS X
 ++++++++
+
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
@@ -275,8 +230,11 @@ FUSE for OS X, which is available as a pre-release_.
 
 FreeBSD
 ++++++++
-Listed below are packages you will need to install |project_name|, its dependencies,
-and commands to make fuse work for using the mount command.
+
+.. todo:: Add zeromq, use python 3.5 or 3.6
+
+Listed below are packages you will need to install Borg, its dependencies,
+and commands to make FUSE work for using the mount command.
 
 ::
 
@@ -305,6 +263,8 @@ Cygwin
 .. note::
     Running under Cygwin is experimental and has only been tested with Cygwin
     (x86-64) v2.5.2. Remote repositories are known broken, local repositories should work.
+
+.. todo:: Add zeromq, use python 3.5 or 3.6
 
 Use the Cygwin installer to install the dependencies::
 
@@ -365,9 +325,9 @@ While we try not to break master, there are no guarantees on anything. ::
     source borg-env/bin/activate   # always before using!
 
     # install borg + dependencies into virtualenv
-    pip install sphinx  # optional, to build the docs
     cd borg
     pip install -r requirements.d/development.txt
+    pip install -r requirements.d/docs.txt  # optional, to build the docs
     pip install -r requirements.d/fuse.txt  # optional, for FUSE support
     pip install -e .  # in-place editable mode
 

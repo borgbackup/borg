@@ -1,18 +1,17 @@
-import os
 from collections import OrderedDict
 from datetime import datetime, timezone
 from io import StringIO
 from unittest.mock import Mock
 
-import pytest
 import msgpack
+import pytest
 
+from . import BaseTestCase
+from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter
-from ..item import Item, ArchiveItem
-from ..key import PlaintextKey
 from ..helpers import Manifest
-from . import BaseTestCase
+from ..item import Item, ArchiveItem
 
 
 @pytest.fixture()
@@ -63,12 +62,17 @@ This archive:                   20 B                 10 B                 10 B""
 
 class MockCache:
 
+    class MockRepo:
+        def async_response(self, wait=True):
+            pass
+
     def __init__(self):
         self.objects = {}
+        self.repository = self.MockRepo()
 
-    def add_chunk(self, id, chunk, stats=None):
-        self.objects[id] = chunk.data
-        return id, len(chunk.data), len(chunk.data)
+    def add_chunk(self, id, chunk, stats=None, wait=True):
+        self.objects[id] = chunk
+        return id, len(chunk), len(chunk)
 
 
 class ArchiveTimestampTestCase(BaseTestCase):

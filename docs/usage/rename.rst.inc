@@ -4,18 +4,44 @@
 
 borg rename
 -----------
-::
+.. code-block:: none
 
-    borg rename <options> ARCHIVE NEWNAME
+    borg [common options] rename [options] ARCHIVE NEWNAME
 
-positional arguments
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+-------------+-----------------------------+
+    | **positional arguments**                                                                          |
+    +-------------------------------------------------------+-------------+-----------------------------+
+    |                                                       | ``ARCHIVE`` | archive to rename           |
+    +-------------------------------------------------------+-------------+-----------------------------+
+    |                                                       | ``NEWNAME`` | the new archive name to use |
+    +-------------------------------------------------------+-------------+-----------------------------+
+    | .. class:: borg-common-opt-ref                                                                    |
+    |                                                                                                   |
+    | :ref:`common_options`                                                                             |
+    +-------------------------------------------------------+-------------+-----------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
     ARCHIVE
         archive to rename
     NEWNAME
         the new archive name to use
 
-`Common options`_
-    |
+
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

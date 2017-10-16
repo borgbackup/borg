@@ -1,0 +1,5 @@
+# style and other checks for many languages.
+# some bears (checkers) have additional requirements.
+coala
+coala-bears
+

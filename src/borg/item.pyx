@@ -1,10 +1,18 @@
+import stat
 from collections import namedtuple
 
 from .constants import ITEM_KEYS
 from .helpers import safe_encode, safe_decode
+from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
+from .helpers import format_file_size
 
-API_VERSION = '1.1_02'
+cdef extern from "_item.c":
+    object _object_to_optr(object obj)
+    object _optr_to_object(object bytes)
+
+
+API_VERSION = '1.1_03'
 
 
 class PropDict:
@@ -156,9 +164,10 @@ class Item(PropDict):
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 
-    atime = PropDict._make_property('atime', int)
-    ctime = PropDict._make_property('ctime', int)
-    mtime = PropDict._make_property('mtime', int)
+    # note: we need to keep the bigint conversion for compatibility with borg 1.0 archives.
+    atime = PropDict._make_property('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    ctime = PropDict._make_property('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    mtime = PropDict._make_property('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
 
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
     # compatibility note: this is a new feature, in old archives size will be missing.
@@ -176,21 +185,29 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False):
+    def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
         """
         Determine the (uncompressed or compressed) size of this item.
 
-        For hardlink slaves, the size is computed via the hardlink master's
-        chunk list, if available (otherwise size will be returned as 0).
-
-        If memorize is True, the computed size value will be stored into the item.
+        :param hardlink_masters: If given, the size of hardlink slaves is computed via the hardlink master's chunk list,
+        otherwise size will be returned as 0.
+        :param memorize: Whether the computed size value will be stored into the item.
+        :param compressed: Whether the compressed or uncompressed size will be returned.
+        :param from_chunks: If true, size is computed from chunks even if a precomputed value is available.
+        :param consider_ids: Returns the size of the given ids only.
         """
         attr = 'csize' if compressed else 'size'
+        assert not (compressed and memorize), 'Item does not have a csize field.'
+        assert not (consider_ids is not None and memorize), "Can't store size when considering only certain ids"
         try:
-            if from_chunks:
+            if from_chunks or consider_ids is not None:
                 raise AttributeError
             size = getattr(self, attr)
         except AttributeError:
+            if stat.S_ISLNK(self.mode):
+                # get out of here quickly. symlinks have no own chunks, their fs size is the length of the target name.
+                # also, there is the dual-use issue of .source (#2343), so don't confuse it with a hardlink slave.
+                return len(self.source)
             # no precomputed (c)size value available, compute it:
             try:
                 chunks = getattr(self, 'chunks')
@@ -213,11 +230,49 @@ class Item(PropDict):
                         chunks, _ = hardlink_masters.get(master, (None, None))
                 if chunks is None:
                     return 0
-            size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks)
+            if consider_ids is not None:
+                size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks if chunk.id in consider_ids)
+            else:
+                size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks)
             # if requested, memorize the precomputed (c)size for items that have an own chunks list:
             if memorize and having_chunks:
                 setattr(self, attr, size)
         return size
+
+    def to_optr(self):
+        """
+        Return an "object pointer" (optr), an opaque bag of bytes.
+        The return value is effectively a reference to this object
+        that can be passed exactly once to Item.from_optr to get this
+        object back.
+
+        to_optr/from_optr must be used symmetrically,
+        don't call from_optr multiple times.
+
+        This object can't be deallocated after a call to to_optr()
+        until from_optr() is called.
+        """
+        return _object_to_optr(self)
+
+    @classmethod
+    def from_optr(self, optr):
+        return _optr_to_object(optr)
+
+    @classmethod
+    def create_deleted(cls, path):
+        return cls(deleted=True, chunks=[], mode=0, path=path)
+
+    def is_link(self):
+        return self._is_type(stat.S_ISLNK)
+
+    def is_dir(self):
+        return self._is_type(stat.S_ISDIR)
+
+    def _is_type(self, typetest):
+        try:
+            return typetest(self.mode)
+        except AttributeError:
+            return False
 
 
 class EncryptedKey(PropDict):
@@ -325,3 +380,140 @@ class ManifestItem(PropDict):
     timestamp = PropDict._make_property('timestamp', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     config = PropDict._make_property('config', dict)
     item_keys = PropDict._make_property('item_keys', tuple)
+
+class ItemDiff:
+    """
+    Comparison of two items from different archives.
+
+    The items may have different paths and still be considered equal (e.g. for renames).
+    It does not include extended or time attributes in the comparison.
+    """
+
+    def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_owner=False, can_compare_chunk_ids=False):
+        self._item1 = item1
+        self._item2 = item2
+        self._numeric_owner = numeric_owner
+        self._can_compare_chunk_ids = can_compare_chunk_ids
+        self.equal = self._equal(chunk_iterator1, chunk_iterator2)
+
+    def __repr__(self):
+        if self.equal:
+            return 'equal'
+
+        changes = []
+
+        if self._item1.is_link() or self._item2.is_link():
+            changes.append(self._link_string())
+
+        if 'chunks' in self._item1 and 'chunks' in self._item2:
+            changes.append(self._content_string())
+
+        if self._item1.is_dir() or self._item2.is_dir():
+            changes.append(self._dir_string())
+
+        if not (self._item1.get('deleted') or self._item2.get('deleted')):
+            changes.append(self._owner_string())
+            changes.append(self._mode_string())
+
+        return ' '.join((x for x in changes if x))
+
+    def _equal(self, chunk_iterator1, chunk_iterator2):
+        # if both are deleted, there is nothing at path regardless of what was deleted
+        if self._item1.get('deleted') and self._item2.get('deleted'):
+            return True
+
+        attr_list = ['deleted', 'mode', 'source']
+        attr_list += ['uid', 'gid'] if self._numeric_owner else ['user', 'group']
+        for attr in attr_list:
+            if self._item1.get(attr) != self._item2.get(attr):
+                return False
+
+        if 'mode' in self._item1:     # mode of item1 and item2 is equal
+            if (self._item1.is_link() and 'source' in self._item1 and 'source' in self._item2
+                and self._item1.source != self._item2.source):
+                return False
+
+        if 'chunks' in self._item1 and 'chunks' in self._item2:
+            return self._content_equal(chunk_iterator1, chunk_iterator2)
+
+        return True
+
+    def _link_string(self):
+        if self._item1.get('deleted'):
+            return 'added link'
+        if self._item2.get('deleted'):
+            return 'removed link'
+        if 'source' in self._item1 and 'source' in self._item2 and self._item1.source != self._item2.source:
+            return 'changed link'
+
+    def _content_string(self):
+        if self._item1.get('deleted'):
+            return ('added {:>13}'.format(format_file_size(self._item2.get_size())))
+        if self._item2.get('deleted'):
+            return ('removed {:>11}'.format(format_file_size(self._item1.get_size())))
+        if not self._can_compare_chunk_ids:
+            return 'modified'
+        chunk_ids1 = {c.id for c in self._item1.chunks}
+        chunk_ids2 = {c.id for c in self._item2.chunks}
+        added_ids = chunk_ids2 - chunk_ids1
+        removed_ids = chunk_ids1 - chunk_ids2
+        added = self._item2.get_size(consider_ids=added_ids)
+        removed = self._item1.get_size(consider_ids=removed_ids)
+        return ('{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
+                                     format_file_size(-removed, precision=1, sign=True)))
+
+    def _dir_string(self):
+        if self._item2.get('deleted') and not self._item1.get('deleted'):
+            return 'removed directory'
+        if self._item1.get('deleted') and not self._item2.get('deleted'):
+            return 'added directory'
+
+    def _owner_string(self):
+        u_attr, g_attr = ('uid', 'gid') if self._numeric_owner else ('user', 'group')
+        u1, g1 = self._item1.get(u_attr), self._item1.get(g_attr)
+        u2, g2 = self._item2.get(u_attr), self._item2.get(g_attr)
+        if (u1, g1) != (u2, g2):
+            return '[{}:{} -> {}:{}]'.format(u1, g1, u2, g2)
+
+    def _mode_string(self):
+        if 'mode' in self._item1 and 'mode' in self._item2 and self._item1.mode != self._item2.mode:
+            return '[{} -> {}]'.format(stat.filemode(self._item1.mode), stat.filemode(self._item2.mode))
+
+    def _content_equal(self, chunk_iterator1, chunk_iterator2):
+        if self._can_compare_chunk_ids:
+            return self._item1.chunks == self._item2.chunks
+        if self._item1.get_size() != self._item2.get_size():
+            return False
+        return ItemDiff._chunk_content_equal(chunk_iterator1, chunk_iterator2)
+
+    @staticmethod
+    def _chunk_content_equal(chunks1, chunks2):
+        """
+        Compare chunk content and return True if they are identical.
+
+        The chunks must be given as chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`).
+        """
+
+        end = object()
+        alen = ai = 0
+        blen = bi = 0
+        while True:
+            if not alen - ai:
+                a = next(chunks1, end)
+                if a is end:
+                    return not blen - bi and next(chunks2, end) is end
+                a = memoryview(a)
+                alen = len(a)
+                ai = 0
+            if not blen - bi:
+                b = next(chunks2, end)
+                if b is end:
+                    return not alen - ai and next(chunks1, end) is end
+                b = memoryview(b)
+                blen = len(b)
+                bi = 0
+            slicelen = min(alen - ai, blen - bi)
+            if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
+                return False
+            ai += slicelen
+            bi += slicelen

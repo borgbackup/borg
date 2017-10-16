@@ -108,23 +108,10 @@ Are there other known limitations?
   An easy workaround is to create multiple archives with less items each.
   See also the :ref:`archive_limitation` and :issue:`1452`.
 
-Why is my backup bigger than with attic?
-----------------------------------------
+  :ref:`borg_info` shows how large (relative to the maximum size) existing
+  archives are.
 
-Attic was rather unflexible when it comes to compression, it always
-compressed using zlib level 6 (no way to switch compression off or
-adjust the level or algorithm).
-
-The default in Borg is lz4, which is fast enough to not use significant CPU time
-in most cases, but can only achieve modest compression. It still compresses
-easily compressed data fairly well.
-
-zlib compression with all levels (1-9) as well as LZMA (1-6) are available
-as well, for cases where they are worth it.
-
-Which choice is the best option depends on a number of factors, like
-bandwidth to the repository, how well the data compresses, available CPU
-power and so on.
+.. _checkpoints_parts:
 
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
@@ -165,6 +152,21 @@ really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
+How can I backup huge file(s) over a unstable connection?
+---------------------------------------------------------
+
+This is not a problem anymore.
+
+For more details, see :ref:`checkpoints_parts`.
+
+How can I restore huge file(s) over an unstable connection?
+-----------------------------------------------------------
+
+If you cannot manage to extract the whole big file in one go, you can extract
+all the part files and manually concatenate them together.
+
+For more details, see :ref:`checkpoints_parts`.
+
 Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
 ---------------------------------------------------------------------------------------
 
@@ -186,6 +188,102 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
+Can I use Borg on SMR hard drives?
+----------------------------------
+
+SMR (shingled magnetic recording) hard drives are very different from
+regular hard drives. Applications have to behave in certain ways or
+performance will be heavily degraded.
+
+Borg 1.1 ships with default settings suitable for SMR drives,
+and has been successfully tested on *Seagate Archive v2* drives
+using the ext4 file system.
+
+Some Linux kernel versions between 3.19 and 4.5 had various bugs
+handling device-managed SMR drives, leading to IO errors, unresponsive
+drives and unreliable operation in general.
+
+For more details, refer to :issue:`2252`.
+
+.. _faq-integrityerror:
+
+I get an IntegrityError or similar - what now?
+----------------------------------------------
+
+A single error does not necessarily indicate bad hardware or a Borg
+bug. All hardware exhibits a bit error rate (BER). Hard drives are typically
+specified as exhibiting less than one error every 12 to 120 TB
+(one bit error in 10e14 to 10e15 bits). The specification is often called
+*unrecoverable read error rate* (URE rate).
+
+Apart from these very rare errors there are two main causes of errors:
+
+(i) Defective hardware: described below.
+(ii) Bugs in software (Borg, operating system, libraries):
+     Ensure software is up to date.
+     Check whether the issue is caused by any fixed bugs described in :ref:`important_notes`.
+
+
+.. rubric:: Finding defective hardware
+
+.. note::
+
+   Hardware diagnostics are operating system dependent and do not
+   apply universally. The commands shown apply for popular Unix-like
+   systems. Refer to your operating system's manual.
+
+Checking hard drives
+  Find the drive containing the repository and use *findmnt*, *mount* or *lsblk*
+  to learn the device path (typically */dev/...*) of the drive.
+  Then, smartmontools can retrieve self-diagnostics of the drive in question::
+
+      # smartctl -a /dev/sdSomething
+
+  The *Offline_Uncorrectable*, *Current_Pending_Sector* and *Reported_Uncorrect*
+  attributes indicate data corruption. A high *UDMA_CRC_Error_Count* usually
+  indicates a bad cable.
+
+  I/O errors logged by the system (refer to the system journal or
+  dmesg) can point to issues as well. I/O errors only affecting the
+  file system easily go unnoticed, since they are not reported to
+  applications (e.g. Borg), while these errors can still corrupt data.
+
+  Drives can corrupt some sectors in one event, while remaining
+  reliable otherwise. Conversely, drives can fail completely with no
+  advance warning. If in doubt, copy all data from the drive in
+  question to another drive -- just in case it fails completely.
+
+  If any of these are suspicious, a self-test is recommended::
+
+      # smartctl -t long /dev/sdSomething
+
+  Running ``fsck`` if not done already might yield further insights.
+
+Checking memory
+  Intermittent issues, such as ``borg check`` finding errors
+  inconsistently between runs, are frequently caused by bad memory.
+
+  Run memtest86+ (or an equivalent memory tester) to verify that
+  the memory subsystem is operating correctly.
+
+Checking processors
+  Processors rarely cause errors. If they do, they are usually overclocked
+  or otherwise operated outside their specifications. We do not recommend to
+  operate hardware outside its specifications for productive use.
+
+  Tools to verify correct processor operation include Prime95 (mprime), linpack,
+  and the `Intel Processor Diagnostic Tool
+  <https://downloadcenter.intel.com/download/19792/Intel-Processor-Diagnostic-Tool>`_
+  (applies only to Intel processors).
+
+.. rubric:: Repairing a damaged repository
+
+With any defective hardware found and replaced, the damage done to the repository
+needs to be ascertained and fixed.
+
+:ref:`borg_check` provides diagnostics and ``--repair`` options for repositories with
+issues. We recommend to first run without ``--repair`` to assess the situation.
+If the found issues and proposed repairs seem right, re-run "check" with ``--repair`` enabled.
 
 Security
 ########
@@ -193,21 +291,100 @@ Security
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
 
-The encryption passphrase can be specified programmatically using the
-`BORG_PASSPHRASE` environment variable. This is convenient when setting up
-automated encrypted backups. Another option is to use
-key file based encryption with a blank passphrase. See
-:ref:`encrypted_repos` for more details.
+There are several ways to specify a passphrase without human intervention:
 
-.. _password_env:
-.. note:: Be careful how you set the environment; using the ``env``
+Setting ``BORG_PASSPHRASE``
+  The passphrase can be specified using the ``BORG_PASSPHRASE`` enviroment variable.
+  This is often the simplest option, but can be insecure if the script that sets it
+  is world-readable.
+
+  .. _password_env:
+  .. note:: Be careful how you set the environment; using the ``env``
           command, a ``system()`` call or using inline shell scripts
+          (e.g. ``BORG_PASSPHRASE=hunter12 borg ...``)
           might expose the credentials in the process list directly
           and they will be readable to all users on a system. Using
           ``export`` in a shell script file should be safe, however, as
           the environment of a process is `accessible only to that
           user
           <https://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
+
+Using ``BORG_PASSCOMMAND`` with a properly permissioned file
+  Another option is to create a file with a password in it in your home
+  directory and use permissions to keep anyone else from reading it. For
+  example, first create a key::
+
+    head -c 1024 /dev/urandom | base64 > ~/.borg-passphrase
+    chmod 400 ~/.borg-passphrase
+
+  Then in an automated script one can put::
+
+    export BORG_PASSCOMMAND="cat ~/.borg-passphrase"
+
+  and Borg will automatically use that passphrase.
+
+Using keyfile-based encryption with a blank passphrase
+  It is possible to encrypt your repository in ``keyfile`` mode instead of the default
+  ``repokey`` mode and use a blank passphrase for the key file. See :ref:`encrypted_repos`
+  for more details.
+
+Using ``BORG_PASSCOMMAND`` with macOS Keychain
+  macOS has a native manager for secrets (such as passphrases) which is safer
+  than just using a file as it is encrypted at rest and unlocked manually
+  (fortunately, the login keyring automatically unlocks when you login). With
+  the built-in ``security`` command, you can access it from the command line,
+  making it useful for ``BORG_PASSCOMMAND``.
+
+  First generate a passphrase and use ``security`` to save it to your login
+  (default) keychain::
+
+    security add-generic-password -D secret -U -a $USER -s borg-passphrase -w $(head -c 1024 /dev/urandom | base64)
+
+  In your backup script retrieve it in the ``BORG_PASSCOMMAND``::
+
+    export BORG_PASSCOMMAND="security find-generic-password -a $USER -s borg-passphrase -w"
+
+Using ``BORG_PASSCOMMAND`` with GNOME Keyring
+  GNOME also has a keyring daemon that can be used to store a Borg passphrase.
+  First ensure ``libsecret-tools``, ``gnome-keyring`` and ``libpam-gnome-keyring``
+  are installed. If ``libpam-gnome-keyring`` wasn't already installed, ensure it
+  runs on login::
+
+    sudo sh -c "echo session optional pam_gnome_keyring.so auto_start >> /etc/pam.d/login"
+    sudo sh -c "echo password optional pam_gnome_keyring.so >> /etc/pam.d/passwd"
+    # you may need to relogin afterwards to activate the login keyring
+
+  Then add a secret to the login keyring::
+
+    head -c 1024 /dev/urandom | base64 | secret-tool store borg-repository repo-name --label="Borg Passphrase"
+
+  If a dialog box pops up prompting you to pick a password for a new keychain, use your
+  login password. If there is a checkbox for automatically unlocking on login, check it
+  to allow backups without any user intervention whatsoever.
+
+  Once the secret is saved, retrieve it in a backup script using ``BORG_PASSCOMMAND``::
+
+    export BORG_PASSCOMMAND="secret-tool lookup borg-repository repo-name"
+
+  .. note:: For this to automatically unlock the keychain it must be run
+    in the ``dbus`` session of an unlocked terminal; for example, running a backup
+    script as a ``cron`` job might not work unless you also ``export DISPLAY=:0``
+    so ``secret-tool`` can pick up your open session. `It gets even more complicated`__
+    when you are running the tool as a different user (e.g. running a backup as root
+    with the password stored in the user keyring).
+
+__ https://github.com/borgbackup/borg/pull/2837#discussion_r127641330
+
+Using ``BORG_PASSCOMMAND`` with KWallet
+  KDE also has a keychain feature in the form of KWallet. The command-line tool
+  ``kwalletcli`` can be used to store and retrieve secrets. Ensure ``kwalletcli``
+  is installed, generate a passphrase, and store it in your "wallet"::
+
+    head -c 1024 /dev/urandom | base64 | kwalletcli -Pe borg-passphrase -f Passwords
+
+  Once the secret is saved, retrieve it in a backup script using ``BORG_PASSCOMMAND``::
+
+    export BORG_PASSCOMMAND="kwalletcli -e borg-passphrase -f Passwords"
 
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------
@@ -273,12 +450,12 @@ Thus:
 - have media at another place
 - have a relatively recent backup on your media
 
-How do I report security issue with |project_name|?
----------------------------------------------------
+How do I report a security issue with Borg?
+-------------------------------------------
 
-Send a private email to the :ref:`security-contact` if you think you
-have discovered a security issue. Please disclose security issues
-responsibly.
+Send a private email to the :ref:`security contact <security-contact>`
+if you think you have discovered a security issue.
+Please disclose security issues responsibly.
 
 Common issues
 #############
@@ -306,7 +483,7 @@ yet noticed on the server. Try these settings:
     ClientAliveCountMax 3
 
 If you have multiple borg create ... ; borg create ... commands in a already
-serialized way in a single script, you need to give them --lock-wait N (with N
+serialized way in a single script, you need to give them ``--lock-wait N`` (with N
 being a bit more than the time the server needs to terminate broken down
 connections and release the lock).
 
@@ -342,16 +519,13 @@ This has some pros and cons, though:
 
 The long term plan to improve this is called "borgception", see :issue:`474`.
 
-How can I backup huge file(s) over a unstable connection?
----------------------------------------------------------
+Can I backup my root partition (/) with Borg?
+---------------------------------------------
 
-This is not a problem any more, see previous FAQ item.
-
-How can I restore huge file(s) over a unstable connection?
-----------------------------------------------------------
-
-If you can not manage to extract the whole big file in one go, you can extract
-all the part files (see above) and manually concatenate them together.
+Backing up your entire root partition works just fine, but remember to
+exclude directories that make no sense to backup, such as /dev, /proc,
+/sys, /tmp and /run, and to use ``--one-file-system`` if you only want to
+backup the root partition (and not any mounted devices e.g.).
 
 If it crashes with a UnicodeError, what can I do?
 -------------------------------------------------
@@ -374,8 +548,8 @@ If you run into that, try this:
 
 .. _a_status_oddity:
 
-I am seeing 'A' (added) status for a unchanged file!?
------------------------------------------------------
+I am seeing 'A' (added) status for an unchanged file!?
+------------------------------------------------------
 
 The files cache is used to determine whether |project_name| already
 "knows" / has backed up a file and if so, to skip the file from
@@ -441,15 +615,19 @@ If the directory where you mount a filesystem is different every time,
 Is there a way to limit bandwidth with |project_name|?
 ------------------------------------------------------
 
-There is no command line option to limit bandwidth with |project_name|, but
-bandwidth limiting can be accomplished with pipeviewer_:
+To limit upload (i.e. :ref:`borg_create`) bandwidth, use the
+``--remote-ratelimit`` option.
+
+There is no built-in way to limit *download*
+(i.e. :ref:`borg_extract`) bandwidth, but limiting download bandwidth
+can be accomplished with pipeviewer_:
 
 Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
 
-    #!/bin/bash
+    #!/bin/sh
         ## -q, --quiet              do not output any transfer information at all
         ## -L, --rate-limit RATE    limit transfer to RATE bytes per second
-    export RATE=307200
+    RATE=307200
     pv -q -L $RATE  | "$@"
 
 Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::
@@ -481,6 +659,53 @@ maybe open an issue in their issue tracker. Do not file an issue in the
 
 If you can reproduce the issue with the proven filesystem, please file an
 issue in the |project_name| issue tracker about that.
+
+
+Why does running 'borg check --repair' warn about data loss?
+------------------------------------------------------------
+
+Repair usually works for recovering data in a corrupted archive. However,
+it's impossible to predict all modes of corruption. In some very rare
+instances, such as malfunctioning storage hardware, additional repo
+corruption may occur. If you can't afford to lose the repo, it's strongly
+recommended that you perform repair on a copy of the repo.
+
+In other words, the warning is there to emphasize that |project_name|:
+  - Will perform automated routines that modify your backup repository
+  - Might not actually fix the problem you are experiencing
+  - Might, in very rare cases, further corrupt your repository
+
+In the case of malfunctioning hardware, such as a drive or USB hub
+corrupting data when read or written, it's best to diagnose and fix the
+cause of the initial corruption before attempting to repair the repo. If
+the corruption is caused by a one time event such as a power outage,
+running `borg check --repair` will fix most problems.
+
+
+Why isn't there more progress / ETA information displayed?
+----------------------------------------------------------
+
+Some borg runs take quite a bit, so it would be nice to see a progress display,
+maybe even including a ETA (expected time of "arrival" [here rather "completion"]).
+
+For some functionality, this can be done: if the total amount of work is more or
+less known, we can display progress. So check if there is a ``--progress`` option.
+
+But sometimes, the total amount is unknown (e.g. for ``borg create`` we just do
+a single pass over the filesystem, so we do not know the total file count or data
+volume before reaching the end). Adding another pass just to determine that would
+take additional time and could be incorrect, if the filesystem is changing.
+
+Even if the fs does not change and we knew count and size of all files, we still
+could not compute the ``borg create`` ETA as we do not know the amount of changed
+chunks, how the bandwidth of source and destination or system performance might
+fluctuate.
+
+You see, trying to display ETA would be futile. The borg developers prefer to
+rather not implement progress / ETA display than doing futile attempts.
+
+See also: https://xkcd.com/612/
+
 
 Miscellaneous
 #############
@@ -533,6 +758,9 @@ Borg intends to be:
     or without warning. allow compatibility breaking for other cases.
   * if major version number changes, it may have incompatible changes
 
+Migrating from Attic
+####################
+
 What are the differences between Attic and Borg?
 ------------------------------------------------
 
@@ -543,8 +771,9 @@ Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
 Here's a (incomplete) list of some major changes:
 
+* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_),
+  including critical data corruption bugs and security issues.
 * more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
-* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_)
 * less chunk management overhead (less memory and disk usage for chunks index)
 * faster remote cache resync (useful when backing up multiple machines into same repo)
 * compression: no, lz4, zlib or lzma compression, adjustable compression levels
@@ -555,9 +784,53 @@ Here's a (incomplete) list of some major changes:
 * uses fadvise to not spoil / blow up the fs cache
 * better error messages / exception handling
 * better logging, screen output, progress indication
-* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, Mac OS X
+* tested on misc. Linux systems, 32 and 64bit, FreeBSD, OpenBSD, NetBSD, macOS
 
 Please read the :ref:`changelog` (or ``docs/changes.rst`` in the source distribution) for more
 information.
 
-Borg is not compatible with original attic (but there is a one-way conversion).
+Borg is not compatible with original Attic (but there is a one-way conversion).
+
+How do I migrate from Attic to Borg?
+------------------------------------
+
+Use :ref:`borg_upgrade`. This is a one-way process that cannot be reversed.
+
+There are some caveats:
+
+- The upgrade can only be performed on local repositories.
+  It cannot be performed on remote repositories.
+
+- If the repository is in "keyfile" encryption mode, the keyfile must
+  exist locally or it must be manually moved after performing the upgrade:
+
+  1. Locate the repository ID, contained in the ``config`` file in the repository.
+  2. Locate the attic key file at ``~/.attic/keys/``. The correct key for the
+     repository starts with the line ``ATTIC_KEY <repository id>``.
+  3. Copy the attic key file to ``~/.config/borg/keys/``
+  4. Change the first line from ``ATTIC_KEY ...`` to ``BORG_KEY ...``.
+  5. Verify that the repository is now accessible (e.g. ``borg list <repository>``).
+- Attic and Borg use different :ref:`"chunker params" <chunker-params>`.
+  This means that data added by Borg won't deduplicate with the existing data
+  stored by Attic. The effect is lessened if the files cache is used with Borg.
+- Repositories in "passphrase" mode *must* be migrated to "repokey" mode using
+  :ref:`borg_key_migrate-to-repokey`. Borg does not support the "passphrase" mode
+  any other way.
+
+Why is my backup bigger than with attic?
+----------------------------------------
+
+Attic was rather unflexible when it comes to compression, it always
+compressed using zlib level 6 (no way to switch compression off or
+adjust the level or algorithm).
+
+The default in Borg is lz4, which is fast enough to not use significant CPU time
+in most cases, but can only achieve modest compression. It still compresses
+easily compressed data fairly well.
+
+zlib compression with all levels (1-9) as well as LZMA (1-6) are available
+as well, for cases where they are worth it.
+
+Which choice is the best option depends on a number of factors, like
+bandwidth to the repository, how well the data compresses, available CPU
+power and so on.

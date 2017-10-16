@@ -19,7 +19,7 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 ``ssh://user@host:port/path/to/repo`` - same, alternative syntax, port can be given
 
 
-**Remote repositories with relative pathes** can be given using this syntax:
+**Remote repositories with relative paths** can be given using this syntax:
 
 ``user@host:path/to/repo`` - path relative to current directory
 
@@ -31,7 +31,7 @@ Note: giving ``user@host:/./path/to/repo`` or ``user@host:/~/path/to/repo`` or
 ``user@host:/~other/path/to/repo`` is also supported, but not required here.
 
 
-**Remote repositories with relative pathes, alternative syntax with port**:
+**Remote repositories with relative paths, alternative syntax with port**:
 
 ``ssh://user@host:port/./path/to/repo`` - path relative to current directory
 
@@ -75,7 +75,7 @@ Type of log output
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want Borg to be mostly silent and only output
 warnings, errors and critical messages, unless output has been requested
-by supplying an option that implies output (eg, --list or --progress).
+by supplying an option that implies output (e.g. ``--list`` or ``--progress``).
 
 Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 
@@ -97,7 +97,7 @@ to get critical level output.
 While you can set misc. log levels, do not expect that every command will
 give different output on different log levels - it's just a possibility.
 
-.. warning:: Options --critical and --error are provided for completeness,
+.. warning:: Options ``--critical`` and ``--error`` are provided for completeness,
              their usage is not recommended as you might miss important information.
 
 Return codes
@@ -105,18 +105,21 @@ Return codes
 
 Borg can exit with the following return codes (rc):
 
-::
-
-    0 = success (logged as INFO)
-    1 = warning (operation reached its normal end, but there were warnings -
-        you should check the log, logged as WARNING)
-    2 = error (like a fatal error, a local or remote exception, the operation
-        did not reach its normal end, logged as ERROR)
-    128+N = killed by signal N (e.g. 137 == kill -9)
+=========== =======
+Return code Meaning
+=========== =======
+0           success (logged as INFO)
+1           warning (operation reached its normal end, but there were warnings --
+            you should check the log, logged as WARNING)
+2           error (like a fatal error, a local or remote exception, the operation
+            did not reach its normal end, logged as ERROR)
+128+N       killed by signal N (e.g. 137 == kill -9)
+=========== =======
 
 If you use ``--show-rc``, the return code is also logged at the indicated
 level as the last log entry.
 
+.. _env_vars:
 
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~
@@ -126,29 +129,38 @@ Borg uses some environment variables for automation:
 General:
     BORG_REPO
         When set, use the value to give the default repository location. If a command needs an archive
-        parameter, you can abbreviate as `::archive`. If a command needs a repository parameter, you
-        can either leave it away or abbreviate as `::`, if a positional parameter is required.
+        parameter, you can abbreviate as ``::archive``. If a command needs a repository parameter, you
+        can either leave it away or abbreviate as ``::``, if a positional parameter is required.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
-        It is used when a passphrase is needed to access a encrypted repo as well as when a new
+        It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
+        See also BORG_NEW_PASSPHRASE.
+    BORG_PASSCOMMAND
+        When set, use the standard output of the command (trailing newlines are stripped) to answer the
+        passphrase question for encrypted repositories.
+        It is used when a passphrase is needed to access an encrypted repo as well as when a new
+        passphrase should be initially set when initializing an encrypted repo.
+        If BORG_PASSPHRASE is also set, it takes precedence.
         See also BORG_NEW_PASSPHRASE.
     BORG_NEW_PASSPHRASE
         When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
-        This variable is checked first. If it is not set, BORG_PASSPHRASE will be checked also.
+        This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
+        be checked.
         Main usecase for this is to fully automate ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
-    BORG_HOSTNAME_IS_UNIQUE=yes
-        Use this to assert that your hostname is unique.
-        Borg will then automatically remove locks that it could determine to be stale.
+    BORG_HOSTNAME_IS_UNIQUE=no
+        Borg assumes that it can derive a unique hostname / identity (see ``borg debug info``).
+        If this is not the case or you do not want Borg to automatically remove stale locks,
+        set this to *no*.
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
         a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options.
     BORG_REMOTE_PATH
-        When set, use the given path/filename as remote path (default is "borg").
+        When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         Using ``--remote-path PATH`` commandline option overrides the environment variable.
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
@@ -203,7 +215,9 @@ Please note:
   (e.g. mode 600, root:root).
 
 
-.. _INI: https://docs.python.org/3.4/library/logging.config.html#configuration-file-format
+.. _INI: https://docs.python.org/3.5/library/logging.config.html#configuration-file-format
+
+.. _file-systems:
 
 File systems
 ~~~~~~~~~~~~
@@ -219,8 +233,18 @@ this with some hardware -- independent of the software used. We don't
 know a list of affected hardware.
 
 If you are suspicious whether your Borg repository is still consistent
-and readable after one of the failures mentioned above occured, run
+and readable after one of the failures mentioned above occurred, run
 ``borg check --verify-data`` to make sure it is consistent.
+
+.. rubric:: Requirements for Borg repository file systems
+
+- Long file names
+- At least three directory levels with short names
+- Typically, file sizes up to a few hundred MB.
+  Large repositories may require large files (>2 GB).
+- Up to 1000 files per directory (10000 for repositories initialized with Borg 1.0)
+- mkdir(2) should be atomic, since it is used for locking
+- Hardlinks are needed for :ref:`borg_upgrade` ``--inplace``
 
 Units
 ~~~~~
@@ -325,8 +349,73 @@ Cache files (client only):
 
 Network (only for client/server operation):
     If your repository is remote, all deduplicated (and optionally compressed/
-    encrypted) data of course has to go over the connection (ssh: repo url).
+    encrypted) data of course has to go over the connection (``ssh://`` repo url).
     If you use a locally mounted network filesystem, additionally some copy
     operations used for transaction support also go over the connection. If
     you backup multiple sources to one target repository, additional traffic
     happens for cache resynchronization.
+
+.. _platforms:
+
+Support for file metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Besides regular file and directory structures, Borg can preserve
+
+* symlinks (stored as symlink, the symlink is not followed)
+* special files:
+
+  * character and block device files (restored via mknod)
+  * FIFOs ("named pipes")
+  * special file *contents* can be backed up in ``--read-special`` mode.
+    By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
+* hardlinked regular files, devices, FIFOs (considering all items in the same archive)
+* timestamps in nanosecond precision: mtime, atime, ctime
+* permissions:
+
+  * IDs of owning user and owning group
+  * names of owning user and owning group (if the IDs can be resolved)
+  * Unix Mode/Permissions (u/g/o permissions, suid, sgid, sticky)
+
+On some platforms additional features are supported:
+
+.. Yes/No's are grouped by reason/mechanism/reference.
+
++------------------+----------+-----------+------------+
+| Platform         | ACLs     | xattr     | Flags      |
+|                  | [#acls]_ | [#xattr]_ | [#flags]_  |
++==================+==========+===========+============+
+| Linux            | Yes      | Yes       | Yes [1]_   |
++------------------+----------+-----------+------------+
+| Mac OS X         | Yes      | Yes       | Yes (all)  |
++------------------+----------+-----------+            |
+| FreeBSD          | Yes      | Yes       |            |
++------------------+----------+-----------+            |
+| OpenBSD          | n/a      | n/a       |            |
++------------------+----------+-----------+            |
+| NetBSD           | n/a      | No [2]_   |            |
++------------------+----------+-----------+------------+
+| Solaris 11       | No [3]_              | n/a        |
++------------------+                      |            |
+| OpenIndiana      |                      |            |
++------------------+----------+-----------+------------+
+| Windows (cygwin) | No [4]_  | No        | No         |
++------------------+----------+-----------+------------+
+
+Other Unix-like operating systems may work as well, but have not been tested at all.
+
+Note that most of the platform-dependent features also depend on the file system.
+For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
+
+.. [1] Only "nodump", "immutable", "compressed" and "append" are supported.
+    Feature request :issue:`618` for more flags.
+.. [2] Feature request :issue:`1332`
+.. [3] Feature request :issue:`1337`
+.. [4] Cygwin tries to map NTFS ACLs to permissions with varying degress of success.
+
+.. [#acls] The native access control list mechanism of the OS. This normally limits access to
+    non-native ACLs. For example, NTFS ACLs aren't completely accessible on Linux with ntfs-3g.
+.. [#xattr] extended attributes; key-value pairs attached to a file, mainly used by the OS.
+    This includes resource forks on Mac OS X.
+.. [#flags] aka *BSD flags*. The Linux set of flags [1]_ is portable across platforms.
+    The BSDs define additional flags.

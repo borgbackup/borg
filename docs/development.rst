@@ -17,7 +17,7 @@ Contributions
 
 Some guidance for contributors:
 
-- discuss about changes on github issue tracker, IRC or mailing list
+- discuss changes on the GitHub issue tracker, on IRC or on the mailing list
 
 - make your PRs on the ``master`` branch (see `Branching Model`_ for details)
 
@@ -29,9 +29,9 @@ Some guidance for contributors:
   - if you need to fix something after commit/push:
 
     - if there are ongoing reviews: do a fixup commit you can
-      merge into the bad commit later.
+      squash into the bad commit later.
     - if there are no ongoing reviews or you did not push the
-      bad commit yet: edit the commit to include your fix or
+      bad commit yet: amend the commit to include your fix or
       merge the fixup commit before pushing.
   - have a nice, clear, typo-free commit comment
   - if you fixed an issue, refer to it in your commit comment
@@ -39,9 +39,9 @@ Some guidance for contributors:
 
 - if you write new code, please add tests and docs for it
 
-- run the tests, fix anything that comes up
+- run the tests, fix any issues that come up
 
-- make a pull request on github
+- make a pull request on GitHub
 
 - wait for review by other developers
 
@@ -52,15 +52,15 @@ Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup :ref:`mailing_list` to the maintainers).
 
-Stable releases are maintained on maintenance branches named x.y-maint, eg.
-the maintenance branch of the 1.0.x series is 1.0-maint.
+Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
+the maintenance branch of the 1.0.x series is ``1.0-maint``.
 
-Most PRs should be made against the ``master`` branch. Only if an
+Most PRs should be filed against the ``master`` branch. Only if an
 issue affects **only** a particular maintenance branch a PR should be
-made against it directly.
+filed against it directly.
 
 While discussing / reviewing a PR it will be decided whether the
-change should be applied to maintenance branch(es). Each maintenance
+change should be applied to maintenance branches. Each maintenance
 branch has a corresponding *backport/x.y-maint* label, which will then
 be applied.
 
@@ -81,8 +81,20 @@ were collected:
 2. Branch a backporting branch off the maintenance branch.
 3. Cherry pick and backport the changes from each labelled PR, remove
    the label for each PR you've backported.
+
+   To preserve authorship metadata, do not follow the ``git cherry-pick``
+   instructions to use ``git commit`` after resolving conflicts. Instead,
+   stage conflict resolutions and run ``git cherry-pick --continue``,
+   much like using ``git rebase``.
+
+   To avoid merge issues (a cherry pick is a form of merge), use
+   these options (similar to the ``git merge`` options used previously,
+   the ``-x`` option adds a reference to the original commit)::
+
+     git cherry-pick --strategy recursive -X rename-threshold=5% -x
+
 4. Make a PR of the backporting branch against the maintenance branch
-   for backport review. Mention the backported PRs in this PR, eg:
+   for backport review. Mention the backported PRs in this PR, e.g.:
 
        Includes changes from #2055 #2057 #2381
 
@@ -101,7 +113,7 @@ troublesome due to merges growing more conflict-heavy and error-prone.
 Code and issues
 ---------------
 
-Code is stored on Github, in the `Borgbackup organization
+Code is stored on GitHub, in the `Borgbackup organization
 <https://github.com/borgbackup/borg/>`_. `Issues
 <https://github.com/borgbackup/borg/issues>`_ and `pull requests
 <https://github.com/borgbackup/borg/pulls>`_ should be sent there as
@@ -170,7 +182,7 @@ Some more advanced examples::
   # verify a changed tox.ini (run this after any change to tox.ini):
   fakeroot -u tox --recreate
 
-  fakeroot -u tox -e py34  # run all tests, but only on python 3.4
+  fakeroot -u tox -e py35  # run all tests, but only on python 3.5
 
   fakeroot -u tox borg.testsuite.locking  # only run 1 test module
 
@@ -182,6 +194,21 @@ Important notes:
 
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
+
+Running more checks using coala
+-------------------------------
+
+First install coala and some checkers ("bears"):
+
+  pip install -r requirements.d/coala.txt
+
+You can now run coala from the toplevel directory; it will read its settings
+from ``.coafile`` there:
+
+  coala
+
+Some bears have additional requirements and they usually tell you about
+them in case they are missing.
 
 Documentation
 -------------
@@ -195,7 +222,7 @@ parsers declared in the program and their documentation, which is
 embedded in the program (see archiver.py). These are committed to git
 for easier use by packagers downstream.
 
-When a command is added, a commandline flag changed, added or removed,
+When a command is added, a command line flag changed, added or removed,
 the usage docs need to be rebuilt as well::
 
   python setup.py build_usage
@@ -205,20 +232,15 @@ However, we prefer to do this as part of our :ref:`releasing`
 preparations, so it is generally not necessary to update these when
 submitting patches that change something about the command line.
 
-The code documentation (which is currently not part of the released
-docs) also uses a generated file (``docs/api.rst``), that needs to be
-updated when a module is added or removed::
-
-  python setup.py build_api
-
 Building the docs with Sphinx
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The documentation (in reStructuredText format, .rst) is in docs/.
 
-To build the html version of it, you need to have sphinx installed::
+To build the html version of it, you need to have Sphinx installed
+(in your Borg virtualenv with Python 3)::
 
-  pip3 install sphinx sphinx_rtd_theme  # important: this will install sphinx with Python 3
+  pip install -r requirements.d/docs.txt
 
 Now run::
 
@@ -227,7 +249,7 @@ Now run::
 
 Then point a web browser at docs/_build/html/index.html.
 
-The website is updated automatically through Github web hooks on the
+The website is updated automatically by ReadTheDocs through GitHub web hooks on the
 main repository.
 
 Using Vagrant
@@ -239,10 +261,14 @@ standalone binaries for various platforms.
 For better security, there is no automatic sync in the VM to host direction.
 The plugin `vagrant-scp` is useful to copy stuff from the VMs to the host.
 
+The "windows10" box requires the `reload` plugin (``vagrant plugin install vagrant-reload``).
+
 Usage::
 
    # To create and provision the VM:
    vagrant up OS
+   # same, but use 6 VM cpus and 12 workers for pytest:
+   VMCPUS=6 XDISTN=12 vagrant up OS
    # To create an ssh session to the VM:
    vagrant ssh OS
    # To execute a command via ssh in the VM:
@@ -274,15 +300,6 @@ If you encounter issues, see also our `Vagrantfile` for details.
           without external dependencies.
 
 
-Merging maintenance branches
-----------------------------
-
-As mentioned above bug fixes will usually be merged into a maintenance branch (x.y-maint) and then
-merged back into the master branch. Large diffs between these branches can make automatic merges troublesome,
-therefore we recommend to use these merge parameters::
-
-  git merge 1.0-maint -s recursive -X rename-threshold=20%
-
 .. _releasing:
 
 Creating a new release
@@ -297,7 +314,10 @@ Checklist:
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
 - check version number of upcoming release in ``CHANGES.rst``
 - verify that ``MANIFEST.in`` and ``setup.py`` are complete
-- ``python setup.py build_api ; python setup.py build_usage ; python setup.py build_man`` and commit
+- ``python setup.py build_usage ; python setup.py build_man`` and
+  commit (be sure to build with Python 3.5 as Python 3.6 added `more
+  guaranteed hashing algorithms
+  <https://github.com/borgbackup/borg/issues/2123>`_)
 - tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
@@ -307,8 +327,8 @@ Checklist:
     git clone borg borg-clean
 
   This makes sure no uncommitted files get into the release archive.
-  It also will find if you forgot to commit something that is needed.
-  It also makes sure the vagrant machines only get committed files and
+  It will also reveal uncommitted required files.
+  Moreover, it makes sure the vagrant machines only get committed files and
   do a fresh start based on that.
 - run tox and/or binary builds on all supported platforms via vagrant,
   check for test failures
@@ -316,14 +336,14 @@ Checklist:
 
     python setup.py register sdist upload --identity="Thomas Waldmann" --sign
 
-- close release milestone on Github
+- close the release milestone on GitHub
 - announce on:
 
  - Mailing list
- - Twitter (follow @ThomasJWaldmann for these tweets)
+ - Twitter
  - IRC channel (change ``/topic``)
 
-- create a Github release, include:
+- create a GitHub release, include:
 
   * standalone binaries (see above for how to create them)
 

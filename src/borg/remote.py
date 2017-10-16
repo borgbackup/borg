@@ -1,39 +1,45 @@
 import errno
-import fcntl
 import functools
 import inspect
+import json
 import logging
 import os
 import select
 import shlex
+import shutil
+import struct
 import sys
 import tempfile
-import time
-import traceback
 import textwrap
 import time
+import traceback
 from subprocess import Popen, PIPE
 
 import msgpack
 
 from . import __version__
+from .compress import LZ4
+from .constants import *  # NOQA
 from .helpers import Error, IntegrityError
-from .helpers import get_home_dir
-from .helpers import sysinfo
 from .helpers import bin_to_hex
+from .helpers import get_home_dir
+from .helpers import get_limited_unpacker
+from .helpers import hostname_is_unique
 from .helpers import replace_placeholders
-from .helpers import yes
-from .repository import Repository, MAX_OBJECT_SIZE, LIST_SCAN_LIMIT
+from .helpers import sysinfo
+from .helpers import format_file_size
+from .helpers import truncate_and_unlink
+from .helpers import prepare_subprocess_env
+from .logger import create_logger, setup_logging
+from .repository import Repository
 from .version import parse_version, format_version
-from .logger import create_logger
+from .algorithms.checksums import xxh64
 
 logger = create_logger(__name__)
 
 RPC_PROTOCOL_VERSION = 2
 BORG_VERSION = parse_version(__version__)
 MSGID, MSG, ARGS, RESULT = b'i', b'm', b'a', b'r'
-
-BUFSIZE = 10 * 1024 * 1024
 
 MAX_INFLIGHT = 100
 
@@ -42,6 +48,8 @@ RATELIMIT_PERIOD = 0.1
 
 def os_write(fd, data):
     """os.write wrapper so we do not lose data for partial writes."""
+    # TODO: this issue is fixed in cygwin since at least 2.8.0, remove this
+    #       wrapper / workaround when this version is considered ancient.
     # This is happening frequently on cygwin due to its small pipe buffer size of only 64kiB
     # and also due to its different blocking pipe behaviour compared to Linux/*BSD.
     # Neither Linux nor *BSD ever do partial writes on blocking pipes, unless interrupted by a
@@ -57,27 +65,6 @@ def os_write(fd, data):
     return amount
 
 
-def get_limited_unpacker(kind):
-    """return a limited Unpacker because we should not trust msgpack data received from remote"""
-    args = dict(use_list=False,  # return tuples, not lists
-                max_bin_len=0,  # not used
-                max_ext_len=0,  # not used
-                max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE),
-                max_str_len=MAX_OBJECT_SIZE,  # a chunk or other repo object
-                )
-    if kind == 'server':
-        args.update(dict(max_array_len=100,  # misc. cmd tuples
-                         max_map_len=100,  # misc. cmd dicts
-                         ))
-    elif kind == 'client':
-        args.update(dict(max_array_len=LIST_SCAN_LIMIT,  # result list from repo.list() / .scan()
-                         max_map_len=100,  # misc. result dicts
-                         ))
-    else:
-        raise ValueError('kind must be "server" or "client"')
-    return msgpack.Unpacker(**args)
-
-
 class ConnectionClosed(Error):
     """Connection closed by remote host"""
 
@@ -87,7 +74,7 @@ class ConnectionClosedWithHint(ConnectionClosed):
 
 
 class PathNotAllowed(Error):
-    """Repository path not allowed"""
+    """Repository path not allowed: {}"""
 
 
 class InvalidRPCMethod(Error):
@@ -178,10 +165,16 @@ class RepositoryServer:  # pragma: no cover
         'inject_exception',
     )
 
-    def __init__(self, restrict_to_paths, append_only):
+    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
+        self.restrict_to_repositories = restrict_to_repositories
+        # This flag is parsed from the serve command line via Archiver.do_serve,
+        # i.e. it reflects local system policy and generally ranks higher than
+        # whatever the client wants, except when initializing a new repository
+        # (see RepositoryServer.open below).
         self.append_only = append_only
+        self.storage_quota = storage_quota
         self.client_version = parse_version('1.0.8')  # fallback version if client is too old to send version information
 
     def positional_to_named(self, method, argv):
@@ -197,15 +190,9 @@ class RepositoryServer:  # pragma: no cover
         stdin_fd = sys.stdin.fileno()
         stdout_fd = sys.stdout.fileno()
         stderr_fd = sys.stdout.fileno()
-        # Make stdin non-blocking
-        fl = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
-        fcntl.fcntl(stdin_fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-        # Make stdout blocking
-        fl = fcntl.fcntl(stdout_fd, fcntl.F_GETFL)
-        fcntl.fcntl(stdout_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
-        # Make stderr blocking
-        fl = fcntl.fcntl(stderr_fd, fcntl.F_GETFL)
-        fcntl.fcntl(stderr_fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
+        os.set_blocking(stdin_fd, False)
+        os.set_blocking(stdout_fd, True)
+        os.set_blocking(stderr_fd, True)
         unpacker = get_limited_unpacker('server')
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
@@ -248,8 +235,10 @@ class RepositoryServer:  # pragma: no cover
                         if dictFormat:
                             ex_short = traceback.format_exception_only(e.__class__, e)
                             ex_full = traceback.format_exception(*sys.exc_info())
+                            ex_trace = True
                             if isinstance(e, Error):
-                                ex_short = e.get_message()
+                                ex_short = [e.get_message()]
+                                ex_trace = e.traceback
                             if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
                                 # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
                                 # and will be handled just like locally raised exceptions. Suppress the remote traceback
@@ -264,6 +253,7 @@ class RepositoryServer:  # pragma: no cover
                                                     b'exception_args': e.args,
                                                     b'exception_full': ex_full,
                                                     b'exception_short': ex_short,
+                                                    b'exception_trace': ex_trace,
                                                     b'sysinfo': sysinfo()})
                             except TypeError:
                                 msg = msgpack.packb({MSGID: msgid,
@@ -272,6 +262,7 @@ class RepositoryServer:  # pragma: no cover
                                                                         for x in e.args],
                                                     b'exception_full': ex_full,
                                                     b'exception_short': ex_short,
+                                                    b'exception_trace': ex_trace,
                                                     b'sysinfo': sysinfo()})
 
                             os_write(stdout_fd, msg)
@@ -307,8 +298,12 @@ class RepositoryServer:  # pragma: no cover
         if client_data == RPC_PROTOCOL_VERSION:
             return RPC_PROTOCOL_VERSION
         # clients since 1.1.0b3 use a dict as client_data
+        # clients since 1.1.0b6 support json log format from server
         if isinstance(client_data, dict):
             self.client_version = client_data[b'client_version']
+            level = logging.getLevelName(logging.getLogger('').level)
+            setup_logging(is_serve=True, json=True, level=level)
+            logger.debug('Initialized logging system for JSON-based protocol')
         else:
             self.client_version = BORG_VERSION  # seems to be newer than current version (no known old format)
 
@@ -335,19 +330,31 @@ class RepositoryServer:  # pragma: no cover
         logging.debug('Resolving repository path %r', path)
         path = self._resolve_path(path)
         logging.debug('Resolved repository path to %r', path)
+        path_with_sep = os.path.join(path, '')  # make sure there is a trailing slash (os.sep)
         if self.restrict_to_paths:
             # if --restrict-to-path P is given, we make sure that we only operate in/below path P.
-            # for the prefix check, it is important that the compared pathes both have trailing slashes,
+            # for the prefix check, it is important that the compared paths both have trailing slashes,
             # so that a path /foobar will NOT be accepted with --restrict-to-path /foo option.
-            path_with_sep = os.path.join(path, '')  # make sure there is a trailing slash (os.sep)
             for restrict_to_path in self.restrict_to_paths:
                 restrict_to_path_with_sep = os.path.join(os.path.realpath(restrict_to_path), '')  # trailing slash
                 if path_with_sep.startswith(restrict_to_path_with_sep):
                     break
             else:
                 raise PathNotAllowed(path)
+        if self.restrict_to_repositories:
+            for restrict_to_repository in self.restrict_to_repositories:
+                restrict_to_repository_with_sep = os.path.join(os.path.realpath(restrict_to_repository), '')
+                if restrict_to_repository_with_sep == path_with_sep:
+                    break
+            else:
+                raise PathNotAllowed(path)
+        # "borg init" on "borg serve --append-only" (=self.append_only) does not create an append only repo,
+        # while "borg init --append-only" (=append_only) does, regardless of the --append-only (self.append_only)
+        # flag for serve.
+        append_only = (not create and self.append_only) or append_only
         self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock,
-                                     append_only=self.append_only or append_only,
+                                     append_only=append_only,
+                                     storage_quota=self.storage_quota,
                                      exclusive=exclusive)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
@@ -365,7 +372,7 @@ class RepositoryServer:  # pragma: no cover
         elif kind == 'IntegrityError':
             raise IntegrityError(s1)
         elif kind == 'PathNotAllowed':
-            raise PathNotAllowed()
+            raise PathNotAllowed('foo')
         elif kind == 'ObjectNotFound':
             raise Repository.ObjectNotFound(s1, s2)
         elif kind == 'InvalidRPCMethod':
@@ -472,6 +479,10 @@ class RemoteRepository:
                 return self.exception_class
 
         @property
+        def traceback(self):
+            return self.unpacked.get(b'exception_trace', True)
+
+        @property
         def exception_class(self):
             return self.unpacked[b'exception_class'].decode()
 
@@ -510,43 +521,39 @@ class RemoteRepository:
         self.rx_bytes = 0
         self.tx_bytes = 0
         self.to_send = b''
+        self.stderr_received = b''  # incomplete stderr line bytes received (no \n yet)
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
         self.responses = {}
+        self.async_responses = {}
+        self.shutdown_time = None
         self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
         self.unpacker = get_limited_unpacker('client')
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
         self.p = None
         testing = location.host == '__testsuite__'
+        # when testing, we invoke and talk to a borg process directly (no ssh).
+        # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
+        env = prepare_subprocess_env(system=not testing)
         borg_cmd = self.borg_cmd(args, testing)
-        env = dict(os.environ)
         if not testing:
             borg_cmd = self.ssh_cmd(location) + borg_cmd
-            # pyinstaller binary modifies LD_LIBRARY_PATH=/tmp/_ME... but we do not want
-            # that the system's ssh binary picks up (non-matching) libraries from there.
-            # thus we install the original LDLP, before pyinstaller has modified it:
-            lp_key = 'LD_LIBRARY_PATH'
-            lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 has this
-            if lp_orig is not None:
-                env[lp_key] = lp_orig
-            else:
-                env.pop(lp_key, None)
-        env.pop('BORG_PASSPHRASE', None)  # security: do not give secrets to subprocess
-        env['BORG_VERSION'] = __version__
         logger.debug('SSH command line: %s', borg_cmd)
         self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         self.stdin_fd = self.p.stdin.fileno()
         self.stdout_fd = self.p.stdout.fileno()
         self.stderr_fd = self.p.stderr.fileno()
-        fcntl.fcntl(self.stdin_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdin_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        fcntl.fcntl(self.stdout_fd, fcntl.F_SETFL, fcntl.fcntl(self.stdout_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
-        fcntl.fcntl(self.stderr_fd, fcntl.F_SETFL, fcntl.fcntl(self.stderr_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        os.set_blocking(self.stdin_fd, False)
+        os.set_blocking(self.stdout_fd, False)
+        os.set_blocking(self.stderr_fd, False)
         self.r_fds = [self.stdout_fd, self.stderr_fd]
         self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 
         try:
             try:
-                version = self.call('negotiate', {'client_data': {b'client_version': BORG_VERSION}})
+                version = self.call('negotiate', {'client_data': {
+                    b'client_version': BORG_VERSION,
+                }})
             except ConnectionClosed:
                 raise ConnectionClosedWithHint('Is borg working on the server?') from None
             if version == RPC_PROTOCOL_VERSION:
@@ -604,13 +611,14 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             if exc_type is not None:
+                self.shutdown_time = time.monotonic() + 30
                 self.rollback()
         finally:
             # in any case, we want to cleanly close the repo, even if the
             # rollback can not succeed (e.g. because the connection was
             # already closed) and raised another exception:
-            logger.debug('RemoteRepository: %d bytes sent, %d bytes received, %d messages sent',
-                         self.tx_bytes, self.rx_bytes, self.msgid)
+            logger.debug('RemoteRepository: %s bytes sent, %s bytes received, %d messages sent',
+                         format_file_size(self.tx_bytes), format_file_size(self.rx_bytes), self.msgid)
             self.close()
 
     @property
@@ -636,9 +644,29 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 opts.append('--critical')
             else:
                 raise ValueError('log level missing, fix this code')
+
+            # Tell the remote server about debug topics it may need to consider.
+            # Note that debug topics are usable for "spew" or "trace" logs which would
+            # be too plentiful to transfer for normal use, so the server doesn't send
+            # them unless explicitly enabled.
+            #
+            # Needless to say, if you do --debug-topic=repository.compaction, for example,
+            # with a 1.0.x server it won't work, because the server does not recognize the
+            # option.
+            #
+            # This is not considered a problem, since this is a debugging feature that
+            # should not be used for regular use.
+            for topic in args.debug_topics:
+                if '.' not in topic:
+                    topic = 'borg.debug.' + topic
+                if 'repository' in topic:
+                    opts.append('--debug-topic=%s' % topic)
+
+            if 'storage_quota' in args and args.storage_quota:
+                opts.append('--storage-quota=%s' % args.storage_quota)
         env_vars = []
-        if yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', env_msg=None, prompt=False):
-            env_vars.append('BORG_HOSTNAME_IS_UNIQUE=yes')
+        if not hostname_is_unique():
+            env_vars.append('BORG_HOSTNAME_IS_UNIQUE=no')
         if testing:
             return env_vars + [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover
@@ -664,8 +692,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         for resp in self.call_many(cmd, [args], **kw):
             return resp
 
-    def call_many(self, cmd, calls, wait=True, is_preloaded=False):
-        if not calls:
+    def call_many(self, cmd, calls, wait=True, is_preloaded=False, async_wait=True):
+        if not calls and cmd != 'async_responses':
             return
 
         def pop_preload_msgid(chunkid):
@@ -690,8 +718,16 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise IntegrityError('(not available)')
                 else:
                     raise IntegrityError(args[0].decode())
+            elif error == 'AtticRepository':
+                if old_server:
+                    raise Repository.AtticRepository('(not available)')
+                else:
+                    raise Repository.AtticRepository(args[0].decode())
             elif error == 'PathNotAllowed':
-                raise PathNotAllowed()
+                if old_server:
+                    raise PathNotAllowed('(unknown)')
+                else:
+                    raise PathNotAllowed(args[0].decode())
             elif error == 'ObjectNotFound':
                 if old_server:
                     raise Repository.ObjectNotFound('(not available)', self.location.orig)
@@ -708,6 +744,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         calls = list(calls)
         waiting_for = []
         while wait or calls:
+            if self.shutdown_time and time.monotonic() > self.shutdown_time:
+                # we are shutting this RemoteRepository down already, make sure we do not waste
+                # a lot of time in case a lot of async stuff is coming in or remote is gone or slow.
+                logger.debug('shutdown_time reached, shutting down with %d waiting_for and %d async_responses.',
+                             len(waiting_for), len(self.async_responses))
+                return
             while waiting_for:
                 try:
                     unpacked = self.responses.pop(waiting_for[0])
@@ -720,6 +762,22 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             return
                 except KeyError:
                     break
+            if cmd == 'async_responses':
+                while True:
+                    try:
+                        msgid, unpacked = self.async_responses.popitem()
+                    except KeyError:
+                        # there is nothing left what we already have received
+                        if async_wait and self.ignore_responses:
+                            # but do not return if we shall wait and there is something left to wait for:
+                            break
+                        else:
+                            return
+                    else:
+                        if b'exception_class' in unpacked:
+                            handle_error(unpacked)
+                        else:
+                            yield unpacked[RESULT]
             if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
                 w_fds = [self.stdin_fd]
             else:
@@ -749,8 +807,14 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             raise UnexpectedRPCDataFormatFromServer(data)
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
+                            # async methods never return values, but may raise exceptions.
                             if b'exception_class' in unpacked:
-                                handle_error(unpacked)
+                                self.async_responses[msgid] = unpacked
+                            else:
+                                # we currently do not have async result values except "None",
+                                # so we do not add them into async_responses.
+                                if unpacked[RESULT] is not None:
+                                    self.async_responses[msgid] = unpacked
                         else:
                             self.responses[msgid] = unpacked
                 elif fd is self.stderr_fd:
@@ -758,9 +822,16 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     if not data:
                         raise ConnectionClosed()
                     self.rx_bytes += len(data)
-                    data = data.decode('utf-8')
-                    for line in data.splitlines(keepends=True):
-                        handle_remote_line(line)
+                    # deal with incomplete lines (may appear due to block buffering)
+                    if self.stderr_received:
+                        data = self.stderr_received + data
+                        self.stderr_received = b''
+                    lines = data.splitlines(keepends=True)
+                    if lines and not lines[-1].endswith((b'\r', b'\n')):
+                        self.stderr_received = lines.pop()
+                    # now we have complete lines in <lines> and any partial line in self.stderr_received.
+                    for line in lines:
+                        handle_remote_line(line.decode('utf-8'))  # decode late, avoid partial utf-8 sequences
             if w:
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
@@ -799,7 +870,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         # that the fd should be writable
                         if e.errno != errno.EAGAIN:
                             raise
-        self.ignore_responses |= set(waiting_for)
+        self.ignore_responses |= set(waiting_for)  # we lose order here
 
     @api(since=parse_version('1.0.0'),
          append_only={'since': parse_version('1.0.7'), 'previously': False})
@@ -877,12 +948,67 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             self.p.wait()
             self.p = None
 
+    def async_response(self, wait=True):
+        for resp in self.call_many('async_responses', calls=[], wait=True, async_wait=wait):
+            return resp
+
     def preload(self, ids):
         self.preload_ids += ids
 
 
 def handle_remote_line(line):
-    if line.startswith('$LOG '):
+    """
+    Handle a remote log line.
+
+    This function is remarkably complex because it handles multiple wire formats.
+    """
+    assert line.endswith(('\r', '\n'))
+    if line.startswith('{'):
+        # This format is used by Borg since 1.1.0b6 for new-protocol clients.
+        # It is the same format that is exposed by --log-json.
+        msg = json.loads(line)
+
+        if msg['type'] not in ('progress_message', 'progress_percent', 'log_message'):
+            logger.warning('Dropped remote log message with unknown type %r: %s', msg['type'], line)
+            return
+
+        if msg['type'] == 'log_message':
+            # Re-emit log messages on the same level as the remote to get correct log suppression and verbosity.
+            level = getattr(logging, msg['levelname'], logging.CRITICAL)
+            assert isinstance(level, int)
+            target_logger = logging.getLogger(msg['name'])
+            msg['message'] = 'Remote: ' + msg['message']
+            # In JSON mode, we manually check whether the log message should be propagated.
+            if logging.getLogger('borg').json and level >= target_logger.getEffectiveLevel():
+                sys.stderr.write(json.dumps(msg) + '\n')
+            else:
+                target_logger.log(level, '%s', msg['message'])
+        elif msg['type'].startswith('progress_'):
+            # Progress messages are a bit more complex.
+            # First of all, we check whether progress output is enabled. This is signalled
+            # through the effective level of the borg.output.progress logger
+            # (also see ProgressIndicatorBase in borg.helpers).
+            progress_logger = logging.getLogger('borg.output.progress')
+            if progress_logger.getEffectiveLevel() == logging.INFO:
+                # When progress output is enabled, we check whether the client is in
+                # --log-json mode, as signalled by the "json" attribute on the "borg" logger.
+                if logging.getLogger('borg').json:
+                    # In --log-json mode we re-emit the progress JSON line as sent by the server,
+                    # with the message, if any, prefixed with "Remote: ".
+                    if 'message' in msg:
+                        msg['message'] = 'Remote: ' + msg['message']
+                    sys.stderr.write(json.dumps(msg) + '\n')
+                elif 'message' in msg:
+                    # In text log mode we write only the message to stderr and terminate with \r
+                    # (carriage return, i.e. move the write cursor back to the beginning of the line)
+                    # so that the next message, progress or not, overwrites it. This mirrors the behaviour
+                    # of local progress displays.
+                    sys.stderr.write('Remote: ' + msg['message'] + '\r')
+    elif line.startswith('$LOG '):
+        # This format is used by borg serve 0.xx, 1.0.x and 1.1.0b1..b5.
+        # It prefixed log lines with $LOG as a marker, followed by the log level
+        # and optionally a logger name, then "Remote:" as a separator followed by the original
+        # message.
         _, level, msg = line.split(' ', 2)
         level = getattr(logging, level, logging.CRITICAL)  # str -> int
         if msg.startswith('Remote:'):
@@ -893,16 +1019,29 @@ def handle_remote_line(line):
             logname, msg = msg.split(' ', 1)
             logging.getLogger(logname).log(level, msg.rstrip())
     else:
-        sys.stderr.write('Remote: ' + line)
+        # Plain 1.0.x and older format - re-emit to stderr (mirroring what the 1.0.x
+        # client did) or as a generic log message.
+        # We don't know what priority the line had.
+        if logging.getLogger('borg').json:
+            logging.getLogger('').warning('Remote: ' + line.strip())
+        else:
+            # In non-JSON mode we circumvent logging to preserve carriage returns (\r)
+            # which are generated by remote progress displays.
+            sys.stderr.write('Remote: ' + line)
 
 
 class RepositoryNoCache:
     """A not caching Repository wrapper, passes through to repository.
 
     Just to have same API (including the context manager) as RepositoryCache.
+
+    *transform* is a callable taking two arguments, key and raw repository data.
+    The return value is returned from get()/get_many(). By default, the raw
+    repository data is returned.
     """
-    def __init__(self, repository):
+    def __init__(self, repository, transform=None):
         self.repository = repository
+        self.transform = transform or (lambda key, data: data)
 
     def close(self):
         pass
@@ -914,52 +1053,166 @@ class RepositoryNoCache:
         self.close()
 
     def get(self, key):
-        return next(self.get_many([key]))
+        return next(self.get_many([key], cache=False))
 
-    def get_many(self, keys):
-        for data in self.repository.get_many(keys):
-            yield data
+    def get_many(self, keys, cache=True):
+        for key, data in zip(keys, self.repository.get_many(keys)):
+            yield self.transform(key, data)
+
+    def log_instrumentation(self):
+        pass
 
 
 class RepositoryCache(RepositoryNoCache):
-    """A caching Repository wrapper
-
-    Caches Repository GET operations using a local temporary Repository.
     """
-    # maximum object size that will be cached, 64 kiB.
-    THRESHOLD = 2**16
+    A caching Repository wrapper.
 
-    def __init__(self, repository):
-        super().__init__(repository)
-        tmppath = tempfile.mkdtemp(prefix='borg-tmp')
-        self.caching_repo = Repository(tmppath, create=True, exclusive=True)
-        self.caching_repo.__enter__()  # handled by context manager in base class
+    Caches Repository GET operations locally.
+
+    *pack* and *unpack* complement *transform* of the base class.
+    *pack* receives the output of *transform* and should return bytes,
+    which are stored in the cache. *unpack* receives these bytes and
+    should return the initial data (as returned by *transform*).
+    """
+
+    def __init__(self, repository, pack=None, unpack=None, transform=None):
+        super().__init__(repository, transform)
+        self.pack = pack or (lambda data: data)
+        self.unpack = unpack or (lambda data: data)
+        self.cache = set()
+        self.basedir = tempfile.mkdtemp(prefix='borg-cache-')
+        self.query_size_limit()
+        self.size = 0
+        # Instrumentation
+        self.hits = 0
+        self.misses = 0
+        self.slow_misses = 0
+        self.slow_lat = 0.0
+        self.evictions = 0
+        self.enospc = 0
+
+    def query_size_limit(self):
+        stat_fs = os.statvfs(self.basedir)
+        available_space = stat_fs.f_bsize * stat_fs.f_bavail
+        self.size_limit = int(min(available_space * 0.25, 2**31))
+
+    def key_filename(self, key):
+        return os.path.join(self.basedir, bin_to_hex(key))
+
+    def backoff(self):
+        self.query_size_limit()
+        target_size = int(0.9 * self.size_limit)
+        while self.size > target_size and self.cache:
+            key = self.cache.pop()
+            file = self.key_filename(key)
+            self.size -= os.stat(file).st_size
+            os.unlink(file)
+            self.evictions += 1
+
+    def add_entry(self, key, data, cache):
+        transformed = self.transform(key, data)
+        if not cache:
+            return transformed
+        packed = self.pack(transformed)
+        file = self.key_filename(key)
+        try:
+            with open(file, 'wb') as fd:
+                fd.write(packed)
+        except OSError as os_error:
+            try:
+                truncate_and_unlink(file)
+            except FileNotFoundError:
+                pass  # open() could have failed as well
+            if os_error.errno == errno.ENOSPC:
+                self.enospc += 1
+                self.backoff()
+            else:
+                raise
+        else:
+            self.size += len(packed)
+            self.cache.add(key)
+            if self.size > self.size_limit:
+                self.backoff()
+        return transformed
+
+    def log_instrumentation(self):
+        logger.debug('RepositoryCache: current items %d, size %s / %s, %d hits, %d misses, %d slow misses (+%.1fs), '
+                     '%d evictions, %d ENOSPC hit',
+                     len(self.cache), format_file_size(self.size), format_file_size(self.size_limit),
+                     self.hits, self.misses, self.slow_misses, self.slow_lat,
+                     self.evictions, self.enospc)
 
     def close(self):
-        if self.caching_repo is not None:
-            self.caching_repo.destroy()
-            self.caching_repo = None
+        self.log_instrumentation()
+        self.cache.clear()
+        shutil.rmtree(self.basedir)
 
-    def get_many(self, keys):
-        unknown_keys = [key for key in keys if key not in self.caching_repo]
+    def get_many(self, keys, cache=True):
+        unknown_keys = [key for key in keys if key not in self.cache]
         repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys))
         for key in keys:
-            try:
-                yield self.caching_repo.get(key)
-            except Repository.ObjectNotFound:
+            if key in self.cache:
+                file = self.key_filename(key)
+                with open(file, 'rb') as fd:
+                    self.hits += 1
+                    yield self.unpack(fd.read())
+            else:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        if len(data) <= self.THRESHOLD:
-                            self.caching_repo.put(key, data)
-                        yield data
+                        transformed = self.add_entry(key, data, cache)
+                        self.misses += 1
+                        yield transformed
                         break
+                else:
+                    # slow path: eviction during this get_many removed this key from the cache
+                    t0 = time.perf_counter()
+                    data = self.repository.get(key)
+                    self.slow_lat += time.perf_counter() - t0
+                    transformed = self.add_entry(key, data, cache)
+                    self.slow_misses += 1
+                    yield transformed
         # Consume any pending requests
         for _ in repository_iterator:
             pass
 
 
-def cache_if_remote(repository):
-    if isinstance(repository, RemoteRepository):
-        return RepositoryCache(repository)
+def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None, transform=None, force_cache=False):
+    """
+    Return a Repository(No)Cache for *repository*.
+
+    If *decrypted_cache* is a key object, then get and get_many will return a tuple
+    (csize, plaintext) instead of the actual data in the repository. The cache will
+    store decrypted data, which increases CPU efficiency (by avoiding repeatedly decrypting
+    and more importantly MAC and ID checking cached objects).
+    Internally, objects are compressed with LZ4.
+    """
+    if decrypted_cache and (pack or unpack or transform):
+        raise ValueError('decrypted_cache and pack/unpack/transform are incompatible')
+    elif decrypted_cache:
+        key = decrypted_cache
+        # 32 bit csize, 64 bit (8 byte) xxh64
+        cache_struct = struct.Struct('=I8s')
+        compressor = LZ4()
+
+        def pack(data):
+            csize, decrypted = data
+            compressed = compressor.compress(decrypted)
+            return cache_struct.pack(csize, xxh64(compressed)) + compressed
+
+        def unpack(data):
+            data = memoryview(data)
+            csize, checksum = cache_struct.unpack(data[:cache_struct.size])
+            compressed = data[cache_struct.size:]
+            if checksum != xxh64(compressed):
+                raise IntegrityError('detected corrupted data in metadata cache')
+            return csize, compressor.decompress(compressed)
+
+        def transform(id_, data):
+            csize = len(data)
+            decrypted = key.decrypt(id_, data)
+            return csize, decrypted
+
+    if isinstance(repository, RemoteRepository) or force_cache:
+        return RepositoryCache(repository, pack, unpack, transform)
     else:
-        return RepositoryNoCache(repository)
+        return RepositoryNoCache(repository, transform)

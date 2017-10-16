@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-DELETE 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg delete <options> TARGET
+borg [common options] delete <options> TARGET
 .SH DESCRIPTION
 .sp
 This command deletes an archive from the repository or the complete repository.
@@ -50,9 +50,6 @@ archive or repository to delete
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-p\fP,\fB  \-\-progress
-show progress display while deleting a single archive
-.TP
 .B \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
 .TP
@@ -60,7 +57,7 @@ print statistics for the deleted archive
 delete only the local cache for the given repository
 .TP
 .B \-\-force
-force deletion of corrupted archives
+force deletion of corrupted archives, use \-\-force \-\-force in case \-\-force does not work.
 .TP
 .B \-\-save\-space
 work slower, but using less space
@@ -69,7 +66,10 @@ work slower, but using less space
 .INDENT 0.0
 .TP
 .B \-P\fP,\fB  \-\-prefix
-only consider archive names starting with this prefix
+only consider archive names starting with this prefix.
+.TP
+.B \-a\fP,\fB  \-\-glob\-archives
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .B \-\-sort\-by
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

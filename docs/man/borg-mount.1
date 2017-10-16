@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-MOUNT 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-MOUNT 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg mount <options> REPOSITORY_OR_ARCHIVE MOUNTPOINT
+borg [common options] mount <options> REPOSITORY_OR_ARCHIVE MOUNTPOINT
 .SH DESCRIPTION
 .sp
 This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -55,7 +55,7 @@ versions: when used with a repository mount, this gives a merged, versioned
 view of the files in the archives. EXPERIMENTAL, layout may change in future.
 .IP \(bu 2
 allow_damaged_files: by default damaged files (where missing chunks were
-replaced with runs of zeros by borg check \-\-repair) are not readable and
+replaced with runs of zeros by borg check \fB\-\-repair\fP) are not readable and
 return EIO (I/O error). Set this option to read such files.
 .UNINDENT
 .sp
@@ -95,7 +95,10 @@ Extra mount options
 .INDENT 0.0
 .TP
 .B \-P\fP,\fB  \-\-prefix
-only consider archive names starting with this prefix
+only consider archive names starting with this prefix.
+.TP
+.B \-a\fP,\fB  \-\-glob\-archives
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .B \-\-sort\-by
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

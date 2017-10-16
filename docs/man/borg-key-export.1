@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-EXPORT 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-KEY-EXPORT 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg key export <options> REPOSITORY PATH
+borg [common options] key export <options> REPOSITORY PATH
 .SH DESCRIPTION
 .sp
 If repository encryption is used, the repository is inaccessible
@@ -68,6 +68,9 @@ where to store the backup
 .TP
 .B \-\-paper
 Create an export suitable for printing and later type\-in
+.TP
+.B \-\-qr\-html
+Create an html file suitable for printing and later type\-in or qr scan
 .UNINDENT
 .SH SEE ALSO
 .sp

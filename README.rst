@@ -1,6 +1,6 @@
-|screencast|
+|screencast_basic|
 
-.. highlight:: bash
+More screencasts: `installation`_, `advanced usage`_
 
 What is BorgBackup?
 -------------------
@@ -26,6 +26,10 @@ Main features
   Deduplication based on content-defined chunking is used to reduce the number
   of bytes stored: each file is split into a number of variable length chunks
   and only chunks that have never been seen before are added to the repository.
+
+  A chunk is considered duplicate if its id_hash value is identical.
+  A cryptographically strong hash or MAC function is used as id_hash, e.g.
+  (hmac-)sha256.
 
   To deduplicate, all the chunks in the same repository are considered, no
   matter whether they come from different machines, from previous backups,
@@ -85,9 +89,12 @@ Main features
 Easy to use
 ~~~~~~~~~~~
 
-Initialize a new backup repository and create a backup archive::
+Initialize a new backup repository (see ``borg init --help`` for encryption options)::
 
-    $ borg init /path/to/repo
+    $ borg init -e repokey /path/to/repo
+
+Create a backup archive::
+
     $ borg create /path/to/repo::Saturday1 ~/Documents
 
 Now doing another backup, just to show off the great deduplication::
@@ -112,6 +119,16 @@ Now doing another backup, just to show off the great deduplication::
 
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
+Helping, Donations and Bounties
+-------------------------------
+
+Your help is always welcome!
+Spread the word, give feedback, help with documentation, testing or development.
+
+You can also give monetary support to the project, see there for details:
+
+https://borgbackup.readthedocs.io/en/stable/support.html#bounties-and-fundraisers
+
 Links
 -----
 
@@ -119,9 +136,8 @@ Links
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
   `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
   `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
-* `GitHub <https://github.com/borgbackup/borg>`_,
-  `Issue Tracker <https://github.com/borgbackup/borg/issues>`_ and
-  `Bounties & Fundraisers <https://www.bountysource.com/teams/borgbackup>`_
+* `GitHub <https://github.com/borgbackup/borg>`_ and
+  `Issue Tracker <https://github.com/borgbackup/borg/issues>`_.
 * `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
@@ -142,7 +158,11 @@ see ``docs/suppport.rst`` in the source distribution).
 
 .. start-badges
 
-|doc| |build| |coverage| |bestpractices|
+|doc| |build| |coverage| |bestpractices| |bounties|
+
+.. |bounties| image:: https://api.bountysource.com/badge/team?team_id=78284&style=bounties_posted
+        :alt: Bounty Source
+        :target: https://www.bountysource.com/teams/borgbackup
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
         :alt: Documentation
@@ -156,9 +176,13 @@ see ``docs/suppport.rst`` in the source distribution).
         :alt: Test Coverage
         :target: https://codecov.io/github/borgbackup/borg?branch=master
 
-.. |screencast| image:: https://asciinema.org/a/28691.png
-        :alt: BorgBackup Installation and Basic Usage
-        :target: https://asciinema.org/a/28691?autoplay=1&speed=2
+.. |screencast_basic| image:: https://asciinema.org/a/133292.png
+        :alt: BorgBackup Basic Usage
+        :target: https://asciinema.org/a/133292?autoplay=1&speed=1
+
+.. _installation: https://asciinema.org/a/133291?autoplay=1&speed=1
+
+.. _advanced usage: https://asciinema.org/a/133293?autoplay=1&speed=1
 
 .. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
         :alt: Best Practices Score

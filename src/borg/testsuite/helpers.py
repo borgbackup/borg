@@ -1,7 +1,9 @@
-import argparse
 import hashlib
+import io
 import os
+import shutil
 import sys
+from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
 from time import mktime, strptime, sleep
 
@@ -15,20 +17,32 @@ from ..helpers import Location
 from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
 from ..helpers import make_path_safe, clean_lines
-from ..helpers import prune_within, prune_split
+from ..helpers import interval, prune_within, prune_split
 from ..helpers import get_cache_dir, get_keys_dir, get_security_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
-from ..helpers import StableDict, bin_to_hex
-from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams, Chunk
+from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
+from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
-from ..helpers import load_exclude_file, load_pattern_file
-from ..helpers import CompressionSpec, CompressionDecider1, CompressionDecider2
-from ..helpers import parse_pattern, PatternMatcher, RegexPattern, PathPrefixPattern, FnmatchPattern, ShellPattern
 from ..helpers import swidth_slice
 from ..helpers import chunkit
+from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
+from ..helpers import popen_with_error_handling
+from ..helpers import dash_open
 
 from . import BaseTestCase, FakeInputs
+
+
+class BigIntTestCase(BaseTestCase):
+
+    def test_bigint(self):
+        self.assert_equal(int_to_bigint(0), 0)
+        self.assert_equal(int_to_bigint(2**63-1), 2**63-1)
+        self.assert_equal(int_to_bigint(-2**63+1), -2**63+1)
+        self.assert_equal(int_to_bigint(2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\x00')
+        self.assert_equal(int_to_bigint(-2**63), b'\x00\x00\x00\x00\x00\x00\x00\x80\xff')
+        self.assert_equal(bigint_to_int(int_to_bigint(-2**70)), -2**70)
+        self.assert_equal(bigint_to_int(int_to_bigint(2**70)), 2**70)
 
 
 def test_bin_to_hex():
@@ -37,64 +51,130 @@ def test_bin_to_hex():
 
 
 class TestLocationWithoutEnv:
-    def test_ssh(self, monkeypatch):
+    @pytest.fixture
+    def keys_dir(self, tmpdir, monkeypatch):
+        tmpdir = str(tmpdir)
+        monkeypatch.setenv('BORG_KEYS_DIR', tmpdir)
+        if not tmpdir.endswith(os.path.sep):
+            tmpdir += os.path.sep
+        return tmpdir
+
+    def test_ssh(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('ssh://user@host:1234/some/path::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive='archive')"
+        assert Location('ssh://user@host:1234/some/path::archive').to_key_filename() == keys_dir + 'host__some_path'
         assert repr(Location('ssh://user@host:1234/some/path')) == \
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
         assert repr(Location('ssh://user@host/some/path')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[::]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='::', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[::]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='::', port=1234, path='/some/path', archive=None)"
+        assert Location('ssh://user@[::]:1234/some/path').to_key_filename() == keys_dir + '____some_path'
+        assert repr(Location('ssh://user@[::]/some/path')) == \
+            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[2001:db8::]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=1234, path='/some/path', archive=None)"
+        assert Location('ssh://user@[2001:db8::]:1234/some/path').to_key_filename() == keys_dir + '2001_db8____some_path'
+        assert repr(Location('ssh://user@[2001:db8::]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::c0:ffee]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[2001:db8::c0:ffee]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=1234, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::c0:ffee]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::192.0.2.1]:1234/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=1234, path='/some/path', archive='archive')"
+        assert repr(Location('ssh://user@[2001:db8::192.0.2.1]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=1234, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2001:db8::192.0.2.1]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
+        assert Location('ssh://user@[2001:db8::192.0.2.1]/some/path').to_key_filename() == keys_dir + '2001_db8__192_0_2_1__some_path'
 
-    def test_file(self, monkeypatch):
+    def test_file(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('file:///some/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
         assert repr(Location('file:///some/path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+        assert Location('file:///some/path').to_key_filename() == keys_dir + 'some_path'
 
-    def test_scp(self, monkeypatch):
+    def test_scp(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('user@host:/some/path::archive')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
         assert repr(Location('user@host:/some/path')) == \
             "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[::]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[::]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[2001:db8::]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[2001:db8::]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[2001:db8::c0:ffee]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[2001:db8::c0:ffee]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive=None)"
+        assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path::archive')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive='archive')"
+        assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
+        assert Location('user@[2001:db8::192.0.2.1]:/some/path').to_key_filename() == keys_dir + '2001_db8__192_0_2_1__some_path'
 
-    def test_smb(self, monkeypatch):
+    def test_smb(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('file:////server/share/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='//server/share/path', archive='archive')"
+        assert Location('file:////server/share/path::archive').to_key_filename() == keys_dir + 'server_share_path'
 
-    def test_folder(self, monkeypatch):
+    def test_folder(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive')"
         assert repr(Location('path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='path', archive=None)"
+        assert Location('path').to_key_filename() == keys_dir + 'path'
 
-    def test_abspath(self, monkeypatch):
+    def test_long_path(self, monkeypatch, keys_dir):
+        monkeypatch.delenv('BORG_REPO', raising=False)
+        assert Location(os.path.join(*(40 * ['path']))).to_key_filename() == keys_dir + '_'.join(20 * ['path']) + '_'
+
+    def test_abspath(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('/some/absolute/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive='archive')"
         assert repr(Location('/some/absolute/path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path', archive=None)"
+        assert Location('/some/absolute/path').to_key_filename() == keys_dir + 'some_absolute_path'
         assert repr(Location('ssh://user@host/some/path')) == \
                "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
+        assert Location('ssh://user@host/some/path').to_key_filename() == keys_dir + 'host__some_path'
 
-    def test_relpath(self, monkeypatch):
+    def test_relpath(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('some/relative/path::archive')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive='archive')"
         assert repr(Location('some/relative/path')) == \
             "Location(proto='file', user=None, host=None, port=None, path='some/relative/path', archive=None)"
+        assert Location('some/relative/path').to_key_filename() == keys_dir + 'some_relative_path'
         assert repr(Location('ssh://user@host/./some/path')) == \
                "Location(proto='ssh', user='user', host='host', port=None, path='/./some/path', archive=None)"
+        assert Location('ssh://user@host/./some/path').to_key_filename() == keys_dir + 'host__some_path'
         assert repr(Location('ssh://user@host/~/some/path')) == \
                "Location(proto='ssh', user='user', host='host', port=None, path='/~/some/path', archive=None)"
+        assert Location('ssh://user@host/~/some/path').to_key_filename() == keys_dir + 'host__some_path'
         assert repr(Location('ssh://user@host/~user/some/path')) == \
                "Location(proto='ssh', user='user', host='host', port=None, path='/~user/some/path', archive=None)"
+        assert Location('ssh://user@host/~user/some/path').to_key_filename() == keys_dir + 'host__user_some_path'
 
-    def test_with_colons(self, monkeypatch):
+    def test_with_colons(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('/abs/path:w:cols::arch:col')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols', archive='arch:col')"
@@ -102,6 +182,7 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='/abs/path:with:colons', archive='archive')"
         assert repr(Location('/abs/path:with:colons')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/abs/path:with:colons', archive=None)"
+        assert Location('/abs/path:with:colons').to_key_filename() == keys_dir + 'abs_path_with_colons'
 
     def test_user_parsing(self):
         # see issue #1930
@@ -230,423 +311,6 @@ class FormatTimedeltaTestCase(BaseTestCase):
         )
 
 
-def check_patterns(files, pattern, expected):
-    """Utility for testing patterns.
-    """
-    assert all([f == os.path.normpath(f) for f in files]), "Pattern matchers expect normalized input paths"
-
-    matched = [f for f in files if pattern.match(f)]
-
-    assert matched == (files if expected is None else expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("/", None),
-    ("/./", None),
-    ("", []),
-    ("/home/u", []),
-    ("/home/user", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc", ["/etc/server/config", "/etc/server/hosts"]),
-    ("///etc//////", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv", ["/srv/messages", "/srv/dmesg"]),
-    ])
-def test_patterns_prefix(pattern, expected):
-    files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
-    ]
-
-    check_patterns(files, PathPrefixPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("", []),
-    ("foo", []),
-    ("relative", ["relative/path1", "relative/two"]),
-    ("more", ["more/relative"]),
-    ])
-def test_patterns_prefix_relative(pattern, expected):
-    files = ["relative/path1", "relative/two", "more/relative"]
-
-    check_patterns(files, PathPrefixPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("/*", None),
-    ("/./*", None),
-    ("*", None),
-    ("*/*", None),
-    ("*///*", None),
-    ("/home/u", []),
-    ("/home/*",
-     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
-      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("*/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
-    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv*", ["/srv/messages", "/srv/dmesg"]),
-    ("/home/*/.thumbnails", ["/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ])
-def test_patterns_fnmatch(pattern, expected):
-    files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
-        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
-    ]
-
-    check_patterns(files, FnmatchPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("*", None),
-    ("**/*", None),
-    ("/**/*", None),
-    ("/./*", None),
-    ("*/*", None),
-    ("*///*", None),
-    ("/home/u", []),
-    ("/home/*",
-     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
-      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc/*/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/etc/**/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/etc/**/*/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("*/.pr????e", []),
-    ("**/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
-    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2/", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/./home//..//home/user2/**/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv*/", ["/srv/messages", "/srv/dmesg", "/srv2/blafasel"]),
-    ("/srv*", ["/srv", "/srv/messages", "/srv/dmesg", "/srv2", "/srv2/blafasel"]),
-    ("/srv/*", ["/srv/messages", "/srv/dmesg"]),
-    ("/srv2/**", ["/srv2", "/srv2/blafasel"]),
-    ("/srv2/**/", ["/srv2/blafasel"]),
-    ("/home/*/.thumbnails", ["/home/foo/.thumbnails"]),
-    ("/home/*/*/.thumbnails", ["/home/foo/bar/.thumbnails"]),
-    ])
-def test_patterns_shell(pattern, expected):
-    files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv", "/srv/messages", "/srv/dmesg",
-        "/srv2", "/srv2/blafasel", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
-    ]
-
-    check_patterns(files, ShellPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("", None),
-    (".*", None),
-    ("^/", None),
-    ("^abc$", []),
-    ("^[^/]", []),
-    ("^(?!/srv|/foo|/opt)",
-     ["/home", "/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile",
-      "/home/user2/public_html/index.html", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails", ]),
-    ])
-def test_patterns_regex(pattern, expected):
-    files = [
-        '/srv/data', '/foo/bar', '/home',
-        '/home/user/.profile', '/home/user/.bashrc',
-        '/home/user2/.profile', '/home/user2/public_html/index.html',
-        '/opt/log/messages.txt', '/opt/log/dmesg.txt',
-        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
-    ]
-
-    obj = RegexPattern(pattern)
-    assert str(obj) == pattern
-    assert obj.pattern == pattern
-
-    check_patterns(files, obj, expected)
-
-
-def test_regex_pattern():
-    # The forward slash must match the platform-specific path separator
-    assert RegexPattern("^/$").match("/")
-    assert RegexPattern("^/$").match(os.path.sep)
-    assert not RegexPattern(r"^\\$").match("/")
-
-
-def use_normalized_unicode():
-    return sys.platform in ("darwin",)
-
-
-def _make_test_patterns(pattern):
-    return [PathPrefixPattern(pattern),
-            FnmatchPattern(pattern),
-            RegexPattern("^{}/foo$".format(pattern)),
-            ShellPattern(pattern),
-            ]
-
-
-@pytest.mark.parametrize("pattern", _make_test_patterns("b\N{LATIN SMALL LETTER A WITH ACUTE}"))
-def test_composed_unicode_pattern(pattern):
-    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo") == use_normalized_unicode()
-
-
-@pytest.mark.parametrize("pattern", _make_test_patterns("ba\N{COMBINING ACUTE ACCENT}"))
-def test_decomposed_unicode_pattern(pattern):
-    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo") == use_normalized_unicode()
-    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-
-@pytest.mark.parametrize("pattern", _make_test_patterns(str(b"ba\x80", "latin1")))
-def test_invalid_unicode_pattern(pattern):
-    assert not pattern.match("ba/foo")
-    assert pattern.match(str(b"ba\x80/foo", "latin1"))
-
-
-@pytest.mark.parametrize("lines, expected", [
-    # "None" means all files, i.e. none excluded
-    ([], None),
-    (["# Comment only"], None),
-    (["*"], []),
-    (["# Comment",
-      "*/something00.txt",
-      "  *whitespace*  ",
-      # Whitespace before comment
-      " #/ws*",
-      # Empty line
-      "",
-      "# EOF"],
-     ["/more/data", "/home", " #/wsfoobar"]),
-    (["re:.*"], []),
-    (["re:\s"], ["/data/something00.txt", "/more/data", "/home"]),
-    ([r"re:(.)(\1)"], ["/more/data", "/home", "\tstart/whitespace", "/whitespace/end\t"]),
-    (["", "", "",
-      "# This is a test with mixed pattern styles",
-      # Case-insensitive pattern
-      "re:(?i)BAR|ME$",
-      "",
-      "*whitespace*",
-      "fm:*/something00*"],
-     ["/more/data"]),
-    ([r"  re:^\s  "], ["/data/something00.txt", "/more/data", "/home", "/whitespace/end\t"]),
-    ([r"  re:\s$  "], ["/data/something00.txt", "/more/data", "/home", " #/wsfoobar", "\tstart/whitespace"]),
-    (["pp:./"], None),
-    (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
-    (["pp:aaabbb"], None),
-    (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
-    (["/nomatch", "/more/*"],
-     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
-    # the order of exclude patterns shouldn't matter
-    (["/more/*", "/nomatch"],
-     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
-    ])
-def test_exclude_patterns_from_file(tmpdir, lines, expected):
-    files = [
-        '/data/something00.txt', '/more/data', '/home',
-        ' #/wsfoobar',
-        '\tstart/whitespace',
-        '/whitespace/end\t',
-    ]
-
-    def evaluate(filename):
-        patterns = []
-        load_exclude_file(open(filename, "rt"), patterns)
-        matcher = PatternMatcher(fallback=True)
-        matcher.add_inclexcl(patterns)
-        return [path for path in files if matcher.match(path)]
-
-    exclfile = tmpdir.join("exclude.txt")
-
-    with exclfile.open("wt") as fh:
-        fh.write("\n".join(lines))
-
-    assert evaluate(str(exclfile)) == (files if expected is None else expected)
-
-
-@pytest.mark.parametrize("lines, expected_roots, expected_numpatterns", [
-    # "None" means all files, i.e. none excluded
-    ([], [], 0),
-    (["# Comment only"], [], 0),
-    (["- *"], [], 1),
-    (["+fm:*/something00.txt",
-      "-/data"], [], 2),
-    (["R /"], ["/"], 0),
-    (["R /",
-      "# comment"], ["/"], 0),
-    (["# comment",
-      "- /data",
-      "R /home"], ["/home"], 1),
-])
-def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatterns):
-    def evaluate(filename):
-        roots = []
-        inclexclpatterns = []
-        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
-        return roots, len(inclexclpatterns)
-    patternfile = tmpdir.join("patterns.txt")
-
-    with patternfile.open("wt") as fh:
-        fh.write("\n".join(lines))
-
-    roots, numpatterns = evaluate(str(patternfile))
-    assert roots == expected_roots
-    assert numpatterns == expected_numpatterns
-
-
-@pytest.mark.parametrize("lines", [
-    (["X /data"]),  # illegal pattern type prefix
-    (["/data"]),    # need a pattern type prefix
-])
-def test_load_invalid_patterns_from_file(tmpdir, lines):
-    patternfile = tmpdir.join("patterns.txt")
-    with patternfile.open("wt") as fh:
-        fh.write("\n".join(lines))
-    filename = str(patternfile)
-    with pytest.raises(argparse.ArgumentTypeError):
-        roots = []
-        inclexclpatterns = []
-        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
-
-
-@pytest.mark.parametrize("lines, expected", [
-    # "None" means all files, i.e. none excluded
-    ([], None),
-    (["# Comment only"], None),
-    (["- *"], []),
-    # default match type is sh: for patterns -> * doesn't match a /
-    (["-*/something0?.txt"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt',
-      '/home', '/home/leo', '/home/leo/t', '/home/other']),
-    (["-fm:*/something00.txt"],
-     ['/data', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t', '/home/other']),
-    (["-fm:*/something0?.txt"],
-     ["/data", '/home', '/home/leo', '/home/leo/t', '/home/other']),
-    (["+/*/something0?.txt",
-      "-/data"],
-     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
-    (["+fm:*/something00.txt",
-      "-/data"],
-     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
-    # include /home/leo and exclude the rest of /home:
-    (["+/home/leo",
-      "-/home/*"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),
-    # wrong order, /home/leo is already excluded by -/home/*:
-    (["-/home/*",
-      "+/home/leo"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home']),
-    (["+fm:/home/leo",
-      "-/home/"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),
-])
-def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
-    files = [
-        '/data', '/data/something00.txt', '/data/subdir/something01.txt',
-        '/home', '/home/leo', '/home/leo/t', '/home/other'
-    ]
-
-    def evaluate(filename):
-        matcher = PatternMatcher(fallback=True)
-        roots = []
-        inclexclpatterns = []
-        load_pattern_file(open(filename, "rt"), roots, inclexclpatterns)
-        matcher.add_inclexcl(inclexclpatterns)
-        return [path for path in files if matcher.match(path)]
-
-    patternfile = tmpdir.join("patterns.txt")
-
-    with patternfile.open("wt") as fh:
-        fh.write("\n".join(lines))
-
-    assert evaluate(str(patternfile)) == (files if expected is None else expected)
-
-
-@pytest.mark.parametrize("pattern, cls", [
-    ("", FnmatchPattern),
-
-    # Default style
-    ("*", FnmatchPattern),
-    ("/data/*", FnmatchPattern),
-
-    # fnmatch style
-    ("fm:", FnmatchPattern),
-    ("fm:*", FnmatchPattern),
-    ("fm:/data/*", FnmatchPattern),
-    ("fm:fm:/data/*", FnmatchPattern),
-
-    # Regular expression
-    ("re:", RegexPattern),
-    ("re:.*", RegexPattern),
-    ("re:^/something/", RegexPattern),
-    ("re:re:^/something/", RegexPattern),
-
-    # Path prefix
-    ("pp:", PathPrefixPattern),
-    ("pp:/", PathPrefixPattern),
-    ("pp:/data/", PathPrefixPattern),
-    ("pp:pp:/data/", PathPrefixPattern),
-
-    # Shell-pattern style
-    ("sh:", ShellPattern),
-    ("sh:*", ShellPattern),
-    ("sh:/data/*", ShellPattern),
-    ("sh:sh:/data/*", ShellPattern),
-    ])
-def test_parse_pattern(pattern, cls):
-    assert isinstance(parse_pattern(pattern), cls)
-
-
-@pytest.mark.parametrize("pattern", ["aa:", "fo:*", "00:", "x1:abc"])
-def test_parse_pattern_error(pattern):
-    with pytest.raises(ValueError):
-        parse_pattern(pattern)
-
-
-def test_pattern_matcher():
-    pm = PatternMatcher()
-
-    assert pm.fallback is None
-
-    for i in ["", "foo", "bar"]:
-        assert pm.match(i) is None
-
-    pm.add([RegexPattern("^a")], "A")
-    pm.add([RegexPattern("^b"), RegexPattern("^z")], "B")
-    pm.add([RegexPattern("^$")], "Empty")
-    pm.fallback = "FileNotFound"
-
-    assert pm.match("") == "Empty"
-    assert pm.match("aaa") == "A"
-    assert pm.match("bbb") == "B"
-    assert pm.match("ccc") == "FileNotFound"
-    assert pm.match("xyz") == "FileNotFound"
-    assert pm.match("z") == "B"
-
-    assert PatternMatcher(fallback="hey!").fallback == "hey!"
-
-
-def test_compression_specs():
-    with pytest.raises(ValueError):
-        CompressionSpec('')
-    assert CompressionSpec('none') == dict(name='none')
-    assert CompressionSpec('lz4') == dict(name='lz4')
-    assert CompressionSpec('zlib') == dict(name='zlib', level=6)
-    assert CompressionSpec('zlib,0') == dict(name='zlib', level=0)
-    assert CompressionSpec('zlib,9') == dict(name='zlib', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('zlib,9,invalid')
-    assert CompressionSpec('lzma') == dict(name='lzma', level=6)
-    assert CompressionSpec('lzma,0') == dict(name='lzma', level=0)
-    assert CompressionSpec('lzma,9') == dict(name='lzma', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('lzma,9,invalid')
-    with pytest.raises(ValueError):
-        CompressionSpec('invalid')
-
-
 def test_chunkerparams():
     assert ChunkerParams('19,23,21,4095') == (19, 23, 21, 4095)
     assert ChunkerParams('10,23,16,4095') == (10, 23, 16, 4095)
@@ -705,16 +369,48 @@ class PruneSplitTestCase(BaseTestCase):
         dotest(test_archives, 0, [], [])
 
 
-class PruneWithinTestCase(BaseTestCase):
+class IntervalTestCase(BaseTestCase):
+    def test_interval(self):
+        self.assert_equal(interval('1H'), 1)
+        self.assert_equal(interval('1d'), 24)
+        self.assert_equal(interval('1w'), 168)
+        self.assert_equal(interval('1m'), 744)
+        self.assert_equal(interval('1y'), 8760)
 
-    def test(self):
+    def test_interval_time_unit(self):
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('H')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected interval number "": expected an integer greater than 0',))
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('-1d')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected interval number "-1": expected an integer greater than 0',))
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('food')
+        self.assert_equal(
+            exc.value.args,
+            ('Unexpected interval number "foo": expected an integer greater than 0',))
+
+    def test_interval_number(self):
+        with pytest.raises(ArgumentTypeError) as exc:
+            interval('5')
+        self.assert_equal(
+            exc.value.args,
+            ("Unexpected interval time unit \"5\": expected one of ['H', 'd', 'w', 'm', 'y']",))
+
+
+class PruneWithinTestCase(BaseTestCase):
+    def test_prune_within(self):
 
         def subset(lst, indices):
             return {lst[i] for i in indices}
 
         def dotest(test_archives, within, indices):
             for ta in test_archives, reversed(test_archives):
-                self.assert_equal(set(prune_within(ta, within)),
+                self.assert_equal(set(prune_within(ta, interval(within))),
                                   subset(test_archives, indices))
 
         # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
@@ -1108,7 +804,7 @@ def test_partial_format():
 
 
 def test_chunk_file_wrapper():
-    cfw = ChunkIteratorFileWrapper(iter([Chunk(b'abc'), Chunk(b'def')]))
+    cfw = ChunkIteratorFileWrapper(iter([b'abc', b'def']))
     assert cfw.read(2) == b'ab'
     assert cfw.read(50) == b'cdef'
     assert cfw.exhausted
@@ -1150,38 +846,6 @@ data2
     assert list(clean_lines(conf, remove_comments=False)) == ['#comment', 'data1 #data1', 'data2', 'data3', ]
 
 
-def test_compression_decider1():
-    default = CompressionSpec('zlib')
-    conf = """
-# use super-fast lz4 compression on huge VM files in this path:
-lz4:/srv/vm_disks
-
-# jpeg or zip files do not compress:
-none:*.jpeg
-none:*.zip
-""".splitlines()
-
-    cd = CompressionDecider1(default, [])  # no conf, always use default
-    assert cd.decide('/srv/vm_disks/linux')['name'] == 'zlib'
-    assert cd.decide('test.zip')['name'] == 'zlib'
-    assert cd.decide('test')['name'] == 'zlib'
-
-    cd = CompressionDecider1(default, [conf, ])
-    assert cd.decide('/srv/vm_disks/linux')['name'] == 'lz4'
-    assert cd.decide('test.zip')['name'] == 'none'
-    assert cd.decide('test')['name'] == 'zlib'  # no match in conf, use default
-
-
-def test_compression_decider2():
-    default = CompressionSpec('zlib')
-
-    cd = CompressionDecider2(default)
-    compr_spec, chunk = cd.decide(Chunk(None))
-    assert compr_spec['name'] == 'zlib'
-    compr_spec, chunk = cd.decide(Chunk(None, compress=CompressionSpec('lzma')))
-    assert compr_spec['name'] == 'lzma'
-
-
 def test_format_line():
     data = dict(foo='bar baz')
     assert format_line('', data) == ''
@@ -1195,6 +859,10 @@ def test_format_line_erroneous():
         assert format_line('{invalid}', data)
     with pytest.raises(PlaceholderError):
         assert format_line('{}', data)
+    with pytest.raises(PlaceholderError):
+        assert format_line('{now!r}', data)
+    with pytest.raises(PlaceholderError):
+        assert format_line('{now.__class__.__module__.__builtins__}', data)
 
 
 def test_replace_placeholders():
@@ -1221,3 +889,64 @@ def test_swidth_slice_mixed_characters():
     string = '나윤a선나윤선나윤선나윤선나윤선'
     assert swidth_slice(string, 5) == '나윤a'
     assert swidth_slice(string, 6) == '나윤a'
+
+
+def test_safe_timestamps():
+    if SUPPORT_32BIT_PLATFORMS:
+        # ns fit into int64
+        assert safe_ns(2 ** 64) <= 2 ** 63 - 1
+        assert safe_ns(-1) == 0
+        # s fit into int32
+        assert safe_s(2 ** 64) <= 2 ** 31 - 1
+        assert safe_s(-1) == 0
+        # datetime won't fall over its y10k problem
+        beyond_y10k = 2 ** 100
+        with pytest.raises(OverflowError):
+            datetime.utcfromtimestamp(beyond_y10k)
+        assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2038, 1, 1)
+        assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2038, 1, 1)
+    else:
+        # ns fit into int64
+        assert safe_ns(2 ** 64) <= 2 ** 63 - 1
+        assert safe_ns(-1) == 0
+        # s are so that their ns conversion fits into int64
+        assert safe_s(2 ** 64) * 1000000000 <= 2 ** 63 - 1
+        assert safe_s(-1) == 0
+        # datetime won't fall over its y10k problem
+        beyond_y10k = 2 ** 100
+        with pytest.raises(OverflowError):
+            datetime.utcfromtimestamp(beyond_y10k)
+        assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2262, 1, 1)
+        assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2262, 1, 1)
+
+
+class TestPopenWithErrorHandling:
+    @pytest.mark.skipif(not shutil.which('test'), reason='"test" binary is needed')
+    def test_simple(self):
+        proc = popen_with_error_handling('test 1')
+        assert proc.wait() == 0
+
+    @pytest.mark.skipif(shutil.which('borg-foobar-test-notexist'), reason='"borg-foobar-test-notexist" binary exists (somehow?)')
+    def test_not_found(self):
+        proc = popen_with_error_handling('borg-foobar-test-notexist 1234')
+        assert proc is None
+
+    @pytest.mark.parametrize('cmd', (
+            'mismatched "quote',
+            'foo --bar="baz',
+            ''
+    ))
+    def test_bad_syntax(self, cmd):
+        proc = popen_with_error_handling(cmd)
+        assert proc is None
+
+    def test_shell(self):
+        with pytest.raises(AssertionError):
+            popen_with_error_handling('', shell=True)
+
+
+def test_dash_open():
+    assert dash_open('-', 'r') is sys.stdin
+    assert dash_open('-', 'w') is sys.stdout
+    assert dash_open('-', 'rb') is sys.stdin.buffer
+    assert dash_open('-', 'wb') is sys.stdout.buffer

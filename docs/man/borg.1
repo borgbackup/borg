@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg <command> [options] [arguments]
+borg [common options] <command> [options] [arguments]
 .SH DESCRIPTION
 .\" we don't include the README.rst here since we want to keep this terse.
 .
@@ -205,7 +205,7 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 .sp
 \fBssh://user@host:port/path/to/repo\fP \- same, alternative syntax, port can be given
 .sp
-\fBRemote repositories with relative pathes\fP can be given using this syntax:
+\fBRemote repositories with relative paths\fP can be given using this syntax:
 .sp
 \fBuser@host:path/to/repo\fP \- path relative to current directory
 .sp
@@ -216,7 +216,7 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 Note: giving \fBuser@host:/./path/to/repo\fP or \fBuser@host:/~/path/to/repo\fP or
 \fBuser@host:/~other/path/to/repo\fP is also supported, but not required here.
 .sp
-\fBRemote repositories with relative pathes, alternative syntax with port\fP:
+\fBRemote repositories with relative paths, alternative syntax with port\fP:
 .sp
 \fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
 .sp
@@ -259,7 +259,7 @@ If you have set BORG_REPO (see above) and an archive location is needed, use
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want Borg to be mostly silent and only output
 warnings, errors and critical messages, unless output has been requested
-by supplying an option that implies output (eg, \-\-list or \-\-progress).
+by supplying an option that implies output (e.g. \fB\-\-list\fP or \fB\-\-progress\fP).
 .sp
 Log levels: DEBUG < INFO < WARNING < ERROR < CRITICAL
 .sp
@@ -284,28 +284,50 @@ give different output on different log levels \- it\(aqs just a possibility.
 \fBWARNING:\fP
 .INDENT 0.0
 .INDENT 3.5
-Options \-\-critical and \-\-error are provided for completeness,
+Options \fB\-\-critical\fP and \fB\-\-error\fP are provided for completeness,
 their usage is not recommended as you might miss important information.
 .UNINDENT
 .UNINDENT
 .SS Return codes
 .sp
 Borg can exit with the following return codes (rc):
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-0 = success (logged as INFO)
-1 = warning (operation reached its normal end, but there were warnings \-
-    you should check the log, logged as WARNING)
-2 = error (like a fatal error, a local or remote exception, the operation
-    did not reach its normal end, logged as ERROR)
-128+N = killed by signal N (e.g. 137 == kill \-9)
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
+.TS
+center;
+|l|l|.
+_
+T{
+Return code
+T}	T{
+Meaning
+T}
+_
+T{
+0
+T}	T{
+success (logged as INFO)
+T}
+_
+T{
+1
+T}	T{
+warning (operation reached its normal end, but there were warnings \-\-
+you should check the log, logged as WARNING)
+T}
+_
+T{
+2
+T}	T{
+error (like a fatal error, a local or remote exception, the operation
+did not reach its normal end, logged as ERROR)
+T}
+_
+T{
+128+N
+T}	T{
+killed by signal N (e.g. 137 == kill \-9)
+T}
+_
+.TE
 .sp
 If you use \fB\-\-show\-rc\fP, the return code is also logged at the indicated
 level as the last log entry.
@@ -319,22 +341,36 @@ Borg uses some environment variables for automation:
 .TP
 .B BORG_REPO
 When set, use the value to give the default repository location. If a command needs an archive
-parameter, you can abbreviate as \fI::archive\fP\&. If a command needs a repository parameter, you
-can either leave it away or abbreviate as \fI::\fP, if a positional parameter is required.
+parameter, you can abbreviate as \fB::archive\fP\&. If a command needs a repository parameter, you
+can either leave it away or abbreviate as \fB::\fP, if a positional parameter is required.
 .TP
 .B BORG_PASSPHRASE
 When set, use the value to answer the passphrase question for encrypted repositories.
-It is used when a passphrase is needed to access a encrypted repo as well as when a new
+It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo.
+See also BORG_NEW_PASSPHRASE.
+.TP
+.B BORG_PASSCOMMAND
+When set, use the standard output of the command (trailing newlines are stripped) to answer the
+passphrase question for encrypted repositories.
+It is used when a passphrase is needed to access an encrypted repo as well as when a new
+passphrase should be initially set when initializing an encrypted repo.
+If BORG_PASSPHRASE is also set, it takes precedence.
 See also BORG_NEW_PASSPHRASE.
 .TP
 .B BORG_NEW_PASSPHRASE
 When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
-This variable is checked first. If it is not set, BORG_PASSPHRASE will be checked also.
+This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
+be checked.
 Main usecase for this is to fully automate \fBborg change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
+.TP
+.B BORG_HOSTNAME_IS_UNIQUE=no
+Borg assumes that it can derive a unique hostname / identity (see \fBborg debug info\fP).
+If this is not the case or you do not want Borg to automatically remove stale locks,
+set this to \fIno\fP\&.
 .TP
 .B BORG_LOGGING_CONF
 When set, use the given filename as \fI\%INI\fP\-style logging configuration.
@@ -344,7 +380,7 @@ When set, use this command instead of \fBssh\fP\&. This can be used to specify s
 a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options.
 .TP
 .B BORG_REMOTE_PATH
-When set, use the given path/filename as remote path (default is "borg").
+When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
 Using \fB\-\-remote\-path PATH\fP commandline option overrides the environment variable.
 .TP
 .B BORG_FILES_CACHE_TTL
@@ -434,7 +470,7 @@ this with some hardware \-\- independent of the software used. We don\(aqt
 know a list of affected hardware.
 .sp
 If you are suspicious whether your Borg repository is still consistent
-and readable after one of the failures mentioned above occured, run
+and readable after one of the failures mentioned above occurred, run
 \fBborg check \-\-verify\-data\fP to make sure it is consistent.
 .SS Units
 .sp
@@ -532,7 +568,7 @@ depending on archive count and size \- see FAQ about how to reduce).
 .TP
 .B Network (only for client/server operation):
 If your repository is remote, all deduplicated (and optionally compressed/
-encrypted) data of course has to go over the connection (ssh: repo url).
+encrypted) data of course has to go over the connection (\fBssh://\fP repo url).
 If you use a locally mounted network filesystem, additionally some copy
 operations used for transaction support also go over the connection. If
 you backup multiple sources to one target repository, additional traffic

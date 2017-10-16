@@ -37,6 +37,8 @@ Under these circumstances Borg guarantees that the attacker cannot
 The attacker can always impose a denial of service per definition (he could
 forbid connections to the repository, or delete it entirely).
 
+.. _security_structural_auth:
+
 Structural Authentication
 -------------------------
 
@@ -60,6 +62,8 @@ in a particular part of its own data structure assigns this meaning.
 
 This results in a directed acyclic graph of authentication from the manifest
 to the data chunks of individual files.
+
+.. _tam_description:
 
 .. rubric:: Authenticating the manifest
 
@@ -167,6 +171,36 @@ Decryption::
 
     ASSERT( CONSTANT-TIME-COMPARISON( chunk-id, AUTHENTICATOR(id_key, decompressed) ) )
 
+The client needs to track which counter values have been used, since
+encrypting a chunk requires a starting counter value and no two chunks
+may have overlapping counter ranges (otherwise the bitwise XOR of the
+overlapping plaintexts is revealed).
+
+The client does not directly track the counter value, because it
+changes often (with each encrypted chunk), instead it commits a
+"reservation" to the security database and the repository by taking
+the current counter value and adding 4 GiB / 16 bytes (the block size)
+to the counter. Thus the client only needs to commit a new reservation
+every few gigabytes of encrypted data.
+
+This mechanism also avoids reusing counter values in case the client
+crashes or the connection to the repository is severed, since any
+reservation would have been committed to both the security database
+and the repository before any data is encrypted. Borg uses its
+standard mechanism (SaveFile) to ensure that reservations are durable
+(on most hardware / storage systems), therefore a crash of the
+client's host would not impact tracking of reservations.
+
+However, this design is not infallible, and requires synchronization
+between clients, which is handled through the repository. Therefore in
+a multiple-client scenario a repository can trick a client into
+reusing counter values by ignoring counter reservations and replaying
+the manifest (which will fail if the client has seen a more recent
+manifest or has a more recent nonce reservation). If the repository is
+untrusted, but a trusted synchronization channel exists between
+clients, the security database could be synchronized between them over
+said trusted channel. This is not part of Borgs functionality.
+
 .. [#] Using the :ref:`borg key migrate-to-repokey <borg_key_migrate-to-repokey>`
        command a user can convert repositories created using Attic in "passphrase"
        mode to "repokey" mode. In this case the keys were directly derived from
@@ -224,9 +258,13 @@ on widely used libraries providing them:
   We think this is not an additional risk, since we don't ever
   use OpenSSL's networking, TLS or X.509 code, but only their
   primitives implemented in libcrypto.
-- SHA-256 and SHA-512 from Python's hashlib_ standard library module are used
+- SHA-256 and SHA-512 from Python's hashlib_ standard library module are used.
+  Borg requires a Python built with OpenSSL support (due to PBKDF2), therefore
+  these functions are delegated to OpenSSL by Python.
 - HMAC, PBKDF2 and a constant-time comparison from Python's hmac_ standard
-  library module is used.
+  library module is used. While the HMAC implementation is written in Python,
+  the PBKDF2 implementation is provided by OpenSSL. The constant-time comparison
+  (``compare_digest``) is written in C and part of Python.
 - BLAKE2b is either provided by the system's libb2, an official implementation,
   or a bundled copy of the BLAKE2 reference implementation (written in C).
 
@@ -255,9 +293,21 @@ over an encrypted SSH channel (the system's SSH client is used for this
 by piping data from/to it).
 
 This means that the authorization and transport security properties
-are inherited from SSH and the configuration of the SSH client
-and the SSH server. Therefore the remainder of this section
-will focus on the security of the RPC protocol within Borg.
+are inherited from SSH and the configuration of the SSH client and the
+SSH server -- Borg RPC does not contain *any* networking
+code. Networking is done by the SSH client running in a separate
+process, Borg only communicates over the standard pipes (stdout,
+stderr and stdin) with this process. This also means that Borg doesn't
+have to directly use a SSH client (or SSH at all). For example,
+``sudo`` or ``qrexec`` could be used as an intermediary.
+
+By using the system's SSH client and not implementing a
+(cryptographic) network protocol Borg sidesteps many security issues
+that would normally impact distributing statically linked / standalone
+binaries.
+
+The remainder of this section will focus on the security of the RPC
+protocol within Borg.
 
 The assumed worst-case a server can inflict to a client is a
 denial of repository service.
@@ -294,3 +344,28 @@ like remote code execution are inhibited by the design of the protocol:
       general pattern of server-sent responses and are sent instead of response data
       for a request.
 
+The msgpack implementation used (msgpack-python) has a good security track record,
+a large test suite and no issues found by fuzzing. It is based on the msgpack-c implementation,
+sharing the unpacking engine and some support code. msgpack-c has a good track record as well.
+Some issues [#]_ in the past were located in code not included in msgpack-python.
+Borg does not use msgpack-c.
+
+.. [#] - `MessagePack fuzzing <https://blog.gypsyengineer.com/fun/msgpack-fuzzing.html>`_
+       - `Fixed integer overflow and EXT size problem <https://github.com/msgpack/msgpack-c/pull/547>`_
+       - `Fixed array and map size overflow <https://github.com/msgpack/msgpack-c/pull/550>`_
+
+Using OpenSSL
+=============
+
+Borg uses the OpenSSL library for most cryptography (see `Implementations used`_ above).
+OpenSSL is bundled with static releases, thus the bundled copy is not updated with system
+updates.
+
+OpenSSL is a large and complex piece of software and has had its share of vulnerabilities,
+however, it is important to note that Borg links against ``libcrypto`` **not** ``libssl``.
+libcrypto is the low-level cryptography part of OpenSSL,
+while libssl implements TLS and related protocols.
+
+The latter is not used by Borg (cf. `Remote RPC protocol security`_, Borg itself does not implement
+any network access) and historically contained most vulnerabilities, especially critical ones.
+The static binaries released by the project contain neither libssl nor the Python ssl/_ssl modules.

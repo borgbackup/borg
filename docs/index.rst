@@ -1,5 +1,5 @@
 .. include:: global.rst.inc
-
+.. highlight:: none
 
 Borg Documentation
 ==================

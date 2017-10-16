@@ -4,78 +4,147 @@
 
 borg create
 -----------
-::
+.. code-block:: none
 
-    borg create <options> ARCHIVE PATH
+    borg [common options] create [options] ARCHIVE [PATH...]
 
-positional arguments
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                                                                      |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``ARCHIVE``                                       | name of archive to create (must be also a valid directory name)                                                                                   |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``PATH``                                          | paths to archive                                                                                                                                  |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                                                                                                                        |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-n``, ``--dry-run``                             | do not create a backup archive                                                                                                                    |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-s``, ``--stats``                               | print statistics for the created archive                                                                                                          |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--list``                                        | output verbose list of items (files, dirs, ...)                                                                                                   |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--filter STATUSCHARS``                          | only display items with the given status characters (see description)                                                                             |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--json``                                        | output stats as JSON. Implies ``--stats``.                                                                                                        |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the cache. Implies ``--no-files-cache``.                                                                         |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                |
+    |                                                                                                                                                                                                                                                               |
+    | :ref:`common_options`                                                                                                                                                                                                                                         |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **Exclusion options**                                                                                                                                                                                                                                         |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-e PATTERN``, ``--exclude PATTERN``             | exclude paths matching PATTERN                                                                                                                    |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--exclude-from EXCLUDEFILE``                    | read exclude patterns from EXCLUDEFILE, one per line                                                                                              |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--pattern PATTERN``                             | experimental: include/exclude paths matching PATTERN                                                                                              |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--patterns-from PATTERNFILE``                   | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                        |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--exclude-caches``                              | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)                                              |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--exclude-if-present NAME``                     | exclude directories that are tagged by containing a filesystem object with the given NAME                                                         |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--keep-exclude-tags``, ``--keep-tag-files``     | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                         |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **Filesystem options**                                                                                                                                                                                                                                        |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems                                                                  |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--numeric-owner``                               | only store numeric user and group identifiers                                                                                                     |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--noatime``                                     | do not store atime into archive                                                                                                                   |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--noctime``                                     | do not store ctime into archive                                                                                                                   |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--ignore-inode``                                | ignore inode data in the file metadata cache used to detect unchanged files.                                                                      |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--read-special``                                | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files. |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **Archive options**                                                                                                                                                                                                                                           |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--comment COMMENT``                             | add a comment text to the archive                                                                                                                 |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--timestamp TIMESTAMP``                         | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). Alternatively, give a reference file/directory.                |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                            |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095                           |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                  |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
     ARCHIVE
         name of archive to create (must be also a valid directory name)
     PATH
         paths to archive
 
-optional arguments
-    ``-n``, ``--dry-run``
-        | do not create a backup archive
-    ``-s``, ``--stats``
-        | print statistics for the created archive
-    ``-p``, ``--progress``
-        | show progress display while creating the archive, showing Original, Compressed and Deduplicated sizes, followed by the Number of files seen and the path being processed, default: False
-    ``--list``
-        | output verbose list of items (files, dirs, ...)
-    ``--filter STATUSCHARS``
-        | only display items with the given status characters
 
-`Common options`_
-    |
+    optional arguments
+        -n, --dry-run    do not create a backup archive
+        -s, --stats     print statistics for the created archive
+        --list          output verbose list of items (files, dirs, ...)
+        --filter STATUSCHARS    only display items with the given status characters (see description)
+        --json          output stats as JSON. Implies ``--stats``.
+        --no-cache-sync    experimental: do not synchronize the cache. Implies ``--no-files-cache``.
 
-Exclusion options
-    ``-e PATTERN``, ``--exclude PATTERN``
-        | exclude paths matching PATTERN
-    ``--exclude-from EXCLUDEFILE``
-        | read exclude patterns from EXCLUDEFILE, one per line
-    ``--exclude-caches``
-        | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
-    ``--exclude-if-present NAME``
-        | exclude directories that are tagged by containing a filesystem object with the given NAME
-    ``--keep-exclude-tags``, ``--keep-tag-files``
-        | keep tag objects (i.e.: arguments to --exclude-if-present) in otherwise excluded caches/directories
 
-Filesystem options
-    ``-x``, ``--one-file-system``
-        | stay in same file system, do not cross mount points
-    ``--numeric-owner``
-        | only store numeric user and group identifiers
-    ``--noatime``
-        | do not store atime into archive
-    ``--noctime``
-        | do not store ctime into archive
-    ``--ignore-inode``
-        | ignore inode data in the file metadata cache used to detect unchanged files.
-    ``--read-special``
-        | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
+    :ref:`common_options`
+        |
 
-Archive options
-    ``--comment COMMENT``
-        | add a comment text to the archive
-    ``--timestamp TIMESTAMP``
-        | manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). alternatively, give a reference file/directory.
-    ``-c SECONDS``, ``--checkpoint-interval SECONDS``
-        | write checkpoint every SECONDS seconds (Default: 1800)
-    ``--chunker-params PARAMS``
-        | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
-    ``-C COMPRESSION``, ``--compression COMPRESSION``
-        | select compression algorithm, see the output of the "borg help compression" command for details.
-    ``--compression-from COMPRESSIONCONFIG``
-        | read compression patterns from COMPRESSIONCONFIG, see the output of the "borg help compression" command for details.
+    Exclusion options
+        -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
+        --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
+        --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
+        --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+        --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
+        --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
+        --keep-exclude-tags, --keep-tag-files    if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
+
+
+    Filesystem options
+        -x, --one-file-system     stay in the same file system and do not store mount points of other file systems
+        --numeric-owner           only store numeric user and group identifiers
+        --noatime                 do not store atime into archive
+        --noctime                 do not store ctime into archive
+        --ignore-inode            ignore inode data in the file metadata cache used to detect unchanged files.
+        --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
+
+
+    Archive options
+        --comment COMMENT                             add a comment text to the archive
+        --timestamp TIMESTAMP                         manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). Alternatively, give a reference file/directory.
+        -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
+        --chunker-params PARAMS                       specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
+        -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
+
 
 Description
 ~~~~~~~~~~~
 
 This command creates a backup archive containing all files found while recursively
-traversing all paths specified. When giving '-' as path, borg will read data
-from standard input and create a file 'stdin' in the created archive from that
-data.
+traversing all paths specified. Paths are added to the archive as they are given,
+that means if relative paths are desired, the command has to be run from the correct
+directory.
+
+When giving '-' as path, borg will read data from standard input and create a
+file 'stdin' in the created archive from that data.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -87,20 +156,42 @@ checkpoints and treated in special ways.
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
-To speed up pulling backups over sshfs and similar network file systems which do
-not provide correct inode information the --ignore-inode flag can be used. This
-potentially decreases reliability of change detection, while avoiding always reading
-all files on these file systems.
+Backup speed is increased by not reprocessing files that are already part of
+existing archives and weren't modified. Normally, detecting file modifications
+will take inode information into consideration. This is problematic for files
+located on sshfs and similar network file systems which do not provide stable
+inode numbers, such files will always be considered modified. The
+``--ignore-inode`` flag can be used to prevent this and improve performance.
+This flag will reduce reliability of change detection however, with files
+considered unmodified as long as their size and modification time are unchanged.
+
+The mount points of filesystems or filesystem snapshots should be the same for every
+creation of a new archive to ensure fast operation. This is because the file cache that
+is used to determine changed files quickly uses absolute filenames.
+If this is not possible, consider creating a bind mount to a stable location.
+
+The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
+(O, C and D, respectively), then the Number of files (N) processed so far, followed by
+the currently processed path.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
 
 .. man NOTES
 
-The --exclude patterns are not like tar. In tar --exclude .bundler/gems will
-exclude foo/.bundler/gems. In borg it will not, you need to use --exclude
+The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
+exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
 '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
 more information.
+
+In addition to using ``--exclude`` patterns, it is possible to use
+``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file
+or folder name) which, when contained within another folder, will prevent the
+containing folder from being backed up.  By default, the containing folder and
+all of its contents will be omitted from the backup.  If, however, you wish to
+only include the objects specified by ``--exclude-if-present`` in your backup,
+and not include any other contents of the containing folder, this can be enabled
+through using the ``--keep-exclude-tags`` option.
 
 Item flags
 ++++++++++

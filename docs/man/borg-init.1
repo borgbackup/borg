@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-INIT 1 "2017-02-11" "" "borg backup tool"
+.TH BORG-INIT 1 "2017-06-18" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .
@@ -32,13 +32,13 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg init <options> REPOSITORY
+borg [common options] init <options> REPOSITORY
 .SH DESCRIPTION
 .sp
 This command initializes an empty repository. A repository is a filesystem
 directory containing the deduplicated data from zero or more archives.
 .sp
-Encryption can be enabled at repository init time.
+Encryption can be enabled at repository init time. It cannot be changed later.
 .sp
 It is not recommended to work without encryption. Repository encryption protects
 you e.g. against the case that an attacker has access to your backup repository.
@@ -81,35 +81,91 @@ a different keyboard layout.
 You can change your passphrase for existing repos at any time, it won\(aqt affect
 the encryption/decryption key or other secrets.
 .SS Encryption modes
+.\" nanorst: inline-fill
+.
+.TS
+center;
+|l|l|l|l|.
+_
+T{
+Hash/MAC
+T}	T{
+Not encrypted
+no auth
+T}	T{
+Not encrypted,
+but authenticated
+T}	T{
+Encrypted (AEAD w/ AES)
+and authenticated
+T}
+_
+T{
+SHA\-256
+T}	T{
+none
+T}	T{
+\fIauthenticated\fP
+T}	T{
+repokey
+keyfile
+T}
+_
+T{
+BLAKE2b
+T}	T{
+n/a
+T}	T{
+\fIauthenticated\-blake2\fP
+T}	T{
+\fIrepokey\-blake2\fP
+\fIkeyfile\-blake2\fP
+T}
+_
+.TE
+.\" nanorst: inline-replace
+.
+.sp
+\fIMarked modes\fP are new in Borg 1.1 and are not backwards\-compatible with Borg 1.0.x.
+.sp
+On modern Intel/AMD CPUs (except very cheap ones), AES is usually
+hardware\-accelerated.
+BLAKE2b is faster than SHA256 on Intel/AMD 64\-bit CPUs
+(except AMD Ryzen and future CPUs with SHA extensions),
+which makes \fIauthenticated\-blake2\fP faster than \fInone\fP and \fIauthenticated\fP\&.
+.sp
+On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
+than BLAKE2b\-256 there. NEON accelerates AES as well.
+.sp
+Hardware acceleration is always used automatically when available.
 .sp
 \fIrepokey\fP and \fIkeyfile\fP use AES\-CTR\-256 for encryption and HMAC\-SHA256 for
 authentication in an encrypt\-then\-MAC (EtM) construction. The chunk ID hash
 is HMAC\-SHA256 as well (with a separate key).
-These modes are compatible with borg 1.0.x.
+These modes are compatible with Borg 1.0.x.
 .sp
 \fIrepokey\-blake2\fP and \fIkeyfile\-blake2\fP are also authenticated encryption modes,
 but use BLAKE2b\-256 instead of HMAC\-SHA256 for authentication. The chunk ID
 hash is a keyed BLAKE2b\-256 hash.
-These modes are new and \fInot\fP compatible with borg 1.0.x.
+These modes are new and \fInot\fP compatible with Borg 1.0.x.
 .sp
 \fIauthenticated\fP mode uses no encryption, but authenticates repository contents
-through the same keyed BLAKE2b\-256 hash as the other blake2 modes (it uses it
-as chunk ID hash). The key is stored like repokey.
-This mode is new and not compatible with borg 1.0.x.
+through the same HMAC\-SHA256 hash as the \fIrepokey\fP and \fIkeyfile\fP modes (it uses it
+as the chunk ID hash). The key is stored like \fIrepokey\fP\&.
+This mode is new and \fInot\fP compatible with Borg 1.0.x.
 .sp
-\fInone\fP mode uses no encryption and no authentication. It uses sha256 as chunk
+\fIauthenticated\-blake2\fP is like \fIauthenticated\fP, but uses the keyed BLAKE2b\-256 hash
+from the other blake2 modes.
+This mode is new and \fInot\fP compatible with Borg 1.0.x.
+.sp
+\fInone\fP mode uses no encryption and no authentication. It uses SHA256 as chunk
 ID hash. Not recommended, rather consider using an authenticated or
-authenticated/encrypted mode.
-This mode is compatible with borg 1.0.x.
-.sp
-Hardware acceleration will be used automatically.
-.sp
-On modern Intel/AMD CPUs (except very cheap ones), AES is usually
-hardware\-accelerated. BLAKE2b is faster than SHA256 on Intel/AMD 64bit CPUs,
-which makes \fIauthenticated\fP faster than \fInone\fP\&.
-.sp
-On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
-than BLAKE2b\-256 there.
+authenticated/encrypted mode. This mode has possible denial\-of\-service issues
+when running \fBborg create\fP on contents controlled by an attacker.
+Use it only for new repositories where no encryption is wanted \fBand\fP when compatibility
+with 1.0.x is important. If compatibility with 1.0.x is not important, use
+\fIauthenticated\-blake2\fP or \fIauthenticated\fP instead.
+This mode is compatible with Borg 1.0.x.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -123,10 +179,13 @@ repository to create
 .INDENT 0.0
 .TP
 .B \-e\fP,\fB  \-\-encryption
-select encryption key mode
+select encryption key mode \fB(required)\fP
 .TP
-.B \-a\fP,\fB  \-\-append\-only
+.B \-\-append\-only
 create an append\-only mode repository
+.TP
+.B \-\-storage\-quota
+Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

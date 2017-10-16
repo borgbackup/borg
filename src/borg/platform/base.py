@@ -1,6 +1,8 @@
 import errno
 import os
 
+from borg.helpers import truncate_and_unlink
+
 """
 platform base module
 ====================
@@ -13,7 +15,7 @@ platform API: that way platform APIs provided by the platform-specific support m
 are correctly composed into the base functionality.
 """
 
-API_VERSION = '1.1_01'
+API_VERSION = '1.1_02'
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
 
@@ -157,7 +159,7 @@ class SaveFile:
     def __enter__(self):
         from .. import platform
         try:
-            os.unlink(self.tmppath)
+            truncate_and_unlink(self.tmppath)
         except FileNotFoundError:
             pass
         self.fd = platform.SyncFile(self.tmppath, self.binary)
@@ -167,7 +169,7 @@ class SaveFile:
         from .. import platform
         self.fd.close()
         if exc_type is not None:
-            os.unlink(self.tmppath)
+            truncate_and_unlink(self.tmppath)
             return
         os.replace(self.tmppath, self.path)
         platform.sync_dir(os.path.dirname(self.path))
@@ -179,11 +181,6 @@ def swidth(s):
     For western scripts, this is just len(s), but for cjk glyphs, 2 cells are used.
     """
     return len(s)
-
-
-def umount(mountpoint):
-    """un-mount the FUSE filesystem mounted at <mountpoint>"""
-    return 0  # dummy, see also posix module
 
 
 def get_process_id():

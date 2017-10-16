@@ -6,6 +6,8 @@ import sys
 import tempfile
 from unittest.mock import patch
 
+import msgpack
+
 import pytest
 
 from ..hashindex import NSIndex
@@ -207,6 +209,23 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
 
         self.repository.commit()
         assert 0 not in [segment for segment, _ in self.repository.io.segment_iterator()]
+
+    def test_uncommitted_garbage(self):
+        # uncommitted garbage should be no problem, it is cleaned up automatically.
+        # we just have to be careful with invalidation of cached FDs in LoggedIO.
+        self.repository.put(H(0), b'foo')
+        self.repository.commit()
+        # write some crap to a uncommitted segment file
+        last_segment = self.repository.io.get_latest_segment()
+        with open(self.repository.io.segment_filename(last_segment + 1), 'wb') as f:
+            f.write(MAGIC + b'crapcrapcrap')
+        self.repository.close()
+        # usually, opening the repo and starting a transaction should trigger a cleanup.
+        self.repository = self.open()
+        with self.repository:
+            self.repository.put(H(0), b'bar')  # this may trigger compact_segments()
+            self.repository.commit()
+        # the point here is that nothing blows up with an exception.
 
 
 class RepositoryCommitTestCase(RepositoryTestCaseBase):
@@ -415,6 +434,43 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
         assert not os.path.exists(self.repository.path)
 
 
+class QuotaTestCase(RepositoryTestCaseBase):
+    def test_tracking(self):
+        assert self.repository.storage_quota_use == 0
+        self.repository.put(H(1), bytes(1234))
+        assert self.repository.storage_quota_use == 1234 + 41
+        self.repository.put(H(2), bytes(5678))
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41
+        self.repository.delete(H(1))
+        assert self.repository.storage_quota_use == 5678 + 41
+        self.repository.commit()
+        self.reopen()
+        with self.repository:
+            # Open new transaction; hints and thus quota data is not loaded unless needed.
+            self.repository.put(H(3), b'')
+            self.repository.delete(H(3))
+            assert self.repository.storage_quota_use == 5678 + 41
+
+    def test_exceed_quota(self):
+        assert self.repository.storage_quota_use == 0
+        self.repository.storage_quota = 50
+        self.repository.put(H(1), b'')
+        assert self.repository.storage_quota_use == 41
+        self.repository.commit()
+        with pytest.raises(Repository.StorageQuotaExceeded):
+            self.repository.put(H(2), b'')
+        assert self.repository.storage_quota_use == 82
+        with pytest.raises(Repository.StorageQuotaExceeded):
+            self.repository.commit()
+        assert self.repository.storage_quota_use == 82
+        self.reopen()
+        with self.repository:
+            self.repository.storage_quota = 50
+            # Open new transaction; hints and thus quota data is not loaded unless needed.
+            self.repository.put(H(1), b'')
+            assert self.repository.storage_quota_use == 41
+
+
 class NonceReservation(RepositoryTestCaseBase):
     def test_get_free_nonce_asserts(self):
         self.reopen(exclusive=False)
@@ -500,12 +556,108 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         with self.repository:
             assert len(self.repository) == 1
 
+    def _corrupt_index(self):
+        # HashIndex is able to detect incorrect headers and file lengths,
+        # but on its own it can't tell if the data is correct.
+        index_path = os.path.join(self.repository.path, 'index.1')
+        with open(index_path, 'r+b') as fd:
+            index_data = fd.read()
+            # Flip one bit in a key stored in the index
+            corrupted_key = (int.from_bytes(H(0), 'little') ^ 1).to_bytes(32, 'little')
+            corrupted_index_data = index_data.replace(H(0), corrupted_key)
+            assert corrupted_index_data != index_data
+            assert len(corrupted_index_data) == len(index_data)
+            fd.seek(0)
+            fd.write(corrupted_index_data)
+
+    def test_index_corrupted(self):
+        # HashIndex is able to detect incorrect headers and file lengths,
+        # but on its own it can't tell if the data itself is correct.
+        self._corrupt_index()
+        with self.repository:
+            # Data corruption is detected due to mismatching checksums
+            # and fixed by rebuilding the index.
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
+
+    def test_index_corrupted_without_integrity(self):
+        self._corrupt_index()
+        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        os.unlink(integrity_path)
+        with self.repository:
+            # Since the corrupted key is not noticed, the repository still thinks
+            # it contains one key...
+            assert len(self.repository) == 1
+            with pytest.raises(Repository.ObjectNotFound):
+                # ... but the real, uncorrupted key is not found in the corrupted index.
+                self.repository.get(H(0))
+
     def test_unreadable_index(self):
         index = os.path.join(self.repository.path, 'index.1')
         os.unlink(index)
         os.mkdir(index)
         with self.assert_raises(OSError):
             self.do_commit()
+
+    def test_unknown_integrity_version(self):
+        # For now an unknown integrity data version is ignored and not an error.
+        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        with open(integrity_path, 'r+b') as fd:
+            msgpack.pack({
+                # Borg only understands version 2
+                b'version': 4.7,
+            }, fd)
+            fd.truncate()
+        with self.repository:
+            # No issues accessing the repository
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
+
+    def _subtly_corrupted_hints_setup(self):
+        with self.repository:
+            self.repository.append_only = True
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
+            self.repository.put(H(1), b'bar')
+            self.repository.put(H(2), b'baz')
+            self.repository.commit()
+            self.repository.put(H(2), b'bazz')
+            self.repository.commit()
+
+        hints_path = os.path.join(self.repository.path, 'hints.5')
+        with open(hints_path, 'r+b') as fd:
+            hints = msgpack.unpack(fd)
+            fd.seek(0)
+            # Corrupt segment refcount
+            assert hints[b'segments'][2] == 1
+            hints[b'segments'][2] = 0
+            msgpack.pack(hints, fd)
+            fd.truncate()
+
+    def test_subtly_corrupted_hints(self):
+        self._subtly_corrupted_hints_setup()
+        with self.repository:
+            self.repository.append_only = False
+            self.repository.put(H(3), b'1234')
+            # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
+            self.repository.commit()
+
+            assert len(self.repository) == 4
+            assert self.repository.get(H(0)) == b'foo'
+            assert self.repository.get(H(1)) == b'bar'
+            assert self.repository.get(H(2)) == b'bazz'
+
+    def test_subtly_corrupted_hints_without_integrity(self):
+        self._subtly_corrupted_hints_setup()
+        integrity_path = os.path.join(self.repository.path, 'integrity.5')
+        os.unlink(integrity_path)
+        with self.repository:
+            self.repository.append_only = False
+            self.repository.put(H(3), b'1234')
+            # Do a compaction run. Fails, since the corrupted refcount was not detected and leads to an assertion failure.
+            with pytest.raises(AssertionError) as exc_info:
+                self.repository.commit()
+            assert 'Corrupted segment reference count' in str(exc_info.value)
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
@@ -639,8 +791,8 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             self.assert_equal(self.repository.get(H(0)), b'data2')
 
 
-@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryTestCase(RepositoryTestCase):
+    repository = None  # type: RemoteRepository
 
     def open(self, create=False):
         return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
@@ -679,7 +831,8 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         try:
             self.repository.call('inject_exception', {'kind': 'PathNotAllowed'})
         except PathNotAllowed as e:
-            assert len(e.args) == 0
+            assert len(e.args) == 1
+            assert e.args[0] == 'foo'
 
         try:
             self.repository.call('inject_exception', {'kind': 'ObjectNotFound'})
@@ -714,6 +867,11 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         class MockArgs:
             remote_path = 'borg'
             umask = 0o077
+            debug_topics = []
+
+            def __contains__(self, item):
+                # To behave like argparse.Namespace
+                return hasattr(self, item)
 
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
         args = MockArgs()
@@ -723,6 +881,15 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
         args.remote_path = 'borg-0.28.2'
         assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']
+        args.debug_topics = ['something_client_side', 'repository_compaction']
+        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info',
+                                                                 '--debug-topic=borg.debug.repository_compaction']
+        args = MockArgs()
+        args.storage_quota = 0
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
+        args.storage_quota = 314159265
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info',
+                                                                 '--storage-quota=314159265']
 
 
 class RemoteLegacyFree(RepositoryTestCaseBase):
@@ -750,7 +917,6 @@ class RemoteLegacyFree(RepositoryTestCaseBase):
             self.repository.commit()
 
 
-@pytest.mark.skipif(sys.platform == 'cygwin', reason='remote is broken on cygwin and hangs')
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):
@@ -778,16 +944,22 @@ class RemoteLoggerTestCase(BaseTestCase):
         sys.stderr = self.old_stderr
 
     def test_stderr_messages(self):
-        handle_remote_line("unstructured stderr message")
+        handle_remote_line("unstructured stderr message\n")
         self.assert_equal(self.stream.getvalue(), '')
         # stderr messages don't get an implicit newline
-        self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr message')
+        self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr message\n')
+
+    def test_stderr_progress_messages(self):
+        handle_remote_line("unstructured stderr progress message\r")
+        self.assert_equal(self.stream.getvalue(), '')
+        # stderr messages don't get an implicit newline
+        self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr progress message\r')
 
     def test_pre11_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
-        handle_remote_line("$LOG INFO Remote: borg < 1.1 format message")
+        handle_remote_line("$LOG INFO Remote: borg < 1.1 format message\n")
         self.assert_equal(self.stream.getvalue(), 'Remote: borg < 1.1 format message\n')
         self.assert_equal(self.stderr.getvalue(), '')
 
@@ -795,7 +967,7 @@ class RemoteLoggerTestCase(BaseTestCase):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
-        handle_remote_line("$LOG INFO borg.repository Remote: borg >= 1.1 format message")
+        handle_remote_line("$LOG INFO borg.repository Remote: borg >= 1.1 format message\n")
         self.assert_equal(self.stream.getvalue(), 'Remote: borg >= 1.1 format message\n')
         self.assert_equal(self.stderr.getvalue(), '')
 
@@ -804,7 +976,7 @@ class RemoteLoggerTestCase(BaseTestCase):
         self.handler.setLevel(logging.WARNING)
         logging.getLogger().setLevel(logging.WARNING)
 
-        handle_remote_line("$LOG INFO borg.repository Remote: new format info message")
+        handle_remote_line("$LOG INFO borg.repository Remote: new format info message\n")
         self.assert_equal(self.stream.getvalue(), '')
         self.assert_equal(self.stderr.getvalue(), '')
 
@@ -824,7 +996,7 @@ class RemoteLoggerTestCase(BaseTestCase):
         foo_handler.setLevel(logging.INFO)
         logging.getLogger('borg.repository.foo').handlers[:] = [foo_handler]
 
-        handle_remote_line("$LOG INFO borg.repository Remote: new format child message")
+        handle_remote_line("$LOG INFO borg.repository Remote: new format child message\n")
         self.assert_equal(foo_stream.getvalue(), '')
         self.assert_equal(child_stream.getvalue(), 'Remote: new format child message\n')
         self.assert_equal(self.stream.getvalue(), '')

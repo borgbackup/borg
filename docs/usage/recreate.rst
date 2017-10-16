@@ -1,11 +1,12 @@
 .. include:: recreate.rst.inc
+.. include:: ../global.rst.inc
 
 Examples
 ~~~~~~~~
 ::
 
-    # Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives.
-    # Archives created with Borg 1.1+ and the default chunker params are skipped
+    # Make old (Attic / |project_name| 0.xx) archives deduplicate with |project_name| 1.x archives.
+    # Archives created with |project_name| 1.1+ and the default chunker params are skipped
     # (archive ID stays the same).
     $ borg recreate /mnt/backup --chunker-params default --progress
 

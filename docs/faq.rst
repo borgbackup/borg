@@ -15,10 +15,10 @@ Yes, the `deduplication`_ technique used by
 |project_name| makes sure only the modified parts of the file are stored.
 Also, we have optional simple sparse file support for extract.
 
-If you use non-snapshotting backup tools like Borg to back up virtual machines,
+If you use non-snapshotting backup tools like |project_name| to back up virtual machines,
 then the VMs should be turned off for the duration of the backup. Backing up live VMs can (and will)
 result in corrupted or inconsistent backup contents: a VM image is just a regular file to
-Borg with the same issues as regular files when it comes to concurrent reading and writing from
+|project_name| with the same issues as regular files when it comes to concurrent reading and writing from
 the same file.
 
 For backing up live VMs use file system snapshots on the VM host, which establishes
@@ -31,7 +31,7 @@ contents are normally not journaled. Notable exceptions are ext4 in data=journal
 ZFS and btrfs (unless nodatacow is used).
 
 Applications designed with crash-consistency in mind (most relational databases
-like PostgreSQL, SQLite etc. but also for example Borg repositories) should always
+like PostgreSQL, SQLite etc. but also for example |project_name| repositories) should always
 be able to recover to a consistent state from a backup created with
 crash-consistent snapshots (even on ext4 with data=writeback or XFS).
 
@@ -43,8 +43,8 @@ reliable way to create application-consistent backups.
 Other applications may require a lot of work to reach application-consistency:
 It's a broad and complex issue that cannot be explained in entirety here.
 
-Borg doesn't intend to address these issues due to their huge complexity
-and platform/software dependency. Combining Borg with the mechanisms provided
+|project_name| doesn't intend to address these issues due to their huge complexity
+and platform/software dependency. Combining |project_name| with the mechanisms provided
 by the platform (snapshots, hypervisor features) will be the best approach
 to start tackling them.
 
@@ -72,7 +72,7 @@ backup is running (use `borg with-lock ...`). So what you get here is this:
 - client machine ---borg create---> repo1
 - repo1 ---copy---> repo2
 
-There is no special borg command to do the copying, just use cp or rsync if
+There is no special |project_name| command to do the copying, just use cp or rsync if
 you want to do that.
 
 But think about whether that is really what you want. If something goes
@@ -188,14 +188,14 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
-Can I use Borg on SMR hard drives?
-----------------------------------
+Can I use |project_name| on SMR hard drives?
+--------------------------------------------
 
 SMR (shingled magnetic recording) hard drives are very different from
 regular hard drives. Applications have to behave in certain ways or
 performance will be heavily degraded.
 
-Borg 1.1 ships with default settings suitable for SMR drives,
+|project_name| 1.1 ships with default settings suitable for SMR drives,
 and has been successfully tested on *Seagate Archive v2* drives
 using the ext4 file system.
 
@@ -210,7 +210,7 @@ For more details, refer to :issue:`2252`.
 I get an IntegrityError or similar - what now?
 ----------------------------------------------
 
-A single error does not necessarily indicate bad hardware or a Borg
+A single error does not necessarily indicate bad hardware or a |project_name|
 bug. All hardware exhibits a bit error rate (BER). Hard drives are typically
 specified as exhibiting less than one error every 12 to 120 TB
 (one bit error in 10e14 to 10e15 bits). The specification is often called
@@ -219,7 +219,7 @@ specified as exhibiting less than one error every 12 to 120 TB
 Apart from these very rare errors there are two main causes of errors:
 
 (i) Defective hardware: described below.
-(ii) Bugs in software (Borg, operating system, libraries):
+(ii) Bugs in software (|project_name|, operating system, libraries):
      Ensure software is up to date.
      Check whether the issue is caused by any fixed bugs described in :ref:`important_notes`.
 
@@ -246,7 +246,7 @@ Checking hard drives
   I/O errors logged by the system (refer to the system journal or
   dmesg) can point to issues as well. I/O errors only affecting the
   file system easily go unnoticed, since they are not reported to
-  applications (e.g. Borg), while these errors can still corrupt data.
+  applications (e.g. |project_name|), while these errors can still corrupt data.
 
   Drives can corrupt some sectors in one event, while remaining
   reliable otherwise. Conversely, drives can fail completely with no
@@ -321,7 +321,7 @@ Using ``BORG_PASSCOMMAND`` with a properly permissioned file
 
     export BORG_PASSCOMMAND="cat ~/.borg-passphrase"
 
-  and Borg will automatically use that passphrase.
+  and |project_name| will automatically use that passphrase.
 
 Using keyfile-based encryption with a blank passphrase
   It is possible to encrypt your repository in ``keyfile`` mode instead of the default
@@ -345,7 +345,7 @@ Using ``BORG_PASSCOMMAND`` with macOS Keychain
     export BORG_PASSCOMMAND="security find-generic-password -a $USER -s borg-passphrase -w"
 
 Using ``BORG_PASSCOMMAND`` with GNOME Keyring
-  GNOME also has a keyring daemon that can be used to store a Borg passphrase.
+  GNOME also has a keyring daemon that can be used to store a |project_name| passphrase.
   First ensure ``libsecret-tools``, ``gnome-keyring`` and ``libpam-gnome-keyring``
   are installed. If ``libpam-gnome-keyring`` wasn't already installed, ensure it
   runs on login::
@@ -410,7 +410,7 @@ How can I protect against a hacked backup client?
 -------------------------------------------------
 
 Assume you backup your backup client machine C to the backup server S and
-C gets hacked. In a simple push setup, the attacker could then use borg on
+C gets hacked. In a simple push setup, the attacker could then use |project_name| on
 C to delete all backups residing on S.
 
 These are your options to protect against that:
@@ -450,8 +450,8 @@ Thus:
 - have media at another place
 - have a relatively recent backup on your media
 
-How do I report a security issue with Borg?
--------------------------------------------
+How do I report a security issue with |project_name|?
+-----------------------------------------------------
 
 Send a private email to the :ref:`security contact <security-contact>`
 if you think you have discovered a security issue.
@@ -469,8 +469,8 @@ stops after a while (some minutes, hours, ... - not immediately) with
 
 That's a good question and we are trying to find a good answer in :issue:`636`.
 
-Why am I seeing idle borg serve processes on the repo server?
--------------------------------------------------------------
+Why am I seeing idle |project_name| serve processes on the repo server?
+-----------------------------------------------------------------------
 
 Maybe the ssh connection between client and server broke down and that was not
 yet noticed on the server. Try these settings:
@@ -489,8 +489,8 @@ connections and release the lock).
 
 .. _disable_archive_chunks:
 
-The borg cache eats way too much disk space, what can I do?
------------------------------------------------------------
+The |project_name| cache eats way too much disk space, what can I do?
+---------------------------------------------------------------------
 
 There is a temporary (but maybe long lived) hack to avoid using lots of disk
 space for chunks.archive.d (see :issue:`235` for details):
@@ -503,7 +503,7 @@ space for chunks.archive.d (see :issue:`235` for details):
     rm -rf chunks.archive.d ; touch chunks.archive.d
 
 This deletes all the cached archive chunk indexes and replaces the directory
-that kept them with a file, so borg won't be able to store anything "in" there
+that kept them with a file, so |project_name| won't be able to store anything "in" there
 in future.
 
 This has some pros and cons, though:
@@ -519,8 +519,8 @@ This has some pros and cons, though:
 
 The long term plan to improve this is called "borgception", see :issue:`474`.
 
-Can I backup my root partition (/) with Borg?
----------------------------------------------
+Can I backup my root partition (/) with |project_name|?
+-------------------------------------------------------
 
 Backing up your entire root partition works just fine, but remember to
 exclude directories that make no sense to backup, such as /dev, /proc,
@@ -685,7 +685,7 @@ running `borg check --repair` will fix most problems.
 Why isn't there more progress / ETA information displayed?
 ----------------------------------------------------------
 
-Some borg runs take quite a bit, so it would be nice to see a progress display,
+Some |project_name| runs take quite a bit, so it would be nice to see a progress display,
 maybe even including a ETA (expected time of "arrival" [here rather "completion"]).
 
 For some functionality, this can be done: if the total amount of work is more or
@@ -701,7 +701,7 @@ could not compute the ``borg create`` ETA as we do not know the amount of change
 chunks, how the bandwidth of source and destination or system performance might
 fluctuate.
 
-You see, trying to display ETA would be futile. The borg developers prefer to
+You see, trying to display ETA would be futile. The |project_name| developers prefer to
 rather not implement progress / ETA display than doing futile attempts.
 
 See also: https://xkcd.com/612/
@@ -710,8 +710,8 @@ See also: https://xkcd.com/612/
 Miscellaneous
 #############
 
-Requirements for the borg single-file binary, esp. (g)libc?
------------------------------------------------------------
+Requirements for the |project_name| single-file binary, esp. (g)libc?
+---------------------------------------------------------------------
 
 We try to build the binary on old, but still supported systems - to keep the
 minimum requirement for the (g)libc low. The (g)libc can't be bundled into
@@ -724,22 +724,22 @@ below the required version, maybe just try. Due to the dynamic loading (or not
 loading) of some shared libraries, it might still work depending on what
 libraries are actually loaded and used.
 
-In the borg git repository, there is scripts/glibc_check.py that can determine
+In the |project_name| git repository, there is scripts/glibc_check.py that can determine
 (based on the symbols' versions they want to link to) whether a set of given
 (Linux) binaries works with a given glibc version.
 
 
-Why was Borg forked from Attic?
--------------------------------
+Why was |project_name| forked from Attic?
+-----------------------------------------
 
-Borg was created in May 2015 in response to the difficulty of getting new
+|project_name| was created in May 2015 in response to the difficulty of getting new
 code or larger changes incorporated into Attic and establishing a bigger
 developer community / more open development.
 
 More details can be found in `ticket 217
 <https://github.com/jborg/attic/issues/217>`_ that led to the fork.
 
-Borg intends to be:
+|project_name| intends to be:
 
 * simple:
 
@@ -753,7 +753,7 @@ Borg intends to be:
   * discuss openly, don't work in the dark
 * changing:
 
-  * Borg is not compatible with Attic
+  * |project_name| is not compatible with Attic
   * do not break compatibility accidentally, without a good reason
     or without warning. allow compatibility breaking for other cases.
   * if major version number changes, it may have incompatible changes
@@ -761,10 +761,10 @@ Borg intends to be:
 Migrating from Attic
 ####################
 
-What are the differences between Attic and Borg?
-------------------------------------------------
+What are the differences between Attic and |project_name|?
+----------------------------------------------------------
 
-Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
+|project_name| is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
 .. _Attic: https://github.com/jborg/attic
 .. _The Borg collective: https://borgbackup.readthedocs.org/en/latest/authors.html
@@ -789,10 +789,10 @@ Here's a (incomplete) list of some major changes:
 Please read the :ref:`changelog` (or ``docs/changes.rst`` in the source distribution) for more
 information.
 
-Borg is not compatible with original Attic (but there is a one-way conversion).
+|project_name| is not compatible with original Attic (but there is a one-way conversion).
 
-How do I migrate from Attic to Borg?
-------------------------------------
+How do I migrate from Attic to |project_name|?
+----------------------------------------------
 
 Use :ref:`borg_upgrade`. This is a one-way process that cannot be reversed.
 
@@ -810,11 +810,11 @@ There are some caveats:
   3. Copy the attic key file to ``~/.config/borg/keys/``
   4. Change the first line from ``ATTIC_KEY ...`` to ``BORG_KEY ...``.
   5. Verify that the repository is now accessible (e.g. ``borg list <repository>``).
-- Attic and Borg use different :ref:`"chunker params" <chunker-params>`.
-  This means that data added by Borg won't deduplicate with the existing data
-  stored by Attic. The effect is lessened if the files cache is used with Borg.
+- Attic and |project_name| use different :ref:`"chunker params" <chunker-params>`.
+  This means that data added by |project_name| won't deduplicate with the existing data
+  stored by Attic. The effect is lessened if the files cache is used with |project_name|.
 - Repositories in "passphrase" mode *must* be migrated to "repokey" mode using
-  :ref:`borg_key_migrate-to-repokey`. Borg does not support the "passphrase" mode
+  :ref:`borg_key_migrate-to-repokey`. |project_name| does not support the "passphrase" mode
   any other way.
 
 Why is my backup bigger than with attic?
@@ -824,7 +824,7 @@ Attic was rather unflexible when it comes to compression, it always
 compressed using zlib level 6 (no way to switch compression off or
 adjust the level or algorithm).
 
-The default in Borg is lz4, which is fast enough to not use significant CPU time
+The default in |project_name| is lz4, which is fast enough to not use significant CPU time
 in most cases, but can only achieve modest compression. It still compresses
 easily compressed data fairly well.
 

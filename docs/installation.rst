@@ -96,7 +96,7 @@ on the releases_ page for the following platforms:
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 
 To install such a binary, just drop it into a directory in your ``PATH``,
-make borg readable and executable for its users and then you can run ``borg``::
+make |project_name| readable and executable for its users and then you can run ``borg``::
 
     sudo cp borg-linux64 /usr/local/bin/borg
     sudo chown root:root /usr/local/bin/borg
@@ -128,7 +128,7 @@ From Source
   compiled to be able to run on such systems (like Python installed via Anaconda)
   might miss functions required by Borg.
 
-  This issue will be detected early and Borg will abort with a fatal error.
+  This issue will be detected early and |project_name| will abort with a fatal error.
 
 Dependencies
 ~~~~~~~~~~~~

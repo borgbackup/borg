@@ -174,7 +174,7 @@ For more information, refer to the sudo(8) man page and ``env_keep`` in
 the sudoers(5) man page.
 
 .. Tip::
-    To debug what your borg process is actually seeing, find its PID
+    To debug what your |project_name| process is actually seeing, find its PID
     (``ps aux|grep borg``) and then look into ``/proc/<PID>/environ``.
 
 .. backup_compression:

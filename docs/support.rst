@@ -42,7 +42,7 @@ Twitter
 -------
 
 Follow @borgbackup for announcements. You can also add @borgbackup if you
-would like to get retweeted for a borg related tweet.
+would like to get retweeted for a |project_name| related tweet.
 
 Please understand that Twitter is not suitable for longer / more complex
 discussions - use one of the other channels for that.

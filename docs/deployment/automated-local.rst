@@ -44,7 +44,7 @@ Then, create ``etc/backups/40-backup.rules`` with the following content (all on 
     Pick the event whose device path ends in something similar to a device file name,
     typically`sdX/sdXY`. Use the event's device path and replace `sdX/sdXY` after the
     `/block/` part in the path with a star (\*). For example:
-    `DEVPATH=="/devices/pci0000:00/0000:00:11.0/ata3/host2/target2:0:0/2:0:0:0/block/*"`.
+    `DEVPATH=="/devices/pci0000:00/0000:00:11.0/ata3/host2/target2:0:0/2:0:0:0/block/\*"`.
 
     Reboot a few times to ensure that the hardware path does not change: on some motherboards
     components of it can be random. In these cases you cannot use a more accurate rule,
@@ -82,7 +82,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # The backup partition is mounted there
     MOUNTPOINT=/mnt/backup
 
-    # This is the location of the Borg repository
+    # This is the location of the |project_name| repository
     TARGET=$MOUNTPOINT/borg-backups/backup.borg
 
     # Archive name schema
@@ -124,7 +124,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # Set BORG_PASSPHRASE or BORG_PASSCOMMAND somewhere around here, using export,
     # if encryption is used.
 
-    # No one can answer if Borg asks these questions, it is better to just fail quickly
+    # No one can answer if |project_name| asks these questions, it is better to just fail quickly
     # instead of hanging.
     export BORG_RELOCATED_REPO_ACCESS_IS_OK=no
     export BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no
@@ -196,7 +196,7 @@ Note the UUID into the ``/etc/backup/backup.disks`` file.
 
 Mount the drive to /mnt/backup.
 
-Initialize a Borg repository at the location indicated by ``TARGET``::
+Initialize a |project_name| repository at the location indicated by ``TARGET``::
 
     borg init --encryption ... /mnt/backup/borg-backups/backup.borg
 
@@ -217,15 +217,15 @@ The script as shown above will mount any file system with an UUID listed in
 mechanism to keep the script from blowing up whenever a random USB thumb drive is connected.
 It is not meant as a security mechanism. Mounting file systems and reading repository
 data exposes additional attack surfaces (kernel file system drivers,
-possibly user space services and Borg itself). On the other hand, someone
+possibly user space services and |project_name| itself). On the other hand, someone
 standing right next to your computer can attempt a lot of attacks, most of which
 are easier to do than e.g. exploiting file systems (installing a physical key logger,
 DMA attacks, stealing the machine, ...).
 
-Borg ensures that backups are not created on random drives that "just happen"
-to contain a Borg repository. If an unknown unencrypted repository is encountered,
+|project_name| ensures that backups are not created on random drives that "just happen"
+to contain a |project_name| repository. If an unknown unencrypted repository is encountered,
 then the script aborts (BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no).
 
-Backups are only created on hard drives that contain a Borg repository that is
+Backups are only created on hard drives that contain a |project_name| repository that is
 either known (by ID) to your machine or you are using encryption and the
-passphrase of the repository has to match the passphrase supplied to Borg.
+passphrase of the repository has to match the passphrase supplied to |project_name|.

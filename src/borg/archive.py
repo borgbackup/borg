@@ -886,12 +886,11 @@ Utilization of max. archive size: {csize_max:.0%}
     def process_symlink(self, path, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
+        # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
         with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             with backup_io('readlink'):
                 source = os.readlink(path)
             item.source = source
-            if st.st_nlink > 1:
-                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
             item.update(self.stat_attrs(st, path))
             return status
 

@@ -12,7 +12,7 @@ Can I backup VM disk images?
 ----------------------------
 
 Yes, the `deduplication`_ technique used by
-|project_name| makes sure only the modified parts of the file are stored.
+Borg makes sure only the modified parts of the file are stored.
 Also, we have optional simple sparse file support for extract.
 
 If you use non-snapshotting backup tools like Borg to back up virtual machines,
@@ -51,16 +51,16 @@ to start tackling them.
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------
 
-Yes, but in order for the deduplication used by |project_name| to work, it
+Yes, but in order for the deduplication used by Borg to work, it
 needs to keep a local cache containing checksums of all file
 chunks already stored in the repository. This cache is stored in
-``~/.cache/borg/``.  If |project_name| detects that a repository has been
+``~/.cache/borg/``.  If Borg detects that a repository has been
 modified since the local cache was updated it will need to rebuild
 the cache. This rebuild can be quite time consuming.
 
 So, yes it's possible. But it will be most efficient if a single
 repository is only modified from one place. Also keep in mind that
-|project_name| will keep an exclusive lock on the repository while creating
+Borg will keep an exclusive lock on the repository while creating
 or deleting archives, which may make *simultaneous* backups fail.
 
 Can I copy or synchronize my repo to another location?
@@ -116,7 +116,7 @@ Are there other known limitations?
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
 
-Yes, |project_name| supports resuming backups.
+Yes, Borg supports resuming backups.
 
 During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
 is saved every checkpoint interval (the default value for this is 30
@@ -134,7 +134,7 @@ just invoke ``borg create`` as you always do. You may use the same archive name
 as in previous attempt or a different one (e.g. if you always include the current
 datetime), it does not matter.
 
-|project_name| always does full single-pass backups, so it will start again
+Borg always does full single-pass backups, so it will start again
 from the beginning - but it will be much faster, because some of the data was
 already stored into the repo (and is still referenced by the checkpoint
 archive), so it does not need to get transmitted and stored again.
@@ -167,8 +167,8 @@ all the part files and manually concatenate them together.
 
 For more details, see :ref:`checkpoints_parts`.
 
-Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
----------------------------------------------------------------------------------------
+Can Borg add redundancy to the backup data to deal with hardware malfunction?
+-----------------------------------------------------------------------------
 
 No, it can't. While that at first sounds like a good idea to defend against
 some defect HDD sectors or SSD flash blocks, dealing with this in a
@@ -180,8 +180,8 @@ storage or just make backups to different locations / different hardware.
 
 See also :issue:`225`.
 
-Can |project_name| verify data integrity of a backup archive?
--------------------------------------------------------------
+Can Borg verify data integrity of a backup archive?
+---------------------------------------------------
 
 Yes, if you want to detect accidental data damage (like bit rot), use the
 ``check`` operation. It will notice corruption using CRCs and hashes.
@@ -551,7 +551,7 @@ If you run into that, try this:
 I am seeing 'A' (added) status for an unchanged file!?
 ------------------------------------------------------
 
-The files cache is used to determine whether |project_name| already
+The files cache is used to determine whether Borg already
 "knows" / has backed up a file and if so, to skip the file from
 chunking. It does intentionally *not* contain files that have a modification
 time (mtime) same as the newest mtime in the created archive.
@@ -563,7 +563,7 @@ This is expected: it is to avoid data loss with files that are backed up from
 a snapshot and that are immediately changed after the snapshot (but within
 mtime granularity time, so the mtime would not change). Without the code that
 removes these files from the files cache, the change that happened right after
-the snapshot would not be contained in the next backup as |project_name| would
+the snapshot would not be contained in the next backup as Borg would
 think the file is unchanged.
 
 This does not affect deduplication, the file will be chunked, but as the chunks
@@ -586,13 +586,13 @@ already used.
 It always chunks all my files, even unchanged ones!
 ---------------------------------------------------
 
-|project_name| maintains a files cache where it remembers the mtime, size and
-inode of files. When |project_name| does a new backup and starts processing a
+Borg maintains a files cache where it remembers the mtime, size and
+inode of files. When Borg does a new backup and starts processing a
 file, it first looks whether the file has changed (compared to the values
 stored in the files cache). If the values are the same, the file is assumed
 unchanged and thus its contents won't get chunked (again).
 
-|project_name| can't keep an infinite history of files of course, thus entries
+Borg can't keep an infinite history of files of course, thus entries
 in the files cache have a "maximum time to live" which is set via the
 environment variable BORG_FILES_CACHE_TTL (and defaults to 20).
 Every time you do a backup (on the same machine, using the same user), the
@@ -609,11 +609,11 @@ it would be much faster.
 Another possible reason is that files don't always have the same path, for
 example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable.
 If the directory where you mount a filesystem is different every time,
-|project_name| assume they are different files.
+Borg assume they are different files.
 
 
-Is there a way to limit bandwidth with |project_name|?
-------------------------------------------------------
+Is there a way to limit bandwidth with Borg?
+--------------------------------------------
 
 To limit upload (i.e. :ref:`borg_create`) bandwidth, use the
 ``--remote-ratelimit`` option.
@@ -634,7 +634,7 @@ Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::
 
     export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
 
-Now |project_name| will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
+Now Borg will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
 
     pv -R $(pidof pv) -L 102400
 
@@ -644,7 +644,7 @@ Now |project_name| will be bandwidth limited. Nice thing about pv is that you ca
 I am having troubles with some network/FUSE/special filesystem, why?
 --------------------------------------------------------------------
 
-|project_name| is doing nothing special in the filesystem, it only uses very
+Borg is doing nothing special in the filesystem, it only uses very
 common and compatible operations (even the locking is just "mkdir").
 
 So, if you are encountering issues like slowness, corruption or malfunction
@@ -652,13 +652,13 @@ when using a specific filesystem, please try if you can reproduce the issues
 with a local (non-network) and proven filesystem (like ext4 on Linux).
 
 If you can't reproduce the issue then, you maybe have found an issue within
-the filesystem code you used (not with |project_name|). For this case, it is
+the filesystem code you used (not with Borg). For this case, it is
 recommended that you talk to the developers / support of the network fs and
 maybe open an issue in their issue tracker. Do not file an issue in the
-|project_name| issue tracker.
+Borg issue tracker.
 
 If you can reproduce the issue with the proven filesystem, please file an
-issue in the |project_name| issue tracker about that.
+issue in the Borg issue tracker about that.
 
 
 Why does running 'borg check --repair' warn about data loss?
@@ -670,7 +670,7 @@ instances, such as malfunctioning storage hardware, additional repo
 corruption may occur. If you can't afford to lose the repo, it's strongly
 recommended that you perform repair on a copy of the repo.
 
-In other words, the warning is there to emphasize that |project_name|:
+In other words, the warning is there to emphasize that Borg:
   - Will perform automated routines that modify your backup repository
   - Might not actually fix the problem you are experiencing
   - Might, in very rare cases, further corrupt your repository

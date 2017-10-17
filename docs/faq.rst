@@ -94,6 +94,9 @@ Which file types, attributes, etc. are *not* preserved?
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
     * filesystem specific attributes, like ext4 immutable bit, see :issue:`618`.
+    * For hardlinked symlinks, the hardlinking can not be archived (and thus,
+      the hardlinking will not be done at extraction time). The symlinks will
+      be archived and extracted as non-hardlinked symlinks, see :issue:`2379`.
 
 Are there other known limitations?
 ----------------------------------

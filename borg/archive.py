@@ -633,6 +633,9 @@ Number of files: {0.stats.nfiles}'''.format(
             return 'b'  # block device
 
     def process_symlink(self, path, st):
+        # note: we can not support hardlinked symlinks,
+        #       due to the dual-use of item[b'source'], see issue #2343:
+        # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
         with backup_io():
             source = os.readlink(path)
         item = {b'path': make_path_safe(path), b'source': source}

@@ -1063,12 +1063,11 @@ class FilesystemObjectProcessors:
     def process_symlink(self, path, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
+        # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
         with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             with backup_io('readlink'):
                 source = os.readlink(path)
             item.source = source
-            if st.st_nlink > 1:
-                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 

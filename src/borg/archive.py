@@ -1068,7 +1068,7 @@ class FilesystemObjectProcessors:
                 source = os.readlink(path)
             item.source = source
             if st.st_nlink > 1:
-                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
+                logger.warning('hardlinked symlink will be archived as non-hardlinked symlink: %s', path)
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 

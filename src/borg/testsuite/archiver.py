@@ -380,8 +380,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('init', '--encryption=repokey', '--show-version', '--show-rc', self.repository_location, fork=True)
         self.assert_in('borgbackup version', output)
         self.assert_in('terminating with success status, rc 0', output)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        output = self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--exclude-nodump', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--exclude-nodump', '--stats', self.repository_location + '::test.2', 'input')
         self.assert_in('Archive name: test.2', output)
         self.assert_in('This archive: ', output)
         with changedir('output'):
@@ -1655,13 +1655,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.create_regular_file('file3', size=1024 * 80)
             platform.set_flags(os.path.join(self.input_path, 'file3'), stat.UF_NODUMP)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--list', '--exclude-nodump', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         if has_lchflags:
             self.assert_in("x input/file3", output)
         # should find second file as excluded
-        output = self.cmd('create', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
+        output = self.cmd('create', '--list', '--exclude-nodump', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
         if has_lchflags:
@@ -2059,8 +2059,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_test_files()
         have_noatime = has_noatime('input/file1')
-        self.cmd('create', self.repository_location + '::archive', 'input')
-        self.cmd('create', self.repository_location + '::archive2', 'input')
+        self.cmd('create', '--exclude-nodump', self.repository_location + '::archive', 'input')
+        self.cmd('create', '--exclude-nodump', self.repository_location + '::archive2', 'input')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
             os.remove(os.path.join('input', 'flagfile'))

@@ -583,6 +583,7 @@ class Archiver:
                                 self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                               keep_exclude_tags, skip_inodes, tag_path, restrict_dev,
                                               read_special=read_special, dry_run=dry_run)
+                        self.print_file_status('x', path)
                         return
                 if not dry_run:
                     if not recurse_excluded_dir:

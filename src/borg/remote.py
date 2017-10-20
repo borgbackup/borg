@@ -180,7 +180,15 @@ class RepositoryServer:  # pragma: no cover
 
     def positional_to_named(self, method, argv):
         """Translate from positional protocol to named protocol."""
-        return {name: argv[pos] for pos, name in enumerate(compatMap[method])}
+        try:
+            return {name: argv[pos] for pos, name in enumerate(compatMap[method])}
+        except IndexError:
+            if method == 'open' and len(argv) == 4:
+                # borg clients < 1.0.7 use open() with 4 args
+                mapping = compatMap[method][:4]
+            else:
+                raise
+            return {name: argv[pos] for pos, name in enumerate(mapping)}
 
     def filter_args(self, f, kwargs):
         """Remove unknown named parameters from call, because client did (implicitly) say it's ok."""

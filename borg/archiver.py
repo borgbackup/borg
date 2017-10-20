@@ -369,6 +369,7 @@ class Archiver:
                             self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                           keep_tag_files, skip_inodes, tag_path, restrict_dev,
                                           read_special=read_special, dry_run=dry_run)
+                    self.print_file_status('x', path)
                     return
                 if not dry_run:
                     status = archive.process_dir(path, st)

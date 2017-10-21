@@ -49,7 +49,7 @@ Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbac
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
-NixOS        `.nix file`_                                  N/A
+NixOS        `.nix file`_                                  ``nix-env -i borgbackup``
 OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
 OpenIndiana  `OpenIndiana hipster repository`_             ``pkg install borg``
 openSUSE     `openSUSE official repository`_               ``zypper in borgbackup``

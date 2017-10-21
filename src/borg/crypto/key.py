@@ -687,7 +687,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         id = self.repository.id
         keyfile = os.environ.get('BORG_KEY_FILE')
         if keyfile:
-            return self.sanity_check(keyfile, id)
+            return self.sanity_check(os.path.abspath(keyfile), id)
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
@@ -700,7 +700,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     def get_new_target(self, args):
         keyfile = os.environ.get('BORG_KEY_FILE')
         if keyfile:
-            return keyfile
+            return os.path.abspath(keyfile)
         filename = args.location.to_key_filename()
         path = filename
         i = 1

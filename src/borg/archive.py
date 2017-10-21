@@ -282,8 +282,8 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
+                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, nobsdflags=False,
+                 progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
                  consider_part_files=False, log_json=False):
         self.cwd = os.getcwd()
         self.key = key
@@ -300,6 +300,7 @@ class Archive:
         self.numeric_owner = numeric_owner
         self.noatime = noatime
         self.noctime = noctime
+        self.nobsdflags = nobsdflags
         assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
             start = datetime.utcnow()
@@ -691,7 +692,8 @@ Utilization of max. archive size: {csize_max:.0%}
             # some systems don't support calling utime on a symlink
             pass
         acl_set(path, item, self.numeric_owner)
-        if 'bsdflags' in item:
+
+        if not self.nobsdflags and 'bsdflags' in item:
             try:
                 set_flags(path, item.bsdflags, fd=fd)
             except OSError:
@@ -903,10 +905,11 @@ Utilization of max. archive size: {csize_max:.0%}
 
 
 class MetadataCollector:
-    def __init__(self, *, noatime, noctime, numeric_owner):
+    def __init__(self, *, noatime, noctime, numeric_owner, nobsdflags):
         self.noatime = noatime
         self.noctime = noctime
         self.numeric_owner = numeric_owner
+        self.nobsdflags = nobsdflags
 
     def stat_simple_attrs(self, st):
         attrs = dict(
@@ -931,9 +934,11 @@ class MetadataCollector:
 
     def stat_ext_attrs(self, st, path):
         attrs = {}
+        bsdflags = 0
         with backup_io('extended stat'):
             xattrs = xattr.get_all(path, follow_symlinks=False)
-            bsdflags = get_flags(path, st)
+            if not self.nobsdflags:
+                bsdflags = get_flags(path, st)
             acl_get(path, attrs, st, self.numeric_owner)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
@@ -1063,12 +1068,11 @@ class FilesystemObjectProcessors:
     def process_symlink(self, path, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
+        # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
         with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             with backup_io('readlink'):
                 source = os.readlink(path)
             item.source = source
-            if st.st_nlink > 1:
-                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 

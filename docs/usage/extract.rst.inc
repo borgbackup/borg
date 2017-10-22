@@ -27,6 +27,8 @@ borg extract
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--numeric-owner``                   | only obey numeric user and group identifiers                                                              |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--nobsdflags``                      | do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)                                                      |
+    +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdout``                          | write all extracted data to stdout                                                                        |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--sparse``                          | create holes in output sparse file from all-zero chunks                                                   |
@@ -68,6 +70,7 @@ borg extract
         --list            output verbose list of items (files, dirs, ...)
         -n, --dry-run     do not actually change any files
         --numeric-owner    only obey numeric user and group identifiers
+        --nobsdflags      do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)
         --stdout          write all extracted data to stdout
         --sparse          create holes in output sparse file from all-zero chunks
 

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-10-07" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-10-22" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -142,6 +142,9 @@ output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
 .B \-\-no\-cache\-sync
 experimental: do not synchronize the cache. Implies not using the files cache.
+.TP
+.B \-\-no\-files\-cache
+do not load/update the file metadata cache used to detect unchanged files
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -166,6 +169,9 @@ exclude directories that are tagged by containing a filesystem object with the g
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.B \-\-exclude\-nodump
+exclude files flagged NODUMP
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -181,6 +187,9 @@ do not store atime into archive
 .TP
 .B \-\-noctime
 do not store ctime into archive
+.TP
+.B \-\-nobsdflags
+do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive
 .TP
 .B \-\-ignore\-inode
 ignore inode data in the file metadata cache used to detect unchanged files.

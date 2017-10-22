@@ -33,6 +33,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the cache. Implies not using the files cache.                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--no-files-cache``                              | do not load/update the file metadata cache used to detect unchanged files                                                                         |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                |
     |                                                                                                                                                                                                                                                               |
     | :ref:`common_options`                                                                                                                                                                                                                                         |
@@ -53,6 +55,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--keep-exclude-tags``, ``--keep-tag-files``     | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--exclude-nodump``                              | exclude files flagged NODUMP                                                                                                                      |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems                                                                  |
@@ -62,6 +66,8 @@ borg create
     |                                                       | ``--noatime``                                     | do not store atime into archive                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--noctime``                                     | do not store ctime into archive                                                                                                                   |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--nobsdflags``                                  | do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive                                                                              |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--ignore-inode``                                | ignore inode data in the file metadata cache used to detect unchanged files.                                                                      |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -105,6 +111,7 @@ borg create
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
         --no-cache-sync    experimental: do not synchronize the cache. Implies not using the files cache.
+        --no-files-cache    do not load/update the file metadata cache used to detect unchanged files
 
 
     :ref:`common_options`
@@ -118,6 +125,7 @@ borg create
         --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags, --keep-tag-files    if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
+        --exclude-nodump                  exclude files flagged NODUMP
 
 
     Filesystem options
@@ -125,6 +133,7 @@ borg create
         --numeric-owner           only store numeric user and group identifiers
         --noatime                 do not store atime into archive
         --noctime                 do not store ctime into archive
+        --nobsdflags              do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive
         --ignore-inode            ignore inode data in the file metadata cache used to detect unchanged files.
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.

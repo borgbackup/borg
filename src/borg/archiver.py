@@ -169,6 +169,18 @@ def parse_storage_quota(storage_quota):
     return parsed
 
 
+def get_func(args):
+    # This works around http://bugs.python.org/issue9351
+    # func is used at the leaf parsers of the argparse parser tree,
+    # fallback_func at next level towards the root,
+    # fallback2_func at the 2nd next level (which is root in our case).
+    for name in 'func', 'fallback_func', 'fallback2_func':
+        func = getattr(args, name, None)
+        if func is not None:
+            return func
+    raise Exception('expected func attributes not found')
+
+
 class Archiver:
 
     def __init__(self, lock_wait=None, prog=None):
@@ -2429,7 +2441,7 @@ class Archiver:
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
-        parser.set_defaults(func=functools.partial(self.do_maincommand_help, parser))
+        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser))
         parser.common_options = self.CommonOptions(define_common_options,
                                                    suffix_precedence=('_maincommand', '_midcommand', '_subcommand'))
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
@@ -3884,8 +3896,7 @@ class Archiver:
         parser = self.build_parser()
         args = parser.parse_args(args or ['-h'])
         parser.common_options.resolve(args)
-        # This works around http://bugs.python.org/issue9351
-        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        func = get_func(args)
         if func == self.do_create and not args.paths:
             # need at least 1 path but args.paths may also be populated from patterns
             parser.error('Need at least one PATH argument.')
@@ -3921,8 +3932,7 @@ class Archiver:
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        # This works around http://bugs.python.org/issue9351
-        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        func = get_func(args)
         # do not use loggers before this!
         is_serve = func == self.do_serve
         setup_logging(level=args.log_level, is_serve=is_serve, json=args.log_json)

@@ -131,6 +131,72 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.1 (2017-10-22)
+--------------------------
+
+Compatibility notes:
+
+- When upgrading from borg 1.0.x to 1.1.x, please note:
+
+  - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
+  - borg might ask some security-related questions once after upgrading.
+    You can answer them either manually or via environment variable.
+    One known case is if you use unencrypted repositories, then it will ask
+    about a unknown unencrypted repository one time.
+  - your first backup with 1.1.x might be significantly slower (it might
+    completely read, chunk, hash a lot files) - this is due to the
+    --files-cache mode change (and happens every time you change mode).
+    You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
+    mode (but that is less safe for detecting changed files than the default).
+    See the --files-cache docs for details.
+- The deprecated --no-files-cache is not a global/common option any more,
+  but only available for borg create (it is not needed for anything else).
+  Use --files-cache=disabled instead of --no-files-cache.
+- The nodump flag ("do not backup this file") is not honoured any more by
+  default because this functionality (esp. if it happened by error or
+  unexpected) was rather confusing and unexplainable at first to users.
+  If you want that "do not backup NODUMP-flagged files" behaviour, use:
+  borg create --exclude-nodump ...
+
+Fixes:
+
+- borg recreate: correctly compute part file sizes. fixes cosmetic, but
+  annoying issue as borg check complains about size inconsistencies of part
+  files in affected archives. you can solve that by running borg recreate on
+  these archives, see also #3157.
+- bsdflags support: do not open BLK/CHR/LNK files, avoid crashes and
+  slowness, #3130
+- recreate: don't crash on attic archives w/o time_end, #3109
+- don't crash on repository filesystems w/o hardlink support, #3107
+- don't crash in first part of truncate_and_unlink, #3117
+- fix server-side IndexError crash with clients < 1.0.7, #3192
+- don't show traceback if only a global option is given, show help, #3142
+- cache: use SaveFile for more safety, #3158
+- init: fix wrong encryption choices in command line parser, fix missing
+  "authenticated-blake2", #3103
+- move --no-files-cache from common to borg create options, #3146
+- fix detection of non-local path (failed on ..filename), #3108
+- logging with fileConfig: set json attr on "borg" logger, #3114
+- fix crash with relative BORG_KEY_FILE, #3197
+- show excluded dir with "x" for tagged dirs / caches, #3189
+
+New features:
+
+- create: --nobsdflags and --exclude-nodump options, #3160
+- extract: --nobsdflags option, #3160
+
+Other changes:
+
+- remove annoying hardlinked symlinks warning, #3175
+- vagrant: use self-made FreeBSD 10.3 box, #3022
+- travis: don't brew update, hopefully fixes #2532
+- docs:
+
+  - readme: -e option is required in borg 1.1
+  - add example showing --show-version --show-rc
+  - use --format rather than --list-format (deprecated) in example
+  - update docs about hardlinked symlinks limitation
+
 
 Version 1.1.0 (2017-10-07)
 --------------------------

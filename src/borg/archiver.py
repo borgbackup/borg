@@ -555,20 +555,27 @@ class Archiver:
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
-        if st is None:
-            with backup_io('stat'):
-                st = os.stat(path, follow_symlinks=False)
-
-        recurse_excluded_dir = False
-        if not matcher.match(path):
-            self.print_file_status('x', path)
-
-            if stat.S_ISDIR(st.st_mode) and matcher.recurse_dir:
-                recurse_excluded_dir = True
-            else:
-                return
-
         try:
+            recurse_excluded_dir = False
+            if matcher.match(path):
+                if st is None:
+                    with backup_io('stat'):
+                        st = os.stat(path, follow_symlinks=False)
+            else:
+                self.print_file_status('x', path)
+                # get out here as quickly as possible:
+                # we only need to continue if we shall recurse into an excluded directory.
+                # if we shall not recurse, then do not even touch (stat()) the item, it
+                # could trigger an error, e.g. if access is forbidden, see #3209.
+                if not matcher.recurse_dir:
+                    return
+                if st is None:
+                    with backup_io('stat'):
+                        st = os.stat(path, follow_symlinks=False)
+                recurse_excluded_dir = stat.S_ISDIR(st.st_mode)
+                if not recurse_excluded_dir:
+                    return
+
             if (st.st_ino, st.st_dev) in skip_inodes:
                 return
             # if restrict_dev is given, we do not want to recurse into a new filesystem,

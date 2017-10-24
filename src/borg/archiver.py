@@ -2026,10 +2026,12 @@ class Archiver:
             may specify the backup roots (starting points) and patterns for inclusion/exclusion.
             A root path starts with the prefix `R`, followed by a path (a plain path, not a
             file pattern). An include rule starts with the prefix +, an exclude rule starts
-            with the prefix -, both followed by a pattern.
+            with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
             Inclusion patterns are useful to include paths that are contained in an excluded
             path. The first matching pattern is used so if an include pattern matches before
-            an exclude pattern, the file is backed up.
+            an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
+            a directory, it won't recurse into it and won't discover any potential matches for
+            include rules below that directory.
 
             Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
             shell style (`sh:`), so those patterns behave similar to rsync include/exclude

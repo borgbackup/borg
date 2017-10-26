@@ -304,7 +304,7 @@ Setting ``BORG_PASSPHRASE``
   .. _password_env:
   .. note:: Be careful how you set the environment; using the ``env``
           command, a ``system()`` call or using inline shell scripts
-          (e.g. ``BORG_PASSPHRASE=hunter12 borg ...``)
+          (e.g. ``BORG_PASSPHRASE=hunter2 borg ...``)
           might expose the credentials in the process list directly
           and they will be readable to all users on a system. Using
           ``export`` in a shell script file should be safe, however, as
@@ -328,7 +328,8 @@ Using ``BORG_PASSCOMMAND`` with a properly permissioned file
 
 Using keyfile-based encryption with a blank passphrase
   It is possible to encrypt your repository in ``keyfile`` mode instead of the default
-  ``repokey`` mode and use a blank passphrase for the key file. See :ref:`encrypted_repos`
+  ``repokey`` mode and use a blank passphrase for the key file (simply press Enter twice
+  when ``borg init`` asks for the password). See :ref:`encrypted_repos`
   for more details.
 
 Using ``BORG_PASSCOMMAND`` with macOS Keychain

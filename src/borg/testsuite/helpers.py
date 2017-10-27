@@ -18,7 +18,7 @@ from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import interval, prune_within, prune_split
-from ..helpers import get_cache_dir, get_keys_dir, get_security_dir
+from ..helpers import get_cache_dir, get_keys_dir, get_security_dir, get_config_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
@@ -445,6 +445,17 @@ class TestParseTimestamp(BaseTestCase):
     def test(self):
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00.226410'), datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc))
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00'), datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc))
+
+
+def test_get_config_dir(monkeypatch):
+    """test that get_config_dir respects environment"""
+    monkeypatch.delenv('BORG_CONFIG_DIR', raising=False)
+    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
+    assert get_config_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg')
+    monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
+    assert get_config_dir() == os.path.join('/var/tmp/.config', 'borg')
+    monkeypatch.setenv('BORG_CONFIG_DIR', '/var/tmp')
+    assert get_config_dir() == '/var/tmp'
 
 
 def test_get_cache_dir(monkeypatch):

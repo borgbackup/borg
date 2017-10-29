@@ -6,6 +6,7 @@ import logging
 import os
 import pstats
 import random
+import re
 import shutil
 import socket
 import stat
@@ -1731,12 +1732,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
         self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
-        self.assert_in('Keeping archive: test2', output)
-        self.assert_in('Would prune:     test1', output)
+        assert re.search(r'Would prune:\s+test1', output)
         # must keep the latest non-checkpoint archive:
-        self.assert_in('Keeping archive: test2', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         # must keep the latest checkpoint archive:
-        self.assert_in('Keeping archive: test4.checkpoint', output)
+        assert re.search(r'Keeping checkpoint archive:\s+test4.checkpoint', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
@@ -1766,8 +1766,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test1', src_dir)
         self.cmd('create', self.repository_location + '::test2', src_dir)
         output = self.cmd('prune', '--list', '--stats', '--dry-run', self.repository_location, '--keep-daily=2')
-        self.assert_in('Keeping archive: test2', output)
-        self.assert_in('Would prune:     test1', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
+        assert re.search(r'Would prune:\s+test1', output)
         self.assert_in('Deleted data:', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
@@ -1784,8 +1784,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
         self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--prefix=foo-')
-        self.assert_in('Keeping archive: foo-2015-08-12-20:00', output)
-        self.assert_in('Would prune:     foo-2015-08-12-10:00', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00', output)
+        assert re.search(r'Would prune:\s+foo-2015-08-12-10:00', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('foo-2015-08-12-10:00', output)
         self.assert_in('foo-2015-08-12-20:00', output)
@@ -1805,8 +1805,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
         self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--glob-archives=2015-*-foo')
-        self.assert_in('Keeping archive: 2015-08-12-20:00-foo', output)
-        self.assert_in('Would prune:     2015-08-12-10:00-foo', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo', output)
+        assert re.search(r'Would prune:\s+2015-08-12-10:00-foo', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('2015-08-12-10:00-foo', output)
         self.assert_in('2015-08-12-20:00-foo', output)

@@ -1639,15 +1639,17 @@ class ArchiveRecreater:
             if not matcher.match(item.path):
                 self.print_file_status('x', item.path)
                 if item_is_hardlink_master(item):
-                    hardlink_masters[item.path] = (item.get('chunks'), None)
+                    hardlink_masters[item.path] = (item.get('chunks'), item.get('chunks_healthy'), None)
                 continue
             if target_is_subset and hardlinkable(item.mode) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset
-                chunks, new_source = hardlink_masters[item.source]
+                chunks, chunks_healthy, new_source = hardlink_masters[item.source]
                 if new_source is None:
                     # First item to use this master, move the chunks
                     item.chunks = chunks
-                    hardlink_masters[item.source] = (None, item.path)
+                    if chunks_healthy is not None:
+                        item.chunks_healthy = chunks_healthy
+                    hardlink_masters[item.source] = (None, None, item.path)
                     del item.source
                 else:
                     # Master was already moved, only update this item's source

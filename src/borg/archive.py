@@ -917,6 +917,10 @@ Utilization of max. archive size: {csize_max:.0%}
                 return chunk_entry
 
         item.chunks = []
+        # if we rechunkify, we'll get a fundamentally different chunks list, thus we need
+        # to get rid of .chunks_healthy, as it might not correspond to .chunks any more.
+        if getattr(self, 'recreate_rechunkify', False) and 'chunks_healthy' in item:
+            del item.chunks_healthy
         from_chunk = 0
         part_number = 1
         for data in chunk_iter:

@@ -1507,7 +1507,12 @@ class ArchiveChecker:
             has_chunks_healthy = 'chunks_healthy' in item
             chunks_current = item.chunks
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
-            assert len(chunks_current) == len(chunks_healthy)
+            if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
+                # should never happen, but there was issue #3218.
+                logger.warning('{}: Invalid chunks_healthy metadata removed!'.format(item.path))
+                del item.chunks_healthy
+                has_chunks_healthy = False
+                chunks_healthy = chunks_current
             for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
                 chunk_id, size, csize = chunk_healthy
                 if chunk_id not in self.chunks:

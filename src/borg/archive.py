@@ -967,13 +967,14 @@ class ChunksProcessor:
 
     def __init__(self, *, key, cache,
                  add_item, write_checkpoint,
-                 checkpoint_interval):
+                 checkpoint_interval, rechunkify):
         self.key = key
         self.cache = cache
         self.add_item = add_item
         self.write_checkpoint = write_checkpoint
         self.checkpoint_interval = checkpoint_interval
         self.last_checkpoint = time.monotonic()
+        self.rechunkify = rechunkify
 
     def write_part_file(self, item, from_chunk, number):
         item = Item(internal_dict=item.as_dict())
@@ -998,6 +999,10 @@ class ChunksProcessor:
                 return chunk_entry
 
         item.chunks = []
+        # if we rechunkify, we'll get a fundamentally different chunks list, thus we need
+        # to get rid of .chunks_healthy, as it might not correspond to .chunks any more.
+        if self.rechunkify and 'chunks_healthy' in item:
+            del item.chunks_healthy
         from_chunk = 0
         part_number = 1
         for data in chunk_iter:
@@ -1891,7 +1896,7 @@ class ArchiveRecreater:
         target.process_file_chunks = ChunksProcessor(
             cache=self.cache, key=self.key,
             add_item=target.add_item, write_checkpoint=target.write_checkpoint,
-            checkpoint_interval=self.checkpoint_interval).process_file_chunks
+            checkpoint_interval=self.checkpoint_interval, rechunkify=target.recreate_rechunkify).process_file_chunks
         target.chunker = Chunker(self.key.chunk_seed, *target.chunker_params)
         return target
 

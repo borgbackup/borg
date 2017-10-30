@@ -4,16 +4,40 @@
 
 borg change-passphrase
 ----------------------
-::
+.. code-block:: none
 
-    borg change-passphrase <options> REPOSITORY
+    borg [common options] change-passphrase [options] [REPOSITORY]
 
-positional arguments
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+--+
+    | **positional arguments**                                                  |
+    +-------------------------------------------------------+----------------+--+
+    |                                                       | ``REPOSITORY`` |  |
+    +-------------------------------------------------------+----------------+--+
+    | .. class:: borg-common-opt-ref                                            |
+    |                                                                           |
+    | :ref:`common_options`                                                     |
+    +-------------------------------------------------------+----------------+--+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
     REPOSITORY
 
 
-`Common options`_
-    |
+
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~

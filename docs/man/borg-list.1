@@ -1,0 +1,249 @@
+.\" Man page generated from reStructuredText.
+.
+.TH BORG-LIST 1 "2017-06-18" "" "borg backup tool"
+.SH NAME
+borg-list \- List archive or repository contents
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH SYNOPSIS
+.sp
+borg [common options] list <options> REPOSITORY_OR_ARCHIVE PATH
+.SH DESCRIPTION
+.sp
+This command lists the contents of a repository or an archive.
+.sp
+See the "borg help patterns" command for more help on exclude patterns.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS arguments
+.INDENT 0.0
+.TP
+.B REPOSITORY_OR_ARCHIVE
+repository/archive to list contents of
+.TP
+.B PATH
+paths to list; patterns are supported
+.UNINDENT
+.SS optional arguments
+.INDENT 0.0
+.TP
+.B \-\-short
+only print file/directory names, nothing else
+.TP
+.B \-\-format\fP,\fB  \-\-list\-format
+specify format for file listing
+(default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
+.TP
+.B \-\-json
+Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
+.TP
+.B \-\-json\-lines
+Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+.UNINDENT
+.SS filters
+.INDENT 0.0
+.TP
+.B \-P\fP,\fB  \-\-prefix
+only consider archive names starting with this prefix.
+.TP
+.B \-a\fP,\fB  \-\-glob\-archives
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+.TP
+.B \-\-sort\-by
+Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+.TP
+.BI \-\-first \ N
+consider first N archives after other filters were applied
+.TP
+.BI \-\-last \ N
+consider last N archives after other filters were applied
+.UNINDENT
+.SS Exclusion options
+.INDENT 0.0
+.TP
+.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+exclude paths matching PATTERN
+.TP
+.BI \-\-exclude\-from \ EXCLUDEFILE
+read exclude patterns from EXCLUDEFILE, one per line
+.TP
+.B \-\-exclude\-caches
+exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
+.TP
+.BI \-\-exclude\-if\-present \ NAME
+exclude directories that are tagged by containing a filesystem object with the given NAME
+.TP
+.B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
+if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ borg list /path/to/repo
+Monday                               Mon, 2016\-02\-15 19:15:11
+repo                                 Mon, 2016\-02\-15 19:26:54
+root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
+newname                              Mon, 2016\-02\-15 19:50:19
+\&...
+
+$ borg list /path/to/repo::root\-2016\-02\-15
+drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
+drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
+\-rwxr\-xr\-x root   root    1029624 Thu, 2014\-11\-13 00:08:51 bin/bash
+lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdiff
+\-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
+\&...
+
+$ borg list /path/to/repo::archiveA \-\-list\-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 .
+drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code
+drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
+\-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
+\&...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH NOTES
+.sp
+The following keys are available for \fB\-\-format\fP:
+.INDENT 0.0
+.IP \(bu 2
+NEWLINE: OS dependent line separator
+.IP \(bu 2
+NL: alias of NEWLINE
+.IP \(bu 2
+NUL: NUL character for creating print0 / xargs \-0 like output, see barchive/bpath
+.IP \(bu 2
+SPACE
+.IP \(bu 2
+TAB
+.IP \(bu 2
+CR
+.IP \(bu 2
+LF
+.UNINDENT
+.sp
+Keys for listing repository archives:
+.INDENT 0.0
+.IP \(bu 2
+archive, name: archive name interpreted as text (might be missing non\-text characters, see barchive)
+.IP \(bu 2
+barchive: verbatim archive name, can contain any character except NUL
+.IP \(bu 2
+time: time of creation of the archive
+.IP \(bu 2
+id: internal ID of the archive
+.UNINDENT
+.sp
+Keys for listing archive files:
+.INDENT 0.0
+.IP \(bu 2
+type
+.IP \(bu 2
+mode
+.IP \(bu 2
+uid
+.IP \(bu 2
+gid
+.IP \(bu 2
+user
+.IP \(bu 2
+group
+.IP \(bu 2
+path: path interpreted as text (might be missing non\-text characters, see bpath)
+.IP \(bu 2
+bpath: verbatim POSIX path, can contain any character except NUL
+.IP \(bu 2
+source: link target for links (identical to linktarget)
+.IP \(bu 2
+linktarget
+.IP \(bu 2
+flags
+.IP \(bu 2
+size
+.IP \(bu 2
+csize: compressed size
+.IP \(bu 2
+dsize: deduplicated size
+.IP \(bu 2
+dcsize: deduplicated compressed size
+.IP \(bu 2
+num_chunks: number of chunks in this file
+.IP \(bu 2
+unique_chunks: number of unique chunks in this file
+.IP \(bu 2
+mtime
+.IP \(bu 2
+ctime
+.IP \(bu 2
+atime
+.IP \(bu 2
+isomtime
+.IP \(bu 2
+isoctime
+.IP \(bu 2
+isoatime
+.IP \(bu 2
+md5
+.IP \(bu 2
+sha1
+.IP \(bu 2
+sha224
+.IP \(bu 2
+sha256
+.IP \(bu 2
+sha384
+.IP \(bu 2
+sha512
+.IP \(bu 2
+archiveid
+.IP \(bu 2
+archivename
+.IP \(bu 2
+extra: prepends {source} with " \-> " for soft links and " link to " for hard links
+.IP \(bu 2
+health: either "healthy" (file ok) or "broken" (if file has all\-zero replacement chunks)
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP, \fIborg\-info(1)\fP, \fIborg\-diff(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-patterns(1)\fP
+.SH AUTHOR
+The Borg Collective
+.\" Generated by docutils manpage writer.
+.

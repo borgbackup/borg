@@ -1,17 +1,17 @@
-import os
+from collections import OrderedDict
 from datetime import datetime, timezone
 from io import StringIO
 from unittest.mock import Mock
 
-import pytest
 import msgpack
+import pytest
 
+from . import BaseTestCase
+from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter
-from ..item import Item
-from ..key import PlaintextKey
 from ..helpers import Manifest
-from . import BaseTestCase
+from ..item import Item, ArchiveItem
 
 
 @pytest.fixture()
@@ -30,8 +30,8 @@ def test_stats_basic(stats):
     assert stats.usize == 10
 
 
-def tests_stats_progress(stats, columns=80):
-    os.environ['COLUMNS'] = str(columns)
+def tests_stats_progress(stats, monkeypatch, columns=80):
+    monkeypatch.setenv('COLUMNS', str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
     s = '20 B O 10 B C 10 B D 0 N '
@@ -53,7 +53,6 @@ def tests_stats_progress(stats, columns=80):
 
 def test_stats_format(stats):
     assert str(stats) == """\
-                       Original size      Compressed size    Deduplicated size
 This archive:                   20 B                 10 B                 10 B"""
     s = "{0.osize_fmt}".format(stats)
     assert s == "20 B"
@@ -63,12 +62,17 @@ This archive:                   20 B                 10 B                 10 B""
 
 class MockCache:
 
+    class MockRepo:
+        def async_response(self, wait=True):
+            pass
+
     def __init__(self):
         self.objects = {}
+        self.repository = self.MockRepo()
 
-    def add_chunk(self, id, chunk, stats=None):
-        self.objects[id] = chunk.data
-        return id, len(chunk.data), len(chunk.data)
+    def add_chunk(self, id, chunk, stats=None, wait=True):
+        self.objects[id] = chunk
+        return id, len(chunk), len(chunk)
 
 
 class ArchiveTimestampTestCase(BaseTestCase):
@@ -78,7 +82,7 @@ class ArchiveTimestampTestCase(BaseTestCase):
         key = PlaintextKey(repository)
         manifest = Manifest(repository, key)
         a = Archive(repository, key, manifest, 'test', create=True)
-        a.metadata = {b'time': isoformat}
+        a.metadata = ArchiveItem(time=isoformat)
         self.assert_equal(a.ts, expected)
 
     def test_with_microseconds(self):
@@ -110,7 +114,7 @@ class ChunkBufferTestCase(BaseTestCase):
         self.assert_equal(data, [Item(internal_dict=d) for d in unpacker])
 
     def test_partial(self):
-        big = "0123456789" * 10000
+        big = "0123456789abcdefghijklmnopqrstuvwxyz" * 25000
         data = [Item(path='full', source=big), Item(path='partial', source=big)]
         cache = MockCache()
         key = PlaintextKey(None)
@@ -202,11 +206,15 @@ def test_invalid_msgpacked_item(packed, item_keys_serialized):
     assert not valid_msgpacked_dict(packed, item_keys_serialized)
 
 
+# pytest-xdist requires always same order for the keys and dicts:
+IK = sorted(list(ITEM_KEYS))
+
+
 @pytest.mark.parametrize('packed',
     [msgpack.packb(o) for o in [
         {b'path': b'/a/b/c'},  # small (different msgpack mapping type!)
-        dict((k, b'') for k in ITEM_KEYS),  # as big (key count) as it gets
-        dict((k, b'x' * 1000) for k in ITEM_KEYS),  # as big (key count and volume) as it gets
+        OrderedDict((k, b'') for k in IK),  # as big (key count) as it gets
+        OrderedDict((k, b'x' * 1000) for k in IK),  # as big (key count and volume) as it gets
     ]])
 def test_valid_msgpacked_items(packed, item_keys_serialized):
     assert valid_msgpacked_dict(packed, item_keys_serialized)
@@ -221,7 +229,7 @@ def test_key_length_msgpacked_items():
 
 def test_backup_io():
     with pytest.raises(BackupOSError):
-        with backup_io():
+        with backup_io:
             raise OSError(123)
 
 

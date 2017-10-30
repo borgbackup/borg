@@ -4,24 +4,75 @@
 
 borg mount
 ----------
-::
+.. code-block:: none
 
-    borg mount <options> REPOSITORY_OR_ARCHIVE MOUNTPOINT
+    borg [common options] mount [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT
 
-positional arguments
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                                                                                     |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``REPOSITORY_OR_ARCHIVE``             | repository/archive to mount                                                                                                                            |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``MOUNTPOINT``                        | where to mount filesystem                                                                                                                              |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                                                                                                                                       |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-f``, ``--foreground``              | stay in foreground, do not daemonize                                                                                                                   |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-o``                                | Extra mount options                                                                                                                                    |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                               |
+    |                                                                                                                                                                                                                                                                              |
+    | :ref:`common_options`                                                                                                                                                                                                                                                        |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                                                  |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-P PREFIX``, ``--prefix PREFIX``    | only consider archive names starting with this prefix.                                                                                                 |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-a GLOB``, ``--glob-archives GLOB`` | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive. |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--sort-by KEYS``                    | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp                                                       |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--first N``                         | consider first N archives after other filters were applied                                                                                             |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--last N``                          | consider last N archives after other filters were applied                                                                                              |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
     REPOSITORY_OR_ARCHIVE
         repository/archive to mount
     MOUNTPOINT
         where to mount filesystem
 
-optional arguments
-    ``-f``, ``--foreground``
-        | stay in foreground, do not daemonize
-    ``-o``
-        | Extra mount options
 
-`Common options`_
-    |
+    optional arguments
+        -f, --foreground    stay in foreground, do not daemonize
+        -o     Extra mount options
+
+
+    :ref:`common_options`
+        |
+
+    Archive filters
+        -P PREFIX, --prefix PREFIX        only consider archive names starting with this prefix.
+        -a GLOB, --glob-archives GLOB     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+        --sort-by KEYS                    Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+        --first N                         consider first N archives after other filters were applied
+        --last N                          consider last N archives after other filters were applied
+
 
 Description
 ~~~~~~~~~~~
@@ -41,11 +92,20 @@ To allow a regular user to use fstab entries, add the ``user`` option:
 For mount options, see the fuse(8) manual page. Additional mount options
 supported by borg:
 
+- versions: when used with a repository mount, this gives a merged, versioned
+  view of the files in the archives. EXPERIMENTAL, layout may change in future.
 - allow_damaged_files: by default damaged files (where missing chunks were
-  replaced with runs of zeros by borg check --repair) are not readable and
+  replaced with runs of zeros by borg check ``--repair``) are not readable and
   return EIO (I/O error). Set this option to read such files.
 
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
 to tweak the performance. It sets the number of cached data chunks; additional
 memory usage can be up to ~8 MiB times this number. The default is the number
 of CPU cores.
+
+When the daemonized process receives a signal or crashes, it does not unmount.
+Unmounting in these cases could cause an active rsync or similar process
+to unintentionally delete data.
+
+When running in the foreground ^C/SIGINT unmounts cleanly, but other
+signals or crashes do not.

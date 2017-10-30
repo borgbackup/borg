@@ -1,22 +1,181 @@
 @import url("theme.css");
 
-/*  The Return of the Borg.
- *
- *  Have a bit green and grey and darkness (and if only in the upper left corner).
- */
-
-.wy-side-nav-search {
-    background-color: #000000 !important;
-}
-
-.wy-side-nav-search > a {
-    color: rgba(255, 255, 255, 0.5);
-}
-
-.wy-side-nav-search > div.version {
-    color: rgba(255, 255, 255, 0.5);
-}
-
-#usage dt code {
+dt code {
     font-weight: normal;
+}
+
+#internals .toctree-wrapper > ul {
+    column-count: 3;
+    -webkit-column-count: 3;
+}
+
+#internals .toctree-wrapper > ul > li {
+    display: inline-block;
+    font-weight: bold;
+}
+
+#internals .toctree-wrapper > ul > li > ul {
+    font-weight: normal;
+}
+
+/* bootstrap has a .container class which clashes with docutils' container class. */
+.docutils.container {
+    width: auto;
+    margin: 0;
+    padding: 0;
+}
+
+/* the default (38px) produces a jumpy baseline in Firefox on Linux. */
+h1 {
+    font-size: 36px;
+}
+
+.text-logo {
+    background-color: #000200;
+    color: #00dd00;
+}
+
+.text-logo:hover,
+.text-logo:active,
+.text-logo:focus {
+    color: #5afe57;
+}
+
+/* by default the top and bottom margins are unequal which looks a bit unbalanced. */
+.sidebar-block {
+    padding: 0;
+    margin: 14px 0 24px 0;
+}
+
+#borg-documentation h1 + p .external img {
+    width: 100%;
+}
+
+.container.experimental,
+#debugging-facilities,
+#borg-recreate {
+    /* don't change text dimensions */
+    margin: 0 -30px; /* padding below + border width */
+    padding: 0 10px; /* 10 px visual margin between edge of text and the border */
+    /* fallback for browsers that don't have repeating-linear-gradient: thick, red lines */
+    border-left: 20px solid red;
+    border-right: 20px solid red;
+    /* fancy red stripes */
+    border-image: repeating-linear-gradient(
+            -45deg,rgba(255,0,0,0.1) 0,rgba(255,0,0,0.75) 10px,rgba(0,0,0,0) 10px,rgba(0,0,0,0) 20px,rgba(255,0,0,0.75) 20px) 0 20 repeat;
+}
+
+.topic {
+    margin: 0 1em;
+    padding: 0 1em;
+    /* #4e4a4a = background of the ToC sidebar */
+    border-left: 2px solid #4e4a4a;;
+    border-right: 2px solid #4e4a4a;;
+}
+
+table.docutils:not(.footnote) td,
+table.docutils:not(.footnote) th {
+    padding: .2em;
+}
+
+table.docutils:not(.footnote) {
+    border-collapse: collapse;
+    border: none;
+}
+
+table.docutils:not(.footnote) td,
+table.docutils:not(.footnote) th {
+    border: 1px solid #ddd;
+}
+
+table.docutils:not(.footnote) tr:first-child th,
+table.docutils:not(.footnote) tr:first-child td {
+    border-top: 0;
+}
+
+table.docutils:not(.footnote) tr:last-child td {
+    border-bottom: 0;
+}
+
+table.docutils:not(.footnote) tr td:first-child,
+table.docutils:not(.footnote) tr th:first-child {
+    border-left: 0;
+}
+
+table.docutils:not(.footnote) tr td:last-child,
+table.docutils:not(.footnote) tr th:last-child,
+table.docutils.borg-options-table tr td {
+    border-right: 0;
+}
+
+table.docutils.option-list tr td,
+table.docutils.borg-options-table tr td {
+    border-left: 0;
+    border-right: 0;
+}
+
+table.docutils.borg-options-table tr td:first-child:not([colspan="3"]) {
+    border-top: 0;
+    border-bottom: 0;
+}
+
+.borg-options-table td[colspan="3"] p {
+    margin: 0;
+}
+
+.borg-options-table {
+    width: 100%;
+}
+
+kbd, /* used in usage pages for options */
+code,
+.rst-content tt.literal,
+.rst-content tt.literal,
+.rst-content code.literal,
+.rst-content tt,
+.rst-content code,
+p .literal,
+p .literal span {
+    border: none;
+    padding: 0;
+    color: black; /* slight contrast with #404040 of regular text */
+    background: none;
+}
+
+kbd {
+    box-shadow: none;
+    line-height: 23px;
+    word-wrap: normal;
+    font-size: 15px;
+    font-family: Consolas, monospace;
+}
+
+.borg-options-table tr td:nth-child(2) .pre {
+    white-space: nowrap;
+}
+
+.borg-options-table tr td:first-child {
+    width: 2em;
+}
+
+cite {
+    white-space: nowrap;
+    color: black; /* slight contrast with #404040 of regular text */
+    font-family: Consolas, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter",
+    "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Courier New", Courier, monospace;
+    font-style: normal;
+    text-decoration: underline;
+}
+
+.borg-common-opt-ref {
+    font-weight: bold;
+}
+
+.sidebar-toc ul li.toctree-l2 a,
+.sidebar-toc ul li.toctree-l3 a {
+    padding-right: 25px;
+}
+
+#common-options .option {
+    white-space: nowrap;
 }

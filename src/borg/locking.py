@@ -1,24 +1,15 @@
 import json
 import os
-import socket
 import time
 
+from . import platform
 from .helpers import Error, ErrorWithTraceback
+from .logger import create_logger
 
 ADD, REMOVE = 'add', 'remove'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
 
-# only determine the PID and hostname once.
-# for FUSE mounts, we fork a child process that needs to release
-# the lock made by the parent, so it needs to use the same PID for that.
-_pid = os.getpid()
-_hostname = socket.gethostname()
-
-
-def get_id():
-    """Get identification tuple for 'us'"""
-    thread_id = 0
-    return _hostname, _pid, thread_id
+logger = create_logger(__name__)
 
 
 class TimeoutTimer:
@@ -109,12 +100,14 @@ class ExclusiveLock:
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
-    def __init__(self, path, timeout=None, sleep=None, id=None):
+    def __init__(self, path, timeout=None, sleep=None, id=None, kill_stale_locks=False):
         self.timeout = timeout
         self.sleep = sleep
         self.path = os.path.abspath(path)
-        self.id = id or get_id()
+        self.id = id or platform.get_process_id()
         self.unique_name = os.path.join(self.path, "%s.%d-%x" % self.id)
+        self.kill_stale_locks = kill_stale_locks
+        self.stale_warning_printed = False
 
     def __enter__(self):
         return self.acquire()
@@ -137,6 +130,7 @@ class ExclusiveLock:
             except FileExistsError:  # already locked
                 if self.by_me():
                     return self
+                self.kill_stale_lock()
                 if timer.timed_out_or_sleep():
                     raise LockTimeout(self.path)
             except OSError as err:
@@ -160,11 +154,63 @@ class ExclusiveLock:
     def by_me(self):
         return os.path.exists(self.unique_name)
 
+    def kill_stale_lock(self):
+        for name in os.listdir(self.path):
+            try:
+                host_pid, thread_str = name.rsplit('-', 1)
+                host, pid_str = host_pid.rsplit('.', 1)
+                pid = int(pid_str)
+                thread = int(thread_str)
+            except ValueError:
+                # Malformed lock name? Or just some new format we don't understand?
+                # It's safer to just exit.
+                return False
+
+            if platform.process_alive(host, pid, thread):
+                return False
+
+            if not self.kill_stale_locks:
+                if not self.stale_warning_printed:
+                    # Log this at warning level to hint the user at the ability
+                    logger.warning("Found stale lock %s, but not deleting because BORG_HOSTNAME_IS_UNIQUE is not set.", name)
+                    self.stale_warning_printed = True
+                return False
+
+            try:
+                os.unlink(os.path.join(self.path, name))
+                logger.warning('Killed stale lock %s.', name)
+            except OSError as err:
+                if not self.stale_warning_printed:
+                    # This error will bubble up and likely result in locking failure
+                    logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
+                    self.stale_warning_printed = True
+                return False
+
+        try:
+            os.rmdir(self.path)
+        except OSError:
+            # Directory is not empty = we lost the race to somebody else
+            # Permission denied = we cannot operate anyway
+            # other error like EIO = we cannot operate and it's unsafe too.
+            return False
+
+        return True
+
     def break_lock(self):
         if self.is_locked():
             for name in os.listdir(self.path):
                 os.unlink(os.path.join(self.path, name))
             os.rmdir(self.path)
+
+    def migrate_lock(self, old_id, new_id):
+        """migrate the lock ownership from old_id to new_id"""
+        assert self.id == old_id
+        new_unique_name = os.path.join(self.path, "%s.%d-%x" % new_id)
+        if self.is_locked() and self.by_me():
+            with open(new_unique_name, "wb"):
+                pass
+            os.unlink(self.unique_name)
+        self.id, self.unique_name = new_id, new_unique_name
 
 
 class LockRoster:
@@ -174,14 +220,30 @@ class LockRoster:
     Note: you usually should call the methods with an exclusive lock held,
     to avoid conflicting access by multiple threads/processes/machines.
     """
-    def __init__(self, path, id=None):
+    def __init__(self, path, id=None, kill_stale_locks=False):
         self.path = path
-        self.id = id or get_id()
+        self.id = id or platform.get_process_id()
+        self.kill_stale_locks = kill_stale_locks
 
     def load(self):
         try:
             with open(self.path) as f:
                 data = json.load(f)
+
+            # Just nuke the stale locks early on load
+            if self.kill_stale_locks:
+                for key in (SHARED, EXCLUSIVE):
+                    try:
+                        entries = data[key]
+                    except KeyError:
+                        continue
+                    elements = set()
+                    for host, pid, thread in entries:
+                        if platform.process_alive(host, pid, thread):
+                            elements.add((host, pid, thread))
+                        else:
+                            logger.warning('Removed stale %s roster lock for pid %d.', key, pid)
+                    data[key] = list(elements)
         except (FileNotFoundError, ValueError):
             # no or corrupt/empty roster file?
             data = {}
@@ -201,6 +263,9 @@ class LockRoster:
         roster = self.load()
         return set(tuple(e) for e in roster.get(key, []))
 
+    def empty(self, *keys):
+        return all(not self.get(key) for key in keys)
+
     def modify(self, key, op):
         roster = self.load()
         try:
@@ -216,8 +281,27 @@ class LockRoster:
         roster[key] = list(list(e) for e in elements)
         self.save(roster)
 
+    def migrate_lock(self, key, old_id, new_id):
+        """migrate the lock ownership from old_id to new_id"""
+        assert self.id == old_id
+        # need to temporarily switch off stale lock killing as we want to
+        # rather migrate than kill them (at least the one made by old_id).
+        killing, self.kill_stale_locks = self.kill_stale_locks, False
+        try:
+            try:
+                self.modify(key, REMOVE)
+            except KeyError:
+                # entry was not there, so no need to add a new one, but still update our id
+                self.id = new_id
+            else:
+                # old entry removed, update our id and add a updated entry
+                self.id = new_id
+                self.modify(key, ADD)
+        finally:
+            self.kill_stale_locks = killing
 
-class UpgradableLock:
+
+class Lock:
     """
     A Lock for a resource that can be accessed in a shared or exclusive way.
     Typically, write access to a resource needs an exclusive lock (1 writer,
@@ -226,24 +310,24 @@ class UpgradableLock:
 
     If possible, try to use the contextmanager here like::
 
-        with UpgradableLock(...) as lock:
+        with Lock(...) as lock:
             ...
 
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
-    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None):
+    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None, kill_stale_locks=False):
         self.path = path
         self.is_exclusive = exclusive
         self.sleep = sleep
         self.timeout = timeout
-        self.id = id or get_id()
+        self.id = id or platform.get_process_id()
         # globally keeping track of shared and exclusive lockers:
-        self._roster = LockRoster(path + '.roster', id=id)
+        self._roster = LockRoster(path + '.roster', id=id, kill_stale_locks=kill_stale_locks)
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
-        # - holding while the UpgradableLock itself is exclusive
-        self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
+        # - holding while the Lock itself is exclusive
+        self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout, kill_stale_locks=kill_stale_locks)
 
     def __enter__(self):
         return self.acquire()
@@ -293,12 +377,18 @@ class UpgradableLock:
     def release(self):
         if self.is_exclusive:
             self._roster.modify(EXCLUSIVE, REMOVE)
+            if self._roster.empty(EXCLUSIVE, SHARED):
+                self._roster.remove()
             self._lock.release()
         else:
             with self._lock:
                 self._roster.modify(SHARED, REMOVE)
+                if self._roster.empty(EXCLUSIVE, SHARED):
+                    self._roster.remove()
 
     def upgrade(self):
+        # WARNING: if multiple read-lockers want to upgrade, it will deadlock because they
+        # all will wait until the other read locks go away - and that won't happen.
         if not self.is_exclusive:
             self.acquire(exclusive=True, remove=SHARED)
 
@@ -306,6 +396,20 @@ class UpgradableLock:
         if self.is_exclusive:
             self.acquire(exclusive=False, remove=EXCLUSIVE)
 
+    def got_exclusive_lock(self):
+        return self.is_exclusive and self._lock.is_locked() and self._lock.by_me()
+
     def break_lock(self):
         self._roster.remove()
         self._lock.break_lock()
+
+    def migrate_lock(self, old_id, new_id):
+        assert self.id == old_id
+        self.id = new_id
+        if self.is_exclusive:
+            self._lock.migrate_lock(old_id, new_id)
+            self._roster.migrate_lock(EXCLUSIVE, old_id, new_id)
+        else:
+            with self._lock:
+                self._lock.migrate_lock(old_id, new_id)
+                self._roster.migrate_lock(SHARED, old_id, new_id)

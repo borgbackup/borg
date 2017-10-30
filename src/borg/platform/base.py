@@ -1,6 +1,8 @@
 import errno
 import os
 
+from borg.helpers import truncate_and_unlink
+
 """
 platform base module
 ====================
@@ -13,7 +15,7 @@ platform API: that way platform APIs provided by the platform-specific support m
 are correctly composed into the base functionality.
 """
 
-API_VERSION = 3
+API_VERSION = '1.1_02'
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
 
@@ -33,6 +35,7 @@ def acl_set(path, item, numeric_owner=False):
     If `numeric_owner` is True the stored uid/gid is used instead
     of the user/group names
     """
+
 
 try:
     from os import lchflags
@@ -62,6 +65,22 @@ def sync_dir(path):
         os.close(fd)
 
 
+def safe_fadvise(fd, offset, len, advice):
+    if hasattr(os, 'posix_fadvise'):
+        advice = getattr(os, 'POSIX_FADV_' + advice)
+        try:
+            os.posix_fadvise(fd, offset, len, advice)
+        except OSError:
+            # usually, posix_fadvise can't fail for us, but there seem to
+            # be failures when running borg under docker on ARM, likely due
+            # to a bug outside of borg.
+            # also, there is a python wrapper bug, always giving errno = 0.
+            # https://github.com/borgbackup/borg/issues/2095
+            # as this call is not critical for correct function (just to
+            # optimize cache usage), we ignore these errors.
+            pass
+
+
 class SyncFile:
     """
     A file class that is supposed to enable write ordering (one way or another) and data durability after close().
@@ -80,8 +99,9 @@ class SyncFile:
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
-    def __init__(self, path):
-        self.fd = open(path, 'xb')
+    def __init__(self, path, binary=False):
+        mode = 'xb' if binary else 'x'
+        self.fd = open(path, mode)
         self.fileno = self.fd.fileno()
 
     def __enter__(self):
@@ -101,15 +121,58 @@ class SyncFile:
         from .. import platform
         self.fd.flush()
         platform.fdatasync(self.fileno)
-        if hasattr(os, 'posix_fadvise'):
-            os.posix_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+        # tell the OS that it does not need to cache what we just wrote,
+        # avoids spoiling the cache for the OS and other processes.
+        safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
 
     def close(self):
         """sync() and close."""
         from .. import platform
-        self.sync()
+        dirname = None
+        try:
+            dirname = os.path.dirname(self.fd.name)
+            self.sync()
+        finally:
+            self.fd.close()
+            if dirname:
+                platform.sync_dir(dirname)
+
+
+class SaveFile:
+    """
+    Update file contents atomically.
+
+    Must be used as a context manager (defining the scope of the transaction).
+
+    On a journaling file system the file contents are always updated
+    atomically and won't become corrupted, even on power failures or
+    crashes (for caveats see SyncFile).
+    """
+
+    SUFFIX = '.tmp'
+
+    def __init__(self, path, binary=False):
+        self.binary = binary
+        self.path = path
+        self.tmppath = self.path + self.SUFFIX
+
+    def __enter__(self):
+        from .. import platform
+        try:
+            truncate_and_unlink(self.tmppath)
+        except FileNotFoundError:
+            pass
+        self.fd = platform.SyncFile(self.tmppath, self.binary)
+        return self.fd
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        from .. import platform
         self.fd.close()
-        platform.sync_dir(os.path.dirname(self.fd.name))
+        if exc_type is not None:
+            truncate_and_unlink(self.tmppath)
+            return
+        os.replace(self.tmppath, self.path)
+        platform.sync_dir(os.path.dirname(self.path))
 
 
 def swidth(s):
@@ -118,3 +181,23 @@ def swidth(s):
     For western scripts, this is just len(s), but for cjk glyphs, 2 cells are used.
     """
     return len(s)
+
+
+def get_process_id():
+    """
+    Return identification tuple (hostname, pid, thread_id) for 'us'. If this is a FUSE process, then the PID will be
+    that of the parent, not the forked FUSE child.
+    """
+    raise NotImplementedError
+
+
+def process_alive(host, pid, thread):
+    """
+    Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
+    """
+    raise NotImplementedError
+
+
+def local_pid_alive(pid):
+    """Return whether *pid* is alive."""
+    raise NotImplementedError

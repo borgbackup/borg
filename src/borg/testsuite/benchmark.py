@@ -14,13 +14,13 @@ from .archiver import changedir, cmd
 
 
 @pytest.yield_fixture
-def repo_url(request, tmpdir):
-    os.environ['BORG_PASSPHRASE'] = '123456'
-    os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
-    os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
-    os.environ['BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'] = 'yes'
-    os.environ['BORG_KEYS_DIR'] = str(tmpdir.join('keys'))
-    os.environ['BORG_CACHE_DIR'] = str(tmpdir.join('cache'))
+def repo_url(request, tmpdir, monkeypatch):
+    monkeypatch.setenv('BORG_PASSPHRASE', '123456')
+    monkeypatch.setenv('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING', 'YES')
+    monkeypatch.setenv('BORG_DELETE_I_KNOW_WHAT_I_AM_DOING', 'YES')
+    monkeypatch.setenv('BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK', 'yes')
+    monkeypatch.setenv('BORG_KEYS_DIR', str(tmpdir.join('keys')))
+    monkeypatch.setenv('BORG_CACHE_DIR', str(tmpdir.join('cache')))
     yield str(tmpdir.join('repository'))
     tmpdir.remove(rec=1)
 
@@ -40,9 +40,11 @@ def testdata(request, tmpdir_factory):
         # do not use a binary zero (\0) to avoid sparse detection
         def data(size):
             return b'0' * size
-    if data_type == 'random':
+    elif data_type == 'random':
         def data(size):
             return os.urandom(size)
+    else:
+        raise ValueError("data_type must be 'random' or 'zeros'.")
     for i in range(count):
         with open(str(p.join(str(i))), "wb") as f:
             f.write(data(size))

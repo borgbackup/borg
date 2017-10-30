@@ -1,6 +1,10 @@
-virtualenv<14.0
+setuptools
+setuptools_scm
+pip
+virtualenv
 tox
 pytest
+pytest-xdist
 pytest-cov
 pytest-benchmark
-Cython
+Cython!=0.27

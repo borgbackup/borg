@@ -1,18 +1,19 @@
 import os
 import re
-import resource
 import stat
+import subprocess
 
 from ..helpers import posix_acl_use_stored_uid_gid
 from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
+from .base import safe_fadvise
 from .posix import swidth
 
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = 3
+API_VERSION = '1.1_02'
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
@@ -52,6 +53,10 @@ cdef extern from "linux/fs.h":
 cdef extern from "sys/ioctl.h":
     int ioctl(int fildes, int request, ...)
 
+cdef extern from "unistd.h":
+    int _SC_PAGESIZE
+    long sysconf(int name)
+
 cdef extern from "string.h":
     char *strerror(int errnum)
 
@@ -67,8 +72,11 @@ BSD_TO_LINUX_FLAGS = {
 
 
 def set_flags(path, bsd_flags, fd=None):
-    if fd is None and stat.S_ISLNK(os.lstat(path).st_mode):
-        return
+    if fd is None:
+        st = os.stat(path, follow_symlinks=False)
+        if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
+            # see comment in get_flags()
+            return
     cdef int flags = 0
     for bsd_flag, linux_flag in BSD_TO_LINUX_FLAGS.items():
         if bsd_flags & bsd_flag:
@@ -87,6 +95,10 @@ def set_flags(path, bsd_flags, fd=None):
 
 
 def get_flags(path, st):
+    if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
+        # avoid opening devices files - trying to open non-present devices can be rather slow.
+        # avoid opening symlinks, O_NOFOLLOW would make the open() fail anyway.
+        return 0
     cdef int linux_flags
     try:
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
@@ -215,9 +227,9 @@ cdef _sync_file_range(fd, offset, length, flags):
     assert length & PAGE_MASK == 0, "length %d not page-aligned" % length
     if sync_file_range(fd, offset, length, flags) != 0:
         raise OSError(errno.errno, os.strerror(errno.errno))
-    os.posix_fadvise(fd, offset, length, os.POSIX_FADV_DONTNEED)
+    safe_fadvise(fd, offset, length, 'DONTNEED')
 
-cdef unsigned PAGE_MASK = resource.getpagesize() - 1
+cdef unsigned PAGE_MASK = sysconf(_SC_PAGESIZE) - 1
 
 
 class SyncFile(BaseSyncFile):
@@ -228,8 +240,8 @@ class SyncFile(BaseSyncFile):
     disk in the immediate future.
     """
 
-    def __init__(self, path):
-        super().__init__(path)
+    def __init__(self, path, binary=False):
+        super().__init__(path, binary)
         self.offset = 0
         self.write_window = (16 * 1024 ** 2) & ~PAGE_MASK
         self.last_sync = 0
@@ -250,4 +262,6 @@ class SyncFile(BaseSyncFile):
     def sync(self):
         self.fd.flush()
         os.fdatasync(self.fileno)
-        os.posix_fadvise(self.fileno, 0, 0, os.POSIX_FADV_DONTNEED)
+        # tell the OS that it does not need to cache what we just wrote,
+        # avoids spoiling the cache for the OS and other processes.
+        safe_fadvise(self.fileno, 0, 0, 'DONTNEED')

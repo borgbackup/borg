@@ -1,0 +1,192 @@
+.\" Man page generated from reStructuredText.
+.
+.TH BORG-RECREATE 1 "2017-06-18" "" "borg backup tool"
+.SH NAME
+borg-recreate \- Re-create archives
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH SYNOPSIS
+.sp
+borg [common options] recreate <options> REPOSITORY_OR_ARCHIVE PATH
+.SH DESCRIPTION
+.sp
+Recreate the contents of existing archives.
+.sp
+This is an \fIexperimental\fP feature. Do \fInot\fP use this on your only backup.
+.sp
+\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP, and PATH
+have the exact same semantics as in "borg create". If PATHs are specified the
+resulting archive will only contain files from these PATHs.
+.sp
+Note that all paths in an archive are relative, therefore absolute patterns/paths
+will \fInot\fP match (\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, PATHs).
+.sp
+\fB\-\-recompress\fP allows to change the compression of existing data in archives.
+Due to how Borg stores compressed size information this might display
+incorrect information for archives that were not recreated at the same time.
+There is no risk of data loss by this.
+.sp
+\fB\-\-chunker\-params\fP will re\-chunk all files in the archive, this can be
+used to have upgraded Borg 0.xx or Attic archives deduplicate with
+Borg 1.x archives.
+.sp
+\fBUSE WITH CAUTION.\fP
+Depending on the PATHs and patterns given, recreate can be used to permanently
+delete files from archives.
+When in doubt, use \fB\-\-dry\-run \-\-verbose \-\-list\fP to see how patterns/PATHS are
+interpreted.
+.sp
+The archive being recreated is only removed after the operation completes. The
+archive that is built during the operation exists at the same time at
+"<ARCHIVE>.recreate". The new archive will have a different archive ID.
+.sp
+With \fB\-\-target\fP the original archive is not replaced, instead a new archive is created.
+.sp
+When rechunking space usage can be substantial, expect at least the entire
+deduplicated size of the archives using the previous chunker params.
+When recompressing expect approx. (throughput / checkpoint\-interval) in space usage,
+assuming all chunks are recompressed.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS arguments
+.INDENT 0.0
+.TP
+.B REPOSITORY_OR_ARCHIVE
+repository/archive to recreate
+.TP
+.B PATH
+paths to recreate; patterns are supported
+.UNINDENT
+.SS optional arguments
+.INDENT 0.0
+.TP
+.B \-\-list
+output verbose list of items (files, dirs, ...)
+.TP
+.BI \-\-filter \ STATUSCHARS
+only display items with the given status characters
+.TP
+.B \-n\fP,\fB  \-\-dry\-run
+do not change anything
+.TP
+.B \-s\fP,\fB  \-\-stats
+print statistics at end
+.UNINDENT
+.SS Exclusion options
+.INDENT 0.0
+.TP
+.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+exclude paths matching PATTERN
+.TP
+.BI \-\-exclude\-from \ EXCLUDEFILE
+read exclude patterns from EXCLUDEFILE, one per line
+.TP
+.B \-\-exclude\-caches
+exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
+.TP
+.BI \-\-exclude\-if\-present \ NAME
+exclude directories that are tagged by containing a filesystem object with the given NAME
+.TP
+.B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
+if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
+.TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
+.UNINDENT
+.SS Archive options
+.INDENT 0.0
+.TP
+.BI \-\-target \ TARGET
+create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
+.TP
+.BI \-c \ SECONDS\fP,\fB \ \-\-checkpoint\-interval \ SECONDS
+write checkpoint every SECONDS seconds (Default: 1800)
+.TP
+.BI \-\-comment \ COMMENT
+add a comment text to the archive
+.TP
+.BI \-\-timestamp \ TIMESTAMP
+manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). alternatively, give a reference file/directory.
+.TP
+.BI \-C \ COMPRESSION\fP,\fB \ \-\-compression \ COMPRESSION
+select compression algorithm, see the output of the "borg help compression" command for details.
+.TP
+.B \-\-recompress
+recompress data chunks according to \fB\-\-compression\fP if \fIif\-different\fP\&. When \fIalways\fP, chunks that are already compressed that way are not skipped, but compressed again. Only the algorithm is considered for \fIif\-different\fP, not the compression level (if any).
+.TP
+.BI \-\-chunker\-params \ PARAMS
+specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: 19,23,21,4095
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives
+# Archives created with Borg 1.1+ and the default chunker params are skipped (archive ID stays the same)
+$ borg recreate /mnt/backup \-\-chunker\-params default \-\-progress
+
+# Create a backup with little but fast compression
+$ borg create /mnt/backup::archive /some/files \-\-compression lz4
+# Then compress it \- this might take longer, but the backup has already completed, so no inconsistencies
+# from a long\-running backup job.
+$ borg recreate /mnt/backup::archive \-\-recompress \-\-compression zlib,9
+
+# Remove unwanted files from all archives in a repository
+$ borg recreate /mnt/backup \-e /home/icke/Pictures/drunk_photos
+
+
+# Change archive comment
+$ borg create \-\-comment "This is a comment" /mnt/backup::archivename ~
+$ borg info /mnt/backup::archivename
+Name: archivename
+Fingerprint: ...
+Comment: This is a comment
+\&...
+$ borg recreate \-\-comment "This is a better comment" /mnt/backup::archivename
+$ borg info /mnt/backup::archivename
+Name: archivename
+Fingerprint: ...
+Comment: This is a better comment
+\&...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-compression(1)\fP
+.SH AUTHOR
+The Borg Collective
+.\" Generated by docutils manpage writer.
+.

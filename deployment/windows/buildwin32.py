@@ -76,7 +76,7 @@ finder.run_script('src/borg/__main__.py')
 
 # For some reason modulefinder does not find these, add them manually
 extramodules = [os.path.join(modulepath, 'site.py'), os.path.join(modulepath, 'encodings/idna.py'),
-    os.path.join(modulepath, 'stringprep.py')]
+    os.path.join(modulepath, 'stringprep.py'), os.path.join(modulepath, 'ctypes/wintypes.py')]
 
 for module in extramodules:
     finder.run_script(module)

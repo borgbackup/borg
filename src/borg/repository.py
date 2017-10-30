@@ -1,6 +1,7 @@
 import errno
 import mmap
 import os
+import sys
 import shutil
 import struct
 from binascii import hexlify, unhexlify
@@ -619,23 +620,24 @@ class Repository:
             else:
                 # Keep one full worst-case segment free in non-append-only mode
                 required_free_space += full_segment_size
-        try:
-            st_vfs = os.statvfs(self.path)
-        except OSError as os_error:
-            logger.warning('Failed to check free space before committing: ' + str(os_error))
-            return
-        # f_bavail: even as root - don't touch the Federal Block Reserve!
-        free_space = st_vfs.f_bavail * st_vfs.f_bsize
-        logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
-        if free_space < required_free_space:
-            if self.created:
-                logger.error('Not enough free space to initialize repository at this location.')
-                self.destroy()
-            else:
-                self._rollback(cleanup=True)
-            formatted_required = format_file_size(required_free_space)
-            formatted_free = format_file_size(free_space)
-            raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
+        if sys.platform != 'win32':
+            try:
+                st_vfs = os.statvfs(self.path)
+            except OSError as os_error:
+                logger.warning('Failed to check free space before committing: ' + str(os_error))
+                return
+            # f_bavail: even as root - don't touch the Federal Block Reserve!
+            free_space = st_vfs.f_bavail * st_vfs.f_bsize
+            logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
+            if free_space < required_free_space:
+                if self.created:
+                    logger.error('Not enough free space to initialize repository at this location.')
+                    self.destroy()
+                else:
+                    self._rollback(cleanup=True)
+                formatted_required = format_file_size(required_free_space)
+                formatted_free = format_file_size(free_space)
+                raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
 
     def log_storage_quota(self):
         if self.storage_quota:

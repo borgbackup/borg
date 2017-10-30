@@ -460,7 +460,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert not os.path.exists('input/unix-socket')
 
-
     @pytest.mark.skipif(not are_symlinks_supported(), reason='symlinks not supported')
     def test_symlink_extract(self):
         self.create_test_files()
@@ -1459,7 +1458,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         finally:
             # Restore permissions so shutil.rmtree is able to delete it
             os.system('chmod -R u+w ' + self.repository_path)
-
 
     @pytest.mark.skipif('BORG_TESTS_IGNORE_MODES' in os.environ, reason='modes unreliable')
     def test_umask(self):

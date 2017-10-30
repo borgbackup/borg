@@ -1,5 +1,7 @@
-import grp
-import pwd
+import sys
+if sys.platform != 'win32':
+    import grp
+    import pwd
 from functools import lru_cache
 
 

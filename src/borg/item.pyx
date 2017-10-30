@@ -184,6 +184,9 @@ class Item(PropDict):
     nlink = PropDict._make_property('nlink', int)
 
     part = PropDict._make_property('part', int)
+    win_dacl = PropDict._make_property('win_dacl', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+    win_sacl = PropDict._make_property('win_sacl', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+    user_sid = PropDict._make_property('user_sid', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
 
     def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
         """

@@ -667,8 +667,9 @@ Utilization of max. archive size: {csize_max:.0%}
         backup_io.op = 'attrs'
         uid = gid = None
         if not self.numeric_owner:
-            uid = user2uid(item.user)
-            gid = group2gid(item.group)
+            if sys.platform != 'win32':
+                uid = user2uid(item.user)
+                gid = group2gid(item.group)
         uid = item.uid if uid is None else uid
         gid = item.gid if gid is None else gid
         # This code is a bit of a mess due to os specific differences
@@ -700,7 +701,7 @@ Utilization of max. archive size: {csize_max:.0%}
         try:
             if sys.platform == 'win32':
                 os.utime(path, ns=(atime, mtime))
-            if fd:
+            elif fd:
                 os.utime(fd, None, ns=(atime, mtime))
             else:
                 os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
@@ -934,12 +935,6 @@ class MetadataCollector:
             gid=st.st_gid,
             mtime=safe_ns(st.st_mtime_ns),
         )
-        if sys.platform == 'win32':
-            user_name, user_sid = get_owner(path)
-            attrs.update({
-                'uid': 0, 'user_sid': user_sid, 'user': user_name,
-                'gid': st.st_gid, 'group': gid2group(st.st_gid),
-            })
         # borg can work with archives only having mtime (older attic archives do not have
         # atime/ctime). it can be useful to omit atime/ctime, if they change without the
         # file content changing - e.g. to get better metadata deduplication.
@@ -950,8 +945,9 @@ class MetadataCollector:
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:
-            attrs['user'] = uid2user(st.st_uid)
-            attrs['group'] = gid2group(st.st_gid)
+            if sys.platform != 'win32':
+                attrs['user'] = uid2user(st.st_uid)
+                attrs['group'] = gid2group(st.st_gid)
         return attrs
 
     def stat_ext_attrs(self, st, path):
@@ -970,6 +966,12 @@ class MetadataCollector:
 
     def stat_attrs(self, st, path):
         attrs = self.stat_simple_attrs(st)
+        if sys.platform == 'win32':
+            user_name, user_sid = get_owner(path)
+            attrs.update({
+                'uid': 0, 'user_sid': user_sid, 'user': user_name,
+                'gid': st.st_gid, 'group': '',
+            })
         attrs.update(self.stat_ext_attrs(st, path))
         return attrs
 

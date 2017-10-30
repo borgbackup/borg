@@ -23,12 +23,15 @@ if my_python < min_python:
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
-install_requires = [
-    # msgpack pure python data corruption was fixed in 0.4.6.
-    # Also, we might use some rather recent API features.
-    'msgpack-python>=0.4.6',
-    'pyzmq',
-]
+if sys.platform != 'win32':
+    install_requires = [
+        # msgpack pure python data corruption was fixed in 0.4.6.
+        # Also, we might use some rather recent API features.
+        'msgpack-python>=0.4.6',
+        'pyzmq',
+    ]
+else:
+    install_requires = ['msgpack-python>=0.4.6']
 
 # note for package maintainers: if you package borgbackup for distribution,
 # please add llfuse as a *requirement* on all platforms that have a working
@@ -790,7 +793,7 @@ if not on_rtd:
 
 def parse(root, describe_command=None):
     file = open('src/borg/_version.py', 'w')
-    output = subprocess.check_output("git describe --tags --long").decode().strip()
+    output = subprocess.check_output("git describe --long").decode().strip()
     file.write('version = "' + output + '"\n')
     return output
 

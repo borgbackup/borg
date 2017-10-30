@@ -1188,7 +1188,10 @@ class Archiver:
         elif args.short:
             format = "{path}{NL}"
         else:
-            format = "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"
+            if sys.platform != 'win32':
+                format = "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"
+            else:
+                format = "{user:8} {size:8} {mtime} {path}{extra}{NL}"
 
         def _list_inner(cache):
             archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
@@ -1206,7 +1209,6 @@ class Archiver:
             _list_inner(cache=None)
 
         return self.exit_code
-
 
     def _list_repository(self, args, repository, manifest, key, write):
         if args.format is not None:

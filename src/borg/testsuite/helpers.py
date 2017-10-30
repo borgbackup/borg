@@ -32,9 +32,6 @@ from ..helpers import dash_open
 
 from . import BaseTestCase, FakeInputs
 
-if sys.platform == 'win32':
-    import posixpath
-
 
 class BigIntTestCase(BaseTestCase):
 
@@ -106,12 +103,12 @@ class TestLocationWithoutEnv:
                 "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive')"
             assert repr(Location('file:///some/path')) == \
                 "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
+            assert Location('file:///some/path').to_key_filename() == keys_dir + 'some_path'
         else:
             assert repr(Location('file://C:/some/path::archive')).replace('\\\\', '/') == \
                 "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive='archive')"
             assert repr(Location('file://C:/some/path')).replace('\\\\', '/') == \
                 "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive=None)"
-            assert Location('file:///some/path').to_key_filename() == keys_dir + 'some_path'
 
     def test_scp(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -228,9 +225,9 @@ class TestLocationWithoutEnv:
         test_pid = os.getpid()
         assert repr(Location('/some/path::archive{pid}')) == \
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{}')".format(test_pid)
-        location_time1 = Location('/some/path::archive{now}')
+        location_time1 = Location('/some/path::archive{now:%s}')
         sleep(1.1)
-        location_time2 = Location('/some/path::archive{now}')
+        location_time2 = Location('/some/path::archive{now:%s}')
         assert location_time1.archive != location_time2.archive
 
     def test_bad_syntax(self):
@@ -263,7 +260,7 @@ class TestLocationWithEnv:
             assert repr(Location('::archive')).replace('\\\\', '/') == \
                 "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive='archive')"
             assert repr(Location()).replace('\\\\', '/') == \
-                "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive=None)"'
+                "Location(proto='file', user=None, host=None, port=None, path='C:/some/path', archive=None)"
             assert repr(Location()) == \
                    "Location(proto='file', user=None, host=None, port=None, path='file://C:/some/path', archive=None)"
 
@@ -327,323 +324,6 @@ class FormatTimedeltaTestCase(BaseTestCase):
             format_timedelta(t1 - t0),
             '2 hours 1.10 seconds'
         )
-
-
-def check_patterns(files, pattern, expected):
-    """Utility for testing patterns.
-    """
-    assert all([f == os.path.normpath(f) for f in files]), "Pattern matchers expect normalized input paths"
-
-    matched = [f for f in files if pattern.match(f)]
-
-    assert matched == (files if expected is None else expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("/", None),
-    ("/./", None),
-    ("", []),
-    ("/home/u", []),
-    ("/home/user", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc", ["/etc/server/config", "/etc/server/hosts"]),
-    ("///etc//////", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv", ["/srv/messages", "/srv/dmesg"]),
-    ])
-@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
-def test_patterns_prefix(pattern, expected):
-    files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
-    ]
-
-    check_patterns(files, PathPrefixPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("", []),
-    ("foo", []),
-    ("relative", ["relative/path1", "relative/two"]),
-    ("more", ["more/relative"]),
-    ])
-@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
-def test_patterns_prefix_relative(pattern, expected):
-    files = ["relative/path1", "relative/two", "more/relative"]
-
-    check_patterns(files, PathPrefixPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("/*", None),
-    ("/./*", None),
-    ("*", None),
-    ("*/*", None),
-    ("*///*", None),
-    ("/home/u", []),
-    ("/home/*",
-     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
-      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("*/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
-    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv*", ["/srv/messages", "/srv/dmesg"]),
-    ("/home/*/.thumbnails", ["/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ])
-@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
-def test_patterns_fnmatch(pattern, expected):
-    files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
-        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
-    ]
-
-    check_patterns(files, FnmatchPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("*", None),
-    ("**/*", None),
-    ("/**/*", None),
-    ("/./*", None),
-    ("*/*", None),
-    ("*///*", None),
-    ("/home/u", []),
-    ("/home/*",
-     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
-      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc/*/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/etc/**/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/etc/**/*/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("*/.pr????e", []),
-    ("**/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
-    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2/", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/./home//..//home/user2/**/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv*/", ["/srv/messages", "/srv/dmesg", "/srv2/blafasel"]),
-    ("/srv*", ["/srv", "/srv/messages", "/srv/dmesg", "/srv2", "/srv2/blafasel"]),
-    ("/srv/*", ["/srv/messages", "/srv/dmesg"]),
-    ("/srv2/**", ["/srv2", "/srv2/blafasel"]),
-    ("/srv2/**/", ["/srv2/blafasel"]),
-    ("/home/*/.thumbnails", ["/home/foo/.thumbnails"]),
-    ("/home/*/*/.thumbnails", ["/home/foo/bar/.thumbnails"]),
-    ])
-@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
-def test_patterns_shell(pattern, expected):
-    files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv", "/srv/messages", "/srv/dmesg",
-        "/srv2", "/srv2/blafasel", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
-    ]
-
-    check_patterns(files, ShellPattern(pattern), expected)
-
-
-@pytest.mark.parametrize("pattern, expected", [
-    # "None" means all files, i.e. all match the given pattern
-    ("", None),
-    (".*", None),
-    ("^/", None),
-    ("^abc$", []),
-    ("^[^/]", []),
-    ("^(?!/srv|/foo|/opt)",
-     ["/home", "/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile",
-      "/home/user2/public_html/index.html", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails", ]),
-    ])
-@pytest.mark.skipif(sys.platform == 'win32', reason='Need some windows path tests')
-def test_patterns_regex(pattern, expected):
-    files = [
-        '/srv/data', '/foo/bar', '/home',
-        '/home/user/.profile', '/home/user/.bashrc',
-        '/home/user2/.profile', '/home/user2/public_html/index.html',
-        '/opt/log/messages.txt', '/opt/log/dmesg.txt',
-        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
-    ]
-
-    obj = RegexPattern(pattern)
-    assert str(obj) == pattern
-    assert obj.pattern == pattern
-
-    check_patterns(files, obj, expected)
-
-
-def test_regex_pattern():
-    # The forward slash must match the platform-specific path separator
-    assert RegexPattern("^/$").match("/")
-    assert RegexPattern("^/$").match(os.path.sep)
-    assert not RegexPattern(r"^\\$").match("/")
-
-
-def use_normalized_unicode():
-    return sys.platform in ("darwin",)
-
-
-def _make_test_patterns(pattern):
-    return [PathPrefixPattern(pattern),
-            FnmatchPattern(pattern),
-            RegexPattern("^{}/foo$".format(pattern)),
-            ShellPattern(pattern),
-            ]
-
-
-@pytest.mark.parametrize("pattern", _make_test_patterns("b\N{LATIN SMALL LETTER A WITH ACUTE}"))
-def test_composed_unicode_pattern(pattern):
-    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo")
-    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo") == use_normalized_unicode()
-
-
-@pytest.mark.parametrize("pattern", _make_test_patterns("ba\N{COMBINING ACUTE ACCENT}"))
-def test_decomposed_unicode_pattern(pattern):
-    assert pattern.match("b\N{LATIN SMALL LETTER A WITH ACUTE}/foo") == use_normalized_unicode()
-    assert pattern.match("ba\N{COMBINING ACUTE ACCENT}/foo")
-
-
-@pytest.mark.parametrize("pattern", _make_test_patterns(str(b"ba\x80", "latin1")))
-def test_invalid_unicode_pattern(pattern):
-    assert not pattern.match("ba/foo")
-    assert pattern.match(str(b"ba\x80/foo", "latin1"))
-
-
-@pytest.mark.parametrize("lines, expected", [
-    # "None" means all files, i.e. none excluded
-    ([], None),
-    (["# Comment only"], None),
-    (["*"], []),
-    (["# Comment",
-      "*/something00.txt",
-      "  *whitespace*  ",
-      # Whitespace before comment
-      " #/ws*",
-      # Empty line
-      "",
-      "# EOF"],
-     ["/more/data", "/home", " #/wsfoobar"]),
-    (["re:.*"], []),
-    (["re:\s"], ["/data/something00.txt", "/more/data", "/home"]),
-    ([r"re:(.)(\1)"], ["/more/data", "/home", "\tstart/whitespace", "/whitespace/end\t"]),
-    (["", "", "",
-      "# This is a test with mixed pattern styles",
-      # Case-insensitive pattern
-      "re:(?i)BAR|ME$",
-      "",
-      "*whitespace*",
-      "fm:*/something00*"],
-     ["/more/data"]),
-    ([r"  re:^\s  "], ["/data/something00.txt", "/more/data", "/home", "/whitespace/end\t"]),
-    ([r"  re:\s$  "], ["/data/something00.txt", "/more/data", "/home", " #/wsfoobar", "\tstart/whitespace"]),
-    (["pp:./"], None),
-    (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
-    (["pp:aaabbb"], None),
-    (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
-    ])
-def test_patterns_from_file(tmpdir, lines, expected):
-    files = [
-        '/data/something00.txt', '/more/data', '/home',
-        ' #/wsfoobar',
-        '\tstart/whitespace',
-        '/whitespace/end\t',
-    ]
-
-    def evaluate(filename):
-        matcher = PatternMatcher(fallback=True)
-        matcher.add(load_excludes(open(filename, "rt")), False)
-        return [path for path in files if matcher.match(path)]
-
-    exclfile = tmpdir.join("exclude.txt")
-
-    with exclfile.open("wt") as fh:
-        fh.write("\n".join(lines))
-
-    assert evaluate(str(exclfile)) == (files if expected is None else expected)
-
-
-@pytest.mark.parametrize("pattern, cls", [
-    ("", FnmatchPattern),
-
-    # Default style
-    ("*", FnmatchPattern),
-    ("/data/*", FnmatchPattern),
-
-    # fnmatch style
-    ("fm:", FnmatchPattern),
-    ("fm:*", FnmatchPattern),
-    ("fm:/data/*", FnmatchPattern),
-    ("fm:fm:/data/*", FnmatchPattern),
-
-    # Regular expression
-    ("re:", RegexPattern),
-    ("re:.*", RegexPattern),
-    ("re:^/something/", RegexPattern),
-    ("re:re:^/something/", RegexPattern),
-
-    # Path prefix
-    ("pp:", PathPrefixPattern),
-    ("pp:/", PathPrefixPattern),
-    ("pp:/data/", PathPrefixPattern),
-    ("pp:pp:/data/", PathPrefixPattern),
-
-    # Shell-pattern style
-    ("sh:", ShellPattern),
-    ("sh:*", ShellPattern),
-    ("sh:/data/*", ShellPattern),
-    ("sh:sh:/data/*", ShellPattern),
-    ])
-def test_parse_pattern(pattern, cls):
-    assert isinstance(parse_pattern(pattern), cls)
-
-
-@pytest.mark.parametrize("pattern", ["aa:", "fo:*", "00:", "x1:abc"])
-def test_parse_pattern_error(pattern):
-    with pytest.raises(ValueError):
-        parse_pattern(pattern)
-
-
-def test_pattern_matcher():
-    pm = PatternMatcher()
-
-    assert pm.fallback is None
-
-    for i in ["", "foo", "bar"]:
-        assert pm.match(i) is None
-
-    pm.add([RegexPattern("^a")], "A")
-    pm.add([RegexPattern("^b"), RegexPattern("^z")], "B")
-    pm.add([RegexPattern("^$")], "Empty")
-    pm.fallback = "FileNotFound"
-
-    assert pm.match("") == "Empty"
-    assert pm.match("aaa") == "A"
-    assert pm.match("bbb") == "B"
-    assert pm.match("ccc") == "FileNotFound"
-    assert pm.match("xyz") == "FileNotFound"
-    assert pm.match("z") == "B"
-
-    assert PatternMatcher(fallback="hey!").fallback == "hey!"
-
-
-def test_compression_specs():
-    with pytest.raises(ValueError):
-        CompressionSpec('')
-    assert CompressionSpec('none') == dict(name='none')
-    assert CompressionSpec('lz4') == dict(name='lz4')
-    assert CompressionSpec('zlib') == dict(name='zlib', level=6)
-    assert CompressionSpec('zlib,0') == dict(name='zlib', level=0)
-    assert CompressionSpec('zlib,9') == dict(name='zlib', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('zlib,9,invalid')
-    assert CompressionSpec('lzma') == dict(name='lzma', level=6)
-    assert CompressionSpec('lzma,0') == dict(name='lzma', level=0)
-    assert CompressionSpec('lzma,9') == dict(name='lzma', level=9)
-    with pytest.raises(ValueError):
-        CompressionSpec('lzma,9,invalid')
-    with pytest.raises(ValueError):
-        CompressionSpec('invalid')
 
 
 def test_chunkerparams():

@@ -38,4 +38,5 @@ elif sys.platform == 'win32':  # pragma: windows only
     from .windows import get_owner, set_owner
     from .windows import get_ads
     from .windows import select
-
+    from .windows import get_process_id
+    from .windows import process_alive

@@ -1,4 +1,5 @@
 import os
+import sys
 
 from .errors import Error
 
@@ -8,6 +9,9 @@ class PythonLibcTooOld(Error):
 
 
 def check_python():
+    if sys.platform == 'win32':
+        # Does not support symlinks anyway
+        return
     required_funcs = {os.stat, os.utime, os.chown}
     if not os.supports_follow_symlinks.issuperset(required_funcs):
         raise PythonLibcTooOld

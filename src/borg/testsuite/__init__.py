@@ -101,6 +101,8 @@ def are_fifos_supported():
 
 @functools.lru_cache()
 def is_utime_fully_supported():
+    if sys.platform == 'win32':
+        return False
     with unopened_tempfile() as filepath:
         # Some filesystems (such as SSHFS) don't support utime on symlinks
         if are_symlinks_supported():

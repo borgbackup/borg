@@ -43,6 +43,7 @@ from .algorithms.checksums import xxh64
 if sys.platform == 'win32':
     from .platform import select as windowsSelect
     select.select = windowsSelect
+
     class NoSSHClient(Error):
         """Could not find supported ssh client. Supported  clients are {}."""
 

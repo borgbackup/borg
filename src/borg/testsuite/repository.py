@@ -925,7 +925,7 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def open(self, create=False):
         if sys.platform != 'win32':
             return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
-			                        exclusive=True, create=create)
+                                    exclusive=True, create=create)
         else:
             return RemoteRepository(Location(os.path.join(self.tmppath, 'repository')), create=create)
 

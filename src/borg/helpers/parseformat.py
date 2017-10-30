@@ -25,6 +25,8 @@ from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
 
+if sys.platform == 'win32':
+    import posixpath
 
 def bin_to_hex(binary):
     return hexlify(binary).decode('ascii')
@@ -362,6 +364,8 @@ class Location:
         |                                                   # or
         """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
+    win_file_re = re.compile(r'(?:file://)?(?P<path>(?:[a-zA-Z]:[\\/])?(?:[^:]*))' + optional_archive_re, re.VERBOSE)
+        
     def __init__(self, text=''):
         self.orig = text
         if not self.parse(self.orig):
@@ -390,30 +394,47 @@ class Location:
             relative = p.startswith('/./')
             p = os.path.normpath(p)
             return ('/.' + p) if relative else p
-
-        m = self.ssh_re.match(text)
-        if m:
-            self.proto = m.group('proto')
-            self.user = m.group('user')
-            self._host = m.group('host')
-            self.port = m.group('port') and int(m.group('port')) or None
-            self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
-            return True
-        m = self.file_re.match(text)
-        if m:
-            self.proto = m.group('proto')
-            self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
-            return True
-        m = self.scp_re.match(text)
-        if m:
-            self.user = m.group('user')
-            self._host = m.group('host')
-            self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
-            self.proto = self._host and 'ssh' or 'file'
-            return True
+        if sys.platform != 'win32':
+            m = self.ssh_re.match(text)
+            if m:
+                self.proto = m.group('proto')
+                self.user = m.group('user')
+                self._host = m.group('host')
+                self.port = m.group('port') and int(m.group('port')) or None
+                self.path = normpath_special(m.group('path'))
+                self.archive = m.group('archive')
+                return True
+            m = self.file_re.match(text)
+            if m:
+                self.proto = m.group('proto')
+                self.path = normpath_special(m.group('path'))
+                self.archive = m.group('archive')
+                return True
+            m = self.scp_re.match(text)
+            if m:
+                self.user = m.group('user')
+                self._host = m.group('host')
+                self.path = normpath_special(m.group('path'))
+                self.archive = m.group('archive')
+                self.proto = self._host and 'ssh' or 'file'
+                return True
+        else:
+            m = self.win_file_re.match(text)
+            if m:
+                self.proto = 'file'
+                self.path = posixpath.normpath(m.group('path'))
+                self.archive = m.group('archive')
+                return True
+            m = self.ssh_re.match(text)
+            if m:
+                self.proto = m.group('proto')
+                self.user = m.group('user')
+                self._host = m.group('host')
+                self.port = m.group('port') and int(m.group('port')) or None
+                self.path = normpath_special(m.group('path'))
+                self.archive = m.group('archive')
+                return True
+                
         return False
 
     def __str__(self):

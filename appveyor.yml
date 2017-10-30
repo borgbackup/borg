@@ -1,8 +1,5 @@
 version: '{build}'
 
-init:
-  - ps: Update-AppveyorBuild -Version "1.0.3-$($env:appveyor_repo_commit.substring(0,7))"
-
 environment:
   matrix:
     - compiler: msys2
@@ -17,6 +14,8 @@ install:
   - 'pip3 install setuptools_scm'
 build_script:
   - 'pip3 install -e .'
+  - ps: $version = python3 -c 'import src.borg._version; print(src.borg._version.version)'
+  - ps: Update-AppveyorBuild -Version $version
   - 'python3 deployment/windows/buildwin32.py'
 test_script:
   # python will return 0 so appveyor will pass the build

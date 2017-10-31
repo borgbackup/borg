@@ -759,6 +759,7 @@ class Clean(clean):
             for compiled in sorted(glob(compiled_glob)):
                 rm(compiled)
 
+
 cmdclass = {
     'build_ext': build_ext,
     'build_usage': build_usage,
@@ -796,6 +797,7 @@ def parse(root, describe_command=None):
     output = subprocess.check_output("git describe --long").decode().strip()
     file.write('version = "' + output + '"\n')
     return output
+
 
 parse_function = parse if sys.platform == 'win32' else None
 

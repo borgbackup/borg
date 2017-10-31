@@ -28,6 +28,7 @@ from ..constants import *  # NOQA
 if sys.platform == 'win32':
     import posixpath
 
+
 def bin_to_hex(binary):
     return hexlify(binary).decode('ascii')
 
@@ -365,7 +366,7 @@ class Location:
         """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
     win_file_re = re.compile(r'(?:file://)?(?P<path>(?:[a-zA-Z]:[\\/])?(?:[^:]*))' + optional_archive_re, re.VERBOSE)
-        
+
     def __init__(self, text=''):
         self.orig = text
         if not self.parse(self.orig):
@@ -392,7 +393,10 @@ class Location:
         def normpath_special(p):
             # avoid that normpath strips away our relative path hack and even makes p absolute
             relative = p.startswith('/./')
-            p = os.path.normpath(p)
+            if sys.platform != 'win32':
+                p = os.path.normpath(p)
+            else:
+                p = posixpath.normpath(p)
             return ('/.' + p) if relative else p
         if sys.platform != 'win32':
             m = self.ssh_re.match(text)
@@ -422,7 +426,7 @@ class Location:
             m = self.win_file_re.match(text)
             if m:
                 self.proto = 'file'
-                self.path = posixpath.normpath(m.group('path'))
+                self.path = os.path.normpath(m.group('path').replace('/', '\\'))
                 self.archive = m.group('archive')
                 return True
             m = self.ssh_re.match(text)
@@ -434,7 +438,7 @@ class Location:
                 self.path = normpath_special(m.group('path'))
                 self.archive = m.group('archive')
                 return True
-                
+
         return False
 
     def __str__(self):

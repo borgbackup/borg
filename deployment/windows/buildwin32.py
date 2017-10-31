@@ -32,7 +32,7 @@ if gccpath == '':
 source = open('wrapper.c', 'w')
 source.write(
 """
-#include <python""" + pythonversion +"""m/python.h>
+#include <python""" + pythonversion + """m/python.h>
 #include <windows.h>
 #include <wchar.h>
 #include <string>
@@ -104,6 +104,7 @@ def finddlls(exe):
         re.append(dll)
     return re
 
+
 items = finder.modules.items()
 for name, mod in items:
     file = mod.__file__
@@ -137,9 +138,9 @@ library.write(os.path.join(modulepath, 'lib-dynload/_sysconfigdata_m_win32_.py')
 library.write(os.path.join(modulepath, 'ctypes/wintypes.py'), 'ctypes/wintypes.py')
 
 for extmodule in ['src/borg/chunker-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
-    'src/borg/compress-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
-    'src/borg/item-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
-    'src/borg/hashindex-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll']:
+                  'src/borg/compress-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
+                  'src/borg/item-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
+                  'src/borg/hashindex-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll']:
     for dll in finddlls(extmodule):
         if builddir not in dll:
             shutil.copyfile(dll, os.path.join(builddir, os.path.split(dll)[1]))

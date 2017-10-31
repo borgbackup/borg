@@ -13,9 +13,9 @@ install:
   - 'pip3 install -r requirements.d/development.txt'
   - 'pip3 install setuptools_scm'
 build_script:
-  - 'pip3 install -e .'
-  - ps: $version = python3 -c 'import src.borg._version; print(src.borg._version.version)'
+  - ps: $version = git describe --long
   - ps: Update-AppveyorBuild -Version $version
+  - 'pip3 install -e .'
   - 'python3 deployment/windows/buildwin32.py'
 test_script:
   # python will return 0 so appveyor will pass the build

@@ -28,7 +28,7 @@ the concept of archives or items.
 Each repository has the following file structure:
 
 README
-  simple text file telling that this is a |project_name| repository
+  simple text file telling that this is a Borg repository
 
 config
   repository configuration
@@ -578,7 +578,7 @@ A chunk is stored as an object as well, of course.
 Chunks
 ~~~~~~
 
-The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorithm.
+The Borg chunker uses a rolling hash computed by the Buzhash_ algorithm.
 It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
 producing chunks of 2^HASH_MASK_BITS Bytes on average.
 
@@ -686,7 +686,7 @@ i.e. the reference count is pinned to MAX_VALUE.
 Indexes / Caches memory usage
 -----------------------------
 
-Here is the estimated memory usage of |project_name| - it's complicated::
+Here is the estimated memory usage of Borg - it's complicated::
 
   chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
 
@@ -822,7 +822,7 @@ Each chunk consists of ``TYPE(1)`` + ``MAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``
 In AES-CTR mode you can think of the IV as the start value for the counter.
 The counter itself is incremented by one after each 16 byte block.
 The IV/counter is not required to be random but it must NEVER be reused.
-So to accomplish this |project_name| initializes the encryption counter to be
+So to accomplish this Borg initializes the encryption counter to be
 higher than any previously used counter value before encrypting new data.
 
 To reduce payload size, only 8 bytes of the 16 bytes nonce is saved in the
@@ -845,7 +845,7 @@ Key files
 
 .. seealso:: The :ref:`key_encryption` section for an in-depth review of the key encryption.
 
-When initialized with the ``init -e keyfile`` command, |project_name|
+When initialized with the ``init -e keyfile`` command, Borg
 needs an associated file in ``$HOME/.config/borg/keys`` to read and write
 the repository. The format is based on msgpack_, base64 encoding and
 PBKDF2_ SHA256 hashing, which is then encoded again in a msgpack_.
@@ -909,7 +909,7 @@ representation of the repository id.
 Compression
 -----------
 
-|project_name| supports the following compression methods:
+Borg supports the following compression methods:
 
 - none (no compression, pass through data 1:1)
 - lz4 (low compression, but super fast)
@@ -945,7 +945,7 @@ See ``borg create --help`` about how to specify the compression level and its de
 Lock files
 ----------
 
-|project_name| uses locks to get (exclusive or shared) access to the cache and
+Borg uses locks to get (exclusive or shared) access to the cache and
 the repository.
 
 The locking system is based on creating a directory `lock.exclusive` (for
@@ -963,7 +963,7 @@ The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
 The repository lock is in `repository/lock.*`.
 
 In case you run into troubles with the locks, you can use the ``borg break-lock``
-command after you first have made sure that no |project_name| process is
+command after you first have made sure that no Borg process is
 running on any machine that accesses this resource. Be very careful, the cache
 or repository might get damaged if multiple processes use it at the same time.
 

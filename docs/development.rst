@@ -5,9 +5,9 @@
 Development
 ===========
 
-This chapter will get you started with |project_name| development.
+This chapter will get you started with Borg development.
 
-|project_name| is written in Python (with a little bit of Cython and C for
+Borg is written in Python (with a little bit of Cython and C for
 the performance critical parts).
 
 Contributions

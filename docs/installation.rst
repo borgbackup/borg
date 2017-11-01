@@ -5,7 +5,7 @@
 Installation
 ============
 
-There are different ways to install |project_name|:
+There are different ways to install Borg:
 
 - :ref:`distribution-package` - easy and fast if a package is
   available from your distribution.
@@ -29,11 +29,11 @@ Some distributions might offer a ready-to-use ``borgbackup``
 package which can be installed with the package manager.
 
 .. important:: Those packages may not be up to date with the latest
-               |project_name| releases. Before submitting a bug
+               Borg releases. Before submitting a bug
                report, check the package version and compare that to
                our latest release then review :doc:`changes` to see if
                the bug has been fixed. Report bugs to the package
-               maintainer rather than directly to |project_name| if the
+               maintainer rather than directly to Borg if the
                package is out of date in the distribution.
 
 .. keep this list in alphabetical order
@@ -87,7 +87,7 @@ Standalone Binary
 .. note:: Releases are signed with an OpenPGP key, see
           :ref:`security-contact` for more instructions.
 
-|project_name| binaries (generated with `pyinstaller`_) are available
+Borg binaries (generated with `pyinstaller`_) are available
 on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
@@ -107,9 +107,9 @@ alias for ``borg mount``::
 
     ln -s /usr/local/bin/borg /usr/local/bin/borgfs
 
-Note that the binary uses /tmp to unpack |project_name| with all dependencies.
+Note that the binary uses /tmp to unpack Borg with all dependencies.
 It will fail if /tmp has not enough free space or is mounted with the ``noexec`` option.
-You can change the temporary directory by setting the ``TEMP`` environment variable before running |project_name|.
+You can change the temporary directory by setting the ``TEMP`` environment variable before running Borg.
 
 If a new version is released, you will have to manually download it and replace
 the old version using the same steps as shown above.
@@ -133,7 +133,7 @@ From Source
 Dependencies
 ~~~~~~~~~~~~
 
-To install |project_name| from a source package (including pip), you have to install the
+To install Borg from a source package (including pip), you have to install the
 following dependencies first:
 
 * `Python 3`_ >= 3.5.0, plus development headers. Even though Python 3 is not
@@ -285,7 +285,7 @@ You can then install ``pip`` and ``virtualenv``::
 Using pip
 ~~~~~~~~~
 
-Virtualenv_ can be used to build and install |project_name| without affecting
+Virtualenv_ can be used to build and install Borg without affecting
 the system Python or requiring root access.  Using a virtual environment is
 optional, but recommended except for the most simple use cases.
 
@@ -305,7 +305,7 @@ This will use ``pip`` to install the latest release from PyPi::
     # or alternatively (if you want FUSE support):
     pip install borgbackup[fuse]
 
-To upgrade |project_name| to a new version later, run the following after
+To upgrade Borg to a new version later, run the following after
 activating your virtual environment::
 
     pip install -U borgbackup  # or ... borgbackup[fuse]

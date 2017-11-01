@@ -63,7 +63,7 @@ specific feature suggestion, you can post a new bounty or back an existing one
 (they always refer to an issue in our `issue tracker`_).
 
 As a developer, you can become a Bounty Hunter and win bounties (earn money) by
-contributing to |project_name|, a free and open source software project.
+contributing to Borg, a free and open source software project.
 
 We might also use BountySource to fund raise for some bigger goals.
 

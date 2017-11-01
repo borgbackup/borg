@@ -1,0 +1,201 @@
+.\" Man page generated from reStructuredText.
+.
+.TH BORG-PATTERNS 1 "2017-06-18" "" "borg backup tool"
+.SH NAME
+borg-patterns \- Details regarding patterns
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH DESCRIPTION
+.sp
+File patterns support these styles: fnmatch, shell, regular expressions,
+path prefixes and path full\-matches. By default, fnmatch is used for
+\fB\-\-exclude\fP patterns and shell\-style is used for the experimental \fB\-\-pattern\fP
+option.
+.sp
+If followed by a colon (\(aq:\(aq) the first two characters of a pattern are used as a
+style selector. Explicit style selection is necessary when a
+non\-default style is desired or when the desired pattern starts with
+two alphanumeric characters followed by a colon (i.e. \fIaa:something/*\fP).
+.INDENT 0.0
+.TP
+.B \fI\%Fnmatch\fP, selector \fIfm:\fP
+This is the default style for \fB\-\-exclude\fP and \fB\-\-exclude\-from\fP\&.
+These patterns use a variant of shell pattern syntax, with \(aq*\(aq matching
+any number of characters, \(aq?\(aq matching any single character, \(aq[...]\(aq
+matching any single character specified, including ranges, and \(aq[!...]\(aq
+matching any character not specified. For the purpose of these patterns,
+the path separator (\(aq\(aq for Windows and \(aq/\(aq on other systems) is not
+treated specially. Wrap meta\-characters in brackets for a literal
+match (i.e. \fI[?]\fP to match the literal character \fI?\fP). For a path
+to match a pattern, it must completely match from start to end, or
+must match from the start to just before a path separator. Except
+for the root path, paths will never end in the path separator when
+matching is attempted.  Thus, if a given pattern ends in a path
+separator, a \(aq*\(aq is appended before matching is attempted.
+.TP
+.B Shell\-style patterns, selector \fIsh:\fP
+This is the default style for \-\-pattern and \-\-patterns\-from.
+Like fnmatch patterns these are similar to shell patterns. The difference
+is that the pattern may include \fI**/\fP for matching zero or more directory
+levels, \fI*\fP for matching zero or more arbitrary characters with the
+exception of any path separator.
+.TP
+.B Regular expressions, selector \fIre:\fP
+Regular expressions similar to those found in Perl are supported. Unlike
+shell patterns regular expressions are not required to match the complete
+path and any substring match is sufficient. It is strongly recommended to
+anchor patterns to the start (\(aq^\(aq), to the end (\(aq$\(aq) or both. Path
+separators (\(aq\(aq for Windows and \(aq/\(aq on other systems) in paths are
+always normalized to a forward slash (\(aq/\(aq) before applying a pattern. The
+regular expression syntax is described in the \fI\%Python documentation for
+the re module\fP\&.
+.TP
+.B Path prefix, selector \fIpp:\fP
+This pattern style is useful to match whole sub\-directories. The pattern
+\fIpp:/data/bar\fP matches \fI/data/bar\fP and everything therein.
+.TP
+.B Path full\-match, selector \fIpf:\fP
+This pattern style is useful to match whole paths.
+This is kind of a pseudo pattern as it can not have any variable or
+unspecified parts \- the full, precise path must be given.
+\fIpf:/data/foo.txt\fP matches \fI/data/foo.txt\fP only.
+.sp
+Implementation note: this is implemented via very time\-efficient O(1)
+hashtable lookups (this means you can have huge amounts of such patterns
+without impacting performance much).
+Due to that, this kind of pattern does not respect any context or order.
+If you use such a pattern to include a file, it will always be included
+(if the directory recursion encounters it).
+Other include/exclude patterns that would normally match will be ignored.
+Same logic applies for exclude.
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fIre:\fP, \fIsh:\fP and \fIfm:\fP patterns are all implemented on top of the Python SRE
+engine. It is very easy to formulate patterns for each of these types which
+requires an inordinate amount of time to match paths. If untrusted users
+are able to supply patterns, ensure they cannot supply \fIre:\fP patterns.
+Further, ensure that \fIsh:\fP and \fIfm:\fP patterns only contain a handful of
+wildcards at most.
+.UNINDENT
+.UNINDENT
+.sp
+Exclusions can be passed via the command line option \fB\-\-exclude\fP\&. When used
+from within a shell the patterns should be quoted to protect them from
+expansion.
+.sp
+The \fB\-\-exclude\-from\fP option permits loading exclusion patterns from a text
+file with one pattern per line. Lines empty or starting with the number sign
+(\(aq#\(aq) after removing whitespace on both ends are ignored. The optional style
+selector prefix is also supported for patterns loaded from a file. Due to
+whitespace removal paths with whitespace at the beginning or end can only be
+excluded using regular expressions.
+.sp
+Examples:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# Exclude \(aq/home/user/file.o\(aq but not \(aq/home/user/file.odt\(aq:
+$ borg create \-e \(aq*.o\(aq backup /
+
+# Exclude \(aq/home/user/junk\(aq and \(aq/home/user/subdir/junk\(aq but
+# not \(aq/home/user/importantjunk\(aq or \(aq/etc/junk\(aq:
+$ borg create \-e \(aq/home/*/junk\(aq backup /
+
+# Exclude the contents of \(aq/home/user/cache\(aq but not the directory itself:
+$ borg create \-e /home/user/cache/ backup /
+
+# The file \(aq/home/user/cache/important\(aq is *not* backed up:
+$ borg create \-e /home/user/cache/ backup / /home/user/cache/important
+
+# The contents of directories in \(aq/home\(aq are not backed up when their name
+# ends in \(aq.tmp\(aq
+$ borg create \-\-exclude \(aqre:^/home/[^/]+\e.tmp/\(aq backup /
+
+# Load exclusions from file
+$ cat >exclude.txt <<EOF
+# Comment line
+/home/*/junk
+*.tmp
+fm:aa:something/*
+re:^/home/[^/]\e.tmp/
+sh:/home/*/.thumbnails
+EOF
+$ borg create \-\-exclude\-from exclude.txt backup /
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+A more general and easier to use way to define filename matching patterns exists
+with the experimental \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP options. Using these, you
+may specify the backup roots (starting points) and patterns for inclusion/exclusion.
+A root path starts with the prefix \fIR\fP, followed by a path (a plain path, not a
+file pattern). An include rule starts with the prefix +, an exclude rule starts
+with the prefix \-, both followed by a pattern.
+Inclusion patterns are useful to include paths that are contained in an excluded
+path. The first matching pattern is used so if an include pattern matches before
+an exclude pattern, the file is backed up.
+.sp
+Note that the default pattern style for \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP is
+shell style (\fIsh:\fP), so those patterns behave similar to rsync include/exclude
+patterns. The pattern style can be set via the \fIP\fP prefix.
+.sp
+Patterns (\fB\-\-pattern\fP) and excludes (\fB\-\-exclude\fP) from the command line are
+considered first (in the order of appearance). Then patterns from \fB\-\-patterns\-from\fP
+are added. Exclusion patterns from \fB\-\-exclude\-from\fP files are appended last.
+.sp
+An example \fB\-\-patterns\-from\fP file could look like that:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# "sh:" pattern style is the default, so the following line is not needed:
+P sh
+R /
+# can be rebuild
+\- /home/*/.cache
+# they\(aqre downloads for a reason
+\- /home/*/Downloads
+# susan is a nice person
+# include susans home
++ /home/susan
+# don\(aqt backup the other home directories
+\- /home/*
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH AUTHOR
+The Borg Collective
+.\" Generated by docutils manpage writer.
+.

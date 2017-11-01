@@ -3,14 +3,15 @@ import os
 import shutil
 import time
 
-import logging
-logger = logging.getLogger(__name__)
-
-from .helpers import get_home_dir, get_keys_dir, get_cache_dir
+from .crypto.key import KeyfileKey, KeyfileNotFoundError
+from .constants import REPOSITORY_README
 from .helpers import ProgressIndicatorPercent
-from .key import KeyfileKey, KeyfileNotFoundError
-from .locking import UpgradableLock
+from .helpers import get_home_dir, get_keys_dir, get_cache_dir
+from .locking import Lock
+from .logger import create_logger
 from .repository import Repository, MAGIC
+
+logger = create_logger(__name__)
 
 ATTIC_MAGIC = b'ATTICSEG'
 
@@ -18,6 +19,7 @@ ATTIC_MAGIC = b'ATTICSEG'
 class AtticRepositoryUpgrader(Repository):
     def __init__(self, *args, **kw):
         kw['lock'] = False  # do not create borg lock files (now) in attic repo
+        kw['check_segment_magic'] = False  # skip the Attic check when upgrading
         super().__init__(*args, **kw)
 
     def upgrade(self, dryrun=True, inplace=False, progress=False):
@@ -34,13 +36,13 @@ class AtticRepositoryUpgrader(Repository):
         with self:
             backup = None
             if not inplace:
-                backup = '{}.upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
+                backup = '{}.before-upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
                 logger.info('making a hardlink copy in %s', backup)
                 if not dryrun:
                     shutil.copytree(self.path, backup, copy_function=os.link)
             logger.info("opening attic repository with borg and converting")
             # now lock the repo, after we have made the copy
-            self.lock = UpgradableLock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
+            self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
             segments = [filename for i, filename in self.io.segment_iterator()]
             try:
                 keyfile = self.find_attic_keyfile()
@@ -49,8 +51,7 @@ class AtticRepositoryUpgrader(Repository):
             else:
                 self.convert_keyfiles(keyfile, dryrun)
         # partial open: just hold on to the lock
-        self.lock = UpgradableLock(os.path.join(self.path, 'lock'),
-                                   exclusive=True).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
         try:
             self.convert_cache(dryrun)
             self.convert_repo_index(dryrun=dryrun, inplace=inplace)
@@ -65,7 +66,7 @@ class AtticRepositoryUpgrader(Repository):
         readme = os.path.join(self.path, 'README')
         os.remove(readme)
         with open(readme, 'w') as fd:
-            fd.write('This is a Borg repository\n')
+            fd.write(REPOSITORY_README)
 
     @staticmethod
     def convert_segments(segments, dryrun=True, inplace=False, progress=False):
@@ -78,7 +79,7 @@ class AtticRepositoryUpgrader(Repository):
         replace the 8 first bytes of all regular files in there."""
         logger.info("converting %d segments..." % len(segments))
         segment_count = len(segments)
-        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%", same_line=True)
+        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%")
         for i, filename in enumerate(segments):
             if progress:
                 pi.show(i)
@@ -131,7 +132,6 @@ class AtticRepositoryUpgrader(Repository):
 
     @staticmethod
     def convert_keyfiles(keyfile, dryrun):
-
         """convert key files from attic to borg
 
         replacement pattern is `s/ATTIC KEY/BORG_KEY/` in

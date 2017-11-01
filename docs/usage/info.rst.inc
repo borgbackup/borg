@@ -4,22 +4,79 @@
 
 borg info
 ---------
-::
+.. code-block:: none
 
-    borg info <options> ARCHIVE
+    borg [common options] info [options] [REPOSITORY_OR_ARCHIVE]
 
-positional arguments
-    ARCHIVE
-        archive to display information about
+.. only:: html
 
-`Common options`_
-    |
+    .. class:: borg-options-table
+
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                                                                                     |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``REPOSITORY_OR_ARCHIVE``             | archive or repository to display information about                                                                                                     |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **optional arguments**                                                                                                                                                                                                                                                       |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--json``                            | format output as JSON                                                                                                                                  |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                               |
+    |                                                                                                                                                                                                                                                                              |
+    | :ref:`common_options`                                                                                                                                                                                                                                                        |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                                                  |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-P PREFIX``, ``--prefix PREFIX``    | only consider archive names starting with this prefix.                                                                                                 |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-a GLOB``, ``--glob-archives GLOB`` | only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive. |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--sort-by KEYS``                    | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp                                                       |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--first N``                         | consider first N archives after other filters were applied                                                                                             |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--last N``                          | consider last N archives after other filters were applied                                                                                              |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+    REPOSITORY_OR_ARCHIVE
+        archive or repository to display information about
+
+
+    optional arguments
+        --json     format output as JSON
+
+
+    :ref:`common_options`
+        |
+
+    Archive filters
+        -P PREFIX, --prefix PREFIX        only consider archive names starting with this prefix.
+        -a GLOB, --glob-archives GLOB     only consider archive names matching the glob. sh: rules apply, see "borg help patterns". ``--prefix`` and ``--glob-archives`` are mutually exclusive.
+        --sort-by KEYS                    Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+        --first N                         consider first N archives after other filters were applied
+        --last N                          consider last N archives after other filters were applied
+
 
 Description
 ~~~~~~~~~~~
 
-This command displays some detailed information about the specified archive.
+This command displays detailed information about the specified archive or repository.
 
-The "This archive" line refers exclusively to this archive:
-"Deduplicated size" is the size of the unique chunks stored only for this
-archive. Non-unique / common chunks show up under "All archives".
+Please note that the deduplicated sizes of the individual archives do not add
+up to the deduplicated size of the repository ("all archives"), because the two
+are meaning different things:
+
+This archive / deduplicated size = amount of data stored ONLY for this archive
+                                 = unique chunks of this archive.
+All archives / deduplicated size = amount of data stored in the repo
+                                 = all chunks in the repository.

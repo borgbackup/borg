@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-API_VERSION = 2
+API_VERSION = '1.1_01'
 
 from libc.stdlib cimport free
 
@@ -50,11 +50,11 @@ cdef class Chunker:
         return chunker_process(self.chunker)
 
 
-def buzhash(unsigned char *data, unsigned long seed):
+def buzhash(data, unsigned long seed):
     cdef uint32_t *table
     cdef uint32_t sum
     table = buzhash_init_table(seed & 0xffffffff)
-    sum = c_buzhash(data, len(data), table)
+    sum = c_buzhash(<const unsigned char *> data, len(data), table)
     free(table)
     return sum
 

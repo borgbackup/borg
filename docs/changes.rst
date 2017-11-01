@@ -1,8 +1,85 @@
-Changelog
-=========
 
-Important note about pre-1.0.4 potential repo corruption
---------------------------------------------------------
+.. _important_notes:
+
+Important notes
+===============
+
+This section provides information about security and corruption issues.
+
+.. _tam_vuln:
+
+Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)
+----------------------------------------------------------
+
+A flaw in the cryptographic authentication scheme in Borg allowed an attacker
+to spoof the manifest. The attack requires an attacker to be able to
+
+1. insert files (with no additional headers) into backups
+2. gain write access to the repository
+
+This vulnerability does not disclose plaintext to the attacker, nor does it
+affect the authenticity of existing archives.
+
+The vulnerability allows an attacker to create a spoofed manifest (the list of archives).
+Creating plausible fake archives may be feasible for small archives, but is unlikely
+for large archives.
+
+The fix adds a separate authentication tag to the manifest. For compatibility
+with prior versions this authentication tag is *not* required by default
+for existing repositories. Repositories created with 1.0.9 and later require it.
+
+Steps you should take:
+
+1. Upgrade all clients to 1.0.9 or later.
+2. Run ``borg upgrade --tam <repository>`` *on every client* for *each* repository.
+3. This will list all archives, including archive IDs, for easy comparison with your logs.
+4. Done.
+
+Prior versions can access and modify repositories with this measure enabled, however,
+to 1.0.9 or later their modifications are indiscernible from an attack and will
+raise an error until the below procedure is followed. We are aware that this can
+be be annoying in some circumstances, but don't see a way to fix the vulnerability
+otherwise.
+
+In case a version prior to 1.0.9 is used to modify a repository where above procedure
+was completed, and now you get an error message from other clients:
+
+1. ``borg upgrade --tam --force <repository>`` once with *any* client suffices.
+
+This attack is mitigated by:
+
+- Noting/logging ``borg list``, ``borg info``, or ``borg create --stats``, which
+  contain the archive IDs.
+
+We are not aware of others having discovered, disclosed or exploited this vulnerability.
+
+Vulnerability time line:
+
+* 2016-11-14: Vulnerability and fix discovered during review of cryptography by Marian Beermann (@enkore)
+* 2016-11-20: First patch
+* 2016-12-20: Released fixed version 1.0.9
+* 2017-01-02: CVE was assigned
+* 2017-01-15: Released fixed version 1.1.0b3 (fix was previously only available from source)
+
+.. _attic013_check_corruption:
+
+Pre-1.0.9 potential data loss
+-----------------------------
+
+If you have archives in your repository that were made with attic <= 0.13
+(and later migrated to borg), running borg check would report errors in these
+archives. See issue #1837.
+
+The reason for this is a invalid (and useless) metadata key that was
+always added due to a bug in these old attic versions.
+
+If you run borg check --repair, things escalate quickly: all archive items
+with invalid metadata will be killed. Due to that attic bug, that means all
+items in all archives made with these old attic versions.
+
+
+Pre-1.0.4 potential repo corruption
+-----------------------------------
 
 Some external errors (like network or disk I/O errors) could lead to
 corruption of the backup repository due to issue #1138.
@@ -49,63 +126,937 @@ The best check that everything is ok is to run a dry-run extraction::
 
     borg extract -v --dry-run REPO::ARCHIVE
 
+.. _changelog:
 
-Version 1.1.0 (not released yet)
---------------------------------
+Changelog
+=========
+
+Version 1.2.0dev0 (not released yet)
+------------------------------------
+
+Compatibility notes:
+
+- dropped support and testing for Python 3.4, minimum requirement is 3.5.0.
+  In case your OS does not provide Python >= 3.5, consider using our binary,
+  which does not need an external Python interpreter.
+- list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
+  "isomtime" was the default but produced a verbose human format,
+  while "mtime" produced a ISO-8601-like format.
+  The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
+  and the default is now "mtime".
+  "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+
+Version 1.1.0rc1 (2017-07-24)
+-----------------------------
+
+Compatibility notes:
+
+- delete: removed short option for --cache-only
 
 New features:
 
-- borg check: will not produce the "Checking segments" output unless
-  new --progress option is passed, #824.
-- options that imply output (--show-rc, --show-version, --list, --stats, 
-  --progress) don't need -v/--info to have that output displayed, #865
-- borg recreate: re-create existing archives, #787 #686 #630 #70, also see
-  #757, #770.
+- support borg list repo --format {comment} {bcomment} {end}, #2081
+- key import: allow reading from stdin, #2760
 
-  - selectively remove files/dirs from old archives
-  - re-compress data
-  - re-chunkify data, e.g. to have upgraded Attic / Borg 0.xx archives
-    deduplicate with Borg 1.x archives or to experiment with chunker-params.
-- create: visit files in inode order (better speed, esp. for large directories
-  and rotating disks)
-- borg diff: show differences between archives
-- borg list improved:
+Fixes:
+
+- with-lock: avoid creating segment files that might be overwritten later, #1867
+- prune: fix checkpoints processing with --glob-archives
+- FUSE: versions view: keep original file extension at end, #2769
+- fix --last, --first: do not accept values <= 0,
+  fix reversed archive ordering with --last
+- include testsuite data (attic.tar.gz) when installing the package
+- use limited unpacker for outer key, for manifest (both security precautions),
+  #2174 #2175
+- fix bashism in shell scripts, #2820, #2816
+- cleanup endianness detection, create _endian.h,
+  fixes build on alpine linux, #2809
+- fix crash with --no-cache-sync (give known chunk size to chunk_incref), #2853
+
+Other changes:
+
+- FUSE: versions view: linear numbering by archive time
+- split up interval parsing from filtering for --keep-within, #2610
+- add a basic .editorconfig, #2734
+- use archive creation time as mtime for FUSE mount, #2834
+- upgrade FUSE for macOS (osxfuse) from 3.5.8 to 3.6.3, #2706
+- hashindex: speed up by replacing modulo with "if" to check for wraparound
+- coala checker / pylint: fixed requirements and .coafile, more ignores
+- borg upgrade: name backup directories as 'before-upgrade', #2811
+- add .mailmap
+- some minor changes suggested by lgtm.com
+- docs:
+
+  - better explanation of the --ignore-inode option relevance, #2800
+  - fix openSUSE command and add openSUSE section
+  - simplify ssh authorized_keys file using "restrict", add legacy note, #2121
+  - mount: show usage of archive filters
+  - mount: add repository example, #2462
+  - info: update and add examples, #2765
+  - prune: include example
+  - improved style / formatting
+  - improved/fixed segments_per_dir docs
+  - recreate: fix wrong "remove unwanted files" example
+  - reference list of status chars in borg recreate --filter description
+  - update source-install docs about doc build dependencies, #2795
+  - cleanup installation docs
+  - file system requirements, update segs per dir
+  - fix checkpoints/parts reference in FAQ, #2859
+- code:
+
+  - hashindex: don't pass side effect into macro
+  - crypto low_level: don't mutate local bytes()
+  - use dash_open function to open file or "-" for stdin/stdout
+  - archiver: argparse cleanup / refactoring
+  - shellpattern: add match_end arg
+- tests: added some additional unit tests, some fixes, #2700 #2710
+- vagrant: fix setup of cygwin, add Debian 9 "stretch"
+- travis: don't perform full travis build on docs-only changes, #2531
+
+
+Version 1.1.0b6 (2017-06-18)
+----------------------------
+
+Compatibility notes:
+
+- Running "borg init" via a "borg serve --append-only" server will *not* create
+  an append-only repository anymore. Use "borg init --append-only" to initialize
+  an append-only repository.
+
+- Repositories in the "repokey" and "repokey-blake2" modes with an empty passphrase
+  are now treated as unencrypted repositories for security checks (e.g.
+  BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK).
+
+  Previously there would be no prompts nor messages if an unknown repository
+  in one of these modes with an empty passphrase was encountered. This would
+  allow an attacker to swap a repository, if one assumed that the lack of
+  password prompts was due to a set BORG_PASSPHRASE.
+
+  Since the "trick" does not work if BORG_PASSPHRASE is set, this does generally
+  not affect scripts.
+
+- Repositories in the "authenticated" mode are now treated as the unencrypted
+  repositories they are.
+
+- The client-side temporary repository cache now holds unencrypted data for better speed.
+
+- borg init: removed the short form of --append-only (-a).
+
+- borg upgrade: removed the short form of --inplace (-i).
+
+New features:
+
+- reimplemented the RepositoryCache, size-limited caching of decrypted repo
+  contents, integrity checked via xxh64. #2515
+- reduced space usage of chunks.archive.d. Existing caches are migrated during
+  a cache sync. #235 #2638
+- integrity checking using xxh64 for important files used by borg, #1101:
+
+  - repository: index and hints files
+  - cache: chunks and files caches, chunks.archive.d
+- improve cache sync speed, #1729
+- create: new --no-cache-sync option
+- add repository mandatory feature flags infrastructure, #1806
+- Verify most operations against SecurityManager. Location, manifest timestamp
+  and key types are now checked for almost all non-debug commands. #2487
+- implement storage quotas, #2517
+- serve: add --restrict-to-repository, #2589
+- BORG_PASSCOMMAND: use external tool providing the key passphrase, #2573
+- borg export-tar, #2519
+- list: --json-lines instead of --json for archive contents, #2439
+- add --debug-profile option (and also "borg debug convert-profile"), #2473
+- implement --glob-archives/-a, #2448
+- normalize authenticated key modes for better naming consistency:
+
+  - rename "authenticated" to "authenticated-blake2" (uses blake2b)
+  - implement "authenticated" mode (uses hmac-sha256)
+
+Fixes:
+
+- hashindex: read/write indices >2 GiB on 32bit systems, better error
+  reporting, #2496
+- repository URLs: implement IPv6 address support and also more informative
+  error message when parsing fails.
+- mount: check whether llfuse is installed before asking for passphrase, #2540
+- mount: do pre-mount checks before opening repository, #2541
+- FUSE:
+
+  - fix crash if empty (None) xattr is read, #2534
+  - fix read(2) caching data in metadata cache
+  - fix negative uid/gid crash (fix crash when mounting archives
+    of external drives made on cygwin), #2674
+  - redo ItemCache, on top of object cache
+  - use decrypted cache
+  - remove unnecessary normpaths
+- serve: ignore --append-only when initializing a repository (borg init), #2501
+- serve: fix incorrect type of exception_short for Errors, #2513
+- fix --exclude and --exclude-from recursing into directories, #2469
+- init: don't allow creating nested repositories, #2563
+- --json: fix encryption[mode] not being the cmdline name
+- remote: propagate Error.traceback correctly
+- fix remote logging and progress, #2241
+
+  - implement --debug-topic for remote servers
+  - remote: restore "Remote:" prefix (as used in 1.0.x)
+  - rpc negotiate: enable v3 log protocol only for supported clients
+  - fix --progress and logging in general for remote
+- fix parse_version, add tests, #2556
+- repository: truncate segments (and also some other files) before unlinking, #2557
+- recreate: keep timestamps as in original archive, #2384
+- recreate: if single archive is not processed, exit 2
+- patterns: don't recurse with ! / --exclude for pf:, #2509
+- cache sync: fix n^2 behaviour in lookup_name
+- extract: don't write to disk with --stdout (affected non-regular-file items), #2645
+- hashindex: implement KeyError, more tests
+
+Other changes:
+
+- remote: show path in PathNotAllowed
+- consider repokey w/o passphrase == unencrypted, #2169
+- consider authenticated mode == unencrypted, #2503
+- restrict key file names, #2560
+- document follow_symlinks requirements, check libc, use stat and chown
+  with follow_symlinks=False, #2507
+- support common options on the main command, #2508
+- support common options on mid-level commands (e.g. borg *key* export)
+- make --progress a common option
+- increase DEFAULT_SEGMENTS_PER_DIR to 1000
+- chunker: fix invalid use of types (function only used by tests)
+- chunker: don't do uint32_t >> 32
+- FUSE:
+
+  - add instrumentation (--debug and SIGUSR1/SIGINFO)
+  - reduced memory usage for repository mounts by lazily instantiating archives
+  - improved archive load times
+- info: use CacheSynchronizer & HashIndex.stats_against (better performance)
+- docs:
+
+  - init: document --encryption as required
+  - security: OpenSSL usage
+  - security: used implementations; note python libraries
+  - security: security track record of OpenSSL and msgpack
+  - patterns: document denial of service (regex, wildcards)
+  - init: note possible denial of service with "none" mode
+  - init: document SHA extension is supported in OpenSSL and thus SHA is
+    faster on AMD Ryzen than blake2b.
+  - book: use A4 format, new builder option format.
+  - book: create appendices
+  - data structures: explain repository compaction
+  - data structures: add chunk layout diagram
+  - data structures: integrity checking
+  - data structures: demingle cache and repo index
+  - Attic FAQ: separate section for attic stuff
+  - FAQ: I get an IntegrityError or similar - what now?
+  - FAQ: Can I use Borg on SMR hard drives?, #2252
+  - FAQ: specify "using inline shell scripts"
+  - add systemd warning regarding placeholders, #2543
+  - xattr: document API
+  - add docs/misc/borg-data-flow data flow chart
+  - debugging facilities
+  - README: how to help the project, #2550
+  - README: add bountysource badge, #2558
+  - fresh new theme + tweaking
+  - logo: vectorized (PDF and SVG) versions
+  - frontends: use headlines - you can link to them
+  - mark --pattern, --patterns-from as experimental
+  - highlight experimental features in online docs
+  - remove regex based pattern examples, #2458
+  - nanorst for "borg help TOPIC" and --help
+  - split deployment
+  - deployment: hosting repositories
+  - deployment: automated backups to a local hard drive
+  - development: vagrant, windows10 requirements
+  - development: update docs remarks
+  - split usage docs, #2627
+  - usage: avoid bash highlight, [options] instead of <options>
+  - usage: add benchmark page
+  - helpers: truncate_and_unlink doc
+  - don't suggest to leak BORG_PASSPHRASE
+  - internals: columnize rather long ToC [webkit fixup]
+    internals: manifest & feature flags
+  - internals: more HashIndex details
+  - internals: fix ASCII art equations
+  - internals: edited obj graph related sections a bit
+  - internals: layers image + description
+  - fix way too small figures in pdf
+  - index: disable syntax highlight (bash)
+  - improve options formatting, fix accidental block quotes
+
+- testing / checking:
+
+  - add support for using coala, #1366
+  - testsuite: add ArchiverCorruptionTestCase
+  - do not test logger name, #2504
+  - call setup_logging after destroying logging config
+  - testsuite.archiver: normalise pytest.raises vs. assert_raises
+  - add test for preserved intermediate folder permissions, #2477
+  - key: add round-trip test
+  - remove attic dependency of the tests, #2505
+  - enable remote tests on cygwin
+  - tests: suppress tar's future timestamp warning
+  - cache sync: add more refcount tests
+  - repository: add tests, including corruption tests
+
+- vagrant:
+
+  - control VM cpus and pytest workers via env vars VMCPUS and XDISTN
+  - update cleaning workdir
+  - fix openbsd shell
+  - add OpenIndiana
+
+- packaging:
+
+  - binaries: don't bundle libssl
+  - setup.py clean to remove compiled files
+  - fail in borg package if version metadata is very broken (setuptools_scm)
+
+- repo / code structure:
+
+  - create borg.algorithms and borg.crypto packages
+  - algorithms: rename crc32 to checksums
+  - move patterns to module, #2469
+  - gitignore: complete paths for src/ excludes
+  - cache: extract CacheConfig class
+  - implement IntegrityCheckedFile + Detached variant, #2502 #1688
+  - introduce popen_with_error_handling to handle common user errors
+
+
+Version 1.1.0b5 (2017-04-30)
+----------------------------
+
+Compatibility notes:
+
+- BORG_HOSTNAME_IS_UNIQUE is now on by default.
+- removed --compression-from feature
+- recreate: add --recompress flag, unify --always-recompress and
+  --recompress
+
+Fixes:
+
+- catch exception for os.link when hardlinks are not supported, #2405
+- borg rename / recreate: expand placeholders, #2386
+- generic support for hardlinks (files, devices, FIFOs), #2324
+- extract: also create parent dir for device files, if needed, #2358
+- extract: if a hardlink master is not in the to-be-extracted subset,
+  the "x" status was not displayed for it, #2351
+- embrace y2038 issue to support 32bit platforms: clamp timestamps to int32,
+  #2347
+- verify_data: fix IntegrityError handling for defect chunks, #2442
+- allow excluding parent and including child, #2314
+
+Other changes:
+
+- refactor compression decision stuff
+- change global compression default to lz4 as well, to be consistent
+  with --compression defaults.
+- placeholders: deny access to internals and other unspecified stuff
+- clearer error message for unrecognized placeholder
+- more clear exception if borg check does not help, #2427
+- vagrant: upgrade FUSE for macOS to 3.5.8, #2346
+- linux binary builds: get rid of glibc 2.13 dependency, #2430
+- docs:
+
+  - placeholders: document escaping
+  - serve: env vars in original commands are ignored
+  - tell what kind of hardlinks we support
+  - more docs about compression
+  - LICENSE: use canonical formulation
+    ("copyright holders and contributors" instead of "author")
+  - document borg init behaviour via append-only borg serve, #2440
+  - be clear about what buzhash is used for, #2390
+  - add hint about chunker params, #2421
+  - clarify borg upgrade docs, #2436
+  - FAQ to explain warning when running borg check --repair, #2341
+  - repository file system requirements, #2080
+  - pre-install considerations
+  - misc. formatting / crossref fixes
+- tests:
+
+  - enhance travis setuptools_scm situation
+  - add extra test for the hashindex
+  - fix invalid param issue in benchmarks
+
+These belong to 1.1.0b4 release, but did not make it into changelog by then:
+
+- vagrant: increase memory for parallel testing
+- lz4 compress: lower max. buffer size, exception handling
+- add docstring to do_benchmark_crud
+- patterns help: mention path full-match in intro
+
+
+Version 1.1.0b4 (2017-03-27)
+----------------------------
+
+Compatibility notes:
+
+- init: the --encryption argument is mandatory now (there are several choices)
+- moved "borg migrate-to-repokey" to "borg key migrate-to-repokey".
+- "borg change-passphrase" is deprecated, use "borg key change-passphrase"
+  instead.
+- the --exclude-if-present option now supports tagging a folder with any
+  filesystem object type (file, folder, etc), instead of expecting only files
+  as tags, #1999
+- the --keep-tag-files option has been deprecated in favor of the new
+  --keep-exclude-tags, to account for the change mentioned above.
+- use lz4 compression by default, #2179
+
+New features:
+
+- JSON API to make developing frontends and automation easier
+  (see :ref:`json_output`)
+
+  - add JSON output to commands: `borg create/list/info --json ...`.
+  - add --log-json option for structured logging output.
+  - add JSON progress information, JSON support for confirmations (yes()).
+- add two new options --pattern and --patterns-from as discussed in #1406
+- new path full match pattern style (pf:) for very fast matching, #2334
+- add 'debug dump-manifest' and 'debug dump-archive' commands
+- add 'borg benchmark crud' command, #1788
+- new 'borg delete --force --force' to delete severely corrupted archives, #1975
+- info: show utilization of maximum archive size, #1452
+- list: add dsize and dcsize keys, #2164
+- paperkey.html: Add interactive html template for printing key backups.
+- key export: add qr html export mode
+- securely erase config file (which might have old encryption key), #2257
+- archived file items: add size to metadata, 'borg extract' and 'borg check' do
+  check the file size for consistency, FUSE uses precomputed size from Item.
+
+Fixes:
+
+- fix remote speed regression introduced in 1.1.0b3, #2185
+- fix regression handling timestamps beyond 2262 (revert bigint removal),
+  introduced in 1.1.0b3, #2321
+- clamp (nano)second values to unproblematic range, #2304
+- hashindex: rebuild hashtable if we have too little empty buckets
+  (performance fix), #2246
+- Location regex: fix bad parsing of wrong syntax
+- ignore posix_fadvise errors in repository.py, #2095
+- borg rpc: use limited msgpack.Unpacker (security precaution), #2139
+- Manifest: Make sure manifest timestamp is strictly monotonically increasing.
+- create: handle BackupOSError on a per-path level in one spot
+- create: clarify -x option / meaning of "same filesystem"
+- create: don't create hard link refs to failed files
+- archive check: detect and fix missing all-zero replacement chunks, #2180
+- files cache: update inode number when --ignore-inode is used, #2226
+- fix decompression exceptions crashing ``check --verify-data`` and others
+  instead of reporting integrity error, #2224 #2221
+- extract: warning for unextracted big extended attributes, #2258, #2161
+- mount: umount on SIGINT/^C when in foreground
+- mount: handle invalid hard link refs
+- mount: fix huge RAM consumption when mounting a repository (saves number of
+  archives * 8 MiB), #2308
+- hashindex: detect mingw byte order #2073
+- hashindex: fix wrong skip_hint on hashindex_set when encountering tombstones,
+  the regression was introduced in #1748
+- fix ChunkIndex.__contains__ assertion  for big-endian archs
+- fix borg key/debug/benchmark crashing without subcommand, #2240
+- Location: accept //servername/share/path
+- correct/refactor calculation of unique/non-unique chunks
+- extract: fix missing call to ProgressIndicator.finish
+- prune: fix error msg, it is --keep-within, not --within
+- fix "auto" compression mode bug (not compressing), #2331
+- fix symlink item fs size computation, #2344
+
+Other changes:
+
+- remote repository: improved async exception processing, #2255 #2225
+- with --compression auto,C, only use C if lz4 achieves at least 3% compression
+- PatternMatcher: only normalize path once, #2338
+- hashindex: separate endian-dependent defs from endian detection
+- migrate-to-repokey: ask using canonical_path() as we do everywhere else.
+- SyncFile: fix use of fd object after close
+- make LoggedIO.close_segment reentrant
+- creating a new segment: use "xb" mode, #2099
+- redo key_creator, key_factory, centralise key knowledge, #2272
+- add return code functions, #2199
+- list: only load cache if needed
+- list: files->items, clarifications
+- list: add "name" key for consistency with info cmd
+- ArchiveFormatter: add "start" key for compatibility with "info"
+- RemoteRepository: account rx/tx bytes
+- setup.py build_usage/build_man/build_api fixes
+- Manifest.in: simplify, exclude .so, .dll and .orig, #2066
+- FUSE: get rid of chunk accounting, st_blocks = ceil(size / blocksize).
+- tests:
+
+  - help python development by testing 3.6-dev
+  - test for borg delete --force
+- vagrant:
+
+  - freebsd: some fixes, #2067
+  - darwin64: use osxfuse 3.5.4 for tests / to build binaries
+  - darwin64: improve VM settings
+  - use python 3.5.3 to build binaries, #2078
+  - upgrade pyinstaller from 3.1.1+ to 3.2.1
+  - pyinstaller: use fixed AND freshly compiled bootloader, #2002
+  - pyinstaller: automatically builds bootloader if missing
+- docs:
+
+  - create really nice man pages
+  - faq: mention --remote-ratelimit in bandwidth limit question
+  - fix caskroom link, #2299
+  - docs/security: reiterate that RPC in Borg does no networking
+  - docs/security: counter tracking, #2266
+  - docs/development: update merge remarks
+  - address SSH batch mode in docs, #2202 #2270
+  - add warning about running build_usage on Python >3.4, #2123
+  - one link per distro in the installation page
+  - improve --exclude-if-present and --keep-exclude-tags, #2268
+  - improve automated backup script in doc, #2214
+  - improve remote-path description
+  - update docs for create -C default change (lz4)
+  - document relative path usage, #1868
+  - document snapshot usage, #2178
+  - corrected some stuff in internals+security
+  - internals: move toctree to after the introduction text
+  - clarify metadata kind, manifest ops
+  - key enc: correct / clarify some stuff, link to internals/security
+  - datas: enc: 1.1.x mas different MACs
+  - datas: enc: correct factual error -- no nonce involved there.
+  - make internals.rst an index page and edit it a bit
+  - add "Cryptography in Borg" and "Remote RPC protocol security" sections
+  - document BORG_HOSTNAME_IS_UNIQUE, #2087
+  - FAQ by categories as proposed by @anarcat in #1802
+  - FAQ: update Which file types, attributes, etc. are *not* preserved?
+  - development: new branching model for git repository
+  - development: define "ours" merge strategy for auto-generated files
+  - create: move --exclude note to main doc
+  - create: move item flags to main doc
+  - fix examples using borg init without -e/--encryption
+  - list: don't print key listings in fat (html + man)
+  - remove Python API docs (were very incomplete, build problems on RTFD)
+  - added FAQ section about backing up root partition
+
+
+Version 1.0.10 (2017-02-13)
+---------------------------
+
+Bug fixes:
+
+- Manifest timestamps are now monotonically increasing,
+  this fixes issues when the system clock jumps backwards
+  or is set inconsistently across computers accessing the same repository, #2115
+- Fixed testing regression in 1.0.10rc1 that lead to a hard dependency on
+  py.test >= 3.0, #2112
+
+New features:
+
+- "key export" can now generate a printable HTML page with both a QR code and
+  a human-readable "paperkey" representation (and custom text) through the
+  ``--qr-html`` option.
+
+  The same functionality is also available through `paperkey.html <paperkey.html>`_,
+  which is the same HTML page generated by ``--qr-html``. It works with existing
+  "key export" files and key files.
+
+Other changes:
+
+- docs:
+
+  - language clarification - "borg create --one-file-system" option does not respect
+    mount points, but considers different file systems instead, #2141
+- setup.py: build_api: sort file list for determinism
+
+
+Version 1.1.0b3 (2017-01-15)
+----------------------------
+
+Compatibility notes:
+
+- borg init: removed the default of "--encryption/-e", #1979
+  This was done so users do a informed decision about -e mode.
+
+Bug fixes:
+
+- borg recreate: don't rechunkify unless explicitly told so
+- borg info: fixed bug when called without arguments, #1914
+- borg init: fix free space check crashing if disk is full, #1821
+- borg debug delete/get obj: fix wrong reference to exception
+- fix processing of remote ~/ and ~user/ paths (regressed since 1.1.0b1), #1759
+- posix platform module: only build / import on non-win32 platforms, #2041
+
+New features:
+
+- new CRC32 implementations that are much faster than the zlib one used previously, #1970
+- add blake2b key modes (use blake2b as MAC). This links against system libb2,
+  if possible, otherwise uses bundled code
+- automatically remove stale locks - set BORG_HOSTNAME_IS_UNIQUE env var
+  to enable stale lock killing. If set, stale locks in both cache and
+  repository are deleted. #562 #1253
+- borg info <repo>: print general repo information, #1680
+- borg check --first / --last / --sort / --prefix, #1663
+- borg mount --first / --last / --sort / --prefix, #1542
+- implement "health" item formatter key, #1749
+- BORG_SECURITY_DIR to remember security related infos outside the cache.
+  Key type, location and manifest timestamp checks now survive cache
+  deletion. This also means that you can now delete your cache and avoid
+  previous warnings, since Borg can still tell it's safe.
+- implement BORG_NEW_PASSPHRASE, #1768
+
+Other changes:
+
+- borg recreate:
+
+  - remove special-cased --dry-run
+  - update --help
+  - remove bloat: interruption blah, autocommit blah, resuming blah
+  - re-use existing checkpoint functionality
+  - archiver tests: add check_cache tool - lints refcounts
+
+- fixed cache sync performance regression from 1.1.0b1 onwards, #1940
+- syncing the cache without chunks.archive.d (see :ref:`disable_archive_chunks`)
+  now avoids any merges and is thus faster, #1940
+- borg check --verify-data: faster due to linear on-disk-order scan
+- borg debug-xxx commands removed, we use "debug xxx" subcommands now, #1627
+- improve metadata handling speed
+- shortcut hashindex_set by having hashindex_lookup hint about address
+- improve / add progress displays, #1721
+- check for index vs. segment files object count mismatch
+- make RPC protocol more extensible: use named parameters.
+- RemoteRepository: misc. code cleanups / refactors
+- clarify cache/repository README file
+
+- docs:
+
+  - quickstart: add a comment about other (remote) filesystems
+  - quickstart: only give one possible ssh url syntax, all others are
+    documented in usage chapter.
+  - mention file://
+  - document repo URLs / archive location
+  - clarify borg diff help, #980
+  - deployment: synthesize alternative --restrict-to-path example
+  - improve cache / index docs, esp. files cache docs, #1825
+  - document using "git merge 1.0-maint -s recursive -X rename-threshold=20%"
+    for avoiding troubles when merging the 1.0-maint branch into master.
+
+- tests:
+
+  - FUSE tests: catch ENOTSUP on freebsd
+  - FUSE tests: test troublesome xattrs last
+  - fix byte range error in test, #1740
+  - use monkeypatch to set env vars, but only on pytest based tests.
+  - point XDG_*_HOME to temp dirs for tests, #1714
+  - remove all BORG_* env vars from the outer environment
+
+
+Version 1.0.10rc1 (2017-01-29)
+------------------------------
+
+Bug fixes:
+
+- borg serve: fix transmission data loss of pipe writes, #1268
+  This affects only the cygwin platform (not Linux, BSD, OS X).
+- Avoid triggering an ObjectiveFS bug in xattr retrieval, #1992
+- When running out of buffer memory when reading xattrs, only skip the
+  current file, #1993
+- Fixed "borg upgrade --tam" crashing with unencrypted repositories. Since
+  :ref:`the issue <tam_vuln>` is not relevant for unencrypted repositories,
+  it now does nothing and prints an error, #1981.
+- Fixed change-passphrase crashing with unencrypted repositories, #1978
+- Fixed "borg check repo::archive" indicating success if "archive" does not exist, #1997
+- borg check: print non-exit-code warning if --last or --prefix aren't fulfilled
+- fix bad parsing of wrong repo location syntax
+- create: don't create hard link refs to failed files,
+  mount: handle invalid hard link refs, #2092
+- detect mingw byte order, #2073
+- creating a new segment: use "xb" mode, #2099
+- mount: umount on SIGINT/^C when in foreground, #2082
+
+Other changes:
+
+- binary: use fixed AND freshly compiled pyinstaller bootloader, #2002
+- xattr: ignore empty names returned by llistxattr(2) et al
+- Enable the fault handler: install handlers for the SIGSEGV, SIGFPE, SIGABRT,
+  SIGBUS and SIGILL signals to dump the Python traceback.
+- Also print a traceback on SIGUSR2.
+- borg change-passphrase: print key location (simplify making a backup of it)
+- officially support Python 3.6 (setup.py: add Python 3.6 qualifier)
+- tests:
+
+  - vagrant / travis / tox: add Python 3.6 based testing
+  - vagrant: fix openbsd repo, #2042
+  - vagrant: fix the freebsd64 machine, #2037 #2067
+  - vagrant: use python 3.5.3 to build binaries, #2078
+  - vagrant: use osxfuse 3.5.4 for tests / to build binaries
+    vagrant: improve darwin64 VM settings
+  - travis: fix osxfuse install (fixes OS X testing on Travis CI)
+  - travis: require succeeding OS X tests, #2028
+  - travis: use latest pythons for OS X based testing
+  - use pytest-xdist to parallelize testing
+  - fix xattr test race condition, #2047
+  - setup.cfg: fix pytest deprecation warning, #2050
+- docs:
+
+  - language clarification - VM backup FAQ
+  - borg create: document how to backup stdin, #2013
+  - borg upgrade: fix incorrect title levels
+  - add CVE numbers for issues fixed in 1.0.9, #2106
+- fix typos (taken from Debian package patch)
+- remote: include data hexdump in "unexpected RPC data" error message
+- remote: log SSH command line at debug level
+- API_VERSION: use numberspaces, #2023
+- remove .github from pypi package, #2051
+- add pip and setuptools to requirements file, #2030
+- SyncFile: fix use of fd object after close (cosmetic)
+- Manifest.in: simplify, exclude \*.{so,dll,orig}, #2066
+- ignore posix_fadvise errors in repository.py, #2095
+  (works around issues with docker on ARM)
+- make LoggedIO.close_segment reentrant, avoid reentrance
+
+
+Version 1.0.9 (2016-12-20)
+--------------------------
+
+Security fixes:
+
+- A flaw in the cryptographic authentication scheme in Borg allowed an attacker
+  to spoof the manifest. See :ref:`tam_vuln` above for the steps you should
+  take.
+
+  CVE-2016-10099 was assigned to this vulnerability.
+- borg check: When rebuilding the manifest (which should only be needed very rarely)
+  duplicate archive names would be handled on a "first come first serve" basis, allowing
+  an attacker to apparently replace archives.
+
+  CVE-2016-10100 was assigned to this vulnerability.
+
+Bug fixes:
+
+- borg check:
+
+  - rebuild manifest if it's corrupted
+  - skip corrupted chunks during manifest rebuild
+- fix TypeError in integrity error handler, #1903, #1894
+- fix location parser for archives with @ char (regression introduced in 1.0.8), #1930
+- fix wrong duration/timestamps if system clock jumped during a create
+- fix progress display not updating if system clock jumps backwards
+- fix checkpoint interval being incorrect if system clock jumps
+
+Other changes:
+
+- docs:
+
+  - add python3-devel as a dependency for cygwin-based installation
+  - clarify extract is relative to current directory
+  - FAQ: fix link to changelog
+  - markup fixes
+- tests:
+
+  - test_get\_(cache|keys)_dir: clean env state, #1897
+  - get back pytest's pretty assertion failures, #1938
+- setup.py build_usage:
+
+  - fixed build_usage not processing all commands
+  - fixed build_usage not generating includes for debug commands
+
+
+Version 1.0.9rc1 (2016-11-27)
+-----------------------------
+
+Bug fixes:
+
+- files cache: fix determination of newest mtime in backup set (which is
+  used in cache cleanup and led to wrong "A" [added] status for unchanged
+  files in next backup), #1860.
+
+- borg check:
+
+  - fix incorrectly reporting attic 0.13 and earlier archives as corrupt
+  - handle repo w/o objects gracefully and also bail out early if repo is
+    *completely* empty, #1815.
+- fix tox/pybuild in 1.0-maint
+- at xattr module import time, loggers are not initialized yet
+
+New features:
+
+- borg umount <mountpoint>
+  exposed already existing umount code via the CLI api, so users can use it,
+  which is more consistent than using borg to mount and fusermount -u (or
+  umount) to un-mount, #1855.
+- implement borg create --noatime --noctime, fixes #1853
+
+Other changes:
+
+- docs:
+
+  - display README correctly on PyPI
+  - improve cache / index docs, esp. files cache docs, fixes #1825
+  - different pattern matching for --exclude, #1779
+  - datetime formatting examples for {now} placeholder, #1822
+  - clarify passphrase mode attic repo upgrade, #1854
+  - clarify --umask usage, #1859
+  - clarify how to choose PR target branch
+  - clarify prune behavior for different archive contents, #1824
+  - fix PDF issues, add logo, fix authors, headings, TOC
+  - move security verification to support section
+  - fix links in standalone README (:ref: tags)
+  - add link to security contact in README
+  - add FAQ about security
+  - move fork differences to FAQ
+  - add more details about resource usage
+- tests: skip remote tests on cygwin, #1268
+- travis:
+
+  - allow OS X failures until the brew cask osxfuse issue is fixed
+  - caskroom osxfuse-beta gone, it's osxfuse now (3.5.3)
+- vagrant:
+
+  - upgrade OSXfuse / FUSE for macOS to 3.5.3
+  - remove llfuse from tox.ini at a central place
+  - do not try to install llfuse on centos6
+  - fix FUSE test for darwin, #1546
+  - add windows virtual machine with cygwin
+  - Vagrantfile cleanup / code deduplication
+
+Version 1.1.0b2 (2016-10-01)
+----------------------------
+
+Bug fixes:
+
+- fix incorrect preservation of delete tags, leading to "object count mismatch"
+  on borg check, #1598. This only occurred with 1.1.0b1 (not with 1.0.x) and is
+  normally fixed by running another borg create/delete/prune.
+- fix broken --progress for double-cell paths (e.g. CJK), #1624
+- borg recreate: also catch SIGHUP
+- FUSE:
+
+  - fix hardlinks in versions view, #1599
+  - add parameter check to ItemCache.get to make potential failures more clear
+
+New features:
+
+- Archiver, RemoteRepository: add --remote-ratelimit (send data)
+- borg help compression, #1582
+- borg check: delete chunks with integrity errors, #1575, so they can be
+  "repaired" immediately and maybe healed later.
+- archives filters concept (refactoring/unifying older code)
+
+  - covers --first/--last/--prefix/--sort-by options
+  - currently used for borg list/info/delete
+
+Other changes:
+
+- borg check --verify-data slightly tuned (use get_many())
+- change {utcnow} and {now} to ISO-8601 format ("T" date/time separator)
+- repo check: log transaction IDs, improve object count mismatch diagnostic
+- Vagrantfile: use TW's fresh-bootloader pyinstaller branch
+- fix module names in api.rst
+- hashindex: bump api_version
+
+
+Version 1.1.0b1 (2016-08-28)
+----------------------------
+
+New features:
+
+- new commands:
+
+  - borg recreate: re-create existing archives, #787 #686 #630 #70, also see
+    #757, #770.
+
+    - selectively remove files/dirs from old archives
+    - re-compress data
+    - re-chunkify data, e.g. to have upgraded Attic / Borg 0.xx archives
+      deduplicate with Borg 1.x archives or to experiment with chunker-params.
+  - borg diff: show differences between archives
+  - borg with-lock: execute a command with the repository locked, #990
+- borg create:
+
+  - Flexible compression with pattern matching on path/filename,
+    and LZ4 heuristic for deciding compressibility, #810, #1007
+  - visit files in inode order (better speed, esp. for large directories and rotating disks)
+  - in-file checkpoints, #1217
+  - increased default checkpoint interval to 30 minutes (was 5 minutes), #896
+  - added uuid archive format tag, #1151
+  - save mountpoint directories with --one-file-system, makes system restore easier, #1033
+  - Linux: added support for some BSD flags, #1050
+  - add 'x' status for excluded paths, #814
+
+    - also means files excluded via UF_NODUMP, #1080
+- borg check:
+
+  - will not produce the "Checking segments" output unless new --progress option is passed, #824.
+  - --verify-data to verify data cryptographically on the client, #975
+- borg list, #751, #1179
 
   - removed {formatkeys}, see "borg list --help"
   - --list-format is deprecated, use --format instead
+  - --format now also applies to listing archives, not only archive contents, #1179
   - now supports the usual [PATH [PATHS…]] syntax and excludes
   - new keys: csize, num_chunks, unique_chunks, NUL
   - supports guaranteed_available hashlib hashes
-    (to avoid varying functionality depending on environment)
-- prune:
+    (to avoid varying functionality depending on environment),
+    which includes the SHA1 and SHA2 family as well as MD5
+- borg prune:
 
   - to better visualize the "thinning out", we now list all archives in
     reverse time order. rephrase and reorder help text.
   - implement --keep-last N via --keep-secondly N, also --keep-minutely.
     assuming that there is not more than 1 backup archive made in 1s,
     --keep-last N and --keep-secondly N are equivalent, #537
-- borg comment: add archive comments, #842
-- provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
-- create: add 'x' status for excluded paths, #814
-- --show-version: shows/logs the borg version, #725
+  - cleanup checkpoints except the latest, #1008
+- borg extract:
+
+  - added --progress, #1449
+  - Linux: limited support for BSD flags, #1050
+- borg info:
+
+  - output is now more similar to borg create --stats, #977
+- borg mount:
+
+  - provide "borgfs" wrapper for borg mount, enables usage via fstab, #743
+  - "versions" mount option - when used with a repository mount, this gives
+    a merged, versioned view of the files in all archives, #729
+- repository:
+
+  - added progress information to commit/compaction phase (often takes some time when deleting/pruning), #1519
+  - automatic recovery for some forms of repository inconsistency, #858
+  - check free space before going forward with a commit, #1336
+  - improved write performance (esp. for rotating media), #985
+
+    - new IO code for Linux
+    - raised default segment size to approx 512 MiB
+  - improved compaction performance, #1041
+  - reduced client CPU load and improved performance for remote repositories, #940
+
+- options that imply output (--show-rc, --show-version, --list, --stats,
+  --progress) don't need -v/--info to have that output displayed, #865
+- add archive comments (via borg (re)create --comment), #842
 - borg list/prune/delete: also output archive id, #731
+- --show-version: shows/logs the borg version, #725
+- added --debug-topic for granular debug logging, #1447
+- use atomic file writing/updating for configuration and key files, #1377
+- BORG_KEY_FILE environment variable, #1001
+- self-testing module, #970
+
 
 Bug fixes:
 
+- list: fixed default output being produced if --format is given with empty parameter, #1489
+- create: fixed overflowing progress line with CJK and similar characters, #1051
+- prune: fixed crash if --prefix resulted in no matches, #1029
 - init: clean up partial repo if passphrase input is aborted, #850
 - info: quote cmdline arguments that have spaces in them
-- failing hashindex tests on netbsd, #804
-- fix links failing for extracting subtrees, #761
+- fix hardlinks failing in some cases for extracting subtrees, #761
 
 Other changes:
 
 - replace stdlib hmac with OpenSSL, zero-copy decrypt (10-15% increase in
   performance of hash-lists and extract).
+- improved chunker performance, #1021
+- open repository segment files in exclusive mode (fail-safe), #1134
+- improved error logging, #1440
 - Source:
 
   - pass meta-data around, #765
   - move some constants to new constants module
   - better readability and less errors with namedtuples, #823
+  - moved source tree into src/ subdirectory, #1016
+  - made borg.platform a package, #1113
+  - removed dead crypto code, #1032
+  - improved and ported parts of the test suite to py.test, #912
+  - created data classes instead of passing dictionaries around, #981, #1158, #1161
+  - cleaned up imports, #1112
 - Docs:
 
   - better help texts and sphinx reproduction of usage help:
@@ -116,11 +1067,293 @@ Other changes:
   - chunker: added some insights by "Voltara", #903
   - clarify what "deduplicated size" means
   - fix / update / add package list entries
+  - added a SaltStack usage example, #956
+  - expanded FAQ
   - new contributors in AUTHORS!
 - Tests:
 
   - vagrant: add ubuntu/xenial 64bit - this box has still some issues
   - ChunkBuffer: add test for leaving partial chunk in buffer, fixes #945
+
+
+Version 1.0.8 (2016-10-29)
+--------------------------
+
+Bug fixes:
+
+- RemoteRepository: Fix busy wait in call_many, #940
+
+New features:
+
+- implement borgmajor/borgminor/borgpatch placeholders, #1694
+  {borgversion} was already there (full version string). With the new
+  placeholders you can now also get e.g. 1 or 1.0 or 1.0.8.
+
+Other changes:
+
+- avoid previous_location mismatch, #1741
+
+  due to the changed canonicalization for relative paths in PR #1711 / #1655
+  (implement /./ relpath hack), there would be a changed repo location warning
+  and the user would be asked if this is ok. this would break automation and
+  require manual intervention, which is unwanted.
+
+  thus, we automatically fix the previous_location config entry, if it only
+  changed in the expected way, but still means the same location.
+
+- docs:
+
+  - deployment.rst: do not use bare variables in ansible snippet
+  - add clarification about append-only mode, #1689
+  - setup.py: add comment about requiring llfuse, #1726
+  - update usage.rst / api.rst
+  - repo url / archive location docs + typo fix
+  - quickstart: add a comment about other (remote) filesystems
+
+- vagrant / tests:
+
+  - no chown when rsyncing (fixes boxes w/o vagrant group)
+  - fix FUSE permission issues on linux/freebsd, #1544
+  - skip FUSE test for borg binary + fakeroot
+  - ignore security.selinux xattrs, fixes tests on centos, #1735
+
+
+Version 1.0.8rc1 (2016-10-17)
+-----------------------------
+
+Bug fixes:
+
+- fix signal handling (SIGINT, SIGTERM, SIGHUP), #1620 #1593
+  Fixes e.g. leftover lock files for quickly repeated signals (e.g. Ctrl-C
+  Ctrl-C) or lost connections or systemd sending SIGHUP.
+- progress display: adapt formatting to narrow screens, do not crash, #1628
+- borg create --read-special - fix crash on broken symlink, #1584.
+  also correctly processes broken symlinks. before this regressed to a crash
+  (5b45385) a broken symlink would've been skipped.
+- process_symlink: fix missing backup_io()
+  Fixes a chmod/chown/chgrp/unlink/rename/... crash race between getting
+  dirents and dispatching to process_symlink.
+- yes(): abort on wrong answers, saying so, #1622
+- fixed exception borg serve raised when connection was closed before reposiory
+  was openend. add an error message for this.
+- fix read-from-closed-FD issue, #1551
+  (this seems not to get triggered in 1.0.x, but was discovered in master)
+- hashindex: fix iterators (always raise StopIteration when exhausted)
+  (this seems not to get triggered in 1.0.x, but was discovered in master)
+- enable relative paths in ssh:// repo URLs, via /./relpath hack, #1655
+- allow repo paths with colons, #1705
+- update changed repo location immediately after acceptance, #1524
+- fix debug get-obj / delete-obj crash if object not found and remote repo,
+  #1684
+- pyinstaller: use a spec file to build borg.exe binary, exclude osxfuse dylib
+  on Mac OS X (avoids mismatch lib <-> driver), #1619
+
+New features:
+
+- add "borg key export" / "borg key import" commands, #1555, so users are able
+  to backup / restore their encryption keys more easily.
+
+  Supported formats are the keyfile format used by borg internally and a
+  special "paper" format with by line checksums for printed backups. For the
+  paper format, the import is an interactive process which checks each line as
+  soon as it is input.
+- add "borg debug-refcount-obj" to determine a repo objects' referrer counts,
+  #1352
+
+Other changes:
+
+- add "borg debug ..." subcommands
+  (borg debug-* still works, but will be removed in borg 1.1)
+- setup.py: Add subcommand support to build_usage.
+- remote: change exception message for unexpected RPC data format to indicate
+  dataflow direction.
+- improved messages / error reporting:
+
+  - IntegrityError: add placeholder for message, so that the message we give
+    appears not only in the traceback, but also in the (short) error message,
+    #1572
+  - borg.key: include chunk id in exception msgs, #1571
+  - better messages for cache newer than repo, #1700
+- vagrant (testing/build VMs):
+
+  - upgrade OSXfuse / FUSE for macOS to 3.5.2
+  - update Debian Wheezy boxes, #1686
+  - openbsd / netbsd: use own boxes, fixes misc rsync installation and
+    FUSE/llfuse related testing issues, #1695 #1696 #1670 #1671 #1728
+- docs:
+
+  - add docs for "key export" and "key import" commands, #1641
+  - fix inconsistency in FAQ (pv-wrapper).
+  - fix second block in "Easy to use" section not showing on GitHub, #1576
+  - add bestpractices badge
+  - link reference docs and faq about BORG_FILES_CACHE_TTL, #1561
+  - improve borg info --help, explain size infos, #1532
+  - add release signing key / security contact to README, #1560
+  - add contribution guidelines for developers
+  - development.rst: add sphinx_rtd_theme to the sphinx install command
+  - adjust border color in borg.css
+  - add debug-info usage help file
+  - internals.rst: fix typos
+  - setup.py: fix build_usage to always process all commands
+  - added docs explaining multiple --restrict-to-path flags, #1602
+  - add more specific warning about write-access debug commands, #1587
+  - clarify FAQ regarding backup of virtual machines, #1672
+- tests:
+
+  - work around FUSE xattr test issue with recent fakeroot
+  - simplify repo/hashindex tests
+  - travis: test FUSE-enabled borg, use trusty to have a recent FUSE
+  - re-enable FUSE tests for RemoteArchiver (no deadlocks any more)
+  - clean env for pytest based tests, #1714
+  - fuse_mount contextmanager: accept any options
+
+
+Version 1.0.7 (2016-08-19)
+--------------------------
+
+Security fixes:
+
+- borg serve: fix security issue with remote repository access, #1428
+  If you used e.g. --restrict-to-path /path/client1/ (with or without trailing
+  slash does not make a difference), it acted like a path prefix match using
+  /path/client1 (note the missing trailing slash) - the code then also allowed
+  working in e.g. /path/client13 or /path/client1000.
+
+  As this could accidentally lead to major security/privacy issues depending on
+  the paths you use, the behaviour was changed to be a strict directory match.
+  That means --restrict-to-path /path/client1 (with or without trailing slash
+  does not make a difference) now uses /path/client1/ internally (note the
+  trailing slash here!) for matching and allows precisely that path AND any
+  path below it. So, /path/client1 is allowed, /path/client1/repo1 is allowed,
+  but not /path/client13 or /path/client1000.
+
+  If you willingly used the undocumented (dangerous) previous behaviour, you
+  may need to rearrange your --restrict-to-path paths now. We are sorry if
+  that causes work for you, but we did not want a potentially dangerous
+  behaviour in the software (not even using a for-backwards-compat option).
+
+Bug fixes:
+
+- fixed repeated LockTimeout exceptions when borg serve tried to write into
+  a already write-locked repo (e.g. by a borg mount), #502 part b)
+  This was solved by the fix for #1220 in 1.0.7rc1 already.
+- fix cosmetics + file leftover for "not a valid borg repository", #1490
+- Cache: release lock if cache is invalid, #1501
+- borg extract --strip-components: fix leak of preloaded chunk contents
+- Repository, when a InvalidRepository exception happens:
+
+  - fix spurious, empty lock.roster
+  - fix repo not closed cleanly
+
+New features:
+
+- implement borg debug-info, fixes #1122
+  (just calls already existing code via cli, same output as below tracebacks)
+
+Other changes:
+
+- skip the O_NOATIME test on GNU Hurd, fixes #1315
+  (this is a very minor issue and the GNU Hurd project knows the bug)
+- document using a clean repo to test / build the release
+
+
+Version 1.0.7rc2 (2016-08-13)
+-----------------------------
+
+Bug fixes:
+
+- do not write objects to repository that are bigger than the allowed size,
+  borg will reject reading them, #1451.
+
+  Important: if you created archives with many millions of files or
+  directories, please verify if you can open them successfully,
+  e.g. try a "borg list REPO::ARCHIVE".
+- lz4 compression: dynamically enlarge the (de)compression buffer, the static
+  buffer was not big enough for archives with extremely many items, #1453
+- larger item metadata stream chunks, raise archive item limit by 8x, #1452
+- fix untracked segments made by moved DELETEs, #1442
+
+  Impact: Previously (metadata) segments could become untracked when deleting data,
+  these would never be cleaned up.
+- extended attributes (xattrs) related fixes:
+
+  - fixed a race condition in xattrs querying that led to the entire file not
+    being backed up (while logging the error, exit code = 1), #1469
+  - fixed a race condition in xattrs querying that led to a crash, #1462
+  - raise OSError including the error message derived from errno, deal with
+    path being a integer FD
+
+Other changes:
+
+- print active env var override by default, #1467
+- xattr module: refactor code, deduplicate, clean up
+- repository: split object size check into too small and too big
+- add a transaction_id assertion, so borg init on a broken (inconsistent)
+  filesystem does not look like a coding error in borg, but points to the
+  real problem.
+- explain confusing TypeError caused by compat support for old servers, #1456
+- add forgotten usage help file from build_usage
+- refactor/unify buffer code into helpers.Buffer class, add tests
+- docs:
+
+  - document archive limitation, #1452
+  - improve prune examples
+
+
+Version 1.0.7rc1 (2016-08-05)
+-----------------------------
+
+Bug fixes:
+
+- fix repo lock deadlocks (related to lock upgrade), #1220
+- catch unpacker exceptions, resync, #1351
+- fix borg break-lock ignoring BORG_REPO env var, #1324
+- files cache performance fixes (fixes unnecessary re-reading/chunking/
+  hashing of unmodified files for some use cases):
+
+  - fix unintended file cache eviction, #1430
+  - implement BORG_FILES_CACHE_TTL, update FAQ, raise default TTL from 10
+    to 20, #1338
+- FUSE:
+
+  - cache partially read data chunks (performance), #965, #966
+  - always create a root dir, #1125
+- use an OrderedDict for helptext, making the build reproducible, #1346
+- RemoteRepository init: always call close on exceptions, #1370 (cosmetic)
+- ignore stdout/stderr broken pipe errors (cosmetic), #1116
+
+New features:
+
+- better borg versions management support (useful esp. for borg servers
+  wanting to offer multiple borg versions and for clients wanting to choose
+  a specific server borg version), #1392:
+
+  - add BORG_VERSION environment variable before executing "borg serve" via ssh
+  - add new placeholder {borgversion}
+  - substitute placeholders in --remote-path
+
+- borg init --append-only option (makes using the more secure append-only mode
+  more convenient. when used remotely, this requires 1.0.7+ also on the borg
+  server), #1291.
+
+Other changes:
+
+- Vagrantfile:
+
+  - darwin64: upgrade to FUSE for macOS 3.4.1 (aka osxfuse), #1378
+  - xenial64: use user "ubuntu", not "vagrant" (as usual), #1331
+- tests:
+
+  - fix FUSE tests on OS X, #1433
+- docs:
+
+  - FAQ: add backup using stable filesystem names recommendation
+  - FAQ about glibc compatibility added, #491, glibc-check improved
+  - FAQ: 'A' unchanged file; remove ambiguous entry age sentence.
+  - OS X: install pkg-config to build with FUSE support, fixes #1400
+  - add notes about shell/sudo pitfalls with env. vars, #1380
+  - added platform feature matrix
+- implement borg debug-dump-repo-objs
 
 
 Version 1.0.6 (2016-07-12)
@@ -172,7 +1405,7 @@ Other changes:
 - tests:
 
   - add more FUSE tests, #1284
-  - deduplicate fuse (u)mount code
+  - deduplicate FUSE (u)mount code
   - fix borg binary test issues, #862
 - docs:
 
@@ -358,7 +1591,7 @@ Bug fixes:
 - add overflow and range checks for 1st (special) uint32 of the hashindex
   values, switch from int32 to uint32.
 - fix so that refcount will never overflow, but just stick to max. value after
-  a overflow would have occured.
+  a overflow would have occurred.
 - borg delete: fix --cache-only for broken caches, #874
 
   Makes --cache-only idempotent: it won't fail if the cache is already deleted.
@@ -457,7 +1690,7 @@ Compatibility notes:
 - disambiguate -p option, #563:
 
   - -p now is same as --progress
-  - -P now is same as --prefix  
+  - -P now is same as --prefix
 - remove deprecated "borg verify",
   use "borg extract --dry-run" instead
 - cleanup environment variable semantics, #355
@@ -522,7 +1755,7 @@ New features:
 - format options for location: user, pid, fqdn, hostname, now, utcnow, user
 - borg list --list-format
 - borg prune -v --list enables the keep/prune list output, #658
- 
+
 Bug fixes:
 
 - fix _open_rb noatime handling, #657
@@ -540,14 +1773,14 @@ Other changes:
 - Vagrant: drop Ubuntu Precise (12.04) - does not have Python >= 3.4
 - Vagrant: use pyinstaller v3.1.1 to build binaries
 - docs:
- 
+
   - borg upgrade: add to docs that only LOCAL repos are supported
   - borg upgrade also handles borg 0.xx -> 1.0
   - use pip extras or requirements file to install llfuse
   - fix order in release process
   - updated usage docs and other minor / cosmetic fixes
   - verified borg examples in docs, #644
-  - freebsd dependency installation and fuse configuration, #649
+  - freebsd dependency installation and FUSE configuration, #649
   - add example how to restore a raw device, #671
   - add a hint about the dev headers needed when installing from source
   - add examples for delete (and handle delete after list, before prune), #656
@@ -1392,7 +2625,7 @@ Version 0.7
 
 - Ported to FreeBSD
 - Improved documentation
-- Experimental: Archives mountable as fuse filesystems.
+- Experimental: Archives mountable as FUSE filesystems.
 - The "user." prefix is no longer stripped from xattrs on Linux
 
 

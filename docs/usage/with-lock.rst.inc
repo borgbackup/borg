@@ -4,11 +4,38 @@
 
 borg with-lock
 --------------
-::
+.. code-block:: none
 
-    borg with-lock <options> REPOSITORY COMMAND ARGS
+    borg [common options] with-lock [options] REPOSITORY COMMAND [ARGS...]
 
-positional arguments
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-------------------------------------------------------+----------------+--------------------+
+    | **positional arguments**                                                                    |
+    +-------------------------------------------------------+----------------+--------------------+
+    |                                                       | ``REPOSITORY`` | repository to lock |
+    +-------------------------------------------------------+----------------+--------------------+
+    |                                                       | ``COMMAND``    | command to run     |
+    +-------------------------------------------------------+----------------+--------------------+
+    |                                                       | ``ARGS``       | command arguments  |
+    +-------------------------------------------------------+----------------+--------------------+
+    | .. class:: borg-common-opt-ref                                                              |
+    |                                                                                             |
+    | :ref:`common_options`                                                                       |
+    +-------------------------------------------------------+----------------+--------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
     REPOSITORY
         repository to lock
     COMMAND
@@ -16,8 +43,9 @@ positional arguments
     ARGS
         command arguments
 
-`Common options`_
-    |
+
+    :ref:`common_options`
+        |
 
 Description
 ~~~~~~~~~~~
@@ -29,6 +57,8 @@ running in the repo), then execute the given command as a subprocess and wait
 for its termination, release the lock and return the user command's return
 code as borg's return code.
 
-Note: if you copy a repository with the lock held, the lock will be present in
-      the copy, obviously. Thus, before using borg on the copy, you need to
-      use "borg break-lock" on it.
+.. note::
+
+    If you copy a repository with the lock held, the lock will be present in
+    the copy, obviously. Thus, before using borg on the copy, you need to
+    use "borg break-lock" on it.

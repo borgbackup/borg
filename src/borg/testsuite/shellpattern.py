@@ -114,3 +114,14 @@ def test_match(path, patterns):
 def test_mismatch(path, patterns):
     for p in patterns:
         assert not check(path, p)
+
+
+def test_match_end():
+    regex = shellpattern.translate("*-home")  # default is match_end == string end
+    assert re.match(regex, '2017-07-03-home')
+    assert not re.match(regex, '2017-07-03-home.checkpoint')
+
+    match_end = r'(%s)?\Z' % r'\.checkpoint(\.\d+)?'  # with/without checkpoint ending
+    regex = shellpattern.translate("*-home", match_end=match_end)
+    assert re.match(regex, '2017-07-03-home')
+    assert re.match(regex, '2017-07-03-home.checkpoint')

@@ -1,1 +1,5 @@
 borg/_version.py export-subst
+
+*.py diff=python
+docs/usage/*.rst.inc merge=ours
+docs/man/* merge=ours

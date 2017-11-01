@@ -1,0 +1,2 @@
+sphinx
+guzzle_sphinx_theme

@@ -2,7 +2,9 @@
 """
 Check if all given binaries work with the given glibc version.
 
-check_glibc.py 2.11 bin [bin ...]
+glibc_check.py 2.11 bin [bin ...]
+
+rc = 0 means "yes", rc = 1 means "no".
 """
 
 import re

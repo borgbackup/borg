@@ -10,6 +10,8 @@ import zipfile
 
 builddir = 'win32exe'
 
+pythonversion = str(sys.version_info[0]) + '.' + str(sys.version_info[1])
+
 if os.path.exists(builddir):
     shutil.rmtree(builddir)
 os.mkdir(builddir)
@@ -30,7 +32,7 @@ if gccpath == '':
 source = open('wrapper.c', 'w')
 source.write(
 """
-#include <python3.5m/python.h>
+#include <python""" + pythonversion + """m/python.h>
 #include <windows.h>
 #include <wchar.h>
 #include <string>
@@ -59,12 +61,12 @@ int wmain(int argc , wchar_t *argv[] )
 }
 """)
 source.close()
-subprocess.check_call('g++ wrapper.c -lpython3.5m -lshlwapi -municode -o ' + builddir + '/borg.exe')
+subprocess.check_call('g++ wrapper.c -lpython' + pythonversion + 'm -lshlwapi -municode -o ' + builddir + '/borg.exe')
 os.remove('wrapper.c')
 
 print('Searching modules')
 
-modulepath = os.path.abspath(os.path.join(gccpath, '../lib/python3.5/'))
+modulepath = os.path.abspath(os.path.join(gccpath, '../lib/python' + pythonversion + '/'))
 
 # Bundle all encodings - In theory user may use any encoding in command prompt
 for file in os.listdir(os.path.join(modulepath, 'encodings')):
@@ -76,7 +78,8 @@ finder.run_script('src/borg/__main__.py')
 
 # For some reason modulefinder does not find these, add them manually
 extramodules = [os.path.join(modulepath, 'site.py'), os.path.join(modulepath, 'encodings/idna.py'),
-    os.path.join(modulepath, 'stringprep.py')]
+    os.path.join(modulepath, 'stringprep.py'), os.path.join(modulepath, 'ctypes/wintypes.py'),
+    os.path.join(modulepath, 'lib-dynload/_sysconfigdata_m_win32_.py')]
 
 for module in extramodules:
     finder.run_script(module)
@@ -101,6 +104,7 @@ def finddlls(exe):
         re.append(dll)
     return re
 
+
 items = finder.modules.items()
 for name, mod in items:
     file = mod.__file__
@@ -113,7 +117,7 @@ for name, mod in items:
         os.makedirs(os.path.join(builddir, 'bin', os.path.split(relpath)[0]), exist_ok=True)
         shutil.copyfile(file, os.path.join(builddir, 'bin', relpath))
     else:
-        relativepath = file[file.find('lib')+len('lib/python3.5/'):]
+        relativepath = file[file.find('lib')+len('lib/python' + pythonversion + '/'):]
         if 'encodings' in file:
             continue
         if relativepath not in library.namelist():
@@ -130,10 +134,13 @@ for dll in finddlls(os.path.join(builddir, "borg.exe")):
         shutil.copyfile(dll, os.path.join(builddir, os.path.split(dll)[1]))
 
 shutil.copyfile(os.path.join('src', 'borg', '__main__.py'), os.path.join(builddir, 'bin', 'borg', '__main__.py'))
-library.write(os.path.join(modulepath, 'site.py'), 'site.py')
+library.write(os.path.join(modulepath, 'lib-dynload/_sysconfigdata_m_win32_.py'), '_sysconfigdata_m_win32_.py')
+library.write(os.path.join(modulepath, 'ctypes/wintypes.py'), 'ctypes/wintypes.py')
 
-for extmodule in ['src/borg/chunker-cpython-35m.dll', 'src/borg/compress-cpython-35m.dll',
-    'src/borg/crypto-cpython-35m.dll', 'src/borg/hashindex-cpython-35m.dll']:
+for extmodule in ['src/borg/chunker-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
+                  'src/borg/compress-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
+                  'src/borg/item-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll',
+                  'src/borg/hashindex-cpython-' + str(sys.version_info[0]) + str(sys.version_info[1]) + 'm.dll']:
     for dll in finddlls(extmodule):
         if builddir not in dll:
             shutil.copyfile(dll, os.path.join(builddir, os.path.split(dll)[1]))

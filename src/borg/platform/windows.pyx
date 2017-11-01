@@ -99,6 +99,8 @@ cdef extern from 'windows.h':
     BOOL OpenThreadToken(HANDLE, DWORD, BOOL, HANDLE*)
     BOOL LookupPrivilegeValueW(wchar_t*, wchar_t*, _LUID*)
     BOOL AdjustTokenPrivileges(HANDLE, BOOL, _TOKEN_PRIVILEGES*, DWORD, _TOKEN_PRIVILEGES*, DWORD*)
+    
+    HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId)
 
     HANDLE GetCurrentThread()
     HANDLE GetCurrentProcess()
@@ -134,6 +136,8 @@ cdef extern from 'windows.h':
 
     cdef extern int TOKEN_ADJUST_PRIVILEGES
     cdef extern int TOKEN_QUERY
+    
+    cdef extern int PROCESS_QUERY_INFORMATION
 
 cdef extern from 'accctrl.h':
     ctypedef enum _SE_OBJECT_TYPE:
@@ -567,3 +571,16 @@ def select(rlist, wlist, xlist, timeout=0):
         if size.value > 0:
             retRlist.append(pipe)
     return retRlist, wlist, retXlist
+
+
+def get_process_id():
+    #return hostname, pid, thread_id
+    return platform.node().lower(), os.getpid(), 0
+
+
+def process_alive(host, pid, thread):
+    if host.lower() != platform.node().lower():
+        return True
+    return (OpenProcess(PROCESS_QUERY_INFORMATION, False, pid) != NULL)
+        
+    

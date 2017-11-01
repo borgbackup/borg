@@ -49,7 +49,7 @@ from .helpers import PrefixSpec, SortBySpec, FilesCacheMode
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
-from .helpers import interval, prune_within, prune_split
+from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
 from .helpers import timestamp
 from .helpers import get_cache_dir
 from .helpers import Manifest, AI_HUMAN_SORT_KEYS
@@ -1333,45 +1333,48 @@ class Archiver:
         # that is newer than a successfully completed backup - and killing the successful backup.
         archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
         keep = []
+        # collect the rule responsible for the keeping of each archive in this dict
+        # keys are archive ids, values are a tuple
+        #   (<rulename>, <how many archives were kept by this rule so far >)
+        kept_because = {}
+
+        # find archives which need to be kept because of the keep-within rule
         if args.within:
-            keep += prune_within(archives, args.within)
-        if args.secondly:
-            keep += prune_split(archives, '%Y-%m-%d %H:%M:%S', args.secondly, keep)
-        if args.minutely:
-            keep += prune_split(archives, '%Y-%m-%d %H:%M', args.minutely, keep)
-        if args.hourly:
-            keep += prune_split(archives, '%Y-%m-%d %H', args.hourly, keep)
-        if args.daily:
-            keep += prune_split(archives, '%Y-%m-%d', args.daily, keep)
-        if args.weekly:
-            keep += prune_split(archives, '%G-%V', args.weekly, keep)
-        if args.monthly:
-            keep += prune_split(archives, '%Y-%m', args.monthly, keep)
-        if args.yearly:
-            keep += prune_split(archives, '%Y', args.yearly, keep)
+            keep += prune_within(archives, args.within, kept_because)
+
+        # find archives which need to be kept because of the various time period rules
+        for rule in PRUNING_PATTERNS.keys():
+            num = getattr(args, rule, None)
+            if num is not None:
+                keep += prune_split(archives, rule, num, kept_because)
+
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=False, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
-            if args.output_list:
-                # set up counters for the progress display
-                to_delete_len = len(to_delete)
-                archives_deleted = 0
+            # set up counters for the progress display
+            to_delete_len = len(to_delete)
+            archives_deleted = 0
             for archive in archives_checkpoints:
                 if archive in to_delete:
                     if args.dry_run:
-                        if args.output_list:
-                            list_logger.info('Would prune:     %s' % format_archive(archive))
+                        log_message = 'Would prune:'
                     else:
-                        if args.output_list:
-                            archives_deleted += 1
-                            list_logger.info('Pruning archive: %s (%d/%d)' % (format_archive(archive),
-                                                                              archives_deleted, to_delete_len))
+                        archives_deleted += 1
+                        log_message = 'Pruning archive (%d/%d):' % (archives_deleted, to_delete_len)
                         Archive(repository, key, manifest, archive.name, cache,
                                 progress=args.progress).delete(stats, forced=args.forced)
                 else:
-                    if args.output_list:
-                        list_logger.info('Keeping archive: %s' % format_archive(archive))
+                    if is_checkpoint(archive.name):
+                        log_message = 'Keeping checkpoint archive:'
+                    else:
+                        log_message = 'Keeping archive (rule: {rule} #{num}):'.format(
+                            rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
+                        )
+                if args.output_list:
+                    list_logger.info("{message:<40} {archive}".format(
+                        message=log_message, archive=format_archive(archive)
+                    ))
             if to_delete and not args.dry_run:
                 manifest.write()
                 repository.commit(save_space=args.save_space)

@@ -1343,26 +1343,18 @@ class Archiver:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
-        if not hasattr(sys.stdout, 'buffer'):
-            # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
-            # which doesn't have an underlying buffer (= lower file object).
-            def write(bytestring):
-                sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
-        else:
-            write = sys.stdout.buffer.write
-
         if args.location.archive:
             if args.json:
                 self.print_error('The --json option is only valid for listing archives, not archive contents.')
                 return self.exit_code
-            return self._list_archive(args, repository, manifest, key, write)
+            return self._list_archive(args, repository, manifest, key)
         else:
             if args.json_lines:
                 self.print_error('The --json-lines option is only valid for listing archive contents, not archives.')
                 return self.exit_code
-            return self._list_repository(args, repository, manifest, key, write)
+            return self._list_repository(args, repository, manifest, key)
 
-    def _list_archive(self, args, repository, manifest, key, write):
+    def _list_archive(self, args, repository, manifest, key):
         matcher = self.build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
@@ -1377,7 +1369,7 @@ class Archiver:
 
             formatter = ItemFormatter(archive, format, json_lines=args.json_lines)
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
-                write(safe_encode(formatter.format_item(item)))
+                sys.stdout.write(formatter.format_item(item))
 
         # Only load the cache if it will be used
         if ItemFormatter.format_needs_cache(format):
@@ -1388,7 +1380,7 @@ class Archiver:
 
         return self.exit_code
 
-    def _list_repository(self, args, repository, manifest, key, write):
+    def _list_repository(self, args, repository, manifest, key):
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -1403,7 +1395,7 @@ class Archiver:
             if args.json:
                 output_data.append(formatter.get_item_data(archive_info))
             else:
-                write(safe_encode(formatter.format_item(archive_info)))
+                sys.stdout.write(formatter.format_item(archive_info))
 
         if args.json:
             json_print(basic_json_data(manifest, extra={

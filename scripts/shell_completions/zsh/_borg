@@ -1,0 +1,390 @@
+#compdef borg
+
+# -------
+#
+# For borg 1.1.1
+#
+# To Install:
+#
+# Copy this file to /usr/share/zsh/site-functions/
+#
+# -------
+# borgbackup ZSH completion
+# Kevin Gravier 2017 <kevin@mrkmg.com>
+# 
+# The MIT License (MIT)
+
+# Copyright (c) 2017 Kevin
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
+
+_borg() {
+    typeset -A opt_args
+    local -a borg_possible_commands borg_possible_key_commands commands keyCommands borg_standard_options
+    local command keyCommand item subItem
+
+    borg_standard_options=({-h,--help}'[show this help message and exit]'
+                             --critical'[work on log level CRITICAL]'
+                             --error'[work on log level ERROR]'
+                             --warning'[work on log level WARNING (default)]'
+                             {--info,-v,--verbose}'[work on log level INFO]'
+                             --debug'[work on log level DEBUG]'
+                             --default-topic'[enable TOPIC debugging (can be specified multiple times).]:TOPIC'
+                             {-p,--progress}'[show progress information]'
+                             --log-json'[Output one JSON object per log line instead of formatted text.]'
+                             --lock-wait'[wait at most SECONDS for acquiring a repository/cache lock (default: 1).]:SECONDS'
+                             --show-version'[show/log the borg version]'
+                             --show-rc'[show/log the return code (rc)]'
+                             --umask'[set umask to M (local and remote, default: 0077)]:umask'
+                             --remote-path'[set remote path to executable (default: "borg")]:_files'
+                             --remote-ratelimit'[set remote network upload rate limit in kiByte/s (default: 0=unlimited)]:RATE'
+                             --consider-part-files'[treat part files like normal files (e.g. to list/extract them)]'
+                             --debug-profile'[Write execution profile in Borg format into FILE.]:_files')
+
+    borg_possible_commands=(serve init check key change-passphrase create extract export-tar diff rename delete list mount umount info break-lock prune upgrade with-lock benchmark)
+    borg_possible_key_commands=(change-passphrase import export)
+    command=""
+    keyCommand=""
+
+    for item in $words; do
+        (( ${borg_possible_commands[(I)$item]} )) && command=$item
+        (( ${borg_possible_key_commands[(I)$item]} )) && keyCommand=$item
+    done
+
+    case $command in
+        (serve)
+            _arguments \
+                --restrict-to-path'[restrict repository access to PATH]:_files'\
+                --restrict-to-repository'[restrict repository access]:_files'\
+                --append-only'[only allow appending to repository segment files]'\
+                --storage-quota'[Override storage quota of the repository]:QUOTA'\
+                $borg_standard_options
+            ;;
+        (init)
+            _arguments \
+                '2:repo:_files'\
+                {-e,--encryption}'[select encryption key mode]:MODE'\
+                --append-only'[only allow appending to repository segment files]'\
+                --storage-quota'[Override storage quota of the repository]:QUOTA'\
+                $borg_standard_options
+            ;;
+        (check)
+            _arguments \
+                '2:archives:__borg_archive'\
+                --repository-only'[only perform repository checks]'\
+                --archives-only'[only perform archives checks]'\
+                --verify-data'[perform cryptographic archive data integrity verification]'\
+                --repair'[attempt to repair any inconsistencies found]'\
+                --save-space'[work slower, but using less space]'\
+                {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
+                {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
+                --sort-keys'[Comma-separated list of sorting keys]:KEYS'\
+                --first'[consider first N archives after other filters were applied]:N'\
+                --last'[consider last N archives after other filters were applied]:N'\
+                $borg_standard_options
+            ;;
+        (key)
+            case $keyCommand in
+                (change-passphrase)
+                    _arguments \
+                        '2:subCommand:(change-passphrase import export)'\
+                        '3:archives:__borg_archive'\
+                        $borg_standard_options
+                    ;;
+                (import)
+                    _arguments \
+                        '2:subCommand:(change-passphrase import export)'\
+                        '3:archives:__borg_archive'\
+                        '4:path:_files'\
+                        --paper'[interactively import from a backup done with --paper]'\
+                        $borg_standard_options
+                    ;;
+                (export)
+                    _arguments \
+                        '2:subCommand:(change-passphrase import export)'\
+                        '3:archives:__borg_archive'\
+                        '4:path:_files'\
+                        --paper'[Create an export suitable for printing and later type-in]'\
+                        --qr-html'[Create an html file suitable for printing and later type-in or qr scan]'\
+                        $borg_standard_options
+                    ;;
+                *)
+                    _arguments \
+                        '2:subCommand:(change-passphrase import export)'\
+                        $borg_standard_options
+                    ;;
+                esac
+            ;;
+        (change-passphrase)
+            _arguments \
+                '2:archives:__borg_archive'\
+                $borg_standard_options
+            ;;
+        (create)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '3:path:_files'\
+                {-n,--dry-run}'[do not create a backup archive]'\
+                {-s,--stats}'[print statistics for the created archive]'\
+                --list'[output verbose list of items (files, dirs, ...)]'\
+                --filter'[only display items with the given status characters]:STATUSCHARS'\
+                --json'[output stats as JSON. Implies --stats.]'\
+                --no-cache-sync'[experimental: do not synchronize the cache. Implies not using the files cache.]'\
+                {-x,--one-file-system}'[stay in the same file system ]'\
+                --numeric-owner'[only store numeric user and group identifiers]'\
+                --noatime'[do not store atime into archive]'\
+                --noctime'[do not store ctime into archive]'\
+                --nobsdflags'[do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive]'\
+                --ignore-inode'[gnore inode data in the file metadata cache used to detect unchanged files.]'\
+                --files-cache'[operate files cache in MODE. default: ctime,size,inode]:MODE'\
+                --read-special'[open and read block and char device files as well as FIFOs as if they were regular files.]'\
+                {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
+                --exclude-from'[read exclude patterns from EXCLUDEFILE, one per line]:_files'\
+                --pattern'[experimental: include/exclude paths matching PATTERN]:PATTERN'\
+                --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
+                --exclude-caches'[exclude directories that contain a CACHEDIR.TAG file ]'\
+                --exclude-if-present'[exclude directories that are tagged by containing a filesystem object with the given NAME]:NAME'\
+                {--keep-exclude-tags,--keep-tag-files}'[if tag objects are specified with --exclude-if-present, don’t omit the tag objects themselves]'\
+                --exclude-nodump'[exclude files flagged NODUMP]'\
+                --comment'[add a comment text to the archive]:COMMENT'\
+                --timestamp'[manually specify the archive creation date/time]:TIMESTAMP'\
+                {-c,--checkpoint-interval}'[write checkpoint every SECONDS seconds]:SECONDS'\
+                --chunker-params'[pecify the chunker parameters]:PARAMS'\
+                {-C,--compression}'[select compression algorithm]:COMPRESSION'\
+                $borg_standard_options
+            ;;
+        (extract)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '3:path:_files'\
+                --list'[output verbose list of items (files, dirs, ...)]'\
+                {-n,--dry-run}'[do not actually change any files]'\
+                --numeric-owner'[only obey numeric user and group identifiers]'\
+                --nobsdflags'[do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)]'\
+                --stdout'[write all extracted data to stdout]'\
+                --sparse'[create holes in output sparse file from all-zero chunks]'\
+                {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
+                --exclude-from'[read exclude patterns from EXCLUDEFILE, one per line]:_files'\
+                --pattern'[experimental: include/exclude paths matching PATTERN]:PATTERN'\
+                --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
+                --strip-components'[Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.]:NUMBER'\
+                $borg_standard_options
+            ;;
+        (export-tar)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '3:tar:_files'\
+                '4:path:_files'\
+                --tar-filter'[filter program to pipe data through]'\
+                --list'[output verbose list of items (files, dirs, ...)]'\
+                {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
+                --exclude-from'[read exclude patterns from EXCLUDEFILE, one per line]:_files'\
+                --pattern'[experimental: include/exclude paths matching PATTERN]:PATTERN'\
+                --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
+                --strip-components'[Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.]:NUMBER'\
+                $borg_standard_options
+            ;;
+        (diff)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '3:archives:__borg_archive'\
+                '*:path:_files'\
+                --numeric-owner'[only obey numeric user and group identifiers]'\
+                --same-chunker-params'[Override check of chunker parameters.]'\
+                --sort'[Sort the output lines by file path.]'\
+                {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
+                --exclude-from'[read exclude patterns from EXCLUDEFILE, one per line]:_files'\
+                --pattern'[experimental: include/exclude paths matching PATTERN]:PATTERN'\
+                --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
+                --exclude-caches'[exclude directories that contain a CACHEDIR.TAG file ]'\
+                --exclude-if-present'[exclude directories that are tagged by containing a filesystem object with the given NAME]:NAME'\
+                {--keep-exclude-tags,--keep-tag-files}'[if tag objects are specified with --exclude-if-present, don’t omit the tag objects themselves]'\
+                $borg_standard_options
+
+            ;;
+        (rename)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '3:name:NAME'\
+                $borg_standard_options
+            ;;
+        (delete)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '*:archives:archives'\
+                {-s,--stats}'[print statistics for the deleted archive]'\
+                --cache-only'[delete only the local cache for the given repository]'\
+                --force'[force deletion of corrupted archives, use --force --force in case --force does not work.]'\
+                --save-space'[work slower, but using less space]'\
+                {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
+                {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
+                --sort-keys'[Comma-separated list of sorting keys]:KEYS'\
+                --first'[consider first N archives after other filters were applied]:N'\
+                --last'[consider last N archives after other filters were applied]:N'\
+                $borg_standard_options
+            ;;
+        (list)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '*:path:_files'\
+                --short'[only print file/directory names, nothing else]'\
+                {--format,--list-format}'[specify format for file listing]:FORMAT'\
+                --json'[Only valid for listing repository contents. Format output as JSON.]'\
+                --json-lines'[Only valid for listing archive contents. Format output as JSON Lines. ]'\
+                {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
+                {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
+                --sort-keys'[Comma-separated list of sorting keys]:KEYS'\
+                --first'[consider first N archives after other filters were applied]:N'\
+                --last'[consider last N archives after other filters were applied]:N'\
+                {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
+                --exclude-from'[read exclude patterns from EXCLUDEFILE, one per line]:_files'\
+                --pattern'[experimental: include/exclude paths matching PATTERN]:PATTERN'\
+                --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
+                --exclude-caches'[exclude directories that contain a CACHEDIR.TAG file ]'\
+                --exclude-if-present'[exclude directories that are tagged by containing a filesystem object with the given NAME]:NAME'\
+                {--keep-exclude-tags,--keep-tag-files}'[if tag objects are specified with --exclude-if-present, don’t omit the tag objects themselves]'\
+               $borg_standard_options
+            ;;
+        (mount)
+            _arguments \
+                '2:archives:__borg_archive'\
+                '3:mountpoint:_files'\
+                {-f,--foreground}'[stay in foreground, do not daemonize]'\
+                -o'[Extra mount options]:OPTS'\
+                {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
+                {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
+                --sort-keys'[Comma-separated list of sorting keys]:KEYS'\
+                --first'[consider first N archives after other filters were applied]:N'\
+                --last'[consider last N archives after other filters were applied]:N'\
+                $borg_standard_options
+            ;;
+        (umount)
+            _arguments \
+                '2:mountpoint:_files'\
+                $borg_standard_options
+            ;;
+        (info)
+            _arguments \
+                '2:archives:__borg_archive'\
+                --json'[format output as JSON]'\
+                {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
+                {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
+                --sort-keys'[Comma-separated list of sorting keys]:KEYS'\
+                --first'[consider first N archives after other filters were applied]:N'\
+                --last'[consider last N archives after other filters were applied]:N'\
+                {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
+                $borg_standard_options
+            ;;
+        (break-lock)
+            _arguments \
+                '2:archives:__borg_archive'\
+                $borg_standard_options
+            ;;
+        (prune)
+            _arguments \
+                '2:archives:__borg_archive'\
+                {-n,--dry-run}'[do not change repository]'\
+                --force'[]'\
+                {-s,--stats}'[]'\
+                --list'[]'\
+                --keep-within'[keep all archives within this time interval]:INERVAL'\
+                {--keep-last,--keep-secondly}'[number of secondly archives to keep]:N'\
+                --keep-minutely'[number of minutely archives to keep]:N'\
+                {-H,--keep-hourly}'[number of hourly archives to keep]:N'\
+                {-d,--keep-daily}'[number of daily archives to keep]:N'\
+                {-w,--keep-weekly}'[number of weekly archives to keep]:N'\
+                {-m,--keep-monthly}'[number of monthly archives to keep]:N'\
+                {-y,--keep-yearly}'[number of yearly archives to keep]:N'\
+                --save-space'[work slower, but using less space]'\
+                $borg_standard_options
+            ;;
+        (upgrade)
+            _arguments \
+                '2:archives:__borg_archive'\
+                {-n,--dry-run}'[do not change repository]'\
+                --inplace'[rewrite repository in place, with no chance of going back to older versions of the repository.]'\
+                --force'[Force upgrade]'\
+                --tam'[Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).]'\
+                --disable-tam'[Disable manifest authentication (in key and cache).]'\
+                $borg_standard_options
+            ;;
+        (with-lock)
+            _arguments \
+                '(-)2:archives:__borg_archive'\
+                $borg_standard_options
+                #'3:command:_command_names -e'\
+                #'4:arguments:_normal'
+                #TODO Debug this, getting "_tags:comptags:36: nesting level too deep" error
+            ;;
+        (benchmark)
+            _arguments \
+                '2:type:(crud)'\
+                '3:repo:_files'\
+                '4:path:_files'\
+                $borg_standard_options
+            ;;
+        *)
+            commands=(
+                'serve:start repository server process'
+                'init:initialize empty repository'
+                'check:verify repository'
+                'key:manage repository key'
+                'change-passphrase:change repository passphrase'
+                'create:create backup'
+                'extract:extract archive contents'
+                'export-tar:create tarball from archive'
+                'diff:find differences in archive contents'
+                'rename:rename archive'
+                'delete:delete archive'
+                'list:list archive or repository contents'
+                'mount:mount repository'
+                'umount:umount repository'
+                'info:show repository or archive information'
+                'break-lock:break repository and cache locks'
+                'prune:prune archives'
+                'upgrade:upgrade repository format'
+                'with-lock:run user command with lock held'
+                'benchmark:benchmark command'
+            )
+
+            _describe 'values' commands
+            _arguments $borg_standard_options
+                
+        ;;
+    esac
+}
+
+__borg_archive() {
+    local -a items
+    if (($+BORG_REPO)); then
+        items=("${(@f)$(borg list $cpath --short 2>/dev/null | sed "s#^#::#")}")
+    else
+        local cpath
+        cpath=$words[-1]
+        cpath=${cpath%::*}
+        items=("${(@f)$(borg list $cpath --short 2>/dev/null | sed "s#^#${cpath}::#")}")
+    fi
+    if [[ $items[1] == "" ]]; then
+        _files -/
+    else
+        _wanted archives expl 'archive' compadd $items
+    fi
+}

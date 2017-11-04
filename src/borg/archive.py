@@ -1021,8 +1021,9 @@ class ChunksProcessor:
 
                 # if we created part files, we have referenced all chunks from the part files,
                 # but we also will reference the same chunks also from the final, complete file:
+                dummy_stats = Statistics()  # do not count this data volume twice
                 for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, stats, size=chunk.size)
+                    cache.chunk_incref(chunk.id, dummy_stats, size=chunk.size)
 
 
 class FilesystemObjectProcessors:

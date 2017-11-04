@@ -596,7 +596,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     # emit this msg in the same way as the 'Remote: ...' lines that show the remote TypeError
                     sys.stderr.write(msg)
                     self.server_version = parse_version('1.0.6')
-                    compatMap['open'] = ('path', 'create', 'lock_wait', 'lock', ),
+                    compatMap['open'] = ('path', 'create', 'lock_wait', 'lock', )
                     # try again with corrected version and compatMap
                     do_open()
         except Exception:

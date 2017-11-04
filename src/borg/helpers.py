@@ -482,8 +482,7 @@ def get_home_dir():
 def get_keys_dir():
     """Determine where to repository keys and cache"""
 
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
-    keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
+    keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(get_config_dir(), 'keys'))
     if not os.path.exists(keys_dir):
         os.makedirs(keys_dir)
         os.chmod(keys_dir, stat.S_IRWXU)
@@ -492,8 +491,7 @@ def get_keys_dir():
 
 def get_security_dir(repository_id=None):
     """Determine where to store local security information."""
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
-    security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(xdg_config, 'borg', 'security'))
+    security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(get_config_dir(), 'security'))
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     if not os.path.exists(security_dir):
@@ -517,6 +515,16 @@ def get_cache_dir():
                 #       http://www.brynosaurus.com/cachedir/
                 """).encode('ascii'))
     return cache_dir
+
+
+def get_config_dir():
+    """Determine where to store whole config"""
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
+    config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(xdg_config, 'borg'))
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+        os.chmod(config_dir, stat.S_IRWXU)
+    return config_dir
 
 
 def to_localtime(ts):

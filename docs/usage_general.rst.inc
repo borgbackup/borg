@@ -197,6 +197,8 @@ Directories and files:
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories).
+    BORG_CONFIG_DIR
+        Default to '~/.config/borg'. This directory contains the whole config directories.
 
 Building:
     BORG_OPENSSL_PREFIX

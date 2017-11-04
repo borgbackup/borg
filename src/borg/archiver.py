@@ -519,7 +519,7 @@ class Archiver:
                     nobsdflags=args.nobsdflags, numeric_owner=args.numeric_owner)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
-                    checkpoint_interval=args.checkpoint_interval)
+                    checkpoint_interval=args.checkpoint_interval, rechunkify=False)
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
                     chunker_params=args.chunker_params)
@@ -3371,6 +3371,17 @@ class Archiver:
         deduplicated size of the archives using the previous chunker params.
         When recompressing expect approx. (throughput / checkpoint-interval) in space usage,
         assuming all chunks are recompressed.
+
+        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
+        replacement chunks, please first run another backup for the same data and re-run
+        borg check --repair afterwards to heal any archives that had lost chunks which are
+        still generated from the input data.
+
+        Important: running borg recreate to re-chunk will remove the chunks_healthy
+        metadata of all items with replacement chunks, so healing will not be possible
+        any more after re-chunking (it is also unlikely it would ever work: due to the
+        change of chunking parameters, the missing chunk likely will never be seen again
+        even if you still have the data that produced it).
         """)
         subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
                                           description=self.do_recreate.__doc__,

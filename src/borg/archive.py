@@ -967,13 +967,14 @@ class ChunksProcessor:
 
     def __init__(self, *, key, cache,
                  add_item, write_checkpoint,
-                 checkpoint_interval):
+                 checkpoint_interval, rechunkify):
         self.key = key
         self.cache = cache
         self.add_item = add_item
         self.write_checkpoint = write_checkpoint
         self.checkpoint_interval = checkpoint_interval
         self.last_checkpoint = time.monotonic()
+        self.rechunkify = rechunkify
 
     def write_part_file(self, item, from_chunk, number):
         item = Item(internal_dict=item.as_dict())
@@ -998,6 +999,10 @@ class ChunksProcessor:
                 return chunk_entry
 
         item.chunks = []
+        # if we rechunkify, we'll get a fundamentally different chunks list, thus we need
+        # to get rid of .chunks_healthy, as it might not correspond to .chunks any more.
+        if self.rechunkify and 'chunks_healthy' in item:
+            del item.chunks_healthy
         from_chunk = 0
         part_number = 1
         for data in chunk_iter:
@@ -1502,7 +1507,12 @@ class ArchiveChecker:
             has_chunks_healthy = 'chunks_healthy' in item
             chunks_current = item.chunks
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
-            assert len(chunks_current) == len(chunks_healthy)
+            if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
+                # should never happen, but there was issue #3218.
+                logger.warning('{}: Invalid chunks_healthy metadata removed!'.format(item.path))
+                del item.chunks_healthy
+                has_chunks_healthy = False
+                chunks_healthy = chunks_current
             for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
                 chunk_id, size, csize = chunk_healthy
                 if chunk_id not in self.chunks:
@@ -1758,15 +1768,17 @@ class ArchiveRecreater:
             if not matcher.match(item.path):
                 self.print_file_status('x', item.path)
                 if item_is_hardlink_master(item):
-                    hardlink_masters[item.path] = (item.get('chunks'), None)
+                    hardlink_masters[item.path] = (item.get('chunks'), item.get('chunks_healthy'), None)
                 continue
             if target_is_subset and hardlinkable(item.mode) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset
-                chunks, new_source = hardlink_masters[item.source]
+                chunks, chunks_healthy, new_source = hardlink_masters[item.source]
                 if new_source is None:
                     # First item to use this master, move the chunks
                     item.chunks = chunks
-                    hardlink_masters[item.source] = (None, item.path)
+                    if chunks_healthy is not None:
+                        item.chunks_healthy = chunks_healthy
+                    hardlink_masters[item.source] = (None, None, item.path)
                     del item.source
                 else:
                     # Master was already moved, only update this item's source
@@ -1891,7 +1903,7 @@ class ArchiveRecreater:
         target.process_file_chunks = ChunksProcessor(
             cache=self.cache, key=self.key,
             add_item=target.add_item, write_checkpoint=target.write_checkpoint,
-            checkpoint_interval=self.checkpoint_interval).process_file_chunks
+            checkpoint_interval=self.checkpoint_interval, rechunkify=target.recreate_rechunkify).process_file_chunks
         target.chunker = Chunker(self.key.chunk_seed, *target.chunker_params)
         return target
 

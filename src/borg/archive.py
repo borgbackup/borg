@@ -702,12 +702,6 @@ Utilization of max. archive size: {csize_max:.0%}
             # some systems don't support calling utime on a symlink
             pass
         acl_set(path, item, self.numeric_owner)
-
-        if not self.nobsdflags and 'bsdflags' in item:
-            try:
-                set_flags(path, item.bsdflags, fd=fd)
-            except OSError:
-                pass
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.
         xattrs = item.get('xattrs', {})
@@ -730,6 +724,12 @@ Utilization of max. archive size: {csize_max:.0%}
                     set_ec(EXIT_WARNING)
                 else:
                     raise
+        # bsdflags include the immutable flag and need to be set last:
+        if not self.nobsdflags and 'bsdflags' in item:
+            try:
+                set_flags(path, item.bsdflags, fd=fd)
+            except OSError:
+                pass
 
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)

@@ -65,6 +65,16 @@ class Statistics:
         if unique:
             self.usize += csize
 
+    def __add__(self, other):
+        if not isinstance(other, Statistics):
+            raise TypeError('can only add Statistics objects')
+        stats = Statistics(self.output_json)
+        stats.osize = self.osize + other.osize
+        stats.csize = self.csize + other.csize
+        stats.usize = self.usize + other.usize
+        stats.nfiles = self.nfiles + other.nfiles
+        return stats
+
     summary = "{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"
 
     def __str__(self):

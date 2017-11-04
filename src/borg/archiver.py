@@ -482,6 +482,7 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 args.stats |= args.json
+                archive.stats += fso.stats
                 if args.stats:
                     if args.json:
                         json_print(basic_json_data(manifest, cache=cache, extra={

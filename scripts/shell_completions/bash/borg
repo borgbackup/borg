@@ -82,10 +82,10 @@ _borg()
 			# rename
 			#	no specific options
 			*" list "*)
-				local opts="--short --list-format --format --json --json-lines -P --prefix -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files ${common_opts}"
+				local opts="--short --list-format --format --json --json-lines -P --prefix -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
 				;;
 			*' diff '*)
-				local opts="--numeric-owner --same-chunker-params --sort -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files ${common_opts}"
+				local opts="--numeric-owner --same-chunker-params --sort -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
 				;;
 			*' delete '*)
 				local opts="-s --stats --cache-only --force --save-space -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"

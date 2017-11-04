@@ -162,11 +162,6 @@ complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching P
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from list"
 complete -c borg         -l 'patterns-from'         -d 'Include/exclude paths from PATTERNFILE'     -n "__fish_seen_subcommand_from list"
-complete -c borg -f      -l 'exclude-caches'        -d 'Exclude directories tagged as cache'        -n "__fish_seen_subcommand_from list"
-complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that contain FILENAME'  -n "__fish_seen_subcommand_from list"
-# FIXME are these options really part of borg list?
-complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from list"
-complete -c borg -f      -l 'keep-tag-files'        -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from list"
 
 # borg diff options
 complete -c borg -f      -l 'numeric-owner'         -d 'Only consider numeric user:group'           -n "__fish_seen_subcommand_from diff"
@@ -177,11 +172,6 @@ complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching P
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from diff"
 complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from diff"
 complete -c borg         -l 'patterns-from'         -d 'Include/exclude paths from PATTERNFILE'     -n "__fish_seen_subcommand_from diff"
-complete -c borg -f      -l 'exclude-caches'        -d 'Exclude directories tagged as cache'        -n "__fish_seen_subcommand_from diff"
-complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that contain FILENAME'  -n "__fish_seen_subcommand_from diff"
-# FIXME are these options really part of borg diff?
-complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from diff"
-complete -c borg -f      -l 'keep-tag-files'        -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from diff"
 
 # borg delete options
 complete -c borg -f -s s -l 'stats'                 -d 'Print verbose statistics'                   -n "__fish_seen_subcommand_from delete"

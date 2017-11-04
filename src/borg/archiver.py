@@ -3137,7 +3137,7 @@ class Archiver:
                                help='ARCHIVE2 name (no repository location allowed)')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths of items inside the archives to compare; patterns are supported')
-        define_exclusion_group(subparser, tag_files=True)
+        define_exclusion_group(subparser)
 
         rename_epilog = process_epilog("""
         This command renames an archive in the repository.

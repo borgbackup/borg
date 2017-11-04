@@ -151,7 +151,7 @@ end
 def packages_openindiana
   return <<-EOF
     #pkg update  # XXX needs separate provisioning step + reboot
-    pkg install python-34 clang-3.4 lz4 git
+    pkg install python-34 clang-40 lz4 git
     python3 -m ensurepip
     pip3 install -U setuptools pip wheel virtualenv
   EOF

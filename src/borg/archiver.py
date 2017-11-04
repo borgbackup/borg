@@ -3041,7 +3041,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
         define_archive_filters_group(subparser)
-        define_exclusion_group(subparser, tag_files=True)
+        define_exclusion_group(subparser)
 
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for

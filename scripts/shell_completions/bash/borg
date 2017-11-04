@@ -1,0 +1,165 @@
+#!/bin/bash
+
+# Completions for borg version 1.1.1
+# https://www.borgbackup.org/
+# Note:
+# Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
+# Install:
+# Copy this file to /usr/share/bash-completion/completions/ or /etc/bash_completion.d/
+
+_borg()
+{
+	COMPREPLY=()
+	local cur="${COMP_WORDS[COMP_CWORD]}"
+	local prev="${COMP_WORDS[COMP_CWORD-1]}"
+	local prevprev="${COMP_WORDS[COMP_CWORD-2]}"
+	local common_opts="-h --help --version --critical --error --warning --info -v --verbose --debug --debug-topic -p --progress --log-json --lock-wait --show-version --show-rc --umask --remote-path --remote-ratelimit --consider-part-files --debug-profile"
+	local opts="${common_opts}"
+
+	# Commands
+	if [[ ${COMP_CWORD} == 1 ]] ; then
+		local borg_commands="init create extract check rename list diff delete prune info mount umount key serve upgrade recreate export-tar with-lock break-lock benchmark"
+		COMPREPLY=( $(compgen -W "${borg_commands}" -- ${cur}) )
+		return 0
+	fi
+
+	case "${prev}" in
+		'key')
+			COMPREPLY=( $(compgen -W "import export change-passphrase" -- ${cur}) )
+			return 0
+			;;
+		'benchmark')
+			COMPREPLY=( $(compgen -W "crud" -- ${cur}) )
+			return 0
+			;;
+		'--encryption' | '-e')
+			local encryption_modes="none keyfile keyfile-blake2 repokey repokey-blake2 authenticated authenticated-blake2"
+			COMPREPLY=( $(compgen -W "${encryption_modes}" -- ${cur}) )
+			return 0
+			;;
+		'--files-cache')
+			local files_cache_mode="ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
+			COMPREPLY=( $(compgen -W "${files_cache_mode}" -- ${cur}) )
+			return 0
+			;;
+		'--compression')
+			local compression_methods="none auto lz4 zlib,1 zlib,2 zlib,3 zlib,4 zlib,5 zlib,6 zlib,7 zlib,8 zlib,9 lzma,0 lzma,1 lzma,2 lzma,3 lzma,4 lzma,5 lzma,6 lzma,7 lzma,8 lzma,9"
+			COMPREPLY=( $(compgen -W "${compression_methods}" -- ${cur}) )
+			return 0
+			;;
+		'--sort-by')
+			local sort_keys="timestamp name id"
+			COMPREPLY=( $(compgen -W "${sort_keys}" -- ${cur}) )
+			return 0
+			;;
+		'-o')
+			local fuse_options="allow_other allow_root"
+			# FIXME there are lot more options, but not all are applicable
+			COMPREPLY=( $(compgen -W "${fuse_options}" -- ${cur}) )
+			return 0
+			;;
+		'--recompress')
+			local recompress_when="if-different always"
+			COMPREPLY=( $(compgen -W "${recompress_when}" -- ${cur}) )
+			return 0
+			;;
+	esac
+
+	if [[ ${cur} == -* ]] ; then
+		case "${COMP_LINE}" in
+			*' init '*)
+				local opts="-e --encryption --append-only --storage-quota ${common_opts}"
+				;;
+			*' create '*)
+				local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --no-files-cache -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobsdflags --ignore-inode --mtime --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+				;;
+			*' extract '*)
+				local opts="--list -n --dry-run --numeric-owner --nobsdflags --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
+				;;
+			*' check '*)
+				local opts="--repository-only --archives-only --verify-data --repair --save-space -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
+				;;
+			# rename
+			#	no specific options
+			*" list "*)
+				local opts="--short --list-format --format --json --json-lines -P --prefix -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files ${common_opts}"
+				;;
+			*' diff '*)
+				local opts="--numeric-owner --same-chunker-params --sort -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files ${common_opts}"
+				;;
+			*' delete '*)
+				local opts="-s --stats --cache-only --force --save-space -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
+				;;
+			*' prune '*)
+				local opts="-n --dry-run --force -s --stats --list --keep-within --keep-last --keep-secondly --keep-minutely -H --keep-hourly -d --keep-daily -w --keep-weekly -m --keep-monthly -y --keep-yearly --save-space -P --prefix -a --glob-archives ${common_opts}"
+				;;
+			*' info '*)
+				local opts="--json -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
+				;;
+			*' mount '*)
+				local opts="-f --foreground -o -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
+				;;
+			# umount
+			#	no specific options
+			# key change-passphrase
+			#	no specific options
+			*' export '*)
+				local opts="--paper --qr-html ${common_opts}"
+				;;
+			*' import '*)
+				local opts="--paper ${common_opts}"
+				;;
+			*' upgrade '*)
+				local opts="-n --dry-run --inplace --force --tam --disable-tam ${common_opts}"
+				;;
+			*' recreate '*)
+				local opts="--list --filter -n dry-run -s stats -e exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files --target -c checkpoint-interval --comment --timestamp --timestamp -C compression --recompress --chunker-params ${common_opts}"
+				;;
+			*' export-tar '*)
+				local opts="--tar-filter --list -e exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
+				;;
+			*' serve '*)
+				local opts="--restrict-to-path --restrict-to-repository --append-only --storage-quota ${common_opts}"
+				;;
+			# with-lock
+			#	no specific options
+			# break-lock
+			#	no specific options
+			# benchmark crud
+			#	no specific options
+		esac
+
+		COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+		return 0
+	fi
+
+	# Listing archives.
+	# Since "::" is treated as separate word in bash,
+	#   it is $cur when the cursor is right behind it
+	#   and $prev if the user has started to type an archive name.
+ 	local repository_name="" # If set, we'll list the archives
+	local typed_word=""
+	if [[ ${cur} == "::" ]] ; then
+		repository_name=${prev}
+	fi
+	if [[ ${prev} == "::" ]] ; then
+		repository_name=${prevprev}
+		typed_word=${cur}
+	fi
+	if [[ ${repository_name} != "" ]] ; then
+		if [[ ${COMP_LINE} == *" ::"* ]] ; then
+			# There is a space before the "::"
+			# which means that no repository name was typed,
+			# so probably $BORG_REPO is set.
+			repository_name=""
+		fi
+		local archive_list=$(borg list --short "${repository_name}" 2>/dev/null)
+		COMPREPLY=( $(compgen -W "${archive_list}" -- "${typed_word}" ) )
+		return 0
+	fi
+
+	COMPREPLY=( $(compgen -f ${cur}) )
+	return 0
+}
+
+complete -F _borg borg

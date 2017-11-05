@@ -78,8 +78,8 @@ Main features
     * Mac OS X
     * FreeBSD
     * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
-    * Cygwin (not supported, no binaries yet)
-    * Linux Subsystem of Windows 10 (not supported)
+    * Cygwin (experimental, no binaries yet)
+    * Linux Subsystem of Windows 10 (experimental)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently

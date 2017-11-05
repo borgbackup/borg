@@ -2859,6 +2859,11 @@ class Archiver:
         (O, C and D, respectively), then the Number of files (N) processed so far, followed by
         the currently processed path.
 
+        When using ``--stats``, you will get some statistics about how much data was
+        added - the "This Archive" deduplicated size there is most interesting as that is
+        how much your repository will grow.
+        Please note that the "All archives" stats refer to the state after creation.
+
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.
 
@@ -2877,9 +2882,6 @@ class Archiver:
         only include the objects specified by ``--exclude-if-present`` in your backup,
         and not include any other contents of the containing folder, this can be enabled
         through using the ``--keep-exclude-tags`` option.
-
-        Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
-        in ``--list`` output.
 
         Item flags
         ++++++++++
@@ -3153,6 +3155,11 @@ class Archiver:
         This command deletes an archive from the repository or the complete repository.
         Disk space is reclaimed accordingly. If you delete the complete repository, the
         local cache for it (if any) is also deleted.
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after deletion.
         """)
         subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
                                           description=self.do_delete.__doc__,
@@ -3377,6 +3384,11 @@ class Archiver:
         The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after pruning.
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,
@@ -3484,13 +3496,13 @@ class Archiver:
 
             borg delete borg
 
-        Unless ``--inplace`` is specified, the upgrade process first
-        creates a backup copy of the repository, in
-        REPOSITORY.before-upgrade-DATETIME, using hardlinks. This takes
-        longer than in place upgrades, but is much safer and gives
-        progress information (as opposed to ``cp -al``). Once you are
-        satisfied with the conversion, you can safely destroy the
-        backup copy.
+        Unless ``--inplace`` is specified, the upgrade process first creates a backup
+        copy of the repository, in REPOSITORY.before-upgrade-DATETIME, using hardlinks.
+        This requires that the repository and its parent directory reside on same
+        filesystem so the hardlink copy can work.
+        This takes longer than in place upgrades, but is much safer and gives
+        progress information (as opposed to ``cp -al``). Once you are satisfied
+        with the conversion, you can safely destroy the backup copy.
 
         WARNING: Running the upgrade in place will make the current
         copy unusable with older version, with no way of going back

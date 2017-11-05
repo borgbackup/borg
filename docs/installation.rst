@@ -250,8 +250,7 @@ Cygwin
 ++++++
 
 .. note::
-    Running under Cygwin is experimental and has only been tested with Cygwin
-    (x86-64) v2.5.2. Remote repositories are known broken, local repositories should work.
+    Running under Cygwin is experimental and has not been tested much yet.
 
 Use the Cygwin installer to install the dependencies::
 

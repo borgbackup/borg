@@ -131,7 +131,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.1 (2017-10-22)
+Version 1.1.2 (2017-11-05)
 --------------------------
 
 Compatibility notes:
@@ -149,6 +149,51 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+Fixes:
+
+- fix KeyError crash when talking to borg server < 1.0.7, #3244
+- extract: set bsdflags last (include immutable flag), #3263
+- create: don't do stat() call on excluded-norecurse directory, fix exception
+  handling for stat() call, #3209
+- create --stats: do not count data volume twice when checkpointing, #3224
+- recreate: move chunks_healthy when excluding hardlink master, #3228
+- recreate: get rid of chunks_healthy when rechunking (does not match), #3218
+- check: get rid of already existing not matching chunks_healthy metadata, #3218
+- list: fix stdout broken pipe handling, #3245
+- list/diff: remove tag-file options (not used), #3226
+
+New features:
+
+- bash, zsh and fish shell auto-completions, see scripts/shell_completions/
+- added BORG_CONFIG_DIR env var, #3083
+
+Other changes:
+
+- docs:
+
+  - clarify using a blank passphrase in keyfile mode
+  - mention "!" (exclude-norecurse) type in "patterns" help
+  - document to first heal before running borg recreate to re-chunk stuff,
+    because that will have to get rid of chunks_healthy metadata.
+  - more than 23 is not supported for CHUNK_MAX_EXP, #3115
+  - borg does not respect nodump flag by default any more
+  - clarify same-filesystem requirement for borg upgrade, #2083
+  - update / rephrase cygwin / WSL status, #3174
+  - improve docs about --stats, #3260
+- vagrant: openindiana new clang package
+
+Already contained in 1.1.1 (last minute fix):
+
+- arg parsing: fix fallback function, refactor, #3205. This is a fixup
+  for #3155, which was broken on at least python <= 3.4.2.
+
+
+Version 1.1.1 (2017-10-22)
+--------------------------
+
+Compatibility notes:
+
 - The deprecated --no-files-cache is not a global/common option any more,
   but only available for borg create (it is not needed for anything else).
   Use --files-cache=disabled instead of --no-files-cache.

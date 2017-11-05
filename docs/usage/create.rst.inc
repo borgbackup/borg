@@ -212,6 +212,11 @@ The ``--progress`` option shows (from left to right) Original, Compressed and De
 (O, C and D, respectively), then the Number of files (N) processed so far, followed by
 the currently processed path.
 
+When using ``--stats``, you will get some statistics about how much data was
+added - the "This Archive" deduplicated size there is most interesting as that is
+how much your repository will grow.
+Please note that the "All archives" stats refer to the state after creation.
+
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
 
@@ -230,9 +235,6 @@ all of its contents will be omitted from the backup.  If, however, you wish to
 only include the objects specified by ``--exclude-if-present`` in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the ``--keep-exclude-tags`` option.
-
-Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
-in ``--list`` output.
 
 Item flags
 ++++++++++

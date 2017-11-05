@@ -2859,6 +2859,11 @@ class Archiver:
         (O, C and D, respectively), then the Number of files (N) processed so far, followed by
         the currently processed path.
 
+        When using ``--stats``, you will get some statistics about how much data was
+        added - the "This Archive" deduplicated size there is most interesting as that is
+        how much your repository will grow.
+        Please note that the "All archives" stats refer to the state after creation.
+
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.
 
@@ -3153,6 +3158,11 @@ class Archiver:
         This command deletes an archive from the repository or the complete repository.
         Disk space is reclaimed accordingly. If you delete the complete repository, the
         local cache for it (if any) is also deleted.
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after deletion.
         """)
         subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
                                           description=self.do_delete.__doc__,
@@ -3377,6 +3387,11 @@ class Archiver:
         The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after pruning.
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,

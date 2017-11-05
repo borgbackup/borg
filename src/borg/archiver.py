@@ -2691,9 +2691,6 @@ class Archiver:
         and not include any other contents of the containing folder, this can be enabled
         through using the ``--keep-exclude-tags`` option.
 
-        Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
-        in ``--list`` output.
-
         Item flags
         ++++++++++
 
@@ -3307,13 +3304,13 @@ class Archiver:
 
             borg delete borg
 
-        Unless ``--inplace`` is specified, the upgrade process first
-        creates a backup copy of the repository, in
-        REPOSITORY.before-upgrade-DATETIME, using hardlinks. This takes
-        longer than in place upgrades, but is much safer and gives
-        progress information (as opposed to ``cp -al``). Once you are
-        satisfied with the conversion, you can safely destroy the
-        backup copy.
+        Unless ``--inplace`` is specified, the upgrade process first creates a backup
+        copy of the repository, in REPOSITORY.before-upgrade-DATETIME, using hardlinks.
+        This requires that the repository and its parent directory reside on same
+        filesystem so the hardlink copy can work.
+        This takes longer than in place upgrades, but is much safer and gives
+        progress information (as opposed to ``cp -al``). Once you are satisfied
+        with the conversion, you can safely destroy the backup copy.
 
         WARNING: Running the upgrade in place will make the current
         copy unusable with older version, with no way of going back

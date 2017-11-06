@@ -2688,6 +2688,9 @@ class Archiver:
         key_export_epilog = process_epilog("""
         If repository encryption is used, the repository is inaccessible
         without the key. This command allows to backup this essential key.
+        Note that the backup produced does not include the passphrase itself
+        (i.e. the exported key stays encrypted). In order to regain access to a
+        repository, one needs both the exported key and the original passphrase.
 
         There are two backup formats. The normal backup format is suitable for
         digital storage as a file. The ``--paper`` backup format is optimized

@@ -48,6 +48,64 @@ and platform/software dependency. Combining Borg with the mechanisms provided
 by the platform (snapshots, hypervisor features) will be the best approach
 to start tackling them.
 
+How can I decrease the size of disk image backups?
+--------------------------------------------------
+
+Full disk images are as large as the full disk when uncompressed and might not get much
+smaller post-deduplication after heavy use. This is because virtually all file systems
+don't actually delete the data on disk (that is the place of so-called "secure delete")
+but instead delete the filesystem entries referring to the data. This leaves the random
+data on disk until the FS eventually claims it for another file. Therefore, if a hard
+drive nears capacity and files are deleted again, the change will barely decrease the
+space it takes up when compressed and deduplicated. Depending on the filesystem of the
+VM (or physical computer, if for some reason a normal filesystem backup can't be taken),
+there are several ways to decrease the size of a full image:
+
+Using ntfsclone (NTFS, i.e. Windows VMs)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ntfsclone can only operate on filesystems with the journal cleared (i.e. turned-off
+machines) which somewhat limits its utility in the case of VM snapshots. However,
+when it can be used, its special image format is even more efficient than just zeroing
+and deduplicating. For backup, save the disk header and the contents of each partition::
+
+    HEADER_SIZE=$(sfdisk -lo Start $DISK | grep -A1 -P 'Start$' | tail -n1 | xargs echo)
+    PARTITIONS=$(sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d')
+    dd if=$DISK count=$HEADER_SIZE | borg create repo::hostname-partinfo -
+    echo "$PARTITIONS" | grep NTFS | cut -d' ' -f1 | while read x; do
+        PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
+        ntfsclone -so - $x | borg create repo::hostname-part$PARTNUM -
+    done
+    # to backup non-NTFS partitions as well:
+    echo "$PARTITIONS" | grep -v NTFS | cut -d' ' -f1 | while read x; do
+        PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
+        borg create --read-special repo::hostname-part$PARTNUM $x
+    done
+
+Restoration is similar to the above process, but done in reverse::
+
+    borg extract --stdout repo::hostname-partinfo | dd of=$DISK && partprobe
+    PARTITIONS=$(sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d')
+    borg list --format {archive}{NL} repo | grep 'part[0-9]*$' | while read x; do
+        PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
+        PARTITION=$(echo "$PARTITIONS" | grep -E "$DISKp?$PARTNUM" | head -n1)
+        if echo "$PARTITION" | cut -d' ' -f2- | grep -q NTFS; then
+            borg extract --stdout repo::$x | ntfsclone -rO $(echo "$PARTITION" | cut -d' ' -f1) -
+        else
+            borg extract --stdout repo::$x | dd of=$(echo "$PARTITION" | cut -d' ' -f1)
+        fi
+    done
+
+.. note::
+
+   When backing up a disk image (as opposed to a real block device), mount it as
+   a loopback image to use the above snippets::
+
+       DISK=$(losetup -Pf --show /path/to/disk/image)
+       # do backup as shown above
+       sync $DISK
+       losetup -d $DISK
+
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------
 

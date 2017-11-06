@@ -309,6 +309,7 @@ Checklist:
 
 - make sure all issues for this milestone are closed or moved to the
   next milestone
+- check if there are any pending fixes for security issues
 - find and fix any low hanging fruit left on the issue tracker
 - check that Travis CI is happy
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``

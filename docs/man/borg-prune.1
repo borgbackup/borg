@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PRUNE 1 "2017-10-22" "" "borg backup tool"
+.TH BORG-PRUNE 1 "2017-11-05" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .
@@ -73,6 +73,11 @@ negative number of archives to keep means that there is no limit.
 The \fB\-\-keep\-last N\fP option is doing the same as \fB\-\-keep\-secondly N\fP (and it will
 keep the last N archives under the assumption that you do not create more than one
 backup archive in the same second).
+.sp
+When using \fB\-\-stats\fP, you will get some statistics about how much data was
+deleted \- the "Deleted data" deduplicated size there is most interesting as
+that is how much your repository will shrink.
+Please note that the "All archives" stats refer to the state after pruning.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -171,7 +176,7 @@ $ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-mont
 .UNINDENT
 .sp
 There is also a visualized prune example in \fBdocs/misc/prune\-example.txt\fP:
-.IP "System Message: ERROR/3 (docs/virtmanpage.rst:, line 140)"
+.IP "System Message: ERROR/3 (docs/virtmanpage.rst:, line 145)"
 Unknown directive type "highlight".
 .INDENT 0.0
 .INDENT 3.5

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2017-10-22" "" "borg backup tool"
+.TH BORG-DELETE 1 "2017-11-05" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .
@@ -38,6 +38,11 @@ borg [common options] delete [options] [TARGET] [ARCHIVE...]
 This command deletes an archive from the repository or the complete repository.
 Disk space is reclaimed accordingly. If you delete the complete repository, the
 local cache for it (if any) is also deleted.
+.sp
+When using \fB\-\-stats\fP, you will get some statistics about how much data was
+deleted \- the "Deleted data" deduplicated size there is most interesting as
+that is how much your repository will shrink.
+Please note that the "All archives" stats refer to the state after deletion.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

@@ -135,3 +135,8 @@ negative number of archives to keep means that there is no limit.
 The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
 keep the last N archives under the assumption that you do not create more than one
 backup archive in the same second).
+
+When using ``--stats``, you will get some statistics about how much data was
+deleted - the "Deleted data" deduplicated size there is most interesting as
+that is how much your repository will shrink.
+Please note that the "All archives" stats refer to the state after pruning.

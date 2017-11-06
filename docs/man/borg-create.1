@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-10-22" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-11-05" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -107,6 +107,11 @@ If this is not possible, consider creating a bind mount to a stable location.
 The \fB\-\-progress\fP option shows (from left to right) Original, Compressed and Deduplicated
 (O, C and D, respectively), then the Number of files (N) processed so far, followed by
 the currently processed path.
+.sp
+When using \fB\-\-stats\fP, you will get some statistics about how much data was
+added \- the "This Archive" deduplicated size there is most interesting as that is
+how much your repository will grow.
+Please note that the "All archives" stats refer to the state after creation.
 .sp
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
@@ -306,9 +311,6 @@ all of its contents will be omitted from the backup.  If, however, you wish to
 only include the objects specified by \fB\-\-exclude\-if\-present\fP in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the \fB\-\-keep\-exclude\-tags\fP option.
-.sp
-Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
-in \fB\-\-list\fP output.
 .SS Item flags
 .sp
 \fB\-\-list\fP outputs a list of all files, directories and other

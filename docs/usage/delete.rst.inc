@@ -86,3 +86,8 @@ Description
 This command deletes an archive from the repository or the complete repository.
 Disk space is reclaimed accordingly. If you delete the complete repository, the
 local cache for it (if any) is also deleted.
+
+When using ``--stats``, you will get some statistics about how much data was
+deleted - the "Deleted data" deduplicated size there is most interesting as
+that is how much your repository will shrink.
+Please note that the "All archives" stats refer to the state after deletion.

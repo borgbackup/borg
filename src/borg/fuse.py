@@ -17,6 +17,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .crypto.low_level import blake2b_128
+from .archiver import Archiver
 from .archive import Archive
 from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
@@ -118,7 +119,7 @@ class ItemCache:
         else:
             raise ValueError('Invalid entry type in self.meta')
 
-    def iter_archive_items(self, archive_item_ids):
+    def iter_archive_items(self, archive_item_ids, filter=None):
         unpacker = msgpack.Unpacker()
 
         # Current offset in the metadata stream, which consists of all metadata chunks glued together
@@ -161,6 +162,11 @@ class ItemCache:
                     # Need more data, feed the next chunk
                     break
 
+                item = Item(internal_dict=item)
+                if filter and not filter(item):
+                    msgpacked_bytes = b''
+                    continue
+
                 current_item = msgpacked_bytes
                 current_item_length = len(current_item)
                 current_spans_chunks = stream_offset - current_item_length < chunk_begin
@@ -197,7 +203,7 @@ class ItemCache:
                 inode = write_offset + self.offset
                 write_offset += 9
 
-                yield inode, Item(internal_dict=item)
+                yield inode, item
 
         self.write_offset = write_offset
 
@@ -289,7 +295,13 @@ class FuseBackend(object):
         t0 = time.perf_counter()
         archive = Archive(self.repository_uncached, self.key, self._manifest, archive_name,
                           consider_part_files=self._args.consider_part_files)
-        for item_inode, item in self.cache.iter_archive_items(archive.metadata.items):
+        strip_components = self._args.strip_components
+        matcher = Archiver.build_matcher(self._args.patterns, self._args.paths)
+        dummy = lambda x, y: None  # TODO: add hardlink_master support code, see Archiver
+        filter = Archiver.build_filter(matcher, dummy, strip_components)
+        for item_inode, item in self.cache.iter_archive_items(archive.metadata.items, filter=filter):
+            if strip_components:
+                item.path = os.sep.join(item.path.split(os.sep)[strip_components:])
             path = os.fsencode(item.path)
             is_dir = stat.S_ISDIR(item.mode)
             if is_dir:

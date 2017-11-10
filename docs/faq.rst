@@ -294,7 +294,7 @@ Why is the time elapsed in the archive stats different from wall clock time?
 Borg needs to write the time elapsed into the archive metadata before finalizing
 the archive, compacting the segments, and committing the repo & cache. This means
 when Borg is run with e.g. the ``time`` command, the duration shown in the archive
-stats may be slightly shorter than the full time the command runs for.
+stats may be shorter than the full time the command runs for.
 
 Security
 ########

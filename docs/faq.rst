@@ -103,8 +103,29 @@ Restoration is similar to the above process, but done in reverse::
 
        DISK=$(losetup -Pf --show /path/to/disk/image)
        # do backup as shown above
-       sync $DISK
        losetup -d $DISK
+
+Using zerofree (ext2, ext3, ext4)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+zerofree works similarly to ntfsclone in that it zeros out unused chunks of the FS, except
+that it works in place, zeroing the original partition. This makes the backup process a bit
+simpler::
+
+    sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d' | grep Linux | cut -d' ' -f1 | xargs -n1 zerofree
+    borg create --read-special repo::hostname-disk $DISK
+
+Because the partitions were zeroed in place, restoration is only one command::
+
+    borg extract --stdout repo::hostname-disk | dd of=$DISK
+
+.. note:: The "traditional" way to zero out space on a partition, especially one already
+          mounted, is to simply ``dd`` from ``/dev/zero`` to a temporary file and delete
+          it. This is ill-advised for the reasons mentioned in the ``zerofree`` man page:
+
+          - it is slow
+          - it makes the disk image (temporarily) grow to its maximal extent
+          - it (temporarily) uses all free space on the disk, so other concurrent write actions may fail.
 
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------

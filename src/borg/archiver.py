@@ -2669,8 +2669,9 @@ class Archiver:
 
         When using ``--stats``, you will get some statistics about how much data was
         added - the "This Archive" deduplicated size there is most interesting as that is
-        how much your repository will grow.
-        Please note that the "All archives" stats refer to the state after creation.
+        how much your repository will grow. Please note that the "All archives" stats refer to
+        the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
+        exclusive because the data is not actually compressed and deduplicated during a dry run.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.
@@ -2738,10 +2739,12 @@ class Archiver:
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
 
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+        group = subparser.add_mutually_exclusive_group()
+        group.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not create a backup archive')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+        group.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the created archive')
+
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',

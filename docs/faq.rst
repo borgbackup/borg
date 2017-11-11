@@ -502,8 +502,7 @@ space for chunks.archive.d (see :issue:`235` for details):
 ::
 
     # this assumes you are working with the same user as the backup.
-    # you can get the REPOID from the "config" file inside the repository.
-    cd ~/.cache/borg/<REPOID>
+    cd ~/.cache/borg/$(borg config /path/to/repo id)
     rm -rf chunks.archive.d ; touch chunks.archive.d
 
 This deletes all the cached archive chunk indexes and replaces the directory
@@ -808,7 +807,7 @@ There are some caveats:
 - If the repository is in "keyfile" encryption mode, the keyfile must
   exist locally or it must be manually moved after performing the upgrade:
 
-  1. Locate the repository ID, contained in the ``config`` file in the repository.
+  1. Get the repository ID with ``borg config /path/to/repo id``.
   2. Locate the attic key file at ``~/.attic/keys/``. The correct key for the
      repository starts with the line ``ATTIC_KEY <repository id>``.
   3. Copy the attic key file to ``~/.config/borg/keys/``

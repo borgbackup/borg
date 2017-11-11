@@ -51,6 +51,7 @@ Usage
    usage/serve
    usage/lock
    usage/benchmark
+   usage/config
 
    usage/help
    usage/debug

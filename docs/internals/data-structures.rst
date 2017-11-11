@@ -535,7 +535,7 @@ ACLs/xattrs), the limit will be ~32 million files/directories per archive.
 If one tries to create an archive object bigger than MAX_OBJECT_SIZE, a fatal
 IntegrityError will be raised.
 
-A workaround is to create multiple archives with less items each, see
+A workaround is to create multiple archives with fewer items each, see
 also :issue:`1452`.
 
 .. _item:
@@ -706,7 +706,7 @@ be estimated like that::
 All units are Bytes.
 
 It is assuming every chunk is referenced exactly once (if you have a lot of
-duplicate chunks, you will have less chunks than estimated above).
+duplicate chunks, you will have fewer chunks than estimated above).
 
 It is also assuming that typical chunk size is 2^HASH_MASK_BITS (if you have
 a lot of files smaller than this statistical medium chunk size, you will have

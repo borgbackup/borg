@@ -515,7 +515,7 @@ class Archiver:
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
                 metadata_collector = MetadataCollector(noatime=args.noatime, noctime=args.noctime,
-                    nobsdflags=args.nobsdflags, numeric_owner=args.numeric_owner)
+                    nobsdflags=args.nobsdflags, numeric_owner=args.numeric_owner, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
                     checkpoint_interval=args.checkpoint_interval)
@@ -2771,6 +2771,8 @@ class Archiver:
                               help='do not store atime into archive')
         fs_group.add_argument('--noctime', dest='noctime', action='store_true',
                               help='do not store ctime into archive')
+        fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
+                              help='do not store birthtime (creation date) into archive')
         fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
                               help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',

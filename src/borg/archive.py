@@ -683,6 +683,18 @@ Utilization of max. archive size: {csize_max:.0%}
         else:
             # old archives only had mtime in item metadata
             atime = mtime
+        if 'birthtime' in item:
+            birthtime = item.birthtime
+            try:
+                # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
+                # See utimes(2) on either of the BSDs for details.
+                if fd:
+                    os.utime(fd, None, ns=(atime, birthtime))
+                else:
+                    os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
+            except OSError:
+                # some systems don't support calling utime on a symlink
+                pass
         try:
             if fd:
                 os.utime(fd, None, ns=(atime, mtime))
@@ -905,11 +917,12 @@ Utilization of max. archive size: {csize_max:.0%}
 
 
 class MetadataCollector:
-    def __init__(self, *, noatime, noctime, numeric_owner, nobsdflags):
+    def __init__(self, *, noatime, noctime, numeric_owner, nobsdflags, nobirthtime):
         self.noatime = noatime
         self.noctime = noctime
         self.numeric_owner = numeric_owner
         self.nobsdflags = nobsdflags
+        self.nobirthtime = nobirthtime
 
     def stat_simple_attrs(self, st):
         attrs = dict(
@@ -925,6 +938,9 @@ class MetadataCollector:
             attrs['atime'] = safe_ns(st.st_atime_ns)
         if not self.noctime:
             attrs['ctime'] = safe_ns(st.st_ctime_ns)
+        if not self.nobirthtime and hasattr(st, 'st_birthtime'):
+            # sadly, there's no stat_result.st_birthtime_ns
+            attrs['birthtime'] = int(st.st_birthtime * 10**9)
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:

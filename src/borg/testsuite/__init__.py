@@ -116,6 +116,28 @@ def is_utime_fully_supported():
         return False
 
 
+@functools.lru_cache()
+def is_birthtime_fully_supported():
+    if not hasattr(os.stat_result, 'st_birthtime'):
+        return False
+    with unopened_tempfile() as filepath:
+        # Some filesystems (such as SSHFS) don't support utime on symlinks
+        if are_symlinks_supported():
+            os.symlink('something', filepath)
+        else:
+            open(filepath, 'w').close()
+        try:
+            birthtime, mtime, atime = 946598400, 946684800, 946771200
+            os.utime(filepath, (atime, birthtime), follow_symlinks=False)
+            os.utime(filepath, (atime, mtime), follow_symlinks=False)
+            new_stats = os.stat(filepath, follow_symlinks=False)
+            if new_stats.st_birthtime == birthtime and new_stats.st_mtime == mtime and new_stats.st_atime == atime:
+                return True
+        except OSError as err:
+            pass
+        return False
+
+
 def no_selinux(x):
     # selinux fails our FUSE tests, thus ignore selinux xattrs
     SELINUX_KEY = 'security.selinux'

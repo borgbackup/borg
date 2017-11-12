@@ -54,7 +54,7 @@ from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
-from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported
+from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
 from .upgrader import attic_repo
 from . import key
@@ -493,6 +493,39 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         else:
             # it touched the input file's atime while backing it up
             assert sto.st_atime_ns == atime * 1e9
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
+    @pytest.mark.skipif(not is_birthtime_fully_supported(), reason='cannot properly setup and execute test without birthtime')
+    def test_birthtime(self):
+        self.create_test_files()
+        birthtime, mtime, atime = 946598400, 946684800, 946771200
+        os.utime('input/file1', (atime, birthtime))
+        os.utime('input/file1', (atime, mtime))
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        sti = os.stat('input/file1')
+        sto = os.stat('output/input/file1')
+        assert int(sti.st_birthtime * 1e9) == int(sto.st_birthtime * 1e9) == birthtime * 1e9
+        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
+    @pytest.mark.skipif(not is_birthtime_fully_supported(), reason='cannot properly setup and execute test without birthtime')
+    def test_nobirthtime(self):
+        self.create_test_files()
+        birthtime, mtime, atime = 946598400, 946684800, 946771200
+        os.utime('input/file1', (atime, birthtime))
+        os.utime('input/file1', (atime, mtime))
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', '--nobirthtime', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        sti = os.stat('input/file1')
+        sto = os.stat('output/input/file1')
+        assert int(sti.st_birthtime * 1e9) == birthtime * 1e9
+        assert int(sto.st_birthtime * 1e9) == mtime * 1e9
+        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
 
     def _extract_repository_id(self, path):
         with Repository(self.repository_path) as repository:

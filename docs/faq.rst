@@ -108,7 +108,7 @@ Are there other known limitations?
   usually corresponding to tens or hundreds of millions of files/dirs.
   When trying to go beyond that limit, you will get a fatal IntegrityError
   exception telling that the (archive) object is too big.
-  An easy workaround is to create multiple archives with less items each.
+  An easy workaround is to create multiple archives with fewer items each.
   See also the :ref:`archive_limitation` and :issue:`1452`.
 
   :ref:`borg_info` shows how large (relative to the maximum size) existing
@@ -215,7 +215,7 @@ I get an IntegrityError or similar - what now?
 
 A single error does not necessarily indicate bad hardware or a Borg
 bug. All hardware exhibits a bit error rate (BER). Hard drives are typically
-specified as exhibiting less than one error every 12 to 120 TB
+specified as exhibiting fewer than one error every 12 to 120 TB
 (one bit error in 10e14 to 10e15 bits). The specification is often called
 *unrecoverable read error rate* (URE rate).
 

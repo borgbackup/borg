@@ -1050,7 +1050,7 @@ Other changes:
 
   - pass meta-data around, #765
   - move some constants to new constants module
-  - better readability and less errors with namedtuples, #823
+  - better readability and fewer errors with namedtuples, #823
   - moved source tree into src/ subdirectory, #1016
   - made borg.platform a package, #1113
   - removed dead crypto code, #1032
@@ -2416,7 +2416,7 @@ Version 0.23.0 (2015-06-11)
 Incompatible changes (compared to attic, fork related):
 
 - changed sw name and cli command to "borg", updated docs
-- package name (and name in urls) uses "borgbackup" to have less collisions
+- package name (and name in urls) uses "borgbackup" to have fewer collisions
 - changed repo / cache internal magic strings from ATTIC* to BORG*,
   changed cache location to .cache/borg/ - this means that it currently won't
   accept attic repos (see issue #21 about improving that)

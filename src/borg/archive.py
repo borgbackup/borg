@@ -940,7 +940,7 @@ class MetadataCollector:
             attrs['ctime'] = safe_ns(st.st_ctime_ns)
         if not self.nobirthtime and hasattr(st, 'st_birthtime'):
             # sadly, there's no stat_result.st_birthtime_ns
-            attrs['birthtime'] = int(st.st_birthtime * 10**9)
+            attrs['birthtime'] = safe_ns(int(st.st_birthtime * 10**9))
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:

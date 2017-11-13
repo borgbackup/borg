@@ -238,10 +238,11 @@ class build_usage(Command):
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
         parser = Archiver(prog='borg').build_parser()
+        borgfs_parser = Archiver(prog='borgfs').build_parser()
 
-        self.generate_level("", parser, Archiver)
+        self.generate_level("", parser, Archiver, {'borgfs': borgfs_parser})
 
-    def generate_level(self, prefix, parser, Archiver):
+    def generate_level(self, prefix, parser, Archiver, extra_choices=None):
         is_subcommand = False
         choices = {}
         for action in parser._actions:
@@ -249,6 +250,8 @@ class build_usage(Command):
                 is_subcommand = True
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
+        if extra_choices is not None:
+            choices.update(extra_choices)
         if prefix and not choices:
             return
         print('found commands: %s' % list(choices.keys()))
@@ -501,12 +504,13 @@ class build_man(Command):
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
         parser = Archiver(prog='borg').build_parser()
+        borgfs_parser = Archiver(prog='borgfs').build_parser()
 
-        self.generate_level('', parser, Archiver)
+        self.generate_level('', parser, Archiver, {'borgfs': borgfs_parser})
         self.build_topic_pages(Archiver)
         self.build_intro_page()
 
-    def generate_level(self, prefix, parser, Archiver):
+    def generate_level(self, prefix, parser, Archiver, extra_choices=None):
         is_subcommand = False
         choices = {}
         for action in parser._actions:
@@ -514,6 +518,8 @@ class build_man(Command):
                 is_subcommand = True
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
+        if extra_choices is not None:
+            choices.update(extra_choices)
         if prefix and not choices:
             return
 
@@ -521,7 +527,10 @@ class build_man(Command):
             if command.startswith('debug') or command == 'help':
                 continue
 
-            man_title = 'borg-' + command.replace(' ', '-')
+            if command == "borgfs":
+                man_title = command
+            else:
+                man_title = 'borg-' + command.replace(' ', '-')
             print('building man page', man_title + '(1)', file=sys.stderr)
 
             is_intermediary = self.generate_level(command + ' ', parser, Archiver)
@@ -536,7 +545,10 @@ class build_man(Command):
                     write('| borg', '[common options]', command, subcommand, '...')
                     self.see_also.setdefault(command, []).append('%s-%s' % (command, subcommand))
             else:
-                write('borg', '[common options]', command, end='')
+                if command == "borgfs":
+                    write(command, end='')
+                else:
+                    write('borg', '[common options]', command, end='')
                 self.write_usage(write, parser)
             write('\n')
 

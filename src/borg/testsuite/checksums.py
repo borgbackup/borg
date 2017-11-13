@@ -14,13 +14,18 @@ if checksums.have_clmul:
 
 @pytest.mark.parametrize('implementation', crc32_implementations)
 def test_crc32(implementation):
-    # This includes many critical values, like zero length, 3/4/5, 6/7/8 and so on which are near and on
-    # alignment boundaries. This is of course just a sanity check ie. "did it compile all right?".
-    data = os.urandom(256)
+    # This includes many critical values, like misc. length and misc. aligned start addresses.
+    data = os.urandom(300)
+    mv = memoryview(data)
     initial_crc = 0x12345678
-    for i in range(0, 256):
-        d = data[:i]
-        assert zlib.crc32(d, initial_crc) == implementation(d, initial_crc)
+    for start in range(0, 4):  # 4B / int32 alignment, head processing
+        for length in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                       31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
+                       63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+                       127, 128, 129, 130, 131, 132, 133, 134, 135,
+                       255, 256, 257, ]:
+            d = mv[start:start+length]
+            assert zlib.crc32(d, initial_crc) == implementation(d, initial_crc)
 
 
 def test_xxh64():

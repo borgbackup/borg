@@ -280,7 +280,7 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, nobsdflags=False,
+                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, nobirthtime=False, nobsdflags=False,
                  progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
                  consider_part_files=False, log_json=False):
         self.cwd = os.getcwd()
@@ -298,6 +298,7 @@ class Archive:
         self.numeric_owner = numeric_owner
         self.noatime = noatime
         self.noctime = noctime
+        self.nobirthtime = nobirthtime
         self.nobsdflags = nobsdflags
         assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
@@ -683,6 +684,18 @@ Utilization of max. archive size: {csize_max:.0%}
         else:
             # old archives only had mtime in item metadata
             atime = mtime
+        if 'birthtime' in item:
+            birthtime = item.birthtime
+            try:
+                # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
+                # See utimes(2) on either of the BSDs for details.
+                if fd:
+                    os.utime(fd, None, ns=(atime, birthtime))
+                else:
+                    os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
+            except OSError:
+                # some systems don't support calling utime on a symlink
+                pass
         try:
             if fd:
                 os.utime(fd, None, ns=(atime, mtime))
@@ -822,6 +835,9 @@ Utilization of max. archive size: {csize_max:.0%}
             attrs['atime'] = safe_ns(st.st_atime_ns)
         if not self.noctime:
             attrs['ctime'] = safe_ns(st.st_ctime_ns)
+        if not self.nobirthtime and hasattr(st, 'st_birthtime'):
+            # sadly, there's no stat_result.st_birthtime_ns
+            attrs['birthtime'] = safe_ns(int(st.st_birthtime * 10**9))
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:

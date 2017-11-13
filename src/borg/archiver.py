@@ -536,7 +536,7 @@ class Archiver:
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
-                                  numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
+                                  numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime, nobirthtime=args.nobirthtime,
                                   nobsdflags=args.nobsdflags, progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
@@ -2964,6 +2964,8 @@ class Archiver:
                               help='do not store atime into archive')
         fs_group.add_argument('--noctime', dest='noctime', action='store_true',
                               help='do not store ctime into archive')
+        fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
+                              help='do not store birthtime (creation date) into archive')
         fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
                               help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',

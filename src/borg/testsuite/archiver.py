@@ -3655,14 +3655,17 @@ def get_all_parsers():
     Return dict mapping command to parser.
     """
     parser = Archiver(prog='borg').build_parser()
+    borgfs_parser = Archiver(prog='borgfs').build_parser()
     parsers = {}
 
-    def discover_level(prefix, parser, Archiver):
+    def discover_level(prefix, parser, Archiver, extra_choices=None):
         choices = {}
         for action in parser._actions:
             if action.choices is not None and 'SubParsersAction' in str(action.__class__):
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
+        if extra_choices is not None:
+            choices.update(extra_choices)
         if prefix and not choices:
             return
 
@@ -3670,7 +3673,7 @@ def get_all_parsers():
             discover_level(command + " ", parser, Archiver)
             parsers[command] = parser
 
-    discover_level("", parser, Archiver)
+    discover_level("", parser, Archiver, {'borgfs': borgfs_parser})
     return parsers
 
 

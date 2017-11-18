@@ -296,6 +296,34 @@ the archive, compacting the segments, and committing the repo & cache. This mean
 when Borg is run with e.g. the ``time`` command, the duration shown in the archive
 stats may be shorter than the full time the command runs for.
 
+How do I configure different prune policies for different directories?
+----------------------------------------------------------------------
+
+Say you want to prune ``/var/log`` faster than the rest of
+``/``. How do we implement that? The answer is to backup to different
+archive *names* and then implement different prune policies for
+different prefixes. For example, you could have a script that does::
+
+    borg create $REPOSITORY:main-$(date +%Y-%m-%d) --exclude /var/log /
+    borg create $REPOSITORY:logs-$(date +%Y-%m-%d) /var/log
+
+Then you would have two different prune calls with different policies::
+
+    borg prune --verbose --list -d 30 --prefix main- "$REPOSITORY"
+    borg prune --verbose --list -d 7  --prefix logs- "$REPOSITORY"
+
+This will keep 7 days of logs and 30 days of everything else. Borg 1.1
+also supports the ``--glob-archives`` parameter.
+
+How do I remove files from an existing backup?
+----------------------------------------------
+
+Say you now want to remove old logfiles because you changed your
+backup policy as described above. The only way to do this is to use
+the :ref:`borg_recreate` command to rewrite all archives with a
+different ``--exclude`` pattern. See the examples in the
+:ref:`borg_recreate` manpage for more information.
+
 Security
 ########
 

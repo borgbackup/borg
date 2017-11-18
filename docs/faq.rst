@@ -719,6 +719,18 @@ rather not implement progress / ETA display than doing futile attempts.
 See also: https://xkcd.com/612/
 
 
+Why am I getting 'Operation not permitted' errors when backing up on sshfs?
+---------------------------------------------------------------------------
+
+By default, ``sshfs`` is not entirely POSIX-compliant when renaming files due to
+a technicality in the SFTP protocol. Fortunately, it also provides a workaround_
+to make it behave correctly::
+
+    sshfs -o workaround=rename user@host:dir /mnt/dir
+
+.. _workaround: https://unix.stackexchange.com/a/123236
+
+
 Miscellaneous
 #############
 

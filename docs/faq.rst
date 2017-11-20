@@ -133,11 +133,10 @@ to the checkpoint. This means that in case of an interruption, you only need to
 retransfer the data since the last checkpoint.
 
 If a backup was interrupted, you normally do not need to do anything special,
-just invoke ``borg create`` as you always do. (If locks are still on a repository,
-such as if the client suffered a sudden poweroff during a backup, you may need to
-run ``borg break-lock`` before the next backup.) You may use the same archive name
-as in previous attempt or a different one (e.g. if you always include the current
-datetime), it does not matter.
+just invoke ``borg create`` as you always do. If the repository is still locked,
+you may need to run ``borg break-lock`` before the next backup. You may use the 
+same archive name as in previous attempt or a different one (e.g. if you always
+include the current datetime), it does not matter.
 
 Borg always does full single-pass backups, so it will start again
 from the beginning - but it will be much faster, because some of the data was

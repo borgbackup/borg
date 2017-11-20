@@ -326,7 +326,7 @@ class Cache:
         """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
 
     class RepositoryReplay(Error):
-        """Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
+        """Cache, or information obtained from the security directory is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
 
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""

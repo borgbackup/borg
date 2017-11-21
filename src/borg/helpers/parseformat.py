@@ -501,13 +501,13 @@ class BaseFormatter:
 class ArchiveFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
         'name': 'archive name interpreted as text (might be missing non-text characters, see barchive)',
-        'archive': 'archive name interpreted as text (might be missing non-text characters, see barchive)',
+        'archive': 'alias of "name"',
         'barchive': 'verbatim archive name, can contain any character except NUL',
         'comment': 'archive comment interpreted as text (might be missing non-text characters, see bcomment)',
         'bcomment': 'verbatim archive comment, can contain any character except NUL',
         'time': 'time (start) of creation of the archive',
         # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
-        'start': 'time (start) of creation of the archive',
+        'start': 'alias of "time"',
         'end': 'time (end) of creation of the archive',
         'id': 'internal ID of the archive',
     }

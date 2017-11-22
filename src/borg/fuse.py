@@ -119,7 +119,7 @@ class ItemCache:
         else:
             raise ValueError('Invalid entry type in self.meta')
 
-    def iter_archive_items(self, archive_item_ids, filter=None):
+    def iter_archive_items(self, archive_item_ids, filter=None, consider_part_files=False):
         unpacker = msgpack.Unpacker()
 
         # Current offset in the metadata stream, which consists of all metadata chunks glued together
@@ -163,7 +163,7 @@ class ItemCache:
                     break
 
                 item = Item(internal_dict=item)
-                if filter and not filter(item):
+                if filter and not filter(item) or not consider_part_files and 'part' in item:
                     msgpacked_bytes = b''
                     continue
 
@@ -306,7 +306,8 @@ class FuseBackend(object):
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
         filter = Archiver.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
-        for item_inode, item in self.cache.iter_archive_items(archive.metadata.items, filter=filter):
+        for item_inode, item in self.cache.iter_archive_items(archive.metadata.items, filter=filter,
+                                                              consider_part_files=self._args.consider_part_files):
             if strip_components:
                 item.path = os.sep.join(item.path.split(os.sep)[strip_components:])
             path = os.fsencode(item.path)

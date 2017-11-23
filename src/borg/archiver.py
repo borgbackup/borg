@@ -2325,6 +2325,9 @@ class Archiver:
         subparser.add_argument('-o', dest='options', type=str,
                             help='Extra mount options')
         define_archive_filters_group(subparser)
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+        define_exclusion_group(subparser, strip_components=True)
         if parser.prog == 'borgfs':
             return parser
 

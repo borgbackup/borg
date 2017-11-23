@@ -760,7 +760,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.mkdir(os.path.join(self.input_path, 'dir1'))
         os.mkdir(os.path.join(self.input_path, 'dir1/subdir'))
 
-        self.create_regular_file('source')
+        self.create_regular_file('source', contents=b'123456')
         os.link(os.path.join(self.input_path, 'source'),
                 os.path.join(self.input_path, 'abba'))
         os.link(os.path.join(self.input_path, 'source'),
@@ -778,30 +778,56 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
 
     @requires_hardlinks
-    def test_strip_components_links(self):
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_mount_hardlinks(self):
         self._extract_hardlinks_setup()
-        with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, '--strip-components=2'), \
+             changedir(mountpoint):
             assert os.stat('hardlink').st_nlink == 2
             assert os.stat('subdir/hardlink').st_nlink == 2
+            assert open('subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('aaaa').st_nlink == 2
             assert os.stat('source2').st_nlink == 2
-        with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, 'input/dir1'), \
+             changedir(mountpoint):
+            assert os.stat('input/dir1/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
+            assert os.stat('input/dir1/aaaa').st_nlink == 2
+            assert os.stat('input/dir1/source2').st_nlink == 2
+        with self.fuse_mount(self.repository_location + '::test', mountpoint), \
+             changedir(mountpoint):
+            assert os.stat('input/source').st_nlink == 4
+            assert os.stat('input/abba').st_nlink == 4
             assert os.stat('input/dir1/hardlink').st_nlink == 4
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     @requires_hardlinks
     def test_extract_hardlinks(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
+            assert os.stat('hardlink').st_nlink == 2
+            assert os.stat('subdir/hardlink').st_nlink == 2
+            assert open('subdir/hardlink', 'rb').read() == b'123456'
+            assert os.stat('aaaa').st_nlink == 2
+            assert os.stat('source2').st_nlink == 2
+        with changedir('output'):
             self.cmd('extract', self.repository_location + '::test', 'input/dir1')
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/source').st_nlink == 4
+            assert os.stat('input/abba').st_nlink == 4
             assert os.stat('input/dir1/hardlink').st_nlink == 4
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     def test_extract_include_exclude(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -2182,8 +2208,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('test', contents=b'first')
         if are_hardlinks_supported():
-            self.create_regular_file('hardlink1', contents=b'')
+            self.create_regular_file('hardlink1', contents=b'123456')
             os.link('input/hardlink1', 'input/hardlink2')
+            os.link('input/hardlink1', 'input/hardlink3')
         self.cmd('create', self.repository_location + '::archive1', 'input')
         self.create_regular_file('test', contents=b'second')
         self.cmd('create', self.repository_location + '::archive2', 'input')
@@ -2195,9 +2222,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxx in there
             assert {b'first', b'second'} == {open(os.path.join(path, f), 'rb').read() for f in files}
             if are_hardlinks_supported():
-                st1 = os.stat(os.path.join(mountpoint, 'input', 'hardlink1', 'hardlink1.00001'))
-                st2 = os.stat(os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001'))
-                assert st1.st_ino == st2.st_ino
+                hl1 = os.path.join(mountpoint, 'input', 'hardlink1', 'hardlink1.00001')
+                hl2 = os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001')
+                hl3 = os.path.join(mountpoint, 'input', 'hardlink3', 'hardlink3.00001')
+                assert os.stat(hl1).st_ino == os.stat(hl2).st_ino == os.stat(hl3).st_ino
+                assert open(hl3, 'rb').read() == b'123456'
+        # similar again, but exclude the hardlink master:
+        with self.fuse_mount(self.repository_location, mountpoint, '-o', 'versions', '-e', 'input/hardlink1'):
+            if are_hardlinks_supported():
+                hl2 = os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001')
+                hl3 = os.path.join(mountpoint, 'input', 'hardlink3', 'hardlink3.00001')
+                assert os.stat(hl2).st_ino == os.stat(hl3).st_ino
+                assert open(hl3, 'rb').read() == b'123456'
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):

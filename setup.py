@@ -807,10 +807,12 @@ setup(
             'borgfs = borg.archiver:main',
         ]
     },
+    # See also the MANIFEST.in file.
+    # We want to install all the files in the package directories...
     include_package_data=True,
-    package_data={
-        'borg': ['paperkey.html'],
-        'borg.testsuite': ['attic.tar.gz'],
+    # ...except the source files which have been compiled (C extensions):
+    exclude_package_data={
+        '': ['*.c', '*.h', '*.pyx', ],
     },
     cmdclass=cmdclass,
     ext_modules=ext_modules,

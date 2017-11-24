@@ -2778,6 +2778,19 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with environment_variable(_BORG_BENCHMARK_CRUD_TEST='YES'):
             self.cmd('benchmark', 'crud', self.repository_location, self.input_path)
 
+    def test_config(self):
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        for flags in [[], ['--cache']]:
+            for cfg_key in {'testkey', 'testsection.testkey'}:
+                self.cmd('config', self.repository_location, *flags, cfg_key, exit_code=1)
+                self.cmd('config', self.repository_location, *flags, cfg_key, 'testcontents')
+                output = self.cmd('config', self.repository_location, *flags, cfg_key)
+                assert output == 'testcontents\n'
+                self.cmd('config', self.repository_location, *flags, '--delete', cfg_key)
+                self.cmd('config', self.repository_location, *flags, cfg_key, exit_code=1)
+
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
 
@@ -3258,6 +3271,10 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
+        pass
+
+    @unittest.skip('only works locally')
+    def test_config(self):
         pass
 
     def test_strip_components_doesnt_leak(self):

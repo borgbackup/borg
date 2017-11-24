@@ -1,5 +1,6 @@
 import argparse
 import collections
+import configparser
 import faulthandler
 import functools
 import hashlib
@@ -1516,6 +1517,41 @@ class Archiver:
             # any other mechanism relying on existing segment data not changing).
             # see issue #1867.
             repository.commit()
+
+    @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
+    def do_config(self, args, repository, manifest, key, cache):
+        """get, set, and delete values in a repository or cache config file"""
+        try:
+            section, name = args.name.split('.')
+        except ValueError:
+            section = args.cache and "cache" or "repository"
+            name = args.name
+
+        if args.cache:
+            cache.cache_config.load()
+            config = cache.cache_config._config
+            save = cache.cache_config.save
+        else:
+            config = repository.config
+            save = lambda: repository.save_config(repository.path, repository.config)
+
+        if args.delete:
+            config.remove_option(section, name)
+            if len(config.options(section)) == 0:
+                config.remove_section(section)
+            save()
+        elif args.value:
+            if section not in config.sections():
+                config.add_section(section)
+            config.set(section, name, args.value)
+            save()
+        else:
+            try:
+                print(config.get(section, name))
+            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                print(e, file=sys.stderr)
+                return EXIT_WARNING
+        return EXIT_SUCCESS
 
     def do_debug_info(self, args):
         """display system information for debugging / bug reports"""
@@ -3489,6 +3525,37 @@ class Archiver:
                                help='command to run')
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
+
+        config_epilog = process_epilog("""
+        This command gets and sets options in a local repository or cache config file.
+        For security reasons, this command only works on local repositories.
+
+        To delete a config value entirely, use ``--delete``. To get an existing key, pass
+        only the key name. To set a key, pass both the key name and the new value. Keys
+        can be specified in the format "section.name" or simply "name"; the section will
+        default to "repository" and "cache" for the repo and cache configs, respectively.
+
+        By default, borg config manipulates the repository config file. Using ``--cache``
+        edits the repository cache's config file instead.
+        """)
+        subparser = subparsers.add_parser('config', parents=[common_parser], add_help=False,
+                                          description=self.do_config.__doc__,
+                                          epilog=config_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='get and set repository config options')
+        subparser.set_defaults(func=self.do_config)
+        subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
+                               help='get and set values from the repo cache')
+        subparser.add_argument('-d', '--delete', dest='delete', action='store_true',
+                               help='delete the key from the config file')
+
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False, proto='file'),
+                               help='repository to configure')
+        subparser.add_argument('name', metavar='NAME',
+                               help='name of config key')
+        subparser.add_argument('value', metavar='VALUE', nargs='?',
+                               help='new value for key')
 
         subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')

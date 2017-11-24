@@ -22,10 +22,11 @@ a good amount of free space on the filesystem that has your backup repository
 repositories. See also :ref:`cache-memory-usage`.
 
 Borg doesn't use space reserved for root on repository disks (even when run as root),
-on file systems which do not support this mechanism (e.g. XFS) we recommend to
-reserve some space in Borg itself just to be safe by adjusting the
-``additional_free_space`` setting in the ``[repository]`` section of a repositories
-``config`` file. A good starting point is ``2G``.
+on file systems which do not support this mechanism (e.g. XFS) we recommend to reserve
+some space in Borg itself just to be safe by adjusting the ``additional_free_space``
+setting (a good starting point is ``2G``)::
+
+    borg config /path/to/repo additional_free_space 2G
 
 If Borg runs out of disk space, it tries to free as much space as it
 can while aborting the current operation safely, which allows the user to free more space

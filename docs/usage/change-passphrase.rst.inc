@@ -44,3 +44,8 @@ Description
 
 The key files used for repository encryption are optionally passphrase
 protected. This command can be used to change this passphrase.
+
+Please note that this command only changes the passphrase, but not any
+secret protected by it (like e.g. encryption/MAC keys or chunker seed).
+Thus, changing the passphrase after passphrase and borg key got compromised
+does not protect future (nor past) backups to the same repository.

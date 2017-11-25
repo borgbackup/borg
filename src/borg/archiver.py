@@ -2916,6 +2916,12 @@ class Archiver:
           it had before a content change happened. This can be used maliciously as well as
           well-meant, but in both cases mtime based cache modes can be problematic.
 
+        By default, borg tries to archive all metadata that it supports archiving.
+        If that is not what you want or need, there are some tuning options:
+
+        - --nobsdflags (getting bsdflags has a speed penalty under Linux)
+        - --noatime (if atime changes frequently, the metadata stream will dedup badly)
+
         The mount points of filesystems or filesystem snapshots should be the same for every
         creation of a new archive to ensure fast operation. This is because the file cache that
         is used to determine changed files quickly uses absolute filenames.

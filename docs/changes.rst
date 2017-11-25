@@ -300,6 +300,19 @@ Other changes:
 Version 1.1.0 (2017-10-07)
 --------------------------
 
+Compatibility notes:
+
+- borg command line: do not put options in between positional arguments
+
+  This sometimes works (e.g. it worked in borg 1.0.x), but can easily stop
+  working if we make positional arguments optional (like it happened for
+  borg create's "paths" argument in 1.1). There are also places in borg 1.0
+  where we do that, so it doesn't work there in general either. #3356
+
+  Good: borg create -v --stats repo::archive path
+  Good: borg create repo::archive path -v --stats
+  Bad:  borg create repo::archive -v --stats path
+
 Fixes:
 
 - fix LD_LIBRARY_PATH restoration for subprocesses, #3077

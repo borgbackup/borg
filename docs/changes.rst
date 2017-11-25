@@ -131,8 +131,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.2 (2017-11-05)
---------------------------
+Version 1.1.3 (not released yet)
+--------------------------------
 
 Compatibility notes:
 
@@ -149,6 +149,60 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+Fixes:
+
+- XXX SECFIX XXX
+- crc32: deal with unaligned buffer, add tests - this broke borg on older ARM
+  CPUs that can not deal with unaligned 32bit memory accesses and raise a bus
+  error in such cases. the fix might also improve performance on some CPUs as
+  all 32bit memory accesses by the crc32 code are properly aligned now. #3317
+- mount: fixed support of --consider-part-files and do not show .borg_part_N
+  files by default in the mounted FUSE filesystem. #3347
+- fixed cache/repo timestamp inconsistency message, highlight that information
+  is obtained from security dir (deleting the cache will not bypass this error
+  in case the user knows this is a legitimate repo).
+- borgfs: don't show sub-command in borgfs help, #3287
+- create: show an error when --dry-run and --stats are used together, #3298
+
+New features:
+
+- mount: added exclusion group options and paths, #2138
+
+  Reused some code to support similar options/paths as borg extract offers -
+  making good use of these to only mount a smaller subset of dirs/files can
+  speed up mounting a lot and also will consume way less memory.
+
+  borg mount [options] repo_or_archive mountpoint path [paths...]
+
+  paths: you can just give some "root paths" (like for borg extract) to
+  only partially populate the FUSE filesystem.
+
+  new options: --exclude[-from], --pattern[s-from], --strip-components
+- create/extract: support st_birthtime on platforms supporting it, #3272
+
+Other changes:
+
+- clean up and simplify packaging (only package committed files, do not install
+  .c/.h/.pyx files)
+- docs:
+
+  - point out tuning options for borg create, #3239
+  - add instructions for using ntfsclone, zerofree, #81
+  - move image backup-related FAQ entries to a new page
+  - clarify key aliases for borg list --format, #3111
+  - mention break-lock in checkpointing FAQ entry, #3328
+  - document sshfs rename workaround, #3315
+  - add FAQ about removing files from existing archives
+  - add FAQ about different prune policies
+  - usage and man page for borgfs, #3216
+  - clarify create --stats duration vs. wall time, #3301
+  - clarify encrypted key format for borg key export, #3296
+  - update release checklist about security fixes
+
+
+Version 1.1.2 (2017-11-05)
+--------------------------
 
 Fixes:
 

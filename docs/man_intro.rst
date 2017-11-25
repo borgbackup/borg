@@ -65,4 +65,4 @@ SEE ALSO
 * Releases https://github.com/borgbackup/borg/releases
 * Changelog https://github.com/borgbackup/borg/blob/master/docs/changes.rst
 * GitHub https://github.com/borgbackup/borg
-* Security contact https://borgbackup.org/support/support.html#security-contact
+* Security contact https://borgbackup.readthedocs.io/en/latest/support.html#security-contact

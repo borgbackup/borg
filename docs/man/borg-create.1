@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-11-05" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -110,8 +110,9 @@ the currently processed path.
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
 added \- the "This Archive" deduplicated size there is most interesting as that is
-how much your repository will grow.
-Please note that the "All archives" stats refer to the state after creation.
+how much your repository will grow. Please note that the "All archives" stats refer to
+the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
+exclusive because the data is not actually compressed and deduplicated during a dry run.
 .sp
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
@@ -192,6 +193,9 @@ do not store atime into archive
 .TP
 .B \-\-noctime
 do not store ctime into archive
+.TP
+.B \-\-nobirthtime
+do not store birthtime (creation date) into archive
 .TP
 .B \-\-nobsdflags
 do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive

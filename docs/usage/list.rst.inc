@@ -118,15 +118,15 @@ The following keys are available for ``--format``:
 
 Keys for listing repository archives:
 
-- name: archive name interpreted as text (might be missing non-text characters, see barchive)
 - archive: archive name interpreted as text (might be missing non-text characters, see barchive)
+- name: alias of "archive"
 - barchive: verbatim archive name, can contain any character except NUL
 - comment: archive comment interpreted as text (might be missing non-text characters, see bcomment)
 - bcomment: verbatim archive comment, can contain any character except NUL
 - id: internal ID of the archive
 
-- time: time (start) of creation of the archive
 - start: time (start) of creation of the archive
+- time: alias of "start"
 - end: time (end) of creation of the archive
 
 

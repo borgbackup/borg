@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMMON 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-COMMON 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .
@@ -60,8 +60,8 @@ show progress information
 .B \-\-log\-json
 Output one JSON object per log line instead of formatted text.
 .TP
-.BI \-\-lock\-wait \ N
-wait for the lock, but max. N seconds (default: 1).
+.BI \-\-lock\-wait \ SECONDS
+wait at most SECONDS for acquiring a repository/cache lock (default: 1).
 .TP
 .B \-\-show\-version
 show/log the borg version
@@ -69,16 +69,13 @@ show/log the borg version
 .B \-\-show\-rc
 show/log the return code (rc)
 .TP
-.B \-\-no\-files\-cache
-do not load/update the file metadata cache used to detect unchanged files
-.TP
 .BI \-\-umask \ M
 set umask to M (local and remote, default: 0077)
 .TP
 .BI \-\-remote\-path \ PATH
 use PATH as borg executable on the remote (default: "borg")
 .TP
-.BI \-\-remote\-ratelimit \ rate
+.BI \-\-remote\-ratelimit \ RATE
 set remote network upload rate limit in kiByte/s (default: 0=unlimited)
 .TP
 .B \-\-consider\-part\-files

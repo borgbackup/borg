@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-DELETE 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .
@@ -32,12 +32,17 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] delete <options> TARGET
+borg [common options] delete [options] [TARGET] [ARCHIVE...]
 .SH DESCRIPTION
 .sp
 This command deletes an archive from the repository or the complete repository.
 Disk space is reclaimed accordingly. If you delete the complete repository, the
 local cache for it (if any) is also deleted.
+.sp
+When using \fB\-\-stats\fP, you will get some statistics about how much data was
+deleted \- the "Deleted data" deduplicated size there is most interesting as
+that is how much your repository will shrink.
+Please note that the "All archives" stats refer to the state after deletion.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -46,6 +51,9 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .TP
 .B TARGET
 archive or repository to delete
+.TP
+.B ARCHIVE
+archives to delete
 .UNINDENT
 .SS optional arguments
 .INDENT 0.0
@@ -53,25 +61,25 @@ archive or repository to delete
 .B \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
 .TP
-.B \-c\fP,\fB  \-\-cache\-only
+.B \-\-cache\-only
 delete only the local cache for the given repository
 .TP
 .B \-\-force
-force deletion of corrupted archives, use \-\-force \-\-force in case \-\-force does not work.
+force deletion of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
 .TP
 .B \-\-save\-space
 work slower, but using less space
 .UNINDENT
-.SS filters
+.SS Archive filters
 .INDENT 0.0
 .TP
-.B \-P\fP,\fB  \-\-prefix
+.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.B \-a\fP,\fB  \-\-glob\-archives
+.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
-.B \-\-sort\-by
+.BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
 .TP
 .BI \-\-first \ N

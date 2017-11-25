@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -59,7 +59,7 @@ matching is attempted.  Thus, if a given pattern ends in a path
 separator, a \(aq*\(aq is appended before matching is attempted.
 .TP
 .B Shell\-style patterns, selector \fIsh:\fP
-This is the default style for \-\-pattern and \-\-patterns\-from.
+This is the default style for \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP\&.
 Like fnmatch patterns these are similar to shell patterns. The difference
 is that the pattern may include \fI**/\fP for matching zero or more directory
 levels, \fI*\fP for matching zero or more arbitrary characters with the
@@ -160,10 +160,12 @@ with the experimental \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP options. Us
 may specify the backup roots (starting points) and patterns for inclusion/exclusion.
 A root path starts with the prefix \fIR\fP, followed by a path (a plain path, not a
 file pattern). An include rule starts with the prefix +, an exclude rule starts
-with the prefix \-, both followed by a pattern.
+with the prefix \-, an exclude\-norecurse rule starts with !, all followed by a pattern.
 Inclusion patterns are useful to include paths that are contained in an excluded
 path. The first matching pattern is used so if an include pattern matches before
-an exclude pattern, the file is backed up.
+an exclude pattern, the file is backed up. If an exclude\-norecurse pattern matches
+a directory, it won\(aqt recurse into it and won\(aqt discover any potential matches for
+include rules below that directory.
 .sp
 Note that the default pattern style for \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP is
 shell style (\fIsh:\fP), so those patterns behave similar to rsync include/exclude

@@ -10,7 +10,6 @@
 --lock-wait SECONDS    wait at most SECONDS for acquiring a repository/cache lock (default: 1).
 --show-version     show/log the borg version
 --show-rc          show/log the return code (rc)
---no-files-cache    do not load/update the file metadata cache used to detect unchanged files
 --umask M          set umask to M (local and remote, default: 0077)
 --remote-path PATH    use PATH as borg executable on the remote (default: "borg")
 --remote-ratelimit RATE    set remote network upload rate limit in kiByte/s (default: 0=unlimited)

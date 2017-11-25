@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXTRACT 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-EXTRACT 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] extract <options> ARCHIVE PATH
+borg [common options] extract [options] ARCHIVE [PATH...]
 .SH DESCRIPTION
 .sp
 This command extracts the contents of an archive. By default the entire
@@ -48,6 +48,14 @@ decrypting, decompressing.
 .sp
 \fB\-\-progress\fP can be slower than no progress display, since it makes one additional
 pass over the archive metadata.
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Currently, extract always writes into the current working directory ("."),
+so make sure you \fBcd\fP to the right place before calling \fBborg extract\fP\&.
+.UNINDENT
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -69,6 +77,21 @@ output verbose list of items (files, dirs, ...)
 .B \-n\fP,\fB  \-\-dry\-run
 do not actually change any files
 .TP
+.B \-\-numeric\-owner
+only obey numeric user and group identifiers
+.TP
+.B \-\-nobsdflags
+do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)
+.TP
+.B \-\-stdout
+write all extracted data to stdout
+.TP
+.B \-\-sparse
+create holes in output sparse file from all\-zero chunks
+.UNINDENT
+.SS Exclusion options
+.INDENT 0.0
+.TP
 .BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
 exclude paths matching PATTERN
 .TP
@@ -81,17 +104,8 @@ experimental: include/exclude paths matching PATTERN
 .BI \-\-patterns\-from \ PATTERNFILE
 experimental: read include/exclude patterns from PATTERNFILE, one per line
 .TP
-.B \-\-numeric\-owner
-only obey numeric user and group identifiers
-.TP
 .BI \-\-strip\-components \ NUMBER
-Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.
-.TP
-.B \-\-stdout
-write all extracted data to stdout
-.TP
-.B \-\-sparse
-create holes in output sparse file from all\-zero chunks
+Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -118,14 +132,6 @@ $ borg extract /path/to/repo::my\-files home/USERNAME/src \-\-exclude \(aq*.o\(a
 $ borg extract \-\-stdout /path/to/repo::my\-sdx | dd of=/dev/sdx bs=10M
 .ft P
 .fi
-.UNINDENT
-.UNINDENT
-.sp
-\fBNOTE:\fP
-.INDENT 0.0
-.INDENT 3.5
-Currently, extract always writes into the current working directory ("."),
-so make sure you \fBcd\fP to the right place before calling \fBborg extract\fP\&.
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

@@ -23,7 +23,7 @@ borg list
     +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--short``                                   | only print file/directory names, nothing else                                                                                                                                                                                                                            |
     +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--format FORMAT``, ``--list-format FORMAT`` | specify format for file listing (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")                                                                                                                                                            |
+    |                                                                             | ``--format FORMAT``, ``--list-format FORMAT`` | specify format for file listing (default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")                                                                                                                                                               |
     +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--json``                                    | Only valid for listing repository contents. Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available. |
     +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -55,12 +55,6 @@ borg list
     +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--patterns-from PATTERNFILE``               | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                                                                                                                                               |
     +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--exclude-caches``                          | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)                                                                                                                                                                     |
-    +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--exclude-if-present NAME``                 | exclude directories that are tagged by containing a filesystem object with the given NAME                                                                                                                                                                                |
-    +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--keep-exclude-tags``, ``--keep-tag-files`` | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                                                                                                                                                |
-    +-----------------------------------------------------------------------------+-----------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -80,7 +74,7 @@ borg list
 
     optional arguments
         --short     only print file/directory names, nothing else
-        --format FORMAT, --list-format FORMAT    specify format for file listing (default: "{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NL}")
+        --format FORMAT, --list-format FORMAT    specify format for file listing (default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")
         --json      Only valid for listing repository contents. Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
         --json-lines    Only valid for listing archive contents. Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 
@@ -101,9 +95,6 @@ borg list
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
         --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
         --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
-        --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
-        --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
-        --keep-exclude-tags, --keep-tag-files    if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
 
 
 Description
@@ -127,15 +118,15 @@ The following keys are available for ``--format``:
 
 Keys for listing repository archives:
 
-- name: archive name interpreted as text (might be missing non-text characters, see barchive)
 - archive: archive name interpreted as text (might be missing non-text characters, see barchive)
+- name: alias of "archive"
 - barchive: verbatim archive name, can contain any character except NUL
 - comment: archive comment interpreted as text (might be missing non-text characters, see bcomment)
 - bcomment: verbatim archive comment, can contain any character except NUL
 - id: internal ID of the archive
 
-- time: time (start) of creation of the archive
 - start: time (start) of creation of the archive
+- time: alias of "start"
 - end: time (end) of creation of the archive
 
 

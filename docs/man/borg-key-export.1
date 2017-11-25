@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-EXPORT 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-KEY-EXPORT 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .
@@ -32,16 +32,20 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] key export <options> REPOSITORY PATH
+borg [common options] key export [options] [REPOSITORY] [PATH]
 .SH DESCRIPTION
 .sp
 If repository encryption is used, the repository is inaccessible
 without the key. This command allows to backup this essential key.
+Note that the backup produced does not include the passphrase itself
+(i.e. the exported key stays encrypted). In order to regain access to a
+repository, one needs both the exported key and the original passphrase.
 .sp
-There are two backup formats. The normal backup format is suitable for
+There are three backup formats. The normal backup format is suitable for
 digital storage as a file. The \fB\-\-paper\fP backup format is optimized
 for printing and typing in while importing, with per line checks to
-reduce problems with manual input.
+reduce problems with manual input. The \fB\-\-qr\-html\fP creates a printable
+HTML template with a QR code and a copy of the \fB\-\-paper\fP\-formatted key.
 .sp
 For repositories using keyfile encryption the key is saved locally
 on the system that is capable of doing backups. To guard against loss

@@ -1,8 +1,6 @@
-include README.rst AUTHORS LICENSE CHANGES.rst MANIFEST.in
-exclude .coafile .coveragerc .gitattributes .gitignore .travis.yml Vagrantfile
+# stuff we need to include into the sdist is handled automatically by
+# setuptools_scm - it includes all git-committed files.
+# but we want to exclude some committed files/dirs not needed in the sdist:
+exclude .coafile .coveragerc .editorconfig .gitattributes .gitignore .mailmap .travis.yml Vagrantfile
 prune .travis
 prune .github
-graft src
-graft docs
-prune docs/_build
-global-exclude *.py[co] *.orig *.so *.dll

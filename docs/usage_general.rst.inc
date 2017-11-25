@@ -390,6 +390,7 @@ Besides regular file and directory structures, Borg can preserve
     By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
 * hardlinked regular files, devices, FIFOs (considering all items in the same archive)
 * timestamps in nanosecond precision: mtime, atime, ctime
+* other timestamps: birthtime (on platforms supporting it)
 * permissions:
 
   * IDs of owning user and owning group

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-EXPORT 1 "2017-11-05" "" "borg backup tool"
+.TH BORG-KEY-EXPORT 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .
@@ -37,6 +37,9 @@ borg [common options] key export [options] [REPOSITORY] [PATH]
 .sp
 If repository encryption is used, the repository is inaccessible
 without the key. This command allows to backup this essential key.
+Note that the backup produced does not include the passphrase itself
+(i.e. the exported key stays encrypted). In order to regain access to a
+repository, one needs both the exported key and the original passphrase.
 .sp
 There are two backup formats. The normal backup format is suitable for
 digital storage as a file. The \fB\-\-paper\fP backup format is optimized

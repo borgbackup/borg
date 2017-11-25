@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2017-11-05" "" "borg backup tool"
+.TH BORG-LIST 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -152,9 +152,9 @@ LF
 Keys for listing repository archives:
 .INDENT 0.0
 .IP \(bu 2
-name: archive name interpreted as text (might be missing non\-text characters, see barchive)
-.IP \(bu 2
 archive: archive name interpreted as text (might be missing non\-text characters, see barchive)
+.IP \(bu 2
+name: alias of "archive"
 .IP \(bu 2
 barchive: verbatim archive name, can contain any character except NUL
 .IP \(bu 2
@@ -164,9 +164,9 @@ bcomment: verbatim archive comment, can contain any character except NUL
 .IP \(bu 2
 id: internal ID of the archive
 .IP \(bu 2
-time: time (start) of creation of the archive
-.IP \(bu 2
 start: time (start) of creation of the archive
+.IP \(bu 2
+time: alias of "start"
 .IP \(bu 2
 end: time (end) of creation of the archive
 .UNINDENT

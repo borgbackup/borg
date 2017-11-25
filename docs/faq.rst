@@ -94,7 +94,7 @@ retransfer the data since the last checkpoint.
 
 If a backup was interrupted, you normally do not need to do anything special,
 just invoke ``borg create`` as you always do. If the repository is still locked,
-you may need to run ``borg break-lock`` before the next backup. You may use the 
+you may need to run ``borg break-lock`` before the next backup. You may use the
 same archive name as in previous attempt or a different one (e.g. if you always
 include the current datetime), it does not matter.
 
@@ -265,7 +265,7 @@ Say you want to prune ``/var/log`` faster than the rest of
 archive *names* and then implement different prune policies for
 different prefixes. For example, you could have a script that does::
 
-    borg create $REPOSITORY:main-$(date +%Y-%m-%d) --exclude /var/log /
+    borg create --exclude /var/log $REPOSITORY:main-$(date +%Y-%m-%d) /
     borg create $REPOSITORY:logs-$(date +%Y-%m-%d) /var/log
 
 Then you would have two different prune calls with different policies::

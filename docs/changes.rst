@@ -139,6 +139,7 @@ Compatibility notes:
 - When upgrading from borg 1.0.x to 1.1.x, please note:
 
   - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
+  - borg upgrade: you do not need to and you also should not run it.
   - borg might ask some security-related questions once after upgrading.
     You can answer them either manually or via environment variable.
     One known case is if you use unencrypted repositories, then it will ask

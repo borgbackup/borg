@@ -3762,7 +3762,7 @@ class Archiver:
         R- == borg extract (extract archive, dry-run, do everything, but do not write files to disk)
               R-Z- == all zero files. Measuring heavily duplicated files.
               R-R- == random files. No duplication here, measuring throughput through all processing
-                      stages, except writing to disk.
+              stages, except writing to disk.
 
         U- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
               The throughput value is kind of virtual here, it does not actually read the file.

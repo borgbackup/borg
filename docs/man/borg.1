@@ -186,6 +186,26 @@ get other informational messages.
 .UNINDENT
 .UNINDENT
 .SH NOTES
+.SS Positional Arguments and Options: Order matters
+.sp
+Borg only supports taking options (\fB\-s\fP and \fB\-\-progress\fP in the example)
+to the left or right of all positional arguments (\fBrepo::archive\fP and \fBpath\fP
+in the example), but not in between them:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg create \-s \-\-progress repo::archive path  # good and preferred
+borg create repo::archive path \-s \-\-progress  # also works
+borg create \-s repo::archive path \-\-progress  # works, but ugly
+borg create repo::archive \-s \-\-progress path  # BAD
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+This is due to a problem in the argparse module: \fI\%http://bugs.python.org/issue15112\fP
 .SS Repository URLs
 .sp
 \fBLocal filesystem\fP (or locally mounted network filesystem):
@@ -613,6 +633,8 @@ By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
 hardlinked regular files, devices, FIFOs (considering all items in the same archive)
 .IP \(bu 2
 timestamps in nanosecond precision: mtime, atime, ctime
+.IP \(bu 2
+other timestamps: birthtime (on platforms supporting it)
 .IP \(bu 2
 permissions:
 .INDENT 2.0

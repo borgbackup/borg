@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-11-25" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-11-26" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -252,7 +252,7 @@ $ borg create /path/to/repo::my\-files /home \e
 
 # Backup the root filesystem into an archive named "root\-YYYY\-MM\-DD"
 # use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
-$ borg create \-C zlib,6 /path/to/repo::root\-{now:%Y\-%m\-%d} / \-\-one\-file\-system
+$ borg create \-C zlib,6 \-\-one\-file\-system /path/to/repo::root\-{now:%Y\-%m\-%d} /
 
 # Backup a remote host locally ("pull" style) using sshfs
 $ mkdir sshfs\-mount

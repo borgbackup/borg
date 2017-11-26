@@ -3548,7 +3548,7 @@ class Archiver:
                                           description=self.do_config.__doc__,
                                           epilog=config_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='get and set repository config options')
+                                          help='get and set configuration values')
         subparser.set_defaults(func=self.do_config)
         subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
                                help='get and set values from the repo cache')

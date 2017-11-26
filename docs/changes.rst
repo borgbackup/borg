@@ -180,7 +180,7 @@ New features:
 
   new options: --exclude[-from], --pattern[s-from], --strip-components
 - create/extract: support st_birthtime on platforms supporting it, #3272
-- add "borg config" command, #3304
+- add "borg config" command for querying/setting/deleting config values, #3304
 
 Other changes:
 

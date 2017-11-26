@@ -180,6 +180,7 @@ New features:
 
   new options: --exclude[-from], --pattern[s-from], --strip-components
 - create/extract: support st_birthtime on platforms supporting it, #3272
+- add "borg config" command, #3304
 
 Other changes:
 
@@ -199,6 +200,9 @@ Other changes:
   - clarify create --stats duration vs. wall time, #3301
   - clarify encrypted key format for borg key export, #3296
   - update release checklist about security fixes
+  - document good and problematic option placements, fix examples, #3356
+  - add note about using --nobsdflags to avoid speed penalty related to
+    bsdflags, #3239
 
 
 Version 1.1.2 (2017-11-05)

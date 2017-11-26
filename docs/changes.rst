@@ -131,8 +131,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.3 (not released yet)
---------------------------------
+Version 1.1.3 (2017-11-27)
+--------------------------
 
 Compatibility notes:
 
@@ -153,7 +153,11 @@ Compatibility notes:
 
 Fixes:
 
-- XXX SECFIX XXX
+- Security Fix for CVE-2017-15914: Incorrect implementation of access controls
+  allows remote users to override repository restrictions in Borg servers.
+  A user able to access a remote Borg SSH server is able to circumvent access
+  controls post-authentication.
+  Affected releases: 1.1.0, 1.1.1, 1.1.2. Releases 1.0.x are NOT affected.
 - crc32: deal with unaligned buffer, add tests - this broke borg on older ARM
   CPUs that can not deal with unaligned 32bit memory accesses and raise a bus
   error in such cases. the fix might also improve performance on some CPUs as

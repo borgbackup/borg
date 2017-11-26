@@ -1,6 +1,11 @@
+Support
+=======
 
-Security
-========
+Support and Services
+--------------------
+
+Please see https://www.borgbackup.org/ for free and paid support and service options.
+
 
 .. _security-contact:
 

@@ -678,7 +678,7 @@ class build_man(Command):
         roles.register_local_role('issue', issue)
         # We give the source_path so that docutils can find relative includes
         # as-if the document where located in the docs/ directory.
-        man_page = publish_string(source=rst, source_path='docs/virtmanpage.rst', writer=manpage.Writer())
+        man_page = publish_string(source=rst, source_path='docs/%s.rst' % name, writer=manpage.Writer())
         with open('docs/man/%s.1' % name, 'wb') as fd:
             fd.write(man_page)
 

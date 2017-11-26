@@ -149,8 +149,9 @@ reject to delete the repository completely). This is useful for scenarios where 
 backup client machine backups remotely to a backup server using ``borg serve``, since
 a hacked client machine cannot delete backups on the server permanently.
 
-To activate append-only mode, edit the repository ``config`` file and add a line
-``append_only=1`` to the ``[repository]`` section (or edit the line if it exists).
+To activate append-only mode, set ``append_only`` to 1 in the repository config::
+
+    borg config /path/to/repo append_only 1
 
 In append-only mode Borg will create a transaction log in the ``transactions`` file,
 where each line is a transaction and a UTC timestamp.

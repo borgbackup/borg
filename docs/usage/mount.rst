@@ -36,6 +36,12 @@ Examples
     # which does not support lazy processing of archives.
     $ borg mount -o versions --glob-archives '*-my-home' --last 10 /path/to/repo /tmp/mymountpoint
 
+    # Exclusion options are supported.
+    # These can speed up mounting and lower memory needs significantly.
+    $ borg mount /path/to/repo /tmp/mymountpoint only/that/path
+    $ borg mount --exclude '...' /path/to/repo /tmp/mymountpoint
+
+
 borgfs
 ++++++
 

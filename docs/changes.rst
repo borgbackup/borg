@@ -204,6 +204,7 @@ Other changes:
   - document good and problematic option placements, fix examples, #3356
   - add note about using --nobsdflags to avoid speed penalty related to
     bsdflags, #3239
+  - move most of support section to www.borgbackup.org
 
 
 Version 1.1.2 (2017-11-05)

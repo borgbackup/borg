@@ -50,7 +50,7 @@ Branching model
 
 Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
-send smaller patches via the borgbackup `Mailing List<https://borgbackup.org/support/support.html#_mailing_list>`_. 
+send smaller patches via the borgbackup `Mailing List<https://borgbackup.org/support/free.html#_mailing_list>`_. 
 to the maintainers).
 
 Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.

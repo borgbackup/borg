@@ -127,7 +127,7 @@ Spread the word, give feedback, help with documentation, testing or development.
 
 You can also give monetary support to the project, see there for details:
 
-https://www.borgbackup.org/support/support.html#bounties-and-fundraisers
+https://www.borgbackup.org/support/free.html#bounties-and-fundraisers
 
 Links
 -----
@@ -141,7 +141,7 @@ Links
 * `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
-* `Security contact <https://borgbackup.readthedocs.io/en/latest/support.html#security-contact>`_
+* `Security contact <https://borgbackup.readthedocs.io/en/latest/free.html#security-contact>`_
 
 Compatibility notes
 -------------------

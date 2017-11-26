@@ -3997,6 +3997,7 @@ class Archiver:
                 return forced_result
             # we only take specific options from the forced "borg serve" command:
             result.restrict_to_paths = forced_result.restrict_to_paths
+            result.restrict_to_repositories = forced_result.restrict_to_repositories
             result.append_only = forced_result.append_only
         return result
 

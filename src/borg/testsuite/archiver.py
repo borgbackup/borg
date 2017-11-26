@@ -3552,10 +3552,22 @@ def test_get_args():
     assert args.restrict_to_paths == ['/p1', '/p2']
     assert args.umask == 0o027
     assert args.log_level == 'info'
+    # similar, but with --restrict-to-repository
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-repository=/r1', '--restrict-to-repository=/r2', ],
+                             'borg serve --info --umask=0027')
+    assert args.restrict_to_repositories == ['/r1', '/r2']
     # trying to cheat - break out of path restriction
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
                              'borg serve --restrict-to-path=/')
     assert args.restrict_to_paths == ['/p1', '/p2']
+    # trying to cheat - break out of repository restriction
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-repository=/r1', '--restrict-to-repository=/r2', ],
+                             'borg serve --restrict-to-repository=/')
+    assert args.restrict_to_repositories == ['/r1', '/r2']
+    # trying to cheat - break below repository restriction
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-repository=/r1', '--restrict-to-repository=/r2', ],
+                             'borg serve --restrict-to-repository=/r1/below')
+    assert args.restrict_to_repositories == ['/r1', '/r2']
     # trying to cheat - try to execute different subcommand
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
                              'borg init --encryption=repokey /')

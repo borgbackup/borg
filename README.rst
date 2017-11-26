@@ -127,7 +127,7 @@ Spread the word, give feedback, help with documentation, testing or development.
 
 You can also give monetary support to the project, see there for details:
 
-https://www.borgbackup.org/support/support.html#bounties-and-fundraisers
+https://www.borgbackup.org/support/free.html#bounties-and-fundraisers
 
 Links
 -----

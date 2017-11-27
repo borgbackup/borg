@@ -332,13 +332,11 @@ uint32_t crc32_slice_by_8(const void* data, size_t length, uint32_t previousCrc3
   uint32_t crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF
 
   const uint32_t* current;
-  const uint8_t* currentChar;
+  const uint8_t* currentChar = (const uint8_t*) data;
 
   // enabling optimization (at least -O2) automatically unrolls the inner for-loop
   const size_t Unroll = 4;
   const size_t BytesAtOnce = 8 * Unroll;
-
-  currentChar = (const uint8_t*) data;
 
   // wanted: 32 bit / 4 Byte alignment, compute leading, unaligned bytes length
   uintptr_t unaligned_length = (4 - (((uintptr_t) currentChar) & 3)) & 3;

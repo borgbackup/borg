@@ -242,9 +242,11 @@ class build_usage(Command):
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
         parser = Archiver(prog='borg').build_parser()
-        borgfs_parser = Archiver(prog='borgfs').build_parser()
+        # borgfs has a separate man page to satisfy debian's "every program from a package
+        # must have a man page" requirement, but it doesn't need a separate HTML docs page
+        #borgfs_parser = Archiver(prog='borgfs').build_parser()
 
-        self.generate_level("", parser, Archiver, {'borgfs': borgfs_parser})
+        self.generate_level("", parser, Archiver)
 
     def generate_level(self, prefix, parser, Archiver, extra_choices=None):
         is_subcommand = False

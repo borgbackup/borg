@@ -22,9 +22,15 @@ try:
 except ImportError:
     lzma = None
 
+try:
+    import zstd
+except ImportError:
+    zstd = None
+
+
 from .helpers import Buffer, DecompressionError
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.1_04'
 
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -188,6 +194,38 @@ class LZMA(CompressorBase):
             raise DecompressionError(str(e)) from None
 
 
+class ZSTD(CompressorBase):
+    """zstd compression / decompression (pypi: zstandard, gh: python-zstandard)"""
+    # This is a NOT THREAD SAFE implementation.
+    # Only ONE python context must to be created at a time.
+    # It should work flawlessly as long as borg will call ONLY ONE compression job at time.
+    ID = b'\x03\x00'
+    name = 'zstd'
+
+    def __init__(self, level=3, **kwargs):
+        super().__init__(**kwargs)
+        self.level = level
+        if zstd is None:
+            raise ValueError('No zstd support found.')
+
+    def compress(self, data):
+        if not isinstance(data, bytes):
+            data = bytes(data)  # zstd < 0.9.0 does not work with memoryview
+        cctx = zstd.ZstdCompressor(level=self.level, write_content_size=True)
+        data = cctx.compress(data)
+        return super().compress(data)
+
+    def decompress(self, data):
+        if not isinstance(data, bytes):
+            data = bytes(data)  # zstd < 0.9.0 does not work with memoryview
+        dctx = zstd.ZstdDecompressor()
+        data = super().decompress(data)
+        try:
+            return dctx.decompress(data)
+        except zstd.ZstdError as e:
+            raise DecompressionError(str(e)) from None
+
+
 class ZLIB(CompressorBase):
     """
     zlib compression / decompression (python stdlib)
@@ -291,9 +329,10 @@ COMPRESSOR_TABLE = {
     ZLIB.name: ZLIB,
     LZMA.name: LZMA,
     Auto.name: Auto,
+    ZSTD.name: ZSTD,
 }
 # List of possible compression types. Does not include Auto, since it is a meta-Compressor.
-COMPRESSOR_LIST = [LZ4, CNONE, ZLIB, LZMA, ]  # check fast stuff first
+COMPRESSOR_LIST = [LZ4, ZSTD, CNONE, ZLIB, LZMA, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]
@@ -346,6 +385,16 @@ class CompressionSpec:
             else:
                 raise ValueError
             self.level = level
+        elif self.name in ('zstd', ):
+            if count < 2:
+                level = 3  # default compression level in zstd
+            elif count == 2:
+                level = int(values[1])
+                if not 1 <= level <= 22:
+                    raise ValueError
+            else:
+                raise ValueError
+            self.level = level
         elif self.name == 'auto':
             if 2 <= count <= 3:
                 compression = ','.join(values[1:])
@@ -359,7 +408,7 @@ class CompressionSpec:
     def compressor(self):
         if self.name in ('none', 'lz4', ):
             return get_compressor(self.name)
-        elif self.name in ('zlib', 'lzma', ):
+        elif self.name in ('zlib', 'lzma', 'zstd', ):
             return get_compressor(self.name, level=self.level)
         elif self.name == 'auto':
             return get_compressor(self.name, compressor=self.inner.compressor)

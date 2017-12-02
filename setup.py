@@ -27,6 +27,8 @@ install_requires = [
     # Also, we might use some rather recent API features.
     'msgpack-python>=0.4.6',
     'pyzmq',
+    # https://github.com/indygreg/python-zstandard
+    'zstandard',
 ]
 
 # note for package maintainers: if you package borgbackup for distribution,

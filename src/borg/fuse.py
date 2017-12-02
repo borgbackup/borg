@@ -362,7 +362,7 @@ class FuseBackend(object):
             return name + version_enc + ext
 
         if 'source' in item and hardlinkable(item.mode):
-            source = os.path.join(*item.source.split(os.sep)[stripped_components:])
+            source = os.sep.join(item.source.split(os.sep)[stripped_components:])
             chunks, link_target = hardlink_masters.get(item.source, (None, source))
             if link_target:
                 # Hard link was extracted previously, just link

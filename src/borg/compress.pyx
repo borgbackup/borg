@@ -22,11 +22,6 @@ try:
 except ImportError:
     lzma = None
 
-try:
-    import zstd
-except ImportError:
-    zstd = None
-
 
 from .helpers import Buffer, DecompressionError
 
@@ -36,6 +31,17 @@ cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_compressBound(int inputSize) nogil
+
+
+cdef extern from "algorithms/zstd-libselect.h":
+    size_t ZSTD_compress(void* dst, size_t dstCapacity, const void* src, size_t srcSize, int  compressionLevel) nogil
+    size_t ZSTD_decompress(void* dst, size_t dstCapacity, const void* src, size_t compressedSize) nogil
+    size_t ZSTD_compressBound(size_t srcSize) nogil
+    unsigned long long ZSTD_CONTENTSIZE_UNKNOWN
+    unsigned long long ZSTD_CONTENTSIZE_ERROR
+    unsigned long long ZSTD_getFrameContentSize(const void *src, size_t srcSize) nogil
+    unsigned ZSTD_isError(size_t code) nogil
+    const char* ZSTD_getErrorName(size_t code) nogil
 
 
 buffer = Buffer(bytearray, size=0)
@@ -203,25 +209,50 @@ class ZSTD(CompressorBase):
     def __init__(self, level=3, **kwargs):
         super().__init__(**kwargs)
         self.level = level
-        if zstd is None:
-            raise ValueError('No zstd support found.')
 
-    def compress(self, data):
-        if not isinstance(data, bytes):
-            data = bytes(data)  # zstd < 0.9.0 does not work with memoryview
-        cctx = zstd.ZstdCompressor(level=self.level, write_content_size=True)
-        data = cctx.compress(data)
-        return super().compress(data)
+    def compress(self, idata):
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
+        cdef int isize = len(idata)
+        cdef size_t osize
+        cdef char *source = idata
+        cdef char *dest
+        cdef int level = self.level
+        osize = ZSTD_compressBound(isize)
+        buf = buffer.get(osize)
+        dest = <char *> buf
+        with nogil:
+            osize = ZSTD_compress(dest, osize, source, isize, level)
+        if ZSTD_isError(osize):
+            raise Exception('zstd compress failed: %s' % ZSTD_getErrorName(osize))
+        return super().compress(dest[:osize])
 
-    def decompress(self, data):
-        if not isinstance(data, bytes):
-            data = bytes(data)  # zstd < 0.9.0 does not work with memoryview
-        dctx = zstd.ZstdDecompressor()
-        data = super().decompress(data)
+    def decompress(self, idata):
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
+        idata = super().decompress(idata)
+        cdef int isize = len(idata)
+        cdef unsigned long long osize
+        cdef unsigned long long rsize
+        cdef char *source = idata
+        cdef char *dest
+        osize = ZSTD_getFrameContentSize(source, isize)
+        if osize == ZSTD_CONTENTSIZE_ERROR:
+            raise DecompressionError('zstd get size failed: data was not compressed by zstd')
+        if osize == ZSTD_CONTENTSIZE_UNKNOWN:
+            raise DecompressionError('zstd get size failed: original size unknown')
         try:
-            return dctx.decompress(data)
-        except zstd.ZstdError as e:
-            raise DecompressionError(str(e)) from None
+            buf = buffer.get(osize)
+        except MemoryError:
+            raise DecompressionError('MemoryError')
+        dest = <char *> buf
+        with nogil:
+            rsize = ZSTD_decompress(dest, osize, source, isize)
+        if ZSTD_isError(rsize):
+            raise DecompressionError('zstd decompress failed: %s' % ZSTD_getErrorName(rsize))
+        if rsize != osize:
+            raise DecompressionError('zstd decompress failed: size mismatch')
+        return dest[:osize]
 
 
 class ZLIB(CompressorBase):

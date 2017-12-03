@@ -27,8 +27,6 @@ install_requires = [
     # Also, we might use some rather recent API features.
     'msgpack-python>=0.4.6',
     'pyzmq',
-    # https://github.com/indygreg/python-zstandard
-    'zstandard',
 ]
 
 # note for package maintainers: if you package borgbackup for distribution,
@@ -161,10 +159,20 @@ def detect_libb2(prefixes):
                     return prefix
 
 
+def detect_libzstd(prefixes):
+    for prefix in prefixes:
+        filename = os.path.join(prefix, 'include', 'zstd.h')
+        if os.path.exists(filename):
+            with open(filename, 'r') as fd:
+                if 'ZSTD_getFrameContentSize' in fd.read():
+                    return prefix
+
+
 include_dirs = []
 library_dirs = []
 define_macros = []
 crypto_libraries = ['crypto']
+compression_libraries = ['lz4']
 
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
                              '/usr/local/borg', '/opt/local', '/opt/pkg', ]
@@ -199,6 +207,18 @@ if libb2_prefix:
     library_dirs.append(os.path.join(libb2_prefix, 'lib'))
     crypto_libraries.append('b2')
     define_macros.append(('BORG_USE_LIBB2', 'YES'))
+
+possible_libzstd_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libzstd', '/usr/local/libzstd',
+                             '/usr/local/borg', '/opt/local', '/opt/pkg', ]
+if os.environ.get('BORG_LIBZSTD_PREFIX'):
+    possible_libzstd_prefixes.insert(0, os.environ.get('BORG_LIBZSTD_PREFIX'))
+libzstd_prefix = detect_libzstd(possible_libzstd_prefixes)
+if libzstd_prefix:
+    print('Detected and preferring libzstd over bundled ZSTD')
+    include_dirs.append(os.path.join(libzstd_prefix, 'include'))
+    library_dirs.append(os.path.join(libzstd_prefix, 'lib'))
+    compression_libraries.append('zstd')
+    define_macros.append(('BORG_USE_LIBZSTD', 'YES'))
 
 
 with open('README.rst', 'r') as fd:
@@ -758,7 +778,7 @@ cmdclass = {
 ext_modules = []
 if not on_rtd:
     ext_modules += [
-    Extension('borg.compress', [compress_source], libraries=['lz4'], include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
+    Extension('borg.compress', [compress_source], libraries=compression_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.crypto.low_level', [crypto_ll_source, crypto_helpers], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
     Extension('borg.hashindex', [hashindex_source]),
     Extension('borg.item', [item_source]),

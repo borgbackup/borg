@@ -1,5 +1,5 @@
 #ifdef BORG_USE_LIBZSTD
 #include <zstd.h>
 #else
-#error "TODO"
+#include "zstd/lib/zstd.h"
 #endif

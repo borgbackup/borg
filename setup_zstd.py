@@ -1,125 +1,125 @@
+# Support code for building a C extension with zstd files
+#
 # Copyright (c) 2016-present, Gregory Szorc
+#               2017-present, Thomas Waldmann (mods to make it more generic)
 # All rights reserved.
 #
 # This software may be modified and distributed under the terms
 # of the BSD license. See the LICENSE file for details.
 
 import os
-from distutils.extension import Extension
 
+# zstd files, structure as seen in zstd project repository:
 
-zstd_sources = ['zstd/%s' % p for p in (
-    'common/entropy_common.c',
-    'common/error_private.c',
-    'common/fse_decompress.c',
-    'common/pool.c',
-    'common/threading.c',
-    'common/xxhash.c',
-    'common/zstd_common.c',
-    'compress/fse_compress.c',
-    'compress/huf_compress.c',
-    'compress/zstd_compress.c',
-    'compress/zstdmt_compress.c',
-    'decompress/huf_decompress.c',
-    'decompress/zstd_decompress.c',
-    'dictBuilder/cover.c',
-    'dictBuilder/divsufsort.c',
-    'dictBuilder/zdict.c',
-)]
+zstd_sources = [
+    'lib/common/entropy_common.c',
+    'lib/common/error_private.c',
+    'lib/common/fse_decompress.c',
+    'lib/common/pool.c',
+    'lib/common/threading.c',
+    'lib/common/xxhash.c',
+    'lib/common/zstd_common.c',
+    'lib/compress/fse_compress.c',
+    'lib/compress/huf_compress.c',
+    'lib/compress/zstd_compress.c',
+    'lib/compress/zstd_double_fast.c',
+    'lib/compress/zstd_fast.c',
+    'lib/compress/zstd_lazy.c',
+    'lib/compress/zstd_ldm.c',
+    'lib/compress/zstd_opt.c',
+    'lib/compress/zstdmt_compress.c',
+    'lib/decompress/huf_decompress.c',
+    'lib/decompress/zstd_decompress.c',
+    'lib/dictBuilder/cover.c',
+    'lib/dictBuilder/divsufsort.c',
+    'lib/dictBuilder/zdict.c',
+]
 
-zstd_sources_legacy = ['zstd/%s' % p for p in (
-    'deprecated/zbuff_common.c',
-    'deprecated/zbuff_compress.c',
-    'deprecated/zbuff_decompress.c',
-    'legacy/zstd_v01.c',
-    'legacy/zstd_v02.c',
-    'legacy/zstd_v03.c',
-    'legacy/zstd_v04.c',
-    'legacy/zstd_v05.c',
-    'legacy/zstd_v06.c',
-    'legacy/zstd_v07.c'
-)]
+zstd_sources_legacy = [
+    'lib/deprecated/zbuff_common.c',
+    'lib/deprecated/zbuff_compress.c',
+    'lib/deprecated/zbuff_decompress.c',
+    'lib/legacy/zstd_v01.c',
+    'lib/legacy/zstd_v02.c',
+    'lib/legacy/zstd_v03.c',
+    'lib/legacy/zstd_v04.c',
+    'lib/legacy/zstd_v05.c',
+    'lib/legacy/zstd_v06.c',
+    'lib/legacy/zstd_v07.c',
+]
 
 zstd_includes = [
-    'zstd',
-    'zstd/common',
-    'zstd/compress',
-    'zstd/decompress',
-    'zstd/dictBuilder',
+    'lib',
+    'lib/common',
+    'lib/compress',
+    'lib/decompress',
+    'lib/dictBuilder',
 ]
 
 zstd_includes_legacy = [
-    'zstd/deprecated',
-    'zstd/legacy',
-]
-
-ext_includes = [
-    'c-ext',
-    'zstd/common',
-]
-
-ext_sources = [
-    'zstd/common/pool.c',
-    'zstd/common/threading.c',
-    'zstd.c',
-    'c-ext/bufferutil.c',
-    'c-ext/compressiondict.c',
-    'c-ext/compressobj.c',
-    'c-ext/compressor.c',
-    'c-ext/compressoriterator.c',
-    'c-ext/compressionparams.c',
-    'c-ext/compressionreader.c',
-    'c-ext/compressionwriter.c',
-    'c-ext/constants.c',
-    'c-ext/decompressobj.c',
-    'c-ext/decompressor.c',
-    'c-ext/decompressoriterator.c',
-    'c-ext/decompressionreader.c',
-    'c-ext/decompressionwriter.c',
-    'c-ext/frameparams.c',
-]
-
-zstd_depends = [
-    'c-ext/python-zstandard.h',
+    'lib/deprecated',
+    'lib/legacy',
 ]
 
 
-def get_c_extension(support_legacy=False, system_zstd=False, name='zstd'):
-    """Obtain a distutils.extension.Extension for the C extension."""
-    root = os.path.abspath(os.path.dirname(__file__))
+def zstd_system_prefix(prefixes):
+    for prefix in prefixes:
+        filename = os.path.join(prefix, 'include', 'zstd.h')
+        if os.path.exists(filename):
+            with open(filename, 'r') as fd:
+                if 'ZSTD_getFrameContentSize' in fd.read():  # checks for zstd >= 1.3.0
+                    return prefix
 
-    sources = set([os.path.join(root, p) for p in ext_sources])
-    if not system_zstd:
-        sources.update([os.path.join(root, p) for p in zstd_sources])
-        if support_legacy:
-            sources.update([os.path.join(root, p) for p in zstd_sources_legacy])
-    sources = list(sources)
 
-    include_dirs = set([os.path.join(root, d) for d in ext_includes])
-    if not system_zstd:
-        include_dirs.update([os.path.join(root, d) for d in zstd_includes])
-        if support_legacy:
-            include_dirs.update([os.path.join(root, d) for d in zstd_includes_legacy])
-    include_dirs = list(include_dirs)
+def zstd_ext_kwargs(bundled_path, system_prefix=None, system=False, multithreaded=False, legacy=False, **kwargs):
+    """amend kwargs with zstd suff for a distutils.extension.Extension initialization.
 
-    depends = [os.path.join(root, p) for p in zstd_depends]
+    bundled_path: relative (to this file) path to the bundled library source code files
+    system_prefix: where the system-installed library can be found
+    system: True: use the system-installed shared library, False: use the bundled library code
+    multithreaded: True: define ZSTD_MULTITHREAD
+    legacy: include legacy API support
+    kwargs: distutils.extension.Extension kwargs that should be amended
+    returns: amended kwargs
+    """
+    def multi_join(paths, *path_segments):
+        """apply os.path.join on a list of paths"""
+        return [os.path.join(*(path_segments + (path, ))) for path in paths]
 
-    extra_args = ['-DZSTD_MULTITHREAD']
+    use_system = system and system_prefix is not None
 
-    if not system_zstd:
-        extra_args.append('-DZSTDLIB_VISIBILITY=')
-        extra_args.append('-DZDICTLIB_VISIBILITY=')
-        extra_args.append('-DZSTDERRORLIB_VISIBILITY=')
-        extra_args.append('-fvisibility=hidden')
+    sources = kwargs.get('sources', [])
+    if not use_system:
+        sources += multi_join(zstd_sources, bundled_path)
+        if legacy:
+            sources += multi_join(zstd_sources_legacy, bundled_path)
 
-    if not system_zstd and support_legacy:
-        extra_args.append('-DZSTD_LEGACY_SUPPORT=1')
+    include_dirs = kwargs.get('include_dirs', [])
+    if use_system:
+        include_dirs += multi_join(['include'], system_prefix)
+    else:
+        include_dirs += multi_join(zstd_includes, bundled_path)
+        if legacy:
+            include_dirs += multi_join(zstd_includes_legacy, bundled_path)
 
-    libraries = ['zstd'] if system_zstd else []
+    library_dirs = kwargs.get('library_dirs', [])
+    if use_system:
+        library_dirs += multi_join(['lib'], system_prefix)
 
-    # TODO compile with optimizations.
-    return Extension(name, sources,
-                     include_dirs=include_dirs,
-                     depends=depends,
-                     extra_compile_args=extra_args,
-                     libraries=libraries)
+    libraries = kwargs.get('libraries', [])
+    if use_system:
+        libraries += ['zstd', ]
+
+    extra_compile_args = kwargs.get('extra_compile_args', [])
+    if multithreaded:
+        extra_compile_args += ['-DZSTD_MULTITHREAD', ]
+    if not use_system:
+        extra_compile_args += ['-DZSTDLIB_VISIBILITY=', '-DZDICTLIB_VISIBILITY=', '-DZSTDERRORLIB_VISIBILITY=', ]
+                               # '-fvisibility=hidden' does not work, doesn't find PyInit_compress then
+        if legacy:
+            extra_compile_args += ['-DZSTD_LEGACY_SUPPORT=1', ]
+
+    ret = dict(**kwargs)
+    ret.update(dict(sources=sources, extra_compile_args=extra_compile_args,
+                    include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries))
+    return ret

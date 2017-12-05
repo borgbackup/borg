@@ -12,6 +12,11 @@ from distutils.core import Command
 
 import textwrap
 
+import setup_zstd
+
+# True: use the shared libzstd (>= 1.3.0) from the system, False: use the bundled zstd code
+prefer_system_libzstd = True
+
 min_python = (3, 5)
 my_python = sys.version_info
 
@@ -159,15 +164,6 @@ def detect_libb2(prefixes):
                     return prefix
 
 
-def detect_libzstd(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'zstd.h')
-        if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'ZSTD_getFrameContentSize' in fd.read():
-                    return prefix
-
-
 include_dirs = []
 library_dirs = []
 define_macros = []
@@ -212,13 +208,13 @@ possible_libzstd_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libzstd', '/u
                              '/usr/local/borg', '/opt/local', '/opt/pkg', ]
 if os.environ.get('BORG_LIBZSTD_PREFIX'):
     possible_libzstd_prefixes.insert(0, os.environ.get('BORG_LIBZSTD_PREFIX'))
-libzstd_prefix = detect_libzstd(possible_libzstd_prefixes)
-if libzstd_prefix:
+libzstd_prefix = setup_zstd.zstd_system_prefix(possible_libzstd_prefixes)
+if prefer_system_libzstd and libzstd_prefix:
     print('Detected and preferring libzstd over bundled ZSTD')
-    include_dirs.append(os.path.join(libzstd_prefix, 'include'))
-    library_dirs.append(os.path.join(libzstd_prefix, 'lib'))
-    compression_libraries.append('zstd')
     define_macros.append(('BORG_USE_LIBZSTD', 'YES'))
+    libzstd_system = True
+else:
+    libzstd_system = False
 
 
 with open('README.rst', 'r') as fd:
@@ -777,18 +773,22 @@ cmdclass = {
 
 ext_modules = []
 if not on_rtd:
+    compress_ext_kwargs = dict(sources=[compress_source], include_dirs=include_dirs, library_dirs=library_dirs,
+                               libraries=compression_libraries, define_macros=define_macros)
+    compress_ext_kwargs = setup_zstd.zstd_ext_kwargs(bundled_path='src/borg/algorithms/zstd',
+                                                     system_prefix=libzstd_prefix, system=libzstd_system,
+                                                     multithreaded=False, legacy=False, **compress_ext_kwargs)
     ext_modules += [
-    Extension('borg.compress', [compress_source], libraries=compression_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
-    Extension('borg.crypto.low_level', [crypto_ll_source, crypto_helpers], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
-    Extension('borg.hashindex', [hashindex_source]),
-    Extension('borg.item', [item_source]),
-    Extension('borg.chunker', [chunker_source]),
-    Extension('borg.algorithms.checksums', [checksums_source]),
-
-]
+        Extension('borg.compress', **compress_ext_kwargs),
+        Extension('borg.crypto.low_level', [crypto_ll_source, crypto_helpers], libraries=crypto_libraries,
+                  include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
+        Extension('borg.hashindex', [hashindex_source]),
+        Extension('borg.item', [item_source]),
+        Extension('borg.chunker', [chunker_source]),
+        Extension('borg.algorithms.checksums', [checksums_source]),
+    ]
     if not sys.platform.startswith(('win32', )):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
-
     if sys.platform == 'linux':
         ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl']))
     elif sys.platform.startswith('freebsd'):

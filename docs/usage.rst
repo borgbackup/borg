@@ -12,6 +12,23 @@ command in detail.
 General
 -------
 
+Positional Arguments and Options: Order matters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Borg only supports taking options (``-v`` and ``--list`` in the example)
+to the left or right of all positional arguments (``repo::archive`` and ``path``
+in the example), but not in between them:
+
+::
+
+    borg extract -v --list repo::archive path  # good and preferred
+    borg extract repo::archive path -v --list  # also works
+    borg extract -v repo::archive path --list  # works, but ugly
+    borg extract repo::archive -v --list path  # BAD
+
+This is due to a problem in the argparse module: http://bugs.python.org/issue15112
+
+
 Repository URLs
 ~~~~~~~~~~~~~~~
 

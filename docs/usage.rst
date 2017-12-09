@@ -431,7 +431,7 @@ Examples
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     # use zlib compression (good, but slow) - default is no compression
-    $ borg create -C zlib,6 /path/to/repo::root-{now:%Y-%m-%d} / --one-file-system
+    $ borg create -C zlib,6 --one-file-system /path/to/repo::root-{now:%Y-%m-%d} /
 
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals

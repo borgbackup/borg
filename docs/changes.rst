@@ -128,6 +128,63 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.0.12 (not released yet)
+---------------------------------
+
+Bug fixes:
+
+- repository: cleanup/write: invalidate cached FDs, tests
+- serve: fix exitcode, #2910
+- extract: set bsdflags last (include immutable flag), #3263
+- create --timestamp: set start time, #2957
+- create: show excluded dir with "x" for tagged dirs / caches, #3189
+- migrate locks to child PID when daemonize is used
+- Buffer: fix wrong thread-local storage use, #2951
+- fix detection of non-local path, #3108
+- fix LDLP restoration for subprocesses, #3077
+- fix subprocess environments (xattr module's fakeroot version check,
+  borg umount, BORG_PASSCOMMAND), #3050
+- remote: deal with partial lines, #2637
+- get rid of datetime.isoformat, use safe parse_timestamp to parse
+  timestamps, #2994
+
+Other changes:
+
+- ignore corrupt files cache, #2939
+- replace "modulo" with "if" to check for wraparound in hashmap
+- keymanager: don't depend on optional readline module, #2980
+- exclude broken pytest 3.3.0 release
+- exclude broken Cython 0.27(.0) release, #3066
+- flake8: add some ignores
+- docs:
+
+  - create: document exclusion through nodump
+  - document good and problematic option placements, fix examples, #3356
+  - update docs about hardlinked symlinks limitation
+  - faq: we do not implement futile attempts of ETA / progress displays
+  - simplified rate limiting wrapper in FAQ
+  - twitter account @borgbackup, #2948
+  - add note about metadata dedup and --no[ac]time, #2518
+  - change-passphrase only changes the passphrase, #2990
+  - clarify encrypted key format for borg key export, #3296
+  - document sshfs rename workaround, #3315
+  - update release checklist about security fixes
+- vagrant:
+
+  - use FUSE for macOS 3.7.1 to build the macOS binary
+  - use python 3.5.4 to build the binaries
+  - add exe location to PATH when we build an exe
+  - use https pypi url for wheezy
+  - netbsd: bash is already installed
+  - netbsd: fix netbsd version in PKG_PATH
+  - use self-made FreeBSD 10.3 box, #3022
+- travis:
+
+  - don't perform full Travis build on docs-only changes, #2531
+  - only short-circuit docs-only changes for pull requests
+  - don't brew update, hopefully fixes #2532
+
+
 Version 1.0.11 (2017-07-21)
 ---------------------------
 

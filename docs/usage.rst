@@ -12,6 +12,23 @@ command in detail.
 General
 -------
 
+Positional Arguments and Options: Order matters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Borg only supports taking options (``-v`` and ``--list`` in the example)
+to the left or right of all positional arguments (``repo::archive`` and ``path``
+in the example), but not in between them:
+
+::
+
+    borg extract -v --list repo::archive path  # good and preferred
+    borg extract repo::archive path -v --list  # also works
+    borg extract -v repo::archive path --list  # works, but ugly
+    borg extract repo::archive -v --list path  # BAD
+
+This is due to a problem in the argparse module: http://bugs.python.org/issue15112
+
+
 Repository URLs
 ~~~~~~~~~~~~~~~
 
@@ -414,7 +431,7 @@ Examples
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     # use zlib compression (good, but slow) - default is no compression
-    $ borg create -C zlib,6 /path/to/repo::root-{now:%Y-%m-%d} / --one-file-system
+    $ borg create -C zlib,6 --one-file-system /path/to/repo::root-{now:%Y-%m-%d} /
 
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals

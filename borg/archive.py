@@ -490,12 +490,6 @@ Number of files: {0.stats.nfiles}'''.format(
         else:
             os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
         acl_set(path, item, self.numeric_owner)
-        # Only available on OS X and FreeBSD
-        if has_lchflags and b'bsdflags' in item:
-            try:
-                os.lchflags(path, item[b'bsdflags'])
-            except OSError:
-                pass
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.
         xattrs = item.get(b'xattrs', {})
@@ -518,6 +512,12 @@ Number of files: {0.stats.nfiles}'''.format(
                     set_ec(EXIT_WARNING)
                 else:
                     raise
+        # Only available on OS X and FreeBSD
+        if has_lchflags and b'bsdflags' in item:
+            try:
+                os.lchflags(path, item[b'bsdflags'])
+            except OSError:
+                pass
 
     def rename(self, name):
         if name in self.manifest.archives:

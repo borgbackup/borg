@@ -49,9 +49,9 @@ Usage
    usage/recreate
    usage/tar
    usage/serve
+   usage/config
    usage/lock
    usage/benchmark
-   usage/config
 
    usage/help
    usage/debug

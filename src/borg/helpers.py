@@ -664,6 +664,7 @@ def replace_placeholders(text):
     data = {
         'pid': os.getpid(),
         'fqdn': socket.getfqdn(),
+        'reverse-fqdn': '.'.join(reversed(socket.getfqdn().split('.'))),
         'hostname': socket.gethostname(),
         'now': DatetimeWrapper(current_time.now()),
         'utcnow': DatetimeWrapper(current_time.utcnow()),

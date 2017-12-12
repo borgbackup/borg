@@ -180,9 +180,11 @@ def format_line(format, data):
 def replace_placeholders(text):
     """Replace placeholders in text with their values."""
     current_time = datetime.now()
+    fqdn = socket.getfqdn()
     data = {
         'pid': os.getpid(),
-        'fqdn': socket.getfqdn(),
+        'fqdn': fqdn,
+        'reverse-fqdn': '.'.join(reversed(fqdn.split('.'))),
         'hostname': socket.gethostname(),
         'now': DatetimeWrapper(current_time.now()),
         'utcnow': DatetimeWrapper(current_time.utcnow()),

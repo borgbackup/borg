@@ -651,6 +651,8 @@ class build_man(Command):
             examples = examples.replace(usage_include, '')
             examples = examples.replace('Examples\n~~~~~~~~', '')
             examples = examples.replace('Miscellaneous Help\n------------------', '')
+            examples = examples.replace('``docs/misc/prune-example.txt``:', '``docs/misc/prune-example.txt``.')
+            examples = examples.replace('.. highlight:: none\n', '')  # we don't support highlight
             examples = re.sub('^(~+)$', lambda matches: '+' * len(matches.group(0)), examples, flags=re.MULTILINE)
             examples = examples.strip()
         if examples:

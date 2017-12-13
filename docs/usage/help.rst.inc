@@ -176,9 +176,13 @@ placeholders:
     The current local date and time, by default in ISO-8601 format.
     You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
+    Retrieves the current time during placeholder evaluation and does not honor ``--timestamp`` if given.
+
 {utcnow}
     The current UTC date and time, by default in ISO-8601 format.
     You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
+
+    Retrieves the current time during placeholder evaluation and does not honor ``--timestamp`` if given.
 
 {user}
     The user name (or UID, if no name is available) of the user running borg.

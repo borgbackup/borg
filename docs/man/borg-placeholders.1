@@ -45,10 +45,14 @@ The full name of the machine.
 .B {now}
 The current local date and time, by default in ISO\-8601 format.
 You can also supply your own \fI\%format string\fP, e.g. {now:%Y\-%m\-%d_%H:%M:%S}
+.sp
+Retrieves the current time during placeholder evaluation and does not honor \fB\-\-timestamp\fP if given.
 .TP
 .B {utcnow}
 The current UTC date and time, by default in ISO\-8601 format.
 You can also supply your own \fI\%format string\fP, e.g. {utcnow:%Y\-%m\-%d_%H:%M:%S}
+.sp
+Retrieves the current time during placeholder evaluation and does not honor \fB\-\-timestamp\fP if given.
 .TP
 .B {user}
 The user name (or UID, if no name is available) of the user running borg.

@@ -173,8 +173,8 @@ library_dirs.append(os.path.join(ssl_prefix, 'lib'))
 
 possible_liblz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4',
                          '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LZ4_PREFIX'):
-    possible_liblz4_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
+if os.environ.get('BORG_LIBLZ4_PREFIX'):
+    possible_liblz4_prefixes.insert(0, os.environ.get('BORG_LIBLZ4_PREFIX'))
 liblz4_prefix = setup_lz4.lz4_system_prefix(possible_liblz4_prefixes)
 if prefer_system_liblz4 and liblz4_prefix:
     print('Detected and preferring liblz4 over bundled LZ4')

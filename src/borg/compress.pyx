@@ -22,14 +22,26 @@ try:
 except ImportError:
     lzma = None
 
+
 from .helpers import Buffer, DecompressionError
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.1_04'
 
 cdef extern from "lz4.h":
     int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_compressBound(int inputSize) nogil
+
+
+cdef extern from "algorithms/zstd-libselect.h":
+    size_t ZSTD_compress(void* dst, size_t dstCapacity, const void* src, size_t srcSize, int  compressionLevel) nogil
+    size_t ZSTD_decompress(void* dst, size_t dstCapacity, const void* src, size_t compressedSize) nogil
+    size_t ZSTD_compressBound(size_t srcSize) nogil
+    unsigned long long ZSTD_CONTENTSIZE_UNKNOWN
+    unsigned long long ZSTD_CONTENTSIZE_ERROR
+    unsigned long long ZSTD_getFrameContentSize(const void *src, size_t srcSize) nogil
+    unsigned ZSTD_isError(size_t code) nogil
+    const char* ZSTD_getErrorName(size_t code) nogil
 
 
 buffer = Buffer(bytearray, size=0)
@@ -188,6 +200,63 @@ class LZMA(CompressorBase):
             raise DecompressionError(str(e)) from None
 
 
+class ZSTD(CompressorBase):
+    """zstd compression / decompression (pypi: zstandard, gh: python-zstandard)"""
+    # This is a NOT THREAD SAFE implementation.
+    # Only ONE python context must to be created at a time.
+    # It should work flawlessly as long as borg will call ONLY ONE compression job at time.
+    ID = b'\x03\x00'
+    name = 'zstd'
+
+    def __init__(self, level=3, **kwargs):
+        super().__init__(**kwargs)
+        self.level = level
+
+    def compress(self, idata):
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
+        cdef int isize = len(idata)
+        cdef size_t osize
+        cdef char *source = idata
+        cdef char *dest
+        cdef int level = self.level
+        osize = ZSTD_compressBound(isize)
+        buf = buffer.get(osize)
+        dest = <char *> buf
+        with nogil:
+            osize = ZSTD_compress(dest, osize, source, isize, level)
+        if ZSTD_isError(osize):
+            raise Exception('zstd compress failed: %s' % ZSTD_getErrorName(osize))
+        return super().compress(dest[:osize])
+
+    def decompress(self, idata):
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
+        idata = super().decompress(idata)
+        cdef int isize = len(idata)
+        cdef unsigned long long osize
+        cdef unsigned long long rsize
+        cdef char *source = idata
+        cdef char *dest
+        osize = ZSTD_getFrameContentSize(source, isize)
+        if osize == ZSTD_CONTENTSIZE_ERROR:
+            raise DecompressionError('zstd get size failed: data was not compressed by zstd')
+        if osize == ZSTD_CONTENTSIZE_UNKNOWN:
+            raise DecompressionError('zstd get size failed: original size unknown')
+        try:
+            buf = buffer.get(osize)
+        except MemoryError:
+            raise DecompressionError('MemoryError')
+        dest = <char *> buf
+        with nogil:
+            rsize = ZSTD_decompress(dest, osize, source, isize)
+        if ZSTD_isError(rsize):
+            raise DecompressionError('zstd decompress failed: %s' % ZSTD_getErrorName(rsize))
+        if rsize != osize:
+            raise DecompressionError('zstd decompress failed: size mismatch')
+        return dest[:osize]
+
+
 class ZLIB(CompressorBase):
     """
     zlib compression / decompression (python stdlib)
@@ -291,9 +360,10 @@ COMPRESSOR_TABLE = {
     ZLIB.name: ZLIB,
     LZMA.name: LZMA,
     Auto.name: Auto,
+    ZSTD.name: ZSTD,
 }
 # List of possible compression types. Does not include Auto, since it is a meta-Compressor.
-COMPRESSOR_LIST = [LZ4, CNONE, ZLIB, LZMA, ]  # check fast stuff first
+COMPRESSOR_LIST = [LZ4, ZSTD, CNONE, ZLIB, LZMA, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]
@@ -346,6 +416,16 @@ class CompressionSpec:
             else:
                 raise ValueError
             self.level = level
+        elif self.name in ('zstd', ):
+            if count < 2:
+                level = 3  # default compression level in zstd
+            elif count == 2:
+                level = int(values[1])
+                if not 1 <= level <= 22:
+                    raise ValueError
+            else:
+                raise ValueError
+            self.level = level
         elif self.name == 'auto':
             if 2 <= count <= 3:
                 compression = ','.join(values[1:])
@@ -359,7 +439,7 @@ class CompressionSpec:
     def compressor(self):
         if self.name in ('none', 'lz4', ):
             return get_compressor(self.name)
-        elif self.name in ('zlib', 'lzma', ):
+        elif self.name in ('zlib', 'lzma', 'zstd', ):
             return get_compressor(self.name, level=self.level)
         elif self.name == 'auto':
             return get_compressor(self.name, compressor=self.inner.compressor)

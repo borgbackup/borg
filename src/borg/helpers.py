@@ -135,7 +135,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if chunker.API_VERSION != '1.1_01':
         raise ExtensionModuleError
-    if compress.API_VERSION != '1.1_05':
+    if compress.API_VERSION != '1.1_06':
         raise ExtensionModuleError
     if borg.crypto.low_level.API_VERSION != '1.1_02':
         raise ExtensionModuleError

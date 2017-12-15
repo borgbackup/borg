@@ -2093,6 +2093,9 @@ class Archiver:
         {fqdn}
             The full name of the machine.
 
+        {reverse-fqdn}
+            The full name of the machine in reverse domain name notation.
+
         {now}
             The current local date and time, by default in ISO-8601 format.
             You can also supply your own `format string <https://docs.python.org/3.4/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
@@ -2202,7 +2205,12 @@ class Archiver:
             else:
                 commands[args.topic].print_help()
         else:
-            parser.error('No help available on %s' % (args.topic,))
+            msg_lines = []
+            msg_lines += ['No help available on %s.' % args.topic]
+            msg_lines += ['Try one of the following:']
+            msg_lines += ['    Commands: %s' % ', '.join(sorted(commands.keys()))]
+            msg_lines += ['    Topics: %s' % ', '.join(sorted(self.helptext.keys()))]
+            parser.error('\n'.join(msg_lines))
         return self.exit_code
 
     def do_subcommand_help(self, parser, args):

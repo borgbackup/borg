@@ -25,10 +25,10 @@ except ImportError:
 
 from .helpers import Buffer, DecompressionError
 
-API_VERSION = '1.1_05'
+API_VERSION = '1.1_06'
 
 cdef extern from "algorithms/lz4-libselect.h":
-    int LZ4_compress_limitedOutput(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
+    int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_compressBound(int inputSize) nogil
 
@@ -139,7 +139,7 @@ class LZ4(CompressorBase):
         buf = buffer.get(osize)
         dest = <char *> buf
         with nogil:
-            osize = LZ4_compress_limitedOutput(source, dest, isize, osize)
+            osize = LZ4_compress_default(source, dest, isize, osize)
         if not osize:
             raise Exception('lz4 compress failed')
         return super().compress(dest[:osize])

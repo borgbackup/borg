@@ -3006,7 +3006,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
         with repository:
-            repository.delete(archive.metadata.items[-5])
+            repository.delete(archive.metadata.items[0])
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)

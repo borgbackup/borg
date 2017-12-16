@@ -66,6 +66,13 @@ class SecurityManager:
         self.location_file = os.path.join(self.dir, 'location')
         self.manifest_ts_file = os.path.join(self.dir, 'manifest-timestamp')
 
+    @staticmethod
+    def destroy(repository, path=None):
+        """destroy the security dir for ``repository`` or at ``path``"""
+        path = path or get_security_dir(repository.id_str)
+        if os.path.exists(path):
+            shutil.rmtree(path)
+
     def known(self):
         return os.path.exists(self.key_type_file)
 

@@ -38,7 +38,7 @@ from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
 from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
-from .cache import Cache, assert_secure
+from .cache import Cache, assert_secure, SecurityManager
 from .constants import *  # NOQA
 from .compress import CompressionSpec
 from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
@@ -1108,6 +1108,7 @@ class Archiver:
                 return self.exit_code
             repository.destroy()
             logger.info("Repository deleted.")
+            SecurityManager.destroy(repository)
         Cache.destroy(repository)
         logger.info("Cache deleted.")
         return self.exit_code

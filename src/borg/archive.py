@@ -1457,7 +1457,7 @@ class ArchiveChecker:
             """
             item_keys = frozenset(key.encode() for key in self.manifest.item_keys)
             required_item_keys = frozenset(key.encode() for key in REQUIRED_ITEM_KEYS)
-            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and 'path' in item,
+            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and b'path' in item,
                                       self.manifest.item_keys)
             _state = 0
 

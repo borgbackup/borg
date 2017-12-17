@@ -14,12 +14,16 @@ import textwrap
 
 import setup_lz4
 import setup_zstd
+import setup_b2
 
 # True: use the shared liblz4 (>= 1.7.0 / r129) from the system, False: use the bundled lz4 code
 prefer_system_liblz4 = True
 
 # True: use the shared libzstd (>= 1.3.0) from the system, False: use the bundled zstd code
 prefer_system_libzstd = True
+
+# True: use the shared libb2 from the system, False: use the bundled blake2 code
+prefer_system_libb2 = True
 
 min_python = (3, 4)
 my_python = sys.version_info
@@ -146,19 +150,9 @@ def detect_openssl(prefixes):
                     return prefix
 
 
-def detect_libb2(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'blake2.h')
-        if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'blake2b_init' in fd.read():
-                    return prefix
-
-
 include_dirs = []
 library_dirs = []
 define_macros = []
-crypto_libraries = ['crypto']
 
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
                              '/usr/local/borg', '/opt/local', '/opt/pkg', ]
@@ -187,13 +181,13 @@ possible_libb2_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libb2', '/usr/l
                            '/usr/local/borg', '/opt/local', '/opt/pkg', ]
 if os.environ.get('BORG_LIBB2_PREFIX'):
     possible_libb2_prefixes.insert(0, os.environ.get('BORG_LIBB2_PREFIX'))
-libb2_prefix = detect_libb2(possible_libb2_prefixes)
-if libb2_prefix:
+libb2_prefix = setup_b2.b2_system_prefix(possible_libb2_prefixes)
+if prefer_system_libb2 and libb2_prefix:
     print('Detected and preferring libb2 over bundled BLAKE2')
-    include_dirs.append(os.path.join(libb2_prefix, 'include'))
-    library_dirs.append(os.path.join(libb2_prefix, 'lib'))
-    crypto_libraries.append('b2')
     define_macros.append(('BORG_USE_LIBB2', 'YES'))
+    libb2_system = True
+else:
+    libb2_system = False
 
 possible_libzstd_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libzstd', '/usr/local/libzstd',
                              '/usr/local/borg', '/opt/local', '/opt/pkg', ]
@@ -774,9 +768,14 @@ if not on_rtd:
     compress_ext_kwargs = setup_zstd.zstd_ext_kwargs(bundled_path='src/borg/algorithms/zstd',
                                                      system_prefix=libzstd_prefix, system=libzstd_system,
                                                      multithreaded=False, legacy=False, **compress_ext_kwargs)
+    crypto_ext_kwargs = dict(sources=[crypto_ll_source], libraries=['crypto'],
+                             include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros)
+    crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
+                                               system_prefix=libb2_prefix, system=libb2_system,
+                                               **crypto_ext_kwargs)
     ext_modules += [
         Extension('borg.compress', **compress_ext_kwargs),
-        Extension('borg.crypto.low_level', [crypto_ll_source], libraries=crypto_libraries, include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros),
+        Extension('borg.crypto.low_level', **crypto_ext_kwargs),
         Extension('borg.hashindex', [hashindex_source]),
         Extension('borg.item', [item_source]),
         Extension('borg.chunker', [chunker_source]),

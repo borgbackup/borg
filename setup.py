@@ -12,7 +12,11 @@ from distutils.core import Command
 
 import textwrap
 
+import setup_lz4
 import setup_zstd
+
+# True: use the shared liblz4 (>= 1.7.0 / r129) from the system, False: use the bundled lz4 code
+prefer_system_liblz4 = True
 
 # True: use the shared libzstd (>= 1.3.0) from the system, False: use the bundled zstd code
 prefer_system_libzstd = True
@@ -142,15 +146,6 @@ def detect_openssl(prefixes):
                     return prefix
 
 
-def detect_lz4(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'lz4.h')
-        if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'LZ4_decompress_safe' in fd.read():
-                    return prefix
-
-
 def detect_libb2(prefixes):
     for prefix in prefixes:
         filename = os.path.join(prefix, 'include', 'blake2.h')
@@ -164,7 +159,6 @@ include_dirs = []
 library_dirs = []
 define_macros = []
 crypto_libraries = ['crypto']
-compression_libraries = ['lz4']
 
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
                              '/usr/local/borg', '/opt/local', '/opt/pkg', ]
@@ -177,16 +171,17 @@ include_dirs.append(os.path.join(ssl_prefix, 'include'))
 library_dirs.append(os.path.join(ssl_prefix, 'lib'))
 
 
-possible_lz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4',
+possible_liblz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4',
                          '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LZ4_PREFIX'):
-    possible_lz4_prefixes.insert(0, os.environ.get('BORG_LZ4_PREFIX'))
-lz4_prefix = detect_lz4(possible_lz4_prefixes)
-if lz4_prefix:
-    include_dirs.append(os.path.join(lz4_prefix, 'include'))
-    library_dirs.append(os.path.join(lz4_prefix, 'lib'))
-elif not on_rtd:
-    raise Exception('Unable to find LZ4 headers. (Looked here: {})'.format(', '.join(possible_lz4_prefixes)))
+if os.environ.get('BORG_LIBLZ4_PREFIX'):
+    possible_liblz4_prefixes.insert(0, os.environ.get('BORG_LIBLZ4_PREFIX'))
+liblz4_prefix = setup_lz4.lz4_system_prefix(possible_liblz4_prefixes)
+if prefer_system_liblz4 and liblz4_prefix:
+    print('Detected and preferring liblz4 over bundled LZ4')
+    define_macros.append(('BORG_USE_LIBLZ4', 'YES'))
+    liblz4_system = True
+else:
+    liblz4_system = False
 
 possible_libb2_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libb2', '/usr/local/libb2',
                            '/usr/local/borg', '/opt/local', '/opt/pkg', ]
@@ -772,7 +767,10 @@ cmdclass = {
 ext_modules = []
 if not on_rtd:
     compress_ext_kwargs = dict(sources=[compress_source], include_dirs=include_dirs, library_dirs=library_dirs,
-                               libraries=compression_libraries, define_macros=define_macros)
+                               define_macros=define_macros)
+    compress_ext_kwargs = setup_lz4.lz4_ext_kwargs(bundled_path='src/borg/algorithms/lz4',
+                                                   system_prefix=liblz4_prefix, system=liblz4_system,
+                                                   **compress_ext_kwargs)
     compress_ext_kwargs = setup_zstd.zstd_ext_kwargs(bundled_path='src/borg/algorithms/zstd',
                                                      system_prefix=libzstd_prefix, system=libzstd_system,
                                                      multithreaded=False, legacy=False, **compress_ext_kwargs)

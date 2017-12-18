@@ -186,6 +186,17 @@ Backup compression
 The default is lz4 (very fast, but low compression ratio), but other methods are
 supported for different situations.
 
+You can use zstd for a wide range from high speed (and relatively low
+compression) using N=1 to high compression (and lower speed) using N=22.
+
+zstd is a modern compression algorithm and might be preferable over zlib and
+lzma, except if you need compatibility to older borg versions (< 1.1.4) that
+did not yet offer zstd.
+
+    $ borg create --compression zstd,N /path/to/repo::arch ~
+
+Other options are:
+
 If you have a fast repo storage and you want minimum CPU usage, no compression::
 
     $ borg create --compression none /path/to/repo::arch ~

@@ -910,15 +910,16 @@ Compression
 
 - none (no compression, pass through data 1:1)
 - lz4 (low compression, but super fast)
+- zstd (level 1-22 offering a wide range: level 1 is lower compression and high
+  speed, level 22 is higher compression and lower speed) - since borg 1.1.4
 - zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
   level 1 is low, level 9 is high compression)
 - lzma (level 0-9, level 0 is low, level 9 is high compression).
 
-Speed:  none > lz4 > zlib > lzma
-Compression: lzma > zlib > lz4 > none
+Speed:  none > lz4 > zlib > lzma, lz4 > zstd
+Compression: lzma > zlib > lz4 > none, zstd > lz4
 
-Be careful, higher zlib and especially lzma compression levels might take a
-lot of resources (CPU and memory).
+Be careful, higher compression levels might use a lot of resources (CPU/memory).
 
 The overall speed of course also depends on the speed of your target storage.
 If that is slow, using a higher compression level might yield better overall

@@ -788,7 +788,7 @@ Here's a (incomplete) list of some major changes:
 * more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
 * less chunk management overhead (less memory and disk usage for chunks index)
 * faster remote cache resync (useful when backing up multiple machines into same repo)
-* compression: no, lz4, zlib or lzma compression, adjustable compression levels
+* compression: no, lz4, zstd, zlib or lzma compression, adjustable compression levels
 * repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
 * simple sparse file support, great for virtual machine disk files
 * can read special files (e.g. block devices) or from stdin, write to stdout
@@ -840,8 +840,7 @@ The default in Borg is lz4, which is fast enough to not use significant CPU time
 in most cases, but can only achieve modest compression. It still compresses
 easily compressed data fairly well.
 
-zlib compression with all levels (1-9) as well as LZMA (1-6) are available
-as well, for cases where they are worth it.
+Borg also offers zstd, zlib and lzma compression, choose wisely.
 
 Which choice is the best option depends on a number of factors, like
 bandwidth to the repository, how well the data compresses, available CPU

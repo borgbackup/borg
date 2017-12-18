@@ -171,8 +171,6 @@ Salt running on a Debian system.
         - openssl
         - libacl1-dev
         - libacl1
-        - liblz4-dev
-        - liblz4-1
         - build-essential
         - libfuse-dev
         - fuse

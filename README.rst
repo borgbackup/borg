@@ -58,8 +58,13 @@ Main features
     authenticity is verified using HMAC-SHA256. Data is encrypted clientside.
 
 **Compression**
-    All data can be compressed by lz4 (super fast, low compression), zlib
-    (medium speed and compression) or lzma (low speed, high compression).
+    All data can be optionally compressed:
+
+    * lz4 (super fast, low compression)
+    * zstd (wide range from high speed and low compression to high compression
+      and lower speed)
+    * zlib (medium speed and compression)
+    * lzma (low speed, high compression)
 
 **Off-site backups**
     Borg can store data on any remote host accessible over SSH.  If Borg is

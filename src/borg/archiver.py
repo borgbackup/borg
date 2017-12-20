@@ -2160,7 +2160,13 @@ class Archiver:
             Do not compress.
 
         lz4
-            Use lz4 compression. High speed, low compression. (default)
+            Use lz4 compression. Very high speed, very low compression. (default)
+
+        zstd[,L]
+            Use zstd ("zstandard") compression, a modern wide-range algorithm.
+            If you do not explicitely give the compression level L (ranging from 1
+            to 22), it will use level 3.
+            Archives compressed with zstd are not compatible with borg < 1.1.4.
 
         zlib[,L]
             Use zlib ("gz") compression. Medium speed, medium compression.
@@ -2187,6 +2193,8 @@ class Archiver:
         Examples::
 
             borg create --compression lz4 REPO::ARCHIVE data
+            borg create --compression zstd REPO::ARCHIVE data
+            borg create --compression zstd,10 REPO::ARCHIVE data
             borg create --compression zlib REPO::ARCHIVE data
             borg create --compression zlib,1 REPO::ARCHIVE data
             borg create --compression auto,lzma,6 REPO::ARCHIVE data

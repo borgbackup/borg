@@ -141,12 +141,17 @@ following dependencies first:
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
 * libacl_ (which depends on libattr_), both plus development headers.
-* liblz4_ >= r129 (1.7.0), plus development headers.
 * ZeroMQ_ >= 4.0.0, plus development headers.
+* We have bundled code of the following packages, but borg by default (see
+  setup.py if you want to change that) prefers a shared library if it can
+  be found on the system (lib + dev headers) at build time:
+
+  - liblz4_ >= 1.7.0 (r129)
+  - libzstd_ >= 1.3.0
+  - libb2_
 * some Python dependencies, pip will automatically install them for you
 * optionally, the llfuse_ Python package is required if you wish to mount an
   archive as a FUSE filesystem. See setup.py about the version requirements.
-* optionally libb2_. If it is not found a bundled implementation is used instead.
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below or the Vagrantfile in the git repository,
@@ -169,7 +174,6 @@ Install the dependencies with development headers::
     sudo apt-get install python3 python3-dev python3-pip python-virtualenv \
     libssl-dev openssl \
     libacl1-dev libacl1 \
-    liblz4-dev liblz4-1 \
     libzmq3-dev libzmq3 \
     build-essential
     sudo apt-get install libfuse-dev fuse pkg-config    # optional, for FUSE support
@@ -188,7 +192,6 @@ Install the dependencies with development headers::
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv
     sudo dnf install openssl-devel openssl
     sudo dnf install libacl-devel libacl
-    sudo dnf install lz4-devel
     sudo dnf install gcc gcc-c++
     sudo dnf install redhat-rpm-config                 # not needed in Korora
     sudo dnf install fuse-devel fuse pkgconfig         # optional, for FUSE support
@@ -205,7 +208,7 @@ Install the dependencies automatically using zypper::
 Alternatively, you can enumerate all build dependencies in the command line::
 
     sudo zypper install python3 python3-devel \
-    libacl-devel liblz4-devel openssl-devel \
+    libacl-devel openssl-devel \
     python3-Cython python3-Sphinx python3-msgpack-python \
     python3-pytest python3-setuptools python3-setuptools_scm \
     python3-sphinx_rtd_theme python3-llfuse gcc gcc-c++
@@ -218,7 +221,7 @@ Mac OS X
 Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
 
-    brew install python3 lz4 openssl
+    brew install python3 openssl
     brew install pkg-config                            # optional, for FUSE support
     pip3 install virtualenv
 
@@ -238,7 +241,7 @@ and commands to make FUSE work for using the mount command.
 
 ::
 
-     pkg install -y python3 openssl liblz4 fusefs-libs pkgconf
+     pkg install -y python3 openssl fusefs-libs pkgconf
      pkg install -y git
      python3.4 -m ensurepip # to install pip for Python3
      To use the mount command:
@@ -270,7 +273,6 @@ Use the Cygwin installer to install the dependencies::
     python3 python3-devel python3-setuptools
     binutils gcc-g++
     libopenssl openssl-devel
-    liblz4_1 liblz4-devel
     git make openssh
 
 You can then install ``pip`` and ``virtualenv``::

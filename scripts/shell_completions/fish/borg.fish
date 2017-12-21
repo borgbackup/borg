@@ -1,4 +1,4 @@
-# Completions for borg version 1.1.1
+# Completions for borg
 # https://www.borgbackup.org/
 # Note: 
 # The list_archives function works on password protected repositories only if $BORG_PASSPHRASE is set.
@@ -65,6 +65,7 @@ complete -c borg -f      -l 'log-json'              -d 'Output one JSON object p
 complete -c borg -f      -l 'lock-wait'             -d 'Wait for lock max N seconds [1]'
 complete -c borg -f      -l 'show-version'          -d 'Log version information'
 complete -c borg -f      -l 'show-rc'               -d 'Log the return code'
+complete -c borg -f      -l 'no-files-cache'        -d 'Do not load/update file metadata cache'
 complete -c borg -f      -l 'umask'                 -d 'Set umask to M [0077]'
 complete -c borg         -l 'remote-path'           -d 'Use PATH as remote borg executable'
 complete -c borg -f      -l 'remote-ratelimit'      -d 'Set remote network upload RATE limit'
@@ -84,7 +85,6 @@ complete -c borg -f      -l 'list'                  -d 'Print verbose list of it
 complete -c borg -f      -l 'filter'                -d 'Only items with given STATUSCHARS'          -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'json'                  -d 'Print verbose stats as json'                -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'no-cache-sync'         -d 'Do not synchronize the cache'               -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'no-files-cache'        -d 'Do not load/update metadata cache'          -n "__fish_seen_subcommand_from create"
 #	Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from create"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from create"
@@ -94,16 +94,12 @@ complete -c borg -f      -l 'exclude-caches'        -d 'Exclude directories tagg
 complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that contain FILENAME'  -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'keep-tag-files'        -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'exclude-nodump'        -d 'Exclude files flagged nodump'               -n "__fish_seen_subcommand_from create"
 #	Filesytem options
 complete -c borg -f -s x -l 'one-file-system'       -d 'Stay in the same file system'               -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'numeric-owner'         -d 'Only store numeric user:group identifiers'  -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'noatime'               -d 'Do not store atime'                         -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'noctime'               -d 'Do not store ctime'                         -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'nobsdflags'            -d 'Do not store bsdflags'                      -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'ignore-inode'          -d 'Ignore inode data in file metadata cache'   -n "__fish_seen_subcommand_from create"
-set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
-complete -c borg -f      -l 'files-cache'           -d 'Operate files cache in MODE' -a "$files_cache_mode" -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'read-special'          -d 'Open device files like regular files'       -n "__fish_seen_subcommand_from create"
 #	Archive options
 complete -c borg -f      -l 'comment'               -d 'Add COMMENT to the archive'                 -n "__fish_seen_subcommand_from create"
@@ -118,7 +114,6 @@ complete -c borg -f -s C -l 'compression'           -d 'Select compression ALGOR
 complete -c borg -f      -l 'list'                  -d 'Print verbose list of items'                -n "__fish_seen_subcommand_from extract"
 complete -c borg -f -s n -l 'dry-run'               -d 'Do not actually extract any files'          -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'numeric-owner'         -d 'Only obey numeric user:group identifiers'   -n "__fish_seen_subcommand_from extract"
-complete -c borg -f      -l 'nobsdflags'            -d 'Do not extract bsdflags'                    -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'stdout'                -d 'Write all extracted data to stdout'         -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'sparse'                -d 'Create holes in sparse file'                -n "__fish_seen_subcommand_from extract"
 #	Exclusion options

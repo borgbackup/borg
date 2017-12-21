@@ -203,19 +203,22 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     allowed). So please test your scripts interactively before making them a non-interactive script.
 
 Directories and files:
-    BORG_KEYS_DIR
-        Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
-    BORG_KEY_FILE
-        When set, use the given filename as repository key file.
+    BORG_BASE_DIR
+        Default to '$HOME', '~$USER', '~' (in that order)'.
+        If we refer to ~ below, we in fact mean BORG_BASE_DIR.
+    BORG_CONFIG_DIR
+        Default to '~/.config/borg'. This directory contains the whole config directories.
+    BORG_CACHE_DIR
+        Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
+        of space for dealing with big repositories.
     BORG_SECURITY_DIR
         Default to '~/.config/borg/security'. This directory contains information borg uses to
         track its usage of NONCES ("numbers used once" - usually in encryption context) and other
         security relevant data.
-    BORG_CACHE_DIR
-        Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
-        of space for dealing with big repositories).
-    BORG_CONFIG_DIR
-        Default to '~/.config/borg'. This directory contains the whole config directories.
+    BORG_KEYS_DIR
+        Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
+    BORG_KEY_FILE
+        When set, use the given filename as repository key file.
 
 Building:
     BORG_OPENSSL_PREFIX

@@ -1,7 +1,7 @@
-# Completions for borg version 1.1.1
+# Completions for borg
 # https://www.borgbackup.org/
 # Note: 
-# The list_archives function works on password protected repositories only if $BORG_PASSPHRASE is set.
+# Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
 # Install:
 # Copy this file to /usr/share/fish/vendor_completions.d/
 
@@ -38,6 +38,7 @@ complete -c borg -f -n __fish_is_first_token -a 'recreate' -d 'Recreate contents
 complete -c borg -f -n __fish_is_first_token -a 'export-tar' -d 'Create tarball from an archive'
 complete -c borg -f -n __fish_is_first_token -a 'with-lock' -d 'Run a command while repository lock held'
 complete -c borg -f -n __fish_is_first_token -a 'break-lock' -d 'Break the repository lock'
+complete -c borg -f -n __fish_is_first_token -a 'config' -d 'Get/set options in repo/cache config'
 
 function __fish_borg_seen_benchmark
 	if __fish_seen_subcommand_from benchmark
@@ -84,7 +85,6 @@ complete -c borg -f      -l 'list'                  -d 'Print verbose list of it
 complete -c borg -f      -l 'filter'                -d 'Only items with given STATUSCHARS'          -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'json'                  -d 'Print verbose stats as json'                -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'no-cache-sync'         -d 'Do not synchronize the cache'               -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'no-files-cache'        -d 'Do not load/update metadata cache'          -n "__fish_seen_subcommand_from create"
 #	Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from create"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from create"
@@ -94,12 +94,13 @@ complete -c borg -f      -l 'exclude-caches'        -d 'Exclude directories tagg
 complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that contain FILENAME'  -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'keep-tag-files'        -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'exclude-nodump'        -d 'Exclude files flagged nodump'               -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'exclude-nodump'        -d 'Exclude files flagged NODUMP'               -n "__fish_seen_subcommand_from create"
 #	Filesytem options
 complete -c borg -f -s x -l 'one-file-system'       -d 'Stay in the same file system'               -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'numeric-owner'         -d 'Only store numeric user:group identifiers'  -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'noatime'               -d 'Do not store atime'                         -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'noctime'               -d 'Do not store ctime'                         -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'nobirthtime'           -d 'Do not store creation date'                 -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'nobsdflags'            -d 'Do not store bsdflags'                      -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'ignore-inode'          -d 'Ignore inode data in file metadata cache'   -n "__fish_seen_subcommand_from create"
 set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
@@ -118,9 +119,9 @@ complete -c borg -f -s C -l 'compression'           -d 'Select compression ALGOR
 complete -c borg -f      -l 'list'                  -d 'Print verbose list of items'                -n "__fish_seen_subcommand_from extract"
 complete -c borg -f -s n -l 'dry-run'               -d 'Do not actually extract any files'          -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'numeric-owner'         -d 'Only obey numeric user:group identifiers'   -n "__fish_seen_subcommand_from extract"
-complete -c borg -f      -l 'nobsdflags'            -d 'Do not extract bsdflags'                    -n "__fish_seen_subcommand_from extract"
+complete -c borg -f      -l 'nobsdflags'            -d 'Do not extract/set bsdflags'                -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'stdout'                -d 'Write all extracted data to stdout'         -n "__fish_seen_subcommand_from extract"
-complete -c borg -f      -l 'sparse'                -d 'Create holes in sparse file'                -n "__fish_seen_subcommand_from extract"
+complete -c borg -f      -l 'sparse'                -d 'Create holes in output sparse file'         -n "__fish_seen_subcommand_from extract"
 #	Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from extract"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from extract"
@@ -215,7 +216,8 @@ complete -c borg -f      -l 'last'                  -d 'Only last N archives'   
 
 # borg mount options
 complete -c borg -f -s f -l 'foreground'            -d 'Stay in foreground, do not daemonize'       -n "__fish_seen_subcommand_from mount"
-set -l fuse_options "allow_other allow_root" # FIXME there are lot more options, but not all are applicable
+# FIXME there are lot more options, but not all are applicable:
+set -l fuse_options "allow_other allow_root versions allow_damaged_files"
 complete -c borg -f -s o                            -d 'Fuse mount OPTIONS' -a "$fuse_options"      -n "__fish_seen_subcommand_from mount"
 #	Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from mount"
@@ -293,6 +295,10 @@ complete -c borg -f      -l 'storage-quota'         -d 'Override storage QUOTA o
 
 # borg benchmark
 #	no specific options
+
+# borg config
+complete -c borg -f -s c -l 'cache'                 -d 'Get/set values in the repo cache'           -n "__fish_seen_subcommand_from config"
+complete -c borg -f -s d -l 'delete'                -d 'Delete the KEY from the config'             -n "__fish_seen_subcommand_from config"
 
 
 # List archives

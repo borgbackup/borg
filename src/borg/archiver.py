@@ -124,6 +124,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
         def wrapper(self, args, **kwargs):
             location = args.location  # note: 'location' must be always present in args
             append_only = getattr(args, 'append_only', False)
+            storage_quota = getattr(args, 'storage_quota', None)
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
@@ -131,8 +132,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                                               lock_wait=self.lock_wait, lock=lock, append_only=append_only, args=args)
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
-                                        lock_wait=self.lock_wait, lock=lock,
-                                        append_only=append_only)
+                                        lock_wait=self.lock_wait, lock=lock, append_only=append_only,
+                                        storage_quota=storage_quota)
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)

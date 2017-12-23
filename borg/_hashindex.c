@@ -87,7 +87,7 @@ static int hash_sizes[] = {
 #define EMPTY _htole32(0xffffffff)
 #define DELETED _htole32(0xfffffffe)
 
-#define BUCKET_ADDR(index, idx) (index->buckets + (idx * index->bucket_size))
+#define BUCKET_ADDR(index, idx) (index->buckets + ((idx) * index->bucket_size))
 
 #define BUCKET_MATCHES_KEY(index, idx, key) (memcmp(key, BUCKET_ADDR(index, idx), index->key_size) == 0)
 

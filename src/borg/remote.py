@@ -23,7 +23,7 @@ from .compress import LZ4
 from .constants import *  # NOQA
 from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
-from .helpers import get_home_dir
+from .helpers import get_base_dir
 from .helpers import get_limited_unpacker
 from .helpers import hostname_is_unique
 from .helpers import replace_placeholders
@@ -330,9 +330,9 @@ class RepositoryServer:  # pragma: no cover
             path = os.fsdecode(path)
         # Leading slash is always present with URI (ssh://), but not with short-form (who@host:path).
         if path.startswith('/~/'):  # /~/x = path x relative to home dir
-            path = os.path.join(get_home_dir(), path[3:])
+            path = os.path.join(get_base_dir(), path[3:])
         elif path.startswith('~/'):
-            path = os.path.join(get_home_dir(), path[2:])
+            path = os.path.join(get_base_dir(), path[2:])
         elif path.startswith('/~'):  # /~username/x = relative to "user" home dir
             path = os.path.expanduser(path[1:])
         elif path.startswith('~'):

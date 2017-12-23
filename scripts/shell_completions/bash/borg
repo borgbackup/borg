@@ -42,8 +42,8 @@ _borg()
 			COMPREPLY=( $(compgen -W "${files_cache_mode}" -- ${cur}) )
 			return 0
 			;;
-		'--compression')
-			local compression_methods="none auto lz4 zlib,1 zlib,2 zlib,3 zlib,4 zlib,5 zlib,6 zlib,7 zlib,8 zlib,9 lzma,0 lzma,1 lzma,2 lzma,3 lzma,4 lzma,5 lzma,6 lzma,7 lzma,8 lzma,9"
+		'--compression' | '-C')
+			local compression_methods="none auto lz4 zstd,1 zstd,2 zstd,3 zstd,4 zstd,5 zstd,6 zstd,7 zstd,8 zstd,9 zstd,10 zstd,11 zstd,12 zstd,13 zstd,14 zstd,15 zstd,16 zstd,17 zstd,18 zstd,19 zstd,20 zstd,21 zstd,22 zlib,1 zlib,2 zlib,3 zlib,4 zlib,5 zlib,6 zlib,7 zlib,8 zlib,9 lzma,0 lzma,1 lzma,2 lzma,3 lzma,4 lzma,5 lzma,6 lzma,7 lzma,8 lzma,9"
 			COMPREPLY=( $(compgen -W "${compression_methods}" -- ${cur}) )
 			return 0
 			;;

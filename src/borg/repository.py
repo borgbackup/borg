@@ -195,6 +195,21 @@ class Repository:
     def id_str(self):
         return bin_to_hex(self.id)
 
+    @staticmethod
+    def is_repository(path):
+        """Check whether there is already a Borg repository at *path*."""
+        try:
+            # Use binary mode to avoid troubles if a README contains some stuff not in our locale
+            with open(os.path.join(path, 'README'), 'rb') as fd:
+                # Read only the first ~100 bytes (if any), in case some README file we stumble upon is large.
+                readme_head = fd.read(100)
+                # The first comparison captures our current variant (REPOSITORY_README), the second comparison
+                # is an older variant of the README file (used by 1.0.x).
+                return b'Borg Backup repository' in readme_head or b'Borg repository' in readme_head
+        except OSError:
+            # Ignore FileNotFound, PermissionError, ...
+            return False
+
     def check_can_create_repository(self, path):
         """
         Raise self.AlreadyExists if a repository already exists at *path* or any parent directory.
@@ -218,18 +233,8 @@ class Repository:
             if path == previous_path:
                 # We reached the root of the directory hierarchy (/.. = / and C:\.. = C:\).
                 break
-            try:
-                # Use binary mode to avoid troubles if a README contains some stuff not in our locale
-                with open(os.path.join(path, 'README'), 'rb') as fd:
-                    # Read only the first ~100 bytes (if any), in case some README file we stumble upon is large.
-                    readme_head = fd.read(100)
-                    # The first comparison captures our current variant (REPOSITORY_README), the second comparison
-                    # is an older variant of the README file (used by 1.0.x).
-                    if b'Borg Backup repository' in readme_head or b'Borg repository' in readme_head:
-                        raise self.AlreadyExists(path)
-            except OSError:
-                # Ignore FileNotFound, PermissionError, ...
-                pass
+            if self.is_repository(path):
+                raise self.AlreadyExists(path)
 
     def create(self, path):
         """Create a new empty repository at `path`

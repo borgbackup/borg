@@ -185,10 +185,31 @@ def swidth(s):
     return len(s)
 
 
+# patched socket.getfqdn() - see https://bugs.python.org/issue5004
+def getfqdn(name=''):
+    """Get fully qualified domain name from name.
+
+    An empty argument is interpreted as meaning the local host.
+    """
+    name = name.strip()
+    if not name or name == '0.0.0.0':
+        name = socket.gethostname()
+    try:
+        addrs = socket.getaddrinfo(name, None, 0, socket.SOCK_DGRAM, 0, socket.AI_CANONNAME)
+    except socket.error:
+        pass
+    else:
+        for addr in addrs:
+            if addr[3]:
+                name = addr[3]
+                break
+    return name
+
+
 # for performance reasons, only determine hostname / fqdn / hostid once.
 # XXX this sometimes requires live internet access for issuing a DNS query in the background.
 hostname = socket.gethostname()
-fqdn = socket.getfqdn()
+fqdn = getfqdn(hostname)
 hostid = '%s@%s' % (fqdn, uuid.getnode())
 
 

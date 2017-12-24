@@ -116,6 +116,12 @@ class Repository:
     class AlreadyExists(Error):
         """A repository already exists at {}."""
 
+    class OtherFilesExist(Error):
+        """Files not created by Borg already exist at {}."""
+
+    class NotADirectory(Error):
+        """{} is not a directory."""
+
     class InvalidRepository(Error):
         """{} is not a valid repository. Check repo config."""
 
@@ -212,7 +218,7 @@ class Repository:
 
     def check_can_create_repository(self, path):
         """
-        Raise self.AlreadyExists if a repository already exists at *path* or any parent directory.
+        Raise an exception if a repository already exists at *path* or any parent directory.
 
         Checking parent directories is done for two reasons:
         (1) It's just a weird thing to do, and usually not intended. A Borg using the "parent" repository
@@ -222,8 +228,13 @@ class Repository:
             repository, user's can only use the quota'd repository, when their --restrict-to-path points
             at the user's repository.
         """
-        if os.path.exists(path) and (not os.path.isdir(path) or os.listdir(path)):
-            raise self.AlreadyExists(path)
+        if os.path.exists(path):
+            if not os.path.isdir(path):
+                raise self.NotADirectory(path)
+            elif self.is_repository(path):
+                raise self.AlreadyExists(path)
+            elif os.listdir(path):
+                raise self.OtherFilesExist(path)
 
         while True:
             # Check all parent directories for Borg's repository README

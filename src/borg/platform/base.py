@@ -1,5 +1,7 @@
 import errno
 import os
+import socket
+import uuid
 
 from borg.helpers import truncate_and_unlink
 
@@ -15,7 +17,7 @@ platform API: that way platform APIs provided by the platform-specific support m
 are correctly composed into the base functionality.
 """
 
-API_VERSION = '1.1_02'
+API_VERSION = '1.1_03'
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
 
@@ -183,12 +185,44 @@ def swidth(s):
     return len(s)
 
 
+# patched socket.getfqdn() - see https://bugs.python.org/issue5004
+def getfqdn(name=''):
+    """Get fully qualified domain name from name.
+
+    An empty argument is interpreted as meaning the local host.
+    """
+    name = name.strip()
+    if not name or name == '0.0.0.0':
+        name = socket.gethostname()
+    try:
+        addrs = socket.getaddrinfo(name, None, 0, socket.SOCK_DGRAM, 0, socket.AI_CANONNAME)
+    except socket.error:
+        pass
+    else:
+        for addr in addrs:
+            if addr[3]:
+                name = addr[3]
+                break
+    return name
+
+
+# for performance reasons, only determine hostname / fqdn / hostid once.
+# XXX this sometimes requires live internet access for issuing a DNS query in the background.
+hostname = socket.gethostname()
+fqdn = getfqdn(hostname)
+hostid = '%s@%s' % (fqdn, uuid.getnode())
+
+
 def get_process_id():
     """
-    Return identification tuple (hostname, pid, thread_id) for 'us'. If this is a FUSE process, then the PID will be
-    that of the parent, not the forked FUSE child.
+    Return identification tuple (hostname, pid, thread_id) for 'us'.
+    This always returns the current pid, which might be different from before, e.g. if daemonize() was used.
+
+    Note: Currently thread_id is *always* zero.
     """
-    raise NotImplementedError
+    thread_id = 0
+    pid = os.getpid()
+    return hostid, pid, thread_id
 
 
 def process_alive(host, pid, thread):

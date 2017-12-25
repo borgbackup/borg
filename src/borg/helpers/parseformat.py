@@ -179,8 +179,8 @@ def format_line(format, data):
 
 def replace_placeholders(text):
     """Replace placeholders in text with their values."""
+    from ..platform import fqdn
     current_time = datetime.now()
-    fqdn = socket.getfqdn()
     data = {
         'pid': os.getpid(),
         'fqdn': fqdn,

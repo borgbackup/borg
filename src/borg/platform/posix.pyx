@@ -1,8 +1,5 @@
 import errno
 import os
-import uuid
-import socket
-import subprocess
 
 
 cdef extern from "wchar.h":
@@ -18,23 +15,6 @@ def swidth(s):
         return str_len
 
 
-# for performance reasons, only determine the hostname once.
-# XXX this sometimes requires live internet access for issuing a DNS query in the background.
-_hostname = '%s@%s' % (socket.getfqdn(), uuid.getnode())
-
-
-def get_process_id():
-    """
-    Return identification tuple (hostname, pid, thread_id) for 'us'.
-    This always returns the current pid, which might be different from before, e.g. if daemonize() was used.
-
-    Note: Currently thread_id is *always* zero.
-    """
-    thread_id = 0
-    pid = os.getpid()
-    return _hostname, pid, thread_id
-
-
 def process_alive(host, pid, thread):
     """
     Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
@@ -43,8 +23,9 @@ def process_alive(host, pid, thread):
     returns always True, since there is no real way to check.
     """
     from . import local_pid_alive
+    from . import hostid
 
-    if host != _hostname:
+    if host != hostid:
         return True
 
     if thread != 0:

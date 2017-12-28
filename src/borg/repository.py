@@ -116,11 +116,8 @@ class Repository:
     class AlreadyExists(Error):
         """A repository already exists at {}."""
 
-    class OtherFilesExist(Error):
-        """Files not created by Borg already exist at {}."""
-
-    class NotADirectory(Error):
-        """{} is not a directory."""
+    class PathAlreadyExists(Error):
+        """There is already something at {}."""
 
     class InvalidRepository(Error):
         """{} is not a valid repository. Check repo config."""
@@ -229,12 +226,10 @@ class Repository:
             at the user's repository.
         """
         if os.path.exists(path):
-            if not os.path.isdir(path):
-                raise self.NotADirectory(path)
-            elif self.is_repository(path):
+            if self.is_repository(path):
                 raise self.AlreadyExists(path)
-            elif os.listdir(path):
-                raise self.OtherFilesExist(path)
+            if not os.path.isdir(path) or os.listdir(path):
+                raise self.PathAlreadyExists(path)
 
         while True:
             # Check all parent directories for Borg's repository README

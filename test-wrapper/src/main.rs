@@ -72,7 +72,7 @@ fn main() {
         None => lib_path.into_os_string(),
     };
     let mut command = Command::new(args.next().unwrap_or_else(|| "sh".to_string()));
-    let mut command = command
+    let command = command
         .args(args)
         .env(LIB_INJECT_ENV, inject_path)
         .env("TEST_WRAPPER_SOCKET", &socket_path);

@@ -110,7 +110,8 @@ fn reply<T: Serialize + Debug>(writer: &mut BufWriter<UnixStream>, obj: &T) {
 }
 
 fn reply_zero(writer: &mut BufWriter<UnixStream>) {
-    serialize_into(writer, &0, bincode::Infinite)
+    let zero: c_int = 0;
+    serialize_into(writer, &zero, bincode::Infinite)
         .expect("Failed to write reply to client socket");
     writer.flush().expect("IO Error flushing client socket");
 }
@@ -174,7 +175,7 @@ pub fn connection(conn: UnixStream, conn_num: u32) {
                             entry.remove();
                         }
                     }
-                    _ => {}
+                    _ => error!("Client {} called ReadyDeletion for unknown file {:?}", conn_num, id)
                 }
             }
             Message::Reference(id) => {

@@ -42,21 +42,12 @@ wrap! {
                 return Ok(0);
             }
         }
+        let id = FD_ID_CACHE.lock().unwrap().remove(&fd).unwrap_or(
+            FileId::from_stat(&CPath::from_fd(fd).get_stat()?)
+        );
         let ret = ORIG_CLOSE(fd);
         if ret != -1 {
-            if let Some(id) = FD_ID_CACHE.lock().unwrap().remove(&fd) {
-                let mut file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
-                if let Some(count) = file_ref_counts.get_mut(&id) {
-                    if *count == 0 {
-                        warn!("Tried to drop ref to file with no references");
-                    } else {
-                        *count -= 1;
-                        if *count == 0 {
-                            let _ = message(Message::DropReference(id));
-                        }
-                    }
-                }
-            }
+            dec_file_ref_count(id)?;
         }
         Ok(ret)
     }

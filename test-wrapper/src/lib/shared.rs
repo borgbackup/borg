@@ -168,7 +168,8 @@ pub fn request<T: DeserializeOwned>(message: Message) -> T {
 
 // The reply is important, as it ensures the operation is finished serverside
 pub fn message(message: Message) -> Result<()> {
-    match request(message) {
+    let res: c_int = request(message);
+    match res {
         0 => Ok(()),
         e => Err(e),
     }
@@ -431,6 +432,21 @@ impl Debug for CPath {
             },
         }
     }
+}
+
+pub fn dec_file_ref_count(id: FileId) -> Result<()> {
+    let mut file_ref_counts = FILE_REF_COUNTS.lock().unwrap();
+    if let Some(count) = file_ref_counts.get_mut(&id) {
+        if *count != 0 {
+            *count -= 1;
+            if *count == 0 {
+                return message(Message::DropReference(id));
+            }
+            return Ok(());
+        }
+    }
+    warn!("Tried to drop ref to file with no references");
+    Ok(())
 }
 
 pub fn inc_file_ref_count(id: FileId) -> Result<()> {

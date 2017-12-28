@@ -6,15 +6,15 @@ use internal_stat::{INTERNAL_FSTAT, NativeStat};
 
 use libc::{self, O_RDONLY, O_NONBLOCK};
 
-fn base_unlink<F: FnOnce() -> c_int, G: FnOnce() -> c_int>(fd_fn: F, orig_fn: G) -> Result<c_int> {
-    REENTRANT.with(|c| c.set(false));
-    let fd = fd_fn();
-    REENTRANT.with(|c| c.set(true));
+fn base_unlink<F: FnOnce() -> c_int, G: FnOnce() -> c_int>(open_fn: F, orig_fn: G) -> Result<c_int> {
+    let fd = open_fn();
     if fd == -1 {
         debug!("Failed to open file before unlink");
         return Ok(orig_fn());
     }
     let ret = orig_fn();
+    let id = CPath::from_fd(fd).get_id()?;
+    inc_file_ref_count(id)?;
     let statbuf = unsafe {
         let mut statbuf: NativeStat = mem::uninitialized();
         if INTERNAL_FSTAT(fd, &mut statbuf as *mut _) == -1 {
@@ -23,11 +23,10 @@ fn base_unlink<F: FnOnce() -> c_int, G: FnOnce() -> c_int>(fd_fn: F, orig_fn: G)
         statbuf
     };
     if statbuf.st_nlink == 0 {
-        let _ = message(Message::ReadyDeletion(FileId::from_stat(&statbuf)));
+        let _ = message(Message::ReadyDeletion(id));
     }
-    REENTRANT.with(|c| c.set(false));
+    dec_file_ref_count(id)?;
     unsafe { libc::close(fd) };
-    REENTRANT.with(|c| c.set(true));
     Ok(ret)
 }
 

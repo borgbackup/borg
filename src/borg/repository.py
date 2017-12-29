@@ -116,6 +116,9 @@ class Repository:
     class AlreadyExists(Error):
         """A repository already exists at {}."""
 
+    class PathAlreadyExists(Error):
+        """There is already something at {}."""
+
     class InvalidRepository(Error):
         """{} is not a valid repository. Check repo config."""
 
@@ -195,9 +198,24 @@ class Repository:
     def id_str(self):
         return bin_to_hex(self.id)
 
+    @staticmethod
+    def is_repository(path):
+        """Check whether there is already a Borg repository at *path*."""
+        try:
+            # Use binary mode to avoid troubles if a README contains some stuff not in our locale
+            with open(os.path.join(path, 'README'), 'rb') as fd:
+                # Read only the first ~100 bytes (if any), in case some README file we stumble upon is large.
+                readme_head = fd.read(100)
+                # The first comparison captures our current variant (REPOSITORY_README), the second comparison
+                # is an older variant of the README file (used by 1.0.x).
+                return b'Borg Backup repository' in readme_head or b'Borg repository' in readme_head
+        except OSError:
+            # Ignore FileNotFound, PermissionError, ...
+            return False
+
     def check_can_create_repository(self, path):
         """
-        Raise self.AlreadyExists if a repository already exists at *path* or any parent directory.
+        Raise an exception if a repository already exists at *path* or any parent directory.
 
         Checking parent directories is done for two reasons:
         (1) It's just a weird thing to do, and usually not intended. A Borg using the "parent" repository
@@ -207,8 +225,11 @@ class Repository:
             repository, user's can only use the quota'd repository, when their --restrict-to-path points
             at the user's repository.
         """
-        if os.path.exists(path) and (not os.path.isdir(path) or os.listdir(path)):
-            raise self.AlreadyExists(path)
+        if os.path.exists(path):
+            if self.is_repository(path):
+                raise self.AlreadyExists(path)
+            if not os.path.isdir(path) or os.listdir(path):
+                raise self.PathAlreadyExists(path)
 
         while True:
             # Check all parent directories for Borg's repository README
@@ -218,18 +239,8 @@ class Repository:
             if path == previous_path:
                 # We reached the root of the directory hierarchy (/.. = / and C:\.. = C:\).
                 break
-            try:
-                # Use binary mode to avoid troubles if a README contains some stuff not in our locale
-                with open(os.path.join(path, 'README'), 'rb') as fd:
-                    # Read only the first ~100 bytes (if any), in case some README file we stumble upon is large.
-                    readme_head = fd.read(100)
-                    # The first comparison captures our current variant (REPOSITORY_README), the second comparison
-                    # is an older variant of the README file (used by 1.0.x).
-                    if b'Borg Backup repository' in readme_head or b'Borg repository' in readme_head:
-                        raise self.AlreadyExists(path)
-            except OSError:
-                # Ignore FileNotFound, PermissionError, ...
-                pass
+            if self.is_repository(path):
+                raise self.AlreadyExists(path)
 
     def create(self, path):
         """Create a new empty repository at `path`

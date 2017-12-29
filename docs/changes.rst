@@ -197,26 +197,40 @@ Compatibility notes:
     versions (header and lib) can't be found at build time, bundled code will
     be used:
 
-    - added: libzstd >= 1.3.0 (bundled: 1.3.2)
-    - updated: liblz4 >= 1.7.0 / r129 (bundled: 1.8.0)
+    - added requirement: libzstd >= 1.3.0 (bundled: 1.3.2)
+    - updated requirement: liblz4 >= 1.7.0 / r129 (bundled: 1.8.0)
 
 Fixes:
 
-- data corruption fix: fix for borg check --repair malfunction, #3444.
+- check: data corruption fix: fix for borg check --repair malfunction, #3444.
   See the more detailled notes close to the top of this document.
-- also delete security dir when deleting a repo, #3427
-- fix building the "borg prune" man page, #3398
+- delete: also delete security dir when deleting a repo, #3427
+- prune: fix building the "borg prune" man page, #3398
+- init: use given --storage-quota for local repo, #3470
+- init: properly quote repo path in output
+- fix startup delay with dns-only own fqdn resolving, #3471
 
 New features:
 
 - added zstd compression. try it!
-- added placeholder for fqdn in reverse notation
+- added placeholder {reverse-fqdn} for fqdn in reverse notation
+- added BORG_BASE_DIR environment variable, #3338
 
 Other changes:
 
 - list help topics when invalid topic is requested
-- add auto-generated docs for borg config
-- don't generate HTML docs page for borgfs, #3404
+- fix lz4 deprecation warning, requires lz4 >= 1.7.0 (r129)
+- add parens for C preprocessor macro argument usages (did not cause malfunction)
+- exclude broken pytest 3.3.0 release
+- updated fish/bash completions
+- init: more clear exception messages for borg create, #3465
+- docs:
+
+  - add auto-generated docs for borg config
+  - don't generate HTML docs page for borgfs, #3404
+  - docs update for lz4 b2 zstd changes
+  - add zstd to compression help, readme, docs
+  - update requirements and install docs about bundled lz4 and zstd
 - refactored build of the compress and crypto.low_level extensions, #3415:
 
   - move some lib/build related code to setup_{zstd,lz4,b2}.py
@@ -228,9 +242,6 @@ Other changes:
   - add prefer_system_lib* = True settings to setup.py - by default the build
     will prefer a shared library over the bundled code, if library and headers
     can be found and meet the minimum requirements.
-- fix lz4 deprecation warning, requires lz4 >= 1.7.0 (r129)
-- add parens for C preprocessor macro argument usages (did not cause malfunction)
-- exclude broken pytest 3.3.0 release
 
 
 Version 1.1.3 (2017-11-27)

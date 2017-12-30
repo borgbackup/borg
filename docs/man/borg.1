@@ -438,23 +438,27 @@ allowed). So please test your scripts interactively before making them a non\-in
 .B Directories and files:
 .INDENT 7.0
 .TP
-.B BORG_KEYS_DIR
-Default to \(aq~/.config/borg/keys\(aq. This directory contains keys for encrypted repositories.
+.B BORG_BASE_DIR
+Default to \(aq$HOME\(aq, \(aq~$USER\(aq, \(aq~\(aq (in that order)\(aq.
+If we refer to ~ below, we in fact mean BORG_BASE_DIR.
 .TP
-.B BORG_KEY_FILE
-When set, use the given filename as repository key file.
+.B BORG_CONFIG_DIR
+Default to \(aq~/.config/borg\(aq. This directory contains the whole config directories.
+.TP
+.B BORG_CACHE_DIR
+Default to \(aq~/.cache/borg\(aq. This directory contains the local cache and might need a lot
+of space for dealing with big repositories.
 .TP
 .B BORG_SECURITY_DIR
 Default to \(aq~/.config/borg/security\(aq. This directory contains information borg uses to
 track its usage of NONCES ("numbers used once" \- usually in encryption context) and other
 security relevant data.
 .TP
-.B BORG_CACHE_DIR
-Default to \(aq~/.cache/borg\(aq. This directory contains the local cache and might need a lot
-of space for dealing with big repositories).
+.B BORG_KEYS_DIR
+Default to \(aq~/.config/borg/keys\(aq. This directory contains keys for encrypted repositories.
 .TP
-.B BORG_CONFIG_DIR
-Default to \(aq~/.config/borg\(aq. This directory contains the whole config directories.
+.B BORG_KEY_FILE
+When set, use the given filename as repository key file.
 .UNINDENT
 .TP
 .B Building:
@@ -463,8 +467,9 @@ Default to \(aq~/.config/borg\(aq. This directory contains the whole config dire
 .B BORG_OPENSSL_PREFIX
 Adds given OpenSSL header file directory to the default locations (setup.py).
 .TP
-.B BORG_LZ4_PREFIX
-Adds given LZ4 header file directory to the default locations (setup.py).
+.B BORG_LIBLZ4_PREFIX
+Adds given prefix directory to the default locations. If a \(aqinclude/lz4.h\(aq is found Borg
+will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
 .TP
 .B BORG_LIBB2_PREFIX
 Adds given prefix directory to the default locations. If a \(aqinclude/blake2.h\(aq is found Borg

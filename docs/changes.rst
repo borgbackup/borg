@@ -1493,7 +1493,7 @@ Bug fixes:
 - borg delete:
 
   - make it possible to delete a repo without manifest
-  - borg delete --forced allows to delete corrupted archives, #1139
+  - borg delete --forced allows one to delete corrupted archives, #1139
 - borg check:
 
   - make borg check work for empty repo

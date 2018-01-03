@@ -126,7 +126,7 @@ resulting archive will only contain files from these PATHs.
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will *not* match (``--exclude``, ``--exclude-from``, PATHs).
 
-``--recompress`` allows to change the compression of existing data in archives.
+``--recompress`` allows one to change the compression of existing data in archives.
 Due to how Borg stores compressed size information this might display
 incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.

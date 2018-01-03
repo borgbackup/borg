@@ -43,7 +43,7 @@ exe = EXE(pyz,
 
 if False:
     # Enable this block to build a directory-based binary instead of
-    # a packed single file. This allows to easily look at all included
+    # a packed single file. This allows one to easily look at all included
     # files (e.g. without having to strace or halt the built binary
     # and introspect /tmp).
     coll = COLLECT(exe,

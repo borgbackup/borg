@@ -2070,7 +2070,7 @@ class Archiver:
         then, after parsing the command line, multiple definitions are resolved.
 
         Defaults are handled by only setting them on the top-level parser and setting
-        a sentinel object in all sub-parsers, which then allows to discern which parser
+        a sentinel object in all sub-parsers, which then allows one to discern which parser
         supplied the option.
         """
 
@@ -2613,7 +2613,7 @@ class Archiver:
 
         key_export_epilog = process_epilog("""
         If repository encryption is used, the repository is inaccessible
-        without the key. This command allows to backup this essential key.
+        without the key. This command allows one to backup this essential key.
         Note that the backup produced does not include the passphrase itself
         (i.e. the exported key stays encrypted). In order to regain access to a
         repository, one needs both the exported key and the original passphrase.
@@ -2650,7 +2650,7 @@ class Archiver:
                                help='Create an html file suitable for printing and later type-in or qr scan')
 
         key_import_epilog = process_epilog("""
-        This command allows to restore a key previously backed up with the
+        This command allows one to restore a key previously backed up with the
         export command.
 
         If the ``--paper`` option is given, the import will be an interactive
@@ -3425,7 +3425,7 @@ class Archiver:
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (``--exclude``, ``--exclude-from``, PATHs).
 
-        ``--recompress`` allows to change the compression of existing data in archives.
+        ``--recompress`` allows one to change the compression of existing data in archives.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.

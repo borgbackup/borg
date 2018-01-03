@@ -1973,20 +1973,20 @@ class Archiver:
 
         zstd[,L]
             Use zstd ("zstandard") compression, a modern wide-range algorithm.
-            If you do not explicitely give the compression level L (ranging from 1
+            If you do not explicitly give the compression level L (ranging from 1
             to 22), it will use level 3.
             Archives compressed with zstd are not compatible with borg < 1.1.4.
 
         zlib[,L]
             Use zlib ("gz") compression. Medium speed, medium compression.
-            If you do not explicitely give the compression level L (ranging from 0
+            If you do not explicitly give the compression level L (ranging from 0
             to 9), it will use level 6.
             Giving level 0 (means "no compression", but still has zlib protocol
             overhead) is usually pointless, you better use "none" compression.
 
         lzma[,L]
             Use lzma ("xz") compression. Low speed, high compression.
-            If you do not explicitely give the compression level L (ranging from 0
+            If you do not explicitly give the compression level L (ranging from 0
             to 9), it will use level 6.
             Giving levels above 6 is pointless and counterproductive because it does
             not compress better due to the buffer size used by borg - but it wastes

@@ -374,7 +374,7 @@ needs to be handled.
 
 Lastly, cache_ invalidation is handled by noting which feature
 flags were and which were not understood while manipulating a cache.
-This allows one to detect whether the cache needs to be invalidated,
+This allows borg to detect whether the cache needs to be invalidated,
 i.e. rebuilt from scratch. See `Cache feature flags`_ below.
 
 The *config* key stores the feature flags enabled on a repository:
@@ -1022,7 +1022,7 @@ Before feeding the checksum algorithm any data, the file name (i.e. without any 
 is mixed into the checksum, since the name encodes the context of the data for Borg.
 
 The various indices used by Borg have separate header and main data parts.
-IntegrityCheckedFile allows one to checksum them independently, which avoids
+IntegrityCheckedFile allows borg to checksum them independently, which avoids
 even reading the data when the header is corrupted. When a part is signalled,
 the length of the part name is mixed into the checksum state first (encoded
 as an ASCII string via `%10d` printf format), then the name of the part

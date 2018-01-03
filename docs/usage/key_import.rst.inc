@@ -54,8 +54,7 @@ borg key import
 Description
 ~~~~~~~~~~~
 
-This command allows one to restore a key previously backed up with the
-export command.
+This command restores a key previously backed up with the export command.
 
 If the ``--paper`` option is given, the import will be an interactive
 process in which each line is checked for plausibility before

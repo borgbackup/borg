@@ -3071,7 +3071,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 'name': 'archive1',
                 'time': '2016-12-15T18:49:51.849711',
                 'version': 1,
-            })
+            }, use_bin_type=False)
             archive_id = key.id_hash(archive)
             repository.put(archive_id, key.encrypt(archive))
             repository.commit()
@@ -3166,7 +3166,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'archives': {},
                 'config': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
-            })))
+            }, use_bin_type=False)))
             repository.commit()
 
     def test_fresh_init_tam_required(self):
@@ -3178,7 +3178,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'version': 1,
                 'archives': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
-            })))
+            }, use_bin_type=False)))
             repository.commit()
 
         with pytest.raises(TAMRequiredError):
@@ -3196,7 +3196,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
 
             manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
             del manifest[b'tam']
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest)))
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest, use_bin_type=False)))
             repository.commit()
         output = self.cmd('list', '--debug', self.repository_location)
         assert 'archive1234' in output

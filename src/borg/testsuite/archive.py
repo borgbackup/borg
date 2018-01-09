@@ -138,7 +138,7 @@ class ChunkBufferTestCase(BaseTestCase):
 class RobustUnpackerTestCase(BaseTestCase):
 
     def make_chunks(self, items):
-        return b''.join(msgpack.packb({'path': item}) for item in items)
+        return b''.join(msgpack.packb({'path': item}, use_bin_type=False) for item in items)
 
     def _validator(self, value):
         return isinstance(value, dict) and value.get(b'path') in (b'foo', b'bar', b'boo', b'baz')
@@ -193,12 +193,12 @@ class RobustUnpackerTestCase(BaseTestCase):
 
 @pytest.fixture
 def item_keys_serialized():
-    return [msgpack.packb(name) for name in ITEM_KEYS]
+    return [msgpack.packb(name, use_bin_type=False) for name in ITEM_KEYS]
 
 
 @pytest.mark.parametrize('packed',
     [b'', b'x', b'foobar', ] +
-    [msgpack.packb(o) for o in (
+    [msgpack.packb(o, use_bin_type=False) for o in (
         [None, 0, 0.0, False, '', {}, [], ()] +
         [42, 23.42, True, b'foobar', {b'foo': b'bar'}, [b'foo', b'bar'], (b'foo', b'bar')]
     )])
@@ -211,7 +211,7 @@ IK = sorted(list(ITEM_KEYS))
 
 
 @pytest.mark.parametrize('packed',
-    [msgpack.packb(o) for o in [
+    [msgpack.packb(o, use_bin_type=False) for o in [
         {b'path': b'/a/b/c'},  # small (different msgpack mapping type!)
         OrderedDict((k, b'') for k in IK),  # as big (key count) as it gets
         OrderedDict((k, b'x' * 1000) for k in IK),  # as big (key count and volume) as it gets
@@ -223,8 +223,8 @@ def test_valid_msgpacked_items(packed, item_keys_serialized):
 def test_key_length_msgpacked_items():
     key = b'x' * 32  # 31 bytes is the limit for fixstr msgpack type
     data = {key: b''}
-    item_keys_serialized = [msgpack.packb(key), ]
-    assert valid_msgpacked_dict(msgpack.packb(data), item_keys_serialized)
+    item_keys_serialized = [msgpack.packb(key, use_bin_type=False), ]
+    assert valid_msgpacked_dict(msgpack.packb(data, use_bin_type=False), item_keys_serialized)
 
 
 def test_backup_io():

@@ -208,10 +208,10 @@ class KeyBase:
             'hmac': bytes(64),
             'salt': os.urandom(64),
         })
-        packed = msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
+        packed = msgpack.packb(metadata_dict, unicode_errors='surrogateescape', use_bin_type=False)
         tam_key = self._tam_key(tam['salt'], context)
         tam['hmac'] = HMAC(tam_key, packed, sha512).digest()
-        return msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
+        return msgpack.packb(metadata_dict, unicode_errors='surrogateescape', use_bin_type=False)
 
     def unpack_and_verify_manifest(self, data, force_tam_not_required=False):
         """Unpack msgpacked *data* and return (object, did_verify)."""
@@ -622,7 +622,7 @@ class KeyfileKeyBase(AESKeyBase):
             hash=hash,
             data=cdata,
         )
-        return msgpack.packb(enc_key.as_dict())
+        return msgpack.packb(enc_key.as_dict(), use_bin_type=False)
 
     def _save(self, passphrase):
         key = Key(
@@ -634,7 +634,7 @@ class KeyfileKeyBase(AESKeyBase):
             chunk_seed=self.chunk_seed,
             tam_required=self.tam_required,
         )
-        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)
+        data = self.encrypt_key_file(msgpack.packb(key.as_dict(), use_bin_type=False), passphrase)
         key_data = '\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii')))
         return key_data
 

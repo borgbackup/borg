@@ -337,12 +337,12 @@ class TestTAM:
             key.unpack_and_verify_manifest(blob)
 
     def test_missing_when_required(self, key):
-        blob = msgpack.packb({})
+        blob = msgpack.packb({}, use_bin_type=False)
         with pytest.raises(TAMRequiredError):
             key.unpack_and_verify_manifest(blob)
 
     def test_missing(self, key):
-        blob = msgpack.packb({})
+        blob = msgpack.packb({}, use_bin_type=False)
         key.tam_required = False
         unpacked, verified = key.unpack_and_verify_manifest(blob)
         assert unpacked == {}
@@ -353,7 +353,7 @@ class TestTAM:
             'tam': {
                 'type': 'HMAC_VOLLBIT',
             },
-        })
+        }, use_bin_type=False)
         with pytest.raises(TAMUnsupportedSuiteError):
             key.unpack_and_verify_manifest(blob)
 
@@ -362,7 +362,7 @@ class TestTAM:
             'tam': {
                 'type': 'HMAC_VOLLBIT',
             },
-        })
+        }, use_bin_type=False)
         key.tam_required = False
         unpacked, verified = key.unpack_and_verify_manifest(blob)
         assert unpacked == {}
@@ -377,7 +377,7 @@ class TestTAM:
     def test_invalid(self, key, tam, exc):
         blob = msgpack.packb({
             'tam': tam,
-        })
+        }, use_bin_type=False)
         with pytest.raises(exc):
             key.unpack_and_verify_manifest(blob)
 
@@ -400,7 +400,7 @@ class TestTAM:
             del tam['hmac']
         if salt is None:
             del tam['salt']
-        blob = msgpack.packb(data)
+        blob = msgpack.packb(data, use_bin_type=False)
         with pytest.raises(TAMInvalid):
             key.unpack_and_verify_manifest(blob)
 
@@ -427,7 +427,7 @@ class TestTAM:
         assert len(unpacked[b'tam'][which]) == 64
         unpacked[b'tam'][which] = unpacked[b'tam'][which][0:32] + bytes(32)
         assert len(unpacked[b'tam'][which]) == 64
-        blob = msgpack.packb(unpacked)
+        blob = msgpack.packb(unpacked, use_bin_type=False)
 
         with pytest.raises(TAMInvalid):
             key.unpack_and_verify_manifest(blob)

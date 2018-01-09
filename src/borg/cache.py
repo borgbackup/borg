@@ -515,7 +515,7 @@ class LocalCache(CacheStatsMixin):
                     for path_hash, item in u:
                         entry = FileCacheEntry(*item)
                         # in the end, this takes about 240 Bytes per file
-                        self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+                        self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1), use_bin_type=False)
                 except (TypeError, ValueError) as exc:
                     logger.warning('The files cache seems corrupt, ignoring it. '
                                    'Expect lower performance. [%s]' % str(exc))
@@ -559,7 +559,7 @@ class LocalCache(CacheStatsMixin):
                     entry = FileCacheEntry(*msgpack.unpackb(item))
                     if entry.age == 0 and bigint_to_int(entry.cmtime) < self._newest_cmtime or \
                        entry.age > 0 and entry.age < ttl:
-                        msgpack.pack((path_hash, entry), fd)
+                        msgpack.pack((path_hash, entry), fd, use_bin_type=False)
             self.cache_config.integrity['files'] = fd.integrity_data
         pi.output('Saving chunks cache')
         with IntegrityCheckedFile(path=os.path.join(self.path, 'chunks'), write=True) as fd:
@@ -937,7 +937,7 @@ class LocalCache(CacheStatsMixin):
         # number comparison in a future backup run (and avoid chunking everything
         # again at that time), we need to update the inode number in the cache with what
         # we see in the filesystem.
-        self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
+        self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0), use_bin_type=False)
         return entry.chunk_ids
 
     def memorize_file(self, path_hash, st, ids, cache_mode=DEFAULT_FILES_CACHE_MODE):
@@ -949,7 +949,7 @@ class LocalCache(CacheStatsMixin):
         elif 'm' in cache_mode:
             cmtime_ns = safe_ns(st.st_mtime_ns)
         entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_bigint(cmtime_ns), chunk_ids=ids)
-        self.files[path_hash] = msgpack.packb(entry)
+        self.files[path_hash] = msgpack.packb(entry, use_bin_type=False)
         self._newest_cmtime = max(self._newest_cmtime or 0, cmtime_ns)
 
 

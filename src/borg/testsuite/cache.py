@@ -32,7 +32,7 @@ class TestCacheSynchronizer:
             'bar': 5678,
             'user': 'chunks',
             'chunks': []
-        })
+        }, use_bin_type=False)
         sync.feed(data)
         assert not len(index)
 
@@ -46,7 +46,7 @@ class TestCacheSynchronizer:
                 (H(1), 1, 2),
                 (H(2), 2, 3),
             ]
-        })
+        }, use_bin_type=False)
         sync.feed(data)
         assert len(index) == 2
         assert index[H(1)] == (1, 1, 2)
@@ -62,7 +62,7 @@ class TestCacheSynchronizer:
                 (H(1), 1, 2),
                 (H(2), 2, 3),
             ]
-        })
+        }, use_bin_type=False)
         data += packb({
             'xattrs': {
                 'security.foo': 'bar',
@@ -71,7 +71,7 @@ class TestCacheSynchronizer:
             'stuff': [
                 (1, 2, 3),
             ]
-        })
+        }, use_bin_type=False)
         data += packb({
             'xattrs': {
                 'security.foo': 'bar',
@@ -84,17 +84,17 @@ class TestCacheSynchronizer:
             'stuff': [
                 (1, 2, 3),
             ]
-        })
+        }, use_bin_type=False)
         data += packb({
             'chunks': [
                 (H(3), 1, 2),
             ],
-        })
+        }, use_bin_type=False)
         data += packb({
             'chunks': [
                 (H(1), 1, 2),
             ],
-        })
+        }, use_bin_type=False)
 
         part1 = data[:70]
         part2 = data[70:120]
@@ -124,7 +124,7 @@ class TestCacheSynchronizer:
         lambda elem: {'chunks': [(elem, 1, 2)]},
     ))
     def test_corrupted(self, sync, structure, elem, error):
-        packed = packb(structure(elem))
+        packed = packb(structure(elem), use_bin_type=False)
         with pytest.raises(ValueError) as excinfo:
             sync.feed(packed)
         if isinstance(error, str):
@@ -142,7 +142,7 @@ class TestCacheSynchronizer:
         ({'chunks': [(bytes(32), 1.0, 2)]}, 'Unexpected object: double'),
     ))
     def test_corrupted_ancillary(self, index, sync, data, error):
-        packed = packb(data)
+        packed = packb(data, use_bin_type=False)
         with pytest.raises(ValueError) as excinfo:
             sync.feed(packed)
         assert str(excinfo.value) == 'cache_sync_feed failed: ' + error
@@ -175,7 +175,7 @@ class TestCacheSynchronizer:
             'chunks': [
                 (H(0), 1, 2),
             ]
-        })
+        }, use_bin_type=False)
         with pytest.raises(ValueError) as excinfo:
             sync.feed(data)
         assert str(excinfo.value) == 'cache_sync_feed failed: invalid reference count'
@@ -187,7 +187,7 @@ class TestCacheSynchronizer:
             'chunks': [
                 (H(0), 1, 2),
             ]
-        })
+        }, use_bin_type=False)
         sync.feed(data)
         assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)
 
@@ -198,7 +198,7 @@ class TestCacheSynchronizer:
             'chunks': [
                 (H(0), 1, 2),
             ]
-        })
+        }, use_bin_type=False)
         sync.feed(data)
         # Incremented to maximum
         assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)

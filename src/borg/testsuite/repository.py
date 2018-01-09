@@ -606,7 +606,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             msgpack.pack({
                 # Borg only understands version 2
                 b'version': 4.7,
-            }, fd)
+            }, fd, use_bin_type=False)
             fd.truncate()
         with self.repository:
             # No issues accessing the repository
@@ -631,7 +631,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             # Corrupt segment refcount
             assert hints[b'segments'][2] == 1
             hints[b'segments'][2] = 0
-            msgpack.pack(hints, fd)
+            msgpack.pack(hints, fd, use_bin_type=False)
             fd.truncate()
 
     def test_subtly_corrupted_hints(self):

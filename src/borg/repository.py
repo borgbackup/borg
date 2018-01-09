@@ -558,7 +558,7 @@ class Repository:
         hints_name = 'hints.%d' % transaction_id
         hints_file = os.path.join(self.path, hints_name)
         with IntegrityCheckedFile(hints_file + '.tmp', filename=hints_name, write=True) as fd:
-            msgpack.pack(hints, fd)
+            msgpack.pack(hints, fd, use_bin_type=False)
             flush_and_sync(fd)
         integrity[b'hints'] = fd.integrity_data
 
@@ -575,7 +575,7 @@ class Repository:
         integrity_name = 'integrity.%d' % transaction_id
         integrity_file = os.path.join(self.path, integrity_name)
         with open(integrity_file + '.tmp', 'wb') as fd:
-            msgpack.pack(integrity, fd)
+            msgpack.pack(integrity, fd, use_bin_type=False)
             flush_and_sync(fd)
 
         # Rename the integrity file first

@@ -37,8 +37,8 @@ on_rtd = os.environ.get('READTHEDOCS')
 
 install_requires = [
     # msgpack pure python data corruption was fixed in 0.4.6.
-    # Also, we might use some rather recent API features.
-    'msgpack-python>=0.4.6',
+    # msgpack 0.5.0 was a bit of a troublemaker.
+    'msgpack-python>=0.4.6,!=0.5.0,<0.6.0',
     'pyzmq',
 ]
 

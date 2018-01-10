@@ -37,6 +37,10 @@ Under these circumstances Borg guarantees that the attacker cannot
 The attacker can always impose a denial of service per definition (he could
 forbid connections to the repository, or delete it entirely).
 
+When the above attack model is extended to include multiple clients
+independently updating the same repository, then Borg fails to provide
+confidentiality (i.e. guarantees 3) and 4) do not apply any more).
+
 .. _security_structural_auth:
 
 Structural Authentication

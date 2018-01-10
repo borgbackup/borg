@@ -17,9 +17,12 @@ if my_python < min_python:
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
-# msgpack pure python data corruption was fixed in 0.4.6.
-# Also, we might use some rather recent API features.
-install_requires = ['msgpack-python>=0.4.6', ]
+install_requires = [
+    # msgpack pure python data corruption was fixed in 0.4.6.
+    # msgpack 0.5.0 was a bit of a troublemaker.
+    # also, msgpack dropped py34 support at 0.5.0.
+    'msgpack-python>=0.4.6,<0.5.0',
+]
 
 # note for package maintainers: if you package borgbackup for distribution,
 # please add llfuse as a *requirement* on all platforms that have a working

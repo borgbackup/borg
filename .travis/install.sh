@@ -4,6 +4,7 @@ set -e
 set -x
 
 if [[ "$(uname -s)" == 'Darwin' ]]; then
+    brew update
     if [[ "${OPENSSL}" != "0.9.8" ]]; then
         brew outdated openssl || brew upgrade openssl
     fi

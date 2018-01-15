@@ -17,7 +17,7 @@ import time
 import unittest
 from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import datetime, timezone
 from datetime import timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
@@ -3165,7 +3165,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'version': 1,
                 'archives': {},
                 'config': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
+                'timestamp': (datetime.now(timezone.utc) + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 
@@ -3177,7 +3177,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
+                'timestamp': (datetime.now(timezone.utc) + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit()
 

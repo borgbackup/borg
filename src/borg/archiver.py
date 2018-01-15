@@ -22,7 +22,7 @@ import time
 import traceback
 from binascii import unhexlify
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from itertools import zip_longest
 
 from .logger import create_logger, setup_logging
@@ -506,7 +506,7 @@ class Archiver:
         self.exclude_nodump = args.exclude_nodump
         self.files_cache_mode = args.files_cache_mode
         dry_run = args.dry_run
-        t0 = datetime.utcnow()
+        t0 = datetime.now(timezone.utc)
         t0_monotonic = time.monotonic()
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,

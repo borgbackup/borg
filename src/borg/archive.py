@@ -234,7 +234,7 @@ class ChunkBuffer:
 
     def __init__(self, key, chunker_params=ITEMS_CHUNKER_PARAMS):
         self.buffer = BytesIO()
-        self.packer = msgpack.Packer(unicode_errors='surrogateescape')
+        self.packer = msgpack.Packer(unicode_errors='surrogateescape', use_bin_type=False)
         self.chunks = []
         self.key = key
         self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
@@ -746,7 +746,7 @@ Utilization of max. archive size: {csize_max:.0%}
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)
         setattr(metadata, key, value)
-        data = msgpack.packb(metadata.as_dict(), unicode_errors='surrogateescape')
+        data = msgpack.packb(metadata.as_dict(), unicode_errors='surrogateescape', use_bin_type=False)
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, data, self.stats)
         self.manifest.archives[self.name] = (new_id, metadata.time)
@@ -1212,7 +1212,7 @@ class RobustUnpacker:
 
     def __init__(self, validator, item_keys):
         super().__init__()
-        self.item_keys = [msgpack.packb(name.encode()) for name in item_keys]
+        self.item_keys = [msgpack.packb(name.encode(), use_bin_type=False) for name in item_keys]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -1442,7 +1442,7 @@ class ArchiveChecker:
         # lost manifest on a older borg version than the most recent one that was ever used
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
-        archive_keys_serialized = [msgpack.packb(name.encode()) for name in ARCHIVE_KEYS]
+        archive_keys_serialized = [msgpack.packb(name.encode(), use_bin_type=False) for name in ARCHIVE_KEYS]
         for chunk_id, _ in self.chunks.iteritems():
             cdata = self.repository.get(chunk_id)
             try:
@@ -1693,7 +1693,7 @@ class ArchiveChecker:
                 for previous_item_id in archive.items:
                     mark_as_possibly_superseded(previous_item_id)
                 archive.items = items_buffer.chunks
-                data = msgpack.packb(archive.as_dict(), unicode_errors='surrogateescape')
+                data = msgpack.packb(archive.as_dict(), unicode_errors='surrogateescape', use_bin_type=False)
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)

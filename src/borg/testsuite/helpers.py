@@ -457,7 +457,7 @@ class StableDictTestCase(BaseTestCase):
     def test(self):
         d = StableDict(foo=1, bar=2, boo=3, baz=4)
         self.assert_equal(list(d.items()), [('bar', 2), ('baz', 4), ('boo', 3), ('foo', 1)])
-        self.assert_equal(hashlib.md5(msgpack.packb(d)).hexdigest(), 'fc78df42cd60691b3ac3dd2a2b39903f')
+        self.assert_equal(hashlib.md5(msgpack.packb(d, use_bin_type=False)).hexdigest(), 'fc78df42cd60691b3ac3dd2a2b39903f')
 
 
 class TestParseTimestamp(BaseTestCase):

@@ -262,7 +262,7 @@ class RepositoryServer:  # pragma: no cover
                                                     b'exception_full': ex_full,
                                                     b'exception_short': ex_short,
                                                     b'exception_trace': ex_trace,
-                                                    b'sysinfo': sysinfo()})
+                                                    b'sysinfo': sysinfo()}, use_bin_type=False)
                             except TypeError:
                                 msg = msgpack.packb({MSGID: msgid,
                                                     b'exception_class': e.__class__.__name__,
@@ -271,7 +271,7 @@ class RepositoryServer:  # pragma: no cover
                                                     b'exception_full': ex_full,
                                                     b'exception_short': ex_short,
                                                     b'exception_trace': ex_trace,
-                                                    b'sysinfo': sysinfo()})
+                                                    b'sysinfo': sysinfo()}, use_bin_type=False)
 
                             os_write(stdout_fd, msg)
                         else:
@@ -291,12 +291,12 @@ class RepositoryServer:  # pragma: no cover
                                 logging.error(msg)
                                 logging.log(tb_log_level, tb)
                             exc = 'Remote Exception (see remote log for the traceback)'
-                            os_write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
+                            os_write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc), use_bin_type=False))
                     else:
                         if dictFormat:
-                            os_write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
+                            os_write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}, use_bin_type=False))
                         else:
-                            os_write(stdout_fd, msgpack.packb((1, msgid, None, res)))
+                            os_write(stdout_fd, msgpack.packb((1, msgid, None, res), use_bin_type=False))
             if es:
                 self.repository.close()
                 return
@@ -855,18 +855,18 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                                 self.msgid += 1
                                 waiting_for.append(self.msgid)
                                 if self.dictFormat:
-                                    self.to_send = msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args})
+                                    self.to_send = msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}, use_bin_type=False)
                                 else:
-                                    self.to_send = msgpack.packb((1, self.msgid, cmd, self.named_to_positional(cmd, args)))
+                                    self.to_send = msgpack.packb((1, self.msgid, cmd, self.named_to_positional(cmd, args)), use_bin_type=False)
                     if not self.to_send and self.preload_ids:
                         chunk_id = self.preload_ids.pop(0)
                         args = {'id': chunk_id}
                         self.msgid += 1
                         self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
                         if self.dictFormat:
-                            self.to_send = msgpack.packb({MSGID: self.msgid, MSG: 'get', ARGS: args})
+                            self.to_send = msgpack.packb({MSGID: self.msgid, MSG: 'get', ARGS: args}, use_bin_type=False)
                         else:
-                            self.to_send = msgpack.packb((1, self.msgid, 'get', self.named_to_positional(cmd, args)))
+                            self.to_send = msgpack.packb((1, self.msgid, 'get', self.named_to_positional(cmd, args)), use_bin_type=False)
 
                 if self.to_send:
                     try:

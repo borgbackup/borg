@@ -66,6 +66,13 @@ class SecurityManager:
         self.location_file = os.path.join(self.dir, 'location')
         self.manifest_ts_file = os.path.join(self.dir, 'manifest-timestamp')
 
+    @staticmethod
+    def destroy(repository, path=None):
+        """destroy the security dir for ``repository`` or at ``path``"""
+        path = path or get_security_dir(repository.id_str)
+        if os.path.exists(path):
+            shutil.rmtree(path)
+
     def known(self):
         return os.path.exists(self.key_type_file)
 
@@ -326,7 +333,7 @@ class Cache:
         """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
 
     class RepositoryReplay(Error):
-        """Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
+        """Cache, or information obtained from the security directory is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
 
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""

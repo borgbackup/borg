@@ -5,9 +5,9 @@
 Development
 ===========
 
-This chapter will get you started with |project_name| development.
+This chapter will get you started with Borg development.
 
-|project_name| is written in Python (with a little bit of Cython and C for
+Borg is written in Python (with a little bit of Cython and C for
 the performance critical parts).
 
 Contributions
@@ -50,7 +50,7 @@ Branching model
 
 Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
-send smaller patches via the borgbackup :ref:`mailing_list` to the maintainers).
+send smaller patches via the borgbackup mailing list to the maintainers).
 
 Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
 the maintenance branch of the 1.0.x series is ``1.0-maint``.
@@ -309,6 +309,7 @@ Checklist:
 
 - make sure all issues for this milestone are closed or moved to the
   next milestone
+- check if there are any pending fixes for security issues
 - find and fix any low hanging fruit left on the issue tracker
 - check that Travis CI is happy
 - update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``

@@ -4,7 +4,7 @@ import os
 import os.path
 import platform
 import sys
-from collections import deque
+from collections import deque, OrderedDict
 from datetime import datetime, timezone, timedelta
 from itertools import islice
 from operator import attrgetter
@@ -17,22 +17,44 @@ from .. import __version__ as borg_version
 from .. import chunker
 
 
-def prune_within(archives, hours):
+def prune_within(archives, hours, kept_because):
     target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
-    return [a for a in archives if a.ts > target]
+    kept_counter = 0
+    result = []
+    for a in archives:
+        if a.ts > target:
+            kept_counter += 1
+            kept_because[a.id] = ("within", kept_counter)
+            result.append(a)
+    return result
 
 
-def prune_split(archives, pattern, n, skip=[]):
+PRUNING_PATTERNS = OrderedDict([
+    ("secondly", '%Y-%m-%d %H:%M:%S'),
+    ("minutely", '%Y-%m-%d %H:%M'),
+    ("hourly", '%Y-%m-%d %H'),
+    ("daily", '%Y-%m-%d'),
+    ("weekly", '%G-%V'),
+    ("monthly", '%Y-%m'),
+    ("yearly", '%Y'),
+])
+
+
+def prune_split(archives, rule, n, kept_because=None):
     last = None
     keep = []
+    pattern = PRUNING_PATTERNS[rule]
+    if kept_because is None:
+        kept_because = {}
     if n == 0:
         return keep
     for a in sorted(archives, key=attrgetter('ts'), reverse=True):
         period = to_localtime(a.ts).strftime(pattern)
         if period != last:
             last = period
-            if a not in skip:
+            if a.id not in kept_because:
                 keep.append(a)
+                kept_because[a.id] = (rule, len(keep))
                 if len(keep) == n:
                     break
     return keep

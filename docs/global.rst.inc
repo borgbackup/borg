@@ -1,5 +1,4 @@
 .. highlight:: bash
-.. |project_name| replace:: Borg
 .. |package_dirname| replace:: borgbackup-|version|
 .. |package_filename| replace:: |package_dirname|.tar.gz
 .. |package_url| replace:: https://pypi.python.org/packages/source/b/borgbackup/|package_filename|
@@ -15,6 +14,7 @@
 .. _libacl: https://savannah.nongnu.org/projects/acl/
 .. _libattr: https://savannah.nongnu.org/projects/attr/
 .. _liblz4: https://github.com/Cyan4973/lz4
+.. _libzstd: https://github.com/facebook/zstd
 .. _libb2: https://github.com/BLAKE2/libb2
 .. _ZeroMQ: http://zeromq.org/
 .. _OpenSSL: https://www.openssl.org/

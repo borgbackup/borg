@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-RECREATE 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] recreate <options> REPOSITORY_OR_ARCHIVE PATH
+borg [common options] recreate [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
 .SH DESCRIPTION
 .sp
 Recreate the contents of existing archives.
@@ -46,7 +46,7 @@ resulting archive will only contain files from these PATHs.
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will \fInot\fP match (\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, PATHs).
 .sp
-\fB\-\-recompress\fP allows to change the compression of existing data in archives.
+\fB\-\-recompress\fP allows one to change the compression of existing data in archives.
 Due to how Borg stores compressed size information this might display
 incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
@@ -71,6 +71,17 @@ When rechunking space usage can be substantial, expect at least the entire
 deduplicated size of the archives using the previous chunker params.
 When recompressing expect approx. (throughput / checkpoint\-interval) in space usage,
 assuming all chunks are recompressed.
+.sp
+If you recently ran borg check \-\-repair and it had to fix lost chunks with all\-zero
+replacement chunks, please first run another backup for the same data and re\-run
+borg check \-\-repair afterwards to heal any archives that had lost chunks which are
+still generated from the input data.
+.sp
+Important: running borg recreate to re\-chunk will remove the chunks_healthy
+metadata of all items with replacement chunks, so healing will not be possible
+any more after re\-chunking (it is also unlikely it would ever work: due to the
+change of chunking parameters, the missing chunk likely will never be seen again
+even if you still have the data that produced it).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -90,7 +101,7 @@ paths to recreate; patterns are supported
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
-only display items with the given status characters
+only display items with the given status characters (listed in borg create \-\-help)
 .TP
 .B \-n\fP,\fB  \-\-dry\-run
 do not change anything
@@ -107,6 +118,12 @@ exclude paths matching PATTERN
 .BI \-\-exclude\-from \ EXCLUDEFILE
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
+.TP
 .B \-\-exclude\-caches
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
 .TP
@@ -115,12 +132,6 @@ exclude directories that are tagged by containing a filesystem object with the g
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
-.TP
-.BI \-\-pattern \ PATTERN
-experimental: include/exclude paths matching PATTERN
-.TP
-.BI \-\-patterns\-from \ PATTERNFILE
-experimental: read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SS Archive options
 .INDENT 0.0
@@ -152,19 +163,20 @@ specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HA
 .sp
 .nf
 .ft C
-# Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives
-# Archives created with Borg 1.1+ and the default chunker params are skipped (archive ID stays the same)
+# Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives.
+# Archives created with Borg 1.1+ and the default chunker params are skipped
+# (archive ID stays the same).
 $ borg recreate /mnt/backup \-\-chunker\-params default \-\-progress
 
 # Create a backup with little but fast compression
 $ borg create /mnt/backup::archive /some/files \-\-compression lz4
-# Then compress it \- this might take longer, but the backup has already completed, so no inconsistencies
-# from a long\-running backup job.
+# Then compress it \- this might take longer, but the backup has already completed,
+# so no inconsistencies from a long\-running backup job.
 $ borg recreate /mnt/backup::archive \-\-recompress \-\-compression zlib,9
 
-# Remove unwanted files from all archives in a repository
-$ borg recreate /mnt/backup \-e /home/icke/Pictures/drunk_photos
-
+# Remove unwanted files from all archives in a repository.
+# Note the relative path for the \-\-exclude option \- archives only contain relative paths.
+$ borg recreate /mnt/backup \-\-exclude home/icke/Pictures/drunk_photos
 
 # Change archive comment
 $ borg create \-\-comment "This is a comment" /mnt/backup::archivename ~

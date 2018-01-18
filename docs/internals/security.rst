@@ -199,7 +199,7 @@ the manifest (which will fail if the client has seen a more recent
 manifest or has a more recent nonce reservation). If the repository is
 untrusted, but a trusted synchronization channel exists between
 clients, the security database could be synchronized between them over
-said trusted channel. This is not part of Borgs functionality.
+said trusted channel. This is not part of Borg's functionality.
 
 .. [#] Using the :ref:`borg key migrate-to-repokey <borg_key_migrate-to-repokey>`
        command a user can convert repositories created using Attic in "passphrase"

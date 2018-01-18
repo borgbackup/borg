@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-MOUNT 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-MOUNT 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] mount <options> REPOSITORY_OR_ARCHIVE MOUNTPOINT
+borg [common options] mount [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT [PATH...]
 .SH DESCRIPTION
 .sp
 This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -81,6 +81,9 @@ repository/archive to mount
 .TP
 .B MOUNTPOINT
 where to mount filesystem
+.TP
+.B PATH
+paths to extract; patterns are supported
 .UNINDENT
 .SS optional arguments
 .INDENT 0.0
@@ -91,16 +94,16 @@ stay in foreground, do not daemonize
 .B \-o
 Extra mount options
 .UNINDENT
-.SS filters
+.SS Archive filters
 .INDENT 0.0
 .TP
-.B \-P\fP,\fB  \-\-prefix
+.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.B \-a\fP,\fB  \-\-glob\-archives
+.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
-.B \-\-sort\-by
+.BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
 .TP
 .BI \-\-first \ N
@@ -108,6 +111,24 @@ consider first N archives after other filters were applied
 .TP
 .BI \-\-last \ N
 consider last N archives after other filters were applied
+.UNINDENT
+.SS Exclusion options
+.INDENT 0.0
+.TP
+.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+exclude paths matching PATTERN
+.TP
+.BI \-\-exclude\-from \ EXCLUDEFILE
+read exclude patterns from EXCLUDEFILE, one per line
+.TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
+.TP
+.BI \-\-strip\-components \ NUMBER
+Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.
 .UNINDENT
 .SH SEE ALSO
 .sp

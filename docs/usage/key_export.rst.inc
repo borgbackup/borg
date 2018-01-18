@@ -58,12 +58,16 @@ Description
 ~~~~~~~~~~~
 
 If repository encryption is used, the repository is inaccessible
-without the key. This command allows to backup this essential key.
+without the key. This command allows one to backup this essential key.
+Note that the backup produced does not include the passphrase itself
+(i.e. the exported key stays encrypted). In order to regain access to a
+repository, one needs both the exported key and the original passphrase.
 
-There are two backup formats. The normal backup format is suitable for
+There are three backup formats. The normal backup format is suitable for
 digital storage as a file. The ``--paper`` backup format is optimized
 for printing and typing in while importing, with per line checks to
-reduce problems with manual input.
+reduce problems with manual input. The ``--qr-html`` creates a printable
+HTML template with a QR code and a copy of the ``--paper``-formatted key.
 
 For repositories using keyfile encryption the key is saved locally
 on the system that is capable of doing backups. To guard against loss

@@ -12,25 +12,28 @@ from .process import prepare_subprocess_env
 from ..constants import *  # NOQA
 
 
-def get_home_dir():
-    """Get user's home directory while preferring a possibly set HOME
-    environment variable
+def get_base_dir():
+    """Get home directory / base directory for borg:
+
+    - BORG_BASE_DIR, if set
+    - HOME, if set
+    - ~$USER, if USER is set
+    - ~
     """
+    base_dir = os.environ.get('BORG_BASE_DIR') or os.environ.get('HOME')
     # os.path.expanduser() behaves differently for '~' and '~someuser' as
     # parameters: when called with an explicit username, the possibly set
     # environment variable HOME is no longer respected. So we have to check if
     # it is set and only expand the user's home directory if HOME is unset.
-    if os.environ.get('HOME', ''):
-        return os.environ.get('HOME')
-    else:
-        return os.path.expanduser('~%s' % os.environ.get('USER', ''))
+    if not base_dir:
+        base_dir = os.path.expanduser('~%s' % os.environ.get('USER', ''))
+    return base_dir
 
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
 
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
-    keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(xdg_config, 'borg', 'keys'))
+    keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(get_config_dir(), 'keys'))
     if not os.path.exists(keys_dir):
         os.makedirs(keys_dir)
         os.chmod(keys_dir, stat.S_IRWXU)
@@ -39,8 +42,7 @@ def get_keys_dir():
 
 def get_security_dir(repository_id=None):
     """Determine where to store local security information."""
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_home_dir(), '.config'))
-    security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(xdg_config, 'borg', 'security'))
+    security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(get_config_dir(), 'security'))
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     if not os.path.exists(security_dir):
@@ -51,7 +53,7 @@ def get_security_dir(repository_id=None):
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(get_home_dir(), '.cache'))
+    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(get_base_dir(), '.cache'))
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
@@ -64,6 +66,16 @@ def get_cache_dir():
                 #       http://www.brynosaurus.com/cachedir/
                 """).encode('ascii'))
     return cache_dir
+
+
+def get_config_dir():
+    """Determine where to store whole config"""
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_base_dir(), '.config'))
+    config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(xdg_config, 'borg'))
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+        os.chmod(config_dir, stat.S_IRWXU)
+    return config_dir
 
 
 def dir_is_cachedir(path):

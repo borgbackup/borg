@@ -1,5 +1,6 @@
 import argparse
 import collections
+import configparser
 import faulthandler
 import functools
 import hashlib
@@ -37,7 +38,7 @@ from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
 from .archive import BackupOSError, backup_io
 from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
-from .cache import Cache, assert_secure
+from .cache import Cache, assert_secure, SecurityManager
 from .constants import *  # NOQA
 from .compress import CompressionSpec
 from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
@@ -49,7 +50,7 @@ from .helpers import PrefixSpec, SortBySpec, FilesCacheMode
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
-from .helpers import interval, prune_within, prune_split
+from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
 from .helpers import timestamp
 from .helpers import get_cache_dir
 from .helpers import Manifest, AI_HUMAN_SORT_KEYS
@@ -123,6 +124,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
         def wrapper(self, args, **kwargs):
             location = args.location  # note: 'location' must be always present in args
             append_only = getattr(args, 'append_only', False)
+            storage_quota = getattr(args, 'storage_quota', None)
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
@@ -130,8 +132,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                                               lock_wait=self.lock_wait, lock=lock, append_only=append_only, args=args)
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
-                                        lock_wait=self.lock_wait, lock=lock,
-                                        append_only=append_only)
+                                        lock_wait=self.lock_wait, lock=lock, append_only=append_only,
+                                        storage_quota=storage_quota)
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)
@@ -154,7 +156,9 @@ def with_archive(method):
     @functools.wraps(method)
     def wrapper(self, args, repository, key, manifest, **kwargs):
         archive = Archive(repository, key, manifest, args.location.archive,
-                          numeric_owner=getattr(args, 'numeric_owner', False), cache=kwargs.get('cache'),
+                          numeric_owner=getattr(args, 'numeric_owner', False),
+                          nobsdflags=getattr(args, 'nobsdflags', False),
+                          cache=kwargs.get('cache'),
                           consider_part_files=args.consider_part_files, log_json=args.log_json)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
     return wrapper
@@ -165,6 +169,18 @@ def parse_storage_quota(storage_quota):
     if parsed < parse_file_size('10M'):
         raise argparse.ArgumentTypeError('quota is too small (%s). At least 10M are required.' % storage_quota)
     return parsed
+
+
+def get_func(args):
+    # This works around http://bugs.python.org/issue9351
+    # func is used at the leaf parsers of the argparse parser tree,
+    # fallback_func at next level towards the root,
+    # fallback2_func at the 2nd next level (which is root in our case).
+    for name in 'func', 'fallback_func', 'fallback2_func':
+        func = getattr(args, name, None)
+        if func is not None:
+            return func
+    raise Exception('expected func attributes not found')
 
 
 class Archiver:
@@ -237,10 +253,10 @@ class Archiver:
                 'errors if written to with an older version (up to and including Borg 1.0.8).\n'
                 '\n'
                 'If you want to use these older versions, you can disable the check by running:\n'
-                'borg upgrade --disable-tam \'%s\'\n'
+                'borg upgrade --disable-tam %s\n'
                 '\n'
                 'See https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability '
-                'for details about the security implications.', path)
+                'for details about the security implications.', shlex.quote(path))
         return self.exit_code
 
     @with_repository(exclusive=True, manifest=False)
@@ -468,6 +484,7 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 args.stats |= args.json
+                archive.stats += fso.stats
                 if args.stats:
                     if args.json:
                         json_print(basic_json_data(manifest, cache=cache, extra={
@@ -485,6 +502,8 @@ class Archiver:
         self.output_filter = args.output_filter
         self.output_list = args.output_list
         self.ignore_inode = args.ignore_inode
+        self.nobsdflags = args.nobsdflags
+        self.exclude_nodump = args.exclude_nodump
         self.files_cache_mode = args.files_cache_mode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
@@ -499,10 +518,10 @@ class Archiver:
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
                 metadata_collector = MetadataCollector(noatime=args.noatime, noctime=args.noctime,
-                    numeric_owner=args.numeric_owner)
+                    nobsdflags=args.nobsdflags, numeric_owner=args.numeric_owner, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
-                    checkpoint_interval=args.checkpoint_interval)
+                    checkpoint_interval=args.checkpoint_interval, rechunkify=False)
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
                     chunker_params=args.chunker_params)
@@ -521,20 +540,27 @@ class Archiver:
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
-        if st is None:
-            with backup_io('stat'):
-                st = os.stat(path, follow_symlinks=False)
-
-        recurse_excluded_dir = False
-        if not matcher.match(path):
-            self.print_file_status('x', path)
-
-            if stat.S_ISDIR(st.st_mode) and matcher.recurse_dir:
-                recurse_excluded_dir = True
-            else:
-                return
-
         try:
+            recurse_excluded_dir = False
+            if matcher.match(path):
+                if st is None:
+                    with backup_io('stat'):
+                        st = os.stat(path, follow_symlinks=False)
+            else:
+                self.print_file_status('x', path)
+                # get out here as quickly as possible:
+                # we only need to continue if we shall recurse into an excluded directory.
+                # if we shall not recurse, then do not even touch (stat()) the item, it
+                # could trigger an error, e.g. if access is forbidden, see #3209.
+                if not matcher.recurse_dir:
+                    return
+                if st is None:
+                    with backup_io('stat'):
+                        st = os.stat(path, follow_symlinks=False)
+                recurse_excluded_dir = stat.S_ISDIR(st.st_mode)
+                if not recurse_excluded_dir:
+                    return
+
             if (st.st_ino, st.st_dev) in skip_inodes:
                 return
             # if restrict_dev is given, we do not want to recurse into a new filesystem,
@@ -542,11 +568,12 @@ class Archiver:
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
             status = None
-            # Ignore if nodump flag is set
-            with backup_io('flags'):
-                if get_flags(path, st) & stat.UF_NODUMP:
-                    self.print_file_status('x', path)
-                    return
+            if self.exclude_nodump:
+                # Ignore if nodump flag is set
+                with backup_io('flags'):
+                    if get_flags(path, st) & stat.UF_NODUMP:
+                        self.print_file_status('x', path)
+                        return
             if stat.S_ISREG(st.st_mode):
                 if not dry_run:
                     status = fso.process_file(path, st, cache, self.ignore_inode, self.files_cache_mode)
@@ -560,6 +587,7 @@ class Archiver:
                                 self._process(fso, cache, matcher, exclude_caches, exclude_if_present,
                                               keep_exclude_tags, skip_inodes, tag_path, restrict_dev,
                                               read_special=read_special, dry_run=dry_run)
+                        self.print_file_status('x', path)
                         return
                 if not dry_run:
                     if not recurse_excluded_dir:
@@ -1081,6 +1109,7 @@ class Archiver:
                 return self.exit_code
             repository.destroy()
             logger.info("Repository deleted.")
+            SecurityManager.destroy(repository)
         Cache.destroy(repository)
         logger.info("Cache deleted.")
         return self.exit_code
@@ -1122,26 +1151,18 @@ class Archiver:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
-        if not hasattr(sys.stdout, 'buffer'):
-            # This is a shim for supporting unit tests replacing sys.stdout with e.g. StringIO,
-            # which doesn't have an underlying buffer (= lower file object).
-            def write(bytestring):
-                sys.stdout.write(bytestring.decode('utf-8', errors='replace'))
-        else:
-            write = sys.stdout.buffer.write
-
         if args.location.archive:
             if args.json:
                 self.print_error('The --json option is only valid for listing archives, not archive contents.')
                 return self.exit_code
-            return self._list_archive(args, repository, manifest, key, write)
+            return self._list_archive(args, repository, manifest, key)
         else:
             if args.json_lines:
                 self.print_error('The --json-lines option is only valid for listing archive contents, not archives.')
                 return self.exit_code
-            return self._list_repository(args, repository, manifest, key, write)
+            return self._list_repository(args, repository, manifest, key)
 
-    def _list_archive(self, args, repository, manifest, key, write):
+    def _list_archive(self, args, repository, manifest, key):
         matcher = self.build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
@@ -1156,7 +1177,7 @@ class Archiver:
 
             formatter = ItemFormatter(archive, format, json_lines=args.json_lines)
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
-                write(safe_encode(formatter.format_item(item)))
+                sys.stdout.write(formatter.format_item(item))
 
         # Only load the cache if it will be used
         if ItemFormatter.format_needs_cache(format):
@@ -1167,7 +1188,7 @@ class Archiver:
 
         return self.exit_code
 
-    def _list_repository(self, args, repository, manifest, key, write):
+    def _list_repository(self, args, repository, manifest, key):
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -1182,7 +1203,7 @@ class Archiver:
             if args.json:
                 output_data.append(formatter.get_item_data(archive_info))
             else:
-                write(safe_encode(formatter.format_item(archive_info)))
+                sys.stdout.write(formatter.format_item(archive_info))
 
         if args.json:
             json_print(basic_json_data(manifest, extra={
@@ -1308,45 +1329,48 @@ class Archiver:
         # that is newer than a successfully completed backup - and killing the successful backup.
         archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
         keep = []
+        # collect the rule responsible for the keeping of each archive in this dict
+        # keys are archive ids, values are a tuple
+        #   (<rulename>, <how many archives were kept by this rule so far >)
+        kept_because = {}
+
+        # find archives which need to be kept because of the keep-within rule
         if args.within:
-            keep += prune_within(archives, args.within)
-        if args.secondly:
-            keep += prune_split(archives, '%Y-%m-%d %H:%M:%S', args.secondly, keep)
-        if args.minutely:
-            keep += prune_split(archives, '%Y-%m-%d %H:%M', args.minutely, keep)
-        if args.hourly:
-            keep += prune_split(archives, '%Y-%m-%d %H', args.hourly, keep)
-        if args.daily:
-            keep += prune_split(archives, '%Y-%m-%d', args.daily, keep)
-        if args.weekly:
-            keep += prune_split(archives, '%G-%V', args.weekly, keep)
-        if args.monthly:
-            keep += prune_split(archives, '%Y-%m', args.monthly, keep)
-        if args.yearly:
-            keep += prune_split(archives, '%Y', args.yearly, keep)
+            keep += prune_within(archives, args.within, kept_because)
+
+        # find archives which need to be kept because of the various time period rules
+        for rule in PRUNING_PATTERNS.keys():
+            num = getattr(args, rule, None)
+            if num is not None:
+                keep += prune_split(archives, rule, num, kept_because)
+
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
         with Cache(repository, key, manifest, do_files=False, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
-            if args.output_list:
-                # set up counters for the progress display
-                to_delete_len = len(to_delete)
-                archives_deleted = 0
+            # set up counters for the progress display
+            to_delete_len = len(to_delete)
+            archives_deleted = 0
             for archive in archives_checkpoints:
                 if archive in to_delete:
                     if args.dry_run:
-                        if args.output_list:
-                            list_logger.info('Would prune:     %s' % format_archive(archive))
+                        log_message = 'Would prune:'
                     else:
-                        if args.output_list:
-                            archives_deleted += 1
-                            list_logger.info('Pruning archive: %s (%d/%d)' % (format_archive(archive),
-                                                                              archives_deleted, to_delete_len))
+                        archives_deleted += 1
+                        log_message = 'Pruning archive (%d/%d):' % (archives_deleted, to_delete_len)
                         Archive(repository, key, manifest, archive.name, cache,
                                 progress=args.progress).delete(stats, forced=args.forced)
                 else:
-                    if args.output_list:
-                        list_logger.info('Keeping archive: %s' % format_archive(archive))
+                    if is_checkpoint(archive.name):
+                        log_message = 'Keeping checkpoint archive:'
+                    else:
+                        log_message = 'Keeping archive (rule: {rule} #{num}):'.format(
+                            rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
+                        )
+                if args.output_list:
+                    list_logger.info("{message:<40} {archive}".format(
+                        message=log_message, archive=format_archive(archive)
+                    ))
             if to_delete and not args.dry_run:
                 manifest.write()
                 repository.commit(save_space=args.save_space)
@@ -1495,6 +1519,41 @@ class Archiver:
             # any other mechanism relying on existing segment data not changing).
             # see issue #1867.
             repository.commit()
+
+    @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
+    def do_config(self, args, repository, manifest, key, cache):
+        """get, set, and delete values in a repository or cache config file"""
+        try:
+            section, name = args.name.split('.')
+        except ValueError:
+            section = args.cache and "cache" or "repository"
+            name = args.name
+
+        if args.cache:
+            cache.cache_config.load()
+            config = cache.cache_config._config
+            save = cache.cache_config.save
+        else:
+            config = repository.config
+            save = lambda: repository.save_config(repository.path, repository.config)
+
+        if args.delete:
+            config.remove_option(section, name)
+            if len(config.options(section)) == 0:
+                config.remove_section(section)
+            save()
+        elif args.value:
+            if section not in config.sections():
+                config.add_section(section)
+            config.set(section, name, args.value)
+            save()
+        else:
+            try:
+                print(config.get(section, name))
+            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                print(e, file=sys.stderr)
+                return EXIT_WARNING
+        return EXIT_SUCCESS
 
     def do_debug_info(self, args):
         """display system information for debugging / bug reports"""
@@ -1805,10 +1864,12 @@ class Archiver:
             may specify the backup roots (starting points) and patterns for inclusion/exclusion.
             A root path starts with the prefix `R`, followed by a path (a plain path, not a
             file pattern). An include rule starts with the prefix +, an exclude rule starts
-            with the prefix -, both followed by a pattern.
+            with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
             Inclusion patterns are useful to include paths that are contained in an excluded
             path. The first matching pattern is used so if an include pattern matches before
-            an exclude pattern, the file is backed up.
+            an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
+            a directory, it won't recurse into it and won't discover any potential matches for
+            include rules below that directory.
 
             Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
             shell style (`sh:`), so those patterns behave similar to rsync include/exclude
@@ -1841,6 +1902,9 @@ class Archiver:
 
         {fqdn}
             The full name of the machine.
+
+        {reverse-fqdn}
+            The full name of the machine in reverse domain name notation.
 
         {now}
             The current local date and time, by default in ISO-8601 format.
@@ -1905,18 +1969,24 @@ class Archiver:
             Do not compress.
 
         lz4
-            Use lz4 compression. High speed, low compression. (default)
+            Use lz4 compression. Very high speed, very low compression. (default)
+
+        zstd[,L]
+            Use zstd ("zstandard") compression, a modern wide-range algorithm.
+            If you do not explicitly give the compression level L (ranging from 1
+            to 22), it will use level 3.
+            Archives compressed with zstd are not compatible with borg < 1.1.4.
 
         zlib[,L]
             Use zlib ("gz") compression. Medium speed, medium compression.
-            If you do not explicitely give the compression level L (ranging from 0
+            If you do not explicitly give the compression level L (ranging from 0
             to 9), it will use level 6.
             Giving level 0 (means "no compression", but still has zlib protocol
             overhead) is usually pointless, you better use "none" compression.
 
         lzma[,L]
             Use lzma ("xz") compression. Low speed, high compression.
-            If you do not explicitely give the compression level L (ranging from 0
+            If you do not explicitly give the compression level L (ranging from 0
             to 9), it will use level 6.
             Giving levels above 6 is pointless and counterproductive because it does
             not compress better due to the buffer size used by borg - but it wastes
@@ -1932,6 +2002,8 @@ class Archiver:
         Examples::
 
             borg create --compression lz4 REPO::ARCHIVE data
+            borg create --compression zstd REPO::ARCHIVE data
+            borg create --compression zstd,10 REPO::ARCHIVE data
             borg create --compression zlib REPO::ARCHIVE data
             borg create --compression zlib,1 REPO::ARCHIVE data
             borg create --compression auto,lzma,6 REPO::ARCHIVE data
@@ -1951,7 +2023,12 @@ class Archiver:
             else:
                 commands[args.topic].print_help()
         else:
-            parser.error('No help available on %s' % (args.topic,))
+            msg_lines = []
+            msg_lines += ['No help available on %s.' % args.topic]
+            msg_lines += ['Try one of the following:']
+            msg_lines += ['    Commands: %s' % ', '.join(sorted(commands.keys()))]
+            msg_lines += ['    Topics: %s' % ', '.join(sorted(self.helptext.keys()))]
+            parser.error('\n'.join(msg_lines))
         return self.exit_code
 
     def do_subcommand_help(self, parser, args):
@@ -1993,7 +2070,7 @@ class Archiver:
         then, after parsing the command line, multiple definitions are resolved.
 
         Defaults are handled by only setting them on the top-level parser and setting
-        a sentinel object in all sub-parsers, which then allows to discern which parser
+        a sentinel object in all sub-parsers, which then allows one to discern which parser
         supplied the option.
         """
 
@@ -2198,6 +2275,7 @@ class Archiver:
         def define_exclusion_group(subparser, **kwargs):
             exclude_group = subparser.add_argument_group('Exclusion options')
             define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
+            return exclude_group
 
         def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
             filters_group = subparser.add_argument_group('Archive filters',
@@ -2226,7 +2304,7 @@ class Archiver:
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
-        parser.set_defaults(func=functools.partial(self.do_maincommand_help, parser))
+        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser))
         parser.common_options = self.CommonOptions(define_common_options,
                                                    suffix_precedence=('_maincommand', '_midcommand', '_subcommand'))
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
@@ -2242,7 +2320,70 @@ class Archiver:
         mid_common_parser.set_defaults(paths=[], patterns=[])
         parser.common_options.add_common_group(mid_common_parser, '_midcommand')
 
-        subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
+        mount_epilog = process_epilog("""
+        This command mounts an archive as a FUSE filesystem. This can be useful for
+        browsing an archive or restoring individual files. Unless the ``--foreground``
+        option is given the command will run in the background until the filesystem
+        is ``umounted``.
+
+        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
+        used in fstab entries:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
+
+        To allow a regular user to use fstab entries, add the ``user`` option:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
+
+        For mount options, see the fuse(8) manual page. Additional mount options
+        supported by borg:
+
+        - versions: when used with a repository mount, this gives a merged, versioned
+          view of the files in the archives. EXPERIMENTAL, layout may change in future.
+        - allow_damaged_files: by default damaged files (where missing chunks were
+          replaced with runs of zeros by borg check ``--repair``) are not readable and
+          return EIO (I/O error). Set this option to read such files.
+
+        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
+        to tweak the performance. It sets the number of cached data chunks; additional
+        memory usage can be up to ~8 MiB times this number. The default is the number
+        of CPU cores.
+
+        When the daemonized process receives a signal or crashes, it does not unmount.
+        Unmounting in these cases could cause an active rsync or similar process
+        to unintentionally delete data.
+
+        When running in the foreground ^C/SIGINT unmounts cleanly, but other
+        signals or crashes do not.
+        """)
+
+        if parser.prog == 'borgfs':
+            parser.description = self.do_mount.__doc__
+            parser.epilog = mount_epilog
+            parser.formatter_class = argparse.RawDescriptionHelpFormatter
+            parser.help = 'mount repository'
+            subparser = parser
+        else:
+            subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
+            subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
+                                            description=self.do_mount.__doc__,
+                                            epilog=mount_epilog,
+                                            formatter_class=argparse.RawDescriptionHelpFormatter,
+                                            help='mount repository')
+        subparser.set_defaults(func=self.do_mount)
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+                            help='repository/archive to mount')
+        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+                            help='where to mount filesystem')
+        subparser.add_argument('-f', '--foreground', dest='foreground',
+                            action='store_true',
+                            help='stay in foreground, do not daemonize')
+        subparser.add_argument('-o', dest='options', type=str,
+                            help='Extra mount options')
+        define_archive_filters_group(subparser)
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+        define_exclusion_group(subparser, strip_components=True)
+        if parser.prog == 'borgfs':
+            return parser
 
         serve_epilog = process_epilog("""
         This command starts a repository server process. This command is usually not used manually.
@@ -2472,12 +2613,16 @@ class Archiver:
 
         key_export_epilog = process_epilog("""
         If repository encryption is used, the repository is inaccessible
-        without the key. This command allows to backup this essential key.
+        without the key. This command allows one to backup this essential key.
+        Note that the backup produced does not include the passphrase itself
+        (i.e. the exported key stays encrypted). In order to regain access to a
+        repository, one needs both the exported key and the original passphrase.
 
-        There are two backup formats. The normal backup format is suitable for
+        There are three backup formats. The normal backup format is suitable for
         digital storage as a file. The ``--paper`` backup format is optimized
         for printing and typing in while importing, with per line checks to
-        reduce problems with manual input.
+        reduce problems with manual input. The ``--qr-html`` creates a printable
+        HTML template with a QR code and a copy of the ``--paper``-formatted key.
 
         For repositories using keyfile encryption the key is saved locally
         on the system that is capable of doing backups. To guard against loss
@@ -2505,8 +2650,7 @@ class Archiver:
                                help='Create an html file suitable for printing and later type-in or qr scan')
 
         key_import_epilog = process_epilog("""
-        This command allows to restore a key previously backed up with the
-        export command.
+        This command restores a key previously backed up with the export command.
 
         If the ``--paper`` option is given, the import will be an interactive
         process in which each line is checked for plausibility before
@@ -2643,6 +2787,12 @@ class Archiver:
         (O, C and D, respectively), then the Number of files (N) processed so far, followed by
         the currently processed path.
 
+        When using ``--stats``, you will get some statistics about how much data was
+        added - the "This Archive" deduplicated size there is most interesting as that is
+        how much your repository will grow. Please note that the "All archives" stats refer to
+        the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
+        exclusive because the data is not actually compressed and deduplicated during a dry run.
+
         See the output of the "borg help patterns" command for more help on exclude patterns.
         See the output of the "borg help placeholders" command for more help on placeholders.
 
@@ -2661,9 +2811,6 @@ class Archiver:
         only include the objects specified by ``--exclude-if-present`` in your backup,
         and not include any other contents of the containing folder, this can be enabled
         through using the ``--keep-exclude-tags`` option.
-
-        Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
-        in ``--list`` output.
 
         Item flags
         ++++++++++
@@ -2712,10 +2859,12 @@ class Archiver:
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
 
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+        dryrun_group = subparser.add_mutually_exclusive_group()
+        dryrun_group.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not create a backup archive')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+        dryrun_group.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the created archive')
+
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
@@ -2727,7 +2876,9 @@ class Archiver:
         subparser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                help='do not load/update the file metadata cache used to detect unchanged files')
 
-        define_exclusion_group(subparser, tag_files=True)
+        exclude_group = define_exclusion_group(subparser, tag_files=True)
+        exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',
+                                   help='exclude files flagged NODUMP')
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
@@ -2738,6 +2889,10 @@ class Archiver:
                               help='do not store atime into archive')
         fs_group.add_argument('--noctime', dest='noctime', action='store_true',
                               help='do not store ctime into archive')
+        fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
+                              help='do not store birthtime (creation date) into archive')
+        fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
+                              help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
@@ -2804,6 +2959,8 @@ class Archiver:
                                help='do not actually change any files')
         subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                                help='only obey numeric user and group identifiers')
+        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
+                               help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
         subparser.add_argument('--stdout', dest='stdout', action='store_true',
                                help='write all extracted data to stdout')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',
@@ -2907,7 +3064,7 @@ class Archiver:
                                help='ARCHIVE2 name (no repository location allowed)')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths of items inside the archives to compare; patterns are supported')
-        define_exclusion_group(subparser, tag_files=True)
+        define_exclusion_group(subparser)
 
         rename_epilog = process_epilog("""
         This command renames an archive in the repository.
@@ -2931,6 +3088,11 @@ class Archiver:
         This command deletes an archive from the repository or the complete repository.
         Disk space is reclaimed accordingly. If you delete the complete repository, the
         local cache for it (if any) is also deleted.
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after deletion.
         """)
         subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
                                           description=self.do_delete.__doc__,
@@ -3003,58 +3165,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
         define_archive_filters_group(subparser)
-        define_exclusion_group(subparser, tag_files=True)
-
-        mount_epilog = process_epilog("""
-        This command mounts an archive as a FUSE filesystem. This can be useful for
-        browsing an archive or restoring individual files. Unless the ``--foreground``
-        option is given the command will run in the background until the filesystem
-        is ``umounted``.
-
-        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
-        used in fstab entries:
-        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
-
-        To allow a regular user to use fstab entries, add the ``user`` option:
-        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
-
-        For mount options, see the fuse(8) manual page. Additional mount options
-        supported by borg:
-
-        - versions: when used with a repository mount, this gives a merged, versioned
-          view of the files in the archives. EXPERIMENTAL, layout may change in future.
-        - allow_damaged_files: by default damaged files (where missing chunks were
-          replaced with runs of zeros by borg check ``--repair``) are not readable and
-          return EIO (I/O error). Set this option to read such files.
-
-        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
-        to tweak the performance. It sets the number of cached data chunks; additional
-        memory usage can be up to ~8 MiB times this number. The default is the number
-        of CPU cores.
-
-        When the daemonized process receives a signal or crashes, it does not unmount.
-        Unmounting in these cases could cause an active rsync or similar process
-        to unintentionally delete data.
-
-        When running in the foreground ^C/SIGINT unmounts cleanly, but other
-        signals or crashes do not.
-        """)
-        subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
-                                          description=self.do_mount.__doc__,
-                                          epilog=mount_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='mount repository')
-        subparser.set_defaults(func=self.do_mount)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
-                               help='repository/archive to mount')
-        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
-                               help='where to mount filesystem')
-        subparser.add_argument('-f', '--foreground', dest='foreground',
-                               action='store_true',
-                               help='stay in foreground, do not daemonize')
-        subparser.add_argument('-o', dest='options', type=str,
-                               help='Extra mount options')
-        define_archive_filters_group(subparser)
+        define_exclusion_group(subparser)
 
         umount_epilog = process_epilog("""
         This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
@@ -3155,6 +3266,11 @@ class Archiver:
         The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after pruning.
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,
@@ -3262,13 +3378,13 @@ class Archiver:
 
             borg delete borg
 
-        Unless ``--inplace`` is specified, the upgrade process first
-        creates a backup copy of the repository, in
-        REPOSITORY.before-upgrade-DATETIME, using hardlinks. This takes
-        longer than in place upgrades, but is much safer and gives
-        progress information (as opposed to ``cp -al``). Once you are
-        satisfied with the conversion, you can safely destroy the
-        backup copy.
+        Unless ``--inplace`` is specified, the upgrade process first creates a backup
+        copy of the repository, in REPOSITORY.before-upgrade-DATETIME, using hardlinks.
+        This requires that the repository and its parent directory reside on same
+        filesystem so the hardlink copy can work.
+        This takes longer than in place upgrades, but is much safer and gives
+        progress information (as opposed to ``cp -al``). Once you are satisfied
+        with the conversion, you can safely destroy the backup copy.
 
         WARNING: Running the upgrade in place will make the current
         copy unusable with older version, with no way of going back
@@ -3308,7 +3424,7 @@ class Archiver:
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (``--exclude``, ``--exclude-from``, PATHs).
 
-        ``--recompress`` allows to change the compression of existing data in archives.
+        ``--recompress`` allows one to change the compression of existing data in archives.
         Due to how Borg stores compressed size information this might display
         incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.
@@ -3333,6 +3449,17 @@ class Archiver:
         deduplicated size of the archives using the previous chunker params.
         When recompressing expect approx. (throughput / checkpoint-interval) in space usage,
         assuming all chunks are recompressed.
+
+        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
+        replacement chunks, please first run another backup for the same data and re-run
+        borg check --repair afterwards to heal any archives that had lost chunks which are
+        still generated from the input data.
+
+        Important: running borg recreate to re-chunk will remove the chunks_healthy
+        metadata of all items with replacement chunks, so healing will not be possible
+        any more after re-chunking (it is also unlikely it would ever work: due to the
+        change of chunking parameters, the missing chunk likely will never be seen again
+        even if you still have the data that produced it).
         """)
         subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
                                           description=self.do_recreate.__doc__,
@@ -3415,6 +3542,37 @@ class Archiver:
                                help='command to run')
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
+
+        config_epilog = process_epilog("""
+        This command gets and sets options in a local repository or cache config file.
+        For security reasons, this command only works on local repositories.
+
+        To delete a config value entirely, use ``--delete``. To get an existing key, pass
+        only the key name. To set a key, pass both the key name and the new value. Keys
+        can be specified in the format "section.name" or simply "name"; the section will
+        default to "repository" and "cache" for the repo and cache configs, respectively.
+
+        By default, borg config manipulates the repository config file. Using ``--cache``
+        edits the repository cache's config file instead.
+        """)
+        subparser = subparsers.add_parser('config', parents=[common_parser], add_help=False,
+                                          description=self.do_config.__doc__,
+                                          epilog=config_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='get and set configuration values')
+        subparser.set_defaults(func=self.do_config)
+        subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
+                               help='get and set values from the repo cache')
+        subparser.add_argument('-d', '--delete', dest='delete', action='store_true',
+                               help='delete the key from the config file')
+
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False, proto='file'),
+                               help='repository to configure')
+        subparser.add_argument('name', metavar='NAME',
+                               help='name of config key')
+        subparser.add_argument('value', metavar='VALUE', nargs='?',
+                               help='new value for key')
 
         subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
                                           description='Extra help')
@@ -3621,7 +3779,7 @@ class Archiver:
         R- == borg extract (extract archive, dry-run, do everything, but do not write files to disk)
               R-Z- == all zero files. Measuring heavily duplicated files.
               R-R- == random files. No duplication here, measuring throughput through all processing
-                      stages, except writing to disk.
+              stages, except writing to disk.
 
         U- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
               The throughput value is kind of virtual here, it does not actually read the file.
@@ -3665,6 +3823,7 @@ class Archiver:
                 return forced_result
             # we only take specific options from the forced "borg serve" command:
             result.restrict_to_paths = forced_result.restrict_to_paths
+            result.restrict_to_repositories = forced_result.restrict_to_repositories
             result.append_only = forced_result.append_only
         return result
 
@@ -3675,8 +3834,7 @@ class Archiver:
         parser = self.build_parser()
         args = parser.parse_args(args or ['-h'])
         parser.common_options.resolve(args)
-        # This works around http://bugs.python.org/issue9351
-        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        func = get_func(args)
         if func == self.do_create and not args.paths:
             # need at least 1 path but args.paths may also be populated from patterns
             parser.error('Need at least one PATH argument.')
@@ -3712,8 +3870,7 @@ class Archiver:
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        # This works around http://bugs.python.org/issue9351
-        func = getattr(args, 'func', None) or getattr(args, 'fallback_func')
+        func = get_func(args)
         # do not use loggers before this!
         is_serve = func == self.do_serve
         setup_logging(level=args.log_level, is_serve=is_serve, json=args.log_json)
@@ -3788,10 +3945,6 @@ def sig_trace_handler(sig_no, stack):  # pragma: no cover
 
 
 def main():  # pragma: no cover
-    # provide 'borg mount' behaviour when the main script/executable is named borgfs
-    if os.path.basename(sys.argv[0]) == "borgfs":
-        sys.argv.insert(1, "mount")
-
     # Make sure stdout and stderr have errors='replace' to avoid unicode
     # issues when print()-ing unicode file names
     sys.stdout = ErrorIgnoringTextIOWrapper(sys.stdout.buffer, sys.stdout.encoding, 'replace', line_buffering=True)

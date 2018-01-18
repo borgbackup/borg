@@ -330,12 +330,26 @@ const uint32_t Crc32Lookup[8][256] =
 uint32_t crc32_slice_by_8(const void* data, size_t length, uint32_t previousCrc32)
 {
   uint32_t crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF
-  const uint32_t* current = (const uint32_t*) data;
+
+  const uint32_t* current;
+  const uint8_t* currentChar = (const uint8_t*) data;
 
   // enabling optimization (at least -O2) automatically unrolls the inner for-loop
   const size_t Unroll = 4;
   const size_t BytesAtOnce = 8 * Unroll;
-  const uint8_t* currentChar;
+
+  // wanted: 32 bit / 4 Byte alignment, compute leading, unaligned bytes length
+  uintptr_t unaligned_length = (4 - (((uintptr_t) currentChar) & 3)) & 3;
+  // process unaligned bytes, if any (standard algorithm)
+  while ((length != 0) && (unaligned_length != 0))
+  {
+    crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *currentChar++];
+    length--;
+    unaligned_length--;
+  }
+
+  // pointer points to 32bit aligned address now
+  current = (const uint32_t*) currentChar;
 
   // process 4x eight bytes at once (Slicing-by-8)
   while (length >= BytesAtOnce)

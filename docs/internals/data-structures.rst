@@ -28,7 +28,7 @@ the concept of archives or items.
 Each repository has the following file structure:
 
 README
-  simple text file telling that this is a |project_name| repository
+  simple text file telling that this is a Borg repository
 
 config
   repository configuration
@@ -374,7 +374,7 @@ needs to be handled.
 
 Lastly, cache_ invalidation is handled by noting which feature
 flags were and which were not understood while manipulating a cache.
-This allows to detect whether the cache needs to be invalidated,
+This allows borg to detect whether the cache needs to be invalidated,
 i.e. rebuilt from scratch. See `Cache feature flags`_ below.
 
 The *config* key stores the feature flags enabled on a repository:
@@ -538,7 +538,7 @@ ACLs/xattrs), the limit will be ~32 million files/directories per archive.
 If one tries to create an archive object bigger than MAX_OBJECT_SIZE, a fatal
 IntegrityError will be raised.
 
-A workaround is to create multiple archives with less items each, see
+A workaround is to create multiple archives with fewer items each, see
 also :issue:`1452`.
 
 .. _item:
@@ -578,7 +578,7 @@ A chunk is stored as an object as well, of course.
 Chunks
 ~~~~~~
 
-The |project_name| chunker uses a rolling hash computed by the Buzhash_ algorithm.
+The Borg chunker uses a rolling hash computed by the Buzhash_ algorithm.
 It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
 producing chunks of 2^HASH_MASK_BITS Bytes on average.
 
@@ -596,9 +596,9 @@ can be used to tune the chunker parameters, the default is:
 - HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
 
 The buzhash table is altered by XORing it with a seed randomly generated once
-for the archive, and stored encrypted in the keyfile. This is to prevent chunk
-size based fingerprinting attacks on your encrypted repo contents (to guess
-what files you have based on a specific set of chunk sizes).
+for the repository, and stored encrypted in the keyfile. This is to prevent
+chunk size based fingerprinting attacks on your encrypted repo contents (to
+guess what files you have based on a specific set of chunk sizes).
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -686,7 +686,7 @@ i.e. the reference count is pinned to MAX_VALUE.
 Indexes / Caches memory usage
 -----------------------------
 
-Here is the estimated memory usage of |project_name| - it's complicated::
+Here is the estimated memory usage of Borg - it's complicated::
 
   chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
 
@@ -709,7 +709,7 @@ be estimated like that::
 All units are Bytes.
 
 It is assuming every chunk is referenced exactly once (if you have a lot of
-duplicate chunks, you will have less chunks than estimated above).
+duplicate chunks, you will have fewer chunks than estimated above).
 
 It is also assuming that typical chunk size is 2^HASH_MASK_BITS (if you have
 a lot of files smaller than this statistical medium chunk size, you will have
@@ -822,7 +822,7 @@ Each chunk consists of ``TYPE(1)`` + ``MAC(32)`` + ``NONCE(8)`` + ``CIPHERTEXT``
 In AES-CTR mode you can think of the IV as the start value for the counter.
 The counter itself is incremented by one after each 16 byte block.
 The IV/counter is not required to be random but it must NEVER be reused.
-So to accomplish this |project_name| initializes the encryption counter to be
+So to accomplish this Borg initializes the encryption counter to be
 higher than any previously used counter value before encrypting new data.
 
 To reduce payload size, only 8 bytes of the 16 bytes nonce is saved in the
@@ -845,7 +845,7 @@ Key files
 
 .. seealso:: The :ref:`key_encryption` section for an in-depth review of the key encryption.
 
-When initialized with the ``init -e keyfile`` command, |project_name|
+When initialized with the ``init -e keyfile`` command, Borg
 needs an associated file in ``$HOME/.config/borg/keys`` to read and write
 the repository. The format is based on msgpack_, base64 encoding and
 PBKDF2_ SHA256 hashing, which is then encoded again in a msgpack_.
@@ -909,19 +909,20 @@ representation of the repository id.
 Compression
 -----------
 
-|project_name| supports the following compression methods:
+Borg supports the following compression methods:
 
 - none (no compression, pass through data 1:1)
 - lz4 (low compression, but super fast)
+- zstd (level 1-22 offering a wide range: level 1 is lower compression and high
+  speed, level 22 is higher compression and lower speed) - since borg 1.1.4
 - zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
   level 1 is low, level 9 is high compression)
 - lzma (level 0-9, level 0 is low, level 9 is high compression).
 
-Speed:  none > lz4 > zlib > lzma
-Compression: lzma > zlib > lz4 > none
+Speed:  none > lz4 > zlib > lzma, lz4 > zstd
+Compression: lzma > zlib > lz4 > none, zstd > lz4
 
-Be careful, higher zlib and especially lzma compression levels might take a
-lot of resources (CPU and memory).
+Be careful, higher compression levels might use a lot of resources (CPU/memory).
 
 The overall speed of course also depends on the speed of your target storage.
 If that is slow, using a higher compression level might yield better overall
@@ -945,7 +946,7 @@ See ``borg create --help`` about how to specify the compression level and its de
 Lock files
 ----------
 
-|project_name| uses locks to get (exclusive or shared) access to the cache and
+Borg uses locks to get (exclusive or shared) access to the cache and
 the repository.
 
 The locking system is based on creating a directory `lock.exclusive` (for
@@ -963,7 +964,7 @@ The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
 The repository lock is in `repository/lock.*`.
 
 In case you run into troubles with the locks, you can use the ``borg break-lock``
-command after you first have made sure that no |project_name| process is
+command after you first have made sure that no Borg process is
 running on any machine that accesses this resource. Be very careful, the cache
 or repository might get damaged if multiple processes use it at the same time.
 
@@ -1021,7 +1022,7 @@ Before feeding the checksum algorithm any data, the file name (i.e. without any 
 is mixed into the checksum, since the name encodes the context of the data for Borg.
 
 The various indices used by Borg have separate header and main data parts.
-IntegrityCheckedFile allows to checksum them independently, which avoids
+IntegrityCheckedFile allows borg to checksum them independently, which avoids
 even reading the data when the header is corrupted. When a part is signalled,
 the length of the part name is mixed into the checksum state first (encoded
 as an ASCII string via `%10d` printf format), then the name of the part

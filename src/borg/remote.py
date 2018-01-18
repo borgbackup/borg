@@ -22,7 +22,7 @@ from .compress import LZ4
 from .constants import *  # NOQA
 from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
-from .helpers import get_home_dir
+from .helpers import get_base_dir
 from .helpers import get_limited_unpacker
 from .helpers import hostname_is_unique
 from .helpers import replace_placeholders
@@ -179,7 +179,15 @@ class RepositoryServer:  # pragma: no cover
 
     def positional_to_named(self, method, argv):
         """Translate from positional protocol to named protocol."""
-        return {name: argv[pos] for pos, name in enumerate(compatMap[method])}
+        try:
+            return {name: argv[pos] for pos, name in enumerate(compatMap[method])}
+        except IndexError:
+            if method == 'open' and len(argv) == 4:
+                # borg clients < 1.0.7 use open() with 4 args
+                mapping = compatMap[method][:4]
+            else:
+                raise
+            return {name: argv[pos] for pos, name in enumerate(mapping)}
 
     def filter_args(self, f, kwargs):
         """Remove unknown named parameters from call, because client did (implicitly) say it's ok."""
@@ -315,9 +323,9 @@ class RepositoryServer:  # pragma: no cover
             path = os.fsdecode(path)
         # Leading slash is always present with URI (ssh://), but not with short-form (who@host:path).
         if path.startswith('/~/'):  # /~/x = path x relative to home dir
-            path = os.path.join(get_home_dir(), path[3:])
+            path = os.path.join(get_base_dir(), path[3:])
         elif path.startswith('~/'):
-            path = os.path.join(get_home_dir(), path[2:])
+            path = os.path.join(get_base_dir(), path[2:])
         elif path.startswith('/~'):  # /~username/x = relative to "user" home dir
             path = os.path.expanduser(path[1:])
         elif path.startswith('~'):
@@ -588,7 +596,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     # emit this msg in the same way as the 'Remote: ...' lines that show the remote TypeError
                     sys.stderr.write(msg)
                     self.server_version = parse_version('1.0.6')
-                    compatMap['open'] = ('path', 'create', 'lock_wait', 'lock', ),
+                    compatMap['open'] = ('path', 'create', 'lock_wait', 'lock', )
                     # try again with corrected version and compatMap
                     do_open()
         except Exception:

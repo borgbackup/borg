@@ -1,11 +1,10 @@
 import hashlib
-import io
 import os
 import shutil
 import sys
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
-from time import mktime, strptime, sleep
+from time import sleep
 
 import pytest
 
@@ -18,7 +17,7 @@ from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import interval, prune_within, prune_split
-from ..helpers import get_cache_dir, get_keys_dir, get_security_dir
+from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
@@ -333,40 +332,56 @@ class MakePathSafeTestCase(BaseTestCase):
 
 class MockArchive:
 
-    def __init__(self, ts):
+    def __init__(self, ts, id):
         self.ts = ts
+        self.id = id
 
     def __repr__(self):
-        return repr(self.ts)
+        return "{0}: {1}".format(self.id, self.ts.isoformat())
 
 
-class PruneSplitTestCase(BaseTestCase):
+@pytest.mark.parametrize(
+    "rule,num_to_keep,expected_ids", [
+        ("yearly", 3, (13, 2, 1)),
+        ("monthly", 3, (13, 8, 4)),
+        ("weekly", 2, (13, 8)),
+        ("daily", 3, (13, 8, 7)),
+        ("hourly", 3, (13, 10, 8)),
+        ("minutely", 3, (13, 10, 9)),
+        ("secondly", 4, (13, 12, 11, 10)),
+        ("daily", 0, []),
+    ]
+)
+def test_prune_split(rule, num_to_keep, expected_ids):
+    def subset(lst, ids):
+        return {i for i in lst if i.id in ids}
 
-    def test(self):
+    archives = [
+        # years apart
+        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=timezone.utc), 1),
+        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=timezone.utc), 2),
+        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=timezone.utc), 3),
+        # months apart
+        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=timezone.utc), 4),
+        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=timezone.utc), 5),
+        # days apart
+        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=timezone.utc), 6),
+        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=timezone.utc), 7),
+        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=timezone.utc), 8),
+        # minutes apart
+        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=timezone.utc), 9),
+        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=timezone.utc), 10),
+        # seconds apart
+        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=timezone.utc), 11),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=timezone.utc), 12),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=timezone.utc), 13),
+    ]
+    kept_because = {}
+    keep = prune_split(archives, rule, num_to_keep, kept_because)
 
-        def local_to_UTC(month, day):
-            """Convert noon on the month and day in 2013 to UTC."""
-            seconds = mktime(strptime('2013-%02d-%02d 12:00' % (month, day), '%Y-%m-%d %H:%M'))
-            return datetime.fromtimestamp(seconds, tz=timezone.utc)
-
-        def subset(lst, indices):
-            return {lst[i] for i in indices}
-
-        def dotest(test_archives, n, skip, indices):
-            for ta in test_archives, reversed(test_archives):
-                self.assert_equal(set(prune_split(ta, '%Y-%m', n, skip)),
-                                  subset(test_archives, indices))
-
-        test_pairs = [(1, 1), (2, 1), (2, 28), (3, 1), (3, 2), (3, 31), (5, 1)]
-        test_dates = [local_to_UTC(month, day) for month, day in test_pairs]
-        test_archives = [MockArchive(date) for date in test_dates]
-
-        dotest(test_archives, 3, [], [6, 5, 2])
-        dotest(test_archives, -1, [], [6, 5, 2, 0])
-        dotest(test_archives, 3, [test_archives[6]], [5, 2, 0])
-        dotest(test_archives, 3, [test_archives[5]], [6, 2, 0])
-        dotest(test_archives, 3, [test_archives[4]], [6, 5, 2])
-        dotest(test_archives, 0, [], [])
+    assert set(keep) == subset(archives, expected_ids)
+    for item in keep:
+        assert kept_because[item.id][0] == rule
 
 
 class IntervalTestCase(BaseTestCase):
@@ -410,14 +425,19 @@ class PruneWithinTestCase(BaseTestCase):
 
         def dotest(test_archives, within, indices):
             for ta in test_archives, reversed(test_archives):
-                self.assert_equal(set(prune_within(ta, interval(within))),
+                kept_because = {}
+                keep = prune_within(ta, interval(within), kept_because)
+                self.assert_equal(set(keep),
                                   subset(test_archives, indices))
+                assert all("within" == kept_because[a.id][0] for a in keep)
 
         # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
         test_offsets = [60, 90*60, 150*60, 210*60, 25*60*60, 49*60*60]
         now = datetime.now(timezone.utc)
         test_dates = [now - timedelta(seconds=s) for s in test_offsets]
-        test_archives = [MockArchive(date) for date in test_dates]
+        test_archives = [
+            MockArchive(date, i) for i, date in enumerate(test_dates)
+        ]
 
         dotest(test_archives, '1H', [0])
         dotest(test_archives, '2H', [0, 1])
@@ -445,6 +465,31 @@ class TestParseTimestamp(BaseTestCase):
     def test(self):
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00.226410'), datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc))
         self.assert_equal(parse_timestamp('2015-04-19T20:25:00'), datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc))
+
+
+def test_get_base_dir(monkeypatch):
+    """test that get_base_dir respects environment"""
+    monkeypatch.delenv('BORG_BASE_DIR', raising=False)
+    monkeypatch.delenv('HOME', raising=False)
+    monkeypatch.delenv('USER', raising=False)
+    assert get_base_dir() == os.path.expanduser('~')
+    monkeypatch.setenv('USER', 'root')
+    assert get_base_dir() == os.path.expanduser('~root')
+    monkeypatch.setenv('HOME', '/var/tmp/home')
+    assert get_base_dir() == '/var/tmp/home'
+    monkeypatch.setenv('BORG_BASE_DIR', '/var/tmp/base')
+    assert get_base_dir() == '/var/tmp/base'
+
+
+def test_get_config_dir(monkeypatch):
+    """test that get_config_dir respects environment"""
+    monkeypatch.delenv('BORG_CONFIG_DIR', raising=False)
+    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
+    assert get_config_dir() == os.path.join(os.path.expanduser('~'), '.config', 'borg')
+    monkeypatch.setenv('XDG_CONFIG_HOME', '/var/tmp/.config')
+    assert get_config_dir() == os.path.join('/var/tmp/.config', 'borg')
+    monkeypatch.setenv('BORG_CONFIG_DIR', '/var/tmp')
+    assert get_config_dir() == '/var/tmp'
 
 
 def test_get_cache_dir(monkeypatch):

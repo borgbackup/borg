@@ -179,10 +179,12 @@ def format_line(format, data):
 
 def replace_placeholders(text):
     """Replace placeholders in text with their values."""
+    from ..platform import fqdn
     current_time = datetime.now()
     data = {
         'pid': os.getpid(),
-        'fqdn': socket.getfqdn(),
+        'fqdn': fqdn,
+        'reverse-fqdn': '.'.join(reversed(fqdn.split('.'))),
         'hostname': socket.gethostname(),
         'now': DatetimeWrapper(current_time.now()),
         'utcnow': DatetimeWrapper(current_time.utcnow()),
@@ -447,7 +449,7 @@ class Location:
                                            path)
 
 
-def location_validator(archive=None):
+def location_validator(archive=None, proto=None):
     def validator(text):
         try:
             loc = Location(text)
@@ -456,7 +458,12 @@ def location_validator(archive=None):
         if archive is True and not loc.archive:
             raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
         elif archive is False and loc.archive:
-            raise argparse.ArgumentTypeError('"%s" No archive can be specified' % text)
+            raise argparse.ArgumentTypeError('"%s": No archive can be specified' % text)
+        if proto is not None and loc.proto != proto:
+            if proto == 'file':
+                raise argparse.ArgumentTypeError('"%s": Repository must be local' % text)
+            else:
+                raise argparse.ArgumentTypeError('"%s": Repository must be remote' % text)
         return loc
     return validator
 
@@ -500,20 +507,20 @@ class BaseFormatter:
 
 class ArchiveFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
-        'name': 'archive name interpreted as text (might be missing non-text characters, see barchive)',
         'archive': 'archive name interpreted as text (might be missing non-text characters, see barchive)',
+        'name': 'alias of "archive"',
         'barchive': 'verbatim archive name, can contain any character except NUL',
         'comment': 'archive comment interpreted as text (might be missing non-text characters, see bcomment)',
         'bcomment': 'verbatim archive comment, can contain any character except NUL',
-        'time': 'time (start) of creation of the archive',
         # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
         'start': 'time (start) of creation of the archive',
+        'time': 'alias of "start"',
         'end': 'time (end) of creation of the archive',
         'id': 'internal ID of the archive',
     }
     KEY_GROUPS = (
-        ('name', 'archive', 'barchive', 'comment', 'bcomment', 'id'),
-        ('time', 'start', 'end'),
+        ('archive', 'name', 'barchive', 'comment', 'bcomment', 'id'),
+        ('start', 'time', 'end'),
     )
 
     @classmethod

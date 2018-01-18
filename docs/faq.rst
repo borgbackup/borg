@@ -8,59 +8,19 @@ Frequently asked questions
 Usage & Limitations
 ###################
 
-Can I backup VM disk images?
-----------------------------
-
-Yes, the `deduplication`_ technique used by
-|project_name| makes sure only the modified parts of the file are stored.
-Also, we have optional simple sparse file support for extract.
-
-If you use non-snapshotting backup tools like Borg to back up virtual machines,
-then the VMs should be turned off for the duration of the backup. Backing up live VMs can (and will)
-result in corrupted or inconsistent backup contents: a VM image is just a regular file to
-Borg with the same issues as regular files when it comes to concurrent reading and writing from
-the same file.
-
-For backing up live VMs use file system snapshots on the VM host, which establishes
-crash-consistency for the VM images. This means that with most file systems
-(that are journaling) the FS will always be fine in the backup (but may need a
-journal replay to become accessible).
-
-Usually this does not mean that file *contents* on the VM are consistent, since file
-contents are normally not journaled. Notable exceptions are ext4 in data=journal mode,
-ZFS and btrfs (unless nodatacow is used).
-
-Applications designed with crash-consistency in mind (most relational databases
-like PostgreSQL, SQLite etc. but also for example Borg repositories) should always
-be able to recover to a consistent state from a backup created with
-crash-consistent snapshots (even on ext4 with data=writeback or XFS).
-
-Hypervisor snapshots capturing most of the VM's state can also be used for backups
-and can be a better alternative to pure file system based snapshots of the VM's disk,
-since no state is lost. Depending on the application this can be the easiest and most
-reliable way to create application-consistent backups.
-
-Other applications may require a lot of work to reach application-consistency:
-It's a broad and complex issue that cannot be explained in entirety here.
-
-Borg doesn't intend to address these issues due to their huge complexity
-and platform/software dependency. Combining Borg with the mechanisms provided
-by the platform (snapshots, hypervisor features) will be the best approach
-to start tackling them.
-
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------
 
-Yes, but in order for the deduplication used by |project_name| to work, it
+Yes, but in order for the deduplication used by Borg to work, it
 needs to keep a local cache containing checksums of all file
 chunks already stored in the repository. This cache is stored in
-``~/.cache/borg/``.  If |project_name| detects that a repository has been
+``~/.cache/borg/``.  If Borg detects that a repository has been
 modified since the local cache was updated it will need to rebuild
 the cache. This rebuild can be quite time consuming.
 
 So, yes it's possible. But it will be most efficient if a single
 repository is only modified from one place. Also keep in mind that
-|project_name| will keep an exclusive lock on the repository while creating
+Borg will keep an exclusive lock on the repository while creating
 or deleting archives, which may make *simultaneous* backups fail.
 
 Can I copy or synchronize my repo to another location?
@@ -97,6 +57,9 @@ Which file types, attributes, etc. are *not* preserved?
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
     * Some filesystem specific attributes, like btrfs NOCOW, see :ref:`platforms`.
+    * For hardlinked symlinks, the hardlinking can not be archived (and thus,
+      the hardlinking will not be done at extraction time). The symlinks will
+      be archived and extracted as non-hardlinked symlinks, see :issue:`2379`.
 
 Are there other known limitations?
 ----------------------------------
@@ -105,7 +68,7 @@ Are there other known limitations?
   usually corresponding to tens or hundreds of millions of files/dirs.
   When trying to go beyond that limit, you will get a fatal IntegrityError
   exception telling that the (archive) object is too big.
-  An easy workaround is to create multiple archives with less items each.
+  An easy workaround is to create multiple archives with fewer items each.
   See also the :ref:`archive_limitation` and :issue:`1452`.
 
   :ref:`borg_info` shows how large (relative to the maximum size) existing
@@ -116,7 +79,7 @@ Are there other known limitations?
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
 
-Yes, |project_name| supports resuming backups.
+Yes, Borg supports resuming backups.
 
 During a backup a special checkpoint archive named ``<archive-name>.checkpoint``
 is saved every checkpoint interval (the default value for this is 30
@@ -129,12 +92,13 @@ completed is useful because it references all the transmitted chunks up
 to the checkpoint. This means that in case of an interruption, you only need to
 retransfer the data since the last checkpoint.
 
-If a backup was interrupted, you do not need to do any special considerations,
-just invoke ``borg create`` as you always do. You may use the same archive name
-as in previous attempt or a different one (e.g. if you always include the current
-datetime), it does not matter.
+If a backup was interrupted, you normally do not need to do anything special,
+just invoke ``borg create`` as you always do. If the repository is still locked,
+you may need to run ``borg break-lock`` before the next backup. You may use the
+same archive name as in previous attempt or a different one (e.g. if you always
+include the current datetime), it does not matter.
 
-|project_name| always does full single-pass backups, so it will start again
+Borg always does full single-pass backups, so it will start again
 from the beginning - but it will be much faster, because some of the data was
 already stored into the repo (and is still referenced by the checkpoint
 archive), so it does not need to get transmitted and stored again.
@@ -167,8 +131,8 @@ all the part files and manually concatenate them together.
 
 For more details, see :ref:`checkpoints_parts`.
 
-Can |project_name| add redundancy to the backup data to deal with hardware malfunction?
----------------------------------------------------------------------------------------
+Can Borg add redundancy to the backup data to deal with hardware malfunction?
+-----------------------------------------------------------------------------
 
 No, it can't. While that at first sounds like a good idea to defend against
 some defect HDD sectors or SSD flash blocks, dealing with this in a
@@ -180,8 +144,8 @@ storage or just make backups to different locations / different hardware.
 
 See also :issue:`225`.
 
-Can |project_name| verify data integrity of a backup archive?
--------------------------------------------------------------
+Can Borg verify data integrity of a backup archive?
+---------------------------------------------------
 
 Yes, if you want to detect accidental data damage (like bit rot), use the
 ``check`` operation. It will notice corruption using CRCs and hashes.
@@ -212,7 +176,7 @@ I get an IntegrityError or similar - what now?
 
 A single error does not necessarily indicate bad hardware or a Borg
 bug. All hardware exhibits a bit error rate (BER). Hard drives are typically
-specified as exhibiting less than one error every 12 to 120 TB
+specified as exhibiting fewer than one error every 12 to 120 TB
 (one bit error in 10e14 to 10e15 bits). The specification is often called
 *unrecoverable read error rate* (URE rate).
 
@@ -285,6 +249,42 @@ needs to be ascertained and fixed.
 issues. We recommend to first run without ``--repair`` to assess the situation.
 If the found issues and proposed repairs seem right, re-run "check" with ``--repair`` enabled.
 
+Why is the time elapsed in the archive stats different from wall clock time?
+----------------------------------------------------------------------------
+
+Borg needs to write the time elapsed into the archive metadata before finalizing
+the archive, compacting the segments, and committing the repo & cache. This means
+when Borg is run with e.g. the ``time`` command, the duration shown in the archive
+stats may be shorter than the full time the command runs for.
+
+How do I configure different prune policies for different directories?
+----------------------------------------------------------------------
+
+Say you want to prune ``/var/log`` faster than the rest of
+``/``. How do we implement that? The answer is to backup to different
+archive *names* and then implement different prune policies for
+different prefixes. For example, you could have a script that does::
+
+    borg create --exclude /var/log $REPOSITORY:main-$(date +%Y-%m-%d) /
+    borg create $REPOSITORY:logs-$(date +%Y-%m-%d) /var/log
+
+Then you would have two different prune calls with different policies::
+
+    borg prune --verbose --list -d 30 --prefix main- "$REPOSITORY"
+    borg prune --verbose --list -d 7  --prefix logs- "$REPOSITORY"
+
+This will keep 7 days of logs and 30 days of everything else. Borg 1.1
+also supports the ``--glob-archives`` parameter.
+
+How do I remove files from an existing backup?
+----------------------------------------------
+
+Say you now want to remove old logfiles because you changed your
+backup policy as described above. The only way to do this is to use
+the :ref:`borg_recreate` command to rewrite all archives with a
+different ``--exclude`` pattern. See the examples in the
+:ref:`borg_recreate` manpage for more information.
+
 Security
 ########
 
@@ -301,7 +301,7 @@ Setting ``BORG_PASSPHRASE``
   .. _password_env:
   .. note:: Be careful how you set the environment; using the ``env``
           command, a ``system()`` call or using inline shell scripts
-          (e.g. ``BORG_PASSPHRASE=hunter12 borg ...``)
+          (e.g. ``BORG_PASSPHRASE=hunter2 borg ...``)
           might expose the credentials in the process list directly
           and they will be readable to all users on a system. Using
           ``export`` in a shell script file should be safe, however, as
@@ -325,7 +325,8 @@ Using ``BORG_PASSCOMMAND`` with a properly permissioned file
 
 Using keyfile-based encryption with a blank passphrase
   It is possible to encrypt your repository in ``keyfile`` mode instead of the default
-  ``repokey`` mode and use a blank passphrase for the key file. See :ref:`encrypted_repos`
+  ``repokey`` mode and use a blank passphrase for the key file (simply press Enter twice
+  when ``borg init`` asks for the password). See :ref:`encrypted_repos`
   for more details.
 
 Using ``BORG_PASSCOMMAND`` with macOS Keychain
@@ -498,8 +499,7 @@ space for chunks.archive.d (see :issue:`235` for details):
 ::
 
     # this assumes you are working with the same user as the backup.
-    # you can get the REPOID from the "config" file inside the repository.
-    cd ~/.cache/borg/<REPOID>
+    cd ~/.cache/borg/$(borg config /path/to/repo id)
     rm -rf chunks.archive.d ; touch chunks.archive.d
 
 This deletes all the cached archive chunk indexes and replaces the directory
@@ -551,7 +551,7 @@ If you run into that, try this:
 I am seeing 'A' (added) status for an unchanged file!?
 ------------------------------------------------------
 
-The files cache is used to determine whether |project_name| already
+The files cache is used to determine whether Borg already
 "knows" / has backed up a file and if so, to skip the file from
 chunking. It does intentionally *not* contain files that have a modification
 time (mtime) same as the newest mtime in the created archive.
@@ -563,7 +563,7 @@ This is expected: it is to avoid data loss with files that are backed up from
 a snapshot and that are immediately changed after the snapshot (but within
 mtime granularity time, so the mtime would not change). Without the code that
 removes these files from the files cache, the change that happened right after
-the snapshot would not be contained in the next backup as |project_name| would
+the snapshot would not be contained in the next backup as Borg would
 think the file is unchanged.
 
 This does not affect deduplication, the file will be chunked, but as the chunks
@@ -586,13 +586,13 @@ already used.
 It always chunks all my files, even unchanged ones!
 ---------------------------------------------------
 
-|project_name| maintains a files cache where it remembers the mtime, size and
-inode of files. When |project_name| does a new backup and starts processing a
+Borg maintains a files cache where it remembers the mtime, size and
+inode of files. When Borg does a new backup and starts processing a
 file, it first looks whether the file has changed (compared to the values
 stored in the files cache). If the values are the same, the file is assumed
 unchanged and thus its contents won't get chunked (again).
 
-|project_name| can't keep an infinite history of files of course, thus entries
+Borg can't keep an infinite history of files of course, thus entries
 in the files cache have a "maximum time to live" which is set via the
 environment variable BORG_FILES_CACHE_TTL (and defaults to 20).
 Every time you do a backup (on the same machine, using the same user), the
@@ -609,11 +609,11 @@ it would be much faster.
 Another possible reason is that files don't always have the same path, for
 example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable.
 If the directory where you mount a filesystem is different every time,
-|project_name| assume they are different files.
+Borg assume they are different files.
 
 
-Is there a way to limit bandwidth with |project_name|?
-------------------------------------------------------
+Is there a way to limit bandwidth with Borg?
+--------------------------------------------
 
 To limit upload (i.e. :ref:`borg_create`) bandwidth, use the
 ``--remote-ratelimit`` option.
@@ -634,7 +634,7 @@ Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::
 
     export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
 
-Now |project_name| will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
+Now Borg will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
 
     pv -R $(pidof pv) -L 102400
 
@@ -644,7 +644,7 @@ Now |project_name| will be bandwidth limited. Nice thing about pv is that you ca
 I am having troubles with some network/FUSE/special filesystem, why?
 --------------------------------------------------------------------
 
-|project_name| is doing nothing special in the filesystem, it only uses very
+Borg is doing nothing special in the filesystem, it only uses very
 common and compatible operations (even the locking is just "mkdir").
 
 So, if you are encountering issues like slowness, corruption or malfunction
@@ -652,13 +652,13 @@ when using a specific filesystem, please try if you can reproduce the issues
 with a local (non-network) and proven filesystem (like ext4 on Linux).
 
 If you can't reproduce the issue then, you maybe have found an issue within
-the filesystem code you used (not with |project_name|). For this case, it is
+the filesystem code you used (not with Borg). For this case, it is
 recommended that you talk to the developers / support of the network fs and
 maybe open an issue in their issue tracker. Do not file an issue in the
-|project_name| issue tracker.
+Borg issue tracker.
 
 If you can reproduce the issue with the proven filesystem, please file an
-issue in the |project_name| issue tracker about that.
+issue in the Borg issue tracker about that.
 
 
 Why does running 'borg check --repair' warn about data loss?
@@ -670,7 +670,7 @@ instances, such as malfunctioning storage hardware, additional repo
 corruption may occur. If you can't afford to lose the repo, it's strongly
 recommended that you perform repair on a copy of the repo.
 
-In other words, the warning is there to emphasize that |project_name|:
+In other words, the warning is there to emphasize that Borg:
   - Will perform automated routines that modify your backup repository
   - Might not actually fix the problem you are experiencing
   - Might, in very rare cases, further corrupt your repository
@@ -705,6 +705,18 @@ You see, trying to display ETA would be futile. The borg developers prefer to
 rather not implement progress / ETA display than doing futile attempts.
 
 See also: https://xkcd.com/612/
+
+
+Why am I getting 'Operation not permitted' errors when backing up on sshfs?
+---------------------------------------------------------------------------
+
+By default, ``sshfs`` is not entirely POSIX-compliant when renaming files due to
+a technicality in the SFTP protocol. Fortunately, it also provides a workaround_
+to make it behave correctly::
+
+    sshfs -o workaround=rename user@host:dir /mnt/dir
+
+.. _workaround: https://unix.stackexchange.com/a/123236
 
 
 Miscellaneous
@@ -776,7 +788,7 @@ Here's a (incomplete) list of some major changes:
 * more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
 * less chunk management overhead (less memory and disk usage for chunks index)
 * faster remote cache resync (useful when backing up multiple machines into same repo)
-* compression: no, lz4, zlib or lzma compression, adjustable compression levels
+* compression: no, lz4, zstd, zlib or lzma compression, adjustable compression levels
 * repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
 * simple sparse file support, great for virtual machine disk files
 * can read special files (e.g. block devices) or from stdin, write to stdout
@@ -804,7 +816,7 @@ There are some caveats:
 - If the repository is in "keyfile" encryption mode, the keyfile must
   exist locally or it must be manually moved after performing the upgrade:
 
-  1. Locate the repository ID, contained in the ``config`` file in the repository.
+  1. Get the repository ID with ``borg config /path/to/repo id``.
   2. Locate the attic key file at ``~/.attic/keys/``. The correct key for the
      repository starts with the line ``ATTIC_KEY <repository id>``.
   3. Copy the attic key file to ``~/.config/borg/keys/``
@@ -828,8 +840,7 @@ The default in Borg is lz4, which is fast enough to not use significant CPU time
 in most cases, but can only achieve modest compression. It still compresses
 easily compressed data fairly well.
 
-zlib compression with all levels (1-9) as well as LZMA (1-6) are available
-as well, for cases where they are worth it.
+Borg also offers zstd, zlib and lzma compression, choose wisely.
 
 Which choice is the best option depends on a number of factors, like
 bandwidth to the repository, how well the data compresses, available CPU

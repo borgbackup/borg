@@ -58,8 +58,13 @@ Main features
     authenticity is verified using HMAC-SHA256. Data is encrypted clientside.
 
 **Compression**
-    All data can be compressed by lz4 (super fast, low compression), zlib
-    (medium speed and compression) or lzma (low speed, high compression).
+    All data can be optionally compressed:
+
+    * lz4 (super fast, low compression)
+    * zstd (wide range from high speed and low compression to high compression
+      and lower speed)
+    * zlib (medium speed and compression)
+    * lzma (low speed, high compression)
 
 **Off-site backups**
     Borg can store data on any remote host accessible over SSH.  If Borg is
@@ -78,8 +83,8 @@ Main features
     * Mac OS X
     * FreeBSD
     * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
-    * Cygwin (not supported, no binaries yet)
-    * Linux Subsystem of Windows 10 (not supported)
+    * Cygwin (experimental, no binaries yet)
+    * Linux Subsystem of Windows 10 (experimental)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently
@@ -127,7 +132,7 @@ Spread the word, give feedback, help with documentation, testing or development.
 
 You can also give monetary support to the project, see there for details:
 
-https://borgbackup.readthedocs.io/en/stable/support.html#bounties-and-fundraisers
+https://www.borgbackup.org/support/free.html#bounties-and-fundraisers
 
 Links
 -----

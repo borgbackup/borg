@@ -126,7 +126,7 @@ resulting archive will only contain files from these PATHs.
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will *not* match (``--exclude``, ``--exclude-from``, PATHs).
 
-``--recompress`` allows to change the compression of existing data in archives.
+``--recompress`` allows one to change the compression of existing data in archives.
 Due to how Borg stores compressed size information this might display
 incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
@@ -151,3 +151,14 @@ When rechunking space usage can be substantial, expect at least the entire
 deduplicated size of the archives using the previous chunker params.
 When recompressing expect approx. (throughput / checkpoint-interval) in space usage,
 assuming all chunks are recompressed.
+
+If you recently ran borg check --repair and it had to fix lost chunks with all-zero
+replacement chunks, please first run another backup for the same data and re-run
+borg check --repair afterwards to heal any archives that had lost chunks which are
+still generated from the input data.
+
+Important: running borg recreate to re-chunk will remove the chunks_healthy
+metadata of all items with replacement chunks, so healing will not be possible
+any more after re-chunking (it is also unlikely it would ever work: due to the
+change of chunking parameters, the missing chunk likely will never be seen again
+even if you still have the data that produced it).

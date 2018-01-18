@@ -6,6 +6,7 @@ import logging
 import os
 import pstats
 import random
+import re
 import shutil
 import socket
 import stat
@@ -53,7 +54,7 @@ from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
-from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported
+from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
 from .upgrader import attic_repo
 from . import key
@@ -380,8 +381,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('init', '--encryption=repokey', '--show-version', '--show-rc', self.repository_location, fork=True)
         self.assert_in('borgbackup version', output)
         self.assert_in('terminating with success status, rc 0', output)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        output = self.cmd('create', '--stats', self.repository_location + '::test.2', 'input')
+        self.cmd('create', '--exclude-nodump', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--exclude-nodump', '--stats', self.repository_location + '::test.2', 'input')
         self.assert_in('Archive name: test.2', output)
         self.assert_in('This archive: ', output)
         with changedir('output'):
@@ -492,6 +493,39 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         else:
             # it touched the input file's atime while backing it up
             assert sto.st_atime_ns == atime * 1e9
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
+    @pytest.mark.skipif(not is_birthtime_fully_supported(), reason='cannot properly setup and execute test without birthtime')
+    def test_birthtime(self):
+        self.create_test_files()
+        birthtime, mtime, atime = 946598400, 946684800, 946771200
+        os.utime('input/file1', (atime, birthtime))
+        os.utime('input/file1', (atime, mtime))
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        sti = os.stat('input/file1')
+        sto = os.stat('output/input/file1')
+        assert int(sti.st_birthtime * 1e9) == int(sto.st_birthtime * 1e9) == birthtime * 1e9
+        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
+    @pytest.mark.skipif(not is_birthtime_fully_supported(), reason='cannot properly setup and execute test without birthtime')
+    def test_nobirthtime(self):
+        self.create_test_files()
+        birthtime, mtime, atime = 946598400, 946684800, 946771200
+        os.utime('input/file1', (atime, birthtime))
+        os.utime('input/file1', (atime, mtime))
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', '--nobirthtime', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        sti = os.stat('input/file1')
+        sto = os.stat('output/input/file1')
+        assert int(sti.st_birthtime * 1e9) == birthtime * 1e9
+        assert int(sto.st_birthtime * 1e9) == mtime * 1e9
+        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
 
     def _extract_repository_id(self, path):
         with Repository(self.repository_path) as repository:
@@ -726,7 +760,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.mkdir(os.path.join(self.input_path, 'dir1'))
         os.mkdir(os.path.join(self.input_path, 'dir1/subdir'))
 
-        self.create_regular_file('source')
+        self.create_regular_file('source', contents=b'123456')
         os.link(os.path.join(self.input_path, 'source'),
                 os.path.join(self.input_path, 'abba'))
         os.link(os.path.join(self.input_path, 'source'),
@@ -744,30 +778,56 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
 
     @requires_hardlinks
-    def test_strip_components_links(self):
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_mount_hardlinks(self):
         self._extract_hardlinks_setup()
-        with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, '--strip-components=2'), \
+             changedir(mountpoint):
             assert os.stat('hardlink').st_nlink == 2
             assert os.stat('subdir/hardlink').st_nlink == 2
+            assert open('subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('aaaa').st_nlink == 2
             assert os.stat('source2').st_nlink == 2
-        with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, 'input/dir1'), \
+             changedir(mountpoint):
+            assert os.stat('input/dir1/hardlink').st_nlink == 2
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
+            assert os.stat('input/dir1/aaaa').st_nlink == 2
+            assert os.stat('input/dir1/source2').st_nlink == 2
+        with self.fuse_mount(self.repository_location + '::test', mountpoint), \
+             changedir(mountpoint):
+            assert os.stat('input/source').st_nlink == 4
+            assert os.stat('input/abba').st_nlink == 4
             assert os.stat('input/dir1/hardlink').st_nlink == 4
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     @requires_hardlinks
     def test_extract_hardlinks(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
+            assert os.stat('hardlink').st_nlink == 2
+            assert os.stat('subdir/hardlink').st_nlink == 2
+            assert open('subdir/hardlink', 'rb').read() == b'123456'
+            assert os.stat('aaaa').st_nlink == 2
+            assert os.stat('source2').st_nlink == 2
+        with changedir('output'):
             self.cmd('extract', self.repository_location + '::test', 'input/dir1')
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/source').st_nlink == 4
+            assert os.stat('input/abba').st_nlink == 4
             assert os.stat('input/dir1/hardlink').st_nlink == 4
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     def test_extract_include_exclude(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -1655,13 +1715,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.create_regular_file('file3', size=1024 * 80)
             platform.set_flags(os.path.join(self.input_path, 'file3'), stat.UF_NODUMP)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+        output = self.cmd('create', '--list', '--exclude-nodump', self.repository_location + '::test', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         if has_lchflags:
             self.assert_in("x input/file3", output)
         # should find second file as excluded
-        output = self.cmd('create', '--list', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
+        output = self.cmd('create', '--list', '--exclude-nodump', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
         if has_lchflags:
@@ -1731,12 +1791,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
         self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
-        self.assert_in('Keeping archive: test2', output)
-        self.assert_in('Would prune:     test1', output)
+        assert re.search(r'Would prune:\s+test1', output)
         # must keep the latest non-checkpoint archive:
-        self.assert_in('Keeping archive: test2', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         # must keep the latest checkpoint archive:
-        self.assert_in('Keeping archive: test4.checkpoint', output)
+        assert re.search(r'Keeping checkpoint archive:\s+test4.checkpoint', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
@@ -1766,8 +1825,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test1', src_dir)
         self.cmd('create', self.repository_location + '::test2', src_dir)
         output = self.cmd('prune', '--list', '--stats', '--dry-run', self.repository_location, '--keep-daily=2')
-        self.assert_in('Keeping archive: test2', output)
-        self.assert_in('Would prune:     test1', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
+        assert re.search(r'Would prune:\s+test1', output)
         self.assert_in('Deleted data:', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
@@ -1784,8 +1843,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
         self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--prefix=foo-')
-        self.assert_in('Keeping archive: foo-2015-08-12-20:00', output)
-        self.assert_in('Would prune:     foo-2015-08-12-10:00', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00', output)
+        assert re.search(r'Would prune:\s+foo-2015-08-12-10:00', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('foo-2015-08-12-10:00', output)
         self.assert_in('foo-2015-08-12-20:00', output)
@@ -1805,8 +1864,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
         self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2', '--glob-archives=2015-*-foo')
-        self.assert_in('Keeping archive: 2015-08-12-20:00-foo', output)
-        self.assert_in('Would prune:     2015-08-12-10:00-foo', output)
+        assert re.search(r'Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo', output)
+        assert re.search(r'Would prune:\s+2015-08-12-10:00-foo', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('2015-08-12-10:00-foo', output)
         self.assert_in('2015-08-12-20:00-foo', output)
@@ -2059,8 +2118,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_test_files()
         have_noatime = has_noatime('input/file1')
-        self.cmd('create', self.repository_location + '::archive', 'input')
-        self.cmd('create', self.repository_location + '::archive2', 'input')
+        self.cmd('create', '--exclude-nodump', self.repository_location + '::archive', 'input')
+        self.cmd('create', '--exclude-nodump', self.repository_location + '::archive2', 'input')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
             os.remove(os.path.join('input', 'flagfile'))
@@ -2149,8 +2208,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('test', contents=b'first')
         if are_hardlinks_supported():
-            self.create_regular_file('hardlink1', contents=b'')
+            self.create_regular_file('hardlink1', contents=b'123456')
             os.link('input/hardlink1', 'input/hardlink2')
+            os.link('input/hardlink1', 'input/hardlink3')
         self.cmd('create', self.repository_location + '::archive1', 'input')
         self.create_regular_file('test', contents=b'second')
         self.cmd('create', self.repository_location + '::archive2', 'input')
@@ -2162,9 +2222,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert all(f.startswith('test.') for f in files)  # ... with files test.xxxxx in there
             assert {b'first', b'second'} == {open(os.path.join(path, f), 'rb').read() for f in files}
             if are_hardlinks_supported():
-                st1 = os.stat(os.path.join(mountpoint, 'input', 'hardlink1', 'hardlink1.00001'))
-                st2 = os.stat(os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001'))
-                assert st1.st_ino == st2.st_ino
+                hl1 = os.path.join(mountpoint, 'input', 'hardlink1', 'hardlink1.00001')
+                hl2 = os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001')
+                hl3 = os.path.join(mountpoint, 'input', 'hardlink3', 'hardlink3.00001')
+                assert os.stat(hl1).st_ino == os.stat(hl2).st_ino == os.stat(hl3).st_ino
+                assert open(hl3, 'rb').read() == b'123456'
+        # similar again, but exclude the hardlink master:
+        with self.fuse_mount(self.repository_location, mountpoint, '-o', 'versions', '-e', 'input/hardlink1'):
+            if are_hardlinks_supported():
+                hl2 = os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001')
+                hl3 = os.path.join(mountpoint, 'input', 'hardlink3', 'hardlink3.00001')
+                assert os.stat(hl2).st_ino == os.stat(hl3).st_ino
+                assert open(hl3, 'rb').read() == b'123456'
 
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):
@@ -2709,6 +2778,19 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with environment_variable(_BORG_BENCHMARK_CRUD_TEST='YES'):
             self.cmd('benchmark', 'crud', self.repository_location, self.input_path)
 
+    def test_config(self):
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        for flags in [[], ['--cache']]:
+            for cfg_key in {'testkey', 'testsection.testkey'}:
+                self.cmd('config', self.repository_location, *flags, cfg_key, exit_code=1)
+                self.cmd('config', self.repository_location, *flags, cfg_key, 'testcontents')
+                output = self.cmd('config', self.repository_location, *flags, cfg_key)
+                assert output == 'testcontents\n'
+                self.cmd('config', self.repository_location, *flags, '--delete', cfg_key)
+                self.cmd('config', self.repository_location, *flags, cfg_key, exit_code=1)
+
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
 
@@ -2918,7 +3000,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')
         with repository:
-            repository.delete(archive.metadata.items[-5])
+            repository.delete(archive.metadata.items[0])
             repository.commit()
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -3191,6 +3273,10 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     def test_debug_put_get_delete_obj(self):
         pass
 
+    @unittest.skip('only works locally')
+    def test_config(self):
+        pass
+
     def test_strip_components_doesnt_leak(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('dir/file', contents=b"test file contents 1")
@@ -3460,10 +3546,22 @@ def test_get_args():
     assert args.restrict_to_paths == ['/p1', '/p2']
     assert args.umask == 0o027
     assert args.log_level == 'info'
+    # similar, but with --restrict-to-repository
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-repository=/r1', '--restrict-to-repository=/r2', ],
+                             'borg serve --info --umask=0027')
+    assert args.restrict_to_repositories == ['/r1', '/r2']
     # trying to cheat - break out of path restriction
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
                              'borg serve --restrict-to-path=/')
     assert args.restrict_to_paths == ['/p1', '/p2']
+    # trying to cheat - break out of repository restriction
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-repository=/r1', '--restrict-to-repository=/r2', ],
+                             'borg serve --restrict-to-repository=/')
+    assert args.restrict_to_repositories == ['/r1', '/r2']
+    # trying to cheat - break below repository restriction
+    args = archiver.get_args(['borg', 'serve', '--restrict-to-repository=/r1', '--restrict-to-repository=/r2', ],
+                             'borg serve --restrict-to-repository=/r1/below')
+    assert args.restrict_to_repositories == ['/r1', '/r2']
     # trying to cheat - try to execute different subcommand
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
                              'borg init --encryption=repokey /')
@@ -3655,14 +3753,17 @@ def get_all_parsers():
     Return dict mapping command to parser.
     """
     parser = Archiver(prog='borg').build_parser()
+    borgfs_parser = Archiver(prog='borgfs').build_parser()
     parsers = {}
 
-    def discover_level(prefix, parser, Archiver):
+    def discover_level(prefix, parser, Archiver, extra_choices=None):
         choices = {}
         for action in parser._actions:
             if action.choices is not None and 'SubParsersAction' in str(action.__class__):
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
+        if extra_choices is not None:
+            choices.update(extra_choices)
         if prefix and not choices:
             return
 
@@ -3670,7 +3771,7 @@ def get_all_parsers():
             discover_level(command + " ", parser, Archiver)
             parsers[command] = parser
 
-    discover_level("", parser, Archiver)
+    discover_level("", parser, Archiver, {'borgfs': borgfs_parser})
     return parsers
 
 

@@ -60,5 +60,6 @@ code as borg's return code.
 .. note::
 
     If you copy a repository with the lock held, the lock will be present in
-    the copy, obviously. Thus, before using borg on the copy, you need to
-    use "borg break-lock" on it.
+    the copy. Thus, before using borg on the copy from a different host,
+    you need to use "borg break-lock" on the copied repository, because
+    Borg is cautious and does not automatically remove stale locks made by a different host.

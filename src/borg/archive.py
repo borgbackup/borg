@@ -65,6 +65,16 @@ class Statistics:
         if unique:
             self.usize += csize
 
+    def __add__(self, other):
+        if not isinstance(other, Statistics):
+            raise TypeError('can only add Statistics objects')
+        stats = Statistics(self.output_json)
+        stats.osize = self.osize + other.osize
+        stats.csize = self.csize + other.csize
+        stats.usize = self.usize + other.usize
+        stats.nfiles = self.nfiles + other.nfiles
+        return stats
+
     summary = "{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"
 
     def __str__(self):
@@ -282,8 +292,8 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, progress=False,
-                 chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
+                 checkpoint_interval=300, numeric_owner=False, noatime=False, noctime=False, nobsdflags=False,
+                 progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
                  consider_part_files=False, log_json=False):
         self.cwd = os.getcwd()
         self.key = key
@@ -300,6 +310,7 @@ class Archive:
         self.numeric_owner = numeric_owner
         self.noatime = noatime
         self.noctime = noctime
+        self.nobsdflags = nobsdflags
         assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
             start = datetime.utcnow()
@@ -682,6 +693,18 @@ Utilization of max. archive size: {csize_max:.0%}
         else:
             # old archives only had mtime in item metadata
             atime = mtime
+        if 'birthtime' in item:
+            birthtime = item.birthtime
+            try:
+                # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
+                # See utimes(2) on either of the BSDs for details.
+                if fd:
+                    os.utime(fd, None, ns=(atime, birthtime))
+                else:
+                    os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
+            except OSError:
+                # some systems don't support calling utime on a symlink
+                pass
         try:
             if fd:
                 os.utime(fd, None, ns=(atime, mtime))
@@ -691,11 +714,6 @@ Utilization of max. archive size: {csize_max:.0%}
             # some systems don't support calling utime on a symlink
             pass
         acl_set(path, item, self.numeric_owner)
-        if 'bsdflags' in item:
-            try:
-                set_flags(path, item.bsdflags, fd=fd)
-            except OSError:
-                pass
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.
         xattrs = item.get('xattrs', {})
@@ -718,6 +736,12 @@ Utilization of max. archive size: {csize_max:.0%}
                     set_ec(EXIT_WARNING)
                 else:
                     raise
+        # bsdflags include the immutable flag and need to be set last:
+        if not self.nobsdflags and 'bsdflags' in item:
+            try:
+                set_flags(path, item.bsdflags, fd=fd)
+            except OSError:
+                pass
 
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)
@@ -903,10 +927,12 @@ Utilization of max. archive size: {csize_max:.0%}
 
 
 class MetadataCollector:
-    def __init__(self, *, noatime, noctime, numeric_owner):
+    def __init__(self, *, noatime, noctime, numeric_owner, nobsdflags, nobirthtime):
         self.noatime = noatime
         self.noctime = noctime
         self.numeric_owner = numeric_owner
+        self.nobsdflags = nobsdflags
+        self.nobirthtime = nobirthtime
 
     def stat_simple_attrs(self, st):
         attrs = dict(
@@ -922,6 +948,9 @@ class MetadataCollector:
             attrs['atime'] = safe_ns(st.st_atime_ns)
         if not self.noctime:
             attrs['ctime'] = safe_ns(st.st_ctime_ns)
+        if not self.nobirthtime and hasattr(st, 'st_birthtime'):
+            # sadly, there's no stat_result.st_birthtime_ns
+            attrs['birthtime'] = safe_ns(int(st.st_birthtime * 10**9))
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:
@@ -931,9 +960,11 @@ class MetadataCollector:
 
     def stat_ext_attrs(self, st, path):
         attrs = {}
+        bsdflags = 0
         with backup_io('extended stat'):
             xattrs = xattr.get_all(path, follow_symlinks=False)
-            bsdflags = get_flags(path, st)
+            if not self.nobsdflags:
+                bsdflags = get_flags(path, st)
             acl_get(path, attrs, st, self.numeric_owner)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
@@ -952,13 +983,14 @@ class ChunksProcessor:
 
     def __init__(self, *, key, cache,
                  add_item, write_checkpoint,
-                 checkpoint_interval):
+                 checkpoint_interval, rechunkify):
         self.key = key
         self.cache = cache
         self.add_item = add_item
         self.write_checkpoint = write_checkpoint
         self.checkpoint_interval = checkpoint_interval
         self.last_checkpoint = time.monotonic()
+        self.rechunkify = rechunkify
 
     def write_part_file(self, item, from_chunk, number):
         item = Item(internal_dict=item.as_dict())
@@ -983,6 +1015,10 @@ class ChunksProcessor:
                 return chunk_entry
 
         item.chunks = []
+        # if we rechunkify, we'll get a fundamentally different chunks list, thus we need
+        # to get rid of .chunks_healthy, as it might not correspond to .chunks any more.
+        if self.rechunkify and 'chunks_healthy' in item:
+            del item.chunks_healthy
         from_chunk = 0
         part_number = 1
         for data in chunk_iter:
@@ -1001,8 +1037,9 @@ class ChunksProcessor:
 
                 # if we created part files, we have referenced all chunks from the part files,
                 # but we also will reference the same chunks also from the final, complete file:
+                dummy_stats = Statistics()  # do not count this data volume twice
                 for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, stats, size=chunk.size)
+                    cache.chunk_incref(chunk.id, dummy_stats, size=chunk.size)
 
 
 class FilesystemObjectProcessors:
@@ -1063,12 +1100,11 @@ class FilesystemObjectProcessors:
     def process_symlink(self, path, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
+        # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
         with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             with backup_io('readlink'):
                 source = os.readlink(path)
             item.source = source
-            if st.st_nlink > 1:
-                logger.warning('hardlinked symlinks will be archived as non-hardlinked symlinks!')
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
@@ -1488,7 +1524,12 @@ class ArchiveChecker:
             has_chunks_healthy = 'chunks_healthy' in item
             chunks_current = item.chunks
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
-            assert len(chunks_current) == len(chunks_healthy)
+            if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
+                # should never happen, but there was issue #3218.
+                logger.warning('{}: Invalid chunks_healthy metadata removed!'.format(item.path))
+                del item.chunks_healthy
+                has_chunks_healthy = False
+                chunks_healthy = chunks_current
             for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
                 chunk_id, size, csize = chunk_healthy
                 if chunk_id not in self.chunks:
@@ -1544,7 +1585,7 @@ class ArchiveChecker:
             """
             item_keys = frozenset(key.encode() for key in self.manifest.item_keys)
             required_item_keys = frozenset(key.encode() for key in REQUIRED_ITEM_KEYS)
-            unpacker = RobustUnpacker(lambda item: isinstance(item, dict) and 'path' in item,
+            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and b'path' in item,
                                       self.manifest.item_keys)
             _state = 0
 
@@ -1744,15 +1785,17 @@ class ArchiveRecreater:
             if not matcher.match(item.path):
                 self.print_file_status('x', item.path)
                 if item_is_hardlink_master(item):
-                    hardlink_masters[item.path] = (item.get('chunks'), None)
+                    hardlink_masters[item.path] = (item.get('chunks'), item.get('chunks_healthy'), None)
                 continue
             if target_is_subset and hardlinkable(item.mode) and item.get('source') in hardlink_masters:
                 # master of this hard link is outside the target subset
-                chunks, new_source = hardlink_masters[item.source]
+                chunks, chunks_healthy, new_source = hardlink_masters[item.source]
                 if new_source is None:
                     # First item to use this master, move the chunks
                     item.chunks = chunks
-                    hardlink_masters[item.source] = (None, item.path)
+                    if chunks_healthy is not None:
+                        item.chunks_healthy = chunks_healthy
+                    hardlink_masters[item.source] = (None, None, item.path)
                     del item.source
                 else:
                     # Master was already moved, only update this item's source
@@ -1877,7 +1920,7 @@ class ArchiveRecreater:
         target.process_file_chunks = ChunksProcessor(
             cache=self.cache, key=self.key,
             add_item=target.add_item, write_checkpoint=target.write_checkpoint,
-            checkpoint_interval=self.checkpoint_interval).process_file_chunks
+            checkpoint_interval=self.checkpoint_interval, rechunkify=target.recreate_rechunkify).process_file_chunks
         target.chunker = Chunker(self.key.chunk_seed, *target.chunker_params)
         return target
 

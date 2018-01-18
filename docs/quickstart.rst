@@ -5,7 +5,7 @@
 Quick Start
 ===========
 
-This chapter will get you started with |project_name| and covers
+This chapter will get you started with Borg and covers
 various use cases.
 
 A step by step example
@@ -21,19 +21,20 @@ a good amount of free space on the filesystem that has your backup repository
 (and also on ~/.cache). A few GB should suffice for most hard-drive sized
 repositories. See also :ref:`cache-memory-usage`.
 
-|project_name| doesn't use space reserved for root on repository disks (even when run as root),
-on file systems which do not support this mechanism (e.g. XFS) we recommend to
-reserve some space in |project_name| itself just to be safe by adjusting the
-``additional_free_space`` setting in the ``[repository]`` section of a repositories
-``config`` file. A good starting point is ``2G``.
+Borg doesn't use space reserved for root on repository disks (even when run as root),
+on file systems which do not support this mechanism (e.g. XFS) we recommend to reserve
+some space in Borg itself just to be safe by adjusting the ``additional_free_space``
+setting (a good starting point is ``2G``)::
 
-If |project_name| runs out of disk space, it tries to free as much space as it
+    borg config /path/to/repo additional_free_space 2G
+
+If Borg runs out of disk space, it tries to free as much space as it
 can while aborting the current operation safely, which allows the user to free more space
 by deleting/pruning archives. This mechanism is not bullet-proof in some
 circumstances [1]_.
 
 If you *really* run out of disk space, it can be hard or impossible to free space,
-because |project_name| needs free space to operate - even to delete backup
+because Borg needs free space to operate - even to delete backup
 archives.
 
 You can use some monitoring process or just include the free space information
@@ -153,14 +154,14 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 Pitfalls with shell variables and environment variables
 -------------------------------------------------------
 
-This applies to all environment variables you want |project_name| to see, not just
+This applies to all environment variables you want Borg to see, not just
 ``BORG_PASSPHRASE``. The short explanation is: always ``export`` your variable,
 and use single quotes if you're unsure of the details of your shell's expansion
 behavior. E.g.::
 
     export BORG_PASSPHRASE='complicated & long'
 
-This is because ``export`` exposes variables to subprocesses, which |project_name| may be
+This is because ``export`` exposes variables to subprocesses, which Borg may be
 one of. More on ``export`` can be found in the "ENVIRONMENT" section of the
 bash(1) man page.
 
@@ -184,6 +185,17 @@ Backup compression
 
 The default is lz4 (very fast, but low compression ratio), but other methods are
 supported for different situations.
+
+You can use zstd for a wide range from high speed (and relatively low
+compression) using N=1 to high compression (and lower speed) using N=22.
+
+zstd is a modern compression algorithm and might be preferable over zlib and
+lzma, except if you need compatibility to older borg versions (< 1.1.4) that
+did not yet offer zstd.
+
+    $ borg create --compression zstd,N /path/to/repo::arch ~
+
+Other options are:
 
 If you have a fast repo storage and you want minimum CPU usage, no compression::
 
@@ -220,7 +232,7 @@ means that an attacker who manages to compromise the host containing an
 encrypted archive will not be able to access any of the data, even while the backup
 is being made.
 
-|project_name| supports different methods to store the AES and HMAC keys.
+Borg supports different methods to store the AES and HMAC keys.
 
 ``repokey`` mode
     The key is stored inside the repository (in its "config" file).
@@ -265,8 +277,8 @@ For automated backups the passphrase can be specified using the
 Remote repositories
 -------------------
 
-|project_name| can initialize and access repositories on remote hosts if the
-host is accessible using SSH.  This is fastest and easiest when |project_name|
+Borg can initialize and access repositories on remote hosts if the
+host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case the following syntax is used::
 
   $ borg init user@hostname:/path/to/repo
@@ -275,12 +287,12 @@ Note: please see the usage chapter for a full documentation of repo URLs.
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in
-the remote server's `authorized_keys` file. This example will start |project_name|
+the remote server's `authorized_keys` file. This example will start Borg
 in server mode and limit it to a specific filesystem path::
 
   command="borg serve --restrict-to-path /path/to/repo",restrict ssh-rsa AAAAB3[...]
 
-If it is not possible to install |project_name| on the remote host,
+If it is not possible to install Borg on the remote host,
 it is still possible to use the remote host to store a repository by
 mounting the remote filesystem, for example, using sshfs::
 

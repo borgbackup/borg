@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-06-18" "" "borg backup tool"
+.TH BORG-CREATE 1 "2017-11-25" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] create <options> ARCHIVE PATH
+borg [common options] create [options] ARCHIVE [PATH...]
 .SH DESCRIPTION
 .sp
 This command creates a backup archive containing all files found while recursively
@@ -53,10 +53,51 @@ checkpoints and treated in special ways.
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 .sp
-To speed up pulling backups over sshfs and similar network file systems which do
-not provide correct inode information the \fB\-\-ignore\-inode\fP flag can be used. This
-potentially decreases reliability of change detection, while avoiding always reading
-all files on these file systems.
+Backup speed is increased by not reprocessing files that are already part of
+existing archives and weren\(aqt modified. The detection of unmodified files is
+done by comparing multiple file metadata values with previous values kept in
+the files cache.
+.sp
+This comparison can operate in different modes as given by \fB\-\-files\-cache\fP:
+.INDENT 0.0
+.IP \(bu 2
+ctime,size,inode (default)
+.IP \(bu 2
+mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+.IP \(bu 2
+ctime,size (ignore the inode number)
+.IP \(bu 2
+mtime,size (ignore the inode number)
+.IP \(bu 2
+rechunk,ctime (all files are considered modified \- rechunk, cache ctime)
+.IP \(bu 2
+rechunk,mtime (all files are considered modified \- rechunk, cache mtime)
+.IP \(bu 2
+disabled (disable the files cache, all files considered modified \- rechunk)
+.UNINDENT
+.sp
+inode number: better safety, but often unstable on network filesystems
+.sp
+Normally, detecting file modifications will take inode information into
+consideration to improve the reliability of file change detection.
+This is problematic for files located on sshfs and similar network file
+systems which do not provide stable inode numbers, such files will always
+be considered modified. You can use modes without \fIinode\fP in this case to
+improve performance, but reliability of change detection might be reduced.
+.sp
+ctime vs. mtime: safety vs. speed
+.INDENT 0.0
+.IP \(bu 2
+ctime is a rather safe way to detect changes to a file (metadata and contents)
+as it can not be set from userspace. But, a metadata\-only change will already
+update the ctime, so there might be some unnecessary chunking/hashing even
+without content changes. Some filesystems do not support ctime (change time).
+.IP \(bu 2
+mtime usually works and only updates if file contents were changed. But mtime
+can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+it had before a content change happened. This can be used maliciously as well as
+well\-meant, but in both cases mtime based cache modes can be problematic.
+.UNINDENT
 .sp
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that
@@ -66,6 +107,12 @@ If this is not possible, consider creating a bind mount to a stable location.
 The \fB\-\-progress\fP option shows (from left to right) Original, Compressed and Deduplicated
 (O, C and D, respectively), then the Number of files (N) processed so far, followed by
 the currently processed path.
+.sp
+When using \fB\-\-stats\fP, you will get some statistics about how much data was
+added \- the "This Archive" deduplicated size there is most interesting as that is
+how much your repository will grow. Please note that the "All archives" stats refer to
+the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
+exclusive because the data is not actually compressed and deduplicated during a dry run.
 .sp
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
@@ -94,13 +141,16 @@ print statistics for the created archive
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
-only display items with the given status characters
+only display items with the given status characters (see description)
 .TP
 .B \-\-json
-output stats as JSON (implies \-\-stats)
+output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
 .B \-\-no\-cache\-sync
-experimental: do not synchronize the cache. Implies \-\-no\-files\-cache.
+experimental: do not synchronize the cache. Implies not using the files cache.
+.TP
+.B \-\-no\-files\-cache
+do not load/update the file metadata cache used to detect unchanged files
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -111,6 +161,12 @@ exclude paths matching PATTERN
 .BI \-\-exclude\-from \ EXCLUDEFILE
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
+.BI \-\-pattern \ PATTERN
+experimental: include/exclude paths matching PATTERN
+.TP
+.BI \-\-patterns\-from \ PATTERNFILE
+experimental: read include/exclude patterns from PATTERNFILE, one per line
+.TP
 .B \-\-exclude\-caches
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
 .TP
@@ -118,13 +174,10 @@ exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosauru
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
-if tag objects are specified with \-\-exclude\-if\-present, don\(aqt omit the tag objects themselves from the backup archive
+if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
 .TP
-.BI \-\-pattern \ PATTERN
-experimental: include/exclude paths matching PATTERN
-.TP
-.BI \-\-patterns\-from \ PATTERNFILE
-experimental: read include/exclude patterns from PATTERNFILE, one per line
+.B \-\-exclude\-nodump
+exclude files flagged NODUMP
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -141,8 +194,17 @@ do not store atime into archive
 .B \-\-noctime
 do not store ctime into archive
 .TP
+.B \-\-nobirthtime
+do not store birthtime (creation date) into archive
+.TP
+.B \-\-nobsdflags
+do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive
+.TP
 .B \-\-ignore\-inode
 ignore inode data in the file metadata cache used to detect unchanged files.
+.TP
+.BI \-\-files\-cache \ MODE
+operate files cache in MODE. default: ctime,size,inode
 .TP
 .B \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
@@ -154,7 +216,7 @@ open and read block and char device files as well as FIFOs as if they were regul
 add a comment text to the archive
 .TP
 .BI \-\-timestamp \ TIMESTAMP
-manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). alternatively, give a reference file/directory.
+manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). Alternatively, give a reference file/directory.
 .TP
 .BI \-c \ SECONDS\fP,\fB \ \-\-checkpoint\-interval \ SECONDS
 write checkpoint every SECONDS seconds (Default: 1800)
@@ -208,17 +270,20 @@ $ borg create \-\-chunker\-params 10,23,16,4095 /path/to/repo::small /smallstuff
 # Backup a raw device (must not be active/in use/mounted at that time)
 $ dd if=/dev/sdx bs=10M | borg create /path/to/repo::my\-sdx \-
 
-# No compression (default)
+# No compression (none)
+$ borg create \-\-compression none /path/to/repo::arch ~
+
+# Super fast, low compression (lz4, default)
 $ borg create /path/to/repo::arch ~
 
-# Super fast, low compression
-$ borg create \-\-compression lz4 /path/to/repo::arch ~
-
-# Less fast, higher compression (N = 0..9)
+# Less fast, higher compression (zlib, N = 0..9)
 $ borg create \-\-compression zlib,N /path/to/repo::arch ~
 
-# Even slower, even higher compression (N = 0..9)
+# Even slower, even higher compression (lzma, N = 0..9)
 $ borg create \-\-compression lzma,N /path/to/repo::arch ~
+
+# Only compress compressible data with lzma,N (N = 0..9)
+$ borg create \-\-compression auto,lzma,N /path/to/repo::arch ~
 
 # Use short hostname, user name and current time in archive name
 $ borg create /path/to/repo::{hostname}\-{user}\-{now} ~

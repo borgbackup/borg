@@ -1,3 +1,20 @@
+Positional Arguments and Options: Order matters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Borg only supports taking options (``-s`` and ``--progress`` in the example)
+to the left or right of all positional arguments (``repo::archive`` and ``path``
+in the example), but not in between them:
+
+::
+
+    borg create -s --progress repo::archive path  # good and preferred
+    borg create repo::archive path -s --progress  # also works
+    borg create -s repo::archive path --progress  # works, but ugly
+    borg create repo::archive -s --progress path  # BAD
+
+This is due to a problem in the argparse module: http://bugs.python.org/issue15112
+
+
 Repository URLs
 ~~~~~~~~~~~~~~~
 
@@ -186,23 +203,29 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     allowed). So please test your scripts interactively before making them a non-interactive script.
 
 Directories and files:
-    BORG_KEYS_DIR
-        Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
-    BORG_KEY_FILE
-        When set, use the given filename as repository key file.
+    BORG_BASE_DIR
+        Default to '$HOME', '~$USER', '~' (in that order)'.
+        If we refer to ~ below, we in fact mean BORG_BASE_DIR.
+    BORG_CONFIG_DIR
+        Default to '~/.config/borg'. This directory contains the whole config directories.
+    BORG_CACHE_DIR
+        Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
+        of space for dealing with big repositories.
     BORG_SECURITY_DIR
         Default to '~/.config/borg/security'. This directory contains information borg uses to
         track its usage of NONCES ("numbers used once" - usually in encryption context) and other
         security relevant data.
-    BORG_CACHE_DIR
-        Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
-        of space for dealing with big repositories).
+    BORG_KEYS_DIR
+        Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
+    BORG_KEY_FILE
+        When set, use the given filename as repository key file.
 
 Building:
     BORG_OPENSSL_PREFIX
         Adds given OpenSSL header file directory to the default locations (setup.py).
-    BORG_LZ4_PREFIX
-        Adds given LZ4 header file directory to the default locations (setup.py).
+    BORG_LIBLZ4_PREFIX
+        Adds given prefix directory to the default locations. If a 'include/lz4.h' is found Borg
+        will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
     BORG_LIBB2_PREFIX
         Adds given prefix directory to the default locations. If a 'include/blake2.h' is found Borg
         will be linked against the system libb2 instead of a bundled implementation. (setup.py)
@@ -371,6 +394,7 @@ Besides regular file and directory structures, Borg can preserve
     By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
 * hardlinked regular files, devices, FIFOs (considering all items in the same archive)
 * timestamps in nanosecond precision: mtime, atime, ctime
+* other timestamps: birthtime (on platforms supporting it)
 * permissions:
 
   * IDs of owning user and owning group

@@ -124,10 +124,12 @@ Examples::
     may specify the backup roots (starting points) and patterns for inclusion/exclusion.
     A root path starts with the prefix `R`, followed by a path (a plain path, not a
     file pattern). An include rule starts with the prefix +, an exclude rule starts
-    with the prefix -, both followed by a pattern.
+    with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
     Inclusion patterns are useful to include paths that are contained in an excluded
     path. The first matching pattern is used so if an include pattern matches before
-    an exclude pattern, the file is backed up.
+    an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
+    a directory, it won't recurse into it and won't discover any potential matches for
+    include rules below that directory.
 
     Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
     shell style (`sh:`), so those patterns behave similar to rsync include/exclude
@@ -167,13 +169,16 @@ placeholders:
 {fqdn}
     The full name of the machine.
 
+{reverse-fqdn}
+    The full name of the machine in reverse domain name notation.
+
 {now}
     The current local date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.4/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
 {utcnow}
     The current UTC date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.4/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
 {user}
     The user name (or UID, if no name is available) of the user running borg.
@@ -240,14 +245,14 @@ lz4
 
 zlib[,L]
     Use zlib ("gz") compression. Medium speed, medium compression.
-    If you do not explicitely give the compression level L (ranging from 0
+    If you do not explicitly give the compression level L (ranging from 0
     to 9), it will use level 6.
     Giving level 0 (means "no compression", but still has zlib protocol
     overhead) is usually pointless, you better use "none" compression.
 
 lzma[,L]
     Use lzma ("xz") compression. Low speed, high compression.
-    If you do not explicitely give the compression level L (ranging from 0
+    If you do not explicitly give the compression level L (ranging from 0
     to 9), it will use level 6.
     Giving levels above 6 is pointless and counterproductive because it does
     not compress better due to the buffer size used by borg - but it wastes

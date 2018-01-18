@@ -61,6 +61,16 @@ affect metadata stream deduplication: if only this timestamp changes between
 backups and is stored into the metadata stream, the metadata stream chunks
 won't deduplicate just because of that.
 
+``--nobsdflags``
+~~~~~~~~~~~~~~~~
+
+You can use this to not query and store (or not extract and set) bsdflags -
+in case you don't need them or if they are broken somehow for your fs.
+
+On Linux, dealing with the bsflags needs some additional syscalls.
+Especially when dealing with lots of small files, this causes a noticable
+overhead, so you can use this option also for speeding up operations.
+
 ``--umask``
 ~~~~~~~~~~~
 
@@ -149,8 +159,9 @@ reject to delete the repository completely). This is useful for scenarios where 
 backup client machine backups remotely to a backup server using ``borg serve``, since
 a hacked client machine cannot delete backups on the server permanently.
 
-To activate append-only mode, edit the repository ``config`` file and add a line
-``append_only=1`` to the ``[repository]`` section (or edit the line if it exists).
+To activate append-only mode, set ``append_only`` to 1 in the repository config::
+
+    borg config /path/to/repo append_only 1
 
 In append-only mode Borg will create a transaction log in the ``transactions`` file,
 where each line is a transaction and a UTC timestamp.

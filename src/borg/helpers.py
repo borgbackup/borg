@@ -2101,8 +2101,21 @@ except ImportError:
         scandir = scandir_generic
 
 
+def scandir_keyfunc(dirent):
+    try:
+        return (0, dirent.inode())
+    except OSError as e:
+        # maybe a permission denied error while doing a stat() on the dirent
+        logger.debug('scandir_inorder: Unable to stat %s: %s', dirent.path, e)
+        # order this dirent after all the others lexically by file name
+        # we may not break the whole scandir just because of an exception in one dirent
+        # ignore the exception for now, since another stat will be done later anyways
+        # (or the entry will be skipped by an exclude pattern)
+        return (1, dirent.name)
+
+
 def scandir_inorder(path='.'):
-    return sorted(scandir(path), key=lambda dirent: dirent.inode())
+    return sorted(scandir(path), key=scandir_keyfunc)
 
 
 def clean_lines(lines, lstrip=None, rstrip=None, remove_empty=True, remove_comments=True):

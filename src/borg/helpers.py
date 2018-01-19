@@ -2086,7 +2086,7 @@ class GenericDirEntry:
 
 def scandir_generic(path='.'):
     """Like os.listdir(), but yield DirEntry objects instead of returning a list of names."""
-    for name in sorted(os.listdir(path)):
+    for name in os.listdir(path):
         yield GenericDirEntry(path, name)
 
 

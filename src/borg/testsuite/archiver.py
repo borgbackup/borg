@@ -3331,13 +3331,9 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
     def test_cache_files(self):
         self.cmd('create', self.repository_location + '::test', 'input')
         self.corrupt(os.path.join(self.cache_path, 'files'))
-
-        if self.FORK_DEFAULT:
-            out = self.cmd('create', self.repository_location + '::test1', 'input', exit_code=2)
-            assert 'failed integrity check' in out
-        else:
-            with pytest.raises(FileIntegrityError):
-                self.cmd('create', self.repository_location + '::test1', 'input')
+        out = self.cmd('create', self.repository_location + '::test1', 'input')
+        # borg warns about the corrupt files cache, but then continues without files cache.
+        assert 'files cache is corrupted' in out
 
     def test_chunks_archive(self):
         self.cmd('create', self.repository_location + '::test1', 'input')

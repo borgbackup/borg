@@ -502,25 +502,32 @@ class LocalCache(CacheStatsMixin):
         self.files = {}
         self._newest_cmtime = None
         logger.debug('Reading files cache ...')
-
-        with IntegrityCheckedFile(path=os.path.join(self.path, 'files'), write=False,
-                                  integrity_data=self.cache_config.integrity.get('files')) as fd:
-            u = msgpack.Unpacker(use_list=True)
-            while True:
-                data = fd.read(64 * 1024)
-                if not data:
-                    break
-                u.feed(data)
-                try:
-                    for path_hash, item in u:
-                        entry = FileCacheEntry(*item)
-                        # in the end, this takes about 240 Bytes per file
-                        self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
-                except (TypeError, ValueError) as exc:
-                    logger.warning('The files cache seems corrupt, ignoring it. '
-                                   'Expect lower performance. [%s]' % str(exc))
-                    self.files = {}
-                    return
+        msg = None
+        try:
+            with IntegrityCheckedFile(path=os.path.join(self.path, 'files'), write=False,
+                                      integrity_data=self.cache_config.integrity.get('files')) as fd:
+                u = msgpack.Unpacker(use_list=True)
+                while True:
+                    data = fd.read(64 * 1024)
+                    if not data:
+                        break
+                    u.feed(data)
+                    try:
+                        for path_hash, item in u:
+                            entry = FileCacheEntry(*item)
+                            # in the end, this takes about 240 Bytes per file
+                            self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+                    except (TypeError, ValueError) as exc:
+                        msg = "The files cache seems invalid. [%s]" % str(exc)
+                        break
+        except OSError as exc:
+            msg = "The files cache can't be read. [%s]" % str(exc)
+        except FileIntegrityError as fie:
+            msg = "The files cache is corrupted. [%s]" % str(fie)
+        if msg is not None:
+            logger.warning(msg)
+            logger.warning('Continuing without files cache - expect lower performance.')
+            self.files = {}
 
     def begin_txn(self):
         # Initialize transaction snapshot

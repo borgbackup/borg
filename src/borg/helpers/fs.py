@@ -11,6 +11,9 @@ from .process import prepare_subprocess_env
 
 from ..constants import *  # NOQA
 
+from ..logger import create_logger
+logger = create_logger()
+
 
 def get_base_dir():
     """Get home directory / base directory for borg:
@@ -128,8 +131,21 @@ def hardlinkable(mode):
     return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
 
 
+def scandir_keyfunc(dirent):
+    try:
+        return (0, dirent.inode())
+    except OSError as e:
+        # maybe a permission denied error while doing a stat() on the dirent
+        logger.debug('scandir_inorder: Unable to stat %s: %s', dirent.path, e)
+        # order this dirent after all the others lexically by file name
+        # we may not break the whole scandir just because of an exception in one dirent
+        # ignore the exception for now, since another stat will be done later anyways
+        # (or the entry will be skipped by an exclude pattern)
+        return (1, dirent.name)
+
+
 def scandir_inorder(path='.'):
-    return sorted(os.scandir(path), key=lambda dirent: dirent.inode())
+    return sorted(os.scandir(path), key=scandir_keyfunc)
 
 
 def secure_erase(path):

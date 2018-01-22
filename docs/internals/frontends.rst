@@ -328,6 +328,8 @@ command_line
     Array of strings of the command line that created the archive
 
     The note about paths from above applies here as well.
+chunker_params
+    The chunker parameters the archive has been created with.
 
 :ref:`borg_info` further has:
 
@@ -363,6 +365,12 @@ The same archive with more information (``borg info --last 1 --json``)::
     {
         "archives": [
             {
+                "chunker_params": [
+                    13,
+                    23,
+                    16,
+                    4095
+                ],
                 "command_line": [
                     "/home/user/.local/bin/borg",
                     "create",

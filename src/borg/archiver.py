@@ -2396,19 +2396,19 @@ class Archiver:
         def define_common_options(add_common_option):
             add_common_option('-h', '--help', action='help', help='show this help message and exit')
             add_common_option('--critical', dest='log_level',
-                              action='store_const', const='critical', default='warning',
+                              action='store_const', const='critical', default=None,
                               help='work on log level CRITICAL')
             add_common_option('--error', dest='log_level',
-                              action='store_const', const='error', default='warning',
+                              action='store_const', const='error', default=None,
                               help='work on log level ERROR')
             add_common_option('--warning', dest='log_level',
-                              action='store_const', const='warning', default='warning',
+                              action='store_const', const='warning', default=None,
                               help='work on log level WARNING (default)')
             add_common_option('--info', '-v', '--verbose', dest='log_level',
-                              action='store_const', const='info', default='warning',
+                              action='store_const', const='info', default=None,
                               help='work on log level INFO')
             add_common_option('--debug', dest='log_level',
-                              action='store_const', const='debug', default='warning',
+                              action='store_const', const='debug', default=None,
                               help='enable debug output, work on log level DEBUG')
             add_common_option('--debug-topic', metavar='TOPIC', dest='debug_topics', action='append', default=[],
                               help='enable TOPIC debugging (can be specified multiple times). '

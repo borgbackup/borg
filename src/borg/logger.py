@@ -84,14 +84,14 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
             borg_logger.json = json
             logger.debug('using logging configuration read from "{0}"'.format(conf_fname))
             warnings.showwarning = _log_warning
-            if level:
+            if level is not None:
                 # if level is specified on the commandline,
                 # we override only the log level of the stderr stream handler
                 # this allows logging configurations that always additionally log
                 # to a log-file or to syslog using a log level defined in the config
                 root = logging.getLogger('')
                 for handler in root.handlers:
-                    if instance(handler, logging.StreamHandler):
+                    if isinstance(handler, logging.StreamHandler):
                         handler.setLevel(level.upper())
             return None
         except Exception as err:  # XXX be more precise
@@ -115,7 +115,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
         logger.handlers[0].close()
         logger.handlers.clear()
     logger.addHandler(handler)
-    if not level:
+    if level is None:
         level = 'warning'
     logger.setLevel(level.upper())
     configured = True

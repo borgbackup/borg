@@ -408,6 +408,7 @@ class Archive:
                 'hostname': self.metadata.hostname,
                 'username': self.metadata.username,
                 'comment': self.metadata.get('comment', ''),
+                'chunker_params': self.metadata.get('chunker_params', ''),
             })
         return info
 

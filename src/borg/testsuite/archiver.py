@@ -2782,20 +2782,17 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.create_test_files()
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        for cfg_key in {'testkey', 'testsection.testkey'}:
-            self.cmd('config', self.repository_location, cfg_key, exit_code=1)
-            self.cmd('config', self.repository_location, cfg_key, 'testcontents')
+        for cfg_key, cfg_value in [
+            ('additional_free_space', '2G'),
+            ('repository.append_only', '1'),
+        ]:
             output = self.cmd('config', self.repository_location, cfg_key)
-            assert output == 'testcontents\n'
+            assert output == '0' + '\n'
+            self.cmd('config', self.repository_location, cfg_key, cfg_value)
+            output = self.cmd('config', self.repository_location, cfg_key)
+            assert output == cfg_value + '\n'
             self.cmd('config', self.repository_location, '--delete', cfg_key)
             self.cmd('config', self.repository_location, cfg_key, exit_code=1)
-
-            self.cmd('config', self.repository_location, '--cache', cfg_key, exit_code=1)
-            self.cmd('config', self.repository_location, '--cache', cfg_key, 'testcontents')
-            output = self.cmd('config', self.repository_location, '--cache', cfg_key)
-            assert output == 'testcontents\n'
-            self.cmd('config', self.repository_location, '--cache', '--delete', cfg_key)
-            self.cmd('config', self.repository_location, '--cache', cfg_key, exit_code=1)
 
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')

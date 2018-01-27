@@ -148,8 +148,8 @@ def detect_openssl(prefixes):
     for prefix in prefixes:
         filename = os.path.join(prefix, 'include', 'openssl', 'evp.h')
         if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'PKCS5_PBKDF2_HMAC(' in fd.read():
+            with open(filename, 'rb') as fd:
+                if b'PKCS5_PBKDF2_HMAC(' in fd.read():
                     return prefix
 
 

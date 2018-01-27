@@ -66,8 +66,8 @@ def zstd_system_prefix(prefixes):
     for prefix in prefixes:
         filename = os.path.join(prefix, 'include', 'zstd.h')
         if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'ZSTD_getFrameContentSize' in fd.read():  # checks for zstd >= 1.3.0
+            with open(filename, 'rb') as fd:
+                if b'ZSTD_getFrameContentSize' in fd.read():  # checks for zstd >= 1.3.0
                     return prefix
 
 

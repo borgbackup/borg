@@ -24,8 +24,8 @@ def b2_system_prefix(prefixes):
     for prefix in prefixes:
         filename = os.path.join(prefix, 'include', 'blake2.h')
         if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'blake2b_init' in fd.read():
+            with open(filename, 'rb') as fd:
+                if b'blake2b_init' in fd.read():
                     return prefix
 
 

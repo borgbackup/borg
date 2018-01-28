@@ -36,6 +36,7 @@ import logging
 import logging.config
 import logging.handlers  # needed for handlers defined there being configurable in logging.conf file
 import os
+import sys
 import warnings
 
 configured = False
@@ -89,7 +90,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
             for handler in root.handlers:
                 if isinstance(handler, logging.StreamHandler):
                     try:
-                        if handler.stream.fileno() == 2:
+                        if handler.stream.fileno() == sys.stderr.fileno():
                             stderr_handlers.append(handler)
                     except AttributeError:
                         pass

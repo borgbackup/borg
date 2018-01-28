@@ -69,6 +69,7 @@ format=FILE %%(levelname)s: %%(message)s
     logfile = tmpdir.join('borg.log')
     # touch the file
     logfile.open(mode='w')
+
     class context:
         cfg = {
             'level_root': 'NOTSET',
@@ -78,16 +79,19 @@ format=FILE %%(levelname)s: %%(message)s
         }
         logging_config_file = tmpdir.join('borg_logging.conf')
         stream = StringIO()
+
         @classmethod
         def write_logging_conf(cls):
             data = logging_conf % cls.cfg
             cls.logging_config_file.write(data)
+
         @classmethod
         def logfile_contents(cls):
             return open(cls.cfg['logfile_path']).read()
     os.environ['BORG_LOGGING_CONF'] = str(context.logging_config_file)
     yield context
     del os.environ['BORG_LOGGING_CONF']
+
 
 def test_setup_logging(io_logger):
     logger.info('hello world')
@@ -101,13 +105,13 @@ def test_setup_logging(io_logger):
         ('warning', 'NOTSET', logging.WARNING, logging.INFO),
     ]
 )
-def test_setup_logging_configfile(level_arg,level_stderr,expected_stderr_level, expected_file_level,
+def test_setup_logging_configfile(level_arg, level_stderr, expected_stderr_level, expected_file_level,
                                   loggingconfigfile):
     loggingconfigfile.cfg.update(level_stderr=level_stderr)
     loggingconfigfile.write_logging_conf()
     stream = loggingconfigfile.stream
     logfile_contents = loggingconfigfile.logfile_contents
-    handler = setup_logging(stream=stream, level=level_arg)
+    setup_logging(stream=stream, level=level_arg)
     # stream should default to warning
     logger.debug('hello debug')
     txt = "DEBUG: hello debug\n"
@@ -140,6 +144,7 @@ def test_setup_logging_configfile(level_arg,level_stderr,expected_stderr_level, 
     else:
         assert txt not in logfile_contents()
 
+
 def test_multiple_loggers(io_logger):
     logger = logging.getLogger(__name__)
     logger.info('hello world 1')
@@ -171,6 +176,7 @@ def test_lazy_logger(io_logger):
         raise Exception
     except Exception:
         logger.exception("exception")
+
 
 def test_lazy_logger_not_setup():
     # just calling all the methods of the proxy

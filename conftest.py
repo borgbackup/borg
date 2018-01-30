@@ -86,7 +86,6 @@ _run_forked = None
 
 def pytest_collection_modifyitems(config, items):
     global _run_forked
-    
     runfunc = None
     plugin = config.pluginmanager.get_plugin('pytest_forked')
     if plugin:

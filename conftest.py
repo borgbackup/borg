@@ -77,3 +77,35 @@ class DefaultPatches:
 @pytest.fixture(autouse=True)
 def default_patches(request):
     return DefaultPatches(request)
+
+
+# tests marked as "ownprocess" are executed in a forked process in order to be isolated from other tests
+# if the pytest-forked plugin is not available, those tests will be skipped
+_run_forked = None
+
+
+def pytest_collection_modifyitems(config, items):
+    global _run_forked
+    
+    runfunc = None
+    plugin = config.pluginmanager.get_plugin('pytest_forked')
+    if plugin:
+        def runfunc(item):
+            reports = plugin.forked_run_report(item)
+            for rep in reports:
+                item.ihook.pytest_runtest_logreport(report=rep)
+            return True
+    _run_forked = runfunc
+    if not _run_forked:
+        # skip all plugins that need to be isolated in an own process
+        skip_mark = pytest.mark.skip(reason="need pytest-forked plugin to run tests marked with \"ownprocess\"")
+        for item in items:
+            if "ownprocess" in item.keywords:
+                item.add_marker(skip_mark)
+
+
+def pytest_runtest_protocol(item):
+    if 'ownprocess' in item.keywords:
+        if _run_forked:
+            return _run_forked(item)
+        # else: item will be skipped (see above)

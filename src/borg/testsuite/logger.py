@@ -5,21 +5,8 @@ import os
 import pytest
 
 from ..logger import find_parent_module, create_logger, setup_logging
-from .. import logger as _logger
+from .. import logger as logger_module
 logger = create_logger()
-
-
-def reset_logging():
-    global logger
-    import importlib
-    # otherwise we'd need to reset the root logger and delete all other loggerss
-    importlib.reload(logging)
-    _logger.configured = False
-    logger = create_logger()
-
-
-def teardown_function(function):
-    reset_logging()
 
 
 @pytest.fixture()
@@ -29,6 +16,17 @@ def io_logger():
     handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
     logger.setLevel(logging.DEBUG)
     return io
+
+
+@pytest.fixture()
+def reset_logging():
+    # this should only be used in tests marked as ownprocess for testing logging setup
+    global logger
+    import importlib
+    # otherwise we'd need to reset the root logger and delete all other loggers
+    importlib.reload(logging)
+    logger_module.configured = False
+    logger = create_logger()
 
 
 @pytest.fixture(scope='function')
@@ -67,7 +65,7 @@ format=%%(levelname)s: %%(message)s
 format=FILE %%(levelname)s: %%(message)s
 """
     logfile = tmpdir.join('borg.log')
-    # touch the file
+    # create an empty logfile
     logfile.open(mode='w')
 
     class context:
@@ -90,7 +88,6 @@ format=FILE %%(levelname)s: %%(message)s
             return open(cls.cfg['logfile_path']).read()
     os.environ['BORG_LOGGING_CONF'] = str(context.logging_config_file)
     yield context
-    del os.environ['BORG_LOGGING_CONF']
 
 
 def test_setup_logging(io_logger):
@@ -98,6 +95,7 @@ def test_setup_logging(io_logger):
     assert io_logger.getvalue() == "borg.testsuite.logger: hello world\n"
 
 
+@pytest.mark.ownprocess
 @pytest.mark.parametrize(
     "level_arg,level_stderr,expected_stderr_level, expected_file_level", [
         (None, 'NOTSET', logging.DEBUG, logging.INFO),
@@ -106,7 +104,7 @@ def test_setup_logging(io_logger):
     ]
 )
 def test_setup_logging_configfile(level_arg, level_stderr, expected_stderr_level, expected_file_level,
-                                  loggingconfigfile):
+                                  reset_logging, loggingconfigfile):
     loggingconfigfile.cfg.update(level_stderr=level_stderr)
     loggingconfigfile.write_logging_conf()
     stream = loggingconfigfile.stream
@@ -163,7 +161,7 @@ def test_parent_module():
     assert find_parent_module() == __name__
 
 
-def test_lazy_logger(io_logger):
+def test_lazy_logger():
     # just calling all the methods of the proxy
     logger.setLevel(logging.DEBUG)
     logger.debug("debug")
@@ -178,8 +176,8 @@ def test_lazy_logger(io_logger):
         logger.exception("exception")
 
 
-def test_lazy_logger_not_setup():
-    # just calling all the methods of the proxy
+@pytest.mark.ownprocess
+def test_lazy_logger_not_setup(reset_logging):
     with pytest.raises(Exception) as exc:
         logger.debug("debug")
     assert 'tried to call a logger before setup_logging() was called' \

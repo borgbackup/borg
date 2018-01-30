@@ -306,12 +306,12 @@ all the resource usage occurs in that one process, so just add up client +
 server to get the approximate resource usage.
 
 CPU client:
-    borg create: does chunking, hashing, compression, crypto (high CPU usage)
-    chunks cache sync: quite heavy on CPU, doing lots of hashtable operations.
-    borg extract: crypto, decompression (medium to high CPU usage)
-    borg check: similar to extract, but depends on options given.
-    borg prune / borg delete archive: low to medium CPU usage
-    borg delete repo: done on the server
+    - **borg create:** does chunking, hashing, compression, crypto (high CPU usage)
+    - **chunks cache sync:** quite heavy on CPU, doing lots of hashtable operations.
+    - **borg extract:** crypto, decompression (medium to high CPU usage)
+    - **borg check:** similar to extract, but depends on options given.
+    - **borg prune / borg delete archive:** low to medium CPU usage
+    - **borg delete repo:** done on the server
     It won't go beyond 100% of 1 core as the code is currently single-threaded.
     Especially higher zlib and lzma compression levels use significant amounts
     of CPU cycles. Crypto might be cheap on the CPU (if hardware accelerated) or

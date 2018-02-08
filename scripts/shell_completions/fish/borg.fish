@@ -1,6 +1,6 @@
 # Completions for borg
 # https://www.borgbackup.org/
-# Note: 
+# Note:
 # Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
 # Install:
 # Copy this file to /usr/share/fish/vendor_completions.d/
@@ -21,11 +21,11 @@ complete -c borg -f -n __fish_is_first_token -a 'mount' -d 'Mount archive or a r
 complete -c borg -f -n __fish_is_first_token -a 'umount' -d 'Un-mount the mounted archive'
 
 function __fish_borg_seen_key
-	if __fish_seen_subcommand_from key
-		and not __fish_seen_subcommand_from import export change-passphrase
-		return 0
-	end
-	return 1
+    if __fish_seen_subcommand_from key
+        and not __fish_seen_subcommand_from import export change-passphrase
+        return 0
+    end
+    return 1
 end
 complete -c borg -f -n __fish_is_first_token -a 'key' -d 'Manage a repository key'
 complete -c borg -f -n __fish_borg_seen_key  -a 'import' -d 'Import a repository key'
@@ -41,11 +41,11 @@ complete -c borg -f -n __fish_is_first_token -a 'break-lock' -d 'Break the repos
 complete -c borg -f -n __fish_is_first_token -a 'config' -d 'Get/set options in repo/cache config'
 
 function __fish_borg_seen_benchmark
-	if __fish_seen_subcommand_from benchmark
-		and not __fish_seen_subcommand_from crud
-		return 0
-	end
-	return 1
+    if __fish_seen_subcommand_from benchmark
+        and not __fish_seen_subcommand_from crud
+        return 0
+    end
+    return 1
 end
 complete -c borg -f -n __fish_is_first_token -a 'benchmark' -d 'Benchmark borg operations'
 complete -c borg -f -n __fish_borg_seen_benchmark -a 'crud' -d 'Benchmark borg CRUD operations'
@@ -85,7 +85,7 @@ complete -c borg -f      -l 'list'                  -d 'Print verbose list of it
 complete -c borg -f      -l 'filter'                -d 'Only items with given STATUSCHARS'          -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'json'                  -d 'Print verbose stats as json'                -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'no-cache-sync'         -d 'Do not synchronize the cache'               -n "__fish_seen_subcommand_from create"
-#	Exclusion options
+# Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from create"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from create"
@@ -95,7 +95,7 @@ complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that
 complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'keep-tag-files'        -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'exclude-nodump'        -d 'Exclude files flagged NODUMP'               -n "__fish_seen_subcommand_from create"
-#	Filesytem options
+# Filesytem options
 complete -c borg -f -s x -l 'one-file-system'       -d 'Stay in the same file system'               -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'numeric-owner'         -d 'Only store numeric user:group identifiers'  -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'noatime'               -d 'Do not store atime'                         -n "__fish_seen_subcommand_from create"
@@ -106,7 +106,7 @@ complete -c borg -f      -l 'ignore-inode'          -d 'Ignore inode data in fil
 set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
 complete -c borg -f      -l 'files-cache'           -d 'Operate files cache in MODE' -a "$files_cache_mode" -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'read-special'          -d 'Open device files like regular files'       -n "__fish_seen_subcommand_from create"
-#	Archive options
+# Archive options
 complete -c borg -f      -l 'comment'               -d 'Add COMMENT to the archive'                 -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'timestamp'             -d 'Set creation TIME (yyyy-mm-ddThh:mm:ss)'    -n "__fish_seen_subcommand_from create"
 complete -c borg         -l 'timestamp'             -d 'Set creation time by reference FILE'        -n "__fish_seen_subcommand_from create"
@@ -122,7 +122,7 @@ complete -c borg -f      -l 'numeric-owner'         -d 'Only obey numeric user:g
 complete -c borg -f      -l 'nobsdflags'            -d 'Do not extract/set bsdflags'                -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'stdout'                -d 'Write all extracted data to stdout'         -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'sparse'                -d 'Create holes in output sparse file'         -n "__fish_seen_subcommand_from extract"
-#	Exclusion options
+# Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from extract"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from extract"
 complete -c borg         -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from extract"
@@ -135,7 +135,7 @@ complete -c borg -f      -l 'archives-only'         -d 'Only perform archives ch
 complete -c borg -f      -l 'verify-data'           -d 'Cryptographic integrity verification'       -n "__fish_seen_subcommand_from check"
 complete -c borg -f      -l 'repair'                -d 'Attempt to repair found inconsistencies'    -n "__fish_seen_subcommand_from check"
 complete -c borg -f      -l 'save-space'            -d 'Work slower but using less space'           -n "__fish_seen_subcommand_from check"
-#	Archive filters
+# Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from check"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from check"
 set -l sort_keys "timestamp name id"
@@ -144,7 +144,7 @@ complete -c borg -f      -l 'first'                 -d 'Only first N archives'  
 complete -c borg -f      -l 'last'                  -d 'Only last N archives'                       -n "__fish_seen_subcommand_from check"
 
 # borg rename
-#	no specific options
+# no specific options
 
 # borg list options
 complete -c borg -f      -l 'short'                 -d 'Only print file/directory names'            -n "__fish_seen_subcommand_from list"
@@ -152,13 +152,13 @@ complete -c borg -f      -l 'list-format'           -d 'Specify FORMAT for file 
 complete -c borg -f      -l 'format'                -d 'Specify FORMAT for file listing'            -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'json'                  -d 'List contents in json format'               -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'json-lines'            -d 'List contents in json lines format'         -n "__fish_seen_subcommand_from list"
-#	Archive filters
+# Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from list"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'sort-by'               -d 'Sorting KEYS [timestamp]' -a "$sort_keys"   -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'first'                 -d 'Only first N archives'                      -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'last'                  -d 'Only last N archives'                       -n "__fish_seen_subcommand_from list"
-#	Exclusion options
+# Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from list"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from list"
@@ -168,7 +168,7 @@ complete -c borg         -l 'patterns-from'         -d 'Include/exclude paths fr
 complete -c borg -f      -l 'numeric-owner'         -d 'Only consider numeric user:group'           -n "__fish_seen_subcommand_from diff"
 complete -c borg -f      -l 'same-chunker-params'   -d 'Override check of chunker parameters'       -n "__fish_seen_subcommand_from diff"
 complete -c borg -f      -l 'sort'                  -d 'Sort the output lines by file path'         -n "__fish_seen_subcommand_from diff"
-#	Exclusion options
+# Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from diff"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from diff"
 complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from diff"
@@ -179,7 +179,7 @@ complete -c borg -f -s s -l 'stats'                 -d 'Print verbose statistics
 complete -c borg -f      -l 'cache-only'            -d "Delete only the local cache"                -n "__fish_seen_subcommand_from delete"
 complete -c borg -f      -l 'force'                 -d 'Force deletion of corrupted archives'       -n "__fish_seen_subcommand_from delete"
 complete -c borg -f      -l 'save-space'            -d 'Work slower but using less space'           -n "__fish_seen_subcommand_from delete"
-#	Archive filters
+# Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from delete"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from delete"
 complete -c borg -f      -l 'sort-by'               -d 'Sorting KEYS [timestamp]' -a "$sort_keys"   -n "__fish_seen_subcommand_from delete"
@@ -201,13 +201,13 @@ complete -c borg -f -s w -l 'keep-weekly'           -d 'NUMBER of weekly archive
 complete -c borg -f -s m -l 'keep-monthly'          -d 'NUMBER of monthly archives to keep'         -n "__fish_seen_subcommand_from prune"
 complete -c borg -f -s y -l 'keep-yearly'           -d 'NUMBER of yearly archives to keep'          -n "__fish_seen_subcommand_from prune"
 complete -c borg -f      -l 'save-space'            -d 'Work slower but using less space'           -n "__fish_seen_subcommand_from prune"
-#	Archive filters
+# Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from prune"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from prune"
 
 # borg info options
 complete -c borg -f      -l 'json'                  -d 'Format output in json format'               -n "__fish_seen_subcommand_from info"
-#	Archive filters
+# Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from info"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from info"
 complete -c borg -f      -l 'sort-by'               -d 'Sorting KEYS [timestamp]' -a "$sort_keys"   -n "__fish_seen_subcommand_from info"
@@ -219,7 +219,7 @@ complete -c borg -f -s f -l 'foreground'            -d 'Stay in foreground, do n
 # FIXME there are lot more options, but not all are applicable:
 set -l fuse_options "allow_other allow_root versions allow_damaged_files"
 complete -c borg -f -s o                            -d 'Fuse mount OPTIONS' -a "$fuse_options"      -n "__fish_seen_subcommand_from mount"
-#	Archive filters
+# Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from mount"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from mount"
 complete -c borg -f      -l 'sort-by'               -d 'Sorting KEYS [timestamp]' -a "$sort_keys"   -n "__fish_seen_subcommand_from mount"
@@ -227,10 +227,10 @@ complete -c borg -f      -l 'first'                 -d 'Only first N archives'  
 complete -c borg -f      -l 'last'                  -d 'Only last N archives'                       -n "__fish_seen_subcommand_from mount"
 
 # borg umount
-#	no specific options
+# no specific options
 
 # borg key change-passphrase
-#	no specific options
+# no specific options
 
 # borg key export
 complete -c borg -f      -l 'paper'                 -d 'Create an export for printing'              -n "__fish_seen_subcommand_from export"
@@ -251,7 +251,7 @@ complete -c borg -f      -l 'list'                  -d 'Print verbose list of it
 complete -c borg -f      -l 'filter'                -d 'Only items with given STATUSCHARS'          -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f -s n -l 'dry-run'               -d 'Do not change the repository'               -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f -s s -l 'stats'                 -d 'Print verbose statistics'                   -n "__fish_seen_subcommand_from recreate"
-#	Exclusion options
+# Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from recreate"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from recreate"
@@ -260,7 +260,7 @@ complete -c borg -f      -l 'exclude-caches'        -d 'Exclude directories tagg
 complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that contain FILENAME'  -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f      -l 'keep-tag-files'        -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from recreate"
-#	Archive options
+# Archive options
 complete -c borg -f      -l 'target'                -d "Create a new ARCHIVE"                       -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f -s c -l 'checkpoint-interval'   -d 'Write checkpoint every N seconds [1800]'    -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f      -l 'comment'               -d 'Add COMMENT to the archive'                 -n "__fish_seen_subcommand_from recreate"
@@ -274,7 +274,7 @@ complete -c borg -f      -l 'chunker-params'        -d 'Chunker PARAMETERS [19,2
 # borg export-tar options
 complete -c borg         -l 'tar-filter'            -d 'Filter program to pipe data through'        -n "__fish_seen_subcommand_from export-tar"
 complete -c borg -f      -l 'list'                  -d 'Print verbose list of items'                -n "__fish_seen_subcommand_from export-tar"
-#	Exclusion options
+# Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from recreate"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from recreate"
@@ -288,13 +288,13 @@ complete -c borg -f      -l 'append-only'           -d 'Only allow appending to 
 complete -c borg -f      -l 'storage-quota'         -d 'Override storage QUOTA of the repository'   -n "__fish_seen_subcommand_from serve"
 
 # borg with-lock
-#	no specific options
+# no specific options
 
 # borg break-lock
-#	no specific options
+# no specific options
 
 # borg benchmark
-#	no specific options
+# no specific options
 
 # borg config
 complete -c borg -f -s c -l 'cache'                 -d 'Get/set values in the repo cache'           -n "__fish_seen_subcommand_from config"
@@ -304,12 +304,12 @@ complete -c borg -f -s d -l 'delete'                -d 'Delete the KEY from the 
 # List archives
 
 function __fish_borg_is_repository
-	return (string match --quiet --regex '.*::' '"'(commandline --current-token)'"')
+    return (string match --quiet --regex '.*::' '"'(commandline --current-token)'"')
 end
 
 function __fish_borg_list_archives
-	set -l repository_name (string replace --regex '::.*' '' (commandline --current-token))
-	borg list --format="$repository_name::{archive}{NEWLINE}" "$repository_name" ^/dev/null
+    set -l repository_name (string replace --regex '::.*' '' (commandline --current-token))
+    borg list --format="$repository_name::{archive}{NEWLINE}" "$repository_name" ^/dev/null
 end
 
 complete -c borg -f -n __fish_borg_is_repository -a '(__fish_borg_list_archives)'

@@ -5,11 +5,6 @@ try:
 except ImportError:
     lzma = None
 
-try:
-    import zstd
-except ImportError:
-    zstd = None
-
 import pytest
 
 from ..compress import get_compressor, Compressor, CompressionSpec, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
@@ -75,8 +70,6 @@ def test_lzma():
 
 
 def test_zstd():
-    if zstd is None:
-        pytest.skip("No zstd support found.")
     c = get_compressor(name='zstd')
     cdata = c.compress(data)
     assert len(cdata) < len(data)
@@ -109,6 +102,9 @@ def test_compressor():
     params_list = [
         dict(name='none'),
         dict(name='lz4'),
+        dict(name='zstd', level=1),
+        dict(name='zstd', level=3),
+        # avoiding high zstd levels, memory needs unclear
         dict(name='zlib', level=0),
         dict(name='zlib', level=6),
         dict(name='zlib', level=9),
@@ -118,12 +114,6 @@ def test_compressor():
             dict(name='lzma', level=0),
             dict(name='lzma', level=6),
             # we do not test lzma on level 9 because of the huge memory needs
-        ]
-    if zstd:
-        params_list += [
-            dict(name='zstd', level=1),
-            dict(name='zstd', level=3),
-            # also avoiding high zstd levels, memory needs unclear
         ]
     for params in params_list:
         c = Compressor(**params)

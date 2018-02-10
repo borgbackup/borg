@@ -16,8 +16,10 @@ fully trusted targets.
 
 See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
+There is also an `offline documentation`_ available, in mutiple formats.
 
 .. _installation manual: https://borgbackup.readthedocs.org/en/stable/installation.html
+.. _offline documentation: https://readthedocs.org/projects/borgbackup/downloads
 
 Main features
 ~~~~~~~~~~~~~
@@ -141,6 +143,7 @@ Links
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
   `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
   `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
+* `Offline Documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
 * `GitHub <https://github.com/borgbackup/borg>`_ and
   `Issue Tracker <https://github.com/borgbackup/borg/issues>`_.
 * `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and

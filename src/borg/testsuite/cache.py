@@ -256,7 +256,7 @@ class TestAdHocCache:
             repository.get(H(5))
 
     def test_files_cache(self, cache):
-        assert cache.file_known_and_unchanged(bytes(32), None) is None
+        assert cache.file_known_and_unchanged(bytes(32), None) == (False, None)
         assert not cache.do_files
         assert cache.files is None
 

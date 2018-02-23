@@ -1132,12 +1132,13 @@ class FilesystemObjectProcessors:
             if not hardlinked or hardlink_master:
                 if not is_special_file:
                     path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                    ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode, files_cache_mode)
+                    known, ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode, files_cache_mode)
                 else:
                     # in --read-special mode, we may be called for special files.
                     # there should be no information in the cache about special files processed in
                     # read-special mode, but we better play safe as this was wrong in the past:
-                    path_hash = ids = None
+                    path_hash = None
+                    known, ids = False, None
                 first_run = not cache.files and cache.do_files
                 if first_run:
                     logger.debug('Processing files ...')
@@ -1146,12 +1147,13 @@ class FilesystemObjectProcessors:
                     # Make sure all ids are available
                     for id_ in ids:
                         if not cache.seen_chunk(id_):
+                            status = 'M'  # cache said it is unmodified, but we lost a chunk: process file like modified
                             break
                     else:
                         chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
                         status = 'U'  # regular file, unchanged
                 else:
-                    status = 'A'  # regular file, added
+                    status = 'M' if known else 'A'  # regular file, modified or added
                 item.hardlink_master = hardlinked
                 item.update(self.metadata_collector.stat_simple_attrs(st))
                 # Only chunkify the file if needed
@@ -1166,7 +1168,6 @@ class FilesystemObjectProcessors:
                         # we must not memorize special files, because the contents of e.g. a
                         # block or char device will change without its mtime/size/inode changing.
                         cache.memorize_file(path_hash, st, [c.id for c in item.chunks], files_cache_mode)
-                    status = status or 'M'  # regular file, modified (if not 'A' already)
                 self.stats.nfiles += 1
             item.update(self.metadata_collector.stat_attrs(st, path))
             item.get_size(memorize=True)

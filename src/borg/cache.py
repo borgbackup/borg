@@ -918,24 +918,40 @@ class LocalCache(CacheStatsMixin):
             stats.update(-size, -csize, False)
 
     def file_known_and_unchanged(self, path_hash, st, ignore_inode=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
+        """
+        Check if we know the file that has this path_hash (know == it is in our files cache) and
+        whether it is unchanged (the size/inode number/cmtime is same for stuff we check in this cache_mode).
+
+        :param path_hash: hash(file_path), to save some memory in the files cache
+        :param st: the file's stat() result
+        :param ignore_inode: whether the inode number shall be ignored
+        :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
+        :return: known, ids (known is True if we have infos about this file in the cache,
+                             ids is the list of chunk ids IF the file has not changed, otherwise None).
+        """
         if 'd' in cache_mode or not self.do_files or not stat.S_ISREG(st.st_mode):  # d(isabled)
-            return None
+            return False, None
         if self.files is None:
             self._read_files()
+        # note: r(echunk) does not need the files cache in this method, but the files cache will
+        # be updated and saved to disk to memorize the files. To preserve previous generations in
+        # the cache, this means that it also needs to get loaded from disk first, so keep
+        # _read_files() above here.
         if 'r' in cache_mode:  # r(echunk)
-            return None
+            return False, None
         entry = self.files.get(path_hash)
         if not entry:
-            return None
+            return False, None
+        # we know the file!
         entry = FileCacheEntry(*msgpack.unpackb(entry))
         if 's' in cache_mode and entry.size != st.st_size:
-            return None
+            return True, None
         if 'i' in cache_mode and not ignore_inode and entry.inode != st.st_ino:
-            return None
+            return True, None
         if 'c' in cache_mode and bigint_to_int(entry.cmtime) != st.st_ctime_ns:
-            return None
+            return True, None
         elif 'm' in cache_mode and bigint_to_int(entry.cmtime) != st.st_mtime_ns:
-            return None
+            return True, None
         # we ignored the inode number in the comparison above or it is still same.
         # if it is still the same, replacing it in the tuple doesn't change it.
         # if we ignored it, a reason for doing that is that files were moved to a new
@@ -945,7 +961,7 @@ class LocalCache(CacheStatsMixin):
         # again at that time), we need to update the inode number in the cache with what
         # we see in the filesystem.
         self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
-        return entry.chunk_ids
+        return True, entry.chunk_ids
 
     def memorize_file(self, path_hash, st, ids, cache_mode=DEFAULT_FILES_CACHE_MODE):
         # note: r(echunk) modes will update the files cache, d(isabled) mode won't
@@ -999,7 +1015,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     do_files = False
 
     def file_known_and_unchanged(self, path_hash, st, ignore_inode=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
-        return None
+        return False, None
 
     def memorize_file(self, path_hash, st, ids, cache_mode=DEFAULT_FILES_CACHE_MODE):
         pass

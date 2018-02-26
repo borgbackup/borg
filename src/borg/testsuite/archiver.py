@@ -1678,7 +1678,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.utime('input/file1', ns=(st.st_atime_ns, st.st_mtime_ns))
         # this mode uses ctime for change detection, so it should find file1 as modified
         output = self.cmd('create', '--list', '--files-cache=ctime,size', self.repository_location + '::test2', 'input')
-        self.assert_in("A input/file1", output)
+        self.assert_in("M input/file1", output)
 
     def test_file_status_ms_cache_mode(self):
         """test that a chmod'ed file with no content changes does not get chunked again in mtime,size cache_mode"""

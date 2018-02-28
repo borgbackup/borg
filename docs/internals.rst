@@ -249,9 +249,9 @@ can be used to tune the chunker parameters, the default is:
 - HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
 
 The buzhash table is altered by XORing it with a seed randomly generated once
-for the archive, and stored encrypted in the keyfile. This is to prevent chunk
-size based fingerprinting attacks on your encrypted repo contents (to guess
-what files you have based on a specific set of chunk sizes).
+for the repository, and stored encrypted in the keyfile. This is to prevent
+chunk size based fingerprinting attacks on your encrypted repo contents (to
+guess what files you have based on a specific set of chunk sizes).
 
 For some more general usage hints see also ``--chunker-params``.
 

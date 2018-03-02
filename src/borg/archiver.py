@@ -1729,6 +1729,9 @@ class Archiver:
                         int(value)
                     except ValueError:
                         raise ValueError('Invalid value') from None
+                    if name == 'max_segment_size':
+                        if int(value) >= MAX_SEGMENT_SIZE_LIMIT:
+                            raise ValueError('Invalid value: max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)
             elif name in ['additional_free_space', ]:
                 if check_value:
                     try:

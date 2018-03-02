@@ -101,8 +101,8 @@ def detect_openssl(prefixes):
     for prefix in prefixes:
         filename = os.path.join(prefix, 'include', 'openssl', 'evp.h')
         if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'PKCS5_PBKDF2_HMAC(' in fd.read():
+            with open(filename, 'rb') as fd:
+                if b'PKCS5_PBKDF2_HMAC(' in fd.read():
                     return prefix
 
 
@@ -110,8 +110,8 @@ def detect_lz4(prefixes):
     for prefix in prefixes:
         filename = os.path.join(prefix, 'include', 'lz4.h')
         if os.path.exists(filename):
-            with open(filename, 'r') as fd:
-                if 'LZ4_decompress_safe' in fd.read():
+            with open(filename, 'rb') as fd:
+                if b'LZ4_decompress_safe' in fd.read():
                     return prefix
 
 

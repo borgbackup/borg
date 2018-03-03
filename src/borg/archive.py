@@ -443,7 +443,7 @@ Utilization of max. archive size: {csize_max:.0%}
     def add_item(self, item, show_progress=True, stats=None):
         if show_progress and self.show_progress:
             if stats is None:
-                stats= self.stats
+                stats = self.stats
             stats.show_progress(item=item, dt=0.2)
         self.items_buffer.add(item)
 

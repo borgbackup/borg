@@ -729,7 +729,7 @@ cdef class AES:
         cdef Py_buffer idata = ro_buffer(data)
         cdef int ilen = len(data)
         cdef int offset
-        cdef int olen
+        cdef int olen = 0
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
@@ -753,7 +753,7 @@ cdef class AES:
         cdef Py_buffer idata = ro_buffer(data)
         cdef int ilen = len(data)
         cdef int offset
-        cdef int olen
+        cdef int olen = 0
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError

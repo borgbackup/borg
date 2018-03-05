@@ -13,6 +13,17 @@ A step by step example
 
 .. include:: quickstart_example.rst.inc
 
+What is a Repository and an Archive
+-----------------------------------
+
+A Repository is easiest to imagine as a project's folder. A repository contains all
+of the project files (including documentation), and stores each file's revision history.
+
+An Archive file is a file that is composed of one or more computer files along
+with metadata. Archive files are used to collect multiple data files together
+into a single file for easier portability and storage, or simply to compress
+files to use less storage space.
+
 Important note about free space
 -------------------------------
 

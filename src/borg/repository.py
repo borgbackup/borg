@@ -278,7 +278,8 @@ class Repository:
                 os.link(config_path, old_config_path)
             except OSError as e:
                 if e.errno in (errno.EMLINK, errno.ENOSYS, errno.EPERM, errno.ENOTSUP):
-                    logger.warning("Hardlink failed, cannot securely erase old config file")
+                    logger.warning("Failed to securely erase old repository config file (hardlinks not supported>). "
+                                   "Old repokey data, if any, might persist on physical storage.")
                 else:
                     raise
 

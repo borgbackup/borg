@@ -2304,7 +2304,9 @@ class Archiver:
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
-        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser))
+        # paths and patterns must have an empty list as default everywhere
+        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser),
+                            paths=[], patterns=[])
         parser.common_options = self.CommonOptions(define_common_options,
                                                    suffix_precedence=('_maincommand', '_midcommand', '_subcommand'))
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
@@ -2312,7 +2314,6 @@ class Archiver:
         parser.common_options.add_common_group(parser, '_maincommand', provide_defaults=True)
 
         common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        # some empty defaults for all subparsers
         common_parser.set_defaults(paths=[], patterns=[])
         parser.common_options.add_common_group(common_parser, '_subcommand')
 

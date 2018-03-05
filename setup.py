@@ -4,7 +4,7 @@ import io
 import re
 import sys
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timezone
 from glob import glob
 
 from distutils.command.build import build
@@ -643,7 +643,7 @@ class build_man(Command):
         self.write_heading(write, description, double_sided=True)
         # man page metadata
         write(':Author: The Borg Collective')
-        write(':Date:', datetime.utcnow().date().isoformat())
+        write(':Date:', datetime.now(timezone.utc).date().isoformat())
         write(':Manual section: 1')
         write(':Manual group: borg backup tool')
         write()

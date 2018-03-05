@@ -1523,6 +1523,46 @@ class Archiver:
     @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_config(self, args, repository, manifest, key, cache):
         """get, set, and delete values in a repository or cache config file"""
+
+        def repo_validate(section, name, value=None, check_value=True):
+            if section not in ['repository', ]:
+                raise ValueError('Invalid section')
+            if name in ['segments_per_dir', 'max_segment_size', 'storage_quota', ]:
+                if check_value:
+                    try:
+                        int(value)
+                    except ValueError:
+                        raise ValueError('Invalid value') from None
+                    if name == 'max_segment_size':
+                        if int(value) >= MAX_SEGMENT_SIZE_LIMIT:
+                            raise ValueError('Invalid value: max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)
+            elif name in ['additional_free_space', ]:
+                if check_value:
+                    try:
+                        parse_file_size(value)
+                    except ValueError:
+                        raise ValueError('Invalid value') from None
+            elif name in ['append_only', ]:
+                if check_value and value not in ['0', '1']:
+                    raise ValueError('Invalid value')
+            elif name in ['id', ]:
+                if check_value:
+                    try:
+                        bin_id = unhexlify(value)
+                    except:
+                        raise ValueError('Invalid value, must be 64 hex digits') from None
+                    if len(bin_id) != 32:
+                        raise ValueError('Invalid value, must be 64 hex digits')
+            else:
+                raise ValueError('Invalid name')
+
+        def cache_validate(section, name, value=None, check_value=True):
+            if section not in ['cache', ]:
+                raise ValueError('Invalid section')
+            # I looked at the cache config and did not see anything a user would want to edit,
+            # so, for now, raise for any key name
+            raise ValueError('Invalid name')
+
         try:
             section, name = args.name.split('.')
         except ValueError:
@@ -1533,16 +1573,20 @@ class Archiver:
             cache.cache_config.load()
             config = cache.cache_config._config
             save = cache.cache_config.save
+            validate = cache_validate
         else:
             config = repository.config
             save = lambda: repository.save_config(repository.path, repository.config)
+            validate = repo_validate
 
         if args.delete:
+            validate(section, name, check_value=False)
             config.remove_option(section, name)
             if len(config.options(section)) == 0:
                 config.remove_section(section)
             save()
         elif args.value:
+            validate(section, name, args.value)
             if section not in config.sections():
                 config.add_section(section)
             config.set(section, name, args.value)

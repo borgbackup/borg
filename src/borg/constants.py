@@ -36,6 +36,9 @@ MAX_DATA_SIZE = 20971479
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see LoggedIO.put_header_fmt.size assertion in repository module
 assert MAX_OBJECT_SIZE == 20 * 1024 * 1024
 
+# repo config max_segment_size value must be below this limit to stay within uint32 offsets:
+MAX_SEGMENT_SIZE_LIMIT = 2 ** 32 - MAX_OBJECT_SIZE
+
 # borg.remote read() buffer size
 BUFSIZE = 10 * 1024 * 1024
 

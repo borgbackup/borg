@@ -367,17 +367,18 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
         'P': IECommand.PatternStyle,
         'p': IECommand.PatternStyle,
     }
+    if not cmd_line_str:
+        raise argparse.ArgumentTypeError("A pattern/command must not be empty.")
 
-    try:
-        cmd = cmd_prefix_map[cmd_line_str[0]]
+    cmd = cmd_prefix_map.get(cmd_line_str[0])
+    if cmd is None:
+        raise argparse.ArgumentTypeError("A pattern/command must start with any one of: %s" %
+                                         ', '.join(cmd_prefix_map))
 
-        # remaining text on command-line following the command character
-        remainder_str = cmd_line_str[1:].lstrip()
-
-        if not remainder_str:
-            raise ValueError("Missing pattern/information!")
-    except (IndexError, KeyError, ValueError):
-        raise argparse.ArgumentTypeError("Unable to parse pattern/command: {}".format(cmd_line_str))
+    # remaining text on command-line following the command character
+    remainder_str = cmd_line_str[1:].lstrip()
+    if not remainder_str:
+        raise argparse.ArgumentTypeError("A pattern/command must have a value part.")
 
     if cmd is IECommand.RootPath:
         # TODO: validate string?

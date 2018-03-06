@@ -171,6 +171,58 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.1.5 (not released yet)
+--------------------------------
+
+Compatibility notes:
+
+- When upgrading from borg 1.0.x to 1.1.x, please note:
+
+  - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
+  - borg upgrade: you do not need to and you also should not run it.
+  - borg might ask some security-related questions once after upgrading.
+    You can answer them either manually or via environment variable.
+    One known case is if you use unencrypted repositories, then it will ask
+    about a unknown unencrypted repository one time.
+  - your first backup with 1.1.x might be significantly slower (it might
+    completely read, chunk, hash a lot files) - this is due to the
+    --files-cache mode change (and happens every time you change mode).
+    You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
+    mode (but that is less safe for detecting changed files than the default).
+    See the --files-cache docs for details.
+- 1.1.5 changes:
+
+  - require msgpack-python >= 0.4.6 and < 0.5.0.
+    0.5.0+ dropped python 3.4 testing and also caused some other issues because
+    the python package was renamed to msgpack and emitted some FutureWarning.
+
+Fixes:
+
+- create --list: fix that it was never showing M status
+- files cache: improve exception handling, #3553
+- ignore exceptions in scandir_inorder() caused by an implicit stat(),
+  also remove unneeded sort
+- fixed tab completion problem where a space is always added after path even
+  when it shouldn't
+- build: do .h file content checks in binary mode, fixes build issue for
+  non-ascii header files on pure-ascii locale platforms, #3544
+
+New features:
+
+- add chunker_params to borg archive info (--json)
+
+Other changes:
+
+- updated zsh completions for borg 1.1.4
+- tests: fix erroneously skipped zstd compressor tests, #3606
+- docs:
+
+  - link to offline documentation from README
+  - add docs on how to verify a signed release with GPG, #3634
+  - chunk seed is generated per repository (not: archive)
+  - better formatting of CPU usage documentation
+
+
 Version 1.1.4 (2017-12-31)
 --------------------------
 

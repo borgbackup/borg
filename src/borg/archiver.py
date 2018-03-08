@@ -1543,7 +1543,7 @@ class Archiver:
             keep += prune_split(archives, '%Y', args.yearly, keep)
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
-        with Cache(repository, key, manifest, do_files=False, lock_wait=self.lock_wait) as cache:
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
             if args.output_list:
                 # set up counters for the progress display

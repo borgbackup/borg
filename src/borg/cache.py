@@ -360,9 +360,13 @@ class Cache:
 
     def __new__(cls, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
                 progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
+
+        if not do_files and 'd' not in cache_mode:
+            cache_mode = 'd'
+
         def local():
             return LocalCache(repository=repository, key=key, manifest=manifest, path=path, sync=sync,
-                              do_files=do_files, warn_if_unencrypted=warn_if_unencrypted, progress=progress,
+                              warn_if_unencrypted=warn_if_unencrypted, progress=progress,
                               lock_wait=lock_wait, cache_mode=cache_mode)
 
         def adhoc():
@@ -421,10 +425,9 @@ class LocalCache(CacheStatsMixin):
     Persistent, local (client-side) cache.
     """
 
-    def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
+    def __init__(self, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
                  progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE):
         """
-        :param do_files: use file metadata cache
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
         :param lock_wait: timeout for lock acquisition (None: return immediately if lock unavailable)
         :param sync: do :meth:`.sync`
@@ -434,7 +437,6 @@ class LocalCache(CacheStatsMixin):
         self.key = key
         self.manifest = manifest
         self.progress = progress
-        self.do_files = do_files
         self.cache_mode = cache_mode
         self.timestamp = None
         self.txn_active = False
@@ -487,7 +489,7 @@ class LocalCache(CacheStatsMixin):
         with IntegrityCheckedFile(path=os.path.join(self.path, 'chunks'), write=False,
                                   integrity_data=self.cache_config.integrity.get('chunks')) as fd:
             self.chunks = ChunkIndex.read(fd)
-        if 'd' in self.cache_mode or not self.do_files:  # d(isabled)
+        if 'd' in self.cache_mode:  # d(isabled)
             self.files = None
         else:
             self._read_files()
@@ -934,7 +936,7 @@ class LocalCache(CacheStatsMixin):
                              ids is the list of chunk ids IF the file has not changed, otherwise None).
         """
         cache_mode = self.cache_mode
-        if 'd' in cache_mode or not self.do_files or not stat.S_ISREG(st.st_mode):  # d(isabled)
+        if 'd' in cache_mode or not stat.S_ISREG(st.st_mode):  # d(isabled)
             return False, None
         # note: r(echunk) does not need the files cache in this method, but the files cache will
         # be updated and saved to disk to memorize the files. To preserve previous generations in
@@ -968,7 +970,7 @@ class LocalCache(CacheStatsMixin):
     def memorize_file(self, path_hash, st, ids):
         cache_mode = self.cache_mode
         # note: r(echunk) modes will update the files cache, d(isabled) mode won't
-        if 'd' in cache_mode or not self.do_files or not stat.S_ISREG(st.st_mode):
+        if 'd' in cache_mode or not stat.S_ISREG(st.st_mode):
             return
         if 'c' in cache_mode:
             cmtime_ns = safe_ns(st.st_ctime_ns)
@@ -1015,7 +1017,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         pass
 
     files = None
-    do_files = False
+    cache_mode = 'd'
 
     def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
         return False, None

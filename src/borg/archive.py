@@ -993,7 +993,7 @@ Utilization of max. archive size: {csize_max:.0%}
                     # read-special mode, but we better play safe as this was wrong in the past:
                     path_hash = None
                     known, ids = False, None
-                first_run = not cache.files and cache.do_files
+                first_run = not cache.files and 'd' not in cache.cache_mode
                 if first_run:
                     logger.debug('Processing files ...')
                 chunks = None

@@ -1347,7 +1347,7 @@ class Archiver:
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
-        with Cache(repository, key, manifest, do_files=False, lock_wait=self.lock_wait) as cache:
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
             # set up counters for the progress display
             to_delete_len = len(to_delete)

@@ -359,10 +359,13 @@ class Cache:
             shutil.rmtree(path)
 
     def __new__(cls, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
-                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
+                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE,
+                ignore_inode=False):
 
         if not do_files and 'd' not in cache_mode:
             cache_mode = 'd'
+        elif ignore_inode and 'i' in cache_mode:
+            cache_mode = ''.join(set(cache_mode) - set('i'))
 
         def local():
             return LocalCache(repository=repository, key=key, manifest=manifest, path=path, sync=sync,
@@ -924,14 +927,13 @@ class LocalCache(CacheStatsMixin):
         else:
             stats.update(-size, -csize, False)
 
-    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
+    def file_known_and_unchanged(self, path_hash, st):
         """
         Check if we know the file that has this path_hash (know == it is in our files cache) and
         whether it is unchanged (the size/inode number/cmtime is same for stuff we check in this cache_mode).
 
         :param path_hash: hash(file_path), to save some memory in the files cache
         :param st: the file's stat() result
-        :param ignore_inode: whether the inode number shall be ignored
         :return: known, ids (known is True if we have infos about this file in the cache,
                              ids is the list of chunk ids IF the file has not changed, otherwise None).
         """
@@ -950,7 +952,7 @@ class LocalCache(CacheStatsMixin):
         entry = FileCacheEntry(*msgpack.unpackb(entry))
         if 's' in cache_mode and entry.size != st.st_size:
             return True, None
-        if 'i' in cache_mode and not ignore_inode and entry.inode != st.st_ino:
+        if 'i' in cache_mode and entry.inode != st.st_ino:
             return True, None
         if 'c' in cache_mode and bigint_to_int(entry.cmtime) != st.st_ctime_ns:
             return True, None
@@ -1019,7 +1021,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     files = None
     cache_mode = 'd'
 
-    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False):
+    def file_known_and_unchanged(self, path_hash, st):
         return False, None
 
     def memorize_file(self, path_hash, st, ids):

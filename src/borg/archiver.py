@@ -144,6 +144,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
+                               ignore_inode=getattr(args, 'ignore_inode', False),
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
                                cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -528,7 +529,6 @@ class Archiver:
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
-        self.ignore_inode = args.ignore_inode
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
         t0 = datetime.utcnow()
@@ -536,7 +536,7 @@ class Archiver:
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
-                       cache_mode=args.files_cache_mode) as cache:
+                       cache_mode=args.files_cache_mode, ignore_inode=args.ignore_inode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime, nobirthtime=args.nobirthtime,
@@ -594,7 +594,7 @@ class Archiver:
                         return
             if stat.S_ISREG(st.st_mode):
                 if not dry_run:
-                    status = archive.process_file(path, st, cache, self.ignore_inode)
+                    status = archive.process_file(path, st, cache)
             elif stat.S_ISDIR(st.st_mode):
                 if recurse:
                     tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)

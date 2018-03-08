@@ -455,6 +455,7 @@ class Archiver:
                     skip_inodes.add((st.st_ino, st.st_dev))
                 except OSError:
                     pass
+            logger.debug('Processing files ...')
             for path in args.paths:
                 if path == '-':  # stdin
                     path = args.stdin_name

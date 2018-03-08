@@ -1131,13 +1131,13 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         return 'i'  # stdin
 
-    def process_file(self, path, st, cache, ignore_inode=False):
+    def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
             is_special_file = is_special(st.st_mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
                     path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                    known, ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode)
+                    known, ids = cache.file_known_and_unchanged(path_hash, st)
                 else:
                     # in --read-special mode, we may be called for special files.
                     # there should be no information in the cache about special files processed in

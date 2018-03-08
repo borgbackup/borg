@@ -144,7 +144,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
-                               progress=getattr(args, 'progress', False), lock_wait=self.lock_wait) as cache_:
+                               progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
+                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)
@@ -504,13 +505,13 @@ class Archiver:
         self.ignore_inode = args.ignore_inode
         self.nobsdflags = args.nobsdflags
         self.exclude_nodump = args.exclude_nodump
-        self.files_cache_mode = args.files_cache_mode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         t0_monotonic = time.monotonic()
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
-                       lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync) as cache:
+                       lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
+                       cache_mode=args.files_cache_mode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
@@ -576,7 +577,7 @@ class Archiver:
                         return
             if stat.S_ISREG(st.st_mode):
                 if not dry_run:
-                    status = fso.process_file(path, st, cache, self.ignore_inode, self.files_cache_mode)
+                    status = fso.process_file(path, st, cache, self.ignore_inode)
             elif stat.S_ISDIR(st.st_mode):
                 if recurse:
                     tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)

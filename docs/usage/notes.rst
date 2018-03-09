@@ -201,15 +201,28 @@ copy just in case something goes wrong during the recovery. Since recovery is do
 deleting some files, a hard link copy (``cp -al``) is sufficient.
 
 The first step to reset the repository to transaction 5, the last uncompromised transaction,
-is to remove the ``hints.N`` and ``index.N`` files in the repository (these two files are
-always expendable). In this example N is 13.
+is to remove the ``hints.N``, ``index.N`` and ``integrity.N``files in the repository (these
+files are always expendable). In this example N is 13.
 
 Then remove or move all segment files from the segment directories in ``data/`` starting
 with file 6::
 
     rm data/**/{6..13}
 
-That's all to it.
+That's all to do in the repository.
+
+If you want to access this rollbacked repository from a client that already has
+a cache for this repository, the cache will reflect a newer repository state
+than what you actually have in the repository now, after the rollback.
+
+Thus, you need to clear the cache::
+
+    borg delete --cache-only repo
+
+The cache will get rebuilt automatically. Depending on repo size and archive
+count, it may take a while.
+
+You also will need to remove ~/.config/borg/security/REPOID/manifest-timestamp.
 
 Drawbacks
 +++++++++

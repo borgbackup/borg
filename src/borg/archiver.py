@@ -2075,7 +2075,16 @@ class Archiver:
             considered first (in the order of appearance). Then patterns from ``--patterns-from``
             are added. Exclusion patterns from ``--exclude-from`` files are appended last.
 
-            An example ``--patterns-from`` file could look like that::
+            Examples::
+
+                # backup pics, but not the ones from 2018, except the good ones:
+                # note: using = is essential to avoid cmdline argument parsing issues.
+                borg create --pattern=+pics/2018/good --pattern=-pics/2018 repo::arch pics
+
+                # use a file with patterns:
+                borg create --patterns-from patterns.lst repo::arch
+
+            The patterns.lst file could look like that::
 
                 # "sh:" pattern style is the default, so the following line is not needed:
                 P sh

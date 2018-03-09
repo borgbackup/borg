@@ -45,7 +45,7 @@ from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_
 from .crypto.keymanager import KeyManager
 from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .helpers import Error, NoManifestError, set_ec
-from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams
+from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
 from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS, FilesCacheMode
 from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
 from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
@@ -1755,9 +1755,11 @@ class Archiver:
         def cache_validate(section, name, value=None, check_value=True):
             if section not in ['cache', ]:
                 raise ValueError('Invalid section')
-            # I looked at the cache config and did not see anything a user would want to edit,
-            # so, for now, raise for any key name
-            raise ValueError('Invalid name')
+            if name in ['previous_location', ]:
+                if check_value:
+                    Location(value)
+            else:
+                raise ValueError('Invalid name')
 
         try:
             section, name = args.name.split('.')

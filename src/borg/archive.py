@@ -441,9 +441,11 @@ Utilization of max. archive size: {csize_max:.0%}
                                               filter=lambda item: self.item_filter(item, filter)):
             yield item
 
-    def add_item(self, item, show_progress=True):
+    def add_item(self, item, show_progress=True, stats=None):
         if show_progress and self.show_progress:
-            self.stats.show_progress(item=item, dt=0.2)
+            if stats is None:
+                stats = self.stats
+            stats.show_progress(item=item, dt=0.2)
         self.items_buffer.add(item)
 
     def write_checkpoint(self):
@@ -1008,7 +1010,7 @@ class ChunksProcessor:
         self.write_checkpoint()
         return length, number
 
-    def process_file_chunks(self, item, cache, stats, chunk_iter, chunk_processor=None):
+    def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None):
         if not chunk_processor:
             def chunk_processor(data):
                 chunk_entry = cache.add_chunk(self.key.id_hash(data), data, stats, wait=False)
@@ -1024,6 +1026,8 @@ class ChunksProcessor:
         part_number = 1
         for data in chunk_iter:
             item.chunks.append(chunk_processor(data))
+            if show_progress:
+                stats.show_progress(item=item, dt=0.2)
             if self.checkpoint_interval and time.monotonic() - self.last_checkpoint > self.checkpoint_interval:
                 from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
                 self.last_checkpoint = time.monotonic()
@@ -1050,12 +1054,13 @@ class FilesystemObjectProcessors:
 
     def __init__(self, *, metadata_collector, cache, key,
                  add_item, process_file_chunks,
-                 chunker_params):
+                 chunker_params, show_progress):
         self.metadata_collector = metadata_collector
         self.cache = cache
         self.key = key
         self.add_item = add_item
         self.process_file_chunks = process_file_chunks
+        self.show_progress = show_progress
 
         self.hard_links = {}
         self.stats = Statistics()  # threading: done by cache (including progress)
@@ -1077,7 +1082,7 @@ class FilesystemObjectProcessors:
                 hardlink_master = True
         yield item, status, hardlinked, hardlink_master
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
-        self.add_item(item)
+        self.add_item(item, stats=self.stats)
         # ... and added to the archive, so we can remember it to refer to it later in the archive:
         if hardlink_master:
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
@@ -1120,10 +1125,10 @@ class FilesystemObjectProcessors:
             mtime=t, atime=t, ctime=t,
         )
         fd = sys.stdin.buffer  # binary
-        self.process_file_chunks(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd)))
+        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
         item.get_size(memorize=True)
         self.stats.nfiles += 1
-        self.add_item(item)
+        self.add_item(item, stats=self.stats)
         return 'i'  # stdin
 
     def process_file(self, path, st, cache, ignore_inode=False, files_cache_mode=DEFAULT_FILES_CACHE_MODE):
@@ -1163,7 +1168,7 @@ class FilesystemObjectProcessors:
                     with backup_io('open'):
                         fh = Archive._open_rb(path)
                     with os.fdopen(fh, 'rb') as fd:
-                        self.process_file_chunks(item, cache, self.stats, backup_io_iter(self.chunker.chunkify(fd, fh)))
+                        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd, fh)))
                     if not is_special_file:
                         # we must not memorize special files, because the contents of e.g. a
                         # block or char device will change without its mtime/size/inode changing.
@@ -1813,7 +1818,7 @@ class ArchiveRecreater:
         if 'chunks' in item:
             self.process_chunks(archive, target, item)
             target.stats.nfiles += 1
-        target.add_item(item)
+        target.add_item(item, stats=self.stats)
         self.print_file_status(file_status(item.mode), item.path)
 
     def process_chunks(self, archive, target, item):
@@ -1823,7 +1828,7 @@ class ArchiveRecreater:
             return item.chunks
         chunk_iterator = self.iter_chunks(archive, target, list(item.chunks))
         chunk_processor = partial(self.chunk_processor, target)
-        target.process_file_chunks(item, self.cache, target.stats, chunk_iterator, chunk_processor)
+        target.process_file_chunks(item, self.cache, target.stats, self.progress, chunk_iterator, chunk_processor)
 
     def chunk_processor(self, target, data):
         chunk_id = self.key.id_hash(data)

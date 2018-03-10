@@ -1818,7 +1818,7 @@ class ArchiveRecreater:
         if 'chunks' in item:
             self.process_chunks(archive, target, item)
             target.stats.nfiles += 1
-        target.add_item(item, stats=self.stats)
+        target.add_item(item, stats=target.stats)
         self.print_file_status(file_status(item.mode), item.path)
 
     def process_chunks(self, archive, target, item):

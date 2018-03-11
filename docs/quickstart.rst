@@ -13,6 +13,17 @@ A step by step example
 
 .. include:: quickstart_example.rst.inc
 
+Archives and repositories
+-------------------------
+
+A Borg archive is used similarly to a tarball in a simpler backup system. When ``borg create``
+is run on a path, the current state of the files therein is stored in an archive. One can later
+extract or mount an archive to restore from a backup.
+
+Repositories are self-contained stores of archives that can be stored locally or remotely.
+Archives stored inside a repository are deduplicated with one another, which is why Borg
+shines for incremental backups.
+
 Important note about free space
 -------------------------------
 

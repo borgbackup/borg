@@ -1030,6 +1030,10 @@ class Archiver:
                 return 'changed link'
 
         def contents_changed(item1, item2):
+            if item1.get('deleted') != item2.get('deleted'):
+                # a deleleted/non-existing file is considered different to an existing file,
+                # even if the latter is empty.
+                return True
             if can_compare_chunk_ids:
                 return item1.chunks != item2.chunks
             else:

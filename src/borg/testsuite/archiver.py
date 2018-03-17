@@ -3410,6 +3410,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
         # Setup files for the second snapshot
         self.create_regular_file('file_added', size=2048)
+        self.create_regular_file('file_empty_added', size=0)
         os.unlink('input/file_removed')
         os.unlink('input/file_removed2')
         os.unlink('input/file_replaced')
@@ -3483,6 +3484,9 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             assert 'added       2.05 kB input/file_added' in output
             if are_hardlinks_supported():
                 assert 'added       2.05 kB input/hardlink_added' in output
+
+            # check if a diff between non-existent and empty new file is found
+            assert 'added           0 B input/file_empty_added' in output
 
             # The inode has two links and both of them are deleted. They should
             # appear as two deleted files.

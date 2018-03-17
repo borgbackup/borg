@@ -373,3 +373,16 @@ while libssl implements TLS and related protocols.
 The latter is not used by Borg (cf. `Remote RPC protocol security`_, Borg itself does not implement
 any network access) and historically contained most vulnerabilities, especially critical ones.
 The static binaries released by the project contain neither libssl nor the Python ssl/_ssl modules.
+
+Compression and Encryption
+==========================
+
+Combining encryption with compression can be insecure in some contexts (e.g. online protocols).
+
+There was some discussion about this in `github issue #1040`_ and for Borg some developers
+concluded this is no problem at all, some concluded this is hard and extremely slow to exploit
+and thus no problem in practice.
+
+No matter what, there is always the option not to use compression if you are worried about this.
+
+.. _github issue #1040: https://github.com/borgbackup/borg/issues/1040

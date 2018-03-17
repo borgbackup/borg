@@ -86,8 +86,22 @@ If you have set BORG_REPO (see above) and an archive location is needed, use
 ``::archive_name`` - the repo URL part is then read from BORG_REPO.
 
 
-Type of log output
-~~~~~~~~~~~~~~~~~~
+Logging
+~~~~~~~
+
+Borg writes all log output to stderr by default. But please note that something
+showing up on stderr does *not* indicate an error condition just because it is
+on stderr. Please check the log levels of the messages and the return code of
+borg for determining error, warning or success conditions.
+
+If you want to capture the log output to a file, just redirect it:
+
+::
+
+    borg create repo::archive myfiles 2>> logfile
+
+
+Custom logging configurations can be implemented via BORG_LOGGING_CONF.
 
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want Borg to be mostly silent and only output

@@ -37,6 +37,10 @@ Under these circumstances Borg guarantees that the attacker cannot
 The attacker can always impose a denial of service per definition (he could
 forbid connections to the repository, or delete it entirely).
 
+When the above attack model is extended to include multiple clients
+independently updating the same repository, then Borg fails to provide
+confidentiality (i.e. guarantees 3) and 4) do not apply any more).
+
 .. _security_structural_auth:
 
 Structural Authentication
@@ -369,3 +373,16 @@ while libssl implements TLS and related protocols.
 The latter is not used by Borg (cf. `Remote RPC protocol security`_, Borg itself does not implement
 any network access) and historically contained most vulnerabilities, especially critical ones.
 The static binaries released by the project contain neither libssl nor the Python ssl/_ssl modules.
+
+Compression and Encryption
+==========================
+
+Combining encryption with compression can be insecure in some contexts (e.g. online protocols).
+
+There was some discussion about this in `github issue #1040`_ and for Borg some developers
+concluded this is no problem at all, some concluded this is hard and extremely slow to exploit
+and thus no problem in practice.
+
+No matter what, there is always the option not to use compression if you are worried about this.
+
+.. _github issue #1040: https://github.com/borgbackup/borg/issues/1040

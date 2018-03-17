@@ -122,6 +122,9 @@ class Repository:
     class InvalidRepository(Error):
         """{} is not a valid repository. Check repo config."""
 
+    class InvalidRepositoryConfig(Error):
+        """{} does not have a valid configuration. Check repo config [{}]."""
+
     class AtticRepository(Error):
         """Attic repository detected. Please run "borg upgrade {}"."""
 
@@ -278,7 +281,8 @@ class Repository:
                 os.link(config_path, old_config_path)
             except OSError as e:
                 if e.errno in (errno.EMLINK, errno.ENOSYS, errno.EPERM, errno.ENOTSUP):
-                    logger.warning("Hardlink failed, cannot securely erase old config file")
+                    logger.warning("Failed to securely erase old repository config file (hardlinks not supported>). "
+                                   "Old repokey data, if any, might persist on physical storage.")
                 else:
                     raise
 
@@ -383,6 +387,9 @@ class Repository:
             self.close()
             raise self.InvalidRepository(path)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
+        if self.max_segment_size >= MAX_SEGMENT_SIZE_LIMIT:
+            self.close()
+            raise self.InvalidRepositoryConfig(path, 'max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)  # issue 3592
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.additional_free_space = parse_file_size(self.config.get('repository', 'additional_free_space', fallback=0))
         # append_only can be set in the constructor

@@ -980,22 +980,19 @@ Utilization of max. archive size: {csize_max:.0%}
         self.add_item(item)
         return 'i'  # stdin
 
-    def process_file(self, path, st, cache, ignore_inode=False, files_cache_mode=DEFAULT_FILES_CACHE_MODE):
+    def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
             is_special_file = is_special(st.st_mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
                     path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                    known, ids = cache.file_known_and_unchanged(path_hash, st, ignore_inode, files_cache_mode)
+                    known, ids = cache.file_known_and_unchanged(path_hash, st)
                 else:
                     # in --read-special mode, we may be called for special files.
                     # there should be no information in the cache about special files processed in
                     # read-special mode, but we better play safe as this was wrong in the past:
                     path_hash = None
                     known, ids = False, None
-                first_run = not cache.files and cache.do_files
-                if first_run:
-                    logger.debug('Processing files ...')
                 chunks = None
                 if ids is not None:
                     # Make sure all ids are available
@@ -1021,7 +1018,7 @@ Utilization of max. archive size: {csize_max:.0%}
                     if not is_special_file:
                         # we must not memorize special files, because the contents of e.g. a
                         # block or char device will change without its mtime/size/inode changing.
-                        cache.memorize_file(path_hash, st, [c.id for c in item.chunks], files_cache_mode)
+                        cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                 self.stats.nfiles += 1
             item.update(self.stat_attrs(st, path))
             item.get_size(memorize=True)

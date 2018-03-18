@@ -359,11 +359,18 @@ class Cache:
             shutil.rmtree(path)
 
     def __new__(cls, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
-                progress=False, lock_wait=None, permit_adhoc_cache=False):
+                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE,
+                ignore_inode=False):
+
+        if not do_files and 'd' not in cache_mode:
+            cache_mode = 'd'
+        elif ignore_inode and 'i' in cache_mode:
+            cache_mode = ''.join(set(cache_mode) - set('i'))
+
         def local():
             return LocalCache(repository=repository, key=key, manifest=manifest, path=path, sync=sync,
-                              do_files=do_files, warn_if_unencrypted=warn_if_unencrypted, progress=progress,
-                              lock_wait=lock_wait)
+                              warn_if_unencrypted=warn_if_unencrypted, progress=progress,
+                              lock_wait=lock_wait, cache_mode=cache_mode)
 
         def adhoc():
             return AdHocCache(repository=repository, key=key, manifest=manifest)
@@ -421,19 +428,19 @@ class LocalCache(CacheStatsMixin):
     Persistent, local (client-side) cache.
     """
 
-    def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
-                 progress=False, lock_wait=None):
+    def __init__(self, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
+                 progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE):
         """
-        :param do_files: use file metadata cache
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
         :param lock_wait: timeout for lock acquisition (None: return immediately if lock unavailable)
         :param sync: do :meth:`.sync`
+        :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
         self.repository = repository
         self.key = key
         self.manifest = manifest
         self.progress = progress
-        self.do_files = do_files
+        self.cache_mode = cache_mode
         self.timestamp = None
         self.txn_active = False
 
@@ -485,7 +492,10 @@ class LocalCache(CacheStatsMixin):
         with IntegrityCheckedFile(path=os.path.join(self.path, 'chunks'), write=False,
                                   integrity_data=self.cache_config.integrity.get('chunks')) as fd:
             self.chunks = ChunkIndex.read(fd)
-        self.files = None
+        if 'd' in self.cache_mode:  # d(isabled)
+            self.files = None
+        else:
+            self._read_files()
 
     def open(self):
         if not os.path.isdir(self.path):
@@ -917,26 +927,22 @@ class LocalCache(CacheStatsMixin):
         else:
             stats.update(-size, -csize, False)
 
-    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
+    def file_known_and_unchanged(self, path_hash, st):
         """
         Check if we know the file that has this path_hash (know == it is in our files cache) and
         whether it is unchanged (the size/inode number/cmtime is same for stuff we check in this cache_mode).
 
         :param path_hash: hash(file_path), to save some memory in the files cache
         :param st: the file's stat() result
-        :param ignore_inode: whether the inode number shall be ignored
-        :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         :return: known, ids (known is True if we have infos about this file in the cache,
                              ids is the list of chunk ids IF the file has not changed, otherwise None).
         """
-        if 'd' in cache_mode or not self.do_files or not stat.S_ISREG(st.st_mode):  # d(isabled)
+        cache_mode = self.cache_mode
+        if 'd' in cache_mode or not stat.S_ISREG(st.st_mode):  # d(isabled)
             return False, None
-        if self.files is None:
-            self._read_files()
         # note: r(echunk) does not need the files cache in this method, but the files cache will
         # be updated and saved to disk to memorize the files. To preserve previous generations in
-        # the cache, this means that it also needs to get loaded from disk first, so keep
-        # _read_files() above here.
+        # the cache, this means that it also needs to get loaded from disk first.
         if 'r' in cache_mode:  # r(echunk)
             return False, None
         entry = self.files.get(path_hash)
@@ -946,7 +952,7 @@ class LocalCache(CacheStatsMixin):
         entry = FileCacheEntry(*msgpack.unpackb(entry))
         if 's' in cache_mode and entry.size != st.st_size:
             return True, None
-        if 'i' in cache_mode and not ignore_inode and entry.inode != st.st_ino:
+        if 'i' in cache_mode and entry.inode != st.st_ino:
             return True, None
         if 'c' in cache_mode and bigint_to_int(entry.cmtime) != st.st_ctime_ns:
             return True, None
@@ -963,9 +969,10 @@ class LocalCache(CacheStatsMixin):
         self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
         return True, entry.chunk_ids
 
-    def memorize_file(self, path_hash, st, ids, cache_mode=DEFAULT_FILES_CACHE_MODE):
+    def memorize_file(self, path_hash, st, ids):
+        cache_mode = self.cache_mode
         # note: r(echunk) modes will update the files cache, d(isabled) mode won't
-        if 'd' in cache_mode or not self.do_files or not stat.S_ISREG(st.st_mode):
+        if 'd' in cache_mode or not stat.S_ISREG(st.st_mode):
             return
         if 'c' in cache_mode:
             cmtime_ns = safe_ns(st.st_ctime_ns)
@@ -1012,12 +1019,12 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         pass
 
     files = None
-    do_files = False
+    cache_mode = 'd'
 
-    def file_known_and_unchanged(self, path_hash, st, ignore_inode=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
+    def file_known_and_unchanged(self, path_hash, st):
         return False, None
 
-    def memorize_file(self, path_hash, st, ids, cache_mode=DEFAULT_FILES_CACHE_MODE):
+    def memorize_file(self, path_hash, st, ids):
         pass
 
     def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):

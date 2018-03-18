@@ -198,14 +198,20 @@ Compatibility notes:
 
 Fixes:
 
-- create --list: fix that it was never showing M status
+- create --list: fix that it was never showing M status, #3492
+- create: fix timing for first checkpoint (read files cache early, init
+  checkpoint timer after that), see #3394
+- diff: consider an empty file as different to a non-existing file, #3688
 - files cache: improve exception handling, #3553
 - ignore exceptions in scandir_inorder() caused by an implicit stat(),
-  also remove unneeded sort
+  also remove unneeded sort, #3545
 - fixed tab completion problem where a space is always added after path even
   when it shouldn't
 - build: do .h file content checks in binary mode, fixes build issue for
-  non-ascii header files on pure-ascii locale platforms, #3544
+  non-ascii header files on pure-ascii locale platforms, #3544 #3639
+- borgfs: fix patterns/paths processing, #3551
+- config: add some validation, #3566
+- repository config: add validation for max_segment_size, #3592
 
 New features:
 
@@ -215,12 +221,24 @@ Other changes:
 
 - updated zsh completions for borg 1.1.4
 - tests: fix erroneously skipped zstd compressor tests, #3606
+- files cache related code cleanups
+- be more helpful when parsing invalid --pattern values, #3575
+- be more clear in secure-erase warning message, #3591
+- docs build: unicode problem fixed when using a py27-based sphinx
 - docs:
 
-  - link to offline documentation from README
+  - security: explicitly note what happens OUTSIDE the attack model
+  - security: add note about combining compression and encryption
+  - quickstart: add note about permissions, borg@localhost, #3452
+  - recreate --recompress: add missing metavar, clarify description, #3617
+  - improve logging docs, #3549
+  - add an example for --pattern usage, #3661
+  - clarify path semantics when matching, #3598
+  - link to offline documentation from README, #3502
   - add docs on how to verify a signed release with GPG, #3634
   - chunk seed is generated per repository (not: archive)
-  - better formatting of CPU usage documentation
+  - better formatting of CPU usage documentation, #3554
+  - extend append-only repo rollback docs, #3579
 
 
 Version 1.1.4 (2017-12-31)

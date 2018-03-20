@@ -32,6 +32,10 @@ from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_ciph
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
 
 
+class NoPassphraseFailure(Error):
+    """can not acquire a passphrase: {}"""
+
+
 class PassphraseWrong(Error):
     """passphrase supplied in BORG_PASSPHRASE or by BORG_PASSCOMMAND is incorrect."""
 
@@ -445,7 +449,19 @@ class Passphrase(str):
 
     @classmethod
     def getpass(cls, prompt):
-        return cls(getpass.getpass(prompt))
+        try:
+            pw = getpass.getpass(prompt)
+        except EOFError:
+            if prompt:
+                print()  # avoid err msg appearing right of prompt
+            msg = []
+            for env_var in 'BORG_PASSPHRASE', 'BORG_PASSCOMMAND':
+                env_var_set = os.environ.get(env_var) is not None
+                msg.append('%s is %s.' % (env_var, 'set' if env_var_set else 'not set'))
+            msg.append('Interactive password query failed.')
+            raise NoPassphraseFailure(' '.join(msg)) from None
+        else:
+            return cls(pw)
 
     @classmethod
     def verification(cls, passphrase):

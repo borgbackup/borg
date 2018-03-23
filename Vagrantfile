@@ -399,7 +399,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("ubuntu")
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("ubuntu")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)

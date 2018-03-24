@@ -212,6 +212,7 @@ Fixes:
 - borgfs: fix patterns/paths processing, #3551
 - config: add some validation, #3566
 - repository config: add validation for max_segment_size, #3592
+- set cache previous_location on load instead of save
 
 New features:
 
@@ -220,16 +221,18 @@ New features:
 Other changes:
 
 - updated zsh completions for borg 1.1.4
-- tests: fix erroneously skipped zstd compressor tests, #3606
 - files cache related code cleanups
 - be more helpful when parsing invalid --pattern values, #3575
 - be more clear in secure-erase warning message, #3591
+- improve getpass user experience, #3689
 - docs build: unicode problem fixed when using a py27-based sphinx
 - docs:
 
   - security: explicitly note what happens OUTSIDE the attack model
   - security: add note about combining compression and encryption
+  - security: describe chunk size / proximity issue, #3687
   - quickstart: add note about permissions, borg@localhost, #3452
+  - quickstart: add introduction to repositories & archives, #3620
   - recreate --recompress: add missing metavar, clarify description, #3617
   - improve logging docs, #3549
   - add an example for --pattern usage, #3661
@@ -239,6 +242,16 @@ Other changes:
   - chunk seed is generated per repository (not: archive)
   - better formatting of CPU usage documentation, #3554
   - extend append-only repo rollback docs, #3579
+- tests:
+
+  - fix erroneously skipped zstd compressor tests, #3606
+  - skip a test if argparse is broken, #3705
+- vagrant:
+
+  - xenial64 box now uses username 'vagrant', #3707
+  - move cleanup steps to fs_init, #3706
+
+
 
 
 Version 1.1.4 (2017-12-31)

@@ -127,6 +127,12 @@ def is_special(mode):
     return stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
 
 
+class BackupError(Exception):
+    """
+    Exception raised for non-OSError-based exceptions while accessing backup files.
+    """
+
+
 class BackupOSError(Exception):
     """
     Wrapper for OSError raised while accessing backup files.
@@ -551,11 +557,10 @@ Utilization of max. archive size: {csize_max:.0%}
                 if 'size' in item:
                     item_size = item.size
                     if item_size != item_chunks_size:
-                        logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
-                            item.path, item_size, item_chunks_size))
+                        raise BackupError('Size inconsistency detected: size {}, chunks size {}'.format(
+                                          item_size, item_chunks_size))
             if has_damaged_chunks:
-                logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
-                               remove_surrogates(item.path))
+                raise BackupError('File has damaged (all-zero) chunks. Try running borg check --repair.')
             return
 
         original_path = original_path or item.path
@@ -611,11 +616,10 @@ Utilization of max. archive size: {csize_max:.0%}
                 if 'size' in item:
                     item_size = item.size
                     if item_size != item_chunks_size:
-                        logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
-                            item.path, item_size, item_chunks_size))
+                        raise BackupError('Size inconsistency detected: size {}, chunks size {}'.format(
+                                          item_size, item_chunks_size))
                 if has_damaged_chunks:
-                    logger.warning('File %s has damaged (all-zero) chunks. Try running borg check --repair.' %
-                                   remove_surrogates(item.path))
+                    raise BackupError('File has damaged (all-zero) chunks. Try running borg check --repair.')
             return
         with backup_io:
             # No repository access beyond this point.

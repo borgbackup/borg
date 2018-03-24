@@ -290,6 +290,7 @@ class CacheConfig:
             self.previous_location = recanonicalize_relative_location(previous_location, self.repository)
         else:
             self.previous_location = None
+        self._config.set('cache', 'previous_location', self.repository._location.canonical_path())
 
     def save(self, manifest=None, key=None):
         if manifest:
@@ -304,7 +305,6 @@ class CacheConfig:
             self._config.set('integrity', 'manifest', manifest.id_str)
         if key:
             self._config.set('cache', 'key_type', str(key.TYPE))
-        self._config.set('cache', 'previous_location', self.repository._location.canonical_path())
         with SaveFile(self.config_path) as fd:
             self._config.write(fd)
 

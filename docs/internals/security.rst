@@ -386,3 +386,43 @@ and thus no problem in practice.
 No matter what, there is always the option not to use compression if you are worried about this.
 
 .. _github issue #1040: https://github.com/borgbackup/borg/issues/1040
+
+Fingerprinting
+==============
+
+Stored chunk sizes
+------------------
+
+A borg repository does not hide the size of the chunks it stores (size
+information is needed to operate the repository).
+
+The chunks stored are the (compressed and encrypted) output of the chunker,
+chunked according to the input data, the chunker's parameters and the secret
+chunker seed (which all influence the chunk boundary positions).
+
+Small files below some specific threshold (default: 512kiB) result in only one
+chunk (identical content / size as the original file), bigger files result in
+multiple chunks.
+
+After chunking is done, compression, encryption and authentication are applied,
+which influence the sizes of the chunks stored into the repository.
+
+Within our attack model, an attacker posessing a specific set of files which
+he assumes that the victim also posesses (and backups into the repository)
+could try a brute force fingerprinting attack based on the chunk sizes in the
+repository to prove his assumption.
+
+Stored chunk proximity
+----------------------
+
+Borg does not try to obfuscate order / proximity of files it discovers by
+recursing through the filesystem. For performance reasons, we sort directory
+contents in file inode order (not in file name alphabetical order), so order
+fingerprinting is not useful for an attacker.
+
+But, when new files are close to each other (when looking at recursion /
+scanning order), the resulting chunks will be also stored close to each other
+in the resulting repository segment file(s).
+
+This might leak additional information for the chunk size fingerprinting
+attack (see above).

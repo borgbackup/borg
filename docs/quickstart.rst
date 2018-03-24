@@ -16,13 +16,15 @@ A step by step example
 Archives and repositories
 -------------------------
 
-A Borg archive is used similarly to a tarball in a simpler backup system. When ``borg create``
-is run on a path, the current state of the files therein is stored in an archive. One can later
-extract or mount an archive to restore from a backup.
+A *Borg archive* is the result of a single backup (``borg create``). An archive
+stores a snapshot of the data of the files "inside" it. One can later extract or
+mount an archive to restore from a backup.
 
-Repositories are self-contained stores of archives that can be stored locally or remotely.
-Archives stored inside a repository are deduplicated with one another, which is why Borg
-shines for incremental backups.
+*Repositories* are filesystem directories acting as self-contained stores of archives.
+Repositories can be accessed locally via path or remotely via ssh. Under the hood,
+repositories contain data blocks and a manifest tracking which blocks are in each
+archive. If some data hasn't changed from one backup to another, Borg can simply
+reference an already uploaded data chunk (deduplication).
 
 Important note about free space
 -------------------------------

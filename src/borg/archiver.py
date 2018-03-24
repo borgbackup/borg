@@ -485,7 +485,7 @@ class Archiver:
             logger.debug('Processing files ...')
             for path in args.paths:
                 if path == '-':  # stdin
-                    path = 'stdin'
+                    path = args.stdin_name
                     if not dry_run:
                         try:
                             status = archive.process_stdin(path, cache)
@@ -3138,6 +3138,8 @@ class Archiver:
                                help='experimental: do not synchronize the cache. Implies not using the files cache.')
         subparser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
                                help='do not load/update the file metadata cache used to detect unchanged files')
+        subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
+                               help='use NAME in archive for stdin data (default: "stdin")')
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)
         exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',

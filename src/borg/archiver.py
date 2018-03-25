@@ -36,7 +36,7 @@ from . import __version__
 from . import helpers
 from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
-from .archive import BackupOSError, backup_io
+from .archive import BackupError, BackupOSError, backup_io
 from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from .cache import Cache, assert_secure, SecurityManager
 from .constants import *  # NOQA
@@ -733,7 +733,7 @@ class Archiver:
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
                                              stripped_components=strip_components, original_path=orig_path, pi=pi)
-            except BackupOSError as e:
+            except (BackupOSError, BackupError) as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
         if pi:

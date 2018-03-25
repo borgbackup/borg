@@ -201,6 +201,8 @@ Fixes:
 - create --list: fix that it was never showing M status, #3492
 - create: fix timing for first checkpoint (read files cache early, init
   checkpoint timer after that), see #3394
+- extract: set rc=1 when extracting damaged files with all-zero replacement
+  chunks or with size inconsistencies, #3448
 - diff: consider an empty file as different to a non-existing file, #3688
 - files cache: improve exception handling, #3553
 - ignore exceptions in scandir_inorder() caused by an implicit stat(),
@@ -216,6 +218,7 @@ Fixes:
 
 New features:
 
+- create: implement --stdin-name, #3533
 - add chunker_params to borg archive info (--json)
 
 Other changes:

@@ -257,7 +257,7 @@ class TestAdHocCache:
 
     def test_files_cache(self, cache):
         assert cache.file_known_and_unchanged(bytes(32), None) == (False, None)
-        assert not cache.do_files
+        assert cache.cache_mode == 'd'
         assert cache.files is None
 
     def test_txn(self, cache):

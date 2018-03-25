@@ -144,7 +144,9 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
-                               progress=getattr(args, 'progress', False), lock_wait=self.lock_wait) as cache_:
+                               ignore_inode=getattr(args, 'ignore_inode', False),
+                               progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
+                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)
@@ -453,6 +455,7 @@ class Archiver:
                     skip_inodes.add((st.st_ino, st.st_dev))
                 except OSError:
                     pass
+            logger.debug('Processing files ...')
             for path in args.paths:
                 if path == '-':  # stdin
                     path = args.stdin_name
@@ -501,16 +504,15 @@ class Archiver:
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
-        self.ignore_inode = args.ignore_inode
         self.nobsdflags = args.nobsdflags
         self.exclude_nodump = args.exclude_nodump
-        self.files_cache_mode = args.files_cache_mode
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         t0_monotonic = time.monotonic()
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
-                       lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync) as cache:
+                       lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
+                       cache_mode=args.files_cache_mode, ignore_inode=args.ignore_inode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
@@ -576,7 +578,7 @@ class Archiver:
                         return
             if stat.S_ISREG(st.st_mode):
                 if not dry_run:
-                    status = fso.process_file(path, st, cache, self.ignore_inode, self.files_cache_mode)
+                    status = fso.process_file(path, st, cache)
             elif stat.S_ISDIR(st.st_mode):
                 if recurse:
                     tag_paths = dir_is_tagged(path, exclude_caches, exclude_if_present)
@@ -1346,7 +1348,7 @@ class Archiver:
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
-        with Cache(repository, key, manifest, do_files=False, lock_wait=self.lock_wait) as cache:
+        with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
             list_logger = logging.getLogger('borg.output.list')
             # set up counters for the progress display
             to_delete_len = len(to_delete)

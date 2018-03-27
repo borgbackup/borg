@@ -67,3 +67,17 @@ Examples
     $ cd /home/user/Documents
     # The root directory of the archive will be "projectA"
     $ borg create /path/to/repo::daily-projectA-{now:%Y-%m-%d} projectA
+
+    # Backing up desired paths to different locations within the archive
+    # Create a temporary directory
+    mkdir tmp
+    cd tmp
+    # Hardlink folders and files to the locations you want them to be in borg archive
+    ln /shared/library library
+    ln /shared/backups/latest/dump.sql backup.sql
+    # Create the archive
+    borg create /path/to/repo::{now} library backup.sql
+    # Optionally delete the temporary directory
+    cd ..
+    rm -rf tmp
+

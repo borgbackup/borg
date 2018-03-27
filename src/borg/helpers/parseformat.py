@@ -180,14 +180,14 @@ def format_line(format, data):
 def replace_placeholders(text):
     """Replace placeholders in text with their values."""
     from ..platform import fqdn
-    current_time = datetime.now()
+    current_time = datetime.now(timezone.utc)
     data = {
         'pid': os.getpid(),
         'fqdn': fqdn,
         'reverse-fqdn': '.'.join(reversed(fqdn.split('.'))),
         'hostname': socket.gethostname(),
-        'now': DatetimeWrapper(current_time.now()),
-        'utcnow': DatetimeWrapper(current_time.utcnow()),
+        'now': DatetimeWrapper(current_time.astimezone(None)),
+        'utcnow': DatetimeWrapper(current_time),
         'user': uid2user(os.getuid(), os.getuid()),
         'uuid4': str(uuid.uuid4()),
         'borgversion': borg_version,

@@ -443,7 +443,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy32" do |b|
-    b.vm.box = "boxcutter/debian7-i386"
+    b.vm.box = "debian7-i386"
     b.vm.provider :virtualbox do |v|
       v.memory = 768 + $wmem
     end
@@ -460,7 +460,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy64" do |b|
-    b.vm.box = "boxcutter/debian7"
+    b.vm.box = "debian7-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

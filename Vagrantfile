@@ -233,7 +233,7 @@ def install_pythons(boxname)
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.5.4  # binary build, use latest 3.5.x release
+    pyenv install 3.5.5  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -251,8 +251,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.4
-    pyenv virtualenv 3.5.4 borg-env
+    pyenv global 3.5.5
+    pyenv virtualenv 3.5.5 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -329,9 +329,9 @@ end
 def fs_init(user)
   return <<-EOF
     # clean up (wrong/outdated) stuff we likely got via rsync:
-    rm -rf /vagrant/borg/borg/.tox
-    rm -rf /vagrant/borg/borg/__pycache__
-    find /vagrant/borg/borg/src -name '__pycache__' -exec rm -rf {} \\;
+    rm -rf /vagrant/borg/borg/.tox 2> /dev/null
+    rm -rf /vagrant/borg/borg/__pycache__ 2> /dev/null
+    find /vagrant/borg/borg/src -name '__pycache__' -exec rm -rf {} \\;  2> /dev/null
     chown -R #{user} /vagrant/borg
     touch ~#{user}/.bash_profile ; chown #{user} ~#{user}/.bash_profile
     echo 'export LANG=en_US.UTF-8' >> ~#{user}/.bash_profile
@@ -443,7 +443,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy32" do |b|
-    b.vm.box = "boxcutter/debian7-i386"
+    b.vm.box = "debian7-i386"
     b.vm.provider :virtualbox do |v|
       v.memory = 768 + $wmem
     end
@@ -460,7 +460,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy64" do |b|
-    b.vm.box = "boxcutter/debian7"
+    b.vm.box = "debian7-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

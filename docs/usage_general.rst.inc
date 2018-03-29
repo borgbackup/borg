@@ -197,6 +197,10 @@ General:
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
         The FAQ explains this more detailed in: :ref:`always_chunking`
+    BORG_SHOW_SYSINFO
+        When set to no (default: yes), system information (like OS, Python version, ...) in
+        exceptions is not shown.
+        Please only use for good reasons as it makes issues harder to analyze.
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations)
 

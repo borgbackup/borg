@@ -1602,6 +1602,10 @@ class ProgressIndicatorEndless:
 
 
 def sysinfo():
+    show_sysinfo = os.environ.get('BORG_SHOW_SYSINFO', 'yes').lower()
+    if show_sysinfo == 'no':
+        return ''
+
     python_implementation = platform.python_implementation()
     python_version = platform.python_version()
     # platform.uname() does a shell call internally to get processor info,

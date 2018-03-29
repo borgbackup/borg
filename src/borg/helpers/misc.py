@@ -61,11 +61,28 @@ def prune_split(archives, rule, n, kept_because=None):
 
 
 def sysinfo():
-    info = []
-    info.append('Platform: %s' % (' '.join(platform.uname()), ))
+    python_implementation = platform.python_implementation()
+    python_version = platform.python_version()
+    # platform.uname() does a shell call internally to get processor info,
+    # creating #3732 issue, so rather use os.uname().
+    try:
+        uname = os.uname()
+    except AttributeError:
+        uname = None
     if sys.platform.startswith('linux'):
-        info.append('Linux: %s %s %s' % platform.linux_distribution())
-    info.append('Borg: %s  Python: %s %s' % (borg_version, platform.python_implementation(), platform.python_version()))
+        try:
+            linux_distribution = platform.linux_distribution()
+        except:
+            # platform.linux_distribution() is deprecated since py 3.5 and removed in 3.7.
+            linux_distribution = ('Unknown Linux', '', '')
+    else:
+        linux_distribution = None
+    info = []
+    if uname is not None:
+        info.append('Platform: %s' % (' '.join(uname), ))
+    if linux_distribution is not None:
+        info.append('Linux: %s %s %s' % linux_distribution)
+    info.append('Borg: %s  Python: %s %s' % (borg_version, python_implementation, python_version))
     info.append('PID: %d  CWD: %s' % (os.getpid(), os.getcwd()))
     info.append('sys.argv: %r' % sys.argv)
     info.append('SSH_ORIGINAL_COMMAND: %r' % os.environ.get('SSH_ORIGINAL_COMMAND'))

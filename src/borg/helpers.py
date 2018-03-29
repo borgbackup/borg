@@ -1602,11 +1602,29 @@ class ProgressIndicatorEndless:
 
 
 def sysinfo():
+    orig_env = os.environ
+    cleaned_env = prepare_subprocess_env(system=True)
+    linux_distribution = None
+    try:
+        # some platform calls internally run /bin/sh, so run them within a cleaned env,
+        # so that sh doesn't use pyinstaller env libs, but system libs, see #3732
+        os.environ = cleaned_env
+        uname = platform.uname()
+        python_implementation = platform.python_implementation()
+        python_version = platform.python_version()
+        if sys.platform.startswith('linux'):
+            try:
+                linux_distribution = platform.linux_distribution()
+            except:
+                # platform.linux_distribution() is deprecated since py 3.5 and removed in 3.7.
+                linux_distribution = ('Unknown Linux', '', '')
+    finally:
+        os.environ = orig_env
     info = []
-    info.append('Platform: %s' % (' '.join(platform.uname()), ))
-    if sys.platform.startswith('linux'):
-        info.append('Linux: %s %s %s' % platform.linux_distribution())
-    info.append('Borg: %s  Python: %s %s' % (borg_version, platform.python_implementation(), platform.python_version()))
+    info.append('Platform: %s' % (' '.join(uname), ))
+    if linux_distribution is not None:
+        info.append('Linux: %s %s %s' % linux_distribution)
+    info.append('Borg: %s  Python: %s %s' % (borg_version, python_implementation, python_version))
     info.append('PID: %d  CWD: %s' % (os.getpid(), os.getcwd()))
     info.append('sys.argv: %r' % sys.argv)
     info.append('SSH_ORIGINAL_COMMAND: %r' % os.environ.get('SSH_ORIGINAL_COMMAND'))

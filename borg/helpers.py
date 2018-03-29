@@ -1470,26 +1470,25 @@ class ProgressIndicatorEndless:
 
 
 def sysinfo():
-    orig_env = os.environ
-    cleaned_env = prepare_subprocess_env(system=True)
-    linux_distribution = None
+    python_implementation = platform.python_implementation()
+    python_version = platform.python_version()
+    # platform.uname() does a shell call internally to get processor info,
+    # creating #3732 issue, so rather use os.uname().
     try:
-        # some platform calls internally run /bin/sh, so run them within a cleaned env,
-        # so that sh doesn't use pyinstaller env libs, but system libs, see #3732
-        os.environ = cleaned_env
-        uname = platform.uname()
-        python_implementation = platform.python_implementation()
-        python_version = platform.python_version()
-        if sys.platform.startswith('linux'):
-            try:
-                linux_distribution = platform.linux_distribution()
-            except:
-                # platform.linux_distribution() is deprecated since py 3.5 and removed in 3.7.
-                linux_distribution = ('Unknown Linux', '', '')
-    finally:
-        os.environ = orig_env
+        uname = os.uname()
+    except AttributeError:
+        uname = None
+    if sys.platform.startswith('linux'):
+        try:
+            linux_distribution = platform.linux_distribution()
+        except:
+            # platform.linux_distribution() is deprecated since py 3.5 and removed in 3.7.
+            linux_distribution = ('Unknown Linux', '', '')
+    else:
+        linux_distribution = None
     info = []
-    info.append('Platform: %s' % (' '.join(uname), ))
+    if uname is not None:
+        info.append('Platform: %s' % (' '.join(uname), ))
     if linux_distribution is not None:
         info.append('Linux: %s %s %s' % linux_distribution)
     info.append('Borg: %s  Python: %s %s' % (borg_version, python_implementation, python_version))

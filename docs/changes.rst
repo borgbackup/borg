@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.5 (not released yet)
---------------------------------
+Version 1.1.5 (2018-04-01)
+--------------------------
 
 Compatibility notes:
 
@@ -215,11 +215,15 @@ Fixes:
 - config: add some validation, #3566
 - repository config: add validation for max_segment_size, #3592
 - set cache previous_location on load instead of save
+- remove platform.uname() call which caused library mismatch issues, #3732
+- add exception handler around deprecated platform.linux_distribution() call
+- use same datetime object for {now} and {utcnow}, #3548
 
 New features:
 
 - create: implement --stdin-name, #3533
 - add chunker_params to borg archive info (--json)
+- BORG_SHOW_SYSINFO=no to hide system information from exceptions
 
 Other changes:
 
@@ -253,8 +257,8 @@ Other changes:
 
   - xenial64 box now uses username 'vagrant', #3707
   - move cleanup steps to fs_init, #3706
-
-
+  - the boxcutter wheezy boxes are 404, use local ones
+  - update to Python 3.5.5 (for binary builds)
 
 
 Version 1.1.4 (2017-12-31)

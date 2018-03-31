@@ -35,6 +35,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--no-files-cache``                              | do not load/update the file metadata cache used to detect unchanged files                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: "stdin")                                                                                             |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                |
     |                                                                                                                                                                                                                                                               |
     | :ref:`common_options`                                                                                                                                                                                                                                         |
@@ -114,6 +116,7 @@ borg create
         --json          output stats as JSON. Implies ``--stats``.
         --no-cache-sync    experimental: do not synchronize the cache. Implies not using the files cache.
         --no-files-cache    do not load/update the file metadata cache used to detect unchanged files
+        --stdin-name NAME    use NAME in archive for stdin data (default: "stdin")
 
 
     :ref:`common_options`

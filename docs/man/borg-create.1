@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2017-12-30" "" "borg backup tool"
+.TH BORG-CREATE 1 "2018-03-29" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -151,6 +151,9 @@ experimental: do not synchronize the cache. Implies not using the files cache.
 .TP
 .B \-\-no\-files\-cache
 do not load/update the file metadata cache used to detect unchanged files
+.TP
+.BI \-\-stdin\-name \ NAME
+use NAME in archive for stdin data (default: "stdin")
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0

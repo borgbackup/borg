@@ -274,7 +274,26 @@ name).
 .sp
 If you have set BORG_REPO (see above) and an archive location is needed, use
 \fB::archive_name\fP \- the repo URL part is then read from BORG_REPO.
-.SS Type of log output
+.SS Logging
+.sp
+Borg writes all log output to stderr by default. But please note that something
+showing up on stderr does \fInot\fP indicate an error condition just because it is
+on stderr. Please check the log levels of the messages and the return code of
+borg for determining error, warning or success conditions.
+.sp
+If you want to capture the log output to a file, just redirect it:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg create repo::archive myfiles 2>> logfile
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Custom logging configurations can be implemented via BORG_LOGGING_CONF.
 .sp
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want Borg to be mostly silent and only output
@@ -407,6 +426,11 @@ Using \fB\-\-remote\-path PATH\fP commandline option overrides the environment v
 When set to a numeric value, this determines the maximum "time to live" for the files cache
 entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
 The FAQ explains this more detailed in: \fIalways_chunking\fP
+.TP
+.B BORG_SHOW_SYSINFO
+When set to no (default: yes), system information (like OS, Python version, ...) in
+exceptions is not shown.
+Please only use for good reasons as it makes issues harder to analyze.
 .TP
 .B TMPDIR
 where temporary files are stored (might need a lot of temporary space for some operations)
@@ -545,12 +569,21 @@ server to get the approximate resource usage.
 .INDENT 0.0
 .TP
 .B CPU client:
-borg create: does chunking, hashing, compression, crypto (high CPU usage)
-chunks cache sync: quite heavy on CPU, doing lots of hashtable operations.
-borg extract: crypto, decompression (medium to high CPU usage)
-borg check: similar to extract, but depends on options given.
-borg prune / borg delete archive: low to medium CPU usage
-borg delete repo: done on the server
+.INDENT 7.0
+.IP \(bu 2
+\fBborg create:\fP does chunking, hashing, compression, crypto (high CPU usage)
+.IP \(bu 2
+\fBchunks cache sync:\fP quite heavy on CPU, doing lots of hashtable operations.
+.IP \(bu 2
+\fBborg extract:\fP crypto, decompression (medium to high CPU usage)
+.IP \(bu 2
+\fBborg check:\fP similar to extract, but depends on options given.
+.IP \(bu 2
+\fBborg prune / borg delete archive:\fP low to medium CPU usage
+.IP \(bu 2
+\fBborg delete repo:\fP done on the server
+.UNINDENT
+.sp
 It won\(aqt go beyond 100% of 1 core as the code is currently single\-threaded.
 Especially higher zlib and lzma compression levels use significant amounts
 of CPU cycles. Crypto might be cheap on the CPU (if hardware accelerated) or

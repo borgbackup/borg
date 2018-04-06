@@ -14,21 +14,14 @@ def packages_prepare_wheezy
   EOF
 end
 
-def packages_debianoid
+def packages_debianoid(user)
   return <<-EOF
-    if id "vagrant" >/dev/null 2>&1; then
-      username='vagrant'
-      home_dir=/home/vagrant
-    else
-      username='ubuntu'
-      home_dir=/home/ubuntu
-    fi
     apt-get update
     # install all the (security and other) updates
     apt-get dist-upgrade -y
     # for building borgbackup and dependencies:
     apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
-    usermod -a -G fuse $username
+    usermod -a -G fuse #{user}
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
     apt-get install -y fakeroot build-essential git
@@ -40,7 +33,6 @@ def packages_debianoid
     # newer versions are not compatible with py 3.2 any more.
     easy_install3 -i https://pypi.python.org/simple/ 'pip<8.0'
     pip3 install 'virtualenv<14.0'
-    touch $home_dir/.bash_profile ; chown $username $home_dir/.bash_profile
   EOF
 end
 
@@ -60,7 +52,6 @@ def packages_redhatted
     yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel
     #yum install -y python-pip
     #pip install virtualenv
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
 
@@ -83,7 +74,6 @@ def packages_darwin
     brew install fakeroot
     brew install git
     brew install pkg-config
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
 
@@ -110,7 +100,6 @@ def packages_freebsd
     pw groupmod operator -M vagrant
     # /dev/fuse has group operator
     chmod 666 /dev/fuse
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
     # install all the (security and other) updates, packages
     pkg update
     yes | pkg upgrade
@@ -132,7 +121,6 @@ def packages_openbsd
     ln -sf /usr/local/bin/python3.4 /usr/local/bin/python
     easy_install-3.4 pip
     pip3 install virtualenv
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
 
@@ -157,7 +145,6 @@ def packages_netbsd
     ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
     easy_install-3.4 pip
     pip install virtualenv
-    touch ~vagrant/.bash_profile ; chown vagrant ~vagrant/.bash_profile
   EOF
 end
 
@@ -218,9 +205,7 @@ def install_pyenv(boxname)
     echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
-    echo 'export LANG=en_US.UTF-8' >> ~/.bash_profile
   EOF
-  script += "echo 'export XDISTN=%d' >> ~/.bash_profile\n" % [$xdistn]
   return script
 end
 
@@ -236,7 +221,7 @@ def install_pythons(boxname)
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.5.4  # binary build, use latest 3.5.x release
+    pyenv install 3.5.5  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -254,8 +239,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.4
-    pyenv virtualenv 3.5.4 borg-env
+    pyenv global 3.5.5
+    pyenv virtualenv 3.5.5 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -270,7 +255,6 @@ def install_borg(fuse)
     # clean up (wrong/outdated) stuff we likely got via rsync:
     rm -f borg/*.so borg/*.cpy*
     rm -f borg/{chunker,crypto,compress,hashindex,platform_linux}.c
-    rm -rf borg/__pycache__ borg/support/__pycache__ borg/testsuite/__pycache__
     pip install -r requirements.d/development.txt
   EOF
   if fuse
@@ -331,14 +315,17 @@ def run_tests(boxname)
   EOF
 end
 
-def fix_perms
+def fs_init(user)
   return <<-EOF
-    # . ~/.profile
-    if id "vagrant" >/dev/null 2>&1; then
-      chown -R vagrant /vagrant/borg
-    else
-      chown -R ubuntu /vagrant/borg
-    fi
+    # clean up (wrong/outdated) stuff we likely got via rsync:
+    rm -rf /vagrant/borg/borg/.tox 2> /dev/null
+    rm -rf /vagrant/borg/borg/__pycache__ 2> /dev/null
+    find /vagrant/borg/borg/borg -name '__pycache__' -exec rm -rf {} \\;  2> /dev/null
+    chown -R #{user} /vagrant/borg
+    touch ~#{user}/.bash_profile ; chown #{user} ~#{user}/.bash_profile
+    echo 'export LANG=en_US.UTF-8' >> ~#{user}/.bash_profile
+    echo 'export LC_CTYPE=en_US.UTF-8' >> ~#{user}/.bash_profile
+    echo 'export XDISTN=#{$xdistn}' >> ~#{user}/.bash_profile
   EOF
 end
 
@@ -347,9 +334,6 @@ Vagrant.configure(2) do |config|
   config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"], :rsync__chown => false
   # do not let the VM access . on the host machine via the default shared folder!
   config.vm.synced_folder ".", "/vagrant", disabled: true
-
-  # fix permissions on synced folder
-  config.vm.provision "fix perms", :type => :shell, :inline => fix_perms
 
   config.vm.provider :virtualbox do |v|
     #v.gui = true
@@ -362,6 +346,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos7_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos7_64")
@@ -375,6 +360,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 768 + $wmem
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
@@ -388,6 +374,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
@@ -401,7 +388,8 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
@@ -412,7 +400,8 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
@@ -423,7 +412,8 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("stretch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
@@ -434,19 +424,21 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jessie64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie64")
   end
 
   config.vm.define "wheezy32" do |b|
-    b.vm.box = "boxcutter/debian7-i386"
+    b.vm.box = "debian7-i386"
     b.vm.provider :virtualbox do |v|
       v.memory = 768 + $wmem
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy32")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy32")
@@ -457,12 +449,13 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "wheezy64" do |b|
-    b.vm.box = "boxcutter/debian7"
+    b.vm.box = "debian7-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy64")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy64")
@@ -486,6 +479,7 @@ Vagrant.configure(2) do |config|
       # Disable USB variant requiring Virtualbox proprietary extension pack
       v.customize ["modifyvm", :id, '--usbehci', 'off', '--usbxhci', 'off']
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin64")
     b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin64")
@@ -504,6 +498,7 @@ Vagrant.configure(2) do |config|
       v.memory = 1024 + $wmem
     end
     b.ssh.shell = "sh"
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "install system packages", :type => :shell, :inline => packages_freebsd
     b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd")
     b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd")
@@ -520,6 +515,7 @@ Vagrant.configure(2) do |config|
       v.memory = 1024 + $wmem
     end
     b.ssh.shell = "sh"
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
@@ -531,6 +527,7 @@ Vagrant.configure(2) do |config|
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)

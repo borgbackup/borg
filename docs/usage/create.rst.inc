@@ -116,3 +116,6 @@ If this is not possible, consider creating a bind mount to a stable location.
 
 See the output of the "borg help patterns" command for more help on exclude patterns.
 See the output of the "borg help placeholders" command for more help on placeholders.
+
+Borg respects the nodump flag. Files flagged nodump will be marked as excluded (x)
+in ``--list`` output.

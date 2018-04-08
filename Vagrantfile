@@ -430,8 +430,20 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
   end
 
+  config.vm.define "jessie32" do |b|
+    b.vm.box = "debian8-i386"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 768 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jessie64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie64")
+  end
+
   config.vm.define "jessie64" do |b|
-    b.vm.box = "debian/jessie64"
+    b.vm.box = "debian8-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

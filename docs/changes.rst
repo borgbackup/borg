@@ -147,9 +147,16 @@ Bug fixes:
 - remote: deal with partial lines, #2637
 - get rid of datetime.isoformat, use safe parse_timestamp to parse
   timestamps, #2994
+- build: do .h file content checks in binary mode, fixes build issue for
+  non-ascii header files on pure-ascii locale platforms, #3544 #3639
+- remove platform.uname() call which caused library mismatch issues, #3732
+- add exception handler around deprecated platform.linux_distribution() call
 
 Other changes:
 
+- require msgpack-python >= 0.4.6 and < 0.5.0, see #3753
+- add parens for C preprocessor macro argument usages (did not cause
+  malfunction)
 - ignore corrupt files cache, #2939
 - replace "modulo" with "if" to check for wraparound in hashmap
 - keymanager: don't depend on optional readline module, #2980
@@ -169,20 +176,23 @@ Other changes:
   - clarify encrypted key format for borg key export, #3296
   - document sshfs rename workaround, #3315
   - update release checklist about security fixes
+  - docs about how to verify a signed release, #3634
+  - chunk seed is generated per /repository/
 - vagrant:
 
   - use FUSE for macOS 3.7.1 to build the macOS binary
-  - use python 3.5.4 to build the binaries
+  - use python 3.5.5 to build the binaries
   - add exe location to PATH when we build an exe
   - use https pypi url for wheezy
   - netbsd: bash is already installed
   - netbsd: fix netbsd version in PKG_PATH
   - use self-made FreeBSD 10.3 box, #3022
+  - backport fs_init (including related updates) from 1.1
+  - the boxcutter wheezy boxes are 404, use local ones
 - travis:
 
   - don't perform full Travis build on docs-only changes, #2531
   - only short-circuit docs-only changes for pull requests
-  - don't brew update, hopefully fixes #2532
 
 
 Version 1.0.11 (2017-07-21)

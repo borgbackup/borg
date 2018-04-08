@@ -128,8 +128,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.0.12 (not released yet)
----------------------------------
+Version 1.0.12 (2018-04-08)
+---------------------------
 
 Bug fixes:
 

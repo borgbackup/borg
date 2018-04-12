@@ -11,17 +11,29 @@
 #ifndef ZSTD_OPT_H
 #define ZSTD_OPT_H
 
-#include "zstd_compress.h"
-
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-size_t ZSTD_compressBlock_btopt(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_btultra(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
+#include "zstd_compress_internal.h"
 
-size_t ZSTD_compressBlock_btopt_extDict(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_btultra_extDict(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
+void ZSTD_updateTree(
+        ZSTD_matchState_t* ms, ZSTD_compressionParameters const* cParams,
+        const BYTE* ip, const BYTE* iend);  /* used in ZSTD_loadDictionaryContent() */
+
+size_t ZSTD_compressBlock_btopt(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_btultra(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+
+size_t ZSTD_compressBlock_btopt_extDict(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_btultra_extDict(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
 
 #if defined (__cplusplus)
 }

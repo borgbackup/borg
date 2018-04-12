@@ -30,15 +30,15 @@
 
 /* ===   Memory management   === */
 typedef struct ZSTDMT_CCtx_s ZSTDMT_CCtx;
-ZSTDLIB_API ZSTDMT_CCtx* ZSTDMT_createCCtx(unsigned nbThreads);
-ZSTDLIB_API ZSTDMT_CCtx* ZSTDMT_createCCtx_advanced(unsigned nbThreads,
+ZSTDLIB_API ZSTDMT_CCtx* ZSTDMT_createCCtx(unsigned nbWorkers);
+ZSTDLIB_API ZSTDMT_CCtx* ZSTDMT_createCCtx_advanced(unsigned nbWorkers,
                                                     ZSTD_customMem cMem);
 ZSTDLIB_API size_t ZSTDMT_freeCCtx(ZSTDMT_CCtx* mtctx);
 
 ZSTDLIB_API size_t ZSTDMT_sizeof_CCtx(ZSTDMT_CCtx* mtctx);
 
 
-/* ===   Simple buffer-to-butter one-pass function   === */
+/* ===   Simple one-pass compression function   === */
 
 ZSTDLIB_API size_t ZSTDMT_compressCCtx(ZSTDMT_CCtx* mtctx,
                                        void* dst, size_t dstCapacity,
@@ -50,7 +50,7 @@ ZSTDLIB_API size_t ZSTDMT_compressCCtx(ZSTDMT_CCtx* mtctx,
 /* ===   Streaming functions   === */
 
 ZSTDLIB_API size_t ZSTDMT_initCStream(ZSTDMT_CCtx* mtctx, int compressionLevel);
-ZSTDLIB_API size_t ZSTDMT_resetCStream(ZSTDMT_CCtx* mtctx, unsigned long long pledgedSrcSize);    /**< pledgedSrcSize is optional and can be zero == unknown */
+ZSTDLIB_API size_t ZSTDMT_resetCStream(ZSTDMT_CCtx* mtctx, unsigned long long pledgedSrcSize);  /**< if srcSize is not known at reset time, use ZSTD_CONTENTSIZE_UNKNOWN. Note: for compatibility with older programs, 0 means the same as ZSTD_CONTENTSIZE_UNKNOWN, but it will change in the future to mean "empty" */
 
 ZSTDLIB_API size_t ZSTDMT_compressStream(ZSTDMT_CCtx* mtctx, ZSTD_outBuffer* output, ZSTD_inBuffer* input);
 
@@ -60,15 +60,15 @@ ZSTDLIB_API size_t ZSTDMT_endStream(ZSTDMT_CCtx* mtctx, ZSTD_outBuffer* output);
 
 /* ===   Advanced functions and parameters  === */
 
-#ifndef ZSTDMT_SECTION_SIZE_MIN
-#  define ZSTDMT_SECTION_SIZE_MIN (1U << 20)   /* 1 MB - Minimum size of each compression job */
+#ifndef ZSTDMT_JOBSIZE_MIN
+#  define ZSTDMT_JOBSIZE_MIN (1U << 20)   /* 1 MB - Minimum size of each compression job */
 #endif
 
 ZSTDLIB_API size_t ZSTDMT_compress_advanced(ZSTDMT_CCtx* mtctx,
                                            void* dst, size_t dstCapacity,
                                      const void* src, size_t srcSize,
                                      const ZSTD_CDict* cdict,
-                                           ZSTD_parameters const params,
+                                           ZSTD_parameters params,
                                            unsigned overlapLog);
 
 ZSTDLIB_API size_t ZSTDMT_initCStream_advanced(ZSTDMT_CCtx* mtctx,
@@ -84,35 +84,59 @@ ZSTDLIB_API size_t ZSTDMT_initCStream_usingCDict(ZSTDMT_CCtx* mtctx,
 /* ZSTDMT_parameter :
  * List of parameters that can be set using ZSTDMT_setMTCtxParameter() */
 typedef enum {
-    ZSTDMT_p_sectionSize,        /* size of input "section". Each section is compressed in parallel. 0 means default, which is dynamically determined within compression functions */
-    ZSTDMT_p_overlapSectionLog   /* Log of overlapped section; 0 == no overlap, 6(default) == use 1/8th of window, >=9 == use full window */
+    ZSTDMT_p_jobSize,           /* Each job is compressed in parallel. By default, this value is dynamically determined depending on compression parameters. Can be set explicitly here. */
+    ZSTDMT_p_overlapSectionLog  /* Each job may reload a part of previous job to enhance compressionr ratio; 0 == no overlap, 6(default) == use 1/8th of window, >=9 == use full window. This is a "sticky" parameter : its value will be re-used on next compression job */
 } ZSTDMT_parameter;
 
 /* ZSTDMT_setMTCtxParameter() :
  * allow setting individual parameters, one at a time, among a list of enums defined in ZSTDMT_parameter.
- * The function must be called typically after ZSTD_createCCtx().
+ * The function must be called typically after ZSTD_createCCtx() but __before ZSTDMT_init*() !__
  * Parameters not explicitly reset by ZSTDMT_init*() remain the same in consecutive compression sessions.
  * @return : 0, or an error code (which can be tested using ZSTD_isError()) */
 ZSTDLIB_API size_t ZSTDMT_setMTCtxParameter(ZSTDMT_CCtx* mtctx, ZSTDMT_parameter parameter, unsigned value);
 
 
 /*! ZSTDMT_compressStream_generic() :
- *  Combines ZSTDMT_compressStream() with ZSTDMT_flushStream() or ZSTDMT_endStream()
+ *  Combines ZSTDMT_compressStream() with optional ZSTDMT_flushStream() or ZSTDMT_endStream()
  *  depending on flush directive.
  * @return : minimum amount of data still to be flushed
  *           0 if fully flushed
- *           or an error code */
+ *           or an error code
+ *  note : needs to be init using any ZSTD_initCStream*() variant */
 ZSTDLIB_API size_t ZSTDMT_compressStream_generic(ZSTDMT_CCtx* mtctx,
                                                 ZSTD_outBuffer* output,
                                                 ZSTD_inBuffer* input,
                                                 ZSTD_EndDirective endOp);
 
 
-/* ===   Private definitions; never ever use directly  === */
+/* ========================================================
+ * ===  Private interface, for use by ZSTD_compress.c   ===
+ * ===  Not exposed in libzstd. Never invoke directly   ===
+ * ======================================================== */
 
 size_t ZSTDMT_CCtxParam_setMTCtxParameter(ZSTD_CCtx_params* params, ZSTDMT_parameter parameter, unsigned value);
 
-size_t ZSTDMT_initializeCCtxParameters(ZSTD_CCtx_params* params, unsigned nbThreads);
+/* ZSTDMT_CCtxParam_setNbWorkers()
+ * Set nbWorkers, and clamp it.
+ * Also reset jobSize and overlapLog */
+size_t ZSTDMT_CCtxParam_setNbWorkers(ZSTD_CCtx_params* params, unsigned nbWorkers);
+
+/*! ZSTDMT_updateCParams_whileCompressing() :
+ *  Updates only a selected set of compression parameters, to remain compatible with current frame.
+ *  New parameters will be applied to next compression job. */
+void ZSTDMT_updateCParams_whileCompressing(ZSTDMT_CCtx* mtctx, const ZSTD_CCtx_params* cctxParams);
+
+/* ZSTDMT_getNbWorkers():
+ * @return nb threads currently active in mtctx.
+ * mtctx must be valid */
+unsigned ZSTDMT_getNbWorkers(const ZSTDMT_CCtx* mtctx);
+
+/* ZSTDMT_getFrameProgression():
+ * tells how much data has been consumed (input) and produced (output) for current frame.
+ * able to count progression inside worker threads.
+ */
+ZSTD_frameProgression ZSTDMT_getFrameProgression(ZSTDMT_CCtx* mtctx);
+
 
 /*! ZSTDMT_initCStream_internal() :
  *  Private use only. Init streaming operation.
@@ -120,7 +144,7 @@ size_t ZSTDMT_initializeCCtxParameters(ZSTD_CCtx_params* params, unsigned nbThre
  *  must receive dict, or cdict, or none, but not both.
  *  @return : 0, or an error code */
 size_t ZSTDMT_initCStream_internal(ZSTDMT_CCtx* zcs,
-                    const void* dict, size_t dictSize, ZSTD_dictMode_e dictMode,
+                    const void* dict, size_t dictSize, ZSTD_dictContentType_e dictContentType,
                     const ZSTD_CDict* cdict,
                     ZSTD_CCtx_params params, unsigned long long pledgedSrcSize);
 

@@ -216,6 +216,7 @@ class FuseOperations(llfuse.Operations):
     versions = False
     uid_forced = None
     gid_forced = None
+    umask = 0
 
     def __init__(self, key, repository, manifest, args, decrypted_repository):
         super().__init__()
@@ -279,7 +280,7 @@ class FuseOperations(llfuse.Operations):
     def mount(self, mountpoint, mount_options, foreground=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
 
-        def pop_option(options, key, present, not_present, wanted_type):
+        def pop_option(options, key, present, not_present, wanted_type, int_base=0):
             assert isinstance(options, list)  # we mutate this
             for idx, option in enumerate(options):
                 if option == key:
@@ -295,6 +296,11 @@ class FuseOperations(llfuse.Operations):
                         if v in ('n', 'no', 'false', '0'):
                             return False
                         raise ValueError('unsupported value in option: %s' % option)
+                    if wanted_type is int:
+                        try:
+                            return int(value, base=int_base)
+                        except ValueError:
+                            raise ValueError('unsupported value in option: %s' % option) from None
                     try:
                         return wanted_type(value)
                     except ValueError:
@@ -309,9 +315,11 @@ class FuseOperations(llfuse.Operations):
         self.versions = pop_option(options, 'versions', True, False, bool)
         self.uid_forced = pop_option(options, 'uid', None, None, int)
         self.gid_forced = pop_option(options, 'gid', None, None, int)
+        self.umask = pop_option(options, 'umask', 0, 0, int, int_base=8)  # umask is octal, e.g. 222 or 0222
         dir_uid = self.uid_forced if self.uid_forced is not None else self.default_uid
         dir_gid = self.gid_forced if self.gid_forced is not None else self.default_gid
-        self.default_dir = Item(mode=0o40755, mtime=int(time.time() * 1e9), uid=dir_uid, gid=dir_gid)
+        dir_mode = 0o40755 & ~self.umask
+        self.default_dir = Item(mode=dir_mode, mtime=int(time.time() * 1e9), uid=dir_uid, gid=dir_gid)
         self._create_filesystem()
         llfuse.init(self, mountpoint, options)
         if not foreground:
@@ -508,7 +516,7 @@ class FuseOperations(llfuse.Operations):
         entry.generation = 0
         entry.entry_timeout = 300
         entry.attr_timeout = 300
-        entry.st_mode = item.mode
+        entry.st_mode = item.mode & ~self.umask
         entry.st_nlink = item.get('nlink', 1)
         entry.st_uid = self.uid_forced if self.uid_forced is not None else item.uid if item.uid >= 0 else self.default_uid
         entry.st_gid = self.gid_forced if self.gid_forced is not None else item.gid if item.gid >= 0 else self.default_gid

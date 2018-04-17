@@ -2791,7 +2791,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             self.cmd('config', self.repository_location, cfg_key, cfg_value)
             output = self.cmd('config', self.repository_location, cfg_key)
             assert output == cfg_value + '\n'
-            self.cmd('config', self.repository_location, '--delete', cfg_key)
+            self.cmd('config', '--delete', self.repository_location, cfg_key)
             self.cmd('config', self.repository_location, cfg_key, exit_code=1)
 
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')

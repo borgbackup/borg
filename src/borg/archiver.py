@@ -1,4 +1,5 @@
 import argparse
+import sys
 import collections
 import configparser
 import faulthandler
@@ -1577,11 +1578,12 @@ class Archiver:
             else:
                 raise ValueError('Invalid name')
 
-        try:
-            section, name = args.name.split('.')
-        except ValueError:
-            section = args.cache and "cache" or "repository"
-            name = args.name
+        if not args.list:
+            try:
+                section, name = args.name.split('.')
+            except ValueError:
+                section = args.cache and "cache" or "repository"
+                name = args.name
 
         if args.cache:
             manifest, key = Manifest.load(repository, (Manifest.Operation.WRITE,))
@@ -1605,6 +1607,8 @@ class Archiver:
                 if len(config.options(section)) == 0:
                     config.remove_section(section)
                 save()
+            elif args.list:
+                config.write(sys.stdout)
             elif args.value:
                 validate(section, name, args.value)
                 if section not in config.sections():
@@ -3681,13 +3685,17 @@ class Archiver:
         subparser.set_defaults(func=self.do_config)
         subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
                                help='get and set values from the repo cache')
-        subparser.add_argument('-d', '--delete', dest='delete', action='store_true',
+
+        group = subparser.add_mutually_exclusive_group()
+        group.add_argument('-d', '--delete', dest='delete', action='store_true',
                                help='delete the key from the config file')
+        group.add_argument('-l', '--list', action='store_true',
+                               help='list the configuration options if the repo')
 
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False, proto='file'),
                                help='repository to configure')
-        subparser.add_argument('name', metavar='NAME',
+        subparser.add_argument('name', metavar='NAME', nargs='?',
                                help='name of config key')
         subparser.add_argument('value', metavar='VALUE', nargs='?',
                                help='new value for key')

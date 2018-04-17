@@ -260,7 +260,8 @@ Repository encryption
 ---------------------
 
 Repository encryption can be enabled or disabled at repository creation time
-(the default is enabled, with `repokey` method)::
+(for 1.0.x the default value is `repokey`, for >= 1.1.x setting `--encryption` 
+explicitly is mandatory)::
 
     $ borg init --encryption=none|repokey|keyfile PATH
 

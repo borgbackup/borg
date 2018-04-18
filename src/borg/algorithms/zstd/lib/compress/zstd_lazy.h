@@ -11,25 +11,43 @@
 #ifndef ZSTD_LAZY_H
 #define ZSTD_LAZY_H
 
-#include "zstd_compress.h"
-
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-U32 ZSTD_insertAndFindFirstIndex (ZSTD_CCtx* zc, const BYTE* ip, U32 mls);
-void ZSTD_updateTree(ZSTD_CCtx* zc, const BYTE* const ip, const BYTE* const iend, const U32 nbCompares, const U32 mls);
-void ZSTD_updateTree_extDict(ZSTD_CCtx* zc, const BYTE* const ip, const BYTE* const iend, const U32 nbCompares, const U32 mls);
+#include "zstd_compress_internal.h"
 
-size_t ZSTD_compressBlock_btlazy2(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_lazy2(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_lazy(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_greedy(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
+U32 ZSTD_insertAndFindFirstIndex(
+        ZSTD_matchState_t* ms, ZSTD_compressionParameters const* cParams,
+        const BYTE* ip);
 
-size_t ZSTD_compressBlock_greedy_extDict(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_lazy_extDict(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_lazy2_extDict(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_btlazy2_extDict(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
+void ZSTD_preserveUnsortedMark (U32* const table, U32 const size, U32 const reducerValue);  /*! used in ZSTD_reduceIndex(). pre-emptively increase value of ZSTD_DUBT_UNSORTED_MARK */
+
+size_t ZSTD_compressBlock_btlazy2(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_lazy2(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_lazy(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_greedy(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+
+size_t ZSTD_compressBlock_greedy_extDict(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_lazy_extDict(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_lazy2_extDict(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_btlazy2_extDict(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
 
 #if defined (__cplusplus)
 }

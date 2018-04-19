@@ -57,5 +57,5 @@ running in the repo), then execute the given command as a subprocess and wait
 for its termination, release the lock and return the user command's return
 code as borg's return code.
 
-As example you can use "borg with-lock" for copy repo to another location
-(see :ref:`can_i_copy_or_synchronize_my_repo_to_another_location` in the FAQ)
+As example you can use "borg with-lock" to copy a repo to another location
+(see :ref:`can_i_copy_or_synchronize_my_repo_to_another_location` in the FAQ).

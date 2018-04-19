@@ -29,7 +29,7 @@ Can I copy or synchronize my repo to another location?
 Yes, you could just copy all the files. Make sure you do that while no
 backup is running. If you copy a repository while backup is running 
 lock held will be present in the copy. Thus, before using borg on the copy 
-from a different host, you need to use :ref:`with-lock` on the copied 
+from a different host, you need to use :ref:`break-lock` on the copied 
 repository, because Borg is cautious and does not automatically remove 
 stale locks made by a different host.
 

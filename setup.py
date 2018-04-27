@@ -773,7 +773,12 @@ if not on_rtd:
     elif sys.platform == 'darwin':
         ext_modules.append(darwin_ext)
 
-    if cythonize:
+    # sometimes there's no need to cythonize
+    # this breaks chained commands like 'clean sdist'
+    cythonizing = len(sys.argv) > 1 and sys.argv[1] not in ('clean', 'egg_info', '--help-commands', '--version') \
+                  and '--help' not in sys.argv[1:]
+
+    if cythonize and cythonizing:
         # compile .pyx extensions to .c in parallel
         cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], nthreads=cpu_threads+1)
         ext_modules = cythonize(ext_modules, nthreads=cpu_threads+1)

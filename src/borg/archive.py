@@ -1722,15 +1722,20 @@ class ArchiveChecker:
                 logger.error('{} orphaned objects found!'.format(len(orphaned)))
                 self.error_found = True
             if self.repair:
+                logger.info('Deleting orphaned objects...')
                 for id_ in unused:
                     self.repository.delete(id_)
+                logger.info('Finished deleting orphaned objects.')
         else:
             logger.info('Orphaned objects check skipped (needs all archives checked).')
 
     def finish(self, save_space=False):
         if self.repair:
+            logger.info('Writing Manifest.')
             self.manifest.write()
+            logger.info('Committing repo (may take a while, due to compact_segments)...')
             self.repository.commit(save_space=save_space)
+            logger.info('Finished committing repo.')
 
 
 class ArchiveRecreater:

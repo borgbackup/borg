@@ -1721,11 +1721,12 @@ class ArchiveChecker:
             if orphaned:
                 logger.error('{} orphaned objects found!'.format(len(orphaned)))
                 self.error_found = True
-            if self.repair:
-                logger.info('Deleting orphaned objects...')
+            if self.repair and unused:
+                logger.info('Deleting %d orphaned and %d superseded objects...' % (
+                    len(orphaned), len(self.possibly_superseded)))
                 for id_ in unused:
                     self.repository.delete(id_)
-                logger.info('Finished deleting orphaned objects.')
+                logger.info('Finished deleting orphaned/superseded objects.')
         else:
             logger.info('Orphaned objects check skipped (needs all archives checked).')
 

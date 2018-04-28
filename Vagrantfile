@@ -430,15 +430,35 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
   end
 
+  config.vm.define "jessie32" do |b|
+    b.vm.box = "debian8-i386"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 768 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("jessie32")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("jessie32")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("jessie32")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("jessie32")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie32")
+  end
+
   config.vm.define "jessie64" do |b|
-    b.vm.box = "debian/jessie64"
+    b.vm.box = "debian8-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jessie64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("jessie64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("jessie64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("jessie64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("jessie64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie64")
   end
 

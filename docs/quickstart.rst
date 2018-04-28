@@ -269,8 +269,8 @@ to :ref:`borg_init`.
 If you use encryption, all data is encrypted on the client before being written
 to the repository.
 This means that an attacker who manages to compromise the host containing an
-encrypted archive will not be able to access any of the data, even while the backup
-is being made.
+encrypted repository will not be able to access any of the data, even while the
+backup is being made.
 
 Key material is stored in encrypted form and can be only decrypted by providing
 the correct passphrase.

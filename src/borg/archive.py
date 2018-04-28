@@ -1458,7 +1458,10 @@ class ArchiveChecker:
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
         archive_keys_serialized = [msgpack.packb(name.encode()) for name in ARCHIVE_KEYS]
+        pi = ProgressIndicatorPercent(total=len(self.chunks), msg="Rebuilding manifest %6.2f%%", step=0.01,
+                                      msgid='check.rebuild_manifest')
         for chunk_id, _ in self.chunks.iteritems():
+            pi.show()
             cdata = self.repository.get(chunk_id)
             try:
                 data = self.key.decrypt(chunk_id, cdata)
@@ -1490,6 +1493,7 @@ class ArchiveChecker:
                     logger.warning('Duplicate archive name %s, storing as %s', name, new_name)
                     name = new_name
                 manifest.archives[name] = (chunk_id, archive.time)
+        pi.finish()
         logger.info('Manifest rebuild complete.')
         return manifest
 

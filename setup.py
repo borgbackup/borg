@@ -7,8 +7,21 @@ from collections import OrderedDict
 from datetime import datetime
 from glob import glob
 
-from distutils.command.build import build
-from distutils.core import Command
+try:
+    import multiprocessing
+except ImportError:
+    multiprocessing = None
+
+from distutils.command.clean import clean
+from setuptools import Command
+from setuptools.command.build_ext import build_ext
+from setuptools import setup, find_packages, Extension
+from setuptools.command.sdist import sdist
+
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    cythonize = None
 
 import textwrap
 
@@ -31,6 +44,8 @@ my_python = sys.version_info
 if my_python < min_python:
     print("Borg requires Python %d.%d or later" % min_python)
     sys.exit(1)
+
+cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1
 
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
@@ -64,10 +79,6 @@ if sys.platform.startswith('freebsd'):
     # llfuse 0.41.1, 1.1 are ok
     extras_require['fuse'] = ['llfuse <2.0, !=0.42.*, !=0.43, !=1.0', ]
 
-from setuptools import setup, find_packages, Extension
-from setuptools.command.sdist import sdist
-from distutils.command.clean import clean
-
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
 crypto_helpers = 'src/borg/crypto/_crypto_helpers.c'
@@ -94,51 +105,13 @@ cython_sources = [
     platform_darwin_source,
 ]
 
-try:
-    from Cython.Distutils import build_ext
-    import Cython.Compiler.Main as cython_compiler
-
-    class Sdist(sdist):
-        def __init__(self, *args, **kwargs):
-            for src in cython_sources:
-                cython_compiler.compile(src, cython_compiler.default_options)
-            super().__init__(*args, **kwargs)
-
-        def make_distribution(self):
-            self.filelist.extend([
-                'src/borg/compress.c',
-                'src/borg/crypto/low_level.c',
-                'src/borg/chunker.c', 'src/borg/_chunker.c',
-                'src/borg/hashindex.c', 'src/borg/_hashindex.c',
-                'src/borg/cache_sync/cache_sync.c', 'src/borg/cache_sync/sysdep.h', 'src/borg/cache_sync/unpack.h',
-                'src/borg/cache_sync/unpack_define.h', 'src/borg/cache_sync/unpack_template.h',
-                'src/borg/item.c',
-                'src/borg/algorithms/checksums.c',
-                'src/borg/algorithms/crc32_dispatch.c', 'src/borg/algorithms/crc32_clmul.c', 'src/borg/algorithms/crc32_slice_by_8.c',
-                'src/borg/algorithms/xxh64/xxhash.h', 'src/borg/algorithms/xxh64/xxhash.c',
-                'src/borg/platform/posix.c',
-                'src/borg/platform/linux.c',
-                'src/borg/platform/freebsd.c',
-                'src/borg/platform/darwin.c',
-            ])
-            super().make_distribution()
-
-except ImportError:
+if cythonize:
+    Sdist = sdist
+else:
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
             raise Exception('Cython is required to run sdist')
 
-    compress_source = compress_source.replace('.pyx', '.c')
-    crypto_ll_source = crypto_ll_source.replace('.pyx', '.c')
-    chunker_source = chunker_source.replace('.pyx', '.c')
-    hashindex_source = hashindex_source.replace('.pyx', '.c')
-    item_source = item_source.replace('.pyx', '.c')
-    checksums_source = checksums_source.replace('.pyx', '.c')
-    platform_posix_source = platform_posix_source.replace('.pyx', '.c')
-    platform_linux_source = platform_linux_source.replace('.pyx', '.c')
-    platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
-    platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
-    from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, checksums_source,
         platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
@@ -785,14 +758,30 @@ if not on_rtd:
         Extension('borg.chunker', [chunker_source]),
         Extension('borg.algorithms.checksums', [checksums_source]),
     ]
+
+    posix_ext = Extension('borg.platform.posix', [platform_posix_source])
+    linux_ext = Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'])
+    freebsd_ext = Extension('borg.platform.freebsd', [platform_freebsd_source])
+    darwin_ext = Extension('borg.platform.darwin', [platform_darwin_source])
+
     if not sys.platform.startswith(('win32', )):
-        ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
+        ext_modules.append(posix_ext)
     if sys.platform == 'linux':
-        ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl']))
+        ext_modules.append(linux_ext)
     elif sys.platform.startswith('freebsd'):
-        ext_modules.append(Extension('borg.platform.freebsd', [platform_freebsd_source]))
+        ext_modules.append(freebsd_ext)
     elif sys.platform == 'darwin':
-        ext_modules.append(Extension('borg.platform.darwin', [platform_darwin_source]))
+        ext_modules.append(darwin_ext)
+
+    # sometimes there's no need to cythonize
+    # this breaks chained commands like 'clean sdist'
+    cythonizing = len(sys.argv) > 1 and sys.argv[1] not in ('clean', 'egg_info', '--help-commands', '--version') \
+                  and '--help' not in sys.argv[1:]
+
+    if cythonize and cythonizing:
+        # compile .pyx extensions to .c in parallel
+        cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], nthreads=cpu_threads+1)
+        ext_modules = cythonize(ext_modules, nthreads=cpu_threads+1)
 
 setup(
     name='borgbackup',

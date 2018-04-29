@@ -259,32 +259,21 @@ Keep an eye on CPU load and throughput.
 Repository encryption
 ---------------------
 
-Repository encryption can be enabled or disabled at repository creation time
-(the default is enabled, with `repokey` method)::
+You can choose the repository encryption mode at repository creation time::
 
-    $ borg init --encryption=none|repokey|keyfile PATH
+    $ borg init --encryption=MODE PATH
 
-When repository encryption is enabled all data is encrypted using 256-bit AES_
-encryption and the integrity and authenticity is verified using `HMAC-SHA256`_.
+For a list of available encryption MODEs and their descriptions, please refer
+to :ref:`borg_init`.
 
-All data is encrypted on the client before being written to the repository. This
-means that an attacker who manages to compromise the host containing an
-encrypted archive will not be able to access any of the data, even while the backup
-is being made.
+If you use encryption, all data is encrypted on the client before being written
+to the repository.
+This means that an attacker who manages to compromise the host containing an
+encrypted repository will not be able to access any of the data, even while the
+backup is being made.
 
-Borg supports different methods to store the AES and HMAC keys.
-
-``repokey`` mode
-    The key is stored inside the repository (in its "config" file).
-    Use this mode if you trust in your good passphrase giving you enough
-    protection. The repository server never sees the plaintext key.
-
-``keyfile`` mode
-    The key is stored on your local disk (in ``~/.config/borg/keys/``).
-    Use this mode if you want "passphrase and having-the-key" security.
-
-In both modes, the key is stored in encrypted form and can be only decrypted
-by providing the correct passphrase.
+Key material is stored in encrypted form and can be only decrypted by providing
+the correct passphrase.
 
 For automated backups the passphrase can be specified using the
 `BORG_PASSPHRASE` environment variable.

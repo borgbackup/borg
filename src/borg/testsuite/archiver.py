@@ -2793,7 +2793,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert output == cfg_value + '\n'
             self.cmd('config', '--delete', self.repository_location, cfg_key)
             self.cmd('config', self.repository_location, cfg_key, exit_code=1)
-            self.cmd('config', '--list', '--delete', self.repository_location, exit_code=2)
+        self.cmd('config', '--list', '--delete', self.repository_location, exit_code=2)
+
 
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')

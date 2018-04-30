@@ -3689,8 +3689,8 @@ class Archiver:
         group = subparser.add_mutually_exclusive_group()
         group.add_argument('-d', '--delete', dest='delete', action='store_true',
                                help='delete the key from the config file')
-        group.add_argument('-l', '--list', action='store_true',
-                               help='list the configuration options if the repo')
+        group.add_argument('-l', '--list', dest='list', action='store_true',
+                               help='list the configuration options of the repo')
 
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False, proto='file'),

@@ -1688,9 +1688,15 @@ class Archiver:
             json.dump(meta, fd, indent=4)
         return EXIT_SUCCESS
 
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_dump_repo_objs(self, args, repository, manifest, key):
+    @with_repository(manifest=False)
+    def do_debug_dump_repo_objs(self, args, repository):
         """dump (decrypted, decompressed) repo objects"""
+        from .crypto.key import key_factory
+        # set up the key without depending on a manifest obj
+        ids = repository.list(limit=1, marker=None)
+        cdata = repository.get(ids[0])
+        key = key_factory(repository, cdata)
+
         marker = None
         i = 0
         while True:

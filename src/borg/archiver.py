@@ -1578,38 +1578,39 @@ class Archiver:
             assert_secure(repository, manifest)
             cache = Cache(repository, key, manifest, lock_wait=self.lock_wait)
 
-        if args.cache:
-            cache.cache_config.load()
-            config = cache.cache_config._config
-            save = cache.cache_config.save
-            validate = cache_validate
-        else:
-            config = repository.config
-            save = lambda: repository.save_config(repository.path, repository.config)
-            validate = repo_validate
+        try:
+            if args.cache:
+                cache.cache_config.load()
+                config = cache.cache_config._config
+                save = cache.cache_config.save
+                validate = cache_validate
+            else:
+                config = repository.config
+                save = lambda: repository.save_config(repository.path, repository.config)
+                validate = repo_validate
 
-        if args.delete:
-            validate(section, name, check_value=False)
-            config.remove_option(section, name)
-            if len(config.options(section)) == 0:
-                config.remove_section(section)
-            save()
-        elif args.value:
-            validate(section, name, args.value)
-            if section not in config.sections():
-                config.add_section(section)
-            config.set(section, name, args.value)
-            save()
-        else:
-            try:
-                print(config.get(section, name))
-            except (configparser.NoOptionError, configparser.NoSectionError) as e:
-                print(e, file=sys.stderr)
-                return EXIT_WARNING
-
-        if args.cache:
-            cache.close()
-        return EXIT_SUCCESS
+            if args.delete:
+                validate(section, name, check_value=False)
+                config.remove_option(section, name)
+                if len(config.options(section)) == 0:
+                    config.remove_section(section)
+                save()
+            elif args.value:
+                validate(section, name, args.value)
+                if section not in config.sections():
+                    config.add_section(section)
+                config.set(section, name, args.value)
+                save()
+            else:
+                try:
+                    print(config.get(section, name))
+                except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                    print(e, file=sys.stderr)
+                    return EXIT_WARNING
+            return EXIT_SUCCESS
+        finally:
+            if args.cache:
+                cache.close()
 
     def do_debug_info(self, args):
         """display system information for debugging / bug reports"""

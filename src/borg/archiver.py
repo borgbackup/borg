@@ -1522,8 +1522,8 @@ class Archiver:
             # see issue #1867.
             repository.commit()
 
-    @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
-    def do_config(self, args, repository, manifest, key, cache):
+    @with_repository(exclusive=True, manifest=False)
+    def do_config(self, args, repository):
         """get, set, and delete values in a repository or cache config file"""
 
         def repo_validate(section, name, value=None, check_value=True):

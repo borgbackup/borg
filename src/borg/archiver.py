@@ -1574,6 +1574,11 @@ class Archiver:
             name = args.name
 
         if args.cache:
+            manifest, key = Manifest.load(repository, (Manifest.Operation.WRITE,))
+            assert_secure(repository, manifest)
+            cache = Cache(repository, key, manifest, lock_wait=self.lock_wait)
+
+        if args.cache:
             cache.cache_config.load()
             config = cache.cache_config._config
             save = cache.cache_config.save
@@ -1601,6 +1606,9 @@ class Archiver:
             except (configparser.NoOptionError, configparser.NoSectionError) as e:
                 print(e, file=sys.stderr)
                 return EXIT_WARNING
+
+        if args.cache:
+            cache.close()
         return EXIT_SUCCESS
 
     def do_debug_info(self, args):

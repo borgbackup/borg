@@ -741,6 +741,13 @@ Utilization of max. archive size: {csize_max:.0%}
                     # permission denied to set this specific xattr (this may happen related to security.* keys)
                     logger.warning('%s: Permission denied when setting extended attribute %s' % (path, k.decode()))
                     set_ec(EXIT_WARNING)
+                elif e.errno == errno.ENOSPC:
+                    # no space left on device while setting this specific xattr
+                    # ext4 reports ENOSPC when trying to set an xattr with >4kiB while ext4 can only support 4kiB xattrs
+                    # (in this case, this is NOT a "disk full" error, just a ext4 limitation).
+                    logger.warning('%s: No space left on device while setting extended attribute %s (len = %d)' % (
+                        path, k.decode(), len(v)))
+                    set_ec(EXIT_WARNING)
                 else:
                     raise
         # bsdflags include the immutable flag and need to be set last:

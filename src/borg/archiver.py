@@ -1578,6 +1578,26 @@ class Archiver:
             else:
                 raise ValueError('Invalid name')
 
+        def list_config(config):
+            default_values = {
+                'version': '1',
+                'segments_per_dir': str(DEFAULT_SEGMENTS_PER_DIR),
+                'max_segment_size': str(MAX_SEGMENT_SIZE_LIMIT),
+                'additionnal_free_space': '0',
+                'storage_quota': repository.storage_quota,
+                'append_only': repository.append_only
+            }
+            print('[repository]')
+            for key in ['version', 'segments_per_dir', 'max_segment_size',
+                        'storage_quota', 'additional_free_space', 'append_only',
+                        'id']:
+                value = config.get('repository', key, fallback=False)
+                if value:
+                    print('%s = %s' % (key, value))
+                else:
+                    assert key != 'id'
+                    print('%s = %s' % (key, default_values[key]))
+
         if not args.list:
             try:
                 section, name = args.name.split('.')
@@ -1608,7 +1628,7 @@ class Archiver:
                     config.remove_section(section)
                 save()
             elif args.list:
-                config.write(sys.stdout)
+                list_config(config)
             elif args.value:
                 validate(section, name, args.value)
                 if section not in config.sections():
@@ -3669,10 +3689,13 @@ class Archiver:
         This command gets and sets options in a local repository or cache config file.
         For security reasons, this command only works on local repositories.
 
-        To delete a config value entirely, use ``--delete``. To get an existing key, pass
-        only the key name. To set a key, pass both the key name and the new value. Keys
-        can be specified in the format "section.name" or simply "name"; the section will
-        default to "repository" and "cache" for the repo and cache configs, respectively.
+        To delete a config value entirely, use ``--delete``. To list the values
+        stored in the configuration file, use ``--list``.  To get an existing
+        key, pass only the key name. To set a key, pass both the key name and
+        the new value. Keys can be specified in the format "section.name" or
+        simply "name"; the section will default to "repository" and "cache" for
+        the repo and cache configs, respectively.
+
 
         By default, borg config manipulates the repository config file. Using ``--cache``
         edits the repository cache's config file instead.

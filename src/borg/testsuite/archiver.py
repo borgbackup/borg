@@ -57,6 +57,7 @@ from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
 from .upgrader import attic_repo
+
 from . import key
 
 
@@ -2782,6 +2783,14 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.create_test_files()
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('config', '--list', self.repository_location)
+        self.assert_in('[repository]', output)
+        self.assert_in('version', output)
+        self.assert_in('segments_per_dir', output)
+        self.assert_in('storage_quota', output)
+        self.assert_in('append_only', output)
+        self.assert_in('additional_free_space', output)
+        self.assert_in('id', output)
         for cfg_key, cfg_value in [
             ('additional_free_space', '2G'),
             ('repository.append_only', '1'),
@@ -2794,7 +2803,6 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             self.cmd('config', '--delete', self.repository_location, cfg_key)
             self.cmd('config', self.repository_location, cfg_key, exit_code=1)
         self.cmd('config', '--list', '--delete', self.repository_location, exit_code=2)
-
 
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')

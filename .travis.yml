@@ -26,11 +26,11 @@ matrix:
           env: TOXENV=py36
         - language: generic
           os: osx
-          osx_image: xcode6.4
+          osx_image: xcode8.3
           env: TOXENV=py35
         - language: generic
           os: osx
-          osx_image: xcode6.4
+          osx_image: xcode8.3
           env: TOXENV=py36
 
 before_install:

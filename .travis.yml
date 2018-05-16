@@ -31,7 +31,7 @@ matrix:
           env: TOXENV=py36
         - python: "3.7-dev"
           os: linux
-          dist: trusty
+          dist: xenial
           env: TOXENV=py37
         - language: generic
           os: osx

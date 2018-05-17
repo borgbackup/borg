@@ -1772,6 +1772,73 @@ class Archiver:
         return EXIT_SUCCESS
 
     @with_repository(manifest=False)
+    def do_debug_search_repo_objs(self, args, repository):
+        """search for byte sequences in repo objects, repo index MUST be current/correct"""
+        context = 32
+
+        def print_finding(info, wanted, data, offset):
+            before = data[offset - context:offset]
+            after = data[offset + len(wanted):offset + len(wanted) + context]
+            print('%s: %s %s %s == %r %r %r' % (info, before.hex(), wanted.hex(), after.hex(),
+                                                before, wanted, after))
+
+        wanted = args.wanted
+        try:
+            if wanted.startswith('hex:'):
+                wanted = unhexlify(wanted[4:])
+            elif wanted.startswith('str:'):
+                wanted = wanted[4:].encode('utf-8')
+            else:
+                raise ValueError('unsupported search term')
+        except (ValueError, UnicodeEncodeError):
+            wanted = None
+        if not wanted:
+            self.print_error('search term needs to be hex:123abc or str:foobar style')
+            return EXIT_ERROR
+
+        from .crypto.key import key_factory
+        # set up the key without depending on a manifest obj
+        ids = repository.list(limit=1, marker=None)
+        cdata = repository.get(ids[0])
+        key = key_factory(repository, cdata)
+
+        marker = None
+        last_data = b''
+        last_id = None
+        i = 0
+        while True:
+            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
+            if not result:
+                break
+            marker = result[-1]
+            for id in result:
+                cdata = repository.get(id)
+                give_id = id if id != Manifest.MANIFEST_ID else None
+                data = key.decrypt(give_id, cdata)
+
+                # try to locate wanted sequence crossing the border of last_data and data
+                boundary_data = last_data[-(len(wanted) - 1):] + data[:len(wanted) - 1]
+                if wanted in boundary_data:
+                    boundary_data = last_data[-(len(wanted) - 1 + context):] + data[:len(wanted) - 1 + context]
+                    offset = boundary_data.find(wanted)
+                    info = '%d %s | %s' % (i, last_id.hex(), id.hex())
+                    print_finding(info, wanted, boundary_data, offset)
+
+                # try to locate wanted sequence in data
+                count = data.count(wanted)
+                if count:
+                    offset = data.find(wanted)  # only determine first occurance's offset
+                    info = "%d %s #%d" % (i, id.hex(), count)
+                    print_finding(info, wanted, data, offset)
+
+                last_id, last_data = id, data
+                i += 1
+                if i % 10000 == 0:
+                    print('%d objects processed.' % i)
+        print('Done.')
+        return EXIT_SUCCESS
+
+    @with_repository(manifest=False)
     def do_debug_get_obj(self, args, repository):
         """get object contents from the repository and write it into file"""
         hex_id = args.id
@@ -3862,6 +3929,21 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repo to dump')
+
+        debug_search_repo_objs_epilog = process_epilog("""
+        This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.
+        """)
+        subparser = debug_parsers.add_parser('search-repo-objs', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_search_repo_objs.__doc__,
+                                          epilog=debug_search_repo_objs_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='search repo objects (debug)')
+        subparser.set_defaults(func=self.do_debug_search_repo_objs)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to search')
+        subparser.add_argument('wanted', metavar='WANTED', type=str,
+                               help='term to search the repo for, either 0x1234abcd hex term or a string')
 
         debug_get_obj_epilog = process_epilog("""
         This command gets an object from the repository.

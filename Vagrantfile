@@ -150,9 +150,9 @@ end
 def fs_init(user)
   return <<-EOF
     # clean up (wrong/outdated) stuff we likely got via rsync:
-    rm -rf /vagrant/borg/borg/.tox
-    rm -rf /vagrant/borg/borg/__pycache__
-    find /vagrant/borg/borg/src -name '__pycache__' -exec rm -rf {} \\;
+    rm -rf /vagrant/borg/borg/.tox 2> /dev/null
+    rm -rf /vagrant/borg/borg/__pycache__ 2> /dev/null
+    find /vagrant/borg/borg/src -name '__pycache__' -exec rm -rf {} \\; 2> /dev/null
     chown -R #{user} /vagrant/borg
     touch ~#{user}/.bash_profile ; chown #{user} ~#{user}/.bash_profile
     echo 'export LANG=en_US.UTF-8' >> ~#{user}/.bash_profile

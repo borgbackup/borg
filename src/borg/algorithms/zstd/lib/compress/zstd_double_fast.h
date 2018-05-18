@@ -11,15 +11,23 @@
 #ifndef ZSTD_DOUBLE_FAST_H
 #define ZSTD_DOUBLE_FAST_H
 
-#include "zstd_compress.h"
-
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-void ZSTD_fillDoubleHashTable(ZSTD_CCtx* cctx, const void* end, const U32 mls);
-size_t ZSTD_compressBlock_doubleFast(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
-size_t ZSTD_compressBlock_doubleFast_extDict(ZSTD_CCtx* ctx, const void* src, size_t srcSize);
+#include "mem.h"      /* U32 */
+#include "zstd_compress_internal.h"     /* ZSTD_CCtx, size_t */
+
+void ZSTD_fillDoubleHashTable(ZSTD_matchState_t* ms,
+                              ZSTD_compressionParameters const* cParams,
+                              void const* end);
+size_t ZSTD_compressBlock_doubleFast(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+size_t ZSTD_compressBlock_doubleFast_extDict(
+        ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
+        ZSTD_compressionParameters const* cParams, void const* src, size_t srcSize);
+
 
 #if defined (__cplusplus)
 }

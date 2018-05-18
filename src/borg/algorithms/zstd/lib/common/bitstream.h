@@ -167,7 +167,7 @@ MEM_STATIC size_t BIT_readBitsFast(BIT_DStream_t* bitD, unsigned nbBits);
 /*-**************************************************************
 *  Internal functions
 ****************************************************************/
-MEM_STATIC unsigned BIT_highbit32 (register U32 val)
+MEM_STATIC unsigned BIT_highbit32 (U32 val)
 {
     assert(val != 0);
     {
@@ -426,7 +426,7 @@ MEM_STATIC size_t BIT_readBitsFast(BIT_DStream_t* bitD, U32 nbBits)
  *  Refill `bitD` from buffer previously set in BIT_initDStream() .
  *  This function is safe, it guarantees it will not read beyond src buffer.
  * @return : status of `BIT_DStream_t` internal register.
- *           when status == BIT_DStream_unfinished, internal register is filled with at least 25 or 57 bits */
+ *           when status == BIT_DStream_unfinished, internal register is filled with at least 25 or 57 bits */
 MEM_STATIC BIT_DStream_status BIT_reloadDStream(BIT_DStream_t* bitD)
 {
     if (bitD->bitsConsumed > (sizeof(bitD->bitContainer)*8))  /* overflow detected, like end of stream */

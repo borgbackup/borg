@@ -247,6 +247,9 @@ Building:
     BORG_LIBB2_PREFIX
         Adds given prefix directory to the default locations. If a 'include/blake2.h' is found Borg
         will be linked against the system libb2 instead of a bundled implementation. (setup.py)
+    BORG_LIBZSTD_PREFIX
+        Adds given prefix directory to the default locations. If a 'include/zstd.h' is found Borg
+        will be linked against the system libzstd instead of a bundled implementation. (setup.py)
 
 
 Please note:

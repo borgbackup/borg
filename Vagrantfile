@@ -54,7 +54,7 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.6.2  # binary build, use latest 3.6.x release
+    pyenv install 3.6.5  # binary build, use latest 3.6.x release
     pyenv rehash
   EOF
 end
@@ -72,8 +72,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.6 release
-    pyenv global 3.6.2
-    pyenv virtualenv 3.6.2 borg-env
+    pyenv global 3.6.5
+    pyenv virtualenv 3.6.5 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -150,9 +150,9 @@ end
 def fs_init(user)
   return <<-EOF
     # clean up (wrong/outdated) stuff we likely got via rsync:
-    rm -rf /vagrant/borg/borg/.tox
-    rm -rf /vagrant/borg/borg/__pycache__
-    find /vagrant/borg/borg/src -name '__pycache__' -exec rm -rf {} \\;
+    rm -rf /vagrant/borg/borg/.tox 2> /dev/null
+    rm -rf /vagrant/borg/borg/__pycache__ 2> /dev/null
+    find /vagrant/borg/borg/src -name '__pycache__' -exec rm -rf {} \\; 2> /dev/null
     chown -R #{user} /vagrant/borg
     touch ~#{user}/.bash_profile ; chown #{user} ~#{user}/.bash_profile
     echo 'export LANG=en_US.UTF-8' >> ~#{user}/.bash_profile
@@ -178,7 +178,7 @@ Vagrant.configure(2) do |config|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("ubuntu")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")

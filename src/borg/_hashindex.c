@@ -15,6 +15,16 @@
 #define MAGIC "BORG_IDX"
 #define MAGIC_LEN 8
 
+#define DEBUG 0
+
+#define debug_print(fmt, ...)                   \
+  do {                                          \
+    if (DEBUG) {                                \
+      fprintf(stderr, fmt, __VA_ARGS__);        \
+      fflush(NULL);                             \
+    }                                           \
+} while (0)
+
 typedef struct {
     char magic[MAGIC_LEN];
     int32_t num_entries;

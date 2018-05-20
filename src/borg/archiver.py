@@ -1745,7 +1745,7 @@ class Archiver:
 
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
-        """dump (decrypted, decompressed) repo objects"""
+        """dump (decrypted, decompressed) repo objects, repo index MUST be current/correct"""
         from .crypto.key import key_factory
         # set up the key without depending on a manifest obj
         ids = repository.list(limit=1, marker=None)
@@ -1755,7 +1755,7 @@ class Archiver:
         marker = None
         i = 0
         while True:
-            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
             if not result:
                 break
             marker = result[-1]

@@ -1063,27 +1063,21 @@ class Archiver:
                 logger.warning('Aborted.')
             return self.exit_code
 
-        stats_logger = logging.getLogger('borg.output.stats')
-        if args.stats:
-            log_multi(DASHES, STATS_HEADER, logger=stats_logger)
-
+        stats = Statistics()
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             for i, archive_name in enumerate(archive_names, 1):
-                logger.info('Deleting {} ({}/{}):'.format(archive_name, i, len(archive_names)))
-                archive = Archive(repository, key, manifest, archive_name, cache=cache)
-                stats = Statistics()
-                archive.delete(stats, progress=args.progress, forced=args.forced)
-                manifest.write()
-                repository.commit(save_space=args.save_space)
-                cache.commit()
-                logger.info("Archive deleted.")
-                if args.stats:
-                    log_multi(stats.summary.format(label='Deleted data:', stats=stats),
-                              DASHES, logger=stats_logger)
-                if args.forced == 0 and self.exit_code:
-                    break
+                logger.info('Deleting archive: {} ({}/{})'.format(archive_name, i, len(archive_names)))
+                Archive(repository, key, manifest, archive_name, cache=cache).delete(
+                    stats, progress=args.progress, forced=args.forced)
+            manifest.write()
+            repository.commit(save_space=args.save_space)
+            cache.commit()
             if args.stats:
-                stats_logger.info(str(cache))
+                log_multi(DASHES,
+                          STATS_HEADER,
+                          stats.summary.format(label='Deleted data:', stats=stats),
+                          str(cache),
+                          DASHES, logger=logging.getLogger('borg.output.stats'))
 
         return self.exit_code
 

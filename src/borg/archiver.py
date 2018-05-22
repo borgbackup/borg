@@ -1080,12 +1080,12 @@ class Archiver:
                 manifest.write()
                 repository.commit(save_space=args.save_space)
                 cache.commit()
-                if args.stats:
-                    log_multi(DASHES,
-                              STATS_HEADER,
-                              stats.summary.format(label='Deleted data:', stats=stats),
-                              str(cache),
-                              DASHES, logger=logging.getLogger('borg.output.stats'))
+            if args.stats:
+                log_multi(DASHES,
+                          STATS_HEADER,
+                          stats.summary.format(label='Deleted data:', stats=stats),
+                          str(cache),
+                          DASHES, logger=logging.getLogger('borg.output.stats'))
 
         return self.exit_code
 

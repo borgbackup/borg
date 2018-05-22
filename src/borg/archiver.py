@@ -1031,6 +1031,8 @@ class Archiver:
 
     def _delete_archives(self, args, repository):
         """Delete archives"""
+        dry_run = args.dry_run
+
         manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
 
         if args.location.archive or args.archives:
@@ -1053,8 +1055,11 @@ class Archiver:
                     logger.warning('Archive {} not found ({}/{}).'.format(archive_name, i, len(archive_names)))
                 else:
                     deleted = True
-                    logger.info('Deleted {} ({}/{}).'.format(archive_name, i, len(archive_names)))
-            if deleted:
+                    msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
+                    logger.info(msg.format(archive_name, i, len(archive_names)))
+            if dry_run:
+                logger.info('Finished dry-run.')
+            elif deleted:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
                 repository.commit()
@@ -1066,23 +1071,28 @@ class Archiver:
         stats = Statistics()
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             for i, archive_name in enumerate(archive_names, 1):
-                logger.info('Deleting archive: {} ({}/{})'.format(archive_name, i, len(archive_names)))
-                Archive(repository, key, manifest, archive_name, cache=cache).delete(
-                    stats, progress=args.progress, forced=args.forced)
-            manifest.write()
-            repository.commit(save_space=args.save_space)
-            cache.commit()
-            if args.stats:
-                log_multi(DASHES,
-                          STATS_HEADER,
-                          stats.summary.format(label='Deleted data:', stats=stats),
-                          str(cache),
-                          DASHES, logger=logging.getLogger('borg.output.stats'))
+                msg = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
+                logger.info(msg.format(archive_name, i, len(archive_names)))
+                if not dry_run:
+                    Archive(repository, key, manifest, archive_name, cache=cache).delete(
+                        stats, progress=args.progress, forced=args.forced)
+            if not dry_run:
+                manifest.write()
+                repository.commit(save_space=args.save_space)
+                cache.commit()
+                if args.stats:
+                    log_multi(DASHES,
+                              STATS_HEADER,
+                              stats.summary.format(label='Deleted data:', stats=stats),
+                              str(cache),
+                              DASHES, logger=logging.getLogger('borg.output.stats'))
 
         return self.exit_code
 
     def _delete_repository(self, args, repository):
         """Delete a repository"""
+        dry_run = args.dry_run
+
         if not args.cache_only:
             msg = []
             try:
@@ -1103,11 +1113,17 @@ class Archiver:
                        retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
                 self.exit_code = EXIT_ERROR
                 return self.exit_code
-            repository.destroy()
-            logger.info("Repository deleted.")
-            SecurityManager.destroy(repository)
-        Cache.destroy(repository)
-        logger.info("Cache deleted.")
+            if not dry_run:
+                repository.destroy()
+                logger.info("Repository deleted.")
+                SecurityManager.destroy(repository)
+            else:
+                logger.info("Would delete repository.")
+        if not dry_run:
+            Cache.destroy(repository)
+            logger.info("Cache deleted.")
+        else:
+            logger.info("Would delete cache.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -3178,6 +3194,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='delete archive')
         subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',

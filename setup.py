@@ -190,10 +190,12 @@ else:
 
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
+    # remove header, but have one \n before first headline
+    start = long_description.find('What is BorgBackup?')
+    assert start >= 0
+    long_description = '\n' + long_description[start:]
     # remove badges
     long_description = re.compile(r'^\.\. start-badges.*^\.\. end-badges', re.M | re.S).sub('', long_description)
-    # remove |substitutions|
-    long_description = re.compile(r'\|screencast\|').sub('', long_description)
     # remove unknown directives
     long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
 

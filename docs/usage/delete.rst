@@ -7,6 +7,15 @@ Examples
     # delete a single backup archive:
     $ borg delete /path/to/repo::Monday
 
+    # delete all archives whose names begin with the machine's hostname followed by "-"
+    $ borg delete --prefix '{hostname}-' /path/to/repo
+
+    # delete all archives whose names contain "-2012-"
+    $ borg delete --glob-archives '*-2012-*' /path/to/repo
+
+    # see what would be deleted if delete was run without --dry-run
+    $ borg delete -v --dry-run -a '*-May-*' /path/to/repo
+
     # delete the whole repository and the related local cache:
     $ borg delete /path/to/repo
     You requested to completely DELETE the repository *including* all archives it contains:

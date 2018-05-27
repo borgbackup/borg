@@ -2498,7 +2498,10 @@ class Archiver:
                                      'PATH may be an empty directory or the last element of PATH may not exist, in which case '
                                      'the client may initialize a repository there.')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
-                               help='only allow appending to repository segment files')
+                               help='only allow appending to repository segment files. Note that this only '
+                                    'affects the low level structure of the repository, and running `delete` '
+                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in Additional '
+                                    'Notes for more details.')
         subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
                                type=parse_storage_quota, default=None,
                                help='Override storage quota of the repository (e.g. 5G, 1.5T). '
@@ -2620,7 +2623,10 @@ class Archiver:
                                choices=key_argument_names(),
                                help='select encryption key mode **(required)**')
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
-                               help='create an append-only mode repository')
+                               help='create an append-only mode repository. Note that this only affects '
+                                    'the low level structure of the repository, and running `delete` '
+                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in '
+                                    'Additional Notes for more details.')
         subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota', default=None,
                                type=parse_storage_quota,
                                help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')

@@ -73,7 +73,7 @@ from .patterns import PatternMatcher
 from .item import Item
 from .platform import get_flags, get_process_id, SyncFile
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-from .repository import Repository, LIST_SCAN_LIMIT
+from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
 from .selftest import selftest
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
@@ -1747,27 +1747,55 @@ class Archiver:
     def do_debug_dump_repo_objs(self, args, repository):
         """dump (decrypted, decompressed) repo objects, repo index MUST be current/correct"""
         from .crypto.key import key_factory
-        # set up the key without depending on a manifest obj
-        ids = repository.list(limit=1, marker=None)
-        cdata = repository.get(ids[0])
-        key = key_factory(repository, cdata)
 
-        marker = None
-        i = 0
-        while True:
-            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
-            if not result:
-                break
-            marker = result[-1]
-            for id in result:
-                cdata = repository.get(id)
+        def decrypt_dump(i, id, cdata, tag=None, segment=None, offset=None):
+            if cdata is not None:
                 give_id = id if id != Manifest.MANIFEST_ID else None
                 data = key.decrypt(give_id, cdata)
-                filename = '%06d_%s.obj' % (i, bin_to_hex(id))
-                print('Dumping', filename)
-                with open(filename, 'wb') as fd:
-                    fd.write(data)
+            else:
+                data = b''
+            tag_str = '' if tag is None else '_' + tag
+            segment_str = '_' + str(segment) if segment is not None else ''
+            offset_str = '_' + str(offset) if offset is not None else ''
+            id_str = '_' + bin_to_hex(id) if id is not None else ''
+            filename = '%06d%s%s%s%s.obj' % (i, tag_str, segment_str, offset_str, id_str)
+            print('Dumping', filename)
+            with open(filename, 'wb') as fd:
+                fd.write(data)
+
+        if args.ghost:
+            # dump ghosty stuff from segment files: not yet committed objects, deleted / superceded objects, commit tags
+
+            # set up the key without depending on a manifest obj
+            for id, cdata, tag, segment, offset in repository.scan_low_level():
+                if tag == TAG_PUT:
+                    key = key_factory(repository, cdata)
+                    break
+            i = 0
+            for id, cdata, tag, segment, offset in repository.scan_low_level():
+                if tag == TAG_PUT:
+                    decrypt_dump(i, id, cdata, tag='put', segment=segment, offset=offset)
+                elif tag == TAG_DELETE:
+                    decrypt_dump(i, id, None, tag='del', segment=segment, offset=offset)
+                elif tag == TAG_COMMIT:
+                    decrypt_dump(i, None, None, tag='commit', segment=segment, offset=offset)
                 i += 1
+        else:
+            # set up the key without depending on a manifest obj
+            ids = repository.list(limit=1, marker=None)
+            cdata = repository.get(ids[0])
+            key = key_factory(repository, cdata)
+            marker = None
+            i = 0
+            while True:
+                result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
+                if not result:
+                    break
+                marker = result[-1]
+                for id in result:
+                    cdata = repository.get(id)
+                    decrypt_dump(i, id, cdata)
+                    i += 1
         print('Done.')
         return EXIT_SUCCESS
 
@@ -3929,6 +3957,8 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repo to dump')
+        subparser.add_argument('--ghost', dest='ghost', action='store_true',
+                               help='dump all segment file contents, including deleted/uncommitted objects and commits.')
 
         debug_search_repo_objs_epilog = process_epilog("""
         This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.

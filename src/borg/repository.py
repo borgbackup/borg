@@ -973,6 +973,23 @@ class Repository:
             logger.info('Completed repository check, no problems found.')
         return not error_found or repair
 
+    def scan_low_level(self):
+        """Very low level scan over all segment file entries.
+
+        It does NOT care about what's committed and what not.
+        It does NOT care whether an object might be deleted or superceded later.
+        It just yields anything it finds in the segment files.
+
+        This is intended as a last-resort way to get access to all repo contents of damaged repos,
+        when there is uncommitted, but valuable data in there...
+        """
+        for segment, filename in self.io.segment_iterator():
+            try:
+                for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
+                    yield key, data, tag, segment, offset
+            except IntegrityError as err:
+                logger.error('Segment %d (%s) has IntegrityError(s) [%s] - skipping.' % (segment, filename, str(err)))
+
     def _rollback(self, *, cleanup):
         """
         """

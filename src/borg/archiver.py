@@ -1758,7 +1758,7 @@ class Archiver:
             segment_str = '_' + str(segment) if segment is not None else ''
             offset_str = '_' + str(offset) if offset is not None else ''
             id_str = '_' + bin_to_hex(id) if id is not None else ''
-            filename = '%06d%s%s%s%s.obj' % (i, tag_str, segment_str, offset_str, id_str)
+            filename = '%08d%s%s%s%s.obj' % (i, segment_str, offset_str, tag_str, id_str)
             print('Dumping', filename)
             with open(filename, 'wb') as fd:
                 fd.write(data)

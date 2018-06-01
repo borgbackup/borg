@@ -1564,8 +1564,10 @@ class Archiver:
                 # set up counters for the progress display
                 to_delete_len = len(to_delete)
                 archives_deleted = 0
+            pi = ProgressIndicatorPercent(total=len(to_delete), msg='Pruning archives %3.0f%%', msgid='prune')
             for archive in archives_checkpoints:
                 if archive in to_delete:
+                    pi.show()
                     if args.dry_run:
                         if args.output_list:
                             list_logger.info('Would prune:     %s' % format_archive(archive))
@@ -1574,11 +1576,11 @@ class Archiver:
                             archives_deleted += 1
                             list_logger.info('Pruning archive: %s (%d/%d)' % (format_archive(archive),
                                                                               archives_deleted, to_delete_len))
-                        Archive(repository, key, manifest, archive.name, cache,
-                                progress=args.progress).delete(stats, forced=args.forced)
+                        Archive(repository, key, manifest, archive.name, cache).delete(stats, forced=args.forced)
                 else:
                     if args.output_list:
                         list_logger.info('Keeping archive: %s' % format_archive(archive))
+            pi.finish()
             if to_delete and not args.dry_run:
                 manifest.write()
                 repository.commit(save_space=args.save_space)

@@ -60,7 +60,7 @@ def packages_darwin
     # install all the (security and other) updates
     sudo softwareupdate --ignore iTunesX
     sudo softwareupdate --ignore iTunes
-    sudo softwareupdate --ignore "macOS High Sierra"
+    sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
     curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.0/osxfuse-3.8.0.dmg >osxfuse.dmg

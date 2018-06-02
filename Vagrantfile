@@ -60,6 +60,7 @@ def packages_darwin
     # install all the (security and other) updates
     sudo softwareupdate --ignore iTunesX
     sudo softwareupdate --ignore iTunes
+    sudo softwareupdate --ignore "macOS High Sierra"
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
     curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.7.1/osxfuse-3.7.1.dmg >osxfuse.dmg
@@ -330,6 +331,7 @@ def fs_init(user)
   return <<-EOF
     # clean up (wrong/outdated) stuff we likely got via rsync:
     rm -rf /vagrant/borg/borg/.tox 2> /dev/null
+    rm -rf /vagrant/borg/borg/borgbackup.egg-info 2> /dev/null
     rm -rf /vagrant/borg/borg/__pycache__ 2> /dev/null
     find /vagrant/borg/borg/src -name '__pycache__' -exec rm -rf {} \\;  2> /dev/null
     chown -R #{user} /vagrant/borg

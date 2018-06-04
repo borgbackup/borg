@@ -57,7 +57,6 @@ from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
 from .upgrader import attic_repo
-
 from . import key
 
 

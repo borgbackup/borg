@@ -1,5 +1,4 @@
 import argparse
-import sys
 import collections
 import configparser
 import faulthandler

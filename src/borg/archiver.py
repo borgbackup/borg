@@ -1582,7 +1582,7 @@ class Archiver:
                 'version': '1',
                 'segments_per_dir': str(DEFAULT_SEGMENTS_PER_DIR),
                 'max_segment_size': str(MAX_SEGMENT_SIZE_LIMIT),
-                'additionnal_free_space': '0',
+                'additional_free_space': '0',
                 'storage_quota': repository.storage_quota,
                 'append_only': repository.append_only
             }

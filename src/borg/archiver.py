@@ -1591,11 +1591,11 @@ class Archiver:
                         'storage_quota', 'additional_free_space', 'append_only',
                         'id']:
                 value = config.get('repository', key, fallback=False)
-                if value:
-                    print('%s = %s' % (key, value))
-                else:
-                    assert key != 'id'
-                    print('%s = %s' % (key, default_values[key]))
+                if value is None:
+                    value = default_values.get(key)
+                    if value is None:
+                        raise Error('The repository config is missing the %s key which has no default value' % key)
+                print('%s = %s' % (key, value))
 
         if not args.list:
             try:

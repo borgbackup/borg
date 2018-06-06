@@ -3689,7 +3689,7 @@ class Archiver:
         For security reasons, this command only works on local repositories.
 
         To delete a config value entirely, use ``--delete``. To list the values
-        stored in the configuration file, use ``--list``.  To get an existing
+        of the configuration file or the default values, use ``--list``.  To get and existing
         key, pass only the key name. To set a key, pass both the key name and
         the new value. Keys can be specified in the format "section.name" or
         simply "name"; the section will default to "repository" and "cache" for
@@ -3712,7 +3712,7 @@ class Archiver:
         group.add_argument('-d', '--delete', dest='delete', action='store_true',
                                help='delete the key from the config file')
         group.add_argument('-l', '--list', dest='list', action='store_true',
-                               help='list the configuration options of the repo')
+                               help='list the configuration of the repo')
 
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False, proto='file'),

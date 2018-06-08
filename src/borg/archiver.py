@@ -1577,11 +1577,32 @@ class Archiver:
             else:
                 raise ValueError('Invalid name')
 
-        try:
-            section, name = args.name.split('.')
-        except ValueError:
-            section = args.cache and "cache" or "repository"
-            name = args.name
+        def list_config(config):
+            default_values = {
+                'version': '1',
+                'segments_per_dir': str(DEFAULT_SEGMENTS_PER_DIR),
+                'max_segment_size': str(MAX_SEGMENT_SIZE_LIMIT),
+                'additional_free_space': '0',
+                'storage_quota': repository.storage_quota,
+                'append_only': repository.append_only
+            }
+            print('[repository]')
+            for key in ['version', 'segments_per_dir', 'max_segment_size',
+                        'storage_quota', 'additional_free_space', 'append_only',
+                        'id']:
+                value = config.get('repository', key, fallback=False)
+                if value is None:
+                    value = default_values.get(key)
+                    if value is None:
+                        raise Error('The repository config is missing the %s key which has no default value' % key)
+                print('%s = %s' % (key, value))
+
+        if not args.list:
+            try:
+                section, name = args.name.split('.')
+            except ValueError:
+                section = args.cache and "cache" or "repository"
+                name = args.name
 
         if args.cache:
             manifest, key = Manifest.load(repository, (Manifest.Operation.WRITE,))
@@ -1605,6 +1626,8 @@ class Archiver:
                 if len(config.options(section)) == 0:
                     config.remove_section(section)
                 save()
+            elif args.list:
+                list_config(config)
             elif args.value:
                 validate(section, name, args.value)
                 if section not in config.sections():
@@ -3665,10 +3688,13 @@ class Archiver:
         This command gets and sets options in a local repository or cache config file.
         For security reasons, this command only works on local repositories.
 
-        To delete a config value entirely, use ``--delete``. To get an existing key, pass
-        only the key name. To set a key, pass both the key name and the new value. Keys
-        can be specified in the format "section.name" or simply "name"; the section will
-        default to "repository" and "cache" for the repo and cache configs, respectively.
+        To delete a config value entirely, use ``--delete``. To list the values
+        of the configuration file or the default values, use ``--list``.  To get and existing
+        key, pass only the key name. To set a key, pass both the key name and
+        the new value. Keys can be specified in the format "section.name" or
+        simply "name"; the section will default to "repository" and "cache" for
+        the repo and cache configs, respectively.
+
 
         By default, borg config manipulates the repository config file. Using ``--cache``
         edits the repository cache's config file instead.
@@ -3681,13 +3707,17 @@ class Archiver:
         subparser.set_defaults(func=self.do_config)
         subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
                                help='get and set values from the repo cache')
-        subparser.add_argument('-d', '--delete', dest='delete', action='store_true',
+
+        group = subparser.add_mutually_exclusive_group()
+        group.add_argument('-d', '--delete', dest='delete', action='store_true',
                                help='delete the key from the config file')
+        group.add_argument('-l', '--list', dest='list', action='store_true',
+                               help='list the configuration of the repo')
 
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False, proto='file'),
                                help='repository to configure')
-        subparser.add_argument('name', metavar='NAME',
+        subparser.add_argument('name', metavar='NAME', nargs='?',
                                help='name of config key')
         subparser.add_argument('value', metavar='VALUE', nargs='?',
                                help='new value for key')

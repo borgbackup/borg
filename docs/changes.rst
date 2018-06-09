@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.5 (2018-04-01)
---------------------------
+Version 1.1.6 (not released yet)
+--------------------------------
 
 Compatibility notes:
 
@@ -190,6 +190,59 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+- 1.1.6 changes:
+
+  - also allow msgpack-python 0.5.6.
+
+Fixes:
+
+- fix borg exception handling on ENOSPC error with xattrs, #3808
+- prune: fix/improve overall progress display
+- borg config repo ... does not need cache/manifest/key, #3802
+- debug dump-repo-objs should not depend on a manifest obj
+- pypi package:
+
+  - include .coveragerc, needed by tox.ini
+  - fix package long description, #3854
+
+New features:
+
+- mount: add uid, gid, umask mount options
+- delete:
+
+  - only commit once, #3823
+  - implement --dry-run, #3822
+- check:
+
+  - show progress while rebuilding missing manifest, #3787
+  - more --repair output
+- borg config --list <repo>, #3612
+
+Other changes:
+
+- update msgpack requirement, #3753
+- update bundled zstd to 1.3.4, #3745
+- update bundled lz4 code to 1.8.2, #3870
+- docs:
+
+  - describe what BORG_LIBZSTD_PREFIX does
+  - fix and deduplicate encryption quickstart docs, #3776
+- vagrant:
+
+  - FUSE for macOS: upgrade 3.7.1 to 3.8.0
+  - exclude macOS High Sierra upgrade on the darwin64 machine
+  - remove borgbackup.egg-info dir in fs_init (after rsync)
+  - use pyenv-based build/test on jessie32/62
+  - use local 32 and 64bit debian jessie boxes
+  - use "vagrant" as username for new xenial box
+- travis OS X: use xcode 8.3 (not broken)
+
+
+Version 1.1.5 (2018-04-01)
+--------------------------
+
+Compatibility notes:
+
 - 1.1.5 changes:
 
   - require msgpack-python >= 0.4.6 and < 0.5.0.

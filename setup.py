@@ -30,10 +30,10 @@ import setup_zstd
 import setup_b2
 
 # True: use the shared liblz4 (>= 1.7.0 / r129) from the system, False: use the bundled lz4 code
-prefer_system_liblz4 = False
+prefer_system_liblz4 = True
 
 # True: use the shared libzstd (>= 1.3.0) from the system, False: use the bundled zstd code
-prefer_system_libzstd = False
+prefer_system_libzstd = True
 
 # True: use the shared libb2 from the system, False: use the bundled blake2 code
 prefer_system_libb2 = True

@@ -39,7 +39,7 @@ install_requires = [
     # we are rather picky about msgpack versions, because a good working msgpack is
     # very important for borg, see https://github.com/borgbackup/borg/issues/3753
     # best versions seem to be 0.4.6, 0.4.7, 0.4.8 and 0.5.6:
-    'msgpack-python <0.5;python_version=="3.4"',
+    'msgpack-python >=0.4.6, <0.5;python_version=="3.4"',
     'msgpack >=0.5.6;python_version >="3.5"',
     # if you can't satisfy the above requirement, these are versions that might
     # also work ok, IF you make sure to use the COMPILED version of msgpack-python,

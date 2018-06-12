@@ -8,7 +8,6 @@ from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
 from .base import safe_fadvise
-from .posix import swidth
 
 from libc cimport errno
 from libc.stdint cimport int64_t

@@ -780,11 +780,11 @@ class LocalCache(CacheStatsMixin):
             # deallocates old hashindex, creates empty hashindex:
             chunk_idx.clear()
             cleanup_outdated(cached_ids - archive_ids)
-            # Explicitly set the initial hash table capacity to avoid performance issues
+            # Explicitly set the usable initial hash table capacity to avoid performance issues
             # due to hash table "resonance".
-            master_index_capacity = int(len(self.repository) / ChunkIndex.MAX_LOAD_FACTOR)
+            master_index_capacity = len(self.repository)
             if archive_ids:
-                chunk_idx = None if not self.do_cache else ChunkIndex(master_index_capacity)
+                chunk_idx = None if not self.do_cache else ChunkIndex(usable=master_index_capacity)
                 pi = ProgressIndicatorPercent(total=len(archive_ids), step=0.1,
                                               msg='%3.0f%% Syncing chunks cache. Processing archive %s',
                                               msgid='cache.sync')
@@ -805,7 +805,7 @@ class LocalCache(CacheStatsMixin):
                         logger.info("Merging into master chunks index ...")
                         chunk_idx.merge(archive_chunk_idx)
                     else:
-                        chunk_idx = chunk_idx or ChunkIndex(master_index_capacity)
+                        chunk_idx = chunk_idx or ChunkIndex(usable=master_index_capacity)
                         logger.info('Fetching archive index for %s ...', archive_name)
                         fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
                 if not self.do_cache:
@@ -1087,12 +1087,11 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
     def begin_txn(self):
         self._txn_active = True
-        # Explicitly set the initial hash table capacity to avoid performance issues
+        # Explicitly set the initial usable hash table capacity to avoid performance issues
         # due to hash table "resonance".
         # Since we're creating an archive, add 10 % from the start.
         num_chunks = len(self.repository)
-        capacity = int(num_chunks / ChunkIndex.MAX_LOAD_FACTOR * 1.1)
-        self.chunks = ChunkIndex(capacity)
+        self.chunks = ChunkIndex(usable=num_chunks * 1.1)
         pi = ProgressIndicatorPercent(total=num_chunks, msg='Downloading chunk list... %3.0f%%',
                                       msgid='cache.download_chunks')
         t0 = perf_counter()

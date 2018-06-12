@@ -84,7 +84,7 @@ cdef class IndexBase:
     MAX_LOAD_FACTOR = HASH_MAX_LOAD
     MAX_VALUE = _MAX_VALUE
 
-    def __cinit__(self, capacity=0, path=None, permit_compact=False):
+    def __cinit__(self, capacity=0, path=None, permit_compact=False, usable=None):
         self.key_size = self._key_size
         if path:
             if isinstance(path, (str, bytes)):
@@ -94,6 +94,8 @@ cdef class IndexBase:
                 self.index = hashindex_read(path, permit_compact)
             assert self.index, 'hashindex_read() returned NULL with no exception set'
         else:
+            if usable is not None:
+                capacity = int(usable / self.MAX_LOAD_FACTOR)
             self.index = hashindex_init(capacity, self.key_size, self.value_size)
             if not self.index:
                 raise Exception('hashindex_init failed')

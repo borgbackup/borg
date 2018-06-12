@@ -38,13 +38,6 @@ prefer_system_libzstd = True
 # True: use the shared libb2 from the system, False: use the bundled blake2 code
 prefer_system_libb2 = True
 
-min_python = (3, 5)
-my_python = sys.version_info
-
-if my_python < min_python:
-    print("Borg requires Python %d.%d or later" % min_python)
-    sys.exit(1)
-
 cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1
 
 # Are we building on ReadTheDocs?
@@ -77,16 +70,14 @@ extras_require = {
     # llfuse 1.2 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.3 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
-    'fuse': ['llfuse<2.0', ],
+    'fuse': [
+        'llfuse<2.0',
+        # llfuse was frequently broken / did not build on freebsd
+        # llfuse 0.41.1, 1.1 are ok
+        'llfuse !=0.42.*, !=0.43, !=1.0; platform_system == "FreeBSD"',
+        'llfuse >=1.3.4; python_version >="3.7"',
+    ],
 }
-
-if sys.platform.startswith('freebsd'):
-    # llfuse was frequently broken / did not build on freebsd
-    # llfuse 0.41.1, 1.1 are ok
-    extras_require['fuse'] = ['llfuse <2.0, !=0.42.*, !=0.43, !=1.0', ]
-
-if my_python >= (3, 7):
-    extras_require['fuse'][0] += ', >=1.3.4'
 
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
@@ -844,4 +835,5 @@ setup(
     setup_requires=['setuptools_scm>=1.7'],
     install_requires=install_requires,
     extras_require=extras_require,
+    python_requires='>=3.5',
 )

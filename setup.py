@@ -53,7 +53,6 @@ install_requires = [
     # NOT the PURE PYTHON fallback implementation: ==0.5.1, ==0.5.4
     # using any other version is not supported by borg development, feel free to
     # do it on your own risk (and after own testing).
-    'pyzmq',
 ]
 
 # note for package maintainers: if you package borgbackup for distribution,

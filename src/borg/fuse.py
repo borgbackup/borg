@@ -126,20 +126,13 @@ class ItemCache:
         stream_offset = 0
         # Offset of the current chunk in the metadata stream
         chunk_begin = 0
-        # Length of the chunk preciding the current chunk
+        # Length of the chunk preceding the current chunk
         last_chunk_length = 0
         msgpacked_bytes = b''
 
         write_offset = self.write_offset
         meta = self.meta
         pack_indirect_into = self.indirect_entry_struct.pack_into
-
-        def write_bytes(append_msgpacked_bytes):
-            # XXX: Future versions of msgpack include an Unpacker.tell() method that provides this for free.
-            nonlocal msgpacked_bytes
-            nonlocal stream_offset
-            msgpacked_bytes += append_msgpacked_bytes
-            stream_offset += len(append_msgpacked_bytes)
 
         for key, (csize, data) in zip(archive_item_ids, self.decrypted_repository.get_many(archive_item_ids)):
             # Store the chunk ID in the meta-array
@@ -149,16 +142,25 @@ class ItemCache:
             current_id_offset = write_offset
             write_offset += 32
 
-            # The chunk boundaries cannot be tracked through write_bytes, because the unpack state machine
-            # *can* and *will* consume partial items, so calls to write_bytes are unrelated to chunk boundaries.
             chunk_begin += last_chunk_length
             last_chunk_length = len(data)
 
             unpacker.feed(data)
             while True:
                 try:
-                    item = unpacker.unpack(write_bytes)
+                    item = unpacker.unpack()
+                    need_more_data = False
                 except msgpack.OutOfData:
+                    need_more_data = True
+
+                start = stream_offset - chunk_begin
+                # tell() is not helpful for the need_more_data case, but we know it is the remainder
+                # of the data in that case. in the other case, tell() works as expected.
+                length = (len(data) - start) if need_more_data else (unpacker.tell() - stream_offset)
+                msgpacked_bytes += data[start:start+length]
+                stream_offset += length
+
+                if need_more_data:
                     # Need more data, feed the next chunk
                     break
 

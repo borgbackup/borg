@@ -1332,11 +1332,10 @@ class ArchiveChecker:
     def init_chunks(self):
         """Fetch a list of all object keys from repository
         """
-        # Explicitly set the initial hash table capacity to avoid performance issues
+        # Explicitly set the initial usable hash table capacity to avoid performance issues
         # due to hash table "resonance".
-        # Since reconstruction of archive items can add some new chunks, add 10 % headroom
-        capacity = int(len(self.repository) / ChunkIndex.MAX_LOAD_FACTOR * 1.1)
-        self.chunks = ChunkIndex(capacity)
+        # Since reconstruction of archive items can add some new chunks, add 10 % headroom.
+        self.chunks = ChunkIndex(usable=len(self.repository) * 1.1)
         marker = None
         while True:
             result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)

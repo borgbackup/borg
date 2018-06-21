@@ -4,7 +4,8 @@ import unittest
 
 import pytest
 
-from ..xattr import is_enabled, getxattr, setxattr, listxattr, buffer, split_lstring
+from ..platform.xattr import buffer, split_lstring
+from ..xattr import is_enabled, getxattr, setxattr, listxattr
 from . import BaseTestCase
 
 

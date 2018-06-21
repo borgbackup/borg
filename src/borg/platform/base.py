@@ -17,9 +17,46 @@ platform API: that way platform APIs provided by the platform-specific support m
 are correctly composed into the base functionality.
 """
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.2_01'
 
 fdatasync = getattr(os, 'fdatasync', os.fsync)
+
+from .xattr import ENOATTR
+
+
+def listxattr(path, *, follow_symlinks=True):
+    """
+    Return list of xattr names on a file.
+
+    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *follow_symlinks* indicates whether symlinks should be followed
+    and only applies when *path* is not an open file descriptor.
+    """
+    return []
+
+
+def getxattr(path, name, *, follow_symlinks=True):
+    """
+    Read xattr and return its value (as bytes) or None if its empty.
+
+    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *name* is the name of the xattr to read (str).
+    *follow_symlinks* indicates whether symlinks should be followed
+    and only applies when *path* is not an open file descriptor.
+    """
+
+
+def setxattr(path, name, value, *, follow_symlinks=True):
+    """
+    Write xattr on *path*.
+
+    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *name* is the name of the xattr to read (str).
+    *value* is the value to write. It is either bytes or None. The latter
+    signals that the value shall be empty (size equals zero).
+    *follow_symlinks* indicates whether symlinks should be followed
+    and only applies when *path* is not an open file descriptor.
+    """
 
 
 def acl_get(path, item, st, numeric_owner=False):

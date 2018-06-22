@@ -28,6 +28,9 @@ end
 
 def packages_arch
   return <<-EOF
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+    locale-gen
+    localectl set-locale LANG=en_US.UTF-8
     chown vagrant.vagrant /vagrant
     pacman --sync --noconfirm python-virtualenv python-pip
   EOF

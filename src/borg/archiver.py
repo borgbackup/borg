@@ -3154,7 +3154,7 @@ class Archiver:
         diff_epilog = process_epilog("""
             This command finds differences (file contents, user/group/mode) between archives.
 
-            A repository location and an archive name must be specified for REPO_ARCHIVE1.
+            A repository location and an archive name must be specified for REPO::ARCHIVE1.
             ARCHIVE2 is just another archive name in same repository (no repository location
             allowed).
 
@@ -3181,7 +3181,7 @@ class Archiver:
                                help='Override check of chunker parameters.')
         subparser.add_argument('--sort', dest='sort', action='store_true',
                                help='Sort the output lines by file path.')
-        subparser.add_argument('location', metavar='REPO_ARCHIVE1',
+        subparser.add_argument('location', metavar='REPO::ARCHIVE1',
                                type=location_validator(archive=True),
                                help='repository location and ARCHIVE1 name')
         subparser.add_argument('archive2', metavar='ARCHIVE2',

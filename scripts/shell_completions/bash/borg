@@ -71,7 +71,7 @@ _borg()
                 local opts="-e --encryption --append-only --storage-quota ${common_opts}"
                 ;;
             *' create '*)
-                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --ignore-inode --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --ignore-inode --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
                 ;;
             *' extract '*)
                 local opts="--list -n --dry-run --numeric-owner --nobsdflags --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
@@ -88,7 +88,7 @@ _borg()
                 local opts="--numeric-owner --same-chunker-params --sort -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
                 ;;
             *' delete '*)
-                local opts="-s --stats --cache-only --force --save-space -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
+                local opts="-n --dry-run -s --stats --cache-only --force --save-space -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
                 ;;
             *' prune '*)
                 local opts="-n --dry-run --force -s --stats --list --keep-within --keep-last --keep-secondly --keep-minutely -H --keep-hourly -d --keep-daily -w --keep-weekly -m --keep-monthly -y --keep-yearly --save-space -P --prefix -a --glob-archives ${common_opts}"
@@ -97,7 +97,7 @@ _borg()
                 local opts="--json -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
                 ;;
             *' mount '*)
-                local opts="-f --foreground -o -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
+                local opts="-f --foreground -o -P --prefix -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
                 ;;
             # umount
             #   no specific options
@@ -121,15 +121,15 @@ _borg()
             *' serve '*)
                 local opts="--restrict-to-path --restrict-to-repository --append-only --storage-quota ${common_opts}"
                 ;;
+            *' config '*)
+                local opts="-c --cache -d --delete --list ${common_opts}"
+                ;;
             # with-lock
             #   no specific options
             # break-lock
             #   no specific options
             # benchmark crud
             #   no specific options
-            *' config '*)
-                local opts="-c --cache -d --delete ${common_opts}"
-                ;;
         esac
 
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )

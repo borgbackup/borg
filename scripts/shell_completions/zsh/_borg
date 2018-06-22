@@ -86,6 +86,7 @@ _borg() {
                 --filter'[only display items with the given status characters]:STATUSCHARS'\
                 --json'[output stats as JSON. Implies --stats.]'\
                 --no-cache-sync'[experimental: do not synchronize the cache. Implies not using the files cache.]'\
+                --stdin-name'[use NAME in archive for stdin data]:NAME'\
                 {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
                 --exclude-from'[read exclude patterns from EXCLUDEFILE, one per line]:_files'\
                 --pattern'[experimental: include/exclude paths matching PATTERN]:PATTERN'\
@@ -185,6 +186,7 @@ _borg() {
             _arguments \
                 '2:archives:__borg_archive'\
                 '*:archives:archives'\
+                --dry-run'[do not change the repository]'\
                 {-s,--stats}'[print statistics for the deleted archive]'\
                 --cache-only'[delete only the local cache for the given repository]'\
                 --force'[force deletion of corrupted archives, use --force --force in case --force does not work.]'\
@@ -238,6 +240,11 @@ _borg() {
                 --sort-by'[Comma-separated list of sorting keys]:KEYS'\
                 --first'[consider first N archives after other filters were applied]:N'\
                 --last'[consider last N archives after other filters were applied]:N'\
+                {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
+                --exclude-from'[read exclude patterns from EXCLUDEFILE, one per line]:_files'\
+                --pattern'[experimental: include/exclude paths matching PATTERN]:PATTERN'\
+                --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
+                --strip-components'[Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.]:NUMBER'\
                 $borg_common_options
             ;;
         (umount)
@@ -339,7 +346,8 @@ _borg() {
                 '3:name:NAME'\
                 '4:value:VALUE'\
                 {-c,--cache}'[get and set values from the repo cache]'\
-                {-d,--delete}'[delete the key from the config file]'\
+                {-d,--delete}'[delete the key from the config]'\
+                --list'[list the configuration of the repo]'\
                 $borg_common_options
             ;;
         (with-lock)

@@ -85,6 +85,7 @@ complete -c borg -f      -l 'list'                  -d 'Print verbose list of it
 complete -c borg -f      -l 'filter'                -d 'Only items with given STATUSCHARS'          -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'json'                  -d 'Print verbose stats as json'                -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'no-cache-sync'         -d 'Do not synchronize the cache'               -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'stdin-name'            -d 'Use NAME in archive for stdin data'         -n "__fish_seen_subcommand_from create"
 # Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from create"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from create"
@@ -175,6 +176,7 @@ complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths ma
 complete -c borg         -l 'patterns-from'         -d 'Include/exclude paths from PATTERNFILE'     -n "__fish_seen_subcommand_from diff"
 
 # borg delete options
+complete -c borg -f -s n -l 'dry-run'               -d 'Do not change the repository'               -n "__fish_seen_subcommand_from delete"
 complete -c borg -f -s s -l 'stats'                 -d 'Print verbose statistics'                   -n "__fish_seen_subcommand_from delete"
 complete -c borg -f      -l 'cache-only'            -d "Delete only the local cache"                -n "__fish_seen_subcommand_from delete"
 complete -c borg -f      -l 'force'                 -d 'Force deletion of corrupted archives'       -n "__fish_seen_subcommand_from delete"
@@ -217,14 +219,20 @@ complete -c borg -f      -l 'last'                  -d 'Only last N archives'   
 # borg mount options
 complete -c borg -f -s f -l 'foreground'            -d 'Stay in foreground, do not daemonize'       -n "__fish_seen_subcommand_from mount"
 # FIXME there are lot more options, but not all are applicable:
-set -l fuse_options "allow_other allow_root versions allow_damaged_files"
-complete -c borg -f -s o                            -d 'Fuse mount OPTIONS' -a "$fuse_options"      -n "__fish_seen_subcommand_from mount"
+set -l fuse_options "allow_other allow_root versions allow_damaged_files uid gid umask"
+complete -c borg -f -s o                            -d 'Fuse mount OPTION' -a "$fuse_options"       -n "__fish_seen_subcommand_from mount"
 # Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from mount"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from mount"
 complete -c borg -f      -l 'sort-by'               -d 'Sorting KEYS [timestamp]' -a "$sort_keys"   -n "__fish_seen_subcommand_from mount"
 complete -c borg -f      -l 'first'                 -d 'Only first N archives'                      -n "__fish_seen_subcommand_from mount"
 complete -c borg -f      -l 'last'                  -d 'Only last N archives'                       -n "__fish_seen_subcommand_from mount"
+# Exclusion options
+complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from mount"
+complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from mount"
+complete -c borg -f      -l 'pattern'               -d 'Include/exclude paths matching PATTERN'     -n "__fish_seen_subcommand_from mount"
+complete -c borg         -l 'patterns-from'         -d 'Include/exclude paths from PATTERNFILE'     -n "__fish_seen_subcommand_from mount"
+complete -c borg -f      -l 'strip-components'      -d 'Remove NUMBER of leading path elements'     -n "__fish_seen_subcommand_from mount"
 
 # borg umount
 # no specific options
@@ -287,6 +295,11 @@ complete -c borg         -l 'restrict-to-repository' -d 'Restrict repository acc
 complete -c borg -f      -l 'append-only'           -d 'Only allow appending to repository'         -n "__fish_seen_subcommand_from serve"
 complete -c borg -f      -l 'storage-quota'         -d 'Override storage QUOTA of the repository'   -n "__fish_seen_subcommand_from serve"
 
+# borg config
+complete -c borg -f -s c -l 'cache'                 -d 'Get/set/list values in the repo cache'      -n "__fish_seen_subcommand_from config"
+complete -c borg -f -s d -l 'delete'                -d 'Delete the KEY from the config'             -n "__fish_seen_subcommand_from config"
+complete -c borg -f      -l 'list'                  -d 'List the configuration of the repo'         -n "__fish_seen_subcommand_from config"
+
 # borg with-lock
 # no specific options
 
@@ -295,10 +308,6 @@ complete -c borg -f      -l 'storage-quota'         -d 'Override storage QUOTA o
 
 # borg benchmark
 # no specific options
-
-# borg config
-complete -c borg -f -s c -l 'cache'                 -d 'Get/set values in the repo cache'           -n "__fish_seen_subcommand_from config"
-complete -c borg -f -s d -l 'delete'                -d 'Delete the KEY from the config'             -n "__fish_seen_subcommand_from config"
 
 
 # List archives

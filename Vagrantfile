@@ -36,6 +36,39 @@ def packages_arch
   EOF
 end
 
+def packages_freebsd
+  return <<-EOF
+    # in case the VM has no hostname set
+    hostname freebsd
+    # install all the (security and other) updates, base system
+    freebsd-update --not-running-from-cron fetch install
+    # for building borgbackup and dependencies:
+    pkg install -y openssl-devel liblz4 fusefs-libs pkgconf
+    pkg install -y fakeroot git bash
+    # for building python:
+    pkg install -y sqlite3
+    pkg install -y py27-virtualenv  # provides "virtualenv" command
+    pkg install -y python36 py36-virtualenv py36-pip
+    # make sure there is a python3 command
+    ln -s /usr/local/bin/python3.6 /usr/local/bin/python3
+    # make bash default / work:
+    chsh -s bash vagrant
+    mount -t fdescfs fdesc /dev/fd
+    echo 'fdesc        /dev/fd         fdescfs         rw      0       0' >> /etc/fstab
+    # make FUSE work
+    echo 'fuse_load="YES"' >> /boot/loader.conf
+    echo 'vfs.usermount=1' >> /etc/sysctl.conf
+    kldload fuse
+    sysctl vfs.usermount=1
+    pw groupmod operator -M vagrant
+    # /dev/fuse has group operator
+    chmod 666 /dev/fuse
+    # install all the (security and other) updates, packages
+    pkg update
+    yes | pkg upgrade
+  EOF
+end
+
 def install_pyenv(boxname)
   return <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
@@ -212,6 +245,21 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("arch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64")
+  end
+
+  config.vm.define "freebsd64" do |b|
+    b.vm.box = "freebsd12-amd64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.ssh.shell = "sh"
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages freebsd", :type => :shell, :inline => packages_freebsd
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("freebsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64")
   end
 
   # TODO: create more VMs with python 3.5+ and openssl 1.1.

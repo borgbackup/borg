@@ -1534,6 +1534,15 @@ class Archiver:
             # see issue #1867.
             repository.commit()
 
+    @with_repository(manifest=False, exclusive=True)
+    def do_compact(self, args, repository):
+        """compact segment files in the repository"""
+        # see the comment in do_with_lock about why we do it like this:
+        data = repository.get(Manifest.MANIFEST_ID)
+        repository.put(Manifest.MANIFEST_ID, data)
+        repository.commit(compact=True)
+        return EXIT_SUCCESS
+
     @with_repository(exclusive=True, manifest=False)
     def do_config(self, args, repository):
         """get, set, and delete values in a repository or cache config file"""
@@ -3685,6 +3694,19 @@ class Archiver:
                                help='command to run')
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
+
+        compact_epilog = process_epilog("""
+        This command frees repository space by compacting segments.
+        """)
+        subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
+                                          description=self.do_compact.__doc__,
+                                          epilog=compact_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='compact segment files / free space in repo')
+        subparser.set_defaults(func=self.do_compact)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to compact')
 
         config_epilog = process_epilog("""
         This command gets and sets options in a local repository or cache config file.

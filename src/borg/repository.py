@@ -416,7 +416,7 @@ class Repository:
             self.lock.release()
             self.lock = None
 
-    def commit(self, save_space=False):
+    def commit(self, save_space=False, compact=False):
         """Commit transaction
         """
         # save_space is not used anymore, but stays for RPC/API compatibility.
@@ -427,7 +427,7 @@ class Repository:
         self.check_free_space()
         self.log_storage_quota()
         self.io.write_commit()
-        if not self.append_only:
+        if compact and not self.append_only:
             self.compact_segments()
         self.write_index()
         self.rollback()
@@ -951,7 +951,6 @@ class Repository:
                     if current_index.get(key, (-1, -1)) != value:
                         report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
         if repair:
-            self.compact_segments()
             self.write_index()
         self.rollback()
         if error_found:

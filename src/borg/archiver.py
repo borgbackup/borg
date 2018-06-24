@@ -243,7 +243,7 @@ class Archiver:
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
-        repository.commit()
+        repository.commit(compact=False)
         with Cache(repository, key, manifest, warn_if_unencrypted=False):
             pass
         if key.tam_required:
@@ -1012,7 +1012,7 @@ class Archiver:
         name = replace_placeholders(args.name)
         archive.rename(name)
         manifest.write()
-        repository.commit()
+        repository.commit(compact=False)
         cache.commit()
         return self.exit_code
 
@@ -1062,7 +1062,7 @@ class Archiver:
             elif deleted:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
-                repository.commit()
+                repository.commit(compact=False)
                 logger.info('Done. Run "borg check --repair" to clean up the mess.')
             else:
                 logger.warning('Aborted.')
@@ -1078,7 +1078,7 @@ class Archiver:
                         stats, progress=args.progress, forced=args.forced)
             if not dry_run:
                 manifest.write()
-                repository.commit(save_space=args.save_space)
+                repository.commit(compact=False, save_space=args.save_space)
                 cache.commit()
             if args.stats:
                 log_multi(DASHES,
@@ -1387,7 +1387,7 @@ class Archiver:
             pi.finish()
             if to_delete and not args.dry_run:
                 manifest.write()
-                repository.commit(save_space=args.save_space)
+                repository.commit(compact=False, save_space=args.save_space)
                 cache.commit()
             if args.stats:
                 log_multi(DASHES,
@@ -1414,7 +1414,7 @@ class Archiver:
                     print(format_archive(archive_info), '[%s]' % bin_to_hex(archive_info.id))
                 manifest.config[b'tam_required'] = True
                 manifest.write()
-                repository.commit()
+                repository.commit(compact=False)
             if not key.tam_required:
                 key.tam_required = True
                 key.change_passphrase(key._passphrase)
@@ -1437,7 +1437,7 @@ class Archiver:
                     print('Key location:', key.find_key())
             manifest.config[b'tam_required'] = False
             manifest.write()
-            repository.commit()
+            repository.commit(compact=False)
         else:
             # mainly for upgrades from Attic repositories,
             # but also supports borg 0.xx -> 1.0 upgrade.
@@ -1500,7 +1500,7 @@ class Archiver:
                     logger.info('Skipped archive %s: Nothing to do. Archive was not processed.', name)
         if not args.dry_run:
             manifest.write()
-            repository.commit()
+            repository.commit(compact=False)
             cache.commit()
         return self.exit_code
 
@@ -1532,7 +1532,16 @@ class Archiver:
             # that would be bad if somebody uses rsync with ignore-existing (or
             # any other mechanism relying on existing segment data not changing).
             # see issue #1867.
-            repository.commit()
+            repository.commit(compact=False)
+
+    @with_repository(manifest=False, exclusive=True)
+    def do_compact(self, args, repository):
+        """compact segment files in the repository"""
+        # see the comment in do_with_lock about why we do it like this:
+        data = repository.get(Manifest.MANIFEST_ID)
+        repository.put(Manifest.MANIFEST_ID, data)
+        repository.commit(compact=True)
+        return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)
     def do_config(self, args, repository):
@@ -1788,7 +1797,7 @@ class Archiver:
             h = hashlib.sha256(data)  # XXX hardcoded
             repository.put(h.digest(), data)
             print("object %s put." % h.hexdigest())
-        repository.commit()
+        repository.commit(compact=False)
         return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
@@ -1808,7 +1817,7 @@ class Archiver:
                 except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
         if modified:
-            repository.commit()
+            repository.commit(compact=False)
         print('Done.')
         return EXIT_SUCCESS
 
@@ -3685,6 +3694,19 @@ class Archiver:
                                help='command to run')
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
+
+        compact_epilog = process_epilog("""
+        This command frees repository space by compacting segments.
+        """)
+        subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
+                                          description=self.do_compact.__doc__,
+                                          epilog=compact_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='compact segment files / free space in repo')
+        subparser.set_defaults(func=self.do_compact)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to compact')
 
         config_epilog = process_epilog("""
         This command gets and sets options in a local repository or cache config file.

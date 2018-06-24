@@ -493,7 +493,7 @@ Utilization of max. archive size: {csize_max:.0%}
             pass
         self.manifest.archives[name] = (self.id, metadata.time)
         self.manifest.write()
-        self.repository.commit()
+        self.repository.commit(compact=False)
         self.cache.commit()
 
     def calc_stats(self, cache):
@@ -1722,9 +1722,8 @@ class ArchiveChecker:
         if self.repair:
             logger.info('Writing Manifest.')
             self.manifest.write()
-            logger.info('Committing repo (may take a while, due to compact_segments)...')
-            self.repository.commit(save_space=save_space)
-            logger.info('Finished committing repo.')
+            logger.info('Committing repo.')
+            self.repository.commit(compact=False, save_space=save_space)
 
 
 class ArchiveRecreater:

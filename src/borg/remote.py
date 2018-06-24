@@ -889,8 +889,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def check(self, repair=False, save_space=False):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version('1.0.0'))
-    def commit(self, save_space=False):
+    @api(since=parse_version('1.0.0'),
+         compact={'since': parse_version('1.2.0a0'), 'previously': True})
+    def commit(self, save_space=False, compact=True):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'))

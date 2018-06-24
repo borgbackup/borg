@@ -202,7 +202,7 @@ General:
         exceptions is not shown.
         Please only use for good reasons as it makes issues harder to analyze.
     TMPDIR
-        where temporary files are stored (might need a lot of temporary space for some operations)
+        where temporary files are stored (might need a lot of temporary space for some operations), see tempfile_ for details
 
 Some automatic "answerers" (if set, they automatically answer confirmation questions):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
@@ -260,6 +260,8 @@ Please note:
 
 
 .. _INI: https://docs.python.org/3/library/logging.config.html#configuration-file-format
+
+.. _tempfile: https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir
 
 .. _file-systems:
 

@@ -177,6 +177,8 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
     def _assert_sparse(self):
         # The superseded 123456... PUT
         assert self.repository.compact[0] == 41 + 9
+        # a COMMIT
+        assert self.repository.compact[1] == 9
         # The DELETE issued by the superseding PUT (or issued directly)
         assert self.repository.compact[2] == 41
         self.repository._rebuild_sparse(0)
@@ -207,7 +209,7 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
         assert self.repository.compact[0] == 41 + 41 + 4 + len(MAGIC)
 
-        self.repository.commit()
+        self.repository.commit(compact=True)
         assert 0 not in [segment for segment, _ in self.repository.io.segment_iterator()]
 
     def test_uncommitted_garbage(self):
@@ -224,7 +226,7 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         self.repository = self.open()
         with self.repository:
             self.repository.put(H(0), b'bar')  # this may trigger compact_segments()
-            self.repository.commit()
+            self.repository.commit(compact=True)
         # the point here is that nothing blows up with an exception.
 
 
@@ -244,7 +246,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.add_keys()
         self.repository.compact_segments = None
         try:
-            self.repository.commit()
+            self.repository.commit(compact=True)
         except TypeError:
             pass
         self.reopen()
@@ -315,7 +317,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.repository.put(H(2), b'2')
         self.repository.commit()
         self.repository.delete(H(1))
-        self.repository.commit()
+        self.repository.commit(compact=True)
         last_segment = self.repository.io.get_latest_segment() - 1
         num_deletes = 0
         for tag, key, offset, size in self.repository.io.iter_objects(last_segment):
@@ -325,7 +327,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         assert num_deletes == 1
         assert last_segment in self.repository.compact
         self.repository.put(H(3), b'3')
-        self.repository.commit()
+        self.repository.commit(compact=True)
         assert last_segment not in self.repository.compact
         assert not self.repository.io.segment_exists(last_segment)
         for segment, _ in self.repository.io.segment_iterator():
@@ -349,12 +351,12 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         del self.repository.compact[put_segment]
         del self.repository.compact[delete_segment]
 
-        self.repository.commit()
+        self.repository.commit(compact=True)
 
         # Now we perform an unrelated operation on the segment containing the DELETE,
         # causing it to be compacted.
         self.repository.delete(H(2))
-        self.repository.commit()
+        self.repository.commit(compact=True)
 
         assert self.repository.io.segment_exists(put_segment)
         assert not self.repository.io.segment_exists(delete_segment)
@@ -370,7 +372,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.repository.put(H(1), b'1')
         self.repository.delete(H(1))
         assert self.repository.shadow_index[H(1)] == [0]
-        self.repository.commit()
+        self.repository.commit(compact=True)
         # note how an empty list means that nothing is shadowed for sure
         assert self.repository.shadow_index[H(1)] == []
         self.repository.put(H(1), b'1')
@@ -402,16 +404,16 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
         self.repository.append_only = False
         assert segments_in_repository() == 2
         self.repository.put(H(0), b'foo')
-        self.repository.commit()
+        self.repository.commit(compact=True)
         # normal: compact squashes the data together, only one segment
-        assert segments_in_repository() == 4
+        assert segments_in_repository() == 2
 
         self.repository.append_only = True
-        assert segments_in_repository() == 4
+        assert segments_in_repository() == 2
         self.repository.put(H(0), b'foo')
         self.repository.commit()
         # append only: does not compact, only new segments written
-        assert segments_in_repository() == 6
+        assert segments_in_repository() == 4
 
 
 class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
@@ -640,7 +642,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             self.repository.append_only = False
             self.repository.put(H(3), b'1234')
             # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
-            self.repository.commit()
+            self.repository.commit(compact=True)
 
             assert len(self.repository) == 4
             assert self.repository.get(H(0)) == b'foo'
@@ -656,7 +658,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             self.repository.put(H(3), b'1234')
             # Do a compaction run. Fails, since the corrupted refcount was not detected and leads to an assertion failure.
             with pytest.raises(AssertionError) as exc_info:
-                self.repository.commit()
+                self.repository.commit(compact=True)
             assert 'Corrupted segment reference count' in str(exc_info.value)
 
 
@@ -757,7 +759,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.check(status=False)
         self.assert_equal(self.list_indices(), ['index.1'])
         self.check(repair=True, status=True)
-        self.assert_equal(self.list_indices(), ['index.3'])
+        self.assert_equal(self.list_indices(), ['index.2'])
         self.check(status=True)
         self.get_objects(3)
         self.assert_equal(set([1, 2, 3]), self.list_objects())
@@ -783,7 +785,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.repository.put(H(0), b'data2')
         # Simulate a crash before compact
         with patch.object(Repository, 'compact_segments') as compact:
-            self.repository.commit()
+            self.repository.commit(compact=True)
             compact.assert_called_once_with()
         self.reopen()
         with self.repository:

@@ -1540,7 +1540,7 @@ class Archiver:
         # see the comment in do_with_lock about why we do it like this:
         data = repository.get(Manifest.MANIFEST_ID)
         repository.put(Manifest.MANIFEST_ID, data)
-        repository.commit(compact=True)
+        repository.commit(compact=True, cleanup_commits=args.cleanup_commits)
         return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)
@@ -3707,6 +3707,8 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to compact')
+        subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
+                               help='cleanup commit-only 17-byte segment files')
 
         config_epilog = process_epilog("""
         This command gets and sets options in a local repository or cache config file.

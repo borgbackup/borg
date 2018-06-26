@@ -416,7 +416,7 @@ class Repository:
             self.lock.release()
             self.lock = None
 
-    def commit(self, save_space=False, compact=True):
+    def commit(self, save_space=False, compact=True, cleanup_commits=False):
         """Commit transaction
         """
         # save_space is not used anymore, but stays for RPC/API compatibility.
@@ -430,6 +430,13 @@ class Repository:
         self.segments.setdefault(segment, 0)
         self.compact[segment] += LoggedIO.header_fmt.size
         if compact and not self.append_only:
+            if cleanup_commits:
+                # due to bug #2850, there might be a lot of commit-only segment files.
+                # this is for a one-time cleanup of these 17byte files.
+                for segment, filename in self.io.segment_iterator():
+                    if os.path.getsize(filename) == 17:
+                        self.segments[segment] = 0
+                        self.compact[segment] = LoggedIO.header_fmt.size
             self.compact_segments()
         self.write_index()
         self.rollback()

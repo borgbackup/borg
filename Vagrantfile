@@ -9,20 +9,18 @@ $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
 def packages_debianoid(user)
   return <<-EOF
-    apt-get update
+    apt update
     # install all the (security and other) updates
-    apt-get dist-upgrade -y
+    apt dist-upgrade -y
     # for building borgbackup and dependencies:
-    apt-get install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
+    apt install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
     usermod -a -G fuse #{user}
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
-    apt-get install -y fakeroot build-essential git
-    apt-get install -y python3-dev python3-setuptools
+    apt install -y fakeroot build-essential git
+    apt install -y python3-dev python3-setuptools python-virtualenv python3-virtualenv
     # for building python:
-    apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
-    easy_install3 'pip'
-    pip3 install 'virtualenv'
+    apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
   EOF
 end
 
@@ -209,16 +207,16 @@ Vagrant.configure(2) do |config|
     v.cpus = $cpus
   end
 
-  config.vm.define "xenial64" do |b|
-    b.vm.box = "ubuntu/xenial64"
+  config.vm.define "bionic64" do |b|
+    b.vm.box = "ubuntu/bionic64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("bionic64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64")
   end
 
   config.vm.define "stretch64" do |b|

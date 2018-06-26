@@ -17,10 +17,10 @@ def packages_debianoid(user)
     usermod -a -G fuse #{user}
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
-    apt install -y fakeroot build-essential git
+    apt install -y fakeroot build-essential git curl
     apt install -y python3-dev python3-setuptools python-virtualenv python3-virtualenv
     # for building python:
-    apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
+    apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
   EOF
 end
 
@@ -86,7 +86,6 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
     pyenv install 3.6.5  # binary build, use latest 3.6.x release
     pyenv rehash
@@ -167,8 +166,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.5.0 3.6.0
-      pyenv local 3.5.0 3.6.0
+      pyenv global 3.6.0
+      pyenv local 3.6.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then
@@ -226,7 +225,9 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("stretch64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("stretch64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("stretch64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("stretch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("stretch64")

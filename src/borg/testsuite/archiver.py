@@ -307,6 +307,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         return Repository(self.repository_path, exclusive=True)
 
     def create_regular_file(self, name, size=0, contents=None):
+        assert not (size != 0 and contents and len(contents) != size), 'size and contents do not match'
         filename = os.path.join(self.input_path, name)
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
@@ -3406,10 +3407,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             os.symlink('input/empty', 'input/link_target_contents_changed')
             os.symlink('input/empty', 'input/link_replaced_by_file')
         if are_hardlinks_supported():
+            os.link('input/file_replaced', 'input/hardlink_target_replaced')
             os.link('input/empty', 'input/hardlink_contents_changed')
             os.link('input/file_removed', 'input/hardlink_removed')
             os.link('input/file_removed2', 'input/hardlink_target_removed')
-            os.link('input/file_replaced', 'input/hardlink_target_replaced')
 
         # Create the first snapshot
         self.cmd('create', self.repository_location + '::test0', 'input')
@@ -3417,10 +3418,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         # Setup files for the second snapshot
         self.create_regular_file('file_added', size=2048)
         self.create_regular_file('file_empty_added', size=0)
+        os.unlink('input/file_replaced')
+        self.create_regular_file('file_replaced', contents=b'0' * 4096)
         os.unlink('input/file_removed')
         os.unlink('input/file_removed2')
-        os.unlink('input/file_replaced')
-        self.create_regular_file('file_replaced', size=4096, contents=b'0')
         os.rmdir('input/dir_replaced_with_file')
         self.create_regular_file('dir_replaced_with_file', size=8192)
         os.chmod('input/dir_replaced_with_file', stat.S_IFREG | 0o755)
@@ -3449,6 +3450,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         def do_asserts(output, can_compare_ids):
             # File contents changed (deleted and replaced with a new file)
             change = 'B' if can_compare_ids else '{:<19}'.format('modified')
+            assert 'file_replaced' in output  # added to debug #3494
             assert '{} input/file_replaced'.format(change) in output
 
             # File unchanged

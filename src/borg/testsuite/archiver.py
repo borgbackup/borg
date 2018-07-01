@@ -23,7 +23,6 @@ from hashlib import sha256
 from io import BytesIO, StringIO
 from unittest.mock import patch
 
-import msgpack
 import pytest
 
 try:
@@ -46,6 +45,7 @@ from ..helpers import Manifest, MandatoryFeatureUnsupported
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
+from ..helpers import msgpack
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff

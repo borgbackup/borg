@@ -1,11 +1,147 @@
-import msgpack
-import msgpack.fallback
-
 from .datastruct import StableDict
 from ..constants import *  # NOQA
 
+# wrapping msgpack ---------------------------------------------------------------------------------------------------
+#
+# due to the planned breaking api changes in upstream msgpack, we wrap it the way we need it -
+# to avoid having lots of clutter in the calling code. see tickets #968 and #3632.
+#
+# Packing
+# -------
+# use_bin_type = False is needed to generate the old msgpack format (not msgpack 2.0 spec) as borg always did.
+# encoding = None is needed because usage of it is deprecated
+# unicode_errors = None is needed because usage of it is deprecated
+#
+# Unpacking
+# ---------
+# raw = True is needed to unpack the old msgpack format to bytes (not str, about the decoding see item.pyx).
+# encoding = None is needed because usage of it is deprecated
+# unicode_errors = None is needed because usage of it is deprecated
+
+from msgpack import Packer as mp_Packer
+from msgpack import packb as mp_packb
+from msgpack import pack as mp_pack
+from msgpack import Unpacker as mp_Unpacker
+from msgpack import unpackb as mp_unpackb
+from msgpack import unpack as mp_unpack
+
+from msgpack import ExtType
+from msgpack import OutOfData
+
+
+class PackException(Exception):
+    """Exception while msgpack packing"""
+
+
+class UnpackException(Exception):
+    """Exception while msgpack unpacking"""
+
+
+class Packer(mp_Packer):
+    def __init__(self, *, default=None, encoding=None, unicode_errors=None,
+                 use_single_float=False, autoreset=True, use_bin_type=False,
+                 strict_types=False):
+        assert use_bin_type is False
+        assert encoding is None
+        assert unicode_errors is None
+        super().__init__(default=default, encoding=encoding, unicode_errors=unicode_errors,
+                         use_single_float=use_single_float, autoreset=autoreset, use_bin_type=use_bin_type,
+                         strict_types=strict_types)
+
+    def pack(self, obj):
+        try:
+            return super().pack(obj)
+        except Exception as e:
+            raise PackException(e)
+
+
+def packb(o, *, use_bin_type=False, encoding=None, unicode_errors=None, **kwargs):
+    assert use_bin_type is False
+    assert encoding is None
+    assert unicode_errors is None
+    try:
+        return mp_packb(o, use_bin_type=use_bin_type, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+    except Exception as e:
+        raise PackException(e)
+
+
+def pack(o, stream, *, use_bin_type=False, encoding=None, unicode_errors=None, **kwargs):
+    assert use_bin_type is False
+    assert encoding is None
+    assert unicode_errors is None
+    try:
+        return mp_pack(o, stream, use_bin_type=use_bin_type, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+    except Exception as e:
+        raise PackException(e)
+
+
+class Unpacker(mp_Unpacker):
+    def __init__(self, file_like=None, *, read_size=0, use_list=True, raw=True,
+                 object_hook=None, object_pairs_hook=None, list_hook=None,
+                 encoding=None, unicode_errors=None, max_buffer_size=0,
+                 ext_hook=ExtType,
+                 max_str_len=2147483647,  # 2**32-1
+                 max_bin_len=2147483647,
+                 max_array_len=2147483647,
+                 max_map_len=2147483647,
+                 max_ext_len=2147483647):
+        assert raw is True
+        assert encoding is None
+        assert unicode_errors is None
+        super().__init__(file_like=file_like, read_size=read_size, use_list=use_list, raw=raw,
+                         object_hook=object_hook, object_pairs_hook=object_pairs_hook, list_hook=list_hook,
+                         encoding=encoding, unicode_errors=unicode_errors, max_buffer_size=max_buffer_size,
+                         ext_hook=ext_hook,
+                         max_str_len=max_str_len,
+                         max_bin_len=max_bin_len,
+                         max_array_len=max_array_len,
+                         max_map_len=max_map_len,
+                         max_ext_len=max_ext_len)
+
+    def unpack(self):
+        try:
+            return super().unpack()
+        except OutOfData:
+            raise
+        except Exception as e:
+            raise UnpackException(e)
+
+    def __next__(self):
+        try:
+            return super().__next__()
+        except StopIteration:
+            raise
+        except Exception as e:
+            raise UnpackException(e)
+
+    next = __next__
+
+
+def unpackb(packed, *, raw=True, encoding=None, unicode_errors=None, **kwargs):
+    assert raw is True
+    assert encoding is None
+    assert unicode_errors is None
+    try:
+        return mp_unpackb(packed, raw=raw, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+    except Exception as e:
+        raise UnpackException(e)
+
+
+def unpack(stream, *, raw=True, encoding=None, unicode_errors=None, **kwargs):
+    assert raw is True
+    assert encoding is None
+    assert unicode_errors is None
+    try:
+        return mp_unpack(stream, raw=raw, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+    except Exception as e:
+        raise UnpackException(e)
+
+
+# msgpacking related utilities -----------------------------------------------
 
 def is_slow_msgpack():
+    import msgpack
+    import msgpack.fallback
     return msgpack.Packer is msgpack.fallback.Packer
 
 
@@ -31,7 +167,6 @@ def get_limited_unpacker(kind):
                          max_map_len=MAX_ARCHIVES,  # list of archives
                          max_str_len=255,  # archive name
                          object_hook=StableDict,
-                         unicode_errors='surrogateescape',
                          ))
     elif kind == 'key':
         args.update(dict(use_list=True,  # default value
@@ -39,11 +174,10 @@ def get_limited_unpacker(kind):
                          max_map_len=10,  # EncryptedKey dict
                          max_str_len=4000,  # inner key data
                          object_hook=StableDict,
-                         unicode_errors='surrogateescape',
                          ))
     else:
         raise ValueError('kind must be "server", "client", "manifest" or "key"')
-    return msgpack.Unpacker(**args)
+    return Unpacker(**args)
 
 
 def bigint_to_int(mtime):

@@ -4,7 +4,6 @@ import re
 import tempfile
 from binascii import hexlify, unhexlify
 
-import msgpack
 import pytest
 
 from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
@@ -19,6 +18,7 @@ from ..helpers import IntegrityError
 from ..helpers import Location
 from ..helpers import StableDict
 from ..helpers import get_security_dir
+from ..helpers import msgpack
 
 
 class TestKey:
@@ -333,7 +333,7 @@ class TestTAM:
             key.unpack_and_verify_manifest(blob)
 
         blob = b'\xc1\xc1\xc1'
-        with pytest.raises((ValueError, msgpack.UnpackException)):
+        with pytest.raises(msgpack.UnpackException):
             key.unpack_and_verify_manifest(blob)
 
     def test_missing_when_required(self, key):

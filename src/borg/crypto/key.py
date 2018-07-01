@@ -9,8 +9,6 @@ from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, sha512, pbkdf2_hmac
 from hmac import HMAC, compare_digest
 
-import msgpack
-
 from ..logger import create_logger
 
 logger = create_logger()
@@ -24,6 +22,7 @@ from ..helpers import get_keys_dir, get_security_dir
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers import prepare_subprocess_env
+from ..helpers import msgpack
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 
@@ -212,10 +211,10 @@ class KeyBase:
             'hmac': bytes(64),
             'salt': os.urandom(64),
         })
-        packed = msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
+        packed = msgpack.packb(metadata_dict)
         tam_key = self._tam_key(tam['salt'], context)
         tam['hmac'] = HMAC(tam_key, packed, sha512).digest()
-        return msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
+        return msgpack.packb(metadata_dict)
 
     def unpack_and_verify_manifest(self, data, force_tam_not_required=False):
         """Unpack msgpacked *data* and return (object, did_verify)."""

@@ -6,13 +6,12 @@ import sys
 import tempfile
 from unittest.mock import patch
 
-import msgpack
-
 import pytest
 
 from ..hashindex import NSIndex
 from ..helpers import Location
 from ..helpers import IntegrityError
+from ..helpers import msgpack
 from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, ConnectionClosedWithHint, handle_remote_line
 from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE

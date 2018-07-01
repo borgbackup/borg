@@ -8,9 +8,6 @@ from time import sleep
 
 import pytest
 
-import msgpack
-import msgpack.fallback
-
 from .. import platform
 from ..helpers import Location
 from ..helpers import Buffer
@@ -19,6 +16,7 @@ from ..helpers import make_path_safe, clean_lines
 from ..helpers import interval, prune_within, prune_split
 from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir
 from ..helpers import is_slow_msgpack
+from ..helpers import msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
@@ -594,6 +592,9 @@ def test_parse_file_size_invalid(string):
 
 
 def test_is_slow_msgpack():
+    # we need to import upstream msgpack package here, not helpers.msgpack:
+    import msgpack
+    import msgpack.fallback
     saved_packer = msgpack.Packer
     try:
         msgpack.Packer = msgpack.fallback.Packer

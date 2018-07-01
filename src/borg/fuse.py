@@ -11,7 +11,6 @@ from signal import SIGINT
 from distutils.version import LooseVersion
 
 import llfuse
-import msgpack
 
 from .logger import create_logger
 logger = create_logger()
@@ -21,6 +20,7 @@ from .archiver import Archiver
 from .archive import Archive
 from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
+from .helpers import msgpack
 from .item import Item
 from .lrucache import LRUCache
 from .remote import RemoteRepository

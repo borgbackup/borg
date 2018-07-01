@@ -29,8 +29,6 @@ from .logger import create_logger, setup_logging
 
 logger = create_logger()
 
-import msgpack
-
 import borg
 from . import __version__
 from . import helpers
@@ -68,6 +66,7 @@ from .helpers import ChunkIteratorFileWrapper
 from .helpers import popen_with_error_handling, prepare_subprocess_env
 from .helpers import dash_open
 from .helpers import umount
+from .helpers import msgpack
 from .nanorst import rst_to_terminal
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
 from .patterns import PatternMatcher
@@ -1705,7 +1704,7 @@ class Archiver:
             fd.write(',\n')
 
             data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
-            archive_org_dict = msgpack.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape')
+            archive_org_dict = msgpack.unpackb(data, object_hook=StableDict)
 
             fd.write('    "_meta":\n')
             fd.write(do_indent(prepare_dump_dict(archive_org_dict)))
@@ -1738,7 +1737,7 @@ class Archiver:
 
         data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
 
-        meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
+        meta = prepare_dump_dict(msgpack.unpackb(data, object_hook=StableDict))
 
         with dash_open(args.path, 'w') as fd:
             json.dump(meta, fd, indent=4)
@@ -1844,7 +1843,7 @@ class Archiver:
         """convert Borg profile to Python profile"""
         import marshal
         with args.output, args.input:
-            marshal.dump(msgpack.unpack(args.input, use_list=False, encoding='utf-8'), args.output)
+            marshal.dump(msgpack.mp_unpack(args.input, use_list=False, raw=False), args.output)
         return EXIT_SUCCESS
 
     @with_repository(lock=False, manifest=False)
@@ -4107,7 +4106,8 @@ class Archiver:
                         # into a marshal file that can be read by e.g. pyprof2calltree.
                         # For local use it's unnecessary hassle, though, that's why .pyprof makes
                         # it compatible (see above).
-                        msgpack.pack(profiler.stats, fd, use_bin_type=True)
+                        # We do not use our msgpack wrapper here, but directly call mp_pack.
+                        msgpack.mp_pack(profiler.stats, fd, use_bin_type=True)
         else:
             return set_ec(func(args))
 

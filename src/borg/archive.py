@@ -818,7 +818,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         if 'chunks' in item:
                             for chunk_id, size, csize in item.chunks:
                                 chunk_decref(chunk_id, stats)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError): # XXX other exceptions?
                     # if items metadata spans multiple chunks and one chunk got dropped somehow,
                     # it could be that unpacker yields bad types
                     if forced == 0:
@@ -826,7 +826,7 @@ Utilization of max. archive size: {csize_max:.0%}
                     error = True
             if progress:
                 pi.finish()
-        except (msgpack.UnpackException, Repository.ObjectNotFound):
+        except (msgpack.UnpackException, Repository.ObjectNotFound):  # XXX other exceptions?
             # items metadata corrupted
             if forced == 0:
                 raise
@@ -1250,7 +1250,7 @@ class RobustUnpacker:
         def unpack_next():
             try:
                 return next(self._unpacker)
-            except (TypeError, ValueError) as err:
+            except (TypeError, ValueError) as err:  # XXX other exceptions?
                 # transform exceptions that might be raised when feeding
                 # msgpack with invalid data to a more specific exception
                 raise self.UnpackerCrashed(str(err))
@@ -1476,7 +1476,7 @@ class ArchiveChecker:
                 archive = msgpack.unpackb(data)
             # Ignore exceptions that might be raised when feeding
             # msgpack with invalid data
-            except (TypeError, ValueError, StopIteration):
+            except (TypeError, ValueError, StopIteration):  # XXX other exceptions?
                 continue
             if valid_archive(archive):
                 archive = ArchiveItem(internal_dict=archive)

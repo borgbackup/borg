@@ -36,6 +36,7 @@ import logging
 import logging.config
 import logging.handlers  # needed for handlers defined there being configurable in logging.conf file
 import os
+import sys
 import warnings
 
 configured = False
@@ -84,7 +85,27 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
             borg_logger.json = json
             logger.debug('using logging configuration read from "{0}"'.format(conf_fname))
             warnings.showwarning = _log_warning
-            return None
+            root = logging.getLogger('')
+            stderr_handlers = []
+            for handler in root.handlers:
+                if isinstance(handler, logging.StreamHandler):
+                    try:
+                        if handler.stream.fileno() == sys.stderr.fileno():
+                            stderr_handlers.append(handler)
+                    except AttributeError:
+                        pass
+            if level is not None:
+                # if level is specified on the commandline,
+                # we override only the log level of the stderr stream handler
+                # this allows logging configurations that always additionally log
+                # to a log-file or to syslog using a log level defined in the config
+                for handler in stderr_handlers:
+                    handler.setLevel(level.upper())
+            if stream is not None:
+                # to allow testing of file-based config: set stderr handlers to stream
+                for handler in stderr_handlers:
+                    handler.stream = stream
+            return stderr_handlers[0] if stderr_handlers else None
         except Exception as err:  # XXX be more precise
             err_msg = str(err)
     # if we did not / not successfully load a logging configuration, fallback to this:
@@ -106,6 +127,8 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
         logger.handlers[0].close()
         logger.handlers.clear()
     logger.addHandler(handler)
+    if level is None:
+        level = 'warning'
     logger.setLevel(level.upper())
     configured = True
     logger = logging.getLogger(__name__)

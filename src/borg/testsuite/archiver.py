@@ -22,6 +22,7 @@ from datetime import timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
 from unittest.mock import patch
+from contextlib import contextmanager
 
 import msgpack
 import pytest
@@ -55,7 +56,7 @@ from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected
+from .platform import fakeroot_detected, test_wrapper_detected
 from .upgrader import attic_repo
 from . import key
 
@@ -1246,14 +1247,41 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
                                                          'fakeroot')
     def test_extract_xattrs_errors(self):
-        def patched_setxattr_E2BIG(*args, **kwargs):
-            raise OSError(errno.E2BIG, 'E2BIG')
+        def raise_oserr(error):
+            # A lambda cannot contain a statement, such as "raise"
+            raise OSError(error, errno.errorcode[error])
 
-        def patched_setxattr_ENOTSUP(*args, **kwargs):
-            raise OSError(errno.ENOTSUP, 'ENOTSUP')
+        def get_patched_setxattr(error):
+            return lambda *args, **kwargs: raise_oserr(error)
 
-        def patched_setxattr_EACCES(*args, **kwargs):
-            raise OSError(errno.EACCES, 'EACCES')
+        original_test_wrapper_overrides = os.environ.get('TEST_WRAPPER_OVERRIDES')
+        if original_test_wrapper_overrides:
+            test_wrapper_overrides = json.loads(original_test_wrapper_overrides)
+        else:
+            test_wrapper_overrides = {}
+        setxattr_functions = ['setxattr', 'lsetxattr', 'fsetxattr', 'extattr_set_file', 'extattr_set_link', 'extattr_set_fd']
+
+        @contextmanager
+        def patch_setxattr(error):
+            if test_wrapper_detected():
+                overrides = test_wrapper_overrides.copy()
+                for fn in setxattr_functions:
+                    overrides[fn] = {
+                        'returnValue': -1,
+                        'setErrno': error,
+                        'sideEffect': False
+                    }
+                os.environ['TEST_WRAPPER_OVERRIDES'] = json.dumps(overrides)
+                yield
+                if original_test_wrapper_overrides is None:
+                    del os.environ['TEST_WRAPPER_OVERRIDES']
+                else:
+                    os.environ['TEST_WRAPPER_OVERRIDES'] = original_test_wrapper_overrides
+            else:
+                patch_context = patch.object(xattr, 'setxattr', get_patched_setxattr(error))
+                patch_context.__enter__()
+                yield
+                patch_context.__exit__()
 
         self.create_regular_file('file')
         xattr.setxattr('input/file', 'attribute', 'value')
@@ -1261,16 +1289,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             input_abspath = os.path.abspath('input/file')
-            with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
+            with patch_setxattr(errno.E2BIG):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
                 assert out == (input_abspath + ': Value or key of extended attribute attribute is too big for this '
                                                'filesystem\n')
             os.remove(input_abspath)
-            with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
+            with patch_setxattr(errno.ENOTSUP):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
                 assert out == (input_abspath + ': Extended attributes are not supported on this filesystem\n')
             os.remove(input_abspath)
-            with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
+            with patch_setxattr(errno.EACCES):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
                 assert out == (input_abspath + ': Permission denied when setting extended attribute attribute\n')
             assert os.path.isfile(input_abspath)

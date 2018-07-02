@@ -5,6 +5,9 @@ language: python
 cache:
     directories:
         - $HOME/.cache/pip
+        - $HOME/.cargo
+        - $HOME/.rustup
+        - $TRAVIS_BUILD_DIR/test-wrapper/target
 
 matrix:
     include:

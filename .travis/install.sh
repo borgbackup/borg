@@ -41,3 +41,5 @@ pip install -r requirements.d/development.txt
 pip install codecov
 python setup.py --version
 pip install -e .[fuse]
+
+scripts/build-test-wrapper.sh

@@ -252,6 +252,17 @@ if not on_rtd:
         cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], nthreads=cpu_threads+1)
         ext_modules = cythonize(ext_modules, nthreads=cpu_threads+1)
 
+# Remove test-wrapper from the preload.
+# It hinders xcode, and is not needed for setup.
+preload_var = 'LD_PRELOAD'
+if sys.platform == 'darwin':
+    preload_var = 'DYLD_INSERT_LIBRARIES'
+
+original_preload = os.environ.get(preload_var)
+if original_preload:
+    new_preload = filter(lambda x: not (x.endswith('libtestwrapper.so') or x.endswith('libtestwrapper.dylib')), original_preload.split(':'))
+    os.environ[preload_var] = ':'.join(new_preload)
+
 setup(
     name='borgbackup',
     use_scm_version={

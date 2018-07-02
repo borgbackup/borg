@@ -15,9 +15,4 @@ fi
 
 source ~/.venv/bin/activate
 
-if [[ "$(uname -s)" == "Darwin" ]]; then
-    # no fakeroot on OS X
-    sudo tox -e $TOXENV -r
-else
-    fakeroot -u tox -r
-fi
+RUST_LOG=warn test-wrapper/target/release/test-wrapper tox -r

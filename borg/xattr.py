@@ -182,14 +182,20 @@ def _setxattr_inner(func, path, name, value):
 
 
 if sys.platform.startswith('linux'):  # pragma: linux only
+    libc.listxattr.argtypes = (c_char_p, c_char_p, c_size_t)
+    libc.listxattr.restype = c_ssize_t
     libc.llistxattr.argtypes = (c_char_p, c_char_p, c_size_t)
     libc.llistxattr.restype = c_ssize_t
     libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t)
     libc.flistxattr.restype = c_ssize_t
+    libc.setxattr.argtypes = (c_char_p, c_char_p, c_char_p, c_size_t, c_int)
+    libc.setxattr.restype = c_int
     libc.lsetxattr.argtypes = (c_char_p, c_char_p, c_char_p, c_size_t, c_int)
     libc.lsetxattr.restype = c_int
     libc.fsetxattr.argtypes = (c_int, c_char_p, c_char_p, c_size_t, c_int)
     libc.fsetxattr.restype = c_int
+    libc.getxattr.argtypes = (c_char_p, c_char_p, c_char_p, c_size_t)
+    libc.getxattr.restype = c_ssize_t
     libc.lgetxattr.argtypes = (c_char_p, c_char_p, c_char_p, c_size_t)
     libc.lgetxattr.restype = c_ssize_t
     libc.fgetxattr.argtypes = (c_int, c_char_p, c_char_p, c_size_t)

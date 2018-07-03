@@ -245,7 +245,7 @@ if sys.platform.startswith('linux'):  # pragma: linux only
 elif sys.platform == 'darwin':  # pragma: darwin only
     libc.listxattr.argtypes = (c_char_p, c_char_p, c_size_t, c_int)
     libc.listxattr.restype = c_ssize_t
-    libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t)
+    libc.flistxattr.argtypes = (c_int, c_char_p, c_size_t, c_int)
     libc.flistxattr.restype = c_ssize_t
     libc.setxattr.argtypes = (c_char_p, c_char_p, c_char_p, c_size_t, c_uint32, c_int)
     libc.setxattr.restype = c_int

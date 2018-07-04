@@ -78,14 +78,13 @@ _comment_re = re.compile(' *#.*', re.M)
 
 def listxattr(path, *, follow_symlinks=True):
     def func(path, buf, size):
-        cdef char *buffer = <char *> buf
         if isinstance(path, int):
-            return c_flistxattr(path, buffer, size)
+            return c_flistxattr(path, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_listxattr(path, buffer, size)
+                return c_listxattr(path, <char *> buf, size)
             else:
-                return c_llistxattr(path, buffer, size)
+                return c_llistxattr(path, <char *> buf, size)
 
     n, buf = _listxattr_inner(func, path)
     return [os.fsdecode(name) for name in split_string0(buf[:n])
@@ -94,30 +93,28 @@ def listxattr(path, *, follow_symlinks=True):
 
 def getxattr(path, name, *, follow_symlinks=True):
     def func(path, name, buf, size):
-        cdef char *buffer = <char *> buf
         if isinstance(path, int):
-            return c_fgetxattr(path, name, buffer, size)
+            return c_fgetxattr(path, name, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_getxattr(path, name, buffer, size)
+                return c_getxattr(path, name, <char *> buf, size)
             else:
-                return c_lgetxattr(path, name, buffer, size)
+                return c_lgetxattr(path, name, <char *> buf, size)
 
     n, buf = _getxattr_inner(func, path, name)
-    return buf[:n] or None
+    return bytes(buf[:n])
 
 
 def setxattr(path, name, value, *, follow_symlinks=True):
     def func(path, name, value, size):
-        cdef char *val = NULL if value is None else <char *> value
         flags = 0
         if isinstance(path, int):
-            return c_fsetxattr(path, name, val, size, flags)
+            return c_fsetxattr(path, name, <char *> value, size, flags)
         else:
             if follow_symlinks:
-                return c_setxattr(path, name, val, size, flags)
+                return c_setxattr(path, name, <char *> value, size, flags)
             else:
-                return c_lsetxattr(path, name, val, size, flags)
+                return c_lsetxattr(path, name, <char *> value, size, flags)
 
     _setxattr_inner(func, path, name, value)
 

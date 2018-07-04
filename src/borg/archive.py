@@ -726,7 +726,8 @@ Utilization of max. archive size: {csize_max:.0%}
         xattrs = item.get('xattrs', {})
         for k, v in xattrs.items():
             try:
-                xattr.setxattr(fd or path, k, v, follow_symlinks=False)
+                # if we have a None value, it means "empty", so give b'' to setxattr in that case:
+                xattr.setxattr(fd or path, k, v or b'', follow_symlinks=False)
             except OSError as e:
                 if e.errno == errno.E2BIG:
                     # xattr is too big

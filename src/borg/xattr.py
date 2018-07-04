@@ -35,7 +35,9 @@ def get_all(path, follow_symlinks=True):
         names = listxattr(path, follow_symlinks=follow_symlinks)
         for name in names:
             try:
-                result[name] = getxattr(path, name, follow_symlinks=follow_symlinks)
+                # if we get an empty xattr value (b''), we store None into the result dict.
+                # borg always did it like that...
+                result[name] = getxattr(path, name, follow_symlinks=follow_symlinks) or None
             except OSError as e:
                 # if we get ENOATTR, a race has happened: xattr names were deleted after list.
                 # we just ignore the now missing ones. if you want consistency, do snapshots.

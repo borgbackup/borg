@@ -50,14 +50,13 @@ cdef extern from "unistd.h":
 
 def listxattr(path, *, follow_symlinks=True):
     def func(path, buf, size):
-        cdef char *buffer = <char *> buf
         if isinstance(path, int):
-            return c_extattr_list_fd(path, EXTATTR_NAMESPACE_USER, buffer, size)
+            return c_extattr_list_fd(path, EXTATTR_NAMESPACE_USER, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_extattr_list_file(path, EXTATTR_NAMESPACE_USER, buffer, size)
+                return c_extattr_list_file(path, EXTATTR_NAMESPACE_USER, <char *> buf, size)
             else:
-                return c_extattr_list_link(path, EXTATTR_NAMESPACE_USER, buffer, size)
+                return c_extattr_list_link(path, EXTATTR_NAMESPACE_USER, <char *> buf, size)
 
     n, buf = _listxattr_inner(func, path)
     return [os.fsdecode(name) for name in split_lstring(buf[:n]) if name]
@@ -65,29 +64,27 @@ def listxattr(path, *, follow_symlinks=True):
 
 def getxattr(path, name, *, follow_symlinks=True):
     def func(path, name, buf, size):
-        cdef char *buffer = <char *> buf
         if isinstance(path, int):
-            return c_extattr_get_fd(path, EXTATTR_NAMESPACE_USER, name, buffer, size)
+            return c_extattr_get_fd(path, EXTATTR_NAMESPACE_USER, name, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_extattr_get_file(path, EXTATTR_NAMESPACE_USER, name, buffer, size)
+                return c_extattr_get_file(path, EXTATTR_NAMESPACE_USER, name, <char *> buf, size)
             else:
-                return c_extattr_get_link(path, EXTATTR_NAMESPACE_USER, name, buffer, size)
+                return c_extattr_get_link(path, EXTATTR_NAMESPACE_USER, name, <char *> buf, size)
 
     n, buf = _getxattr_inner(func, path, name)
-    return buf[:n] or None
+    return bytes(buf[:n])
 
 
 def setxattr(path, name, value, *, follow_symlinks=True):
     def func(path, name, value, size):
-        cdef char *val = NULL if value is None else <char *> value
         if isinstance(path, int):
-            return c_extattr_set_fd(path, EXTATTR_NAMESPACE_USER, name, val, size)
+            return c_extattr_set_fd(path, EXTATTR_NAMESPACE_USER, name, <char *> value, size)
         else:
             if follow_symlinks:
-                return c_extattr_set_file(path, EXTATTR_NAMESPACE_USER, name, val, size)
+                return c_extattr_set_file(path, EXTATTR_NAMESPACE_USER, name, <char *> value, size)
             else:
-                return c_extattr_set_link(path, EXTATTR_NAMESPACE_USER, name, val, size)
+                return c_extattr_set_link(path, EXTATTR_NAMESPACE_USER, name, <char *> value, size)
 
     _setxattr_inner(func, path, name, value)
 

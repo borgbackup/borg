@@ -1229,7 +1229,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # We need to manually patch chown to get the behaviour Linux has, since fakeroot does not
         # accurately model the interaction of chown(2) and Linux capabilities, i.e. it does not remove them.
         def patched_fchown(fd, uid, gid):
-            xattr.setxattr(fd, 'security.capability', None, follow_symlinks=False)
+            xattr.setxattr(fd, 'security.capability', b'', follow_symlinks=False)
             fchown(fd, uid, gid)
 
         # The capability descriptor used here is valid and taken from a /usr/bin/ping
@@ -2187,8 +2187,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
                     assert sorted(no_selinux(xattr.listxattr(out_fn))) == ['user.empty', 'user.foo', ]
                     assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
-                    # Special case: getxattr returns None (not b'') when reading an empty xattr.
-                    assert xattr.getxattr(out_fn, 'user.empty') is None
+                    assert xattr.getxattr(out_fn, 'user.empty') == b''
                 else:
                     assert xattr.listxattr(out_fn) == []
                     try:

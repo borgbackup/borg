@@ -32,7 +32,7 @@ class XattrTestCase(BaseTestCase):
         self.assert_equal_se(listxattr(self.symlink), [])
         setxattr(self.tmpfile.name, 'user.foo', b'bar')
         setxattr(self.tmpfile.fileno(), 'user.bar', b'foo')
-        setxattr(self.tmpfile.name, 'user.empty', None)
+        setxattr(self.tmpfile.name, 'user.empty', b'')
         self.assert_equal_se(listxattr(self.tmpfile.name), ['user.foo', 'user.bar', 'user.empty'])
         self.assert_equal_se(listxattr(self.tmpfile.fileno()), ['user.foo', 'user.bar', 'user.empty'])
         self.assert_equal_se(listxattr(self.symlink), ['user.foo', 'user.bar', 'user.empty'])
@@ -40,7 +40,7 @@ class XattrTestCase(BaseTestCase):
         self.assert_equal(getxattr(self.tmpfile.name, 'user.foo'), b'bar')
         self.assert_equal(getxattr(self.tmpfile.fileno(), 'user.foo'), b'bar')
         self.assert_equal(getxattr(self.symlink, 'user.foo'), b'bar')
-        self.assert_equal(getxattr(self.tmpfile.name, 'user.empty'), None)
+        self.assert_equal(getxattr(self.tmpfile.name, 'user.empty'), b'')
 
     def test_listxattr_buffer_growth(self):
         # make it work even with ext4, which imposes rather low limits

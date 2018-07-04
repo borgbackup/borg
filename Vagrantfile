@@ -42,7 +42,7 @@ def packages_freebsd
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
     pkg install -y openssl-devel liblz4 fusefs-libs pkgconf
-    pkg install -y fakeroot git bash
+    pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python:
     pkg install -y sqlite3
     pkg install -y py27-virtualenv  # provides "virtualenv" command
@@ -64,6 +64,29 @@ def packages_freebsd
     # install all the (security and other) updates, packages
     pkg update
     yes | pkg upgrade
+  EOF
+end
+
+def packages_darwin
+  return <<-EOF
+    # install all the (security and other) updates
+    sudo softwareupdate --ignore iTunesX
+    sudo softwareupdate --ignore iTunes
+    sudo softwareupdate --ignore "Install macOS High Sierra"
+    sudo softwareupdate --install --all
+    # get osxfuse 3.x release code from github:
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.0/osxfuse-3.8.0.dmg >osxfuse.dmg
+    MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.0.pkg" -target /
+    sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
+    ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    brew update
+    brew install openssl
+    brew install lz4
+    brew install xz  # required for python lzma module
+    brew install fakeroot
+    brew install git
+    brew install pkg-config
   EOF
 end
 
@@ -259,6 +282,31 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64")
+  end
+
+  config.vm.define "darwin64" do |b|
+    b.vm.box = "jhcook/yosemite-clitools"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1536 + $wmem
+      v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']
+      v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
+      # Adjust CPU settings according to
+      # https://github.com/geerlingguy/macos-virtualbox-vm
+      v.customize ['modifyvm', :id, '--cpuidset',
+                   '00000001', '000306a9', '00020800', '80000201', '178bfbff']
+      # Disable USB variant requiring Virtualbox proprietary extension pack
+      v.customize ["modifyvm", :id, '--usbehci', 'off', '--usbxhci', 'off']
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin64")
+    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("darwin64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("darwin64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64")
   end
 
   # TODO: create more VMs with python 3.6 and openssl 1.1.

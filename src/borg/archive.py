@@ -947,11 +947,11 @@ class MetadataCollector:
             attrs['group'] = gid2group(st.st_gid)
         return attrs
 
-    def stat_ext_attrs(self, st, path):
+    def stat_ext_attrs(self, st, path, fd=None):
         attrs = {}
         bsdflags = 0
         with backup_io('extended stat'):
-            xattrs = xattr.get_all(path, follow_symlinks=False)
+            xattrs = xattr.get_all(fd or path, follow_symlinks=False)
             if not self.nobsdflags:
                 bsdflags = get_flags(path, st)
             acl_get(path, attrs, st, self.numeric_owner)
@@ -961,9 +961,9 @@ class MetadataCollector:
             attrs['bsdflags'] = bsdflags
         return attrs
 
-    def stat_attrs(self, st, path):
+    def stat_attrs(self, st, path, fd=None):
         attrs = self.stat_simple_attrs(st)
-        attrs.update(self.stat_ext_attrs(st, path))
+        attrs.update(self.stat_ext_attrs(st, path, fd=fd))
         return attrs
 
 
@@ -1119,6 +1119,7 @@ class FilesystemObjectProcessors:
 
     def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
+            md = None
             is_special_file = is_special(st.st_mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
@@ -1152,12 +1153,19 @@ class FilesystemObjectProcessors:
                         fh = Archive._open_rb(path)
                     with os.fdopen(fh, 'rb') as fd:
                         self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd, fh)))
+                        md = self.metadata_collector.stat_attrs(st, path, fd=fh)
                     if not is_special_file:
                         # we must not memorize special files, because the contents of e.g. a
                         # block or char device will change without its mtime/size/inode changing.
                         cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                 self.stats.nfiles += 1
-            item.update(self.metadata_collector.stat_attrs(st, path))
+            if md is None:
+                fh = Archive._open_rb(path)
+                try:
+                    md = self.metadata_collector.stat_attrs(st, path, fd=fh)
+                finally:
+                    os.close(fh)
+            item.update(md)
             item.get_size(memorize=True)
             if is_special_file:
                 # we processed a special file like a regular file. reflect that in mode,

@@ -335,13 +335,14 @@ class ArchiverTestCaseBase(BaseTestCase):
             os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         self.create_regular_file('fusexattr', size=1)
         if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
+            fn = os.fsencode(os.path.join(self.input_path, 'fusexattr'))
             # ironically, due to the way how fakeroot works, comparing FUSE file xattrs to orig file xattrs
             # will FAIL if fakeroot supports xattrs, thus we only set the xattr if XATTR_FAKEROOT is False.
             # This is because fakeroot with xattr-support does not propagate xattrs of the underlying file
             # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file
             # (from fakeroots point of view) they are invisible to the test process inside the fakeroot.
-            xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), b'user.foo', b'bar')
-            xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), b'user.empty', b'')
+            xattr.setxattr(fn, b'user.foo', b'bar')
+            xattr.setxattr(fn, b'user.empty', b'')
             # XXX this always fails for me
             # ubuntu 14.04, on a TMP dir filesystem with user_xattr, using fakeroot
             # same for newer ubuntu and centos.
@@ -1235,13 +1236,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # The capability descriptor used here is valid and taken from a /usr/bin/ping
         capabilities = b'\x01\x00\x00\x02\x00 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         self.create_regular_file('file')
-        xattr.setxattr('input/file', b'security.capability', capabilities)
+        xattr.setxattr(b'input/file', b'security.capability', capabilities)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             with patch.object(os, 'fchown', patched_fchown):
                 self.cmd('extract', self.repository_location + '::test')
-            assert xattr.getxattr('input/file', b'security.capability') == capabilities
+            assert xattr.getxattr(b'input/file', b'security.capability') == capabilities
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
                                                          'fakeroot')
@@ -1256,7 +1257,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             raise OSError(errno.EACCES, 'EACCES')
 
         self.create_regular_file('file')
-        xattr.setxattr('input/file', b'attribute', b'value')
+        xattr.setxattr(b'input/file', b'attribute', b'value')
         self.cmd('init', self.repository_location, '-e' 'none')
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
@@ -2183,7 +2184,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # list/read xattrs
             try:
                 in_fn = 'input/fusexattr'
-                out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
+                out_fn = os.fsencode(os.path.join(mountpoint, 'input', 'fusexattr'))
                 if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
                     assert sorted(no_selinux(xattr.listxattr(out_fn))) == [b'user.empty', b'user.foo', ]
                     assert xattr.getxattr(out_fn, b'user.foo') == b'bar'

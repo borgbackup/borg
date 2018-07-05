@@ -28,7 +28,7 @@ def listxattr(path, *, follow_symlinks=True):
     """
     Return xattr names of a file (list of bytes objects).
 
-    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *path* can either be a path (bytes) or an open file descriptor (int).
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
     """
@@ -39,7 +39,7 @@ def getxattr(path, name, *, follow_symlinks=True):
     """
     Read xattr and return its value (as bytes).
 
-    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *path* can either be a path (bytes) or an open file descriptor (int).
     *name* is the name of the xattr to read (bytes).
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
@@ -51,7 +51,7 @@ def setxattr(path, name, value, *, follow_symlinks=True):
     """
     Write xattr on *path*.
 
-    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *path* can either be a path (bytes) or an open file descriptor (int).
     *name* is the name of the xattr to read (bytes).
     *value* is the value to write (bytes).
     *follow_symlinks* indicates whether symlinks should be followed

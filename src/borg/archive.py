@@ -674,6 +674,7 @@ Utilization of max. archive size: {csize_max:.0%}
         Does not access the repository.
         """
         backup_io.op = 'attrs'
+        path_bytes = os.fsencode(path)
         uid = gid = None
         if not self.numeric_owner:
             uid = user2uid(item.user)
@@ -728,7 +729,7 @@ Utilization of max. archive size: {csize_max:.0%}
             try:
                 # the key k is a bytes object due to msgpack unpacking it as such.
                 # if we have a None value, it means "empty", so give b'' to setxattr in that case:
-                xattr.setxattr(fd or path, k, v or b'', follow_symlinks=False)
+                xattr.setxattr(fd or path_bytes, k, v or b'', follow_symlinks=False)
             except OSError as e:
                 k_str = k.decode()
                 if e.errno == errno.E2BIG:

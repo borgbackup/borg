@@ -1,6 +1,7 @@
 """A basic extended attributes (xattr) implementation for Linux, FreeBSD and MacOS X."""
 
 import errno
+import os
 import tempfile
 
 from .platform import listxattr, getxattr, setxattr, ENOATTR
@@ -30,6 +31,8 @@ def get_all(path, follow_symlinks=True):
     The returned mapping maps xattr names (bytes) to values (bytes or None).
     None indicates, as a xattr value, an empty value, i.e. a value of length zero.
     """
+    if isinstance(path, str):
+        path = os.fsencode(path)
     try:
         result = {}
         names = listxattr(path, follow_symlinks=follow_symlinks)

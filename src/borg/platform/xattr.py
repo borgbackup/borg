@@ -63,8 +63,7 @@ def _check(rv, path=None, detect_buffer_too_small=False):
 
 
 def _listxattr_inner(func, path):
-    if isinstance(path, str):
-        path = os.fsencode(path)
+    assert isinstance(path, (bytes, int))
     size = len(buffer)
     while True:
         buf = buffer.get(size)
@@ -77,8 +76,7 @@ def _listxattr_inner(func, path):
 
 
 def _getxattr_inner(func, path, name):
-    if isinstance(path, str):
-        path = os.fsencode(path)
+    assert isinstance(path, (bytes, int))
     assert isinstance(name, bytes)
     size = len(buffer)
     while True:
@@ -92,8 +90,7 @@ def _getxattr_inner(func, path, name):
 
 
 def _setxattr_inner(func, path, name, value):
-    if isinstance(path, str):
-        path = os.fsencode(path)
+    assert isinstance(path, (bytes, int))
     assert isinstance(name, bytes)
     assert isinstance(value, bytes)
     _check(func(path, name, value, len(value)), path, detect_buffer_too_small=False)

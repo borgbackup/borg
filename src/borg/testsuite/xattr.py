@@ -27,38 +27,43 @@ class XattrTestCase(BaseTestCase):
         self.assert_equal(is_x, want_x)
 
     def test(self):
-        self.assert_equal_se(listxattr(self.tmpfile.name), [])
-        self.assert_equal_se(listxattr(self.tmpfile.fileno()), [])
-        self.assert_equal_se(listxattr(self.symlink), [])
-        setxattr(self.tmpfile.name, b'user.foo', b'bar')
-        setxattr(self.tmpfile.fileno(), b'user.bar', b'foo')
-        setxattr(self.tmpfile.name, b'user.empty', b'')
-        self.assert_equal_se(listxattr(self.tmpfile.name), [b'user.foo', b'user.bar', b'user.empty'])
-        self.assert_equal_se(listxattr(self.tmpfile.fileno()), [b'user.foo', b'user.bar', b'user.empty'])
-        self.assert_equal_se(listxattr(self.symlink), [b'user.foo', b'user.bar', b'user.empty'])
-        self.assert_equal_se(listxattr(self.symlink, follow_symlinks=False), [])
-        self.assert_equal(getxattr(self.tmpfile.name, b'user.foo'), b'bar')
-        self.assert_equal(getxattr(self.tmpfile.fileno(), b'user.foo'), b'bar')
-        self.assert_equal(getxattr(self.symlink, b'user.foo'), b'bar')
-        self.assert_equal(getxattr(self.tmpfile.name, b'user.empty'), b'')
+        tmp_fn = os.fsencode(self.tmpfile.name)
+        tmp_lfn = os.fsencode(self.symlink)
+        tmp_fd = self.tmpfile.fileno()
+        self.assert_equal_se(listxattr(tmp_fn), [])
+        self.assert_equal_se(listxattr(tmp_fd), [])
+        self.assert_equal_se(listxattr(tmp_lfn), [])
+        setxattr(tmp_fn, b'user.foo', b'bar')
+        setxattr(tmp_fd, b'user.bar', b'foo')
+        setxattr(tmp_fn, b'user.empty', b'')
+        self.assert_equal_se(listxattr(tmp_fn), [b'user.foo', b'user.bar', b'user.empty'])
+        self.assert_equal_se(listxattr(tmp_fd), [b'user.foo', b'user.bar', b'user.empty'])
+        self.assert_equal_se(listxattr(tmp_lfn), [b'user.foo', b'user.bar', b'user.empty'])
+        self.assert_equal_se(listxattr(tmp_lfn, follow_symlinks=False), [])
+        self.assert_equal(getxattr(tmp_fn, b'user.foo'), b'bar')
+        self.assert_equal(getxattr(tmp_fd, b'user.foo'), b'bar')
+        self.assert_equal(getxattr(tmp_lfn, b'user.foo'), b'bar')
+        self.assert_equal(getxattr(tmp_fn, b'user.empty'), b'')
 
     def test_listxattr_buffer_growth(self):
+        tmp_fn = os.fsencode(self.tmpfile.name)
         # make it work even with ext4, which imposes rather low limits
         buffer.resize(size=64, init=True)
         # xattr raw key list will be size 9 * (10 + 1), which is > 64
         keys = [b'user.attr%d' % i for i in range(9)]
         for key in keys:
-            setxattr(self.tmpfile.name, key, b'x')
-        got_keys = listxattr(self.tmpfile.name)
+            setxattr(tmp_fn, key, b'x')
+        got_keys = listxattr(tmp_fn)
         self.assert_equal_se(got_keys, keys)
         self.assert_equal(len(buffer), 128)
 
     def test_getxattr_buffer_growth(self):
+        tmp_fn = os.fsencode(self.tmpfile.name)
         # make it work even with ext4, which imposes rather low limits
         buffer.resize(size=64, init=True)
         value = b'x' * 126
-        setxattr(self.tmpfile.name, b'user.big', value)
-        got_value = getxattr(self.tmpfile.name, b'user.big')
+        setxattr(tmp_fn, b'user.big', value)
+        got_value = getxattr(tmp_fn, b'user.big')
         self.assert_equal(value, got_value)
         self.assert_equal(len(buffer), 128)
 

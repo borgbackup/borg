@@ -21,7 +21,7 @@ cdef extern from "sys/acl.h":
 
     int acl_free(void *obj)
     acl_t acl_get_link_np(const char *path, int type)
-    acl_t acl_set_link_np(const char *path, int type, acl_t acl)
+    int acl_set_link_np(const char *path, int type, acl_t acl)
     acl_t acl_from_text(const char *buf)
     char *acl_to_text_np(acl_t acl, ssize_t *len, int flags)
     int ACL_TEXT_NUMERIC_IDS

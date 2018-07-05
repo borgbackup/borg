@@ -29,7 +29,9 @@ cdef extern from "sys/acl.h":
 
     int acl_free(void *obj)
     acl_t acl_get_link_np(const char *path, int type)
+    acl_t acl_get_fd_np(int fd, int type)
     int acl_set_link_np(const char *path, int type, acl_t acl)
+    int acl_set_fd_np(int fd, acl_t acl, int type)
     acl_t acl_from_text(const char *buf)
     char *acl_to_text(acl_t acl, ssize_t *len_p)
     int ACL_TYPE_EXTENDED
@@ -108,13 +110,16 @@ def _remove_non_numeric_identifier(acl):
     return safe_encode('\n'.join(entries))
 
 
-def acl_get(path, item, st, numeric_owner=False):
+def acl_get(path, item, st, numeric_owner=False, fd=None):
     cdef acl_t acl = NULL
     cdef char *text = NULL
     if isinstance(path, str):
         path = os.fsencode(path)
     try:
-        acl = acl_get_link_np(path, ACL_TYPE_EXTENDED)
+        if fd is not None:
+            acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED)
+        else:
+            acl = acl_get_link_np(path, ACL_TYPE_EXTENDED)
         if acl == NULL:
             return
         text = acl_to_text(acl, NULL)
@@ -129,7 +134,7 @@ def acl_get(path, item, st, numeric_owner=False):
         acl_free(acl)
 
 
-def acl_set(path, item, numeric_owner=False):
+def acl_set(path, item, numeric_owner=False, fd=None):
     cdef acl_t acl = NULL
     acl_text = item.get('acl_extended')
     if acl_text is not None:
@@ -142,7 +147,9 @@ def acl_set(path, item, numeric_owner=False):
                 return
             if isinstance(path, str):
                 path = os.fsencode(path)
-            if acl_set_link_np(path, ACL_TYPE_EXTENDED, acl):
-                return
+            if fd is not None:
+                acl_set_fd_np(fd, acl, ACL_TYPE_EXTENDED)
+            else:
+                acl_set_link_np(path, ACL_TYPE_EXTENDED, acl)
         finally:
             acl_free(acl)

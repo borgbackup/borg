@@ -719,7 +719,7 @@ Utilization of max. archive size: {csize_max:.0%}
         except OSError:
             # some systems don't support calling utime on a symlink
             pass
-        acl_set(path, item, self.numeric_owner)
+        acl_set(path, item, self.numeric_owner, fd=fd)
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.
         warning = xattr.set_all(fd or path, item.get('xattrs', {}), follow_symlinks=False)
@@ -954,7 +954,7 @@ class MetadataCollector:
             xattrs = xattr.get_all(fd or path, follow_symlinks=False)
             if not self.nobsdflags:
                 bsdflags = get_flags(path, st)
-            acl_get(path, attrs, st, self.numeric_owner)
+            acl_get(path, attrs, st, self.numeric_owner, fd=fd)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
         if bsdflags:

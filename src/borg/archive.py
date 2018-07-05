@@ -726,28 +726,27 @@ Utilization of max. archive size: {csize_max:.0%}
         xattrs = item.get('xattrs', {})
         for k, v in xattrs.items():
             try:
+                # the key k is a bytes object due to msgpack unpacking it as such.
                 # if we have a None value, it means "empty", so give b'' to setxattr in that case:
                 xattr.setxattr(fd or path, k, v or b'', follow_symlinks=False)
             except OSError as e:
+                k_str = k.decode()
                 if e.errno == errno.E2BIG:
-                    # xattr is too big
                     logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' %
-                                   (path, k.decode()))
+                                   (path, k_str))
                     set_ec(EXIT_WARNING)
                 elif e.errno == errno.ENOTSUP:
-                    # xattrs not supported here
                     logger.warning('%s: Extended attributes are not supported on this filesystem' % path)
                     set_ec(EXIT_WARNING)
                 elif e.errno == errno.EACCES:
                     # permission denied to set this specific xattr (this may happen related to security.* keys)
-                    logger.warning('%s: Permission denied when setting extended attribute %s' % (path, k.decode()))
+                    logger.warning('%s: Permission denied when setting extended attribute %s' % (path, k_str))
                     set_ec(EXIT_WARNING)
                 elif e.errno == errno.ENOSPC:
-                    # no space left on device while setting this specific xattr
                     # ext4 reports ENOSPC when trying to set an xattr with >4kiB while ext4 can only support 4kiB xattrs
                     # (in this case, this is NOT a "disk full" error, just a ext4 limitation).
                     logger.warning('%s: No space left on device while setting extended attribute %s (len = %d)' % (
-                        path, k.decode(), len(v)))
+                        path, k_str, len(v)))
                     set_ec(EXIT_WARNING)
                 else:
                     raise

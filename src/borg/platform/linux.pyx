@@ -87,7 +87,7 @@ def listxattr(path, *, follow_symlinks=True):
                 return c_llistxattr(path, <char *> buf, size)
 
     n, buf = _listxattr_inner(func, path)
-    return [os.fsdecode(name) for name in split_string0(buf[:n])
+    return [name for name in split_string0(buf[:n])
             if name and not name.startswith(b'system.posix_acl_')]
 
 

@@ -140,7 +140,7 @@ def is_birthtime_fully_supported():
 
 def no_selinux(x):
     # selinux fails our FUSE tests, thus ignore selinux xattrs
-    SELINUX_KEY = 'security.selinux'
+    SELINUX_KEY = b'security.selinux'
     if isinstance(x, dict):
         return {k: v for k, v in x.items() if k != SELINUX_KEY}
     if isinstance(x, list):

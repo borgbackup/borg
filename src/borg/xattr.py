@@ -13,10 +13,10 @@ def is_enabled(path=None):
     """
     with tempfile.NamedTemporaryFile(dir=path, prefix='borg-tmp') as fd:
         try:
-            setxattr(fd.fileno(), 'user.name', b'value')
+            setxattr(fd.fileno(), b'user.name', b'value')
         except OSError:
             return False
-        return getxattr(fd.fileno(), 'user.name') == b'value'
+        return getxattr(fd.fileno(), b'user.name') == b'value'
 
 
 def get_all(path, follow_symlinks=True):
@@ -27,7 +27,7 @@ def get_all(path, follow_symlinks=True):
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
 
-    The returned mapping maps xattr names (str) to values (bytes or None).
+    The returned mapping maps xattr names (bytes) to values (bytes or None).
     None indicates, as a xattr value, an empty value, i.e. a value of length zero.
     """
     try:
@@ -35,7 +35,8 @@ def get_all(path, follow_symlinks=True):
         names = listxattr(path, follow_symlinks=follow_symlinks)
         for name in names:
             try:
-                # if we get an empty xattr value (b''), we store None into the result dict.
+                # xattr name is a bytes object, we directly use it.
+                # if we get an empty xattr value (b''), we store None into the result dict -
                 # borg always did it like that...
                 result[name] = getxattr(path, name, follow_symlinks=follow_symlinks) or None
             except OSError as e:

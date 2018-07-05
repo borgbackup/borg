@@ -46,7 +46,7 @@ def listxattr(path, *, follow_symlinks=True):
                 return c_listxattr(path, <char *> buf, size, XATTR_NOFOLLOW)
 
     n, buf = _listxattr_inner(func, path)
-    return [os.fsdecode(name) for name in split_string0(buf[:n]) if name]
+    return [name for name in split_string0(buf[:n]) if name]
 
 
 def getxattr(path, name, *, follow_symlinks=True):

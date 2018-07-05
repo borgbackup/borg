@@ -22,7 +22,7 @@ class XattrTestCase(BaseTestCase):
 
     def assert_equal_se(self, is_x, want_x):
         # check 2 xattr lists for equality, but ignore security.selinux attr
-        is_x = set(is_x) - {'security.selinux'}
+        is_x = set(is_x) - {b'security.selinux'}
         want_x = set(want_x)
         self.assert_equal(is_x, want_x)
 
@@ -30,23 +30,23 @@ class XattrTestCase(BaseTestCase):
         self.assert_equal_se(listxattr(self.tmpfile.name), [])
         self.assert_equal_se(listxattr(self.tmpfile.fileno()), [])
         self.assert_equal_se(listxattr(self.symlink), [])
-        setxattr(self.tmpfile.name, 'user.foo', b'bar')
-        setxattr(self.tmpfile.fileno(), 'user.bar', b'foo')
-        setxattr(self.tmpfile.name, 'user.empty', b'')
-        self.assert_equal_se(listxattr(self.tmpfile.name), ['user.foo', 'user.bar', 'user.empty'])
-        self.assert_equal_se(listxattr(self.tmpfile.fileno()), ['user.foo', 'user.bar', 'user.empty'])
-        self.assert_equal_se(listxattr(self.symlink), ['user.foo', 'user.bar', 'user.empty'])
+        setxattr(self.tmpfile.name, b'user.foo', b'bar')
+        setxattr(self.tmpfile.fileno(), b'user.bar', b'foo')
+        setxattr(self.tmpfile.name, b'user.empty', b'')
+        self.assert_equal_se(listxattr(self.tmpfile.name), [b'user.foo', b'user.bar', b'user.empty'])
+        self.assert_equal_se(listxattr(self.tmpfile.fileno()), [b'user.foo', b'user.bar', b'user.empty'])
+        self.assert_equal_se(listxattr(self.symlink), [b'user.foo', b'user.bar', b'user.empty'])
         self.assert_equal_se(listxattr(self.symlink, follow_symlinks=False), [])
-        self.assert_equal(getxattr(self.tmpfile.name, 'user.foo'), b'bar')
-        self.assert_equal(getxattr(self.tmpfile.fileno(), 'user.foo'), b'bar')
-        self.assert_equal(getxattr(self.symlink, 'user.foo'), b'bar')
-        self.assert_equal(getxattr(self.tmpfile.name, 'user.empty'), b'')
+        self.assert_equal(getxattr(self.tmpfile.name, b'user.foo'), b'bar')
+        self.assert_equal(getxattr(self.tmpfile.fileno(), b'user.foo'), b'bar')
+        self.assert_equal(getxattr(self.symlink, b'user.foo'), b'bar')
+        self.assert_equal(getxattr(self.tmpfile.name, b'user.empty'), b'')
 
     def test_listxattr_buffer_growth(self):
         # make it work even with ext4, which imposes rather low limits
         buffer.resize(size=64, init=True)
         # xattr raw key list will be size 9 * (10 + 1), which is > 64
-        keys = ['user.attr%d' % i for i in range(9)]
+        keys = [b'user.attr%d' % i for i in range(9)]
         for key in keys:
             setxattr(self.tmpfile.name, key, b'x')
         got_keys = listxattr(self.tmpfile.name)
@@ -57,8 +57,8 @@ class XattrTestCase(BaseTestCase):
         # make it work even with ext4, which imposes rather low limits
         buffer.resize(size=64, init=True)
         value = b'x' * 126
-        setxattr(self.tmpfile.name, 'user.big', value)
-        got_value = getxattr(self.tmpfile.name, 'user.big')
+        setxattr(self.tmpfile.name, b'user.big', value)
+        got_value = getxattr(self.tmpfile.name, b'user.big')
         self.assert_equal(value, got_value)
         self.assert_equal(len(buffer), 128)
 

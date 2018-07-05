@@ -37,8 +37,8 @@ def get_all(path, follow_symlinks=False):
     """
     if isinstance(path, str):
         path = os.fsencode(path)
+    result = {}
     try:
-        result = {}
         names = listxattr(path, follow_symlinks=follow_symlinks)
         for name in names:
             try:
@@ -47,14 +47,29 @@ def get_all(path, follow_symlinks=False):
                 # borg always did it like that...
                 result[name] = getxattr(path, name, follow_symlinks=follow_symlinks) or None
             except OSError as e:
-                # if we get ENOATTR, a race has happened: xattr names were deleted after list.
-                # we just ignore the now missing ones. if you want consistency, do snapshots.
-                if e.errno != ENOATTR:
+                name_str = name.decode()
+                if isinstance(path, int):
+                    path_str = '<FD %d>' % path
+                else:
+                    path_str = os.fsdecode(path)
+                if e.errno == ENOATTR:
+                    # if we get ENOATTR, a race has happened: xattr names were deleted after list.
+                    # we just ignore the now missing ones. if you want consistency, do snapshots.
+                    pass
+                elif e.errno == errno.EPERM:
+                    # we were not permitted to read this attribute, still can continue trying to read others
+                    logger.warning('%s: Operation not permitted when reading extended attribute %s' % (
+                                   path_str, name_str))
+                else:
                     raise
-        return result
     except OSError as e:
         if e.errno in (errno.ENOTSUP, errno.EPERM):
-            return {}
+            # if xattrs are not supported on the filesystem, we give up.
+            # EPERM might be raised by listxattr.
+            pass
+        else:
+            raise
+    return result
 
 
 def set_all(path, xattrs, follow_symlinks=False):

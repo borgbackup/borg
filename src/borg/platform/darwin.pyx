@@ -111,8 +111,10 @@ def _remove_non_numeric_identifier(acl):
 def acl_get(path, item, st, numeric_owner=False):
     cdef acl_t acl = NULL
     cdef char *text = NULL
+    if isinstance(path, str):
+        path = os.fsencode(path)
     try:
-        acl = acl_get_link_np(<bytes>os.fsencode(path), ACL_TYPE_EXTENDED)
+        acl = acl_get_link_np(path, ACL_TYPE_EXTENDED)
         if acl == NULL:
             return
         text = acl_to_text(acl, NULL)
@@ -138,7 +140,9 @@ def acl_set(path, item, numeric_owner=False):
                 acl = acl_from_text(<bytes>_remove_numeric_id_if_possible(acl_text))
             if acl == NULL:
                 return
-            if acl_set_link_np(<bytes>os.fsencode(path), ACL_TYPE_EXTENDED, acl):
+            if isinstance(path, str):
+                path = os.fsencode(path)
+            if acl_set_link_np(path, ACL_TYPE_EXTENDED, acl):
                 return
         finally:
             acl_free(acl)

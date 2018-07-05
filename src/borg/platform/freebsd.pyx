@@ -107,16 +107,17 @@ def acl_get(path, item, st, numeric_owner=False):
     If `numeric_owner` is True the user/group field is not preserved only uid/gid
     """
     cdef int flags = ACL_TEXT_APPEND_ID
-    p = os.fsencode(path)
-    ret = lpathconf(p, _PC_ACL_NFS4)
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    ret = lpathconf(path, _PC_ACL_NFS4)
     if ret < 0 and errno == EINVAL:
         return
     flags |= ACL_TEXT_NUMERIC_IDS if numeric_owner else 0
     if ret > 0:
-        _get_acl(p, ACL_TYPE_NFS4, item, 'acl_nfs4', flags)
+        _get_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', flags)
     else:
-        _get_acl(p, ACL_TYPE_ACCESS, item, 'acl_access', flags)
-        _get_acl(p, ACL_TYPE_DEFAULT, item, 'acl_default', flags)
+        _get_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', flags)
+        _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags)
 
 
 cdef _set_acl(p, type, item, attribute, numeric_owner=False):
@@ -153,7 +154,8 @@ def acl_set(path, item, numeric_owner=False):
     If `numeric_owner` is True the stored uid/gid is used instead
     of the user/group names
     """
-    p = os.fsencode(path)
-    _set_acl(p, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_owner)
-    _set_acl(p, ACL_TYPE_ACCESS, item, 'acl_access', numeric_owner)
-    _set_acl(p, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_owner)
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    _set_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_owner)
+    _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_owner)
+    _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_owner)

@@ -227,20 +227,21 @@ def acl_get(path, item, st, numeric_owner=False):
     cdef char *default_text = NULL
     cdef char *access_text = NULL
 
-    p = <bytes>os.fsencode(path)
-    if stat.S_ISLNK(st.st_mode) or acl_extended_file(p) <= 0:
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    if stat.S_ISLNK(st.st_mode) or acl_extended_file(path) <= 0:
         return
     if numeric_owner:
         converter = acl_numeric_ids
     else:
         converter = acl_append_numeric_ids
     try:
-        access_acl = acl_get_file(p, ACL_TYPE_ACCESS)
+        access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
         if access_acl:
             access_text = acl_to_text(access_acl, NULL)
             if access_text:
                 item['acl_access'] = converter(access_text)
-        default_acl = acl_get_file(p, ACL_TYPE_DEFAULT)
+        default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
         if default_acl:
             default_text = acl_to_text(default_acl, NULL)
             if default_text:
@@ -256,27 +257,29 @@ def acl_set(path, item, numeric_owner=False):
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
 
-    p = <bytes>os.fsencode(path)
+    if isinstance(path, str):
+        path = os.fsencode(path)
     if numeric_owner:
         converter = posix_acl_use_stored_uid_gid
     else:
         converter = acl_use_local_uid_gid
     access_text = item.get('acl_access')
-    default_text = item.get('acl_default')
     if access_text:
         try:
             access_acl = acl_from_text(<bytes>converter(access_text))
             if access_acl:
-                acl_set_file(p, ACL_TYPE_ACCESS, access_acl)
+                acl_set_file(path, ACL_TYPE_ACCESS, access_acl)
         finally:
             acl_free(access_acl)
+    default_text = item.get('acl_default')
     if default_text:
         try:
             default_acl = acl_from_text(<bytes>converter(default_text))
             if default_acl:
-                acl_set_file(p, ACL_TYPE_DEFAULT, default_acl)
+                acl_set_file(path, ACL_TYPE_DEFAULT, default_acl)
         finally:
             acl_free(default_acl)
+
 
 cdef _sync_file_range(fd, offset, length, flags):
     assert offset & PAGE_MASK == 0, "offset %d not page-aligned" % offset

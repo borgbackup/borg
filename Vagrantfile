@@ -30,7 +30,7 @@ def packages_arch
     locale-gen
     localectl set-locale LANG=en_US.UTF-8
     chown vagrant.vagrant /vagrant
-    pacman --sync --noconfirm python-virtualenv python-pip
+    pacman --sync --noconfirm --refresh python-virtualenv python-pip
   EOF
 end
 

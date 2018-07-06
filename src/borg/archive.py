@@ -1151,13 +1151,15 @@ class FilesystemObjectProcessors:
                 else:
                     with backup_io('open'):
                         fh = Archive._open_rb(path)
-                    with os.fdopen(fh, 'rb') as fd:
-                        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd, fh)))
-                        md = self.metadata_collector.stat_attrs(st, path, fd=fh)
-                    if not is_special_file:
-                        # we must not memorize special files, because the contents of e.g. a
-                        # block or char device will change without its mtime/size/inode changing.
-                        cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
+                        try:
+                            self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fh)))
+                            md = self.metadata_collector.stat_attrs(st, path, fd=fh)
+                        finally:
+                            os.close(fh)
+                        if not is_special_file:
+                            # we must not memorize special files, because the contents of e.g. a
+                            # block or char device will change without its mtime/size/inode changing.
+                            cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                 self.stats.nfiles += 1
             if md is None:
                 fh = Archive._open_rb(path)

@@ -88,7 +88,7 @@ except ImportError:
         pass
 
 
-def get_flags(path, st):
+def get_flags(path, st, fd=None):
     """Return BSD-style file flags for path or stat without following symlinks."""
     return getattr(st, 'st_flags', 0)
 

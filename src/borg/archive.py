@@ -953,7 +953,7 @@ class MetadataCollector:
         with backup_io('extended stat'):
             xattrs = xattr.get_all(fd or path, follow_symlinks=False)
             if not self.nobsdflags:
-                bsdflags = get_flags(path, st)
+                bsdflags = get_flags(path, st, fd=fd)
             acl_get(path, attrs, st, self.numeric_owner, fd=fd)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)

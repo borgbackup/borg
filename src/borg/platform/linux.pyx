@@ -153,21 +153,24 @@ def set_flags(path, bsd_flags, fd=None):
             os.close(fd)
 
 
-def get_flags(path, st):
+def get_flags(path, st, fd=None):
     if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
         # avoid opening devices files - trying to open non-present devices can be rather slow.
         # avoid opening symlinks, O_NOFOLLOW would make the open() fail anyway.
         return 0
     cdef int linux_flags
-    try:
-        fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
-    except OSError:
-        return 0
+    open_fd = fd is None
+    if open_fd:
+        try:
+            fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+        except OSError:
+            return 0
     try:
         if ioctl(fd, FS_IOC_GETFLAGS, &linux_flags) == -1:
             return 0
     finally:
-        os.close(fd)
+        if open_fd:
+            os.close(fd)
     bsd_flags = 0
     for bsd_flag, linux_flag in BSD_TO_LINUX_FLAGS.items():
         if linux_flags & linux_flag:

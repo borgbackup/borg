@@ -136,8 +136,8 @@ Version 1.2.0dev0 (not released yet)
 
 Compatibility notes:
 
-- dropped support and testing for Python 3.4, minimum requirement is 3.5.0.
-  In case your OS does not provide Python >= 3.5, consider using our binary,
+- dropped support / testing for Python 3.4 and 3.5, minimum requirement is 3.6.
+  In case your OS does not provide Python >= 3.6, consider using our binary,
   which does not need an external Python interpreter.
 - list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
   "isomtime" was the default but produced a verbose human format,
@@ -145,6 +145,46 @@ Compatibility notes:
   The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
   and the default is now "mtime".
   "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+
+New features:
+
+- prune: Show which rule was applied to keep archive, #2886
+
+Fixes:
+
+- avoid stale filehandle issues, #3265
+- make swidth available on all posix platforms, #2667
+
+Other changes:
+
+- use pyinstaller v3.3.1 to build binaries
+- msgpack: switch to recent "msgpack" pypi pkg name, #3890
+- llfuse: modernize / simplify llfuse version requirements
+- code refactorings / internal improvements:
+
+  - crypto: refactored crypto to use an AEAD style API
+  - crypto: new AES-OCB, CHACHA20-POLY1305
+  - create: be less racy, use fd for xattrs, acls, bsdflags (not path), #906
+  - create: use less syscalls by not using a python file obj, #906, #3962
+  - diff: refactor the diff functionality to new ItemDiff class, #2475
+  - archive: create FilesystemObjectProcessors class
+  - helpers: make a package, split into smaller modules
+  - xattrs: move to platform package, use cython instead ctypes, #2495
+  - xattrs/acls/bsdflags: misc. code/api optimizations
+  - FUSE: separate creation of filesystem from implementation of llfuse funcs, #3042
+  - FUSE: use unpacker.tell() instead of deprecated write_bytes, #3899
+  - setup.py: move build_man / build_usage code to setup_docs.py
+  - setup.py: update to use a newer Cython/setuptools API for compiling .pyx -> .c, #3788
+  - use python 3.5's os.scandir / os.set_blocking
+  - multithreading preparations (not used yet):
+
+    - item.to_optr(), Item.from_optr()
+    - fix chunker holding the GIL during blocking I/O
+- testing:
+
+  - vagrant: new VMs for linux/bsd/darwin, most with OpenSSL 1.1 and py36
+
+
 
 Version 1.1.0rc1 (2017-07-24)
 -----------------------------

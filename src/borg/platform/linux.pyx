@@ -39,12 +39,15 @@ cdef extern from "sys/acl.h":
 
     int acl_free(void *obj)
     acl_t acl_get_file(const char *path, int type)
+    acl_t acl_get_fd(int fd)
     int acl_set_file(const char *path, int type, acl_t acl)
+    int acl_set_fd(int fd, acl_t acl)
     acl_t acl_from_text(const char *buf)
     char *acl_to_text(acl_t acl, ssize_t *len)
 
 cdef extern from "acl/libacl.h":
     int acl_extended_file(const char *path)
+    int acl_extended_fd(int fd)
 
 cdef extern from "fcntl.h":
     int sync_file_range(int fd, int64_t offset, int64_t nbytes, unsigned int flags)
@@ -221,26 +224,37 @@ cdef acl_numeric_ids(acl):
     return safe_encode('\n'.join(entries))
 
 
-def acl_get(path, item, st, numeric_owner=False):
+def acl_get(path, item, st, numeric_owner=False, fd=None):
     cdef acl_t default_acl = NULL
     cdef acl_t access_acl = NULL
     cdef char *default_text = NULL
     cdef char *access_text = NULL
 
-    p = <bytes>os.fsencode(path)
-    if stat.S_ISLNK(st.st_mode) or acl_extended_file(p) <= 0:
+    if fd is None and isinstance(path, str):
+        path = os.fsencode(path)
+    if stat.S_ISLNK(st.st_mode):
+        return
+    if (fd is not None and acl_extended_fd(fd) <= 0
+        or
+        fd is None and acl_extended_file(path) <= 0):
         return
     if numeric_owner:
         converter = acl_numeric_ids
     else:
         converter = acl_append_numeric_ids
     try:
-        access_acl = acl_get_file(p, ACL_TYPE_ACCESS)
+        if fd is not None:
+            # we only have a fd for FILES (not other fs objects), so we can get the access_acl:
+            assert stat.S_ISREG(st.st_mode)
+            access_acl = acl_get_fd(fd)
+        else:
+            # if we have no fd, it can be anything
+            access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
+            default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
         if access_acl:
             access_text = acl_to_text(access_acl, NULL)
             if access_text:
                 item['acl_access'] = converter(access_text)
-        default_acl = acl_get_file(p, ACL_TYPE_DEFAULT)
         if default_acl:
             default_text = acl_to_text(default_acl, NULL)
             if default_text:
@@ -252,31 +266,40 @@ def acl_get(path, item, st, numeric_owner=False):
         acl_free(access_acl)
 
 
-def acl_set(path, item, numeric_owner=False):
+def acl_set(path, item, numeric_owner=False, fd=None):
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
 
-    p = <bytes>os.fsencode(path)
+    if fd is None and isinstance(path, str):
+        path = os.fsencode(path)
     if numeric_owner:
         converter = posix_acl_use_stored_uid_gid
     else:
         converter = acl_use_local_uid_gid
     access_text = item.get('acl_access')
-    default_text = item.get('acl_default')
     if access_text:
         try:
             access_acl = acl_from_text(<bytes>converter(access_text))
             if access_acl:
-                acl_set_file(p, ACL_TYPE_ACCESS, access_acl)
+                if fd is not None:
+                    acl_set_fd(fd, access_acl)
+                else:
+                    acl_set_file(path, ACL_TYPE_ACCESS, access_acl)
         finally:
             acl_free(access_acl)
+    default_text = item.get('acl_default')
     if default_text:
         try:
             default_acl = acl_from_text(<bytes>converter(default_text))
             if default_acl:
-                acl_set_file(p, ACL_TYPE_DEFAULT, default_acl)
+                # default acls apply only to directories
+                if False and fd is not None:  # Linux API seems to not support this
+                    acl_set_fd(fd, default_acl)
+                else:
+                    acl_set_file(path, ACL_TYPE_DEFAULT, default_acl)
         finally:
             acl_free(default_acl)
+
 
 cdef _sync_file_range(fd, offset, length, flags):
     assert offset & PAGE_MASK == 0, "offset %d not page-aligned" % offset

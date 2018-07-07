@@ -47,13 +47,13 @@ Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
 Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbackup``
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
+macOS        `Brew cask`_                                  ``brew cask install borgbackup``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  ``nix-env -i borgbackup``
 OpenBSD      `OpenBSD ports`_                              ``pkg_add borgbackup``
 OpenIndiana  `OpenIndiana hipster repository`_             ``pkg install borg``
 openSUSE     `openSUSE official repository`_               ``zypper in borgbackup``
-OS X         `Brew cask`_                                  ``brew cask install borgbackup``
 Raspbian     `Raspbian testing`_                           ``apt install borgbackup``
 Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbackup``
 ============ ============================================= =======
@@ -226,9 +226,11 @@ dependencies::
     pip3 install virtualenv
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of
-FUSE for OS X, which is available as a pre-release_.
+FUSE for OS X, which is available via github_, or via homebrew::
 
-.. _pre-release: https://github.com/osxfuse/osxfuse/releases
+    brew cask install osxfuse
+
+.. _github: https://github.com/osxfuse/osxfuse/releases/latest
 
 
 FreeBSD

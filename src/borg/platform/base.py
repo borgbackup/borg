@@ -44,7 +44,9 @@ def getxattr(path, name, *, follow_symlinks=True):
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
     """
-    return b''
+    # as this base dummy implementation returns [] from listxattr,
+    # it must raise here for any given name:
+    raise OSError(ENOATTR, os.strerror(ENOATTR), path)
 
 
 def setxattr(path, name, value, *, follow_symlinks=True):

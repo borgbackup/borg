@@ -8,11 +8,25 @@ from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
 from .base import safe_fadvise
+from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.2_01'
+
+cdef extern from "attr/xattr.h":
+    ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size)
+    ssize_t c_llistxattr "llistxattr" (const char *path, char *list, size_t size)
+    ssize_t c_flistxattr "flistxattr" (int filedes, char *list, size_t size)
+
+    ssize_t c_getxattr "getxattr" (const char *path, const char *name, void *value, size_t size)
+    ssize_t c_lgetxattr "lgetxattr" (const char *path, const char *name, void *value, size_t size)
+    ssize_t c_fgetxattr "fgetxattr" (int filedes, const char *name, void *value, size_t size)
+
+    int c_setxattr "setxattr" (const char *path, const char *name, const void *value, size_t size, int flags)
+    int c_lsetxattr "lsetxattr" (const char *path, const char *name, const void *value, size_t size, int flags)
+    int c_fsetxattr "fsetxattr" (int filedes, const char *name, const void *value, size_t size, int flags)
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
@@ -60,6 +74,49 @@ cdef extern from "string.h":
     char *strerror(int errnum)
 
 _comment_re = re.compile(' *#.*', re.M)
+
+
+def listxattr(path, *, follow_symlinks=True):
+    def func(path, buf, size):
+        if isinstance(path, int):
+            return c_flistxattr(path, <char *> buf, size)
+        else:
+            if follow_symlinks:
+                return c_listxattr(path, <char *> buf, size)
+            else:
+                return c_llistxattr(path, <char *> buf, size)
+
+    n, buf = _listxattr_inner(func, path)
+    return [name for name in split_string0(buf[:n])
+            if name and not name.startswith(b'system.posix_acl_')]
+
+
+def getxattr(path, name, *, follow_symlinks=True):
+    def func(path, name, buf, size):
+        if isinstance(path, int):
+            return c_fgetxattr(path, name, <char *> buf, size)
+        else:
+            if follow_symlinks:
+                return c_getxattr(path, name, <char *> buf, size)
+            else:
+                return c_lgetxattr(path, name, <char *> buf, size)
+
+    n, buf = _getxattr_inner(func, path, name)
+    return bytes(buf[:n])
+
+
+def setxattr(path, name, value, *, follow_symlinks=True):
+    def func(path, name, value, size):
+        flags = 0
+        if isinstance(path, int):
+            return c_fsetxattr(path, name, <char *> value, size, flags)
+        else:
+            if follow_symlinks:
+                return c_setxattr(path, name, <char *> value, size, flags)
+            else:
+                return c_lsetxattr(path, name, <char *> value, size, flags)
+
+    _setxattr_inner(func, path, name, value)
 
 
 BSD_TO_LINUX_FLAGS = {

@@ -1,9 +1,14 @@
 import errno
 import os
 
+from libc.errno cimport errno as c_errno
 
 cdef extern from "wchar.h":
     cdef int wcswidth(const Py_UNICODE *str, size_t n)
+
+
+def get_errno():
+    return c_errno
 
 
 def swidth(s):

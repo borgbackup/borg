@@ -335,19 +335,20 @@ class ArchiverTestCaseBase(BaseTestCase):
             os.symlink('somewhere', os.path.join(self.input_path, 'link1'))
         self.create_regular_file('fusexattr', size=1)
         if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
+            fn = os.fsencode(os.path.join(self.input_path, 'fusexattr'))
             # ironically, due to the way how fakeroot works, comparing FUSE file xattrs to orig file xattrs
             # will FAIL if fakeroot supports xattrs, thus we only set the xattr if XATTR_FAKEROOT is False.
             # This is because fakeroot with xattr-support does not propagate xattrs of the underlying file
             # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file
             # (from fakeroots point of view) they are invisible to the test process inside the fakeroot.
-            xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), 'user.foo', b'bar')
-            xattr.setxattr(os.path.join(self.input_path, 'fusexattr'), 'user.empty', b'')
+            xattr.setxattr(fn, b'user.foo', b'bar')
+            xattr.setxattr(fn, b'user.empty', b'')
             # XXX this always fails for me
             # ubuntu 14.04, on a TMP dir filesystem with user_xattr, using fakeroot
             # same for newer ubuntu and centos.
             # if this is supported just on specific platform, platform should be checked first,
             # so that the test setup for all tests using it does not fail here always for others.
-            # xattr.setxattr(os.path.join(self.input_path, 'link1'), 'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
+            # xattr.setxattr(os.path.join(self.input_path, 'link1'), b'user.foo_symlink', b'bar_symlink', follow_symlinks=False)
         # FIFO node
         if are_fifos_supported():
             os.mkfifo(os.path.join(self.input_path, 'fifo1'))
@@ -1229,19 +1230,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # We need to manually patch chown to get the behaviour Linux has, since fakeroot does not
         # accurately model the interaction of chown(2) and Linux capabilities, i.e. it does not remove them.
         def patched_fchown(fd, uid, gid):
-            xattr.setxattr(fd, 'security.capability', None, follow_symlinks=False)
+            xattr.setxattr(fd, b'security.capability', b'', follow_symlinks=False)
             fchown(fd, uid, gid)
 
         # The capability descriptor used here is valid and taken from a /usr/bin/ping
         capabilities = b'\x01\x00\x00\x02\x00 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         self.create_regular_file('file')
-        xattr.setxattr('input/file', 'security.capability', capabilities)
+        xattr.setxattr(b'input/file', b'security.capability', capabilities)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             with patch.object(os, 'fchown', patched_fchown):
                 self.cmd('extract', self.repository_location + '::test')
-            assert xattr.getxattr('input/file', 'security.capability') == capabilities
+            assert xattr.getxattr(b'input/file', b'security.capability') == capabilities
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
                                                          'fakeroot')
@@ -1256,23 +1257,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             raise OSError(errno.EACCES, 'EACCES')
 
         self.create_regular_file('file')
-        xattr.setxattr('input/file', 'attribute', 'value')
+        xattr.setxattr(b'input/file', b'attribute', b'value')
         self.cmd('init', self.repository_location, '-e' 'none')
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             input_abspath = os.path.abspath('input/file')
             with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (input_abspath + ': Value or key of extended attribute attribute is too big for this '
-                                               'filesystem\n')
+                assert '>: Value or key of extended attribute attribute is too big for this filesystem\n' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (input_abspath + ': Extended attributes are not supported on this filesystem\n')
+                assert '>: Extended attributes are not supported on this filesystem\n' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (input_abspath + ': Permission denied when setting extended attribute attribute\n')
+                assert '>: Permission denied when setting extended attribute attribute\n' in out
             assert os.path.isfile(input_abspath)
 
     def test_path_normalization(self):
@@ -2183,16 +2183,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # list/read xattrs
             try:
                 in_fn = 'input/fusexattr'
-                out_fn = os.path.join(mountpoint, 'input', 'fusexattr')
+                out_fn = os.fsencode(os.path.join(mountpoint, 'input', 'fusexattr'))
                 if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                    assert sorted(no_selinux(xattr.listxattr(out_fn))) == ['user.empty', 'user.foo', ]
-                    assert xattr.getxattr(out_fn, 'user.foo') == b'bar'
-                    # Special case: getxattr returns None (not b'') when reading an empty xattr.
-                    assert xattr.getxattr(out_fn, 'user.empty') is None
+                    assert sorted(no_selinux(xattr.listxattr(out_fn))) == [b'user.empty', b'user.foo', ]
+                    assert xattr.getxattr(out_fn, b'user.foo') == b'bar'
+                    assert xattr.getxattr(out_fn, b'user.empty') == b''
                 else:
                     assert xattr.listxattr(out_fn) == []
                     try:
-                        xattr.getxattr(out_fn, 'user.foo')
+                        xattr.getxattr(out_fn, b'user.foo')
                     except OSError as e:
                         assert e.errno == llfuse.ENOATTR
                     else:

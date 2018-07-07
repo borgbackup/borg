@@ -1,9 +1,26 @@
 import os
 
+from libc.stdint cimport uint32_t
+
 from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
+from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.2_01'
+
+cdef extern from "sys/xattr.h":
+    ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size, int flags)
+    ssize_t c_flistxattr "flistxattr" (int filedes, char *list, size_t size, int flags)
+
+    ssize_t c_getxattr "getxattr" (const char *path, const char *name, void *value, size_t size, uint32_t pos, int flags)
+    ssize_t c_fgetxattr "fgetxattr" (int filedes, const char *name, void *value, size_t size, uint32_t pos, int flags)
+
+    int c_setxattr "setxattr" (const char *path, const char *name, const void *value, size_t size, uint32_t pos, int flags)
+    int c_fsetxattr "fsetxattr" (int filedes, const char *name, const void *value, size_t size, uint32_t pos, int flags)
+
+    int XATTR_NOFOLLOW
+
+cdef int XATTR_NOFLAGS = 0x0000
 
 cdef extern from "sys/acl.h":
     ctypedef struct _acl_t:
@@ -16,6 +33,47 @@ cdef extern from "sys/acl.h":
     acl_t acl_from_text(const char *buf)
     char *acl_to_text(acl_t acl, ssize_t *len_p)
     int ACL_TYPE_EXTENDED
+
+
+def listxattr(path, *, follow_symlinks=True):
+    def func(path, buf, size):
+        if isinstance(path, int):
+            return c_flistxattr(path, <char *> buf, size, XATTR_NOFLAGS)
+        else:
+            if follow_symlinks:
+                return c_listxattr(path, <char *> buf, size, XATTR_NOFLAGS)
+            else:
+                return c_listxattr(path, <char *> buf, size, XATTR_NOFOLLOW)
+
+    n, buf = _listxattr_inner(func, path)
+    return [name for name in split_string0(buf[:n]) if name]
+
+
+def getxattr(path, name, *, follow_symlinks=True):
+    def func(path, name, buf, size):
+        if isinstance(path, int):
+            return c_fgetxattr(path, name, <char *> buf, size, 0, XATTR_NOFLAGS)
+        else:
+            if follow_symlinks:
+                return c_getxattr(path, name, <char *> buf, size, 0, XATTR_NOFLAGS)
+            else:
+                return c_getxattr(path, name, <char *> buf, size, 0, XATTR_NOFOLLOW)
+
+    n, buf = _getxattr_inner(func, path, name)
+    return bytes(buf[:n])
+
+
+def setxattr(path, name, value, *, follow_symlinks=True):
+    def func(path, name, value, size):
+        if isinstance(path, int):
+            return c_fsetxattr(path, name, <char *> value, size, 0, XATTR_NOFLAGS)
+        else:
+            if follow_symlinks:
+                return c_setxattr(path, name, <char *> value, size, 0, XATTR_NOFLAGS)
+            else:
+                return c_setxattr(path, name, <char *> value, size, 0, XATTR_NOFOLLOW)
+
+    _setxattr_inner(func, path, name, value)
 
 
 def _remove_numeric_id_if_possible(acl):

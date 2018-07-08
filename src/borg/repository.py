@@ -1482,14 +1482,11 @@ class LoggedIO:
         return self.segment, self.put_header_fmt.size
 
     def write_commit(self, intermediate=False):
+        # Intermediate commits go directly into the current segment - this makes checking their validity more
+        # expensive, but is faster and reduces clobber. Final commits go into a new segment.
+        fd = self.get_write_fd(want_new=not intermediate)
         if intermediate:
-            # Intermediate commits go directly into the current segment - this makes checking their validity more
-            # expensive, but is faster and reduces clobber.
-            fd = self.get_write_fd()
             fd.sync()
-        else:
-            self.close_segment()
-            fd = self.get_write_fd()
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
         crc = self.crc_fmt.pack(crc32(header) & 0xffffffff)
         fd.write(b''.join((crc, header)))

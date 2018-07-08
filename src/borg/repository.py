@@ -21,6 +21,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import hostname_is_unique
 from .helpers import secure_erase, truncate_and_unlink
+from .helpers import Manifest
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -416,7 +417,7 @@ class Repository:
             self.lock.release()
             self.lock = None
 
-    def commit(self, save_space=False):
+    def commit(self, save_space=False, compact=False, cleanup_commits=False):
         """Commit transaction
         """
         # save_space is not used anymore, but stays for RPC/API compatibility.
@@ -426,8 +427,17 @@ class Repository:
             raise exception
         self.check_free_space()
         self.log_storage_quota()
-        self.io.write_commit()
-        if not self.append_only:
+        segment = self.io.write_commit()
+        self.segments.setdefault(segment, 0)
+        self.compact[segment] += LoggedIO.header_fmt.size
+        if compact and not self.append_only:
+            if cleanup_commits:
+                # due to bug #2850, there might be a lot of commit-only segment files.
+                # this is for a one-time cleanup of these 17byte files.
+                for segment, filename in self.io.segment_iterator():
+                    if os.path.getsize(filename) == 17:
+                        self.segments[segment] = 0
+                        self.compact[segment] = LoggedIO.header_fmt.size
             self.compact_segments()
         self.write_index()
         self.rollback()
@@ -676,6 +686,8 @@ class Repository:
             nonlocal unused
             # commit the new, compact, used segments
             segment = self.io.write_commit(intermediate=intermediate)
+            self.segments.setdefault(segment, 0)
+            self.compact[segment] += LoggedIO.header_fmt.size
             logger.debug('complete_xfer: wrote %scommit at segment %d', 'intermediate ' if intermediate else '', segment)
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:
@@ -951,7 +963,6 @@ class Repository:
                     if current_index.get(key, (-1, -1)) != value:
                         report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
         if repair:
-            self.compact_segments()
             self.write_index()
         self.rollback()
         if error_found:
@@ -1058,6 +1069,10 @@ class Repository:
         """
         if not self._active_txn:
             self.prepare_txn(self.get_transaction_id())
+        # specialcase deleting / writing the manifest to be in a separate, new segment file,
+        # so that when we supersede and compact it later, less segment data has to be shuffled around -
+        # compaction can then just delete this segment file and that's all.
+        start_new_segment = id == Manifest.MANIFEST_ID
         try:
             segment, offset = self.index[id]
         except KeyError:
@@ -1067,10 +1082,11 @@ class Repository:
             size = self.io.read(segment, offset, id, read_data=False)
             self.storage_quota_use -= size
             self.compact[segment] += size
-            segment, size = self.io.write_delete(id)
+            segment, size = self.io.write_delete(id, start_new=start_new_segment)
+            start_new_segment = False  # already started a new one
             self.compact[segment] += size
             self.segments.setdefault(segment, 0)
-        segment, offset = self.io.write_put(id, data)
+        segment, offset = self.io.write_put(id, data, start_new=start_new_segment)
         self.storage_quota_use += len(data) + self.io.put_header_fmt.size
         self.segments.setdefault(segment, 0)
         self.segments[segment] += 1
@@ -1240,10 +1256,12 @@ class LoggedIO:
     def segment_filename(self, segment):
         return os.path.join(self.path, 'data', str(segment // self.segments_per_dir), str(segment))
 
-    def get_write_fd(self, no_new=False, raise_full=False):
+    def get_write_fd(self, no_new=False, raise_full=False, start_new=False):
         if not no_new and self.offset and self.offset > self.limit:
             if raise_full:
                 raise self.SegmentFull
+            self.close_segment()
+        if start_new:
             self.close_segment()
         if not self._write_fd:
             if self.segment % self.segments_per_dir == 0:
@@ -1448,12 +1466,12 @@ class LoggedIO:
                 segment, offset))
         return size, tag, key, data
 
-    def write_put(self, id, data, raise_full=False):
+    def write_put(self, id, data, raise_full=False, start_new=False):
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             # this would push the segment entry size beyond MAX_OBJECT_SIZE.
             raise IntegrityError('More than allowed put data [{} > {}]'.format(data_size, MAX_DATA_SIZE))
-        fd = self.get_write_fd(raise_full=raise_full)
+        fd = self.get_write_fd(raise_full=raise_full, start_new=start_new)
         size = data_size + self.put_header_fmt.size
         offset = self.offset
         header = self.header_no_crc_fmt.pack(size, TAG_PUT)
@@ -1462,8 +1480,8 @@ class LoggedIO:
         self.offset += size
         return self.segment, offset
 
-    def write_delete(self, id, raise_full=False):
-        fd = self.get_write_fd(raise_full=raise_full)
+    def write_delete(self, id, raise_full=False, start_new=False):
+        fd = self.get_write_fd(raise_full=raise_full, start_new=start_new)
         header = self.header_no_crc_fmt.pack(self.put_header_fmt.size, TAG_DELETE)
         crc = self.crc_fmt.pack(crc32(id, crc32(header)) & 0xffffffff)
         fd.write(b''.join((crc, header, id)))

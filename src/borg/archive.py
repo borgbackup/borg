@@ -1722,9 +1722,8 @@ class ArchiveChecker:
         if self.repair:
             logger.info('Writing Manifest.')
             self.manifest.write()
-            logger.info('Committing repo (may take a while, due to compact_segments)...')
+            logger.info('Committing repo.')
             self.repository.commit(save_space=save_space)
-            logger.info('Finished committing repo.')
 
 
 class ArchiveRecreater:

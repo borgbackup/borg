@@ -36,13 +36,15 @@ class XattrTestCase(BaseTestCase):
         setxattr(tmp_fn, b'user.foo', b'bar')
         setxattr(tmp_fd, b'user.bar', b'foo')
         setxattr(tmp_fn, b'user.empty', b'')
+        setxattr(tmp_lfn, b'user.linkxattr', b'baz')
         self.assert_equal_se(listxattr(tmp_fn), [b'user.foo', b'user.bar', b'user.empty'])
         self.assert_equal_se(listxattr(tmp_fd), [b'user.foo', b'user.bar', b'user.empty'])
-        self.assert_equal_se(listxattr(tmp_lfn), [b'user.foo', b'user.bar', b'user.empty'])
-        self.assert_equal_se(listxattr(tmp_lfn, follow_symlinks=False), [])
+        self.assert_equal_se(listxattr(tmp_lfn, follow_symlinks=True), [b'user.foo', b'user.bar', b'user.empty'])
+        self.assert_equal_se(listxattr(tmp_lfn), [b'user.linkxattr'])
         self.assert_equal(getxattr(tmp_fn, b'user.foo'), b'bar')
         self.assert_equal(getxattr(tmp_fd, b'user.foo'), b'bar')
-        self.assert_equal(getxattr(tmp_lfn, b'user.foo'), b'bar')
+        self.assert_equal(getxattr(tmp_lfn, b'user.foo', follow_symlinks=True), b'bar')
+        self.assert_equal(getxattr(tmp_lfn, b'user.linkxattr'), b'baz')
         self.assert_equal(getxattr(tmp_fn, b'user.empty'), b'')
 
     def test_listxattr_buffer_growth(self):

@@ -4,7 +4,7 @@ from ..helpers import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
-API_VERSION = '1.2_01'
+API_VERSION = '1.2_02'
 
 cdef extern from "errno.h":
     int errno
@@ -50,7 +50,7 @@ cdef extern from "unistd.h":
     int _PC_ACL_NFS4
 
 
-def listxattr(path, *, follow_symlinks=True):
+def listxattr(path, *, follow_symlinks=False):
     def func(path, buf, size):
         if isinstance(path, int):
             return c_extattr_list_fd(path, EXTATTR_NAMESPACE_USER, <char *> buf, size)
@@ -64,7 +64,7 @@ def listxattr(path, *, follow_symlinks=True):
     return [name for name in split_lstring(buf[:n]) if name]
 
 
-def getxattr(path, name, *, follow_symlinks=True):
+def getxattr(path, name, *, follow_symlinks=False):
     def func(path, name, buf, size):
         if isinstance(path, int):
             return c_extattr_get_fd(path, EXTATTR_NAMESPACE_USER, name, <char *> buf, size)
@@ -78,7 +78,7 @@ def getxattr(path, name, *, follow_symlinks=True):
     return bytes(buf[:n])
 
 
-def setxattr(path, name, value, *, follow_symlinks=True):
+def setxattr(path, name, value, *, follow_symlinks=False):
     def func(path, name, value, size):
         if isinstance(path, int):
             return c_extattr_set_fd(path, EXTATTR_NAMESPACE_USER, name, <char *> value, size)

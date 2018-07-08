@@ -6,7 +6,7 @@ from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 
-API_VERSION = '1.2_01'
+API_VERSION = '1.2_02'
 
 cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size, int flags)
@@ -37,7 +37,7 @@ cdef extern from "sys/acl.h":
     int ACL_TYPE_EXTENDED
 
 
-def listxattr(path, *, follow_symlinks=True):
+def listxattr(path, *, follow_symlinks=False):
     def func(path, buf, size):
         if isinstance(path, int):
             return c_flistxattr(path, <char *> buf, size, XATTR_NOFLAGS)
@@ -51,7 +51,7 @@ def listxattr(path, *, follow_symlinks=True):
     return [name for name in split_string0(buf[:n]) if name]
 
 
-def getxattr(path, name, *, follow_symlinks=True):
+def getxattr(path, name, *, follow_symlinks=False):
     def func(path, name, buf, size):
         if isinstance(path, int):
             return c_fgetxattr(path, name, <char *> buf, size, 0, XATTR_NOFLAGS)
@@ -65,7 +65,7 @@ def getxattr(path, name, *, follow_symlinks=True):
     return bytes(buf[:n])
 
 
-def setxattr(path, name, value, *, follow_symlinks=True):
+def setxattr(path, name, value, *, follow_symlinks=False):
     def func(path, name, value, size):
         if isinstance(path, int):
             return c_fsetxattr(path, name, <char *> value, size, 0, XATTR_NOFLAGS)

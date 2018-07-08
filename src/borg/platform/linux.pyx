@@ -13,7 +13,7 @@ from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_str
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = '1.2_01'
+API_VERSION = '1.2_02'
 
 cdef extern from "attr/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size)
@@ -79,7 +79,7 @@ cdef extern from "string.h":
 _comment_re = re.compile(' *#.*', re.M)
 
 
-def listxattr(path, *, follow_symlinks=True):
+def listxattr(path, *, follow_symlinks=False):
     def func(path, buf, size):
         if isinstance(path, int):
             return c_flistxattr(path, <char *> buf, size)
@@ -94,7 +94,7 @@ def listxattr(path, *, follow_symlinks=True):
             if name and not name.startswith(b'system.posix_acl_')]
 
 
-def getxattr(path, name, *, follow_symlinks=True):
+def getxattr(path, name, *, follow_symlinks=False):
     def func(path, name, buf, size):
         if isinstance(path, int):
             return c_fgetxattr(path, name, <char *> buf, size)
@@ -108,7 +108,7 @@ def getxattr(path, name, *, follow_symlinks=True):
     return bytes(buf[:n])
 
 
-def setxattr(path, name, value, *, follow_symlinks=True):
+def setxattr(path, name, value, *, follow_symlinks=False):
     def func(path, name, value, size):
         flags = 0
         if isinstance(path, int):

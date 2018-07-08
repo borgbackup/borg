@@ -21,6 +21,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import hostname_is_unique
 from .helpers import secure_erase, truncate_and_unlink
+from .helpers import Manifest
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -1250,8 +1251,8 @@ class LoggedIO:
     def segment_filename(self, segment):
         return os.path.join(self.path, 'data', str(segment // self.segments_per_dir), str(segment))
 
-    def get_write_fd(self, no_new=False, raise_full=False):
-        if not no_new and self.offset and self.offset > self.limit:
+    def get_write_fd(self, no_new=False, want_new=False, raise_full=False):
+        if not no_new and (want_new or self.offset and self.offset > self.limit):
             if raise_full:
                 raise self.SegmentFull
             self.close_segment()
@@ -1463,7 +1464,7 @@ class LoggedIO:
         if data_size > MAX_DATA_SIZE:
             # this would push the segment entry size beyond MAX_OBJECT_SIZE.
             raise IntegrityError('More than allowed put data [{} > {}]'.format(data_size, MAX_DATA_SIZE))
-        fd = self.get_write_fd(raise_full=raise_full)
+        fd = self.get_write_fd(want_new=(id == Manifest.MANIFEST_ID), raise_full=raise_full)
         size = data_size + self.put_header_fmt.size
         offset = self.offset
         header = self.header_no_crc_fmt.pack(size, TAG_PUT)
@@ -1473,7 +1474,7 @@ class LoggedIO:
         return self.segment, offset
 
     def write_delete(self, id, raise_full=False):
-        fd = self.get_write_fd(raise_full=raise_full)
+        fd = self.get_write_fd(want_new=(id == Manifest.MANIFEST_ID), raise_full=raise_full)
         header = self.header_no_crc_fmt.pack(self.put_header_fmt.size, TAG_DELETE)
         crc = self.crc_fmt.pack(crc32(id, crc32(header)) & 0xffffffff)
         fd.write(b''.join((crc, header, id)))

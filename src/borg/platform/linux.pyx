@@ -15,7 +15,7 @@ from libc.stdint cimport int64_t
 
 API_VERSION = '1.2_02'
 
-cdef extern from "attr/xattr.h":
+cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size)
     ssize_t c_llistxattr "llistxattr" (const char *path, char *list, size_t size)
     ssize_t c_flistxattr "flistxattr" (int filedes, char *list, size_t size)

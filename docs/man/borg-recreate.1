@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2017-11-25" "" "borg backup tool"
+.TH BORG-RECREATE 1 "2018-07-14" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .
@@ -39,6 +39,8 @@ Recreate the contents of existing archives.
 .sp
 This is an \fIexperimental\fP feature. Do \fInot\fP use this on your only backup.
 .sp
+Important: Repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
+.sp
 \fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP, and PATH
 have the exact same semantics as in "borg create". If PATHs are specified the
 resulting archive will only contain files from these PATHs.
@@ -67,10 +69,9 @@ archive that is built during the operation exists at the same time at
 .sp
 With \fB\-\-target\fP the original archive is not replaced, instead a new archive is created.
 .sp
-When rechunking space usage can be substantial, expect at least the entire
-deduplicated size of the archives using the previous chunker params.
-When recompressing expect approx. (throughput / checkpoint\-interval) in space usage,
-assuming all chunks are recompressed.
+When rechunking (or recompressing), space usage can be substantial \- expect
+at least the entire deduplicated size of the archives using the previous
+chunker (or compression) params.
 .sp
 If you recently ran borg check \-\-repair and it had to fix lost chunks with all\-zero
 replacement chunks, please first run another backup for the same data and re\-run
@@ -151,8 +152,8 @@ manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss form
 .BI \-C \ COMPRESSION\fP,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the "borg help compression" command for details.
 .TP
-.B \-\-recompress
-recompress data chunks according to \fB\-\-compression\fP if \fIif\-different\fP\&. When \fIalways\fP, chunks that are already compressed that way are not skipped, but compressed again. Only the algorithm is considered for \fIif\-different\fP, not the compression level (if any).
+.BI \-\-recompress \ MODE
+recompress data chunks according to \fB\-\-compression\fP\&. MODE \fIif\-different\fP: recompress if current compression is with a different compression algorithm (the level is not considered). MODE \fIalways\fP: recompress even if current compression is with the same compression algorithm (use this to change the compression level). MODE \fInever\fP (default): do not recompress.
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: 19,23,21,4095

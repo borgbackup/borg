@@ -98,8 +98,12 @@ Description
 ~~~~~~~~~~~
 
 The prune command prunes a repository by deleting all archives not matching
-any of the specified retention options. This command is normally used by
-automated backup scripts wanting to keep a certain number of historic backups.
+any of the specified retention options.
+
+Important: Repository disk space is **not** freed until you run ``borg compact``.
+
+This command is normally used by automated backup scripts wanting to keep a
+certain number of historic backups.
 
 Also, prune automatically removes checkpoint archives (incomplete archives left
 behind by interrupted backup runs) except if the checkpoint is the latest

@@ -273,6 +273,8 @@ class build_man(Command):
         'mount': ('umount', 'extract'),  # Would be cooler if these two were on the same page
         'umount': ('mount', ),
         'extract': ('mount', ),
+        'delete': ('compact', ),
+        'prune': ('compact', ),
     }
 
     rst_prelude = textwrap.dedent("""

@@ -23,6 +23,8 @@ first so you will see what it would do without it actually doing anything.
     # Same as above but only apply to archive names starting with the hostname
     # of the machine followed by a "-" character:
     $ borg prune -v --list --keep-daily=7 --keep-weekly=4 --prefix='{hostname}-' /path/to/repo
+    # actually free disk space:
+    $ borg compact /path/to/repo
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:

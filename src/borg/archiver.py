@@ -2311,6 +2311,7 @@ class Archiver:
         # It will replace the entire :ref:`foo` verbatim.
         rst_plain_text_references = {
             'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
+            'separate_compaction': '"Separate compaction"',
         }
 
         def process_epilog(epilog):
@@ -3220,9 +3221,13 @@ class Archiver:
 
         delete_epilog = process_epilog("""
         This command deletes an archive from the repository or the complete repository.
-        Disk space is reclaimed accordingly. If you delete the complete repository, the
-        local cache for it (if any) is also deleted. Alternatively, you can delete just
-        the local cache with the ``--cache-only`` option.
+
+        Important: When deleting archives, repository disk space is **not** freed until
+        you run ``borg compact``.
+
+        If you delete the complete repository, the local cache for it (if any) is
+        also deleted. Alternatively, you can delete just the local cache with the
+        ``--cache-only`` option.
 
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
@@ -3376,8 +3381,12 @@ class Archiver:
 
         prune_epilog = process_epilog("""
         The prune command prunes a repository by deleting all archives not matching
-        any of the specified retention options. This command is normally used by
-        automated backup scripts wanting to keep a certain number of historic backups.
+        any of the specified retention options.
+
+        Important: Repository disk space is **not** freed until you run ``borg compact``.
+
+        This command is normally used by automated backup scripts wanting to keep a
+        certain number of historic backups.
 
         Also, prune automatically removes checkpoint archives (incomplete archives left
         behind by interrupted backup runs) except if the checkpoint is the latest
@@ -3564,6 +3573,8 @@ class Archiver:
 
         This is an *experimental* feature. Do *not* use this on your only backup.
 
+        Important: Repository disk space is **not** freed until you run ``borg compact``.
+
         ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
         have the exact same semantics as in "borg create". If PATHs are specified the
         resulting archive will only contain files from these PATHs.
@@ -3592,10 +3603,9 @@ class Archiver:
 
         With ``--target`` the original archive is not replaced, instead a new archive is created.
 
-        When rechunking space usage can be substantial, expect at least the entire
-        deduplicated size of the archives using the previous chunker params.
-        When recompressing expect approx. (throughput / checkpoint-interval) in space usage,
-        assuming all chunks are recompressed.
+        When rechunking (or recompressing), space usage can be substantial - expect
+        at least the entire deduplicated size of the archives using the previous
+        chunker (or compression) params.
 
         If you recently ran borg check --repair and it had to fix lost chunks with all-zero
         replacement chunks, please first run another backup for the same data and re-run
@@ -3697,6 +3707,16 @@ class Archiver:
 
         compact_epilog = process_epilog("""
         This command frees repository space by compacting segments.
+
+        Use this regularly to avoid running out of space - you do not need to use this
+        after each borg command though.
+
+        borg compact does not need a key, so it is possible to invoke it from the
+        client or also from the server.
+
+        Depending on the amount of segments that need compaction, it may take a while.
+
+        See :ref:`separate_compaction` in Additional Notes for more details.
         """)
         subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
                                           description=self.do_compact.__doc__,

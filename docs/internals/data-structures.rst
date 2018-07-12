@@ -158,9 +158,11 @@ such obsolete entries is called sparse, while a segment containing no such entri
 Since writing a ``DELETE`` tag does not actually delete any data and
 thus does not free disk space any log-based data store will need a
 compaction strategy (somewhat analogous to a garbage collector).
+
 Borg uses a simple forward compacting algorithm,
 which avoids modifying existing segments.
-Compaction runs when a commit is issued (unless the :ref:`append_only_mode` is active).
+Compaction runs when a commit is issued with ``compact=True`` parameter, e.g.
+by the ``borg compact`` command (unless the :ref:`append_only_mode` is active).
 One client transaction can manifest as multiple physical transactions,
 since compaction is transacted, too, and Borg does not distinguish between the two::
 
@@ -197,9 +199,9 @@ The 1.1.x series writes version 2 of the format and reads either version.
 When reading a version 1 hints file, Borg 1.1.x will
 read all sparse segments to determine their sparsity.
 
-This process may take some time if a repository is kept in the append-only mode,
-which causes the number of sparse segments to grow. Repositories not in append-only
-mode have no sparse segments in 1.0.x, since compaction is unconditional.
+This process may take some time if a repository has been kept in append-only mode
+or ``borg compact`` has not been used for a longer time, which both has caused
+the number of sparse segments to grow.
 
 Compaction processes sparse segments from oldest to newest; sparse segments
 which don't contain enough deleted data to justify compaction are skipped. This

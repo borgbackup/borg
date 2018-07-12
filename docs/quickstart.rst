@@ -59,7 +59,7 @@ Also helpful:
 - if you use LVM: use a LV + a filesystem that you can resize later and have
   some unallocated PEs you can add to the LV.
 - consider using quotas
-- use `prune` regularly
+- use `prune` and `compact` regularly
 
 .. [1] This failsafe can fail in these circumstances:
 
@@ -105,8 +105,10 @@ Some files which aren't necessarily needed in this backup are excluded. See
 :ref:`borg_patterns` on how to add more exclude options.
 
 After the backup this script also uses the :ref:`borg_prune` subcommand to keep
-only a certain number of old archives and deletes the others in order to preserve
-disk space.
+only a certain number of old archives and deletes the others.
+
+Finally, it uses the :ref:`borg_compact` subcommand to remove deleted objects
+from the segment files in the repository to preserve disk space.
 
 Before running, make sure that the repository is initialized as documented in
 :ref:`remote_repos` and that the script has the correct permissions to be executable
@@ -176,17 +178,24 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 
     prune_exit=$?
 
+    # actually free repo disk space by compacting segments
+
+    borg compact
+
+    compact_exit=$?
+
     # use highest exit code as global exit code
     global_exit=$(( backup_exit > prune_exit ? backup_exit : prune_exit ))
+    global_exit=$(( compact_exit > global_exit ? compact_exit : global_exit ))
 
     if [ ${global_exit} -eq 1 ];
     then
-        info "Backup and/or Prune finished with a warning"
+        info "Backup, Prune and/or Compact finished with a warning"
     fi
 
     if [ ${global_exit} -gt 1 ];
     then
-        info "Backup and/or Prune finished with an error"
+        info "Backup, Prune and/or Compact finished with an error"
     fi
 
     exit ${global_exit}

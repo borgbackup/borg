@@ -148,16 +148,51 @@ Now, let's see how to restore some LVs from such a backup. ::
     $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
+.. _separate_compaction:
+
+Separate compaction
+~~~~~~~~~~~~~~~~~~~
+
+Borg does not auto-compact the segment files in the repository at commit time
+(at the end of each repository-writing command) any more.
+
+This is new since borg 1.2.0 and requires borg >= 1.2.0 on client and server.
+
+This causes a similar behaviour of the repository as if it was in append-only
+mode (see below) most of the time (until ``borg compact`` is invoked or an
+old client triggers auto-compaction).
+
+This has some notable consequences:
+
+- repository space is not freed immediately when deleting / pruning archives
+- commands finish quicker
+- repository is more robust and might be easier to recover after damages (as
+  it contains data in a more sequential manner, historic manifests, multiple
+  commits - until you run ``borg compact``)
+- user can choose when to run compaction (it should be done regularly, but not
+  neccessarily after each single borg command)
+- user can choose from where to invoke ``borg compact`` to do the compaction
+  (from client or from server, it does not need a key)
+- less repo sync data traffic in case you create a copy of your repository by
+  using a sync tool (like rsync, rclone, ...)
+
+You can manually run compaction by invoking the ``borg compact`` command.
+
 .. _append_only_mode:
 
-Append-only mode
-~~~~~~~~~~~~~~~~
+Append-only mode (forbid compaction)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A repository can be made "append-only", which means that Borg will never overwrite or
-delete committed data (append-only refers to the segment files, but borg will also
-reject to delete the repository completely). This is useful for scenarios where a
-backup client machine backups remotely to a backup server using ``borg serve``, since
-a hacked client machine cannot delete backups on the server permanently.
+A repository can be made "append-only", which means that Borg will never
+overwrite or delete committed data (append-only refers to the segment files,
+but borg will also reject to delete the repository completely).
+
+If ``borg compact`` command is used on a repo in append-only mode, there
+will be no warning or error, but no compaction will happen.
+
+append-only is useful for scenarios where a backup client machine backups
+remotely to a backup server using ``borg serve``, since a hacked client machine
+cannot delete backups on the server permanently.
 
 To activate append-only mode, set ``append_only`` to 1 in the repository config::
 

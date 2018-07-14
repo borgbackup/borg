@@ -6,6 +6,8 @@ Examples
 
     # delete a single backup archive:
     $ borg delete /path/to/repo::Monday
+    # actually free disk space:
+    $ borg compact /path/to/repo
 
     # delete all archives whose names begin with the machine's hostname followed by "-"
     $ borg delete --prefix '{hostname}-' /path/to/repo

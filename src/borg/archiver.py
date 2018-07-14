@@ -243,7 +243,7 @@ class Archiver:
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
-        repository.commit()
+        repository.commit(compact=False)
         with Cache(repository, key, manifest, warn_if_unencrypted=False):
             pass
         if key.tam_required:
@@ -1012,7 +1012,7 @@ class Archiver:
         name = replace_placeholders(args.name)
         archive.rename(name)
         manifest.write()
-        repository.commit()
+        repository.commit(compact=False)
         cache.commit()
         return self.exit_code
 
@@ -1062,7 +1062,7 @@ class Archiver:
             elif deleted:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
-                repository.commit()
+                repository.commit(compact=False)
                 logger.info('Done. Run "borg check --repair" to clean up the mess.')
             else:
                 logger.warning('Aborted.')
@@ -1078,7 +1078,7 @@ class Archiver:
                         stats, progress=args.progress, forced=args.forced)
             if not dry_run:
                 manifest.write()
-                repository.commit(save_space=args.save_space)
+                repository.commit(compact=False, save_space=args.save_space)
                 cache.commit()
             if args.stats:
                 log_multi(DASHES,
@@ -1387,7 +1387,7 @@ class Archiver:
             pi.finish()
             if to_delete and not args.dry_run:
                 manifest.write()
-                repository.commit(save_space=args.save_space)
+                repository.commit(compact=False, save_space=args.save_space)
                 cache.commit()
             if args.stats:
                 log_multi(DASHES,
@@ -1414,7 +1414,7 @@ class Archiver:
                     print(format_archive(archive_info), '[%s]' % bin_to_hex(archive_info.id))
                 manifest.config[b'tam_required'] = True
                 manifest.write()
-                repository.commit()
+                repository.commit(compact=False)
             if not key.tam_required:
                 key.tam_required = True
                 key.change_passphrase(key._passphrase)
@@ -1437,7 +1437,7 @@ class Archiver:
                     print('Key location:', key.find_key())
             manifest.config[b'tam_required'] = False
             manifest.write()
-            repository.commit()
+            repository.commit(compact=False)
         else:
             # mainly for upgrades from Attic repositories,
             # but also supports borg 0.xx -> 1.0 upgrade.
@@ -1500,7 +1500,7 @@ class Archiver:
                     logger.info('Skipped archive %s: Nothing to do. Archive was not processed.', name)
         if not args.dry_run:
             manifest.write()
-            repository.commit()
+            repository.commit(compact=False)
             cache.commit()
         return self.exit_code
 
@@ -1532,7 +1532,16 @@ class Archiver:
             # that would be bad if somebody uses rsync with ignore-existing (or
             # any other mechanism relying on existing segment data not changing).
             # see issue #1867.
-            repository.commit()
+            repository.commit(compact=False)
+
+    @with_repository(manifest=False, exclusive=True)
+    def do_compact(self, args, repository):
+        """compact segment files in the repository"""
+        # see the comment in do_with_lock about why we do it like this:
+        data = repository.get(Manifest.MANIFEST_ID)
+        repository.put(Manifest.MANIFEST_ID, data)
+        repository.commit(compact=True, cleanup_commits=args.cleanup_commits)
+        return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)
     def do_config(self, args, repository):
@@ -1788,7 +1797,7 @@ class Archiver:
             h = hashlib.sha256(data)  # XXX hardcoded
             repository.put(h.digest(), data)
             print("object %s put." % h.hexdigest())
-        repository.commit()
+        repository.commit(compact=False)
         return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
@@ -1808,7 +1817,7 @@ class Archiver:
                 except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
         if modified:
-            repository.commit()
+            repository.commit(compact=False)
         print('Done.')
         return EXIT_SUCCESS
 
@@ -2302,6 +2311,7 @@ class Archiver:
         # It will replace the entire :ref:`foo` verbatim.
         rst_plain_text_references = {
             'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
+            'separate_compaction': '"Separate compaction"',
         }
 
         def process_epilog(epilog):
@@ -3211,9 +3221,13 @@ class Archiver:
 
         delete_epilog = process_epilog("""
         This command deletes an archive from the repository or the complete repository.
-        Disk space is reclaimed accordingly. If you delete the complete repository, the
-        local cache for it (if any) is also deleted. Alternatively, you can delete just
-        the local cache with the ``--cache-only`` option.
+
+        Important: When deleting archives, repository disk space is **not** freed until
+        you run ``borg compact``.
+
+        If you delete the complete repository, the local cache for it (if any) is
+        also deleted. Alternatively, you can delete just the local cache with the
+        ``--cache-only`` option.
 
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
@@ -3367,8 +3381,12 @@ class Archiver:
 
         prune_epilog = process_epilog("""
         The prune command prunes a repository by deleting all archives not matching
-        any of the specified retention options. This command is normally used by
-        automated backup scripts wanting to keep a certain number of historic backups.
+        any of the specified retention options.
+
+        Important: Repository disk space is **not** freed until you run ``borg compact``.
+
+        This command is normally used by automated backup scripts wanting to keep a
+        certain number of historic backups.
 
         Also, prune automatically removes checkpoint archives (incomplete archives left
         behind by interrupted backup runs) except if the checkpoint is the latest
@@ -3555,6 +3573,8 @@ class Archiver:
 
         This is an *experimental* feature. Do *not* use this on your only backup.
 
+        Important: Repository disk space is **not** freed until you run ``borg compact``.
+
         ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
         have the exact same semantics as in "borg create". If PATHs are specified the
         resulting archive will only contain files from these PATHs.
@@ -3583,10 +3603,9 @@ class Archiver:
 
         With ``--target`` the original archive is not replaced, instead a new archive is created.
 
-        When rechunking space usage can be substantial, expect at least the entire
-        deduplicated size of the archives using the previous chunker params.
-        When recompressing expect approx. (throughput / checkpoint-interval) in space usage,
-        assuming all chunks are recompressed.
+        When rechunking (or recompressing), space usage can be substantial - expect
+        at least the entire deduplicated size of the archives using the previous
+        chunker (or compression) params.
 
         If you recently ran borg check --repair and it had to fix lost chunks with all-zero
         replacement chunks, please first run another backup for the same data and re-run
@@ -3685,6 +3704,31 @@ class Archiver:
                                help='command to run')
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
+
+        compact_epilog = process_epilog("""
+        This command frees repository space by compacting segments.
+
+        Use this regularly to avoid running out of space - you do not need to use this
+        after each borg command though.
+
+        borg compact does not need a key, so it is possible to invoke it from the
+        client or also from the server.
+
+        Depending on the amount of segments that need compaction, it may take a while.
+
+        See :ref:`separate_compaction` in Additional Notes for more details.
+        """)
+        subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
+                                          description=self.do_compact.__doc__,
+                                          epilog=compact_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='compact segment files / free space in repo')
+        subparser.set_defaults(func=self.do_compact)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to compact')
+        subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
+                               help='cleanup commit-only 17-byte segment files')
 
         config_epilog = process_epilog("""
         This command gets and sets options in a local repository or cache config file.

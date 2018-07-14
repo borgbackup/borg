@@ -42,6 +42,7 @@ Usage
    usage/diff
    usage/delete
    usage/prune
+   usage/compact
    usage/info
    usage/mount
    usage/key

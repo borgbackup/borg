@@ -462,6 +462,8 @@ def api(*, since, **kwargs_decorator):
                     continue
                 if 'previously' in restriction and named[name] == restriction['previously']:
                     continue
+                if restriction.get('dontcare', False):
+                    continue
 
                 raise self.RPCServerOutdated("{0} {1}={2!s}".format(f.__name__, name, named[name]),
                                              format_version(restriction['since']))
@@ -889,8 +891,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def check(self, repair=False, save_space=False):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version('1.0.0'))
-    def commit(self, save_space=False):
+    @api(since=parse_version('1.0.0'),
+         compact={'since': parse_version('1.2.0a0'), 'previously': True, 'dontcare': True},
+         cleanup_commits={'since': parse_version('1.2.0a0'), 'previously': False, 'dontcare': True})
+    def commit(self, save_space=False, compact=True, cleanup_commits=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'))

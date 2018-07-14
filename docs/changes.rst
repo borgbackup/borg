@@ -139,6 +139,7 @@ Compatibility notes:
 - dropped support / testing for Python 3.4 and 3.5, minimum requirement is 3.6.
   In case your OS does not provide Python >= 3.6, consider using our binary,
   which does not need an external Python interpreter.
+- freeing repository space only happens when "borg compact" is invoked.
 - list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
   "isomtime" was the default but produced a verbose human format,
   while "mtime" produced a ISO-8601-like format.
@@ -148,15 +149,32 @@ Compatibility notes:
 
 New features:
 
+- compact: "borg compact" needs to be used to free repository space by
+  compacting the segments (reading sparse segments, rewriting still needed
+  data to new segments, deleting the sparse segments).
+  Borg < 1.2 invoked compaction automatically at the end of each repository
+  writing command.
+  Borg >= 1.2 does not do that any more to give better speed, more control,
+  more segment file stability (== less stuff moving to newer segments) and
+  more robustness.
+  See the docs about "borg compact" for more details.
+- "borg compact --cleanup-commits" is to cleanup the tons of 17byte long
+  commit-ony segment files caused by borg 1.1.x issue #2850.
+  Invoke this once after upgrading (the server side) borg to 1.2.
+  Compaction now automatically removes unneeded commit-only segment files.
 - prune: Show which rule was applied to keep archive, #2886
 
 Fixes:
 
+- repository compaction now automatically removes unneeded 17byte commit-only
+  segments, #2850
 - avoid stale filehandle issues, #3265
 - make swidth available on all posix platforms, #2667
 
 Other changes:
 
+- repository: better speed and less stuff moving around by using separate
+  segment files for manifest DELETEs and PUTs, #3947
 - use pyinstaller v3.3.1 to build binaries
 - msgpack: switch to recent "msgpack" pypi pkg name, #3890
 - llfuse: modernize / simplify llfuse version requirements

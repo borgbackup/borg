@@ -1463,7 +1463,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 if 'chunks' in item:
                     first_chunk_id = item.chunks[0].id
                     repository.delete(first_chunk_id)
-                    repository.commit()
+                    repository.commit(compact=False)
                     break
         output = self.cmd('delete', '--force', self.repository_location + '::test')
         self.assert_in('deleted archive was corrupted', output)
@@ -1479,7 +1479,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             archive = Archive(repository, key, manifest, 'test')
             id = archive.metadata.items[0]
             repository.put(id, b'corrupted items metadata stream chunk')
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('delete', '--force', '--force', self.repository_location + '::test')
         self.cmd('check', '--repair', self.repository_location)
         output = self.cmd('list', self.repository_location)
@@ -1533,7 +1533,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             manifest.config[b'feature_flags'] = {operation.value.encode(): {b'mandatory': [b'unknown-feature']}}
             manifest.write()
-            repository.commit()
+            repository.commit(compact=False)
 
     def cmd_raises_unknown_feature(self, args):
         if self.FORK_DEFAULT:
@@ -2249,7 +2249,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     break
             else:
                 assert False  # missed the file
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
 
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
@@ -2970,7 +2970,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                     break
             else:
                 self.fail('should not happen')
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.assert_in('New missing file chunk detected', output)
@@ -3013,7 +3013,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive('archive1')
         with repository:
             repository.delete(archive.metadata.items[0])
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.cmd('check', self.repository_location, exit_code=0)
@@ -3022,7 +3022,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive('archive1')
         with repository:
             repository.delete(archive.id)
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.cmd('check', self.repository_location, exit_code=0)
@@ -3031,7 +3031,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive('archive1')
         with repository:
             repository.delete(Manifest.MANIFEST_ID)
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
         self.assert_in('archive1', output)
@@ -3044,7 +3044,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             manifest = repository.get(Manifest.MANIFEST_ID)
             corrupted_manifest = manifest + b'corrupted!'
             repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
         self.assert_in('archive1', output)
@@ -3061,7 +3061,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             chunk = repository.get(archive.id)
             corrupted_chunk = chunk + b'corrupted!'
             repository.put(archive.id, corrupted_chunk)
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
         self.assert_in('archive2', output)
@@ -3086,7 +3086,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             })
             archive_id = key.id_hash(archive)
             repository.put(archive_id, key.encrypt(archive))
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
         output = self.cmd('list', self.repository_location)
@@ -3098,7 +3098,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd('check', self.repository_location, exit_code=0)
         with Repository(self.repository_location, exclusive=True) as repository:
             repository.put(b'01234567890123456789012345678901', b'xxxx')
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -3117,7 +3117,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                     data = repository.get(chunk.id) + b'1234'
                     repository.put(chunk.id, data)
                     break
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=0)
         output = self.cmd('check', '--verify-data', self.repository_location, exit_code=1)
         assert bin_to_hex(chunk.id) + ', integrity error' in output
@@ -3136,7 +3136,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_location, exclusive=True) as repository:
             for id_ in repository.list():
                 repository.delete(id_)
-            repository.commit()
+            repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
 
     def test_attic013_acl_bug(self):
@@ -3179,7 +3179,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'config': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
-            repository.commit()
+            repository.commit(compact=False)
 
     def test_fresh_init_tam_required(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -3191,7 +3191,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'archives': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
-            repository.commit()
+            repository.commit(compact=False)
 
         with pytest.raises(TAMRequiredError):
             self.cmd('list', self.repository_location)
@@ -3209,7 +3209,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
             del manifest[b'tam']
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest)))
-            repository.commit()
+            repository.commit(compact=False)
         output = self.cmd('list', '--debug', self.repository_location)
         assert 'archive1234' in output
         assert 'TAM not found and not required' in output

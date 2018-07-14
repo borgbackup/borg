@@ -75,7 +75,7 @@ def sysinfo():
         uname = None
     if sys.platform.startswith('linux'):
         try:
-            linux_distribution = platform.linux_distribution()
+            linux_distribution = platform.linux_distribution()  # noqa
         except:
             # platform.linux_distribution() is deprecated since py 3.5 and removed in 3.7.
             linux_distribution = ('Unknown Linux', '', '')

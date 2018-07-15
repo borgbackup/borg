@@ -1,3 +1,4 @@
+import errno
 import json
 import os
 import time
@@ -163,7 +164,7 @@ class ExclusiveLock:
                 thread = int(thread_str)
             except ValueError:
                 # Malformed lock name? Or just some new format we don't understand?
-                # It's safer to just exit.
+                logger.error("Found malformed lock %s in %s. Please check/fix manually.", name, self.path)
                 return False
 
             if platform.process_alive(host, pid, thread):
@@ -172,7 +173,7 @@ class ExclusiveLock:
             if not self.kill_stale_locks:
                 if not self.stale_warning_printed:
                     # Log this at warning level to hint the user at the ability
-                    logger.warning("Found stale lock %s, but not deleting because BORG_HOSTNAME_IS_UNIQUE is not set.", name)
+                    logger.warning("Found stale lock %s, but not deleting because BORG_HOSTNAME_IS_UNIQUE is False.", name)
                     self.stale_warning_printed = True
                 return False
 
@@ -188,10 +189,12 @@ class ExclusiveLock:
 
         try:
             os.rmdir(self.path)
-        except OSError:
-            # Directory is not empty = we lost the race to somebody else
-            # Permission denied = we cannot operate anyway
-            # other error like EIO = we cannot operate and it's unsafe too.
+        except OSError as err:
+            if err.errno == errno.ENOTEMPTY:
+                # Directory is not empty = we lost the race to somebody else
+                return False
+            # EACCES or EIO or ... = we cannot operate anyway
+            logger.error('Failed to remove lock dir: %s', str(err))
             return False
 
         return True
@@ -242,7 +245,8 @@ class LockRoster:
                         if platform.process_alive(host, pid, thread):
                             elements.add((host, pid, thread))
                         else:
-                            logger.warning('Removed stale %s roster lock for pid %d.', key, pid)
+                            logger.warning('Removed stale %s roster lock for host %s pid %d thread %d.',
+                                           key, host, pid, thread)
                     data[key] = list(elements)
         except (FileNotFoundError, ValueError):
             # no or corrupt/empty roster file?

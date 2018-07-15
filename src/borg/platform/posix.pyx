@@ -30,6 +30,11 @@ def process_alive(host, pid, thread):
     from . import local_pid_alive
     from . import hostid
 
+    assert isinstance(host, str)
+    assert isinstance(hostid, str)
+    assert isinstance(pid, int)
+    assert isinstance(thread, int)
+
     if host != hostid:
         return True
 

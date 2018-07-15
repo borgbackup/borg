@@ -140,7 +140,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                     if 'compression' in args:
                         kwargs['key'].compressor = args.compression.compressor
                     if secure:
-                        assert_secure(repository, kwargs['manifest'])
+                        assert_secure(repository, kwargs['manifest'], self.lock_wait)
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
@@ -1617,7 +1617,7 @@ class Archiver:
 
         if args.cache:
             manifest, key = Manifest.load(repository, (Manifest.Operation.WRITE,))
-            assert_secure(repository, manifest)
+            assert_secure(repository, manifest, self.lock_wait)
             cache = Cache(repository, key, manifest, lock_wait=self.lock_wait)
 
         try:

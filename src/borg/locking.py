@@ -14,7 +14,7 @@ logger = create_logger(__name__)
 
 class TimeoutTimer:
     """
-    A timer for timeout checks (can also deal with no timeout, give timeout=None [default]).
+    A timer for timeout checks (can also deal with "never timeout").
     It can also compute and optionally execute a reasonable sleep time (e.g. to avoid
     polling too often or to support thread/process rescheduling).
     """
@@ -22,10 +22,10 @@ class TimeoutTimer:
         """
         Initialize a timer.
 
-        :param timeout: time out interval [s] or None (no timeout)
+        :param timeout: time out interval [s] or None (never timeout, wait forever) [default]
         :param sleep: sleep interval [s] (>= 0: do sleep call, <0: don't call sleep)
                       or None (autocompute: use 10% of timeout [but not more than 60s],
-                      or 1s for no timeout)
+                      or 1s for "never timeout" mode)
         """
         if timeout is not None and timeout < 0:
             raise ValueError("timeout must be >= 0")

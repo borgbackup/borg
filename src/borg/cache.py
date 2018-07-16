@@ -159,14 +159,14 @@ class SecurityManager:
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True):
+    def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True, lock_wait=None):
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         self.assert_access_unknown(warn_if_unencrypted, manifest, key)
         if cache_config:
             self._assert_secure(manifest, key, cache_config)
         else:
-            cache_config = CacheConfig(self.repository)
+            cache_config = CacheConfig(self.repository, lock_wait=lock_wait)
             if cache_config.exists():
                 with cache_config:
                     self._assert_secure(manifest, key, cache_config)
@@ -201,9 +201,9 @@ class SecurityManager:
                 raise Cache.CacheInitAbortedError()
 
 
-def assert_secure(repository, manifest):
+def assert_secure(repository, manifest, lock_wait):
     sm = SecurityManager(repository)
-    sm.assert_secure(manifest, manifest.key)
+    sm.assert_secure(manifest, manifest.key, lock_wait=lock_wait)
 
 
 def recanonicalize_relative_location(cache_location, repository):
@@ -373,7 +373,7 @@ class Cache:
                               lock_wait=lock_wait, cache_mode=cache_mode)
 
         def adhoc():
-            return AdHocCache(repository=repository, key=key, manifest=manifest)
+            return AdHocCache(repository=repository, key=key, manifest=manifest, lock_wait=lock_wait)
 
         if not permit_adhoc_cache:
             return local()
@@ -432,7 +432,7 @@ class LocalCache(CacheStatsMixin):
                  progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE):
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
-        :param lock_wait: timeout for lock acquisition (None: return immediately if lock unavailable)
+        :param lock_wait: timeout for lock acquisition (int [s] or None [wait forever])
         :param sync: do :meth:`.sync`
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
@@ -999,14 +999,14 @@ All archives:                unknown              unknown              unknown
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
-    def __init__(self, repository, key, manifest, warn_if_unencrypted=True):
+    def __init__(self, repository, key, manifest, warn_if_unencrypted=True, lock_wait=None):
         self.repository = repository
         self.key = key
         self.manifest = manifest
         self._txn_active = False
 
         self.security_manager = SecurityManager(repository)
-        self.security_manager.assert_secure(manifest, key)
+        self.security_manager.assert_secure(manifest, key, lock_wait=lock_wait)
 
         logger.warning('Note: --no-cache-sync is an experimental feature.')
 

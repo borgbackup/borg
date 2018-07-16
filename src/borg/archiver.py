@@ -1628,7 +1628,7 @@ class Archiver:
                 validate = cache_validate
             else:
                 config = repository.config
-                save = lambda: repository.save_config(repository.path, repository.config)
+                save = lambda: repository.save_config(repository.path, repository.config)  # noqa
                 validate = repo_validate
 
             if args.delete:

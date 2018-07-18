@@ -104,6 +104,7 @@ you may need to run ``borg break-lock`` before the next backup. You may use the
 same archive name as in previous attempt or a different one (e.g. if you always
 include the current datetime), it does not matter.
 
+
 Borg always does full single-pass backups, so it will start again
 from the beginning - but it will be much faster, because some of the data was
 already stored into the repo (and is still referenced by the checkpoint
@@ -121,6 +122,10 @@ these files, but you can make them considered by giving the option
 really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
+
+Note that checkpoints inside files are created only since version 1.1, 
+make sure you have an up-to-date version of borgbackup if you want to continue instead of retransferring a huge file.
+In some cases, there is only an outdated version shipped with your distribution (e.g. Debian). See :ref:`_installation`
 
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------

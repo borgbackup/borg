@@ -104,7 +104,6 @@ you may need to run ``borg break-lock`` before the next backup. You may use the
 same archive name as in previous attempt or a different one (e.g. if you always
 include the current datetime), it does not matter.
 
-
 Borg always does full single-pass backups, so it will start again
 from the beginning - but it will be much faster, because some of the data was
 already stored into the repo (and is still referenced by the checkpoint

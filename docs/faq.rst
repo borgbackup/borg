@@ -122,6 +122,10 @@ really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
+Note that checkpoints inside files are created only since version 1.1, 
+make sure you have an up-to-date version of borgbackup if you want to continue instead of retransferring a huge file.
+In some cases, there is only an outdated version shipped with your distribution (e.g. Debian). See :ref:`_installation`
+
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
 

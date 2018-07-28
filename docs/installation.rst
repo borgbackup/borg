@@ -324,7 +324,12 @@ While we try not to break master, there are no guarantees on anything. ::
     # get borg from github
     git clone https://github.com/borgbackup/borg.git
 
-    virtualenv --python=python3 borg-env
+    # set python interpreter version e.g. 3.6.0
+    pyenv install 3.6.0
+    pyenv global 3.6.0
+    pyenv local 3.6.0
+
+    virtualenv --python=${pyenv which python} borg-env
     source borg-env/bin/activate   # always before using!
 
     # install borg + dependencies into virtualenv

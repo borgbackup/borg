@@ -278,8 +278,6 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.chdir(self._old_wd)
         # note: ignore_errors=True as workaround for issue #862
         shutil.rmtree(self.tmpdir, ignore_errors=True)
-        # destroy logging configuration
-        logging.Logger.manager.loggerDict.clear()
         setup_logging()
 
     def cmd(self, *args, **kw):

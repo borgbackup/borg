@@ -324,7 +324,8 @@ While we try not to break master, there are no guarantees on anything. ::
     # get borg from github
     git clone https://github.com/borgbackup/borg.git
 
-    virtualenv --python=python3 borg-env
+    # create a virtual environment
+    virtualenv --python=${which python3} borg-env
     source borg-env/bin/activate   # always before using!
 
     # install borg + dependencies into virtualenv
@@ -337,5 +338,16 @@ While we try not to break master, there are no guarantees on anything. ::
     # optional: run all the tests, on all supported Python versions
     # requires fakeroot, available through your package manager
     fakeroot -u tox
+
+By default the system installation of python will be used. If you need to use a different version of Python you can install this using ``pyenv``: ::
+
+    ...
+    # create a virtual environment
+    pyenv install 3.6.0
+    pyenv global 3.6.0
+    pyenv local 3.6.0
+    virtualenv --python=${pyenv which python} borg-env
+    source borg-env/bin/activate   # always before using!
+    ...
 
 .. note:: As a developer or power user, you always want to use a virtual environment.

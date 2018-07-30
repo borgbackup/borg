@@ -20,6 +20,10 @@ matrix:
           os: linux
           dist: trusty
           env: TOXENV=py36
+        - python: "3.7"
+          os: linux
+          dist: xenial
+          env: TOXENV=py37
         - language: generic
           os: osx
           osx_image: xcode8.3

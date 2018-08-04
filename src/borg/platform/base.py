@@ -249,7 +249,13 @@ def getfqdn(name=''):
 # XXX this sometimes requires live internet access for issuing a DNS query in the background.
 hostname = socket.gethostname()
 fqdn = getfqdn(hostname)
-hostid = '%s@%s' % (fqdn, uuid.getnode())
+
+# uuid.getnode() is problematic in some environments (e.g. OpenVZ, see #3968) where the virtual MAC address
+# is all-zero. uuid.getnode falls back to returning a random value in that case, which is not what we want.
+# thus, we offer BORG_HOST_ID where a user can set an own, unique id for each of his hosts.
+hostid = os.environ.get('BORG_HOST_ID')
+if not hostid:
+    hostid = '%s@%s' % (fqdn, uuid.getnode())
 
 
 def get_process_id():

@@ -185,6 +185,13 @@ General:
         Borg assumes that it can derive a unique hostname / identity (see ``borg debug info``).
         If this is not the case or you do not want Borg to automatically remove stale locks,
         set this to *no*.
+    BORG_HOST_ID
+        Borg usually computes a host id from the FQDN plus the results of ``uuid.getnode()`` (which usually returns
+        a unique id based on the MAC address of the network interface. Except if that MAC happens to be all-zero - in
+        that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
+        So, if you have a all-zero MAC address or other reasons to better externally control the host id, just set this
+        environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
+        use fqdn@uniqueid.
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
     BORG_RSH

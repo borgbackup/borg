@@ -41,7 +41,7 @@ from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
-from .platform import acl_get, acl_set, set_flags, get_flags, swidth
+from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
@@ -478,7 +478,7 @@ Utilization of max. archive size: {csize_max:.0%}
             'comment': comment or '',
             'items': self.items_buffer.chunks,
             'cmdline': sys.argv,
-            'hostname': socket.gethostname(),
+            'hostname': hostname,
             'username': getuser(),
             'time': start.strftime(ISO_FORMAT),
             'time_end': end.strftime(ISO_FORMAT),

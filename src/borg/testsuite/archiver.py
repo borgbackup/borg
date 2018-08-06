@@ -3384,11 +3384,8 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):
     def test_basic_functionality(self):
-        # Initialize test folder
-        self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-
         # Setup files for the first snapshot
+        self.create_regular_file('empty', size=0)
         self.create_regular_file('file_unchanged', size=128)
         self.create_regular_file('file_removed', size=256)
         self.create_regular_file('file_removed2', size=512)
@@ -3408,6 +3405,8 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             os.link('input/empty', 'input/hardlink_contents_changed')
             os.link('input/file_removed', 'input/hardlink_removed')
             os.link('input/file_removed2', 'input/hardlink_target_removed')
+
+        self.cmd('init', '--encryption=repokey', self.repository_location)
 
         # Create the first snapshot
         self.cmd('create', self.repository_location + '::test0', 'input')

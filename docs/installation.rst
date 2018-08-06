@@ -185,7 +185,7 @@ group, log out and log in again.
 Fedora / Korora
 +++++++++++++++
 
-.. todo:: Add zeromq, use python 3.5 or 3.6
+.. todo:: use python 3.6
 
 Install the dependencies with development headers::
 
@@ -199,7 +199,7 @@ Install the dependencies with development headers::
 openSUSE Tumbleweed / Leap
 ++++++++++++++++++++++++++
 
-.. todo:: Add zeromq, use python 3.5 or 3.6
+.. todo:: use python 3.6
 
 Install the dependencies automatically using zypper::
 
@@ -216,7 +216,7 @@ Alternatively, you can enumerate all build dependencies in the command line::
 Mac OS X
 ++++++++
 
-.. todo:: Add zeromq, use python 3.5 or 3.6
+.. todo:: use python 3.6
 
 Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
@@ -236,7 +236,7 @@ FUSE for OS X, which is available via github_, or via homebrew::
 FreeBSD
 ++++++++
 
-.. todo:: Add zeromq, use python 3.5 or 3.6
+.. todo:: use python 3.6
 
 Listed below are packages you will need to install Borg, its dependencies,
 and commands to make FUSE work for using the mount command.
@@ -268,7 +268,7 @@ Cygwin
 .. note::
     Running under Cygwin is experimental and has not been tested much yet.
 
-.. todo:: Add zeromq, use python 3.5 or 3.6
+.. todo:: use python 3.6
 
 Use the Cygwin installer to install the dependencies::
 

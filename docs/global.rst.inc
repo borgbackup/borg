@@ -16,7 +16,6 @@
 .. _liblz4: https://github.com/Cyan4973/lz4
 .. _libzstd: https://github.com/facebook/zstd
 .. _libb2: https://github.com/BLAKE2/libb2
-.. _ZeroMQ: http://zeromq.org/
 .. _OpenSSL: https://www.openssl.org/
 .. _`Python 3`: https://www.python.org/
 .. _Buzhash: https://en.wikipedia.org/wiki/Buzhash

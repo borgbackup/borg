@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from io import StringIO
 from unittest.mock import Mock
 
-import msgpack
 import pytest
 
 from . import BaseTestCase
@@ -11,6 +10,7 @@ from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter
 from ..helpers import Manifest
+from ..helpers import msgpack
 from ..item import Item, ArchiveItem
 
 

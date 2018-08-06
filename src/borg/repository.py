@@ -11,8 +11,6 @@ from datetime import datetime
 from functools import partial
 from itertools import islice
 
-import msgpack
-
 from .constants import *  # NOQA
 from .hashindex import NSIndex
 from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
@@ -22,6 +20,7 @@ from .helpers import bin_to_hex
 from .helpers import hostname_is_unique
 from .helpers import secure_erase, truncate_and_unlink
 from .helpers import Manifest
+from .helpers import msgpack
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -513,7 +512,7 @@ class Repository:
             try:
                 with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
                     hints = msgpack.unpack(fd)
-            except (msgpack.UnpackException, msgpack.ExtraData, FileNotFoundError, FileIntegrityError) as e:
+            except (msgpack.UnpackException, FileNotFoundError, FileIntegrityError) as e:
                 logger.warning('Repository hints file missing or corrupted, trying to recover: %s', e)
                 if not isinstance(e, FileNotFoundError):
                     os.unlink(hints_path)

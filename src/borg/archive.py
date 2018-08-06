@@ -13,8 +13,6 @@ from io import BytesIO
 from itertools import groupby, zip_longest
 from shutil import get_terminal_size
 
-import msgpack
-
 from .logger import create_logger
 
 logger = create_logger()
@@ -39,6 +37,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import msgpack
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
@@ -239,7 +238,7 @@ class ChunkBuffer:
 
     def __init__(self, key, chunker_params=ITEMS_CHUNKER_PARAMS):
         self.buffer = BytesIO()
-        self.packer = msgpack.Packer(unicode_errors='surrogateescape')
+        self.packer = msgpack.Packer()
         self.chunks = []
         self.key = key
         self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
@@ -348,7 +347,7 @@ class Archive:
 
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
-        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data, unicode_errors='surrogateescape'))
+        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data))
         if metadata.version != 1:
             raise Exception('Unknown archive metadata version')
         return metadata
@@ -735,7 +734,7 @@ Utilization of max. archive size: {csize_max:.0%}
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)
         setattr(metadata, key, value)
-        data = msgpack.packb(metadata.as_dict(), unicode_errors='surrogateescape')
+        data = msgpack.packb(metadata.as_dict())
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, data, self.stats)
         self.manifest.archives[self.name] = (new_id, metadata.time)
@@ -1207,9 +1206,6 @@ def valid_msgpacked_dict(d, keys_serialized):
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker
     """
-    class UnpackerCrashed(Exception):
-        """raise if unpacker crashed"""
-
     def __init__(self, validator, item_keys):
         super().__init__()
         self.item_keys = [msgpack.packb(name.encode()) for name in item_keys]
@@ -1232,14 +1228,6 @@ class RobustUnpacker:
         return self
 
     def __next__(self):
-        def unpack_next():
-            try:
-                return next(self._unpacker)
-            except (TypeError, ValueError) as err:
-                # transform exceptions that might be raised when feeding
-                # msgpack with invalid data to a more specific exception
-                raise self.UnpackerCrashed(str(err))
-
         if self._resync:
             data = b''.join(self._buffered_data)
             while self._resync:
@@ -1252,8 +1240,8 @@ class RobustUnpacker:
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
                 self._unpacker.feed(data)
                 try:
-                    item = unpack_next()
-                except (self.UnpackerCrashed, StopIteration):
+                    item = next(self._unpacker)
+                except (msgpack.UnpackException, StopIteration):
                     # as long as we are resyncing, we also ignore StopIteration
                     pass
                 else:
@@ -1262,7 +1250,7 @@ class RobustUnpacker:
                         return item
                 data = data[1:]
         else:
-            return unpack_next()
+            return next(self._unpacker)
 
 
 class ArchiveChecker:
@@ -1459,9 +1447,8 @@ class ArchiveChecker:
                 continue
             try:
                 archive = msgpack.unpackb(data)
-            # Ignore exceptions that might be raised when feeding
-            # msgpack with invalid data
-            except (TypeError, ValueError, StopIteration):
+            # Ignore exceptions that might be raised when feeding msgpack with invalid data
+            except msgpack.UnpackException:
                 continue
             if valid_archive(archive):
                 archive = ArchiveItem(internal_dict=archive)
@@ -1640,7 +1627,7 @@ class ArchiveChecker:
                                 yield Item(internal_dict=item)
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata (%s)' % reason, chunk_id, i)
-                    except RobustUnpacker.UnpackerCrashed as err:
+                    except msgpack.UnpackException as err:
                         report('Unpacker crashed while unpacking item metadata, trying to resync...', chunk_id, i)
                         unpacker.resync()
                     except Exception:
@@ -1696,7 +1683,7 @@ class ArchiveChecker:
                 for previous_item_id in archive.items:
                     mark_as_possibly_superseded(previous_item_id)
                 archive.items = items_buffer.chunks
-                data = msgpack.packb(archive.as_dict(), unicode_errors='surrogateescape')
+                data = msgpack.packb(archive.as_dict())
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)

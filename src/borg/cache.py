@@ -6,8 +6,6 @@ from binascii import unhexlify
 from collections import namedtuple
 from time import perf_counter
 
-import msgpack
-
 from .logger import create_logger
 
 logger = create_logger()
@@ -26,6 +24,7 @@ from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .helpers import set_ec, EXIT_WARNING
 from .helpers import truncate_and_unlink
+from .helpers import msgpack
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError

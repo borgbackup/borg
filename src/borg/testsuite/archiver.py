@@ -2331,7 +2331,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             output = self.cmd('debug', 'dump-repo-objs', self.repository_location)
         output_dir = sorted(os.listdir('output'))
-        assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
+        assert len(output_dir) > 0 and output_dir[0].startswith('00000000_')
         assert 'Done.' in output
 
     def test_debug_put_get_delete_obj(self):

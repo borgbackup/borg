@@ -73,7 +73,7 @@ from .patterns import PatternMatcher
 from .item import Item
 from .platform import get_flags, get_process_id, SyncFile
 from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-from .repository import Repository, LIST_SCAN_LIMIT
+from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
 from .selftest import selftest
 from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 
@@ -1752,7 +1752,85 @@ class Archiver:
 
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
-        """dump (decrypted, decompressed) repo objects"""
+        """dump (decrypted, decompressed) repo objects, repo index MUST be current/correct"""
+        from .crypto.key import key_factory
+
+        def decrypt_dump(i, id, cdata, tag=None, segment=None, offset=None):
+            if cdata is not None:
+                give_id = id if id != Manifest.MANIFEST_ID else None
+                data = key.decrypt(give_id, cdata)
+            else:
+                data = b''
+            tag_str = '' if tag is None else '_' + tag
+            segment_str = '_' + str(segment) if segment is not None else ''
+            offset_str = '_' + str(offset) if offset is not None else ''
+            id_str = '_' + bin_to_hex(id) if id is not None else ''
+            filename = '%08d%s%s%s%s.obj' % (i, segment_str, offset_str, tag_str, id_str)
+            print('Dumping', filename)
+            with open(filename, 'wb') as fd:
+                fd.write(data)
+
+        if args.ghost:
+            # dump ghosty stuff from segment files: not yet committed objects, deleted / superceded objects, commit tags
+
+            # set up the key without depending on a manifest obj
+            for id, cdata, tag, segment, offset in repository.scan_low_level():
+                if tag == TAG_PUT:
+                    key = key_factory(repository, cdata)
+                    break
+            i = 0
+            for id, cdata, tag, segment, offset in repository.scan_low_level():
+                if tag == TAG_PUT:
+                    decrypt_dump(i, id, cdata, tag='put', segment=segment, offset=offset)
+                elif tag == TAG_DELETE:
+                    decrypt_dump(i, id, None, tag='del', segment=segment, offset=offset)
+                elif tag == TAG_COMMIT:
+                    decrypt_dump(i, None, None, tag='commit', segment=segment, offset=offset)
+                i += 1
+        else:
+            # set up the key without depending on a manifest obj
+            ids = repository.list(limit=1, marker=None)
+            cdata = repository.get(ids[0])
+            key = key_factory(repository, cdata)
+            marker = None
+            i = 0
+            while True:
+                result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
+                if not result:
+                    break
+                marker = result[-1]
+                for id in result:
+                    cdata = repository.get(id)
+                    decrypt_dump(i, id, cdata)
+                    i += 1
+        print('Done.')
+        return EXIT_SUCCESS
+
+    @with_repository(manifest=False)
+    def do_debug_search_repo_objs(self, args, repository):
+        """search for byte sequences in repo objects, repo index MUST be current/correct"""
+        context = 32
+
+        def print_finding(info, wanted, data, offset):
+            before = data[offset - context:offset]
+            after = data[offset + len(wanted):offset + len(wanted) + context]
+            print('%s: %s %s %s == %r %r %r' % (info, before.hex(), wanted.hex(), after.hex(),
+                                                before, wanted, after))
+
+        wanted = args.wanted
+        try:
+            if wanted.startswith('hex:'):
+                wanted = unhexlify(wanted[4:])
+            elif wanted.startswith('str:'):
+                wanted = wanted[4:].encode('utf-8')
+            else:
+                raise ValueError('unsupported search term')
+        except (ValueError, UnicodeEncodeError):
+            wanted = None
+        if not wanted:
+            self.print_error('search term needs to be hex:123abc or str:foobar style')
+            return EXIT_ERROR
+
         from .crypto.key import key_factory
         # set up the key without depending on a manifest obj
         ids = repository.list(limit=1, marker=None)
@@ -1760,9 +1838,11 @@ class Archiver:
         key = key_factory(repository, cdata)
 
         marker = None
+        last_data = b''
+        last_id = None
         i = 0
         while True:
-            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
             if not result:
                 break
             marker = result[-1]
@@ -1770,11 +1850,26 @@ class Archiver:
                 cdata = repository.get(id)
                 give_id = id if id != Manifest.MANIFEST_ID else None
                 data = key.decrypt(give_id, cdata)
-                filename = '%06d_%s.obj' % (i, bin_to_hex(id))
-                print('Dumping', filename)
-                with open(filename, 'wb') as fd:
-                    fd.write(data)
+
+                # try to locate wanted sequence crossing the border of last_data and data
+                boundary_data = last_data[-(len(wanted) - 1):] + data[:len(wanted) - 1]
+                if wanted in boundary_data:
+                    boundary_data = last_data[-(len(wanted) - 1 + context):] + data[:len(wanted) - 1 + context]
+                    offset = boundary_data.find(wanted)
+                    info = '%d %s | %s' % (i, last_id.hex(), id.hex())
+                    print_finding(info, wanted, boundary_data, offset)
+
+                # try to locate wanted sequence in data
+                count = data.count(wanted)
+                if count:
+                    offset = data.find(wanted)  # only determine first occurance's offset
+                    info = "%d %s #%d" % (i, id.hex(), count)
+                    print_finding(info, wanted, data, offset)
+
+                last_id, last_data = id, data
                 i += 1
+                if i % 10000 == 0:
+                    print('%d objects processed.' % i)
         print('Done.')
         return EXIT_SUCCESS
 
@@ -3869,6 +3964,23 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repo to dump')
+        subparser.add_argument('--ghost', dest='ghost', action='store_true',
+                               help='dump all segment file contents, including deleted/uncommitted objects and commits.')
+
+        debug_search_repo_objs_epilog = process_epilog("""
+        This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.
+        """)
+        subparser = debug_parsers.add_parser('search-repo-objs', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_search_repo_objs.__doc__,
+                                          epilog=debug_search_repo_objs_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='search repo objects (debug)')
+        subparser.set_defaults(func=self.do_debug_search_repo_objs)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to search')
+        subparser.add_argument('wanted', metavar='WANTED', type=str,
+                               help='term to search the repo for, either 0x1234abcd hex term or a string')
 
         debug_get_obj_epilog = process_epilog("""
         This command gets an object from the repository.

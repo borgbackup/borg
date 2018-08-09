@@ -2059,6 +2059,89 @@ class Archiver:
         return EXIT_SUCCESS
 
     @with_repository(manifest=False)
+    def do_debug_find_chunks(self, args, repository):
+        """search the repo for chunk list entries, repo index MUST be current/correct"""
+        return  # XXX code is not ready yet XXX
+
+        from .crypto.key import key_factory
+        # set up the key without depending on a manifest obj
+        ids = repository.list(limit=1, marker=None)
+        cdata = repository.get(ids[0])
+        key = key_factory(repository, cdata)
+
+        # unpacker = msgpack.Unpacker(use_list=False)
+
+        marker = None  # we could start at a specific, known-good chunk here
+        i = 0
+        cles = 0
+        last_data = b''
+        while True:
+            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
+            if not result:
+                break
+            marker = result[-1]
+            for id in result:
+                cdata = repository.get(id)
+                give_id = id if id != Manifest.MANIFEST_ID else None
+                data = key.decrypt(give_id, cdata)
+                data = last_data + data
+
+                # a chunk list entry is a 3-tuple (0x93) with a 32 bytes long first elem (0xda0020),
+                # followed by 2 integers.
+                cle_start = b'\x93\xda\x00\x20'
+                pos = data.find(cle_start)
+                if pos >= 0:
+                    while data[pos:].startswith(cle_start):
+                        pos += 4
+                        chunkid = data[pos:pos+32]
+                        pos += 32
+                        int_tag = data[pos]
+                        if int_tag == 0xcd:  # 16bit integer
+                            pos += 3
+                        elif int_tag == 0xce:  # 32bit integer
+                            pos += 5
+                        elif int_tag == 0xcc:  # 8bit integer
+                            pos += 2
+                        else:
+                            # we found something other than we searched for
+                            pos = data.find(cle_start, pos)
+                            if pos < 0:
+                                pos = len(data)
+                                break
+                            else:
+                                continue
+                        int_tag = data[pos]
+                        if int_tag == 0xcd:  # 16bit integer
+                            pos += 3
+                        elif int_tag == 0xce:  # 32bit integer
+                            pos += 5
+                        elif int_tag == 0xcc:  # 8bit integer
+                            pos += 2
+                        else:
+                            # we found something other than we searched for
+                            pos = data.find(cle_start, pos)
+                            if pos < 0:
+                                pos = len(data)
+                                break
+                            else:
+                                continue
+                        print("%d %s CLE %d: %s" % (i, id.hex(), cles, chunkid.hex()))
+                        cles += 1
+                    if cle_start.startswith(data[pos:]):
+                        # rest looks like a incomplete cle_start sequence or is empty and
+                        # we might need to continue in next chunk for both cases.
+                        last_data = data[pos:]
+                    else:
+                        print('reached chunk list end, size: %d' % cles)
+                        last_data = b''
+                        cles = 0
+                i += 1
+                if i % 10000 == 0:
+                    print('%d objects processed.' % i)
+        print('Done.')
+        return EXIT_SUCCESS
+
+    @with_repository(manifest=False)
     def do_debug_get_obj(self, args, repository):
         """get object contents from the repository and write it into file"""
         hex_id = args.id
@@ -4114,6 +4197,19 @@ class Archiver:
                                help='repo to search')
         subparser.add_argument('wanted', metavar='WANTED', type=str,
                                help='term to search the repo for, either 0x1234abcd hex term or a string')
+
+        debug_find_chunks_epilog = process_epilog("""
+        This command searches raw (but decrypted and decompressed) repo objects for chunk lists (like used for files).
+        """)
+        subparser = debug_parsers.add_parser('find-chunks', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_find_chunks.__doc__,
+                                          epilog=debug_find_chunks_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='find chunk lists (debug)')
+        subparser.set_defaults(func=self.do_debug_find_chunks)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to search for chunk lists')
 
         debug_get_obj_epilog = process_epilog("""
         This command gets an object from the repository.

@@ -12,6 +12,10 @@ matrix:
         - python: 3.4
           os: linux
           dist: trusty
+          env: TOXENV=flake8
+        - python: 3.4
+          os: linux
+          dist: trusty
           env: TOXENV=py34
         - python: 3.5.2
           os: linux
@@ -21,15 +25,7 @@ matrix:
           os: linux
           dist: trusty
           env: TOXENV=py36
-        - python: 3.4
-          os: linux
-          dist: trusty
-          env: TOXENV=flake8
-        - python: "3.6-dev"
-          os: linux
-          dist: trusty
-          env: TOXENV=py36
-        - python: "3.7"
+        - python: 3.7
           os: linux
           dist: xenial
           env: TOXENV=py37

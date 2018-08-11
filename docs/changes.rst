@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.6 (2018-06-11)
---------------------------
+Version 1.1.7 (not released yet)
+--------------------------------
 
 Compatibility notes:
 
@@ -190,6 +190,64 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+- 1.1.7 changes:
+
+  - added support for Python 3.7
+
+Fixes:
+
+- cache lock: use lock_wait everywhere to fix infinite wait, see #3968
+- don't archive tagged dir when recursing an excluded dir, #3991
+- py37 argparse: work around bad default in py 3.7.0a/b/rc, #3996
+- py37 remove loggerDict.clear() from tearDown method, #3805
+- some fixes for bugs which likely did not result in problems in practice:
+
+  - fixed logic bug in platform module API version check
+  - fixed xattr/acl function prototypes, added missing ones
+
+New features:
+
+- init: add warning to store both key and passphrase at safe place(s)
+- BORG_HOST_ID env var to work around all-zero MAC address issue, #3985
+- borg debug dump-repo-objs --ghost (dump everything from segment files,
+  including deleted or superceded objects or commit tags)
+- borg debug search-repo-objs (search in repo objects for hex bytes or strings)
+
+Other changes:
+
+- add Python 3.7 support
+- updated shell completions
+- call socket.gethostname only once
+- locking: better logging, add some asserts
+- borg debug dump-repo-objs:
+
+  - filename layout improvements
+  - use repository.scan() to get on-disk order
+- docs:
+
+  - update installation instructions for macOS
+  - added instructions to install fuse via homebrew
+  - improve diff docs
+  - added note that checkpoints inside files requires 1.1+
+  - add link to tempfile module
+  - remove row/column-spanning from docs source, #4000 #3990
+- tests:
+
+  - fetch less data via os.urandom
+  - add py37 env for tox
+  - travis: add 3.7, remove 3.6-dev (we test with -dev in master)
+- vagrant / binary builds:
+
+  - use python 3.5.6
+  - use osxfuse 3.8.2
+  - use own (uptodate) openindiana box
+
+
+Version 1.1.6 (2018-06-11)
+--------------------------
+
+Compatibility notes:
+
 - 1.1.6 changes:
 
   - also allow msgpack-python 0.5.6.

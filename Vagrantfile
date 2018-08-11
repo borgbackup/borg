@@ -570,7 +570,7 @@ Vagrant.configure(2) do |config|
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
   config.vm.define "openindiana64" do |b|
-    b.vm.box = "openindiana/hipster"
+    b.vm.box = "openindiana-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1536 + $wmem
     end

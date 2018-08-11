@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.7 (not released yet)
---------------------------------
+Version 1.1.7 (2018-08-11)
+--------------------------
 
 Compatibility notes:
 
@@ -238,7 +238,6 @@ Other changes:
   - travis: add 3.7, remove 3.6-dev (we test with -dev in master)
 - vagrant / binary builds:
 
-  - use python 3.5.6
   - use osxfuse 3.8.2
   - use own (uptodate) openindiana box
 

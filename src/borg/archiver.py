@@ -490,7 +490,7 @@ class Archiver:
                     restrict_dev = None
                 self._process(fso, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_exclude_tags, skip_inodes, path, restrict_dev,
-                              read_special=args.read_special, dry_run=dry_run, st=st)
+                              read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
                 archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
@@ -544,20 +544,17 @@ class Archiver:
 
     def _process(self, fso, cache, matcher, exclude_caches, exclude_if_present,
                  keep_exclude_tags, skip_inodes, path, restrict_dev,
-                 read_special=False, dry_run=False, st=None):
+                 read_special=False, dry_run=False):
         """
         Process *path* recursively according to the various parameters.
-
-        *st* (if given) is a *os.stat_result* object for *path*.
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
         try:
             recurse_excluded_dir = False
             if matcher.match(path):
-                if st is None:
-                    with backup_io('stat'):
-                        st = os.stat(path, follow_symlinks=False)
+                with backup_io('stat'):
+                    st = os.stat(path, follow_symlinks=False)
             else:
                 self.print_file_status('x', path)
                 # get out here as quickly as possible:
@@ -566,9 +563,8 @@ class Archiver:
                 # could trigger an error, e.g. if access is forbidden, see #3209.
                 if not matcher.recurse_dir:
                     return
-                if st is None:
-                    with backup_io('stat'):
-                        st = os.stat(path, follow_symlinks=False)
+                with backup_io('stat'):
+                    st = os.stat(path, follow_symlinks=False)
                 recurse_excluded_dir = stat.S_ISDIR(st.st_mode)
                 if not recurse_excluded_dir:
                     return

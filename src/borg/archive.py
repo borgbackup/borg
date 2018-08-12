@@ -1076,23 +1076,23 @@ class FilesystemObjectProcessors:
         if hardlink_master:
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
 
-    def process_dir(self, path, st):
+    def process_dir(self, *, path, st):
         with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
-    def process_fifo(self, path, st):
+    def process_fifo(self, *, path, st):
         with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
-    def process_dev(self, path, st, dev_type):
+    def process_dev(self, *, path, st, dev_type):
         with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
             item.rdev = st.st_rdev
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
-    def process_symlink(self, path, st):
+    def process_symlink(self, *, path, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
         # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
@@ -1103,7 +1103,7 @@ class FilesystemObjectProcessors:
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
-    def process_stdin(self, path, cache):
+    def process_stdin(self, *, path, cache):
         uid, gid = 0, 0
         t = int(time.time()) * 1000000000
         item = Item(
@@ -1120,7 +1120,7 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         return 'i'  # stdin
 
-    def process_file(self, path, st, cache):
+    def process_file(self, *, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
             with OsOpen(path, flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):

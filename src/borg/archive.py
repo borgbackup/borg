@@ -1126,60 +1126,60 @@ class FilesystemObjectProcessors:
 
     def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
-            md = None
-            is_special_file = is_special(st.st_mode)
-            if not hardlinked or hardlink_master:
-                if not is_special_file:
-                    path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                    known, ids = cache.file_known_and_unchanged(path_hash, st)
-                else:
-                    # in --read-special mode, we may be called for special files.
-                    # there should be no information in the cache about special files processed in
-                    # read-special mode, but we better play safe as this was wrong in the past:
-                    path_hash = None
-                    known, ids = False, None
-                chunks = None
-                if ids is not None:
-                    # Make sure all ids are available
-                    for id_ in ids:
-                        if not cache.seen_chunk(id_):
-                            status = 'M'  # cache said it is unmodified, but we lost a chunk: process file like modified
-                            break
+            with backup_io('open'):
+                fd = Archive._open_rb(path)
+            try:
+                with backup_io('fstat'):
+                    curr_st = os.fstat(fd)
+                # XXX do some checks here: st vs. curr_st
+                assert stat.S_ISREG(curr_st.st_mode)
+                # make sure stats refer to same object that we are processing below
+                st = curr_st
+                is_special_file = is_special(st.st_mode)
+                if not hardlinked or hardlink_master:
+                    if not is_special_file:
+                        path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
+                        known, ids = cache.file_known_and_unchanged(path_hash, st)
                     else:
-                        chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
-                        status = 'U'  # regular file, unchanged
-                else:
-                    status = 'M' if known else 'A'  # regular file, modified or added
-                item.hardlink_master = hardlinked
-                item.update(self.metadata_collector.stat_simple_attrs(st))
-                # Only chunkify the file if needed
-                if chunks is not None:
-                    item.chunks = chunks
-                else:
-                    with backup_io('open'):
-                        fh = Archive._open_rb(path)
-                        try:
-                            self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fh)))
-                            md = self.metadata_collector.stat_attrs(st, path, fd=fh)
-                        finally:
-                            os.close(fh)
+                        # in --read-special mode, we may be called for special files.
+                        # there should be no information in the cache about special files processed in
+                        # read-special mode, but we better play safe as this was wrong in the past:
+                        path_hash = None
+                        known, ids = False, None
+                    chunks = None
+                    if ids is not None:
+                        # Make sure all ids are available
+                        for id_ in ids:
+                            if not cache.seen_chunk(id_):
+                                status = 'M'  # cache said it is unmodified, but we lost a chunk: process file like modified
+                                break
+                        else:
+                            chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
+                            status = 'U'  # regular file, unchanged
+                    else:
+                        status = 'M' if known else 'A'  # regular file, modified or added
+                    item.hardlink_master = hardlinked
+                    item.update(self.metadata_collector.stat_simple_attrs(st))
+                    # Only chunkify the file if needed
+                    if chunks is not None:
+                        item.chunks = chunks
+                    else:
+                        with backup_io('read'):
+                            self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
                         if not is_special_file:
                             # we must not memorize special files, because the contents of e.g. a
                             # block or char device will change without its mtime/size/inode changing.
                             cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
-                self.stats.nfiles += 1
-            if md is None:
-                fh = Archive._open_rb(path)
-                try:
-                    md = self.metadata_collector.stat_attrs(st, path, fd=fh)
-                finally:
-                    os.close(fh)
-            item.update(md)
-            item.get_size(memorize=True)
-            if is_special_file:
-                # we processed a special file like a regular file. reflect that in mode,
-                # so it can be extracted / accessed in FUSE mount like a regular file:
-                item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
+                    self.stats.nfiles += 1
+                md = self.metadata_collector.stat_attrs(st, path, fd=fd)
+                item.update(md)
+                item.get_size(memorize=True)
+                if is_special_file:
+                    # we processed a special file like a regular file. reflect that in mode,
+                    # so it can be extracted / accessed in FUSE mount like a regular file:
+                    item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
+            finally:
+                os.close(fd)
             return status
 
 

@@ -196,9 +196,9 @@ def backup_io_iter(iterator):
 
 
 @contextmanager
-def OsOpen(path, flags, noatime=False, op='open'):
+def OsOpen(*, flags, path=None, parent_fd=None, name=None, noatime=False, op='open'):
     with backup_io(op):
-        fd = os_open(path, flags, noatime)
+        fd = os_open(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=noatime)
     try:
         yield fd
     finally:
@@ -1076,31 +1076,46 @@ class FilesystemObjectProcessors:
         if hardlink_master:
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
 
-    def process_dir(self, *, path, st):
+    def process_dir(self, *, path, fd, st):
         with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
-            item.update(self.metadata_collector.stat_attrs(st, path))
+            item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
             return status
 
-    def process_fifo(self, *, path, st):
+    def process_fifo(self, *, path, parent_fd, name, st):
         with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            return status
+            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
+                with backup_io('fstat'):
+                    curr_st = os.fstat(fd)
+                # XXX do some checks here: st vs. curr_st
+                assert stat.S_ISFIFO(curr_st.st_mode)
+                # make sure stats refer to same object that we are processing below
+                st = curr_st
+                item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
+                return status
 
-    def process_dev(self, *, path, st, dev_type):
+    def process_dev(self, *, path, parent_fd, name, st, dev_type):
         with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
-            item.rdev = st.st_rdev
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            return status
+            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
+                with backup_io('fstat'):
+                    curr_st = os.fstat(fd)
+                # XXX do some checks here: st vs. curr_st
+                assert stat.S_ISBLK(curr_st.st_mode) or stat.S_ISCHR(curr_st.st_mode)
+                # make sure stats refer to same object that we are processing below
+                st = curr_st
+                item.rdev = st.st_rdev
+                item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
+                return status
 
-    def process_symlink(self, *, path, st):
+    def process_symlink(self, *, path, parent_fd, name, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
         # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
         with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+            fname = name if name is not None and parent_fd is not None else path
             with backup_io('readlink'):
-                source = os.readlink(path)
+                source = os.readlink(fname, dir_fd=parent_fd)
             item.source = source
-            item.update(self.metadata_collector.stat_attrs(st, path))
+            item.update(self.metadata_collector.stat_attrs(st, path))  # can't use FD here?
             return status
 
     def process_stdin(self, *, path, cache):
@@ -1120,9 +1135,9 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         return 'i'  # stdin
 
-    def process_file(self, *, path, st, cache):
+    def process_file(self, *, path, parent_fd, name, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
-            with OsOpen(path, flags_normal, noatime=True) as fd:
+            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):
                     curr_st = os.fstat(fd)
                 # XXX do some checks here: st vs. curr_st
@@ -1172,7 +1187,7 @@ class FilesystemObjectProcessors:
                     # we processed a special file like a regular file. reflect that in mode,
                     # so it can be extracted / accessed in FUSE mount like a regular file:
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-            return status
+                return status
 
 
 def valid_msgpacked_dict(d, keys_serialized):

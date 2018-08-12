@@ -32,7 +32,7 @@ except ImportError:
 
 import borg
 from .. import xattr, helpers, platform
-from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
+from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, parse_storage_quota
 from ..cache import Cache, LocalCache
 from ..constants import *  # NOQA
@@ -46,6 +46,7 @@ from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
 from ..helpers import msgpack
+from ..helpers import flags_noatime, flags_normal
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff

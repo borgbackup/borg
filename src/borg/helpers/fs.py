@@ -189,6 +189,36 @@ def dash_open(path, mode):
         return open(path, mode)
 
 
+def O_(*flags):
+    result = 0
+    for flag in flags:
+        result |= getattr(os, 'O_' + flag, 0)
+    return result
+
+
+flags_base = O_('BINARY', 'NONBLOCK', 'NOCTTY')  # later: add 'NOFOLLOW'
+flags_normal = flags_base | O_('RDONLY')
+flags_noatime = flags_normal | O_('NOATIME')
+
+
+def os_open(path, flags, noatime=False):
+    _flags_normal = flags
+    if noatime:
+        _flags_noatime = _flags_normal | O_('NOATIME')
+        try:
+            # if we have O_NOATIME, this likely will succeed if we are root or owner of file:
+            fd = os.open(path, _flags_noatime)
+        except PermissionError:
+            if _flags_noatime == _flags_normal:
+                # we do not have O_NOATIME, no need to try again:
+                raise
+            # Was this EPERM due to the O_NOATIME flag? Try again without it:
+            fd = os.open(path, _flags_normal)
+    else:
+        fd = os.open(path, _flags_normal)
+    return fd
+
+
 def umount(mountpoint):
     env = prepare_subprocess_env(system=True)
     try:

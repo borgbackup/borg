@@ -38,6 +38,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import os_open, flags_normal
 from .helpers import msgpack
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
@@ -46,9 +47,6 @@ from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
 has_lchmod = hasattr(os, 'lchmod')
-
-flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
-flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
 
 
 class Statistics:
@@ -195,6 +193,16 @@ def backup_io_iter(iterator):
             except StopIteration:
                 return
         yield item
+
+
+@contextmanager
+def OsOpen(path, flags, noatime=False, op='open'):
+    with backup_io(op):
+        fd = os_open(path, flags, noatime)
+    try:
+        yield fd
+    finally:
+        os.close(fd)
 
 
 class DownloadPipeline:
@@ -827,18 +835,6 @@ Utilization of max. archive size: {csize_max:.0%}
             logger.warning('borg check --repair is required to free all space.')
 
     @staticmethod
-    def _open_rb(path):
-        try:
-            # if we have O_NOATIME, this likely will succeed if we are root or owner of file:
-            return os.open(path, flags_noatime)
-        except PermissionError:
-            if flags_noatime == flags_normal:
-                # we do not have O_NOATIME, no need to try again:
-                raise
-            # Was this EPERM due to the O_NOATIME flag? Try again without it:
-            return os.open(path, flags_normal)
-
-    @staticmethod
     def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False):
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
@@ -1126,9 +1122,7 @@ class FilesystemObjectProcessors:
 
     def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
-            with backup_io('open'):
-                fd = Archive._open_rb(path)
-            try:
+            with OsOpen(path, flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):
                     curr_st = os.fstat(fd)
                 # XXX do some checks here: st vs. curr_st
@@ -1178,8 +1172,6 @@ class FilesystemObjectProcessors:
                     # we processed a special file like a regular file. reflect that in mode,
                     # so it can be extracted / accessed in FUSE mount like a regular file:
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-            finally:
-                os.close(fd)
             return status
 
 

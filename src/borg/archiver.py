@@ -625,7 +625,7 @@ class Archiver:
                         with backup_io('scandir'):
                             entries = helpers.scandir_inorder(path=path, fd=child_fd)
                         for dirent in entries:
-                            normpath = os.path.normpath(dirent.path)
+                            normpath = os.path.normpath(os.path.join(path, dirent.name))
                             self._process(path=normpath, parent_fd=child_fd, name=dirent.name,
                                           fso=fso, cache=cache, matcher=matcher,
                                           exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,

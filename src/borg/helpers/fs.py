@@ -149,7 +149,7 @@ def scandir_keyfunc(dirent):
 
 
 def scandir_inorder(*, path, fd=None):
-    # py37+ supports giving a fd instead of a path
+    # py37+ supports giving an fd instead of a path (no full entry.path in DirEntry in that case!)
     arg = fd if fd is not None and py_37_plus else path
     return sorted(os.scandir(arg), key=scandir_keyfunc)
 

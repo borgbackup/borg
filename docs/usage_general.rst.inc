@@ -234,8 +234,10 @@ Directories and files:
     BORG_CONFIG_DIR
         Default to '~/.config/borg'. This directory contains the whole config directories.
     BORG_CACHE_DIR
-        Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
-        of space for dealing with big repositories.
+        Defaults to '~/.cache/borg'. This directory contains data cached during
+        backups and helps speed up subsequent backups. Note that when dealing
+        with large repositories this cache will use a lot of disk space. For
+        best performance consider moving this directory to your fastest device.
     BORG_SECURITY_DIR
         Default to '~/.config/borg/security'. This directory contains information borg uses to
         track its usage of NONCES ("numbers used once" - usually in encryption context) and other

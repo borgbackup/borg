@@ -89,11 +89,11 @@ def safe_timestamp(item_timestamp_ns):
     return datetime.fromtimestamp(t_ns / 1e9)
 
 
-def format_time(ts: datetime):
+def format_time(ts: datetime, format_spec=''):
     """
     Convert *ts* to a human-friendly format with textual weekday.
     """
-    return ts.strftime('%a, %Y-%m-%d %H:%M:%S')
+    return ts.strftime('%a, %Y-%m-%d %H:%M:%S' if format_spec == '' else format_spec)
 
 
 def isoformat_time(ts: datetime):
@@ -128,7 +128,7 @@ class OutputTimestamp:
         self.ts = ts
 
     def __format__(self, format_spec):
-        return format_time(self.ts)
+        return format_time(self.ts, format_spec=format_spec)
 
     def __str__(self):
         return '{}'.format(self)

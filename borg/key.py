@@ -26,7 +26,7 @@ PREFIX = b'\0' * 8
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE or by BORG_PASSCOMMAND is incorrect."""
+    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
 
 
 class PasscommandFailure(Error):
@@ -323,6 +323,9 @@ class Passphrase(str):
         passphrase = cls.env_passcommand()
         if passphrase is not None:
             return passphrase
+        passphrase = cls.fd_passphrase()
+        if passphrase is not None:
+            return passphrase
 
     @classmethod
     def env_passcommand(cls, default=None):
@@ -335,6 +338,16 @@ class Passphrase(str):
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
             return cls(passphrase.rstrip('\n'))
+
+    @classmethod
+    def fd_passphrase(cls):
+        try:
+            fd = int(os.environ.get('BORG_PASSPHRASE_FD'))
+        except (ValueError, TypeError):
+            return None
+        with os.fdopen(fd, mode='r') as f:
+            passphrase = f.read()
+        return cls(passphrase.rstrip('\n'))
 
     @classmethod
     def getpass(cls, prompt):

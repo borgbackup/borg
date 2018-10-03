@@ -4140,6 +4140,7 @@ class Archiver:
             result.restrict_to_paths = forced_result.restrict_to_paths
             result.restrict_to_repositories = forced_result.restrict_to_repositories
             result.append_only = forced_result.append_only
+            result.storage_quota = forced_result.storage_quota
         return result
 
     def parse_args(self, args=None):

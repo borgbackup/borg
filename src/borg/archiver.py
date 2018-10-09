@@ -534,7 +534,7 @@ class Archiver:
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
                     chunker_params=args.chunker_params, show_progress=args.progress)
                 create_inner(archive, cache, fso)
-                logger.error("Directory %s has been created successfully" % archive.name)
+                logger.error("Repository %s has been created successfully" % archive.name)
         else:
             create_inner(None, None, None)
         return self.exit_code

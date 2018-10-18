@@ -108,8 +108,22 @@ class TestLock:
             assert len(lock._roster.get(EXCLUSIVE)) == 1
             assert not lock._roster.empty(SHARED, EXCLUSIVE)
 
+    def test_exclusive_pgid_shared(self, lockpath):
+        lock1 = Lock(lockpath, exclusive=False, id=ID1).acquire()
+        with Lock(lockpath, exclusive=True, id=ID2, timeout=1, pgid=ID1):
+            assert len(lock1._roster.get(SHARED)) == 1
+            assert len(lock1._roster.get(EXCLUSIVE)) == 1
+        lock1.release()
+
+    def test_exclusive_pgid_distinct(self, lockpath):
+        lock1 = Lock(lockpath, exclusive=False, id=ID1).acquire()
+        with pytest.raises(LockTimeout):
+            with Lock(lockpath, exclusive=True, id=ID2, timeout=1):
+                pass
+        lock1.release()
+
     def test_upgrade(self, lockpath):
-        with Lock(lockpath, exclusive=False) as lock:
+        with Lock(lockpath, exclusive=False, pgid=ID1) as lock:
             lock.upgrade()
             lock.upgrade()  # NOP
             assert len(lock._roster.get(SHARED)) == 0
@@ -117,7 +131,7 @@ class TestLock:
             assert not lock._roster.empty(SHARED, EXCLUSIVE)
 
     def test_downgrade(self, lockpath):
-        with Lock(lockpath, exclusive=True) as lock:
+        with Lock(lockpath, exclusive=True, pgid=ID1) as lock:
             lock.downgrade()
             lock.downgrade()  # NOP
             assert len(lock._roster.get(SHARED)) == 1

@@ -320,7 +320,7 @@ class Lock:
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
-    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None, kill_stale_locks=False):
+    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None, kill_stale_locks=False, pgid=None):
         self.path = path
         self.is_exclusive = exclusive
         self.sleep = sleep

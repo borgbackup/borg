@@ -1530,18 +1530,24 @@ class Archiver:
         # we can only do this for local repositories (with .io), though:
         if hasattr(repository, 'io'):
             repository.io.close_segment()
+        # we need to commit the "no change" operation we did to the manifest
+        # because it created a new segment file in the repository. if we would
+        # roll back, the same file would be later used otherwise (for other content).
+        # that would be bad if somebody uses rsync with ignore-existing (or
+        # any other mechanism relying on existing segment data not changing).
+        # see issue #1867.
+        repository.commit(compact=False)
+        if args.shared_lock:
+            try:
+                repository.lock.downgrade()
+            except AttributeError:
+                # this is only for local repositories
+                self.print_error('Running borg with-lock using shared locks is supported only for local repositories.')
+                return self.exit_code
         env = prepare_subprocess_env(system=True)
-        try:
-            # we exit with the return code we get from the subprocess
-            return subprocess.call([args.command] + args.args, env=env)
-        finally:
-            # we need to commit the "no change" operation we did to the manifest
-            # because it created a new segment file in the repository. if we would
-            # roll back, the same file would be later used otherwise (for other content).
-            # that would be bad if somebody uses rsync with ignore-existing (or
-            # any other mechanism relying on existing segment data not changing).
-            # see issue #1867.
-            repository.commit(compact=False)
+        os.setpgid(0,0)
+        # we exit with the return code we get from the subprocess
+        return subprocess.call([args.command] + args.args, env=env)
 
     @with_repository(manifest=False, exclusive=True)
     def do_compact(self, args, repository):
@@ -3788,6 +3794,12 @@ class Archiver:
         for its termination, release the lock and return the user command's return
         code as borg's return code.
 
+        It is possible to relax the lock with --shared-lock, so that you can run borg commands
+        within borg with-lock. This is only supported for local repositories, as the locking
+        protocol cannot account for concurrent access between two or more hosts.
+        This is useful if you want to check a repository state before running some maintenance
+        operations without race conditions or Time Of Check/Time Of Use problems.
+
         .. note::
 
             If you copy a repository with the lock held, the lock will be present in
@@ -3801,6 +3813,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='run user command with lock held')
         subparser.set_defaults(func=self.do_with_lock)
+        subparser.add_argument('--shared-lock', dest='shared_lock', action='store_true',
+                               help='use a shared lock rather than an exclusive one')
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to lock')

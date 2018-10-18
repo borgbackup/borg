@@ -326,6 +326,7 @@ class Lock:
         self.sleep = sleep
         self.timeout = timeout
         self.id = id or platform.get_process_id()
+        self.pgid = pgid or id or platform.get_process_group()
         # globally keeping track of shared and exclusive lockers:
         self._roster = LockRoster(path + '.roster', id=id, kill_stale_locks=kill_stale_locks)
         # an exclusive lock, used for:
@@ -364,8 +365,12 @@ class Lock:
             try:
                 if remove is not None:
                     self._roster.modify(remove, REMOVE)
-                if len(self._roster.get(SHARED)) == 0:
-                    return  # we are the only one and we keep the lock!
+                # We keep the lock if we are the only one, or if it is held only by a reader
+                # whose pid equals our pgid.
+                # A process can only set its own and its children pgids, and only to the target's pid
+                # or a process' pgid from the same session (see setpgid(2))
+                if self._roster.get(SHARED).issubset((self.pgid,)):
+                    return  # we are the only one, or we are in the shared group, and we keep the lock!
                 # restore the roster state as before (undo the roster change):
                 if remove is not None:
                     self._roster.modify(remove, ADD)

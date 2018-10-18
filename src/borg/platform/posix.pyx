@@ -61,3 +61,15 @@ def local_pid_alive(pid):
             return False
         # Any other error (eg. permissions) means that the process ID refers to a live process.
         return True
+
+
+def get_process_group():
+    """
+    Return group id (hostname, pgid, thread_id) from identification tuple for 'us'.
+    This always returns the current pgid, which might be different from before, e.g. if os.setpgid() was used.
+    """
+    from . import hostid
+
+    thread_id = 0
+    pgid = os.getpgid(0)
+    return hostid, pgid, thread_id

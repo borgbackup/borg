@@ -270,6 +270,13 @@ def get_process_id():
     return hostid, pid, thread_id
 
 
+def get_process_group():
+    """
+    Return group tuple (hostname, pgid, thread_id) for 'us'.
+    """
+    raise NotImplementedError
+
+
 def process_alive(host, pid, thread):
     """
     Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.

@@ -95,6 +95,44 @@ borg.
 If you need to access a local repository from different users, you can use the
 same method by using ssh to borg@localhost.
 
+Important note about files changing during the backup process
+-------------------------------------------------------------
+
+Borg does not do anything about the internal consistency of the data
+it backs up.  It just reads and backs up each file in whatever state
+that file is when Borg gets to it.  On an active system, this means
+that by the time Borg backs up a file, it might have changed since the
+backup process was initiated.
+
+If you have a set of files and want to ensure that they are backed up
+in a specific or consistent state, you must take steps to give Borg an
+unchanging view of those files until it is done archiving them.  There
+are a few common techniques to achieve this.
+
+- Avoid running any programs that might change the files.
+
+- Snapshot files, filesystems, container storage volumes, or logical volumes.  LVM or ZFS might be useful here.
+
+- Dump databases or stop the database servers.
+
+- Shut down virtual machines before backing up their images.
+
+- Shut down containers before backing up their storage volumes.
+
+For some systems Borg might work well enough without these
+precautions.  If you are simply backing up the files in your home
+directory, Borg usually works well enough without further care for
+consistency.  Log files and caches might not be in a perfect state,
+but this is rarely a problem.
+
+For databases, virtual machines, and containers, there are specific
+techniques for backing them up that do not simply use Borg to backup
+the underlying filesystem.  For databases, check your database
+documentation for techniques that will save the database state between
+transactions.  For virtual machines, consider running the backup on
+the VM itself or mounting the filesystem.  For Docker containers,
+perhaps the docker's "save" command can help.
+
 Automating backups
 ------------------
 

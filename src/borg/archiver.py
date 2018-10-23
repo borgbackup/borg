@@ -1545,7 +1545,7 @@ class Archiver:
                 self.print_error('Running borg with-lock using shared locks is supported only for local repositories.')
                 return self.exit_code
         env = prepare_subprocess_env(system=True)
-        os.setpgid(0,0)
+        os.setpgid(0, 0)
         # we exit with the return code we get from the subprocess
         return subprocess.call([args.command] + args.args, env=env)
 

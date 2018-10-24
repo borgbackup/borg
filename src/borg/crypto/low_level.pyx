@@ -599,7 +599,7 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.enc_key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_TAG, self.mac_len, <void *> idata.buf+hlen):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_TAG, self.mac_len, <const unsigned char *> idata.buf+hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
             rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
             if not rc:

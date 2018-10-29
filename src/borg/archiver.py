@@ -1978,7 +1978,7 @@ class Archiver:
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
             This is the default style for ``--exclude`` and ``--exclude-from``.
-            These patterns use a variant of shell pattern syntax, with '\*' matching
+            These patterns use a variant of shell pattern syntax, with '\\*' matching
             any number of characters, '?' matching any single character, '[...]'
             matching any single character specified, including ranges, and '[!...]'
             matching any character not specified. For the purpose of these patterns,
@@ -1989,7 +1989,7 @@ class Archiver:
             from the start of the full path to just before a path separator. Except
             for the root path, paths will never end in the path separator when
             matching is attempted.  Thus, if a given pattern ends in a path
-            separator, a '\*' is appended before matching is attempted.
+            separator, a '\\*' is appended before matching is attempted.
 
         Shell-style patterns, selector `sh:`
             This is the default style for ``--pattern`` and ``--patterns-from``.
@@ -2064,7 +2064,7 @@ class Archiver:
 
             # The contents of directories in '/home' are not backed up when their name
             # ends in '.tmp'
-            $ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
+            $ borg create --exclude 're:^/home/[^/]+\\.tmp/' backup /
 
             # Load exclusions from file
             $ cat >exclude.txt <<EOF
@@ -2072,7 +2072,7 @@ class Archiver:
             /home/*/junk
             *.tmp
             fm:aa:something/*
-            re:^/home/[^/]\.tmp/
+            re:^/home/[^/]\\.tmp/
             sh:/home/*/.thumbnails
             EOF
             $ borg create --exclude-from exclude.txt backup /
@@ -3037,7 +3037,7 @@ class Archiver:
 
         The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
         exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
-        '\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
+        '\\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
         more information.
 
         In addition to using ``--exclude`` patterns, it is possible to use
@@ -4074,7 +4074,7 @@ class Archiver:
 
         It creates input data below the given PATH and backups this data into the given REPO.
         The REPO must already exist (it could be a fresh empty repo or an existing repo, the
-        command will create / read / update / delete some archives named borg-test-data\* there.
+        command will create / read / update / delete some archives named borg-test-data\\* there.
 
         Make sure you have free space there, you'll need about 1GB each (+ overhead).
 

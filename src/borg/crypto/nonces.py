@@ -36,7 +36,7 @@ class NonceManager:
     def get_repo_free_nonce(self):
         try:
             return self.repository.get_free_nonce()
-        except InvalidRPCMethod as error:
+        except InvalidRPCMethod:
             # old server version, suppress further calls
             sys.stderr.write("Please upgrade to borg version 1.1+ on the server for safer AES-CTR nonce handling.\n")
             self.get_repo_free_nonce = lambda: None

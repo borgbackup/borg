@@ -111,7 +111,7 @@ def is_utime_fully_supported():
             new_stats = os.stat(filepath, follow_symlinks=False)
             if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
                 return True
-        except OSError as err:
+        except OSError:
             pass
         return False
 
@@ -133,7 +133,7 @@ def is_birthtime_fully_supported():
             new_stats = os.stat(filepath, follow_symlinks=False)
             if new_stats.st_birthtime == birthtime and new_stats.st_mtime == mtime and new_stats.st_atime == atime:
                 return True
-        except OSError as err:
+        except OSError:
             pass
         return False
 

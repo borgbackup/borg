@@ -35,7 +35,7 @@ class TestKey:
         /cXJq7jrqmrJ1phd6dg4SHAM/i+hubadZoS6m25OQzYAW09wZD/phG8OVa698Z5ed3HTaT
         SmrtgJL3EoOKgUI9d6BLE4dJdBqntifo""".strip()
 
-    keyfile2_cdata = unhexlify(re.sub('\W', '', """
+    keyfile2_cdata = unhexlify(re.sub(r'\W', '', """
         0055f161493fcfc16276e8c31493c4641e1eb19a79d0326fad0291e5a9c98e5933
         00000000000003e8d21eaf9b86c297a8cd56432e1915bb
         """))

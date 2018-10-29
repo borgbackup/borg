@@ -414,9 +414,9 @@ class Location:
         return ', '.join(items)
 
     def to_key_filename(self):
-        name = re.sub('[^\w]', '_', self.path).strip('_')
+        name = re.sub(r'[^\w]', '_', self.path).strip('_')
         if self.proto != 'file':
-            name = re.sub('[^\w]', '_', self.host) + '__' + name
+            name = re.sub(r'[^\w]', '_', self.host) + '__' + name
         if len(name) > 100:
             # Limit file names to some reasonable length. Most file systems
             # limit them to 255 [unit of choice]; due to variations in unicode

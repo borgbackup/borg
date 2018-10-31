@@ -62,4 +62,4 @@ def translate(pat, match_end=r"\Z"):
         else:
             res += re.escape(c)
 
-    return res + match_end + "(?ms)"
+    return "(?ms)" + res + match_end

@@ -66,7 +66,7 @@ def get_cache_dir():
             fd.write(textwrap.dedent("""
                 # This file is a cache directory tag created by Borg.
                 # For information about cache directory tags, see:
-                #       http://www.brynosaurus.com/cachedir/
+                #       http://www.bford.info/cachedir/spec.html
                 """).encode('ascii'))
     return cache_dir
 
@@ -85,7 +85,7 @@ def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to
     the CACHEDIR.TAG protocol
-    (http://www.brynosaurus.com/cachedir/spec.html).
+    (http://www.bford.info/cachedir/spec.html).
     """
 
     tag_path = os.path.join(path, CACHE_TAG_NAME)

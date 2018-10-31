@@ -68,7 +68,7 @@ class TestKey:
 
     @pytest.fixture
     def keys_dir(self, request, monkeypatch, tmpdir):
-        monkeypatch.setenv('BORG_KEYS_DIR', tmpdir)
+        monkeypatch.setenv('BORG_KEYS_DIR', str(tmpdir))
         return tmpdir
 
     @pytest.fixture(params=(

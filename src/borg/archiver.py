@@ -2487,7 +2487,7 @@ class Archiver:
             if tag_files:
                 add_option('--exclude-caches', dest='exclude_caches', action='store_true',
                            help='exclude directories that contain a CACHEDIR.TAG file '
-                                '(http://www.brynosaurus.com/cachedir/spec.html)')
+                                '(http://www.bford.info/cachedir/spec.html)')
                 add_option('--exclude-if-present', metavar='NAME', dest='exclude_if_present',
                            action='append', type=str,
                            help='exclude directories that are tagged by containing a filesystem object with '

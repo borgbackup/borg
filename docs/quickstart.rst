@@ -108,7 +108,7 @@ to two kinds of inconsistency:
 
 If you have a set of files and want to ensure that they are backed up
 in a specific or consistent state, you must take steps to prevent
-changes to those files during the backup processgive.  There are a few
+changes to those files during the backup process.  There are a few
 common techniques to achieve this.
 
 - Avoid running any programs that might change the files.

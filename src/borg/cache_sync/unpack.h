@@ -116,7 +116,7 @@ static inline void unpack_init_user_state(unpack_user *u)
 {
     u->last_error = NULL;
     u->level = 0;
-    u->inside_chunks = false;
+    u->inside_chunks = 0;
     u->expect = expect_item_begin;
 }
 

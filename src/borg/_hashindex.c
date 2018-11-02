@@ -34,7 +34,7 @@ typedef struct {
 } __attribute__((__packed__)) HashHeader;
 
 typedef struct {
-    void *buckets;
+    unsigned char *buckets;
     int num_entries;
     int num_buckets;
     int num_empty;
@@ -103,10 +103,10 @@ static void hashindex_write(HashIndex *index, PyObject *file_py);
 
 static uint64_t hashindex_compact(HashIndex *index);
 static HashIndex *hashindex_init(int capacity, int key_size, int value_size);
-static const void *hashindex_get(HashIndex *index, const void *key);
-static int hashindex_set(HashIndex *index, const void *key, const void *value);
-static int hashindex_delete(HashIndex *index, const void *key);
-static void *hashindex_next_key(HashIndex *index, const void *key);
+static const unsigned char *hashindex_get(HashIndex *index, const unsigned char *key);
+static int hashindex_set(HashIndex *index, const unsigned char *key, const unsigned char *value);
+static int hashindex_delete(HashIndex *index, const unsigned char *key);
+static unsigned char *hashindex_next_key(HashIndex *index, const unsigned char *key);
 
 /* Private API */
 static void hashindex_free(HashIndex *index);
@@ -125,13 +125,13 @@ hashindex_free_buckets(HashIndex *index)
 }
 
 static int
-hashindex_index(HashIndex *index, const void *key)
+hashindex_index(HashIndex *index, const unsigned char *key)
 {
     return _le32toh(*((uint32_t *)key)) % index->num_buckets;
 }
 
 static int
-hashindex_lookup(HashIndex *index, const void *key, int *start_idx)
+hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
 {
     int didx = -1;
     int start = hashindex_index(index, key);
@@ -174,7 +174,7 @@ static int
 hashindex_resize(HashIndex *index, int capacity)
 {
     HashIndex *new;
-    void *key = NULL;
+    unsigned char *key = NULL;
     int32_t key_size = index->key_size;
 
     if(!(new = hashindex_init(capacity, key_size, index->value_size))) {
@@ -534,8 +534,8 @@ hashindex_write(HashIndex *index, PyObject *file_py)
 }
 #endif
 
-static const void *
-hashindex_get(HashIndex *index, const void *key)
+static const unsigned char *
+hashindex_get(HashIndex *index, const unsigned char *key)
 {
     int idx = hashindex_lookup(index, key, NULL);
     if(idx < 0) {
@@ -545,7 +545,7 @@ hashindex_get(HashIndex *index, const void *key)
 }
 
 static int
-hashindex_set(HashIndex *index, const void *key, const void *value)
+hashindex_set(HashIndex *index, const unsigned char *key, const unsigned char *value)
 {
     int start_idx;
     int idx = hashindex_lookup(index, key, &start_idx);
@@ -587,7 +587,7 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
 }
 
 static int
-hashindex_delete(HashIndex *index, const void *key)
+hashindex_delete(HashIndex *index, const unsigned char *key)
 {
     int idx = hashindex_lookup(index, key, NULL);
     if (idx < 0) {
@@ -603,8 +603,8 @@ hashindex_delete(HashIndex *index, const void *key)
     return 1;
 }
 
-static void *
-hashindex_next_key(HashIndex *index, const void *key)
+static unsigned char *
+hashindex_next_key(HashIndex *index, const unsigned char *key)
 {
     int idx = 0;
     if(key) {

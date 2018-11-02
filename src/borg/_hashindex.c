@@ -8,9 +8,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
+#if !defined(_MSC_VER)
+#   include <unistd.h>
+#endif
 
 #include "_endian.h"
+
+#if defined(_MSC_VER)
+#   define BORG_PACKED(x) __pragma(pack(push, 1)) x __pragma(pack(pop))
+#else
+#   define BORG_PACKED(x) x __attribute__((packed))
+#endif
 
 #define MAGIC "BORG_IDX"
 #define MAGIC_LEN 8
@@ -25,13 +33,14 @@
     }                                           \
 } while (0)
 
+BORG_PACKED(
 typedef struct {
     char magic[MAGIC_LEN];
     int32_t num_entries;
     int32_t num_buckets;
     int8_t  key_size;
     int8_t  value_size;
-} __attribute__((__packed__)) HashHeader;
+}) HashHeader;
 
 typedef struct {
     unsigned char *buckets;
@@ -355,7 +364,7 @@ hashindex_read(PyObject *file_py, int permit_compact)
     index->num_buckets = _le32toh(header->num_buckets);
     index->key_size = header->key_size;
     index->value_size = header->value_size;
-    index->bucket_size = index->key_size + index->value_size;
+    index->bucket_size = index->key_size + index->value_size; 
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
 
@@ -693,7 +702,8 @@ hashindex_size(HashIndex *index)
 /*
  * Used by the FuseVersionsIndex.
  */
+BORG_PACKED(
 typedef struct {
     uint32_t version;
     char hash[16];
-} __attribute__((__packed__)) FuseVersionsElement;
+} ) FuseVersionsElement;

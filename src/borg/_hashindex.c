@@ -355,7 +355,7 @@ hashindex_read(PyObject *file_py, int permit_compact)
     index->num_buckets = _le32toh(header->num_buckets);
     index->key_size = header->key_size;
     index->value_size = header->value_size;
-    index->bucket_size = index->key_size + index->value_size; 
+    index->bucket_size = index->key_size + index->value_size;
     index->lower_limit = get_lower_limit(index->num_buckets);
     index->upper_limit = get_upper_limit(index->num_buckets);
 

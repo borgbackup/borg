@@ -1,4 +1,6 @@
-#include <unistd.h>
+#if !defined(_MSC_VER)
+#   include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -12,7 +14,8 @@
 #define BORG_BIG_ENDIAN 1
 #elif (defined(BYTE_ORDER) && defined(LITTLE_ENDIAN) && (BYTE_ORDER == LITTLE_ENDIAN)) || \
       (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)) || \
-      (defined(_LITTLE_ENDIAN) && defined(__SVR4) && defined(__sun))
+      (defined(_LITTLE_ENDIAN) && defined(__SVR4) && defined(__sun)) || \
+      (defined(_MSC_VER) && (defined(_M_AMD64) || defined(_M_IX86)))
 #define BORG_BIG_ENDIAN 0
 #else
 #error Unknown byte order

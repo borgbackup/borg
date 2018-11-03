@@ -8,9 +8,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
+#if !defined(_MSC_VER)
+#   include <unistd.h>
+#endif
 
 #include "_endian.h"
+
+#if defined(_MSC_VER)
+#   define BORG_PACKED(x) __pragma(pack(push, 1)) x __pragma(pack(pop))
+#else
+#   define BORG_PACKED(x) x __attribute__((packed))
+#endif
 
 #define MAGIC "BORG_IDX"
 #define MAGIC_LEN 8
@@ -25,13 +33,14 @@
     }                                           \
 } while (0)
 
+BORG_PACKED(
 typedef struct {
     char magic[MAGIC_LEN];
     int32_t num_entries;
     int32_t num_buckets;
     int8_t  key_size;
     int8_t  value_size;
-} __attribute__((__packed__)) HashHeader;
+}) HashHeader;
 
 typedef struct {
     unsigned char *buckets;
@@ -693,7 +702,8 @@ hashindex_size(HashIndex *index)
 /*
  * Used by the FuseVersionsIndex.
  */
+BORG_PACKED(
 typedef struct {
     uint32_t version;
     char hash[16];
-} __attribute__((__packed__)) FuseVersionsElement;
+} ) FuseVersionsElement;

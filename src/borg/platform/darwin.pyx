@@ -2,7 +2,7 @@ import os
 
 from libc.stdint cimport uint32_t
 
-from ..helpers import user2uid, group2gid
+from .posix import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 

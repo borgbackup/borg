@@ -19,7 +19,7 @@ logger = create_logger()
 from .errors import Error
 from .fs import get_keys_dir
 from .time import OutputTimestamp, format_time, to_localtime, safe_timestamp, safe_s
-from .usergroup import uid2user
+from ..platform import getosusername
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
@@ -188,7 +188,7 @@ def replace_placeholders(text):
         'hostname': hostname,
         'now': DatetimeWrapper(current_time.astimezone(None)),
         'utcnow': DatetimeWrapper(current_time),
-        'user': uid2user(os.getuid(), os.getuid()),
+        'user': getosusername(),
         'uuid4': str(uuid.uuid4()),
         'borgversion': borg_version,
         'borgmajor': '%d' % borg_version_tuple[:1],

@@ -1,4 +1,5 @@
 import os
+import sys
 
 from .errors import Error
 
@@ -8,9 +9,14 @@ class PythonLibcTooOld(Error):
 
 
 def check_python():
-    required_funcs = {os.stat, os.utime, os.chown}
+    if sys.platform.startswith(('win32', )):
+        required_funcs = {os.stat}
+    else:
+        required_funcs = {os.stat, os.utime, os.chown}
     if not os.supports_follow_symlinks.issuperset(required_funcs):
         raise PythonLibcTooOld
+    pass
+
 
 
 class ExtensionModuleError(Error):

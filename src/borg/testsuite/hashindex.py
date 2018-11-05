@@ -8,7 +8,7 @@ import zlib
 from ..hashindex import NSIndex, ChunkIndex, ChunkIndexEntry
 from .. import hashindex
 from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
-from . import BaseTestCase
+from . import BaseTestCase, unopened_tempfile
 
 # Note: these tests are part of the self test, do not use or import py.test functionality here.
 #       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
@@ -55,21 +55,22 @@ class HashIndexTestCase(BaseTestCase):
             self.assert_raises(KeyError, idx.__delitem__, H(x))
         self.assert_equal(len(idx), 50)
         idx_name = tempfile.NamedTemporaryFile()
-        idx.write(idx_name.name)
-        del idx
-        # Verify file contents
-        with open(idx_name.name, 'rb') as fd:
-            self.assert_equal(hashlib.sha256(fd.read()).hexdigest(), sha)
-        # Make sure we can open the file
-        idx = cls.read(idx_name.name)
-        self.assert_equal(len(idx), 50)
-        for x in range(50, 100):
-            self.assert_equal(idx[H(x)], make_value(x * 2))
-        idx.clear()
-        self.assert_equal(len(idx), 0)
-        idx.write(idx_name.name)
-        del idx
-        self.assert_equal(len(cls.read(idx_name.name)), 0)
+        with unopened_tempfile() as filepath:
+            idx.write(filepath)
+            del idx
+            # Verify file contents
+            with open(filepath, 'rb') as fd:
+                self.assert_equal(hashlib.sha256(fd.read()).hexdigest(), sha)
+            # Make sure we can open the file
+            idx = cls.read(filepath)
+            self.assert_equal(len(idx), 50)
+            for x in range(50, 100):
+                self.assert_equal(idx[H(x)], make_value(x * 2))
+            idx.clear()
+            self.assert_equal(len(idx), 0)
+            idx.write(filepath)
+            del idx
+            self.assert_equal(len(cls.read(filepath)), 0)
 
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),
@@ -81,20 +82,20 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS
-        idx_name = tempfile.NamedTemporaryFile()
-        idx = NSIndex()
-        idx.write(idx_name.name)
-        initial_size = os.path.getsize(idx_name.name)
-        self.assert_equal(len(idx), 0)
-        for x in range(n):
-            idx[H(x)] = x, x
-        idx.write(idx_name.name)
-        self.assert_true(initial_size < os.path.getsize(idx_name.name))
-        for x in range(n):
-            del idx[H(x)]
-        self.assert_equal(len(idx), 0)
-        idx.write(idx_name.name)
-        self.assert_equal(initial_size, os.path.getsize(idx_name.name))
+        with unopened_tempfile() as filepath:
+            idx = NSIndex()
+            idx.write(filepath)
+            initial_size = os.path.getsize(filepath)
+            self.assert_equal(len(idx), 0)
+            for x in range(n):
+                idx[H(x)] = x, x
+            idx.write(filepath)
+            self.assert_true(initial_size < os.path.getsize(filepath))
+            for x in range(n):
+                del idx[H(x)]
+            self.assert_equal(len(idx), 0)
+            idx.write(filepath)
+            self.assert_equal(initial_size, os.path.getsize(filepath))
 
     def test_iteritems(self):
         idx = NSIndex()

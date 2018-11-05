@@ -172,6 +172,13 @@ General:
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         If BORG_PASSPHRASE is also set, it takes precedence.
+    BORG_PASSPHRASE_FD
+        When set, specifies a file descriptor to read a passphrase
+        from. Programs starting borg may choose to open an anonymous pipe
+        and use it to pass a passphrase. This is safer than passing via
+        BORG_PASSPHRASE, because on some systems (e.g. Linux) environment
+        can be examined by other processes.
+        If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_LOGGING_CONF

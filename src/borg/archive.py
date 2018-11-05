@@ -773,7 +773,7 @@ Utilization of max. archive size: {csize_max:.0%}
         def fetch_async_response(wait=True):
             try:
                 return self.repository.async_response(wait=wait)
-            except Repository.ObjectNotFound as e:
+            except Repository.ObjectNotFound:
                 nonlocal error
                 # object not in repo - strange, but we wanted to delete it anyway.
                 if forced == 0:
@@ -1523,7 +1523,7 @@ class ArchiveChecker:
                                 yield Item(internal_dict=item)
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata (%s)' % reason, chunk_id, i)
-                    except RobustUnpacker.UnpackerCrashed as err:
+                    except RobustUnpacker.UnpackerCrashed:
                         report('Unpacker crashed while unpacking item metadata, trying to resync...', chunk_id, i)
                         unpacker.resync()
                     except Exception:

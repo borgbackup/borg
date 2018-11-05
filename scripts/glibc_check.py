@@ -41,7 +41,7 @@ def main():
             overall_versions.add(requires_glibc)
             if verbose:
                 print("%s %s" % (filename, format_version(requires_glibc)))
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             if verbose:
                 print("%s errored." % filename)
 

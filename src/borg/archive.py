@@ -13,7 +13,7 @@ from io import BytesIO
 from itertools import groupby, zip_longest
 from shutil import get_terminal_size
 
-from .platformflags import IsWin32, IsLinux, IsFreeBsd, IsDarwin
+from .platformflags import is_win32, is_linux, is_freebsd, is_darwin
 from .logger import create_logger
 
 logger = create_logger()
@@ -680,7 +680,7 @@ Utilization of max. archive size: {csize_max:.0%}
         uid = item.uid if uid is None else uid
         gid = item.gid if gid is None else gid
         # This code is a bit of a mess due to os specific differences
-        if not IsWin32:
+        if not is_win32:
             try:
                 if fd:
                     os.fchown(fd, uid, gid)

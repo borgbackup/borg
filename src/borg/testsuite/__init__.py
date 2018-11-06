@@ -3,7 +3,7 @@ import filecmp
 import functools
 import os
 try:
-    import posix  # buildin but not everywhere
+    import posix  # built-in but not everywhere
 except ImportError:
     posix = None
 

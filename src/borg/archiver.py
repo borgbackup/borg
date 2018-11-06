@@ -446,6 +446,8 @@ class Archiver:
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
 
+        logger.info('Creating archive at "%s"' % args.location.orig)
+
         def create_inner(archive, cache, fso):
             # Add cache dir to inode_skip list
             skip_inodes = set()

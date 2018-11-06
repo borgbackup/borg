@@ -44,7 +44,7 @@ def fakeroot_detected():
 
 def user_exists(username):
     if not IsWin32:
-        import pwd # buildin but not on all OS
+        import pwd
         try:
             pwd.getpwnam(username)
             return True

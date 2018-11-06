@@ -10,5 +10,3 @@ IsWin32 = sys.platform.startswith('win32')
 IsLinux = sys.platform.startswith('linux')
 IsFreeBsd = sys.platform.startswith('freebsd')
 IsDarwin = sys.platform.startswith('darwin')
-
-

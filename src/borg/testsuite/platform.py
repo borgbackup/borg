@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 
+from ..platformflags import IsWin32, IsLinux, IsFreeBsd, IsDarwin
 from ..platform import acl_get, acl_set, swidth
 from ..platform import get_process_id, process_alive
 from . import BaseTestCase, unopened_tempfile
@@ -42,12 +43,14 @@ def fakeroot_detected():
 
 
 def user_exists(username):
-    try:
+    if not IsWin32:
         import pwd # buildin but not on all OS
-        pwd.getpwnam(username)
-        return True
-    except (KeyError, ValueError):
-        return False
+        try:
+            pwd.getpwnam(username)
+            return True
+        except (KeyError, ValueError):
+            pass
+    return False
 
 
 @functools.lru_cache()

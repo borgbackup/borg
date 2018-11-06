@@ -13,6 +13,7 @@ from io import BytesIO
 from itertools import groupby, zip_longest
 from shutil import get_terminal_size
 
+from .platformflags import IsWin32, IsLinux, IsFreeBsd, IsDarwin
 from .logger import create_logger
 
 logger = create_logger()
@@ -679,7 +680,7 @@ Utilization of max. archive size: {csize_max:.0%}
         uid = item.uid if uid is None else uid
         gid = item.gid if gid is None else gid
         # This code is a bit of a mess due to os specific differences
-        try:
+        if not IsWin32:
             try:
                 if fd:
                     os.fchown(fd, uid, gid)
@@ -719,8 +720,6 @@ Utilization of max. archive size: {csize_max:.0%}
             except OSError:
                 # some systems don't support calling utime on a symlink
                 pass
-        except AttributeError:
-            pass
         acl_set(path, item, self.numeric_owner, fd=fd)
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.

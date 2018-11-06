@@ -9,6 +9,7 @@ import sys
 
 from .. import __version__
 
+from ..platformflags import IsWin32, IsLinux, IsFreeBsd, IsDarwin
 from ..logger import create_logger
 logger = create_logger()
 
@@ -117,7 +118,7 @@ def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
 
 
 def is_terminal(fd=sys.stdout):
-    return hasattr(fd, 'isatty') and fd.isatty() and (sys.platform != 'win32' or 'ANSICON' in os.environ)
+    return hasattr(fd, 'isatty') and fd.isatty() and (not IsWin32 or 'ANSICON' in os.environ)
 
 
 def prepare_subprocess_env(system, env=None):

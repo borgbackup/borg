@@ -446,8 +446,6 @@ class Archiver:
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
 
-        logger.info('Creating archive at "%s"' % args.location.orig)
-
         def create_inner(archive, cache, fso):
             # Add cache dir to inode_skip list
             skip_inodes = set()
@@ -517,6 +515,7 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         t0_monotonic = time.monotonic()
+        logger.info('Creating archive at "%s"' % args.location.orig)
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,

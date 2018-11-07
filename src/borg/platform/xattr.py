@@ -1,8 +1,6 @@
 import errno
 import os
 
-from .posix import get_errno
-
 from ..helpers import Buffer
 
 
@@ -39,6 +37,7 @@ class BufferTooSmallError(Exception):
 
 
 def _check(rv, path=None, detect_buffer_too_small=False):
+    from . import get_errno # circular reference if imported at global level!
     if rv < 0:
         e = get_errno()
         if detect_buffer_too_small and e == errno.ERANGE:

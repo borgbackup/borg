@@ -115,4 +115,5 @@ def posix_acl_use_stored_uid_gid(acl):
 
 def getosusername():
     """Return the os user name."""
-    return uid2user(os.getuid())
+    uid = os.getuid()
+    return uid2user(uid, uid)

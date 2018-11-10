@@ -654,7 +654,7 @@ class Repository:
             return
         except AttributeError:
             # TODO move the call to statvfs to platform
-            logger.warning('Failed to check free space before committing: no statvfs method available' ) 
+            logger.warning('Failed to check free space before committing: no statvfs method available')
             return
         # f_bavail: even as root - don't touch the Federal Block Reserve!
         free_space = st_vfs.f_bavail * st_vfs.f_bsize

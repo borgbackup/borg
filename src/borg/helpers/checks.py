@@ -2,6 +2,7 @@ import os
 import sys
 
 from .errors import Error
+from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
 
 
 class PythonLibcTooOld(Error):
@@ -9,7 +10,7 @@ class PythonLibcTooOld(Error):
 
 
 def check_python():
-    if sys.platform.startswith(('win32', )):
+    if is_win32:
         required_funcs = {os.stat}
     else:
         required_funcs = {os.stat, os.utime, os.chown}

@@ -1,6 +1,6 @@
 import os
 
-from ..helpers import posix_acl_use_stored_uid_gid
+from .posix import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 

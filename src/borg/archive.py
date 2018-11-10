@@ -29,7 +29,7 @@ from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
-from .helpers import uid2user, user2uid, gid2group, group2gid
+from .platform import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates

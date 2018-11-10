@@ -19,6 +19,7 @@ if not sys.platform.startswith(('win32', )):
     from .posix import process_alive, local_pid_alive
     # posix swidth implementation works for: linux, freebsd, darwin, openindiana, cygwin
     from .posix import swidth
+    from .posix import uid2user, user2uid, gid2group, group2gid, getosusername
 
 if sys.platform.startswith('linux'):  # pragma: linux only
     from .linux import API_VERSION as OS_API_VERSION

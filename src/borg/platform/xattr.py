@@ -37,7 +37,7 @@ class BufferTooSmallError(Exception):
 
 
 def _check(rv, path=None, detect_buffer_too_small=False):
-    from . import get_errno # circular reference if imported at global level!
+    from . import get_errno
     if rv < 0:
         e = get_errno()
         if detect_buffer_too_small and e == errno.ERANGE:

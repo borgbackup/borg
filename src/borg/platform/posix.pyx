@@ -1,10 +1,8 @@
 import errno
 import os
-# begin moved form helpers/usergroup.py
 import grp
 import pwd
 from functools import lru_cache
-# end moved
 
 from libc.errno cimport errno as c_errno
 
@@ -67,7 +65,6 @@ def local_pid_alive(pid):
         # Any other error (eg. permissions) means that the process ID refers to a live process.
         return True
 
-# begin moved form helpers/usergroup.py
 
 @lru_cache(maxsize=None)
 def uid2user(uid, default=None):
@@ -114,8 +111,8 @@ def posix_acl_use_stored_uid_gid(acl):
             else:
                 entries.append(entry)
     return safe_encode('\n'.join(entries))
-#end moved
+
 
 def getosusername():
     """Return the os user name."""
-    return uid2user(os.getuid(), os.getuid())
+    return uid2user(os.getuid())

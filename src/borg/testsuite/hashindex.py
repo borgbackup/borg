@@ -54,7 +54,6 @@ class HashIndexTestCase(BaseTestCase):
         for x in range(50):
             self.assert_raises(KeyError, idx.__delitem__, H(x))
         self.assert_equal(len(idx), 50)
-        idx_name = tempfile.NamedTemporaryFile()
         with unopened_tempfile() as filepath:
             idx.write(filepath)
             del idx

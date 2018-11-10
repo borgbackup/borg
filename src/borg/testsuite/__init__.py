@@ -3,8 +3,8 @@ import filecmp
 import functools
 import os
 try:
-    import posix # buildin but not everywhere
-except:
+    import posix
+except ImportError:
     posix = None
 
 import stat
@@ -48,7 +48,7 @@ except ImportError:
     has_llfuse = False
 
 # The mtime get/set precision varies on different OS and Python versions
-if posix != None and 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
+if posix and 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
     st_mtime_ns_round = 0
 elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
     st_mtime_ns_round = -6

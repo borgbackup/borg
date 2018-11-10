@@ -680,43 +680,46 @@ Utilization of max. archive size: {csize_max:.0%}
         gid = item.gid if gid is None else gid
         # This code is a bit of a mess due to os specific differences
         try:
-            if fd:
-                os.fchown(fd, uid, gid)
-            else:
-                os.chown(path, uid, gid, follow_symlinks=False)
-        except OSError:
-            pass
-        if fd:
-            os.fchmod(fd, item.mode)
-        elif not symlink:
-            os.chmod(path, item.mode)
-        elif has_lchmod:  # Not available on Linux
-            os.lchmod(path, item.mode)
-        mtime = item.mtime
-        if 'atime' in item:
-            atime = item.atime
-        else:
-            # old archives only had mtime in item metadata
-            atime = mtime
-        if 'birthtime' in item:
-            birthtime = item.birthtime
             try:
-                # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
-                # See utimes(2) on either of the BSDs for details.
                 if fd:
-                    os.utime(fd, None, ns=(atime, birthtime))
+                    os.fchown(fd, uid, gid)
                 else:
-                    os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
+                    os.chown(path, uid, gid, follow_symlinks=False)
+            except OSError:
+                pass
+            if fd:
+                os.fchmod(fd, item.mode)
+            elif not symlink:
+                os.chmod(path, item.mode)
+            elif has_lchmod:  # Not available on Linux
+                os.lchmod(path, item.mode)
+            mtime = item.mtime
+            if 'atime' in item:
+                atime = item.atime
+            else:
+                # old archives only had mtime in item metadata
+                atime = mtime
+            if 'birthtime' in item:
+                birthtime = item.birthtime
+                try:
+                    # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
+                    # See utimes(2) on either of the BSDs for details.
+                    if fd:
+                        os.utime(fd, None, ns=(atime, birthtime))
+                    else:
+                        os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
+                except OSError:
+                    # some systems don't support calling utime on a symlink
+                    pass
+            try:
+                if fd:
+                    os.utime(fd, None, ns=(atime, mtime))
+                else:
+                    os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
             except OSError:
                 # some systems don't support calling utime on a symlink
                 pass
-        try:
-            if fd:
-                os.utime(fd, None, ns=(atime, mtime))
-            else:
-                os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
-        except OSError:
-            # some systems don't support calling utime on a symlink
+        except AttributeError:
             pass
         acl_set(path, item, self.numeric_owner, fd=fd)
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include

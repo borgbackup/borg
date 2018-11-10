@@ -4,7 +4,6 @@ import random
 import shutil
 import sys
 import tempfile
-import pwd
 import unittest
 
 from ..platform import acl_get, acl_set, swidth
@@ -44,6 +43,7 @@ def fakeroot_detected():
 
 def user_exists(username):
     try:
+        import pwd # buildin but not on all OS
         pwd.getpwnam(username)
         return True
     except (KeyError, ValueError):

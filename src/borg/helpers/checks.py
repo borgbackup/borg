@@ -1,6 +1,8 @@
 import os
+import sys
 
 from .errors import Error
+from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
 
 
 class PythonLibcTooOld(Error):
@@ -8,7 +10,10 @@ class PythonLibcTooOld(Error):
 
 
 def check_python():
-    required_funcs = {os.stat, os.utime, os.chown}
+    if is_win32:
+        required_funcs = {os.stat}
+    else:
+        required_funcs = {os.stat, os.utime, os.chown}
     if not os.supports_follow_symlinks.issuperset(required_funcs):
         raise PythonLibcTooOld
 

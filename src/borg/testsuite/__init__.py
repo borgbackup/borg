@@ -2,7 +2,11 @@ from contextlib import contextmanager
 import filecmp
 import functools
 import os
-import posix
+try:
+    import posix
+except ImportError:
+    posix = None
+
 import stat
 import sys
 import sysconfig
@@ -44,7 +48,7 @@ except ImportError:
     has_llfuse = False
 
 # The mtime get/set precision varies on different OS and Python versions
-if 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
+if posix and 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
     st_mtime_ns_round = 0
 elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
     st_mtime_ns_round = -6
@@ -95,7 +99,10 @@ def are_fifos_supported():
             os.mkfifo(filepath)
             return True
         except OSError:
-            return False
+            pass
+        except NotImplementedError:
+            pass
+        return False
 
 
 @functools.lru_cache()
@@ -112,6 +119,8 @@ def is_utime_fully_supported():
             if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
                 return True
         except OSError:
+            pass
+        except NotImplementedError:
             pass
         return False
 
@@ -134,6 +143,8 @@ def is_birthtime_fully_supported():
             if new_stats.st_birthtime == birthtime and new_stats.st_mtime == mtime and new_stats.st_atime == atime:
                 return True
         except OSError:
+            pass
+        except NotImplementedError:
             pass
         return False
 

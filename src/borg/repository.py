@@ -652,6 +652,10 @@ class Repository:
         except OSError as os_error:
             logger.warning('Failed to check free space before committing: ' + str(os_error))
             return
+        except AttributeError:
+            # TODO move the call to statvfs to platform
+            logger.warning('Failed to check free space before committing: no statvfs method available')
+            return
         # f_bavail: even as root - don't touch the Federal Block Reserve!
         free_space = st_vfs.f_bavail * st_vfs.f_bsize
         logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))

@@ -16,7 +16,6 @@ from .parseformat import *  # NOQA
 from .process import *  # NOQA
 from .progress import *  # NOQA
 from .time import *  # NOQA
-from .usergroup import *  # NOQA
 from .yes import *  # NOQA
 
 from .msgpack import is_slow_msgpack, int_to_bigint, bigint_to_int, get_limited_unpacker

@@ -4075,7 +4075,7 @@ class Archiver:
 
         It creates input data below the given PATH and backups this data into the given REPO.
         The REPO must already exist (it could be a fresh empty repo or an existing repo, the
-        command will create / read / update / delete some archives named borg-test-data\\* there.
+        command will create / read / update / delete some archives named borg-benchmark-crud\\* there.
 
         Make sure you have free space there, you'll need about 1GB each (+ overhead).
 

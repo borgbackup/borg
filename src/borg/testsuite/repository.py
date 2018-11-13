@@ -32,7 +32,7 @@ class RepositoryTestCaseBase(BaseTestCase):
         return Repository(os.path.join(self.tmppath, 'repository'), exclusive=exclusive, create=create)
 
     def setUp(self):
-        self.tmppath = tempfile.mkdtemp()
+        self.tmppath = tempfile.mkdtemp(prefix=str(os.getpid()) + '_')
         self.repository = self.open(create=True)
         self.repository.__enter__()
 

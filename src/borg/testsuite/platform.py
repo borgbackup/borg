@@ -76,7 +76,7 @@ def are_acls_working():
 class PlatformLinuxTestCase(BaseTestCase):
 
     def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
+        self.tmpdir = tempfile.mkdtemp(prefix=str(os.getpid()) + '_')
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -154,7 +154,7 @@ class PlatformLinuxTestCase(BaseTestCase):
 class PlatformDarwinTestCase(BaseTestCase):
 
     def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
+        self.tmpdir = tempfile.mkdtemp(prefix=str(os.getpid()) + '_')
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)

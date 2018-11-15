@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 import tempfile
+import warnings
 from unittest.mock import patch
 
 import pytest
@@ -33,6 +34,7 @@ class RepositoryTestCaseBase(BaseTestCase):
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp(prefix=str(os.getpid()) + '_')
+        warnings.warn("TESTXXX:{}".format(self.tmppath))
         self.repository = self.open(create=True)
         self.repository.__enter__()
 

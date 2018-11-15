@@ -5,6 +5,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import warnings
 
 from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
 from ..platform import acl_get, acl_set, swidth
@@ -77,6 +78,7 @@ class PlatformLinuxTestCase(BaseTestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp(prefix=str(os.getpid()) + '_')
+        warnings.warn("TESTXXX:{}".format(self.tmpdir))
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -155,7 +157,7 @@ class PlatformDarwinTestCase(BaseTestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp(prefix=str(os.getpid()) + '_')
-
+        warnings.warn("TESTXXX:{}".format(self.tmpdir))
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 

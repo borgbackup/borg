@@ -3,7 +3,7 @@ setuptools_scm
 pip
 virtualenv
 tox
-pytest!=3.3.0
+pytest<4.0.0
 pytest-xdist
 pytest-cov
 pytest-benchmark

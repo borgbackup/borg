@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
+import warnings
 from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
 from datetime import datetime
@@ -252,6 +253,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.environ['BORG_PASSPHRASE'] = 'waytooeasyonlyfortests'
         self.archiver = not self.FORK_DEFAULT and Archiver() or None
         self.tmpdir = tempfile.mkdtemp()
+        warnings.warn("TESTXXX:{}".format(self.tmpdir))
         self.repository_path = os.path.join(self.tmpdir, 'repository')
         self.repository_location = self.prefix + self.repository_path
         self.input_path = os.path.join(self.tmpdir, 'input')

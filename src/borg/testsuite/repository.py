@@ -4,8 +4,8 @@ import os
 import shutil
 import sys
 import tempfile
+import warnings
 from unittest.mock import patch
-
 import pytest
 
 from ..hashindex import NSIndex
@@ -33,6 +33,7 @@ class RepositoryTestCaseBase(BaseTestCase):
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
+        warnings.warn("TESTXXX:{}".format(self.tmppath))
         self.repository = self.open(create=True)
         self.repository.__enter__()
 

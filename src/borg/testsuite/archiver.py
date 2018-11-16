@@ -1255,14 +1255,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             raise OSError(errno.EACCES, 'EACCES')
 
         self.create_regular_file('file')
-        xattr.setxattr(b'input/file', b'attribute', b'value')
+        xattr.setxattr(b'input/file', b'user.attribute', b'value')
         self.cmd('init', self.repository_location, '-e' 'none')
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             input_abspath = os.path.abspath('input/file')
             with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert '>: Value or key of extended attribute attribute is too big for this filesystem\n' in out
+                assert '>: Value or key of extended attribute user.attribute is too big for this filesystem\n' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
@@ -1270,7 +1270,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert '>: Permission denied when setting extended attribute attribute\n' in out
+                assert '>: Permission denied when setting extended attribute user.attribute\n' in out
             assert os.path.isfile(input_abspath)
 
     def test_path_normalization(self):

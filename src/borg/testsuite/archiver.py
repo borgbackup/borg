@@ -55,7 +55,7 @@ from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
-from .upgrader import attic_repo
+from .upgrader import make_attic_repo
 from . import key
 
 # 3.4.3 == first version with argparse bugfix for nargs='*' and 0 arguments given
@@ -2877,7 +2877,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert os.stat('input/dir1/source2').st_nlink == 2
 
     def test_detect_attic_repo(self):
-        path = attic_repo(self.repository_path)
+        path = make_attic_repo(self.repository_path)
         cmds = [
             ['create', path + '::test', self.tmpdir],
             ['extract', path + '::test'],

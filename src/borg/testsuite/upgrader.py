@@ -58,16 +58,20 @@ def key_valid(path):
         return f.read().startswith(KeyfileKey.FILE_ID)
 
 
-@pytest.fixture()
-def attic_repo(tmpdir):
+def make_attic_repo(dir):
     """
     create an attic repo with some stuff in it
 
-    :param tmpdir: path to the repository to be created
+    :param dir: path to the repository to be created
     :returns: path to attic repository
     """
     # there is some stuff in that repo, copied from `RepositoryTestCase.test1`
-    return untar(ATTIC_TAR, str(tmpdir), 'repo')
+    return untar(ATTIC_TAR, str(dir), 'repo')
+
+
+@pytest.fixture()
+def attic_repo(tmpdir):
+    return make_attic_repo(tmpdir)
 
 
 @pytest.fixture(params=[True, False])

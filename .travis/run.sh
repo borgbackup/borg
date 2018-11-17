@@ -13,11 +13,6 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     fi
 fi
 
-source ~/.venv/bin/activate
-
-if [[ "$(uname -s)" == "Darwin" ]]; then
-    # no fakeroot on OS X
-    sudo tox -e $TOXENV -r
-else
-    fakeroot -u tox -r
-fi
+# do not use fakeroot, but run as root on travis.
+# avoids the dreaded EISDIR sporadic failures. see #2482.
+sudo bash -c "source ~/.venv/bin/activate ; tox -e $TOXENV -r"

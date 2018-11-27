@@ -516,10 +516,13 @@ class ArchiveFormatter(BaseFormatter):
         'time': 'alias of "start"',
         'end': 'time (end) of creation of the archive',
         'id': 'internal ID of the archive',
+        'hostname': 'hostname of host on which this archive was created',
+        'username': 'username of user who created this archive',
     }
     KEY_GROUPS = (
         ('archive', 'name', 'barchive', 'comment', 'bcomment', 'id'),
         ('start', 'time', 'end'),
+        ('hostname', 'username'),
     )
 
     @classmethod
@@ -563,8 +566,10 @@ class ArchiveFormatter(BaseFormatter):
         self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
-            'comment': partial(self.get_comment, rs=True),
-            'bcomment': partial(self.get_comment, rs=False),
+            'hostname': partial(self.get_meta, 'hostname', rs=True),
+            'username': partial(self.get_meta, 'username', rs=True),
+            'comment': partial(self.get_meta, 'comment', rs=True),
+            'bcomment': partial(self.get_meta, 'comment', rs=False),
             'end': self.get_ts_end,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
@@ -602,8 +607,9 @@ class ArchiveFormatter(BaseFormatter):
             self._archive = Archive(self.repository, self.key, self.manifest, self.name)
         return self._archive
 
-    def get_comment(self, rs):
-        return remove_surrogates(self.archive.comment) if rs else self.archive.comment
+    def get_meta(self, key, rs):
+        value = self.archive.metadata.get(key, '')
+        return remove_surrogates(value) if rs else value
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)

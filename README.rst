@@ -16,7 +16,7 @@ fully trusted targets.
 
 See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
-There is also an `offline documentation`_ available, in mutiple formats.
+There is also an `offline documentation`_ available, in multiple formats.
 
 .. _installation manual: https://borgbackup.readthedocs.org/en/stable/installation.html
 .. _offline documentation: https://readthedocs.org/projects/borgbackup/downloads

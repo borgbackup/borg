@@ -348,11 +348,11 @@ class Location:
         """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
     def __init__(self, text=''):
-        self.orig = text
-        if not self.parse(self.orig):
-            raise ValueError('Location: parse failed: %s' % self.orig)
+        if not self.parse(text):
+            raise ValueError('Invalid location format: "%s"' % self.orig)
 
     def parse(self, text):
+        self.orig = text
         text = replace_placeholders(text)
         valid = self._parse(text)
         if valid:
@@ -364,10 +364,9 @@ class Location:
         if repo is None:
             return False
         valid = self._parse(repo)
-        if not valid:
-            return False
         self.archive = m.group('archive')
-        return True
+        self.orig = repo if not self.archive else '%s::%s' % (repo, self.archive)
+        return valid
 
     def _parse(self, text):
         def normpath_special(p):
@@ -452,8 +451,8 @@ def location_validator(archive=None, proto=None):
     def validator(text):
         try:
             loc = Location(text)
-        except ValueError:
-            raise argparse.ArgumentTypeError('Invalid location format: "%s"' % text) from None
+        except ValueError as err:
+            raise argparse.ArgumentTypeError(str(err)) from None
         if archive is True and not loc.archive:
             raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
         elif archive is False and loc.archive:

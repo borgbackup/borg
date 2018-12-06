@@ -87,13 +87,15 @@ Standalone Binary
 .. note:: Releases are signed with an OpenPGP key, see
           :ref:`security-contact` for more instructions.
 
-Borg binaries (generated with `pyinstaller`_) are available
-on the releases_ page for the following platforms:
+Borg x86/x64 amd/intel compatible binaries (generated with `pyinstaller`_)
+are available on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
   Older glibc releases are untested and may not work.
 * **Mac OS X**: 10.10 (does not work with older OS X releases)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
+
+ARM binaries are built by Johann Bauer, see: https://borg.bauerj.eu/
 
 To install such a binary, just drop it into a directory in your ``PATH``,
 make borg readable and executable for its users and then you can run ``borg``::

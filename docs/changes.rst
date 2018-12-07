@@ -171,7 +171,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.7 (2018-08-11)
+Version 1.1.8 (2018-12-xx)
 --------------------------
 
 Compatibility notes:
@@ -190,9 +190,47 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
-- 1.1.7 changes:
 
-  - added support for Python 3.7
+Fixes:
+
+- enforce storage quota if set by serve-command, #4093
+- invalid locations: give err msg containing parsed location, #4179
+- list repo: add placeholders for hostname and username, #4130
+
+New features:
+
+- create: added PATH::archive output on INFO log level
+- read a passphrase from a file descriptor specified in the
+  BORG_PASSPHRASE_FD environment variable.
+
+Other:
+
+- docs:
+
+  - option --format is required for some expensive-to-compute values for json
+
+    borg list by default does not compute expensive values except when
+    they are needed. whether they are needed is determined by the format,
+    in standard mode as well as in --json mode.
+  - tell that our binaries are x86/x64 amd/intel, bauerj has ARM
+  - fixed wrong archive name pattern in CRUD benchmark help
+  - fixed link to cachedir spec in docs, #4140
+- tests:
+
+  - stop using fakeroot on travis, avoids sporadic EISDIR errors, #2482
+  - xattr key names must start with "user." on linux
+  - fix code so flake8 3.6 does not complain
+  - explicitly convert environment variable to str, #4136
+  - fix DeprecationWarning: Flags not at the start of the expression, #4137
+  - support pytest4, #4172
+
+
+Version 1.1.7 (2018-08-11)
+--------------------------
+
+Compatibility notes:
+
+- added support for Python 3.7
 
 Fixes:
 

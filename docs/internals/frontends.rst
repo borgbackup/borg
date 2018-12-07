@@ -340,6 +340,16 @@ username
 comment
     Archive comment, if any
 
+Some keys/values are more expensive to compute than others (e.g. because it requires opening the archive,
+not just the manifest). To optimize for speed, `borg list repo` does not determine these values except
+when they are requested. The `--format` option is used for that (for normal mode as well as for `--json`
+mode), so, to have the comment included in the json output, you will need:
+
+::
+
+    borg list repo --format "{name}{comment}" --json`
+
+
 Example of a simple archive listing (``borg list --last 1 --json``)::
 
     {

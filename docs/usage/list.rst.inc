@@ -129,6 +129,9 @@ Keys for listing repository archives:
 - time: alias of "start"
 - end: time (end) of creation of the archive
 
+- hostname: hostname of host on which this archive was created
+- username: username of user who created this archive
+
 
 Keys for listing archive files:
 

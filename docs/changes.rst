@@ -171,7 +171,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.8 (2018-12-xx)
+Version 1.1.8 (2018-12-09)
 --------------------------
 
 Compatibility notes:
@@ -196,6 +196,7 @@ Fixes:
 - enforce storage quota if set by serve-command, #4093
 - invalid locations: give err msg containing parsed location, #4179
 - list repo: add placeholders for hostname and username, #4130
+- on linux, symlinks can't have ACLs, so don't try to set any, #4044
 
 New features:
 
@@ -223,6 +224,9 @@ Other:
   - explicitly convert environment variable to str, #4136
   - fix DeprecationWarning: Flags not at the start of the expression, #4137
   - support pytest4, #4172
+- vagrant:
+
+  - use python 3.5.6 for builds
 
 
 Version 1.1.7 (2018-08-11)

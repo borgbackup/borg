@@ -200,6 +200,10 @@ def acl_set(path, item, numeric_owner=False):
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
 
+    if stat.S_ISLNK(item.get('mode', 0)):
+        # Linux does not support setting ACLs on symlinks
+        return
+
     p = <bytes>os.fsencode(path)
     if numeric_owner:
         converter = posix_acl_use_stored_uid_gid

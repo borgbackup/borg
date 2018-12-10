@@ -8,10 +8,10 @@ cache:
 
 matrix:
     include:
-        - python: 3.6
+        - python: 3.5
           os: linux
           dist: trusty
-          env: TOXENV=flake8
+          env: TOXENV=py35
         - python: 3.6
           os: linux
           dist: trusty
@@ -28,6 +28,14 @@ matrix:
           os: linux
           dist: xenial
           env: TOXENV=py37
+        - python: 3.5
+          os: linux
+          dist: xenial
+          env: TOXENV=flake8
+        - language: generic
+          os: osx
+          osx_image: xcode8.3
+          env: TOXENV=py35
         - language: generic
           os: osx
           osx_image: xcode8.3

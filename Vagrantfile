@@ -140,7 +140,7 @@ def install_borg(fuse)
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install -U wheel  # upgrade wheel, too old for 3.6
+    pip install -U wheel  # upgrade wheel, too old for 3.5
     cd borg
     pip install -r requirements.d/development.txt
     python setup.py clean
@@ -310,6 +310,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64")
   end
 
-  # TODO: create more VMs with python 3.6 and openssl 1.1.
+  # TODO: create more VMs with python 3.5+ and openssl 1.1.
   # See branch 1.1-maint for a better equipped Vagrantfile (but still on py34 and openssl 1.0).
 end

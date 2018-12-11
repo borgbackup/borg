@@ -143,7 +143,6 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                do_files=getattr(args, 'cache_files', False),
-                               ignore_inode=getattr(args, 'ignore_inode', False),
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
                                cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -514,7 +513,7 @@ class Archiver:
         if not dry_run:
             with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
-                       cache_mode=args.files_cache_mode, ignore_inode=args.ignore_inode) as cache:
+                       cache_mode=args.files_cache_mode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
@@ -2266,7 +2265,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--ignore-inode', None, 'Warning: "--ignore-inode" has been deprecated. Use "--files-cache=ctime,size" or "...=mtime,size" instead.'),
             ('--no-files-cache', None, 'Warning: "--no-files-cache" has been deprecated. Use "--files-cache=disabled" instead.'),
         ]
         for i, arg in enumerate(args[:]):
@@ -3116,8 +3114,6 @@ class Archiver:
                               help='do not store birthtime (creation date) into archive')
         fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
                               help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
-        fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
-                              help='ignore inode data in the file metadata cache used to detect unchanged files.')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
                               type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
                               help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)

@@ -358,13 +358,10 @@ class Cache:
             shutil.rmtree(path)
 
     def __new__(cls, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
-                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE,
-                ignore_inode=False):
+                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
 
         if not do_files and 'd' not in cache_mode:
             cache_mode = 'd'
-        elif ignore_inode and 'i' in cache_mode:
-            cache_mode = ''.join(set(cache_mode) - set('i'))
 
         def local():
             return LocalCache(repository=repository, key=key, manifest=manifest, path=path, sync=sync,

@@ -1555,7 +1555,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_unknown_feature_on_change_passphrase(self):
         print(self.cmd('init', '--encryption=repokey', self.repository_location))
         self.add_unknown_feature(Manifest.Operation.CHECK)
-        self.cmd_raises_unknown_feature(['change-passphrase', self.repository_location])
+        self.cmd_raises_unknown_feature(['key', 'change-passphrase', self.repository_location])
 
     def test_unknown_feature_on_read(self):
         print(self.cmd('init', '--encryption=repokey', self.repository_location))
@@ -2082,7 +2082,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
         # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
-        self.cmd('change-passphrase', self.repository_location)
+        self.cmd('key', 'change-passphrase', self.repository_location)
         os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
         self.cmd('list', self.repository_location)
 
@@ -2885,7 +2885,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             ['info', path + '::test'],
             ['key', 'export', path, 'exported'],
             ['key', 'import', path, 'import'],
-            ['change-passphrase', path],
+            ['key', 'change-passphrase', path],
             ['break-lock', path],
         ]
         for args in cmds:

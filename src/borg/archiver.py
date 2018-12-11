@@ -306,11 +306,6 @@ class Archiver:
             logger.info('Key location: %s', key.find_key())
         return EXIT_SUCCESS
 
-    def do_change_passphrase_deprecated(self, args):
-        logger.warning('"borg change-passphrase" is deprecated and will be removed in Borg 1.2.\n'
-                       'Use "borg key change-passphrase" instead.')
-        return self.do_change_passphrase(args)
-
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
         """Export the repository key for backup"""
@@ -2922,16 +2917,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='change repository passphrase')
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
-
-        # Borg 1.0 alias for change passphrase (without the "key" subcommand)
-        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
-                                          description=self.do_change_passphrase.__doc__,
-                                          epilog=change_passphrase_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='change repository passphrase')
-        subparser.set_defaults(func=self.do_change_passphrase_deprecated)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 

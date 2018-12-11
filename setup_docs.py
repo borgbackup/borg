@@ -288,7 +288,6 @@ class build_man(Command):
         'break-lock': 'lock',
         'with-lock': 'lock',
 
-        'change-passphrase': 'key',
         'key_change-passphrase': 'key',
         'key_export': 'key',
         'key_import': 'key',

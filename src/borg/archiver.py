@@ -142,7 +142,6 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                         assert_secure(repository, kwargs['manifest'], self.lock_wait)
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
-                               do_files=getattr(args, 'cache_files', False),
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
                                cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -511,7 +510,7 @@ class Archiver:
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.orig)
         if not dry_run:
-            with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
+            with Cache(repository, key, manifest, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
                        cache_mode=args.files_cache_mode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
@@ -2265,7 +2264,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--no-files-cache', None, 'Warning: "--no-files-cache" has been deprecated. Use "--files-cache=disabled" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -3092,8 +3090,6 @@ class Archiver:
                                help='output stats as JSON. Implies ``--stats``.')
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
                                help='experimental: do not synchronize the cache. Implies not using the files cache.')
-        subparser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
-                               help='do not load/update the file metadata cache used to detect unchanged files')
         subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
                                help='use NAME in archive for stdin data (default: "stdin")')
 

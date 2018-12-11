@@ -357,11 +357,8 @@ class Cache:
             os.remove(config)  # kill config first
             shutil.rmtree(path)
 
-    def __new__(cls, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
+    def __new__(cls, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
                 progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
-
-        if not do_files and 'd' not in cache_mode:
-            cache_mode = 'd'
 
         def local():
             return LocalCache(repository=repository, key=key, manifest=manifest, path=path, sync=sync,

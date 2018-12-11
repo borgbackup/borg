@@ -2266,7 +2266,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--list-format', '--format', 'Warning: "--list-format" has been deprecated. Use "--format" instead.'),
             ('--ignore-inode', None, 'Warning: "--ignore-inode" has been deprecated. Use "--files-cache=ctime,size" or "...=mtime,size" instead.'),
             ('--no-files-cache', None, 'Warning: "--no-files-cache" has been deprecated. Use "--files-cache=disabled" instead.'),
         ]

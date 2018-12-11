@@ -1203,11 +1203,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(sorted(os.listdir('output/input/taggedall')),
                           ['.NOBACKUP1', '.NOBACKUP2', CACHE_TAG_NAME, ])
 
-    def test_exclude_keep_tagged_deprecation(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output_warn = self.cmd('create', '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', src_dir)
-        self.assert_in('--keep-tag-files" has been deprecated.', output_warn)
-
     def test_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
         self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',

@@ -2267,7 +2267,6 @@ class Archiver:
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
             ('--list-format', '--format', 'Warning: "--list-format" has been deprecated. Use "--format" instead.'),
-            ('--keep-tag-files', '--keep-exclude-tags', 'Warning: "--keep-tag-files" has been deprecated. Use "--keep-exclude-tags" instead.'),
             ('--ignore-inode', None, 'Warning: "--ignore-inode" has been deprecated. Use "--files-cache=ctime,size" or "...=mtime,size" instead.'),
             ('--no-files-cache', None, 'Warning: "--no-files-cache" has been deprecated. Use "--files-cache=disabled" instead.'),
         ]
@@ -2488,7 +2487,7 @@ class Archiver:
                            action='append', type=str,
                            help='exclude directories that are tagged by containing a filesystem object with '
                                 'the given NAME')
-                add_option('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
+                add_option('--keep-exclude-tags', dest='keep_exclude_tags',
                            action='store_true',
                            help='if tag objects are specified with ``--exclude-if-present``, '
                                 'don\'t omit the tag objects themselves from the backup archive')

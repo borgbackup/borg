@@ -1203,11 +1203,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_equal(sorted(os.listdir('output/input/taggedall')),
                           ['.NOBACKUP1', '.NOBACKUP2', CACHE_TAG_NAME, ])
 
-    def test_exclude_keep_tagged_deprecation(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output_warn = self.cmd('create', '--exclude-caches', '--keep-tag-files', self.repository_location + '::test', src_dir)
-        self.assert_in('--keep-tag-files" has been deprecated.', output_warn)
-
     def test_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
         self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
@@ -1555,7 +1550,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_unknown_feature_on_change_passphrase(self):
         print(self.cmd('init', '--encryption=repokey', self.repository_location))
         self.add_unknown_feature(Manifest.Operation.CHECK)
-        self.cmd_raises_unknown_feature(['change-passphrase', self.repository_location])
+        self.cmd_raises_unknown_feature(['key', 'change-passphrase', self.repository_location])
 
     def test_unknown_feature_on_read(self):
         print(self.cmd('init', '--encryption=repokey', self.repository_location))
@@ -1891,8 +1886,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', test_archive, src_dir)
-        output_warn = self.cmd('list', '--list-format', '-', test_archive)
-        self.assert_in('--list-format" has been deprecated.', output_warn)
         output_1 = self.cmd('list', test_archive)
         output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}', test_archive)
         output_3 = self.cmd('list', '--format', '{mtime:%s} {path}{NL}', test_archive)
@@ -2082,7 +2075,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
         # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
-        self.cmd('change-passphrase', self.repository_location)
+        self.cmd('key', 'change-passphrase', self.repository_location)
         os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
         self.cmd('list', self.repository_location)
 
@@ -2885,7 +2878,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             ['info', path + '::test'],
             ['key', 'export', path, 'exported'],
             ['key', 'import', path, 'import'],
-            ['change-passphrase', path],
+            ['key', 'change-passphrase', path],
             ['break-lock', path],
         ]
         for args in cmds:

@@ -142,8 +142,6 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                         assert_secure(repository, kwargs['manifest'], self.lock_wait)
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
-                               do_files=getattr(args, 'cache_files', False),
-                               ignore_inode=getattr(args, 'ignore_inode', False),
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
                                cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -305,11 +303,6 @@ class Archiver:
             # print key location to make backing it up easier
             logger.info('Key location: %s', key.find_key())
         return EXIT_SUCCESS
-
-    def do_change_passphrase_deprecated(self, args):
-        logger.warning('"borg change-passphrase" is deprecated and will be removed in Borg 1.2.\n'
-                       'Use "borg key change-passphrase" instead.')
-        return self.do_change_passphrase(args)
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
@@ -517,9 +510,9 @@ class Archiver:
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.orig)
         if not dry_run:
-            with Cache(repository, key, manifest, do_files=args.cache_files, progress=args.progress,
+            with Cache(repository, key, manifest, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
-                       cache_mode=args.files_cache_mode, ignore_inode=args.ignore_inode) as cache:
+                       cache_mode=args.files_cache_mode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
@@ -2271,10 +2264,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--list-format', '--format', 'Warning: "--list-format" has been deprecated. Use "--format" instead.'),
-            ('--keep-tag-files', '--keep-exclude-tags', 'Warning: "--keep-tag-files" has been deprecated. Use "--keep-exclude-tags" instead.'),
-            ('--ignore-inode', None, 'Warning: "--ignore-inode" has been deprecated. Use "--files-cache=ctime,size" or "...=mtime,size" instead.'),
-            ('--no-files-cache', None, 'Warning: "--no-files-cache" has been deprecated. Use "--files-cache=disabled" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -2493,7 +2482,7 @@ class Archiver:
                            action='append', type=str,
                            help='exclude directories that are tagged by containing a filesystem object with '
                                 'the given NAME')
-                add_option('--keep-exclude-tags', '--keep-tag-files', dest='keep_exclude_tags',
+                add_option('--keep-exclude-tags', dest='keep_exclude_tags',
                            action='store_true',
                            help='if tag objects are specified with ``--exclude-if-present``, '
                                 'don\'t omit the tag objects themselves from the backup archive')
@@ -2925,16 +2914,6 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
-        # Borg 1.0 alias for change passphrase (without the "key" subcommand)
-        subparser = subparsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
-                                          description=self.do_change_passphrase.__doc__,
-                                          epilog=change_passphrase_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='change repository passphrase')
-        subparser.set_defaults(func=self.do_change_passphrase_deprecated)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
-
         migrate_to_repokey_epilog = process_epilog("""
         This command migrates a repository from passphrase mode (removed in Borg 1.0)
         to repokey mode.
@@ -3111,8 +3090,6 @@ class Archiver:
                                help='output stats as JSON. Implies ``--stats``.')
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
                                help='experimental: do not synchronize the cache. Implies not using the files cache.')
-        subparser.add_argument('--no-files-cache', dest='cache_files', action='store_false',
-                               help='do not load/update the file metadata cache used to detect unchanged files')
         subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
                                help='use NAME in archive for stdin data (default: "stdin")')
 
@@ -3133,8 +3110,6 @@ class Archiver:
                               help='do not store birthtime (creation date) into archive')
         fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
                               help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
-        fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
-                              help='ignore inode data in the file metadata cache used to detect unchanged files.')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
                               type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
                               help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)

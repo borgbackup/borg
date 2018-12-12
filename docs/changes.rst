@@ -146,6 +146,13 @@ Compatibility notes:
   The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
   and the default is now "mtime".
   "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+- removed deprecated-since-long stuff (deprecated since):
+
+  - command "borg change-passphrase" (2017-02), use "borg key ..."
+  - option "--keep-tag-files" (2017-01), use "--keep-exclude-tags"
+  - option "--list-format" (2017-10), use "--format"
+  - option "--ignore-inode" (2017-09), use "--files-cache" w/o "inode"
+  - option "--no-files-cache" (2017-09), use "--files-cache=disabled"
 
 New features:
 

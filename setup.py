@@ -248,9 +248,15 @@ if not on_rtd:
                   and '--help' not in sys.argv[1:]
 
     if cythonize and cythonizing:
-        # compile .pyx extensions to .c in parallel
-        cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], nthreads=cpu_threads+1)
-        ext_modules = cythonize(ext_modules, nthreads=cpu_threads+1)
+        cython_opts = dict(
+            # compile .pyx extensions to .c in parallel
+            nthreads=cpu_threads + 1,
+            # default language_level will be '3str' starting from Cython 3.0.0,
+            # but old cython versions (< 0.29) do not know that, thus we use 3 for now.
+            compiler_directives={'language_level': 3},
+        )
+        cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], **cython_opts)
+        ext_modules = cythonize(ext_modules, **cython_opts)
 
 setup(
     name='borgbackup',

@@ -273,6 +273,10 @@ def acl_set(path, item, numeric_owner=False, fd=None):
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
 
+    if stat.S_ISLNK(item.get('mode', 0)):
+        # Linux does not support setting ACLs on symlinks
+        return
+
     if fd is None and isinstance(path, str):
         path = os.fsencode(path)
     if numeric_owner:

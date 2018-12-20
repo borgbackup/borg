@@ -220,6 +220,8 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 
     # actually free repo disk space by compacting segments
 
+    info "Compacting repository"
+    
     borg compact
 
     compact_exit=$?
@@ -237,7 +239,12 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     then
         info "Backup, Prune and/or Compact finished with an error"
     fi
-
+    
+    if [ ${global_exit} -lt 1 ];
+    then
+        info "Backup, Prune, and Compact finished without error"
+    fi
+    
     exit ${global_exit}
 
 Pitfalls with shell variables and environment variables

@@ -240,7 +240,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
         info "Backup, Prune and/or Compact finished with an error"
     fi
     
-    if [ ${global_exit} -lt 1 ];
+    if [ ${global_exit} -eq 0 ];
     then
         info "Backup, Prune, and Compact finished without error"
     fi

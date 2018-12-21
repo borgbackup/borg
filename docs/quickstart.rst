@@ -219,16 +219,14 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     # use highest exit code as global exit code
     global_exit=$(( backup_exit > prune_exit ? backup_exit : prune_exit ))
 
-    if [ ${global_exit} -eq 1 ];
-    then
-        info "Backup and/or Prune finished with a warning"
+    if [ ${global_exit} -eq 0 ]; then
+        info "Backup and Prune finished successfully"
+    elif [ ${global_exit} -eq 1 ]; then
+        info "Backup and/or Prune finished with warnings"
+    else
+        info "Backup and/or Prune finished with errors"
     fi
-
-    if [ ${global_exit} -gt 1 ];
-    then
-        info "Backup and/or Prune finished with an error"
-    fi
-
+    
     exit ${global_exit}
 
 Pitfalls with shell variables and environment variables

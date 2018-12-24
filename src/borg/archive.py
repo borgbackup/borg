@@ -1095,16 +1095,16 @@ class FilesystemObjectProcessors:
 
     def process_dev(self, *, path, parent_fd, name, st, dev_type):
         with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
-            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
-                with backup_io('fstat'):
-                    curr_st = os.fstat(fd)
-                # XXX do some checks here: st vs. curr_st
-                assert stat.S_ISBLK(curr_st.st_mode) or stat.S_ISCHR(curr_st.st_mode)
-                # make sure stats refer to same object that we are processing below
-                st = curr_st
-                item.rdev = st.st_rdev
-                item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
-                return status
+            # looks like we can not work fd-based here without causing issues when trying to open/close the device
+            with backup_io('stat'):
+                curr_st = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            # XXX do some checks here: st vs. curr_st
+            assert stat.S_ISBLK(curr_st.st_mode) or stat.S_ISCHR(curr_st.st_mode)
+            # make sure stats refer to same object that we are processing below
+            st = curr_st
+            item.rdev = st.st_rdev
+            item.update(self.metadata_collector.stat_attrs(st, path))
+            return status
 
     def process_symlink(self, *, path, parent_fd, name, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,

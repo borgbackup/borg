@@ -1,3 +1,5 @@
+# cython: language_level=3
+
 import os
 
 from ..helpers import user2uid, group2gid

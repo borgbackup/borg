@@ -33,3 +33,4 @@ Software
 - `BorgWeb - a very simple web UI for BorgBackup <https://borgweb.readthedocs.io/>`_
 - some other stuff found at the `BorgBackup Github organisation <https://github.com/borgbackup/>`_
 - `borgmatic <https://torsion.org/borgmatic/>`_ - simple wrapper script for BorgBackup that creates and prunes backups
+- `vorta <https://github.com/borgbase/vorta>` - A gui for borg backup, based on python and qt.

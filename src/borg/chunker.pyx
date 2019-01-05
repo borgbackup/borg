@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-API_VERSION = '1.1_01'
+API_VERSION = '1.1_02'
 
 from libc.stdlib cimport free
 
@@ -18,6 +18,17 @@ cdef extern from "_chunker.c":
 
 
 cdef class Chunker:
+    """
+    Content-Defined Chunker, variable chunk sizes.
+
+    This chunker does quite some effort to mostly cut the same-content chunks, even if
+    the content moves to a different offset inside the file. It uses the buzhash
+    rolling-hash algorithm to identify the chunk cutting places by looking at the
+    content inside the moving window and computing the rolling hash value over the
+    window contents. If the last n bits of the rolling hash are 0, a chunk is cut.
+    Additionally it obeys some more criteria, like a minimum and maximum chunk size.
+    It also uses a per-repo random seed to avoid some chunk length fingerprinting attacks.
+    """
     cdef _Chunker *chunker
 
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
@@ -48,6 +59,20 @@ cdef class Chunker:
 
     def __next__(self):
         return chunker_process(self.chunker)
+
+
+def get_chunker(algo, *params, **kw):
+    if algo == 'buzhash':
+        seed = kw['seed']
+        return Chunker(seed, *params)
+    raise TypeError('unsupported chunker algo %r' % algo)
+
+
+def max_chunk_size(algo, *params):
+    # see also parseformat.ChunkerParams return values
+    if algo == 'buzhash':
+        return 1 << params[1]
+    raise TypeError('unsupported chunker algo %r' % algo)
 
 
 def buzhash(data, unsigned long seed):

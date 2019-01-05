@@ -19,7 +19,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import Chunker
+from .chunker import get_chunker, max_chunk_size
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
@@ -242,7 +242,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer()
         self.chunks = []
         self.key = key
-        self.chunker = Chunker(self.key.chunk_seed, *chunker_params)
+        self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed)
 
     def add(self, item):
         self.buffer.write(self.packer.pack(item.as_dict()))
@@ -610,7 +610,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 if hardlink_set:
                     return
                 if sparse and self.zeros is None:
-                    self.zeros = b'\0' * (1 << self.chunker_params[1])
+                    self.zeros = b'\0' * max_chunk_size(*self.chunker_params)
                 with backup_io('open'):
                     fd = open(path, 'wb')
                 with fd:
@@ -1058,7 +1058,7 @@ class FilesystemObjectProcessors:
         self.hard_links = {}
         self.stats = Statistics()  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
-        self.chunker = Chunker(key.chunk_seed, *chunker_params)
+        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed)
 
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True):
@@ -1920,6 +1920,9 @@ class ArchiveRecreater:
         target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify
         source_chunker_params = tuple(archive.metadata.get('chunker_params', []))
+        if len(source_chunker_params) == 4 and isinstance(source_chunker_params[0], int):
+            # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
+            source_chunker_params = ('buzhash', ) + source_chunker_params
         target.recreate_rechunkify = self.rechunkify and source_chunker_params != target.chunker_params
         if target.recreate_rechunkify:
             logger.debug('Rechunking archive from %s to %s', source_chunker_params or '(unknown)', target.chunker_params)
@@ -1927,7 +1930,7 @@ class ArchiveRecreater:
             cache=self.cache, key=self.key,
             add_item=target.add_item, write_checkpoint=target.write_checkpoint,
             checkpoint_interval=self.checkpoint_interval, rechunkify=target.recreate_rechunkify).process_file_chunks
-        target.chunker = Chunker(self.key.chunk_seed, *target.chunker_params)
+        target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed)
         return target
 
     def create_target_archive(self, name):

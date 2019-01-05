@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from ..chunker import Chunker, buzhash, buzhash_update
+from ..chunker import Chunker, get_chunker, buzhash, buzhash_update
 from ..constants import *  # NOQA
 from . import BaseTestCase
 
@@ -41,5 +41,6 @@ class ChunkerTestCase(BaseTestCase):
                 self.input = self.input[:-1]
                 return self.input[:1]
 
-        reconstructed = b''.join(Chunker(0, *CHUNKER_PARAMS).chunkify(SmallReadFile()))
+        chunker = get_chunker(*CHUNKER_PARAMS, seed=0)
+        reconstructed = b''.join(chunker.chunkify(SmallReadFile()))
         assert reconstructed == b'a' * 20

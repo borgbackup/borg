@@ -309,10 +309,14 @@ class FormatTimedeltaTestCase(BaseTestCase):
 
 
 def test_chunkerparams():
-    assert ChunkerParams('19,23,21,4095') == (19, 23, 21, 4095)
-    assert ChunkerParams('10,23,16,4095') == (10, 23, 16, 4095)
+    assert ChunkerParams('default') == ('buzhash', 19, 23, 21, 4095)
+    assert ChunkerParams('19,23,21,4095') == ('buzhash', 19, 23, 21, 4095)
+    assert ChunkerParams('buzhash,19,23,21,4095') == ('buzhash', 19, 23, 21, 4095)
+    assert ChunkerParams('10,23,16,4095') == ('buzhash', 10, 23, 16, 4095)
     with pytest.raises(ValueError):
         ChunkerParams('19,24,21,4095')
+    with pytest.raises(ValueError):
+        ChunkerParams('crap,1,2,3,4')
 
 
 class MakePathSafeTestCase(BaseTestCase):

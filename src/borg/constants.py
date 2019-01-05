@@ -60,10 +60,10 @@ HASH_WINDOW_SIZE = 0xfff  # 4095B
 HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 
 # defaults, use --chunker-params to override
-CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
+CHUNKER_PARAMS = ('buzhash', CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 
 # chunker params for the items metadata stream, finer granularity
-ITEMS_CHUNKER_PARAMS = (15, 19, 17, HASH_WINDOW_SIZE)
+ITEMS_CHUNKER_PARAMS = ('buzhash', 15, 19, 17, HASH_WINDOW_SIZE)
 
 # operating mode of the files cache (for fast skipping of unchanged files)
 DEFAULT_FILES_CACHE_MODE_UI = 'ctime,size,inode'

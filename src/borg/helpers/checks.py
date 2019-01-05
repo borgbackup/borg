@@ -27,7 +27,7 @@ def check_extension_modules():
     from .. import platform, compress, item, chunker, hashindex
     if hashindex.API_VERSION != '1.1_07':
         raise ExtensionModuleError
-    if chunker.API_VERSION != '1.1_01':
+    if chunker.API_VERSION != '1.1_02':
         raise ExtensionModuleError
     if compress.API_VERSION != '1.1_06':
         raise ExtensionModuleError
@@ -35,5 +35,5 @@ def check_extension_modules():
         raise ExtensionModuleError
     if platform.API_VERSION != platform.OS_API_VERSION or platform.API_VERSION != '1.2_03':
         raise ExtensionModuleError
-    if item.API_VERSION != '1.1_03':
+    if item.API_VERSION != '1.1_04':
         raise ExtensionModuleError

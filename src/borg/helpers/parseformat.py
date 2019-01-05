@@ -108,12 +108,20 @@ def timestamp(s):
 
 
 def ChunkerParams(s):
-    if s.strip().lower() == "default":
+    params = s.strip().split(',')
+    count = len(params)
+    if count == 0:
+        raise ValueError('no chunker params given')
+    algo = params[0].lower()
+    if algo == 'default' and count == 1:  # default
         return CHUNKER_PARAMS
-    chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
-    if int(chunk_max) > 23:
-        raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
-    return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
+    # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
+    if algo == 'buzhash' and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
+        chunk_min, chunk_max, chunk_mask, window_size = [int(p) for p in params[count - 4:]]
+        if chunk_max > 23:
+            raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
+        return 'buzhash', chunk_min, chunk_max, chunk_mask, window_size
+    raise ValueError('invalid chunker params')
 
 
 def FilesCacheMode(s):

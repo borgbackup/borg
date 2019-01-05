@@ -117,22 +117,46 @@ class Unpacker(mp_Unpacker):
     next = __next__
 
 
-def unpackb(packed, *, raw=True, encoding=None, unicode_errors=None, **kwargs):
+def unpackb(packed, *, raw=True, encoding=None, unicode_errors=None,
+            max_str_len=2147483647,  # 2**32-1
+            max_bin_len=2147483647,
+            max_array_len=2147483647,
+            max_map_len=2147483647,
+            max_ext_len=2147483647,
+            **kwargs):
     assert raw is True
     assert encoding is None
     assert unicode_errors is None
     try:
-        return mp_unpackb(packed, raw=raw, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+        return mp_unpackb(packed, raw=raw, encoding=encoding, unicode_errors=unicode_errors,
+                          max_str_len=max_str_len,
+                          max_bin_len=max_bin_len,
+                          max_array_len=max_array_len,
+                          max_map_len=max_map_len,
+                          max_ext_len=max_ext_len,
+                          **kwargs)
     except Exception as e:
         raise UnpackException(e)
 
 
-def unpack(stream, *, raw=True, encoding=None, unicode_errors=None, **kwargs):
+def unpack(stream, *, raw=True, encoding=None, unicode_errors=None,
+           max_str_len=2147483647,  # 2**32-1
+           max_bin_len=2147483647,
+           max_array_len=2147483647,
+           max_map_len=2147483647,
+           max_ext_len=2147483647,
+           **kwargs):
     assert raw is True
     assert encoding is None
     assert unicode_errors is None
     try:
-        return mp_unpack(stream, raw=raw, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+        return mp_unpack(stream, raw=raw, encoding=encoding, unicode_errors=unicode_errors,
+                         max_str_len=max_str_len,
+                         max_bin_len=max_bin_len,
+                         max_array_len=max_array_len,
+                         max_map_len=max_map_len,
+                         max_ext_len=max_ext_len,
+                         **kwargs)
     except Exception as e:
         raise UnpackException(e)
 

@@ -113,6 +113,10 @@ def ChunkerParams(s):
     if count == 0:
         raise ValueError('no chunker params given')
     algo = params[0].lower()
+    if algo == 'fixed' and 2 <= count <= 3:  # fixed, block_size[, header_size]
+        block_size = int(params[1])
+        header_size = int(params[2]) if count == 3 else 0
+        return algo, block_size, header_size
     if algo == 'default' and count == 1:  # default
         return CHUNKER_PARAMS
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):

@@ -315,6 +315,8 @@ def test_chunkerparams():
     assert ChunkerParams('10,23,16,4095') == ('buzhash', 10, 23, 16, 4095)
     with pytest.raises(ValueError):
         ChunkerParams('19,24,21,4095')
+    assert ChunkerParams('fixed,4096') == ('fixed', 4096, 0)
+    assert ChunkerParams('fixed,4096,200') == ('fixed', 4096, 200)
     with pytest.raises(ValueError):
         ChunkerParams('crap,1,2,3,4')
 

@@ -262,8 +262,9 @@ class Archiver:
                 logger.warning(
                     '\n'
                     'IMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\n'
-                    'The key is already included in the repository config.\n'
-                    'Write down the passphrase. Store it at safe place(s).\n')
+                    'The key is included in the repository config, but should be backed up in case the repository gets corrupted.\n'
+                    'Use "borg key export" to export the key, optionally in printable format.\n'
+                    'Write down the passphrase. Store both at safe place(s).\n')
             else:
                 logger.warning(
                     '\n'

@@ -9,6 +9,7 @@ from time import sleep
 import pytest
 
 from .. import platform
+from ..constants import MAX_DATA_SIZE
 from ..helpers import Location
 from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
@@ -313,12 +314,23 @@ def test_chunkerparams():
     assert ChunkerParams('19,23,21,4095') == ('buzhash', 19, 23, 21, 4095)
     assert ChunkerParams('buzhash,19,23,21,4095') == ('buzhash', 19, 23, 21, 4095)
     assert ChunkerParams('10,23,16,4095') == ('buzhash', 10, 23, 16, 4095)
-    with pytest.raises(ValueError):
-        ChunkerParams('19,24,21,4095')
     assert ChunkerParams('fixed,4096') == ('fixed', 4096, 0)
     assert ChunkerParams('fixed,4096,200') == ('fixed', 4096, 200)
+    # invalid values checking
     with pytest.raises(ValueError):
-        ChunkerParams('crap,1,2,3,4')
+        ChunkerParams('crap,1,2,3,4')  # invalid algo
+    with pytest.raises(ValueError):
+        ChunkerParams('buzhash,5,7,6,4095')  # too small min. size
+    with pytest.raises(ValueError):
+        ChunkerParams('buzhash,19,24,21,4095')  # too big max. size
+    with pytest.raises(ValueError):
+        ChunkerParams('buzhash,23,19,21,4095')  # violates min <= mask <= max
+    with pytest.raises(ValueError):
+        ChunkerParams('fixed,63')  # too small block size
+    with pytest.raises(ValueError):
+        ChunkerParams('fixed,%d,%d' % (MAX_DATA_SIZE + 1, 4096))  # too big block size
+    with pytest.raises(ValueError):
+        ChunkerParams('fixed,%d,%d' % (4096, MAX_DATA_SIZE + 1))  # too big header size
 
 
 class MakePathSafeTestCase(BaseTestCase):

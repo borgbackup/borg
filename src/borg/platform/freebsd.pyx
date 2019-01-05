@@ -1,3 +1,5 @@
+# cython: language_level=3
+
 import os
 
 from ..helpers import posix_acl_use_stored_uid_gid

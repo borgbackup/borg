@@ -1,3 +1,5 @@
+# cython: language_level=3
+
 from ..helpers import bin_to_hex
 
 from libc.stdint cimport uint32_t

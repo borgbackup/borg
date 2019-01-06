@@ -1395,8 +1395,7 @@ class LoggedIO:
         with open(backup_filename, 'rb') as backup_fd:
             # note: file must not be 0 size (windows can't create 0 size mapping)
             with mmap.mmap(backup_fd.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-                data = memoryview(mm)
-                with open(filename, 'wb') as fd:
+                with memoryview(mm) as data, open(filename, 'wb') as fd:
                     fd.write(MAGIC)
                     while len(data) >= self.header_fmt.size:
                         crc, size, tag = self.header_fmt.unpack(data[:self.header_fmt.size])
@@ -1408,7 +1407,6 @@ class LoggedIO:
                             continue
                         fd.write(data[:size])
                         data = data[size:]
-                data.release()
 
     def read(self, segment, offset, id, read_data=True):
         """

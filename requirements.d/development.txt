@@ -2,9 +2,9 @@ setuptools
 setuptools_scm
 pip
 virtualenv<14.0
-pluggy<0.7
-tox<3.2.0
-pytest<3.6.0
+pluggy
+tox
+pytest
 pytest-xdist
 pytest-cov
 pytest-benchmark

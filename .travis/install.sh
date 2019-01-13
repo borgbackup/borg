@@ -4,6 +4,12 @@ set -e
 set -x
 
 if [[ "$(uname -s)" == 'Darwin' ]]; then
+    # HOMEBREW_NO_AUTO_UPDATE=1
+    export HOMEBREW_LOGS=~/brew-logs
+    export HOMEBREW_TEMP=~/brew-temp
+    mkdir $HOMEBREW_LOGS
+    mkdir $HOMEBREW_TEMP
+    # brew update
     if [[ "${OPENSSL}" != "0.9.8" ]]; then
         brew outdated openssl || brew upgrade openssl
     fi

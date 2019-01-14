@@ -49,7 +49,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', **kw):
     if fork:
         try:
             if exe is None:
-                borg = (sys.executable, '-m', 'borg.archiver')
+                borg = (sys.executable, '-m', 'borg')
             elif isinstance(exe, str):
                 borg = (exe, )
             elif not isinstance(exe, tuple):

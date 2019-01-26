@@ -43,17 +43,12 @@ Encryption can be enabled at repository init time. It cannot be changed later.
 It is not recommended to work without encryption. Repository encryption protects
 you e.g. against the case that an attacker has access to your backup repository.
 .sp
-But be careful with the key / the passphrase:
-.sp
-If you want "passphrase\-only" security, use one of the repokey modes. The
-key will be stored inside the repository (in its "config" file). In above
-mentioned attack scenario, the attacker will have the key (but not the
-passphrase).
-.sp
-If you want "passphrase and having\-the\-key" security, use one of the keyfile
-modes. The key will be stored in your home directory (in .config/borg/keys).
-In the attack scenario, the attacker who has just access to your repo won\(aqt
-have the key (and also not the passphrase).
+The repository is encrypted with a key, and the key is protected with a passphrase. 
+By setting the encryption mode, you can choose whether to store the key inside the
+repository ("passphrase only" or "repokey" mode) or to store the key separately in 
+.config/borg/keys ("passphrase and having\-the\-key" or "keyfile" mode). In repokey 
+mode, an attacker with access to your repository needs to know (or guess) the 
+passphrase. In keyfile mode, they will need the keyfile \fBand\fP the passphrase.
 .sp
 Make a backup copy of the key file (keyfile mode) or repo config file
 (repokey mode) and keep it at a safe place, so you still have the key in
@@ -81,6 +76,14 @@ a different keyboard layout.
 You can change your passphrase for existing repos at any time, it won\(aqt affect
 the encryption/decryption key or other secrets.
 .SS Encryption modes
+.sp
+For each repo, the user may select the degree of encryption, and the Hash/MAC 
+algorithm. The table below shows what string to enter, to obtain each combination
+of encryption degree and Hash/MAC algorithm.
+.sp
+Not all modes are backwards compatible with Borg1.0.x. New modes which are not 
+backwards compatible are \fImarked like this\fP 
+.sp
 .\" nanorst: inline-fill
 .
 .TS
@@ -126,46 +129,46 @@ _
 .\" nanorst: inline-replace
 .
 .sp
-\fIMarked modes\fP are new in Borg 1.1 and are not backwards\-compatible with Borg 1.0.x.
-.sp
+How should a user choose between SHA-256 and Blake2b? The main difference is execution speed. 
 On modern Intel/AMD CPUs (except very cheap ones), AES is usually
 hardware\-accelerated.
 BLAKE2b is faster than SHA256 on Intel/AMD 64\-bit CPUs
 (except AMD Ryzen and future CPUs with SHA extensions),
-which makes \fIauthenticated\-blake2\fP faster than \fInone\fP and \fIauthenticated\fP\&.
+which makes \fIauthenticated\-blake2\fP faster than none and \fIauthenticated\fP\&.
 .sp
 On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
 than BLAKE2b\-256 there. NEON accelerates AES as well.
 .sp
 Hardware acceleration is always used automatically when available.
 .sp
-\fIrepokey\fP and \fIkeyfile\fP use AES\-CTR\-256 for encryption and HMAC\-SHA256 for
+repokey and keyfile use AES\-CTR\-256 for encryption and HMAC\-SHA256 for
 authentication in an encrypt\-then\-MAC (EtM) construction. The chunk ID hash
 is HMAC\-SHA256 as well (with a separate key).
-These modes are compatible with Borg 1.0.x.
 .sp
 \fIrepokey\-blake2\fP and \fIkeyfile\-blake2\fP are also authenticated encryption modes,
 but use BLAKE2b\-256 instead of HMAC\-SHA256 for authentication. The chunk ID
 hash is a keyed BLAKE2b\-256 hash.
-These modes are new and \fInot\fP compatible with Borg 1.0.x.
 .sp
 \fIauthenticated\fP mode uses no encryption, but authenticates repository contents
 through the same HMAC\-SHA256 hash as the \fIrepokey\fP and \fIkeyfile\fP modes (it uses it
 as the chunk ID hash). The key is stored like \fIrepokey\fP\&.
-This mode is new and \fInot\fP compatible with Borg 1.0.x.
 .sp
 \fIauthenticated\-blake2\fP is like \fIauthenticated\fP, but uses the keyed BLAKE2b\-256 hash
 from the other blake2 modes.
-This mode is new and \fInot\fP compatible with Borg 1.0.x.
 .sp
-\fInone\fP mode uses no encryption and no authentication. It uses SHA256 as chunk
-ID hash. Not recommended, rather consider using an authenticated or
+none mode uses no encryption and no authentication. It uses SHA256 as chunk
+ID hash. This mode is not recommended, users should consider using an authenticated or
 authenticated/encrypted mode. This mode has possible denial\-of\-service issues
 when running \fBborg create\fP on contents controlled by an attacker.
 Use it only for new repositories where no encryption is wanted \fBand\fP when compatibility
 with 1.0.x is important. If compatibility with 1.0.x is not important, use
 \fIauthenticated\-blake2\fP or \fIauthenticated\fP instead.
-This mode is compatible with Borg 1.0.x.
+.sp
+Backwards compatible modes are: none, repokey and keyfile. \fIauthenticated\fP, 
+\fIauthenticated\-blake2\fP, \fIrepokey\-blake2\fP and \fIkeyfile\-blake2\fP are all NOT 
+backwards compatible with Borg1.0.x. Repos created with earler versions of borg can be 
+upgraded with `borg upgrade`
+.sp
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -202,7 +205,7 @@ $ borg init \-\-encryption=none /path/to/repo
 # Remote repository (accesses a remote borg via ssh)
 $ borg init \-\-encryption=repokey\-blake2 user@hostname:backup
 
-# Remote repository (store the key your home dir)
+# Remote repository (store the key to your home directory under .config/borg/keys)
 $ borg init \-\-encryption=keyfile user@hostname:backup
 .ft P
 .fi

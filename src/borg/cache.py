@@ -262,7 +262,8 @@ class CacheConfig:
 
     def load(self):
         self._config = configparser.ConfigParser(interpolation=None)
-        self._config.read(self.config_path)
+        with open(self.config_path) as fd:
+            self._config.read_file(fd)
         self._check_upgrade(self.config_path)
         self.id = self._config.get('cache', 'repository')
         self.manifest_id = unhexlify(self._config.get('cache', 'manifest'))

@@ -1396,20 +1396,25 @@ class LoggedIO:
         with open(backup_filename, 'rb') as backup_fd:
             # note: file must not be 0 size (windows can't create 0 size mapping)
             with mmap.mmap(backup_fd.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                # memoryview context manager is problematic, see https://bugs.python.org/issue35686
                 data = memoryview(mm)
-                with open(filename, 'wb') as fd:
-                    fd.write(MAGIC)
-                    while len(data) >= self.header_fmt.size:
-                        crc, size, tag = self.header_fmt.unpack(data[:self.header_fmt.size])
-                        if size < self.header_fmt.size or size > len(data):
-                            data = data[1:]
-                            continue
-                        if crc32(data[4:size]) & 0xffffffff != crc:
-                            data = data[1:]
-                            continue
-                        fd.write(data[:size])
-                        data = data[size:]
-                data.release()
+                d = data
+                try:
+                    with open(filename, 'wb') as fd:
+                        fd.write(MAGIC)
+                        while len(d) >= self.header_fmt.size:
+                            crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
+                            if size < self.header_fmt.size or size > len(d):
+                                d = d[1:]
+                                continue
+                            if crc32(d[4:size]) & 0xffffffff != crc:
+                                d = d[1:]
+                                continue
+                            fd.write(d[:size])
+                            d = d[size:]
+                finally:
+                    del d
+                    data.release()
 
     def read(self, segment, offset, id, read_data=True):
         """

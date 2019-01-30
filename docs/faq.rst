@@ -26,12 +26,15 @@ or deleting archives, which may make *simultaneous* backups fail.
 Can I copy or synchronize my repo to another location?
 ------------------------------------------------------
 
-Yes, you could just copy all the files. Make sure you do that while no
-backup is running. If you copy a repository while a backup is running, 
-the lock held will be present in the copy. Thus, before using borg on the copy 
-from a different host, you need to use :ref:`break-lock` on the copied 
-repository, because Borg is cautious and does not automatically remove 
-stale locks made by a different host.
+Yes, you could just copy all the files. But you generally do not want
+to do that.
+
+First, make sure you do that while no backup is running. If you copy a
+repository while a backup is running, the lock held will be present in
+the copy. Thus, before using borg on the copy from a different host,
+you need to use :ref:`break-lock` on the copied repository, because
+Borg is cautious and does not automatically remove stale locks made by
+a different host.
 
 So what you get here is this: 
 
@@ -42,7 +45,14 @@ There is no special borg command to do the copying, just use cp or rsync if
 you want to do that.
 
 But think about whether that is really what you want. If something goes
-wrong in repo1, you will have the same issue in repo2 after the copy.
+wrong in repo1, you will have the same issue in repo2 after the
+copy. Specifically, operating on the two repositories at the same time
+will definitely create some issues, both in terms of security (because
+of counter reuse) and reliability (because of the shared cache).
+
+.. important:: One must never access multiple copies of the same
+               repository with borg, as it might lead to data
+               loss. See :issue:`4272` for an example.
 
 If you want to have 2 independent backups, it is better to do it like this:
 

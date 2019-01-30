@@ -1984,7 +1984,7 @@ class Archiver:
             any number of characters, '?' matching any single character, '[...]'
             matching any single character specified, including ranges, and '[!...]'
             matching any character not specified. For the purpose of these patterns,
-            the path separator ('\\' for Windows and '/' on other systems) is not
+            the path separator ('\\\\' for Windows and '/' on other systems) is not
             treated specially. Wrap meta-characters in brackets for a literal
             match (i.e. `[?]` to match the literal character `?`). For a path
             to match a pattern, the full path must match, or it must match

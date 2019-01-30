@@ -1620,6 +1620,10 @@ class Archiver:
                 print('%s = %s' % (key, value))
 
         if not args.list:
+            if args.name is None:
+                self.print_error('No config key name was provided.')
+                return self.exit_code
+
             try:
                 section, name = args.name.split('.')
             except ValueError:

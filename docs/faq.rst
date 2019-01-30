@@ -329,7 +329,7 @@ Using ``BORG_PASSCOMMAND`` with a properly permissioned file
 
   Then in an automated script one can put::
 
-    export BORG_PASSCOMMAND="cat ~/.borg-passphrase"
+    export BORG_PASSCOMMAND="cat $HOME/.borg-passphrase"
 
   and Borg will automatically use that passphrase.
 

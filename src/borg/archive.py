@@ -510,10 +510,14 @@ Utilization of max. archive size: {csize_max:.0%}
             add(id)
             data = self.key.decrypt(id, chunk)
             sync.feed(data)
-        stats = Statistics()
-        stats.osize, stats.csize, unique_size, stats.usize, unique_chunks, chunks = archive_index.stats_against(cache.chunks)
-        stats.nfiles = sync.num_files
+        size, csize, unique_size, unique_csize, unique_chunks, chunks = archive_index.stats_against(cache.chunks)
         pi.finish()
+        stats = Statistics()
+        stats.nfiles = sync.num_files_totals if self.consider_part_files \
+                       else sync.num_files_totals - sync.num_files_parts
+        stats.osize = size if self.consider_part_files else size - sync.size_parts
+        stats.csize = csize if self.consider_part_files else csize - sync.csize_parts
+        stats.usize = unique_csize  # the part files use same chunks as the full file
         return stats
 
     @contextmanager

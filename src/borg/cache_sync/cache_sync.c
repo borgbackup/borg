@@ -38,7 +38,12 @@ cache_sync_init(HashIndex *chunks)
     unpack_init(&ctx->ctx);
     /* needs to be set only once */
     ctx->ctx.user.chunks = chunks;
-    ctx->ctx.user.num_files = 0;
+    ctx->ctx.user.parts.size = 0;
+    ctx->ctx.user.parts.csize = 0;
+    ctx->ctx.user.parts.num_files = 0;
+    ctx->ctx.user.totals.size = 0;
+    ctx->ctx.user.totals.csize = 0;
+    ctx->ctx.user.totals.num_files = 0;
     ctx->buf = NULL;
     ctx->head = 0;
     ctx->tail = 0;
@@ -63,9 +68,39 @@ cache_sync_error(const CacheSyncCtx *ctx)
 }
 
 static uint64_t
-cache_sync_num_files(const CacheSyncCtx *ctx)
+cache_sync_num_files_totals(const CacheSyncCtx *ctx)
 {
-    return ctx->ctx.user.num_files;
+    return ctx->ctx.user.totals.num_files;
+}
+
+static uint64_t
+cache_sync_num_files_parts(const CacheSyncCtx *ctx)
+{
+    return ctx->ctx.user.parts.num_files;
+}
+
+static uint64_t
+cache_sync_size_totals(const CacheSyncCtx *ctx)
+{
+    return ctx->ctx.user.totals.size;
+}
+
+static uint64_t
+cache_sync_size_parts(const CacheSyncCtx *ctx)
+{
+    return ctx->ctx.user.parts.size;
+}
+
+static uint64_t
+cache_sync_csize_totals(const CacheSyncCtx *ctx)
+{
+    return ctx->ctx.user.totals.csize;
+}
+
+static uint64_t
+cache_sync_csize_parts(const CacheSyncCtx *ctx)
+{
+    return ctx->ctx.user.parts.csize;
 }
 
 /**

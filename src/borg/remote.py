@@ -1104,7 +1104,7 @@ class RepositoryCache(RepositoryNoCache):
 
     def query_size_limit(self):
         stat_fs = os.statvfs(self.basedir)
-        available_space = stat_fs.f_bsize * stat_fs.f_bavail
+        available_space = stat_fs.f_bavail * stat_fs.f_frsize
         self.size_limit = int(min(available_space * 0.25, 2**31))
 
     def key_filename(self, key):

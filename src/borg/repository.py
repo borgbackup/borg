@@ -658,7 +658,7 @@ class Repository:
             logger.warning('Failed to check free space before committing: no statvfs method available')
             return
         # f_bavail: even as root - don't touch the Federal Block Reserve!
-        free_space = st_vfs.f_bavail * st_vfs.f_bsize
+        free_space = st_vfs.f_bavail * st_vfs.f_frsize
         logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
         if free_space < required_free_space:
             if self.created:

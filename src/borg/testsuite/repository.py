@@ -892,6 +892,10 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info',
                                                                  '--storage-quota=314159265']
 
+        args = MockArgs()
+        args.rsh = 'ssh -i foo'
+        self.repository._args = args
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '-i', 'foo', 'example.com']
 
 class RemoteLegacyFree(RepositoryTestCaseBase):
     # Keep testing this so we can someday safely remove the legacy tuple format.

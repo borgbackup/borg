@@ -540,6 +540,7 @@ class RemoteRepository:
         self.unpacker = get_limited_unpacker('client')
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
         self.p = None
+        self._args = args
         testing = location.host == '__testsuite__'
         # when testing, we invoke and talk to a borg process directly (no ssh).
         # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
@@ -685,7 +686,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""
-        args = shlex.split(os.environ.get('BORG_RSH', 'ssh'))
+        rsh = self._args.rsh or os.environ.get('BORG_RSH', 'ssh')
+        args = shlex.split(rsh)
         if location.port:
             args += ['-p', str(location.port)]
         if location.user:

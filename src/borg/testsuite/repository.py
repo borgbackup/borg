@@ -799,6 +799,19 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
                                 exclusive=True, create=create)
 
+    def _get_mock_args(self):
+        class MockArgs:
+            remote_path = 'borg'
+            umask = 0o077
+            debug_topics = []
+            rsh = None
+
+            def __contains__(self, item):
+                # To behave like argparse.Namespace
+                return hasattr(self, item)
+
+        return MockArgs()
+
     def test_invalid_rpc(self):
         self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', {}))
 
@@ -857,6 +870,8 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
             assert len(e.exception_full) > 0
 
     def test_ssh_cmd(self):
+        args = self._get_mock_args()
+        self.repository._args = args
         assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com']
         assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', 'example.com']
         assert self.repository.ssh_cmd(Location('ssh://user@example.com/foo')) == ['ssh', 'user@example.com']
@@ -865,17 +880,8 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '--foo', 'example.com']
 
     def test_borg_cmd(self):
-        class MockArgs:
-            remote_path = 'borg'
-            umask = 0o077
-            debug_topics = []
-
-            def __contains__(self, item):
-                # To behave like argparse.Namespace
-                return hasattr(self, item)
-
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
-        args = MockArgs()
+        args = self._get_mock_args()
         # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
         logging.getLogger().setLevel(logging.INFO)
         # note: test logger is on info log level, so --info gets added automagically
@@ -885,12 +891,15 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         args.debug_topics = ['something_client_side', 'repository_compaction']
         assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info',
                                                                  '--debug-topic=borg.debug.repository_compaction']
-        args = MockArgs()
+        args = self._get_mock_args()
         args.storage_quota = 0
         assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
         args.storage_quota = 314159265
         assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info',
                                                                  '--storage-quota=314159265']
+        args.rsh = 'ssh -i foo'
+        self.repository._args = args
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '-i', 'foo', 'example.com']
 
 
 class RemoteLegacyFree(RepositoryTestCaseBase):

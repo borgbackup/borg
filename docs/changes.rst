@@ -545,6 +545,9 @@ Compatibility notes:
   unexpected) was rather confusing and unexplainable at first to users.
   If you want that "do not backup NODUMP-flagged files" behaviour, use:
   borg create --exclude-nodump ...
+- If you are on Linux and do not need bsdflags archived, consider using
+  ``--nobsdflags`` with ``borg create`` to avoid additional syscalls and
+  speed up backup creation.
 
 Fixes:
 

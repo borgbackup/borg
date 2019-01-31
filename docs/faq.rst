@@ -295,6 +295,15 @@ the :ref:`borg_recreate` command to rewrite all archives with a
 different ``--exclude`` pattern. See the examples in the
 :ref:`borg_recreate` manpage for more information.
 
+Can I safely change the compression level or algorithm?
+--------------------------------------------------------
+
+The compression level and algorithm don't affect deduplication. Chunk ID hashes
+are calculated *before* compression. New compression settings
+will only be applied to new chunks, not existing chunks. So it's safe
+to change them.
+
+
 Security
 ########
 

@@ -66,14 +66,14 @@ typedef struct unpack_user {
 
     enum {
         /* the next thing is a map key at the Item root level,
-         * and it might be the "chunks" key we're looking for */
-        expect_chunks_map_key,
+         * and it might be the "chunks" or "part" key we're looking for */
+        expect_map_key,
 
-        /* blocking state to expect_chunks_map_key
+        /* blocking state to expect_map_key
          * {     'stuff': <complex and arbitrary structure>,     'chunks': [
-         * ecmk    ->   emie    ->   ->       ->      ->   ecmk  ecb       eeboce
+         * emk     ->   emie    ->   ->       ->      ->   emk   ecb       eeboce
          *                (nested containers are tracked via level)
-         * ecmk=expect_chunks_map_key, emie=expect_map_item_end, ecb=expect_chunks_begin,
+         * emk=expect_map_key, emie=expect_map_item_end, ecb=expect_chunks_begin,
          * eeboce=expect_entry_begin_or_chunks_end
          */
         expect_map_item_end,
@@ -129,7 +129,7 @@ typedef struct unpack_context unpack_context;
 typedef int (*execute_fn)(unpack_context *ctx, const char* data, size_t len, size_t* off);
 
 #define UNEXPECTED(what)                                            \
-    if(u->inside_chunks || u->expect == expect_chunks_map_key) { \
+    if(u->inside_chunks || u->expect == expect_map_key) { \
         SET_LAST_ERROR("Unexpected object: " what);                 \
         return -1;                                                  \
     }
@@ -326,7 +326,7 @@ static inline int unpack_callback_map(unpack_user* u, unsigned int n)
             return -1;
         }
         /* This begins a new Item */
-        u->expect = expect_chunks_map_key;
+        u->expect = expect_map_key;
         u->part = 0;
         u->has_chunks = 0;
         u->item.size = 0;
@@ -349,7 +349,7 @@ static inline int unpack_callback_map_item(unpack_user* u, unsigned int current)
     if(u->level == 1) {
         switch(u->expect) {
         case expect_map_item_end:
-            u->expect = expect_chunks_map_key;
+            u->expect = expect_map_key;
             break;
         default:
             SET_LAST_ERROR("Unexpected map item");
@@ -397,7 +397,7 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
         memcpy(u->current.key, p, 32);
         u->expect = expect_size;
         break;
-    case expect_chunks_map_key:
+    case expect_map_key:
         if(length == 6 && !memcmp("chunks", p, 6)) {
             u->expect = expect_chunks_begin;
             u->inside_chunks = 1;

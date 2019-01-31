@@ -729,6 +729,17 @@ to make it behave correctly::
 .. _workaround: https://unix.stackexchange.com/a/123236
 
 
+Can I disable checking for free disk space?
+-------------------------------------------
+
+In some cases, the free disk space of the target volume is reported incorrectly.
+This can happen for CIFS- or FUSE shares. If you are sure that your target volume
+will always have enough disk space, you can use the following workaround to disable
+checking for free disk space::
+
+    borg config -- $REPO_LOCATION additional_free_space -2T
+
+
 Miscellaneous
 #############
 

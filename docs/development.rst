@@ -333,9 +333,11 @@ Checklist:
   do a fresh start based on that.
 - run tox and/or binary builds on all supported platforms via vagrant,
   check for test failures
-- create a release on PyPi::
+- create sdist, sign it, upload release to (test) PyPi::
 
-    python setup.py register sdist upload --identity="Thomas Waldmann" --sign
+    scripts/sdist-sign X.Y.Z
+    scripts/upload-pypi X.Y.Z test
+    scripts/upload-pypi X.Y.Z
 
 - close the release milestone on GitHub
 - announce on:

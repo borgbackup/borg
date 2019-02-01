@@ -249,6 +249,9 @@ def getfqdn(name=''):
 # XXX this sometimes requires live internet access for issuing a DNS query in the background.
 hostname = socket.gethostname()
 fqdn = getfqdn(hostname)
+# some people put the fqdn into /etc/hostname (which is wrong, should be the short hostname)
+# fix this (do the same as "hostname --short" cli command does internally):
+hostname = hostname.split('.')[0]
 
 # uuid.getnode() is problematic in some environments (e.g. OpenVZ, see #3968) where the virtual MAC address
 # is all-zero. uuid.getnode falls back to returning a random value in that case, which is not what we want.

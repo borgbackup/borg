@@ -8,3 +8,4 @@ pytest-xdist
 pytest-cov
 pytest-benchmark
 Cython!=0.27
+twine

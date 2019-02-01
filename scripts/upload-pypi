@@ -1,0 +1,18 @@
+#!/bin/bash
+
+R=$1
+
+if [ "$R" = "" ]; then
+    echo "Usage: upload-pypi 1.2.3 [test]"
+    exit
+fi
+
+if [ "$2" = "test" ]; then
+    export TWINE_REPOSITORY_URL=https://test.pypi.org/legacy/
+else
+    export TWINE_REPOSITORY_URL=
+fi
+
+D=dist/borgbackup-$R.tar.gz
+
+twine upload $D.asc $D

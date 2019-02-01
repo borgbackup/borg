@@ -171,7 +171,8 @@ General:
         When set, use the standard output of the command (trailing newlines are stripped) to answer the
         passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
-        passphrase should be initially set when initializing an encrypted repo.
+        passphrase should be initially set when initializing an encrypted repo. Note that the command
+        is executed without a shell. So variables, like ``$HOME`` will work, but ``~`` won't.
         If BORG_PASSPHRASE is also set, it takes precedence.
         See also BORG_NEW_PASSPHRASE.
     BORG_PASSPHRASE_FD

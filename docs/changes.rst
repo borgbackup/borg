@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.8 (2018-12-09)
---------------------------
+Version 1.1.9 (not released yet)
+--------------------------------
 
 Compatibility notes:
 
@@ -190,6 +190,34 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+Fixes:
+
+- make "hostname" short, even on misconfigured systems, #4262
+- fix free space calculation on macOS (and others?), #4289
+- config: quit with error message when no key is provided, #4223
+- recover_segment: handle too small segment files correctly, #4272
+- correctly release memoryview, #4243
+- avoid diaper pattern in configparser by opening files, #4263
+- add "# cython: language_level=3" directive to .pyx files, #4214
+
+New features:
+
+- add --rsh command line option to complement BORG_RSH env var, #1701
+
+Other:
+
+- docs:
+
+  - add FAQ regarding free disk space check, #3905
+  - update BORG_PASSCOMMAND example and clarify variable expansion, #4249
+- tests:
+
+  - fix the homebrew 1.9 issues on travis-ci, #4254
+
+
+Version 1.1.8 (2018-12-09)
+--------------------------
 
 Fixes:
 

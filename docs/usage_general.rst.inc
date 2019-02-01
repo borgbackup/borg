@@ -204,7 +204,8 @@ General:
         When set, use the given filename as INI_-style logging configuration.
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
-        a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options.
+        a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options. Using
+        the ``--rsh CMD`` commandline option overrides the environment variable.
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         Using ``--remote-path PATH`` commandline option overrides the environment variable.

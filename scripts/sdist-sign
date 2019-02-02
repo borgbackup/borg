@@ -1,0 +1,20 @@
+#!/bin/bash
+
+R=$1
+
+if [ "$R" = "" ]; then
+    echo "Usage: sdist-sign 1.2.3"
+    exit
+fi
+
+if [ "$QUBES_GPG_DOMAIN" = "" ]; then
+    GPG=gpg
+else
+    GPG=qubes-gpg-client-wrapper
+fi
+
+python setup.py sdist
+
+D=dist/borgbackup-$R.tar.gz
+
+$GPG --detach-sign --local-user "Thomas Waldmann" --armor --output $D.asc $D

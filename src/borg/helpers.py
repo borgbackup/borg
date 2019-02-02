@@ -1290,6 +1290,12 @@ def is_slow_msgpack():
     return msgpack.Packer is msgpack.fallback.Packer
 
 
+def is_supported_msgpack():
+    # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
+    return (0, 4, 6) <= msgpack.version <= (0, 5, 6) and \
+           msgpack.version not in [(0, 5, 0), (0, 5, 2), (0, 5, 3), (0, 5, 5)]
+
+
 FALSISH = ('No', 'NO', 'no', 'N', 'n', '0', )
 TRUISH = ('Yes', 'YES', 'yes', 'Y', 'y', '1', )
 DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )

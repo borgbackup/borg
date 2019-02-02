@@ -57,7 +57,7 @@ from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import StableDict
 from .helpers import check_python, check_extension_modules
-from .helpers import dir_is_tagged, is_slow_msgpack, yes, sysinfo
+from .helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
 from .helpers import log_multi
 from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
 from .helpers import ErrorIgnoringTextIOWrapper
@@ -4340,6 +4340,11 @@ class Archiver:
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
         self.prerun_checks(logger)
+        if not is_supported_msgpack():
+            logger.error("You do not have a supported msgpack[-python] version installed. Terminating.")
+            logger.error("This should never happen as specific, supported versions are required by our setup.py.")
+            logger.error("Do not contact borgbackup support about this.")
+            return set_ec(EXIT_ERROR)
         if is_slow_msgpack():
             logger.warning("Using a pure-python msgpack! This will result in lower performance.")
         if args.debug_profile:

@@ -169,6 +169,13 @@ def is_slow_msgpack():
     return msgpack.Packer is msgpack.fallback.Packer
 
 
+def is_supported_msgpack():
+    # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
+    import msgpack
+    return (0, 5, 6) <= msgpack.version <= (0, 6, 0) and \
+           msgpack.version not in [(0, 5, 7), (0, 5, 8), (0, 5, 9)]
+
+
 def get_limited_unpacker(kind):
     """return a limited Unpacker because we should not trust msgpack data received from remote"""
     args = dict(use_list=False,  # return tuples, not lists

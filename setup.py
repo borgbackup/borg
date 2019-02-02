@@ -49,8 +49,10 @@ install_requires = [
     # if you can't satisfy the above requirement, these are versions that might
     # also work ok, IF you make sure to use the COMPILED version of msgpack-python,
     # NOT the PURE PYTHON fallback implementation: ==0.5.1, ==0.5.4
-    # using any other version is not supported by borg development, feel free to
-    # do it on your own risk (and after own testing).
+    #
+    # Please note:
+    # using any other version is not supported by borg development and
+    # any feedback related to issues caused by this will be ignored.
 ]
 
 # note for package maintainers: if you package borgbackup for distribution,

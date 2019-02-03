@@ -2857,7 +2857,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     @requires_hardlinks
     @requires_gnutar
-    def test_extract_hardlinks(self):
+    def test_extract_hardlinks_tar(self):
         self._extract_hardlinks_setup()
         self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1')
         with changedir('output'):

@@ -1503,7 +1503,7 @@ class ArchiveChecker:
                 if self.repair:
                     self.repository.put(id_, cdata)
 
-        def verify_file_chunks(item):
+        def verify_file_chunks(archive_name, item):
             """Verifies that all file chunks are present.
 
             Missing file chunks will be replaced with new chunks of the same length containing all zeros.
@@ -1524,7 +1524,7 @@ class ArchiveChecker:
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
             if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
                 # should never happen, but there was issue #3218.
-                logger.warning('{}: Invalid chunks_healthy metadata removed!'.format(item.path))
+                logger.warning('{}: {}: Invalid chunks_healthy metadata removed!'.format(archive_name, item.path))
                 del item.chunks_healthy
                 has_chunks_healthy = False
                 chunks_healthy = chunks_current
@@ -1533,20 +1533,23 @@ class ArchiveChecker:
                 if chunk_id not in self.chunks:
                     # a chunk of the healthy list is missing
                     if chunk_current == chunk_healthy:
-                        logger.error('{}: New missing file chunk detected (Byte {}-{}). '
-                                     'Replacing with all-zero chunk.'.format(item.path, offset, offset + size))
+                        logger.error('{}: {}: New missing file chunk detected (Byte {}-{}). '
+                                     'Replacing with all-zero chunk.'.format(
+                                     archive_name, item.path, offset, offset + size))
                         self.error_found = chunks_replaced = True
                         chunk_id, size, csize, cdata = replacement_chunk(size)
                         add_reference(chunk_id, size, csize, cdata)
                     else:
-                        logger.info('{}: Previously missing file chunk is still missing (Byte {}-{}). It has a '
-                                    'all-zero replacement chunk already.'.format(item.path, offset, offset + size))
+                        logger.info('{}: {}: Previously missing file chunk is still missing (Byte {}-{}). It has a '
+                                    'all-zero replacement chunk already.'.format(
+                                    archive_name, item.path, offset, offset + size))
                         chunk_id, size, csize = chunk_current
                         if chunk_id in self.chunks:
                             add_reference(chunk_id, size, csize)
                         else:
-                            logger.warning('{}: Missing all-zero replacement chunk detected (Byte {}-{}). '
-                                           'Generating new replacement chunk.'.format(item.path, offset, offset + size))
+                            logger.warning('{}: {}: Missing all-zero replacement chunk detected (Byte {}-{}). '
+                                           'Generating new replacement chunk.'.format(
+                                           archive_name, item.path, offset, offset + size))
                             self.error_found = chunks_replaced = True
                             chunk_id, size, csize, cdata = replacement_chunk(size)
                             add_reference(chunk_id, size, csize, cdata)
@@ -1555,8 +1558,8 @@ class ArchiveChecker:
                         # normal case, all fine.
                         add_reference(chunk_id, size, csize)
                     else:
-                        logger.info('{}: Healed previously missing file chunk! '
-                                    '(Byte {}-{}).'.format(item.path, offset, offset + size))
+                        logger.info('{}: {}: Healed previously missing file chunk! '
+                                    '(Byte {}-{}).'.format(archive_name, item.path, offset, offset + size))
                         add_reference(chunk_id, size, csize)
                         mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
                 chunk_list.append([chunk_id, size, csize])  # list-typed element as chunks_healthy is list-of-lists
@@ -1565,7 +1568,7 @@ class ArchiveChecker:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
                 item.chunks_healthy = item.chunks
             if has_chunks_healthy and chunk_list == chunks_healthy:
-                logger.info('{}: Completely healed previously damaged file!'.format(item.path))
+                logger.info('{}: {}: Completely healed previously damaged file!'.format(archive_name, item.path))
                 del item.chunks_healthy
             item.chunks = chunk_list
             if 'size' in item:
@@ -1573,8 +1576,8 @@ class ArchiveChecker:
                 item_chunks_size = item.get_size(compressed=False, from_chunks=True)
                 if item_size != item_chunks_size:
                     # just warn, but keep the inconsistency, so that borg extract can warn about it.
-                    logger.warning('{}: size inconsistency detected: size {}, chunks size {}'.format(
-                                   item.path, item_size, item_chunks_size))
+                    logger.warning('{}: {}: size inconsistency detected: size {}, chunks size {}'.format(
+                                   archive_name, item.path, item_size, item_chunks_size))
 
         def robust_iterator(archive):
             """Iterates through all archive items
@@ -1685,7 +1688,7 @@ class ArchiveChecker:
                 items_buffer.write_chunk = add_callback
                 for item in robust_iterator(archive):
                     if 'chunks' in item:
-                        verify_file_chunks(item)
+                        verify_file_chunks(info.name, item)
                     items_buffer.add(item)
                 items_buffer.flush(flush=True)
                 for previous_item_id in archive.items:

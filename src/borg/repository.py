@@ -120,6 +120,9 @@ class Repository:
     class PathAlreadyExists(Error):
         """There is already something at {}."""
 
+    class ParentPathDoesNotExist(Error):
+        """The parent path of the repo directory [{}] does not exist."""
+
     class InvalidRepository(Error):
         """{} is not a valid repository. Check repo config."""
 
@@ -147,7 +150,8 @@ class Repository:
         """The storage quota ({}) has been exceeded ({}). Try deleting some archives."""
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True,
-                 append_only=False, storage_quota=None, check_segment_magic=True):
+                 append_only=False, storage_quota=None, check_segment_magic=True,
+                 make_parent_dirs=False):
         self.path = os.path.abspath(path)
         self._location = Location('file://%s' % self.path)
         self.io = None  # type: LoggedIO
@@ -168,6 +172,7 @@ class Repository:
         self.storage_quota_use = 0
         self.transaction_doomed = None
         self.check_segment_magic = check_segment_magic
+        self.make_parent_dirs = make_parent_dirs
 
     def __del__(self):
         if self.lock:
@@ -250,8 +255,14 @@ class Repository:
         """Create a new empty repository at `path`
         """
         self.check_can_create_repository(path)
+        if self.make_parent_dirs:
+            parent_path = os.path.join(path, os.pardir)
+            os.makedirs(parent_path, exist_ok=True)
         if not os.path.exists(path):
-            os.mkdir(path)
+            try:
+                os.mkdir(path)
+            except FileNotFoundError as err:
+                raise self.ParentPathDoesNotExist(path) from err
         with open(os.path.join(path, 'README'), 'w') as fd:
             fd.write(REPOSITORY_README)
         os.mkdir(os.path.join(path, 'data'))

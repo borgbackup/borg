@@ -333,7 +333,8 @@ class RepositoryServer:  # pragma: no cover
             path = path[3:]
         return os.path.realpath(path)
 
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False):
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False,
+             make_parent_dirs=False):
         logging.debug('Resolving repository path %r', path)
         path = self._resolve_path(path)
         logging.debug('Resolved repository path to %r', path)
@@ -362,7 +363,8 @@ class RepositoryServer:  # pragma: no cover
         self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock,
                                      append_only=append_only,
                                      storage_quota=self.storage_quota,
-                                     exclusive=exclusive)
+                                     exclusive=exclusive,
+                                     make_parent_dirs=make_parent_dirs)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
@@ -523,7 +525,8 @@ class RemoteRepository:
     # If compatibility with 1.0.x is not longer needed, replace all checks of this with True and simplify the code
     dictFormat = False  # outside of __init__ for testing of legacy free protocol
 
-    def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False, args=None):
+    def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False,
+                 make_parent_dirs=False, args=None):
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
@@ -576,7 +579,8 @@ class RemoteRepository:
 
             def do_open():
                 self.id = self.open(path=self.location.path, create=create, lock_wait=lock_wait,
-                                    lock=lock, exclusive=exclusive, append_only=append_only)
+                                    lock=lock, exclusive=exclusive, append_only=append_only,
+                                    make_parent_dirs=make_parent_dirs)
 
             if self.dictFormat:
                 do_open()
@@ -739,6 +743,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise PathNotAllowed('(unknown)')
                 else:
                     raise PathNotAllowed(args[0].decode())
+            elif error == 'ParentPathDoesNotExist':
+                raise Repository.ParentPathDoesNotExist(args[0].decode())
             elif error == 'ObjectNotFound':
                 if old_server:
                     raise Repository.ObjectNotFound('(not available)', self.location.orig)
@@ -884,8 +890,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         self.ignore_responses |= set(waiting_for)  # we lose order here
 
     @api(since=parse_version('1.0.0'),
-         append_only={'since': parse_version('1.0.7'), 'previously': False})
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False):
+         append_only={'since': parse_version('1.0.7'), 'previously': False},
+         make_parent_dirs={'since': parse_version('1.1.9'), 'previously': False})
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False,
+             make_parent_dirs=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'))

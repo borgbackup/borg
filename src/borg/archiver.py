@@ -124,15 +124,17 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
             location = args.location  # note: 'location' must be always present in args
             append_only = getattr(args, 'append_only', False)
             storage_quota = getattr(args, 'storage_quota', None)
+            make_parent_dirs = getattr(args, 'make_parent_dirs', False)
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
                 repository = RemoteRepository(location, create=create, exclusive=argument(args, exclusive),
-                                              lock_wait=self.lock_wait, lock=lock, append_only=append_only, args=args)
+                                              lock_wait=self.lock_wait, lock=lock, append_only=append_only,
+                                              make_parent_dirs=make_parent_dirs, args=args)
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
                                         lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                        storage_quota=storage_quota)
+                                        storage_quota=storage_quota, make_parent_dirs=make_parent_dirs)
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)
@@ -2773,6 +2775,8 @@ class Archiver:
         subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota', default=None,
                                type=parse_storage_quota,
                                help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
+        subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
+                               help='create the parent directories of the repository directory, if they are missing.')
 
         check_epilog = process_epilog("""
         The check command verifies the consistency of a repository and the corresponding archives.

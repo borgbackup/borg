@@ -438,6 +438,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
+    def test_init_parent_dirs(self):
+        parent_path = os.path.join(self.tmpdir, 'parent1', 'parent2')
+        repository_path = os.path.join(parent_path, 'repository')
+        repository_location = self.prefix + repository_path
+        with pytest.raises(Repository.ParentPathDoesNotExist):
+            # normal borg init does NOT create missing parent dirs
+            self.cmd('init', '--encryption=none', repository_location)
+        # but if told so, it does:
+        self.cmd('init', '--encryption=none', '--make-parent-dirs', repository_location)
+        assert os.path.exists(parent_path)
+
     def test_unix_socket(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         try:
@@ -2892,6 +2903,10 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 class ArchiverTestCaseBinary(ArchiverTestCase):
     EXE = 'borg.exe'
     FORK_DEFAULT = True
+
+    @unittest.skip('does not raise Exception, but sets rc==2')
+    def test_init_parent_dirs(self):
+        pass
 
     @unittest.skip('patches objects')
     def test_init_interrupt(self):

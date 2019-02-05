@@ -200,20 +200,32 @@ Fixes:
 - correctly release memoryview, #4243
 - avoid diaper pattern in configparser by opening files, #4263
 - add "# cython: language_level=3" directive to .pyx files, #4214
+- info: consider part files for "This archive" stats, #3522
+- work around Microsoft WSL issue #645 (sync_file_range), #1961
 
 New features:
 
 - add --rsh command line option to complement BORG_RSH env var, #1701
+- init: --make-parent-dirs parent1/parent2/repo_dir, #4235
 
 Other:
 
+- add archive name to check --repair output, #3447
+- check for unsupported msgpack versions
 - docs:
 
   - add FAQ regarding free disk space check, #3905
   - update BORG_PASSCOMMAND example and clarify variable expansion, #4249
+  - FAQ regarding change of compression settings, #4222
+  - add note about BSD flags to changelog, #4246
+  - improve logging in example automation script
+  - add note about files changing during backup, #4081
+  - work around the backslash issue, #4280
+  - update release workflow using twine (docs, scripts), #4213
 - tests:
 
   - fix the homebrew 1.9 issues on travis-ci, #4254
+  - fix duplicate test method name, #4311
 
 
 Version 1.1.8 (2018-12-09)

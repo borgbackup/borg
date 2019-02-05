@@ -13,7 +13,7 @@ from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_str
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = '1.2_02'
+API_VERSION = '1.2_03'
 
 cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size)
@@ -315,39 +315,60 @@ cdef _sync_file_range(fd, offset, length, flags):
         raise OSError(errno.errno, os.strerror(errno.errno))
     safe_fadvise(fd, offset, length, 'DONTNEED')
 
+
 cdef unsigned PAGE_MASK = sysconf(_SC_PAGESIZE) - 1
 
 
-class SyncFile(BaseSyncFile):
-    """
-    Implemented using sync_file_range for asynchronous write-out and fdatasync for actual durability.
+def _is_WSL():
+    """detect Windows Subsystem for Linux"""
+    try:
+        with open('/proc/version') as fd:
+            linux_version = fd.read()
+        # hopefully no non-WSL Linux will ever mention 'Microsoft' in the kernel version:
+        return 'Microsoft' in linux_version
+    except:  # noqa
+        # make sure to never ever crash due to this check.
+        return False
 
-    "write-out" means that dirty pages (= data that was written) are submitted to an I/O queue and will be send to
-    disk in the immediate future.
-    """
 
-    def __init__(self, path, binary=False):
-        super().__init__(path, binary)
-        self.offset = 0
-        self.write_window = (16 * 1024 ** 2) & ~PAGE_MASK
-        self.last_sync = 0
-        self.pending_sync = None
+if _is_WSL():
+    class SyncFile(BaseSyncFile):
+        # if we are on Microsoft's "Windows Subsytem for Linux", use the
+        # more generic BaseSyncFile to avoid issues like seen there:
+        # https://github.com/borgbackup/borg/issues/1961
+        pass
+else:
+    # a real Linux, so we can do better. :)
+    class SyncFile(BaseSyncFile):
+        """
+        Implemented using sync_file_range for asynchronous write-out and fdatasync for actual durability.
 
-    def write(self, data):
-        self.offset += self.fd.write(data)
-        offset = self.offset & ~PAGE_MASK
-        if offset >= self.last_sync + self.write_window:
+        "write-out" means that dirty pages (= data that was written) are submitted to an I/O queue and will be send to
+        disk in the immediate future.
+        """
+
+        def __init__(self, path, binary=False):
+            super().__init__(path, binary)
+            self.offset = 0
+            self.write_window = (16 * 1024 ** 2) & ~PAGE_MASK
+            self.last_sync = 0
+            self.pending_sync = None
+
+        def write(self, data):
+            self.offset += self.fd.write(data)
+            offset = self.offset & ~PAGE_MASK
+            if offset >= self.last_sync + self.write_window:
+                self.fd.flush()
+                _sync_file_range(self.fileno, self.last_sync, offset - self.last_sync, SYNC_FILE_RANGE_WRITE)
+                if self.pending_sync is not None:
+                    _sync_file_range(self.fileno, self.pending_sync, self.last_sync - self.pending_sync,
+                                     SYNC_FILE_RANGE_WRITE | SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WAIT_AFTER)
+                self.pending_sync = self.last_sync
+                self.last_sync = offset
+
+        def sync(self):
             self.fd.flush()
-            _sync_file_range(self.fileno, self.last_sync, offset - self.last_sync, SYNC_FILE_RANGE_WRITE)
-            if self.pending_sync is not None:
-                _sync_file_range(self.fileno, self.pending_sync, self.last_sync - self.pending_sync,
-                                 SYNC_FILE_RANGE_WRITE | SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WAIT_AFTER)
-            self.pending_sync = self.last_sync
-            self.last_sync = offset
-
-    def sync(self):
-        self.fd.flush()
-        os.fdatasync(self.fileno)
-        # tell the OS that it does not need to cache what we just wrote,
-        # avoids spoiling the cache for the OS and other processes.
-        safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
+            os.fdatasync(self.fileno)
+            # tell the OS that it does not need to cache what we just wrote,
+            # avoids spoiling the cache for the OS and other processes.
+            safe_fadvise(self.fileno, 0, 0, 'DONTNEED')

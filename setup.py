@@ -43,13 +43,8 @@ on_rtd = os.environ.get('READTHEDOCS')
 
 install_requires = [
     # we are rather picky about msgpack versions, because a good working msgpack is
-    # very important for borg, see https://github.com/borgbackup/borg/issues/3753
-    # as of now, 0.5.6 and 0.6.0 are the only preferred versions of msgpack:
-    'msgpack >=0.5.6, !=0.5.7, !=0.5.8, !=0.5.9, <=0.6.0',
-    # if you can't satisfy the above requirement, these are versions that might
-    # also work ok, IF you make sure to use the COMPILED version of msgpack-python,
-    # NOT the PURE PYTHON fallback implementation: ==0.5.1, ==0.5.4
-    #
+    # very important for borg, see: https://github.com/borgbackup/borg/issues/3753
+    'msgpack >=0.5.6, <=0.6.1',
     # Please note:
     # using any other version is not supported by borg development and
     # any feedback related to issues caused by this will be ignored.

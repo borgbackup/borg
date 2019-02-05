@@ -173,7 +173,7 @@ def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
     import msgpack
     return (0, 5, 6) <= msgpack.version <= (0, 6, 1) and \
-           msgpack.version not in [(0, 5, 7), (0, 5, 8), (0, 5, 9)]
+           msgpack.version not in []  # < blacklist bad releases here
 
 
 def get_limited_unpacker(kind):

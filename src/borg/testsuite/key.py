@@ -92,7 +92,7 @@ class TestKey:
             def canonical_path(self):
                 return self.orig
 
-        _location = _Location()
+        location = _Location()
         id = bytes(32)
         id_str = bin_to_hex(id)
 

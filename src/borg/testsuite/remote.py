@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from ..remote import SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
-from ..repository import Repository
+from ..repositories.remote import SleepingBandwidthLimiter
+from ..repository import Repository, RepositoryCache, cache_if_remote
 from ..crypto.key import PlaintextKey
 from ..compress import CompressionSpec
 from ..helpers import IntegrityError

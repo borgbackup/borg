@@ -8,13 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
+from ..constants import MAX_DATA_SIZE
 from ..hashindex import NSIndex
 from ..helpers import Location
 from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, ConnectionClosedWithHint, handle_remote_line
-from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE
+from ..repositories.local import LocalRepository, LoggedIO
+from ..repositories.remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, ConnectionClosedWithHint, handle_remote_line
+from ..repository import Repository, MAGIC, TAG_DELETE
 from . import BaseTestCase
 from .hashindex import H
 
@@ -29,7 +31,7 @@ class RepositoryTestCaseBase(BaseTestCase):
     def open(self, create=False, exclusive=UNSPECIFIED):
         if exclusive is UNSPECIFIED:
             exclusive = self.exclusive
-        return Repository(os.path.join(self.tmppath, 'repository'), exclusive=exclusive, create=create)
+        return LocalRepository(os.path.join(self.tmppath, 'repository'), exclusive=exclusive, create=create)
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
@@ -386,7 +388,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def open(self, create=False):
-        return Repository(os.path.join(self.tmppath, 'repository'), exclusive=True, create=create, append_only=True)
+        return LocalRepository(os.path.join(self.tmppath, 'repository'), exclusive=True, create=create, append_only=True)
 
     def test_destroy_append_only(self):
         # Can't destroy append only repo (via the API)
@@ -783,7 +785,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.repository.put(H(0), b'data')
         self.repository.put(H(0), b'data2')
         # Simulate a crash before compact
-        with patch.object(Repository, 'compact_segments') as compact:
+        with patch.object(LocalRepository, 'compact_segments') as compact:
             self.repository.commit(compact=True)
             compact.assert_called_once_with(0.1)
         self.reopen()
@@ -865,7 +867,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
             self.repository.call('inject_exception', {'kind': 'divide'})
         except RemoteRepository.RPCError as e:
             assert e.unpacked
-            assert e.get_message() == 'ZeroDivisionError: integer division or modulo by zero\n'
+            assert e.exception_short == 'ZeroDivisionError: integer division or modulo by zero\n'
             assert e.exception_class == 'ZeroDivisionError'
             assert len(e.exception_full) > 0
 

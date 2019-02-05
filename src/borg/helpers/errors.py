@@ -1,3 +1,5 @@
+import traceback
+
 from ..constants import *  # NOQA
 
 import borg.crypto.low_level
@@ -19,6 +21,12 @@ class Error(Exception):
 
     def get_message(self):
         return type(self).__doc__.format(*self.args)
+
+    def get_msgid(self):
+        return type(self).__qualname__
+
+    def format_exc(self):
+        return traceback.format_exc()
 
     __str__ = get_message
 

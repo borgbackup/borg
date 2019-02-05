@@ -477,7 +477,7 @@ class Location:
                                            path)
 
 
-def location_validator(archive=None, proto=None):
+def location_validator(archive=None):
     def validator(text):
         try:
             loc = Location(text)
@@ -487,11 +487,6 @@ def location_validator(archive=None, proto=None):
             raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
         elif archive is False and loc.archive:
             raise argparse.ArgumentTypeError('"%s": No archive can be specified' % text)
-        if proto is not None and loc.proto != proto:
-            if proto == 'file':
-                raise argparse.ArgumentTypeError('"%s": Repository must be local' % text)
-            else:
-                raise argparse.ArgumentTypeError('"%s": Repository must be remote' % text)
         return loc
     return validator
 
@@ -921,13 +916,12 @@ def ellipsis_truncate(msg, space):
 class BorgJsonEncoder(json.JSONEncoder):
     def default(self, o):
         from ..repository import Repository
-        from ..remote import RemoteRepository
         from ..archive import Archive
         from ..cache import LocalCache, AdHocCache
-        if isinstance(o, Repository) or isinstance(o, RemoteRepository):
+        if isinstance(o, Repository):
             return {
-                'id': bin_to_hex(o.id),
-                'location': o._location.canonical_path(),
+                'id': o.id_str,
+                'location': o.location.canonical_path(),
             }
         if isinstance(o, Archive):
             return o.info()

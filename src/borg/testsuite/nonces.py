@@ -6,7 +6,6 @@ from ..crypto import nonces
 from ..crypto.nonces import NonceManager
 from ..crypto.key import bin_to_hex
 from ..helpers import get_security_dir
-from ..remote import InvalidRPCMethod
 
 
 class TestNonceManager:
@@ -15,7 +14,7 @@ class TestNonceManager:
         class _Location:
             orig = '/some/place'
 
-        _location = _Location()
+        location = _Location()
         id = bytes(32)
         id_str = bin_to_hex(id)
 
@@ -28,10 +27,10 @@ class TestNonceManager:
 
     class MockOldRepository(MockRepository):
         def get_free_nonce(self):
-            raise InvalidRPCMethod("")
+            return None
 
         def commit_nonce_reservation(self, next_unreserved, start_nonce):
-            pytest.fail("commit_nonce_reservation should never be called on an old repository")
+            return None
 
     def setUp(self):
         self.repository = None

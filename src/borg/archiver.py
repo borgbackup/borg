@@ -77,8 +77,7 @@ try:
     from .patterns import PatternMatcher
     from .item import Item
     from .platform import get_flags, get_process_id, SyncFile
-    from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-    from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
+    from .repository import Repository, TAG_PUT, TAG_DELETE, TAG_COMMIT, cache_if_remote
     from .selftest import selftest
     from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 except BaseException:
@@ -107,7 +106,7 @@ def argument(args, str_or_bool):
 
 def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                     exclusive=False, manifest=True, cache=False, secure=True,
-                    compatibility=None):
+                    compatibility=None, local_only=False):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
@@ -137,19 +136,17 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
         @functools.wraps(method)
         def wrapper(self, args, **kwargs):
             location = args.location  # note: 'location' must be always present in args
-            append_only = getattr(args, 'append_only', False)
-            storage_quota = getattr(args, 'storage_quota', None)
-            make_parent_dirs = getattr(args, 'make_parent_dirs', False)
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
-            elif location.proto == 'ssh':
-                repository = RemoteRepository(location, create=create, exclusive=argument(args, exclusive),
-                                              lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                              make_parent_dirs=make_parent_dirs, args=args)
-            else:
-                repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
-                                        lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                        storage_quota=storage_quota, make_parent_dirs=make_parent_dirs)
+
+            repository = Repository(location, create=create,
+                                    exclusive=argument(args, exclusive),
+                                    lock_wait=self.lock_wait, lock=lock,
+                                    args=args)
+
+            if local_only and repository.remote:
+                raise argparse.ArgumentTypeError('"%s": Repository must be local' % location.canonical_path())
+
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)
@@ -237,6 +234,7 @@ class Archiver:
 
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually."""
+        from .repositories.remote import RepositoryServer
         RepositoryServer(
             restrict_to_paths=args.restrict_to_paths,
             restrict_to_repositories=args.restrict_to_repositories,
@@ -1620,7 +1618,7 @@ class Archiver:
         repository.commit(compact=True, threshold=threshold, cleanup_commits=args.cleanup_commits)
         return EXIT_SUCCESS
 
-    @with_repository(exclusive=True, manifest=False)
+    @with_repository(exclusive=True, manifest=False, local_only=True)
     def do_config(self, args, repository):
         """get, set, and delete values in a repository or cache config file"""
 
@@ -1671,8 +1669,8 @@ class Archiver:
                 'segments_per_dir': str(DEFAULT_SEGMENTS_PER_DIR),
                 'max_segment_size': str(MAX_SEGMENT_SIZE_LIMIT),
                 'additional_free_space': '0',
-                'storage_quota': repository.storage_quota,
-                'append_only': repository.append_only
+                'storage_quota': '0',
+                'append_only': 'False'
             }
             print('[repository]')
             for key in ['version', 'segments_per_dir', 'max_segment_size',
@@ -1709,7 +1707,7 @@ class Archiver:
                 validate = cache_validate
             else:
                 config = repository.config
-                save = lambda: repository.save_config(repository.path, repository.config)  # noqa
+                save = lambda: repository.save_config()  # noqa
                 validate = repo_validate
 
             if args.delete:
@@ -2933,7 +2931,7 @@ class Archiver:
                                help='list the configuration of the repo')
 
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False, proto='file'),
+                               type=location_validator(archive=False),
                                help='repository to configure')
         subparser.add_argument('name', metavar='NAME', nargs='?',
                                help='name of config key')
@@ -4466,21 +4464,10 @@ def main():  # pragma: no cover
                 exit_code = archiver.run(args)
         except Error as e:
             msg = e.get_message()
-            msgid = type(e).__qualname__
+            msgid = e.get_msgid()
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-            tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
+            tb = "%s\n%s" % (e.format_exc(), sysinfo())
             exit_code = e.exit_code
-        except RemoteRepository.RPCError as e:
-            important = e.exception_class not in ('LockTimeout', ) and e.traceback
-            msgid = e.exception_class
-            tb_log_level = logging.ERROR if important else logging.DEBUG
-            if important:
-                msg = e.exception_full
-            else:
-                msg = e.get_message()
-            tb = '\n'.join('Borg server: ' + l for l in e.sysinfo.splitlines())
-            tb += "\n" + sysinfo()
-            exit_code = EXIT_ERROR
         except Exception:
             msg = 'Local Exception'
             msgid = 'Exception'

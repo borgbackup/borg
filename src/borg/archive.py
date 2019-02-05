@@ -44,8 +44,7 @@ from .helpers import sig_int
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
-from .remote import cache_if_remote
-from .repository import Repository, LIST_SCAN_LIMIT
+from .repository import Repository, cache_if_remote
 
 has_lchmod = hasattr(os, 'lchmod')
 

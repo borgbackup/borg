@@ -6,32 +6,26 @@ import logging
 import os
 import select
 import shlex
-import shutil
-import struct
 import sys
-import tempfile
 import textwrap
 import time
 import traceback
 from subprocess import Popen, PIPE
 
-from . import __version__
-from .compress import LZ4
-from .constants import *  # NOQA
-from .helpers import Error, IntegrityError
-from .helpers import bin_to_hex
-from .helpers import get_base_dir
-from .helpers import get_limited_unpacker
-from .helpers import replace_placeholders
-from .helpers import sysinfo
-from .helpers import format_file_size
-from .helpers import truncate_and_unlink
-from .helpers import prepare_subprocess_env
-from .logger import create_logger, setup_logging
-from .helpers import msgpack
-from .repository import Repository
-from .version import parse_version, format_version
-from .algorithms.checksums import xxh64
+from .. import __version__
+from ..constants import *  # NOQA
+from ..helpers import Error, IntegrityError
+from ..helpers import get_base_dir
+from ..helpers import get_limited_unpacker
+from ..helpers import replace_placeholders
+from ..helpers import sysinfo
+from ..helpers import format_file_size
+from ..helpers import prepare_subprocess_env
+from ..logger import create_logger, setup_logging
+from ..helpers import msgpack
+from .local import LocalRepository
+from ..repository import Repository
+from ..version import parse_version, format_version
 
 logger = create_logger(__name__)
 
@@ -359,11 +353,12 @@ class RepositoryServer:  # pragma: no cover
         # while "borg init --append-only" (=append_only) does, regardless of the --append-only (self.append_only)
         # flag for serve.
         append_only = (not create and self.append_only) or append_only
-        self.repository = Repository(path, create, lock_wait=lock_wait, lock=lock,
-                                     append_only=append_only,
-                                     storage_quota=self.storage_quota,
-                                     exclusive=exclusive,
-                                     make_parent_dirs=make_parent_dirs)
+        self.repository = LocalRepository(path, create,
+                                          lock_wait=lock_wait, lock=lock,
+                                          append_only=append_only,
+                                          storage_quota=self.storage_quota,
+                                          exclusive=exclusive,
+                                          make_parent_dirs=make_parent_dirs)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
@@ -419,7 +414,7 @@ class SleepingBandwidthLimiter:
         return written
 
 
-def api(*, since, **kwargs_decorator):
+def api(*, since, required=True, **kwargs_decorator):
     """Check version requirements and use self.call to do the remote method call.
 
     <since> specifies the version in which borg introduced this method.
@@ -459,7 +454,9 @@ def api(*, since, **kwargs_decorator):
                         named[name] = param.default
 
             if self.server_version < since:
-                raise self.RPCServerOutdated(f.__name__, format_version(since))
+                if required:
+                    raise self.RPCServerOutdated(f.__name__, format_version(since))
+                return None
 
             for name, restriction in kwargs_decorator.items():
                 if restriction['since'] <= self.server_version:
@@ -480,20 +477,30 @@ def api(*, since, **kwargs_decorator):
 class RemoteRepository:
     extra_test_args = []
 
-    class RPCError(Exception):
+    class RPCError(Error):
         def __init__(self, unpacked):
+            super().__init__()
             # for borg < 1.1: unpacked only has b'exception_class' as key
             # for borg 1.1+: unpacked has keys: b'exception_args', b'exception_full', b'exception_short', b'sysinfo'
             self.unpacked = unpacked
 
         def get_message(self):
-            if b'exception_short' in self.unpacked:
-                return b'\n'.join(self.unpacked[b'exception_short']).decode()
+            if self.traceback:
+                return self.exception_full
             else:
-                return self.exception_class
+                return self.exception_short
+
+        def get_msgid(self):
+            return self.exception_class
+
+        def format_exc(self):
+            sysinfo = self.sysinfo.splitlines()
+            return '\n'.join('Borg server: ' + l for l in sysinfo)
 
         @property
         def traceback(self):
+            if self.exception_class in ('LockTimeout', ):
+                return False
             return self.unpacked.get(b'exception_trace', True)
 
         @property
@@ -505,7 +512,14 @@ class RemoteRepository:
             if b'exception_full' in self.unpacked:
                 return b'\n'.join(self.unpacked[b'exception_full']).decode()
             else:
-                return self.get_message() + '\nRemote Exception (see remote log for the traceback)'
+                return self.exception_short + '\nRemote Exception (see remote log for the traceback)'
+
+        @property
+        def exception_short(self):
+            if b'exception_short' in self.unpacked:
+                return b'\n'.join(self.unpacked[b'exception_short']).decode()
+            else:
+                return self.exception_class
 
         @property
         def sysinfo(self):
@@ -530,7 +544,7 @@ class RemoteRepository:
 
     def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False,
                  make_parent_dirs=False, args=None):
-        self.location = self._location = location
+        self.location = location
         self.preload_ids = []
         self.msgid = 0
         self.rx_bytes = 0
@@ -637,10 +651,6 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             logger.debug('RemoteRepository: %s bytes sent, %s bytes received, %d messages sent',
                          format_file_size(self.tx_bytes), format_file_size(self.rx_bytes), self.msgid)
             self.close()
-
-    @property
-    def id_str(self):
-        return bin_to_hex(self.id)
 
     def borg_cmd(self, args, testing):
         """return a borg serve command line"""
@@ -953,17 +963,21 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def load_key(self):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version('1.0.0'))
+    @api(since=parse_version('1.1.0'), required=False)
     def get_free_nonce(self):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version('1.0.0'))
+    @api(since=parse_version('1.1.0'), required=False)
     def commit_nonce_reservation(self, next_unreserved, start_nonce):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'))
     def break_lock(self):
         """actual remoting is done via self.call in the @api decorator"""
+
+    def migrate_lock(self, old_id, new_id):
+        # Not used for remote repositories
+        pass
 
     def close(self):
         if self.p:
@@ -978,6 +992,15 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     def preload(self, ids):
         self.preload_ids += ids
+
+    @property
+    def config(self):
+        # Not currently supported
+        return None
+
+    def save_config(self):
+        # Not currently supported
+        pass
 
 
 def handle_remote_line(line):
@@ -1052,190 +1075,3 @@ def handle_remote_line(line):
             # In non-JSON mode we circumvent logging to preserve carriage returns (\r)
             # which are generated by remote progress displays.
             sys.stderr.write('Remote: ' + line)
-
-
-class RepositoryNoCache:
-    """A not caching Repository wrapper, passes through to repository.
-
-    Just to have same API (including the context manager) as RepositoryCache.
-
-    *transform* is a callable taking two arguments, key and raw repository data.
-    The return value is returned from get()/get_many(). By default, the raw
-    repository data is returned.
-    """
-    def __init__(self, repository, transform=None):
-        self.repository = repository
-        self.transform = transform or (lambda key, data: data)
-
-    def close(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    def get(self, key):
-        return next(self.get_many([key], cache=False))
-
-    def get_many(self, keys, cache=True):
-        for key, data in zip(keys, self.repository.get_many(keys)):
-            yield self.transform(key, data)
-
-    def log_instrumentation(self):
-        pass
-
-
-class RepositoryCache(RepositoryNoCache):
-    """
-    A caching Repository wrapper.
-
-    Caches Repository GET operations locally.
-
-    *pack* and *unpack* complement *transform* of the base class.
-    *pack* receives the output of *transform* and should return bytes,
-    which are stored in the cache. *unpack* receives these bytes and
-    should return the initial data (as returned by *transform*).
-    """
-
-    def __init__(self, repository, pack=None, unpack=None, transform=None):
-        super().__init__(repository, transform)
-        self.pack = pack or (lambda data: data)
-        self.unpack = unpack or (lambda data: data)
-        self.cache = set()
-        self.basedir = tempfile.mkdtemp(prefix='borg-cache-')
-        self.query_size_limit()
-        self.size = 0
-        # Instrumentation
-        self.hits = 0
-        self.misses = 0
-        self.slow_misses = 0
-        self.slow_lat = 0.0
-        self.evictions = 0
-        self.enospc = 0
-
-    def query_size_limit(self):
-        available_space = shutil.disk_usage(self.basedir).free
-        self.size_limit = int(min(available_space * 0.25, 2**31))
-
-    def key_filename(self, key):
-        return os.path.join(self.basedir, bin_to_hex(key))
-
-    def backoff(self):
-        self.query_size_limit()
-        target_size = int(0.9 * self.size_limit)
-        while self.size > target_size and self.cache:
-            key = self.cache.pop()
-            file = self.key_filename(key)
-            self.size -= os.stat(file).st_size
-            os.unlink(file)
-            self.evictions += 1
-
-    def add_entry(self, key, data, cache):
-        transformed = self.transform(key, data)
-        if not cache:
-            return transformed
-        packed = self.pack(transformed)
-        file = self.key_filename(key)
-        try:
-            with open(file, 'wb') as fd:
-                fd.write(packed)
-        except OSError as os_error:
-            try:
-                truncate_and_unlink(file)
-            except FileNotFoundError:
-                pass  # open() could have failed as well
-            if os_error.errno == errno.ENOSPC:
-                self.enospc += 1
-                self.backoff()
-            else:
-                raise
-        else:
-            self.size += len(packed)
-            self.cache.add(key)
-            if self.size > self.size_limit:
-                self.backoff()
-        return transformed
-
-    def log_instrumentation(self):
-        logger.debug('RepositoryCache: current items %d, size %s / %s, %d hits, %d misses, %d slow misses (+%.1fs), '
-                     '%d evictions, %d ENOSPC hit',
-                     len(self.cache), format_file_size(self.size), format_file_size(self.size_limit),
-                     self.hits, self.misses, self.slow_misses, self.slow_lat,
-                     self.evictions, self.enospc)
-
-    def close(self):
-        self.log_instrumentation()
-        self.cache.clear()
-        shutil.rmtree(self.basedir)
-
-    def get_many(self, keys, cache=True):
-        unknown_keys = [key for key in keys if key not in self.cache]
-        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys))
-        for key in keys:
-            if key in self.cache:
-                file = self.key_filename(key)
-                with open(file, 'rb') as fd:
-                    self.hits += 1
-                    yield self.unpack(fd.read())
-            else:
-                for key_, data in repository_iterator:
-                    if key_ == key:
-                        transformed = self.add_entry(key, data, cache)
-                        self.misses += 1
-                        yield transformed
-                        break
-                else:
-                    # slow path: eviction during this get_many removed this key from the cache
-                    t0 = time.perf_counter()
-                    data = self.repository.get(key)
-                    self.slow_lat += time.perf_counter() - t0
-                    transformed = self.add_entry(key, data, cache)
-                    self.slow_misses += 1
-                    yield transformed
-        # Consume any pending requests
-        for _ in repository_iterator:
-            pass
-
-
-def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None, transform=None, force_cache=False):
-    """
-    Return a Repository(No)Cache for *repository*.
-
-    If *decrypted_cache* is a key object, then get and get_many will return a tuple
-    (csize, plaintext) instead of the actual data in the repository. The cache will
-    store decrypted data, which increases CPU efficiency (by avoiding repeatedly decrypting
-    and more importantly MAC and ID checking cached objects).
-    Internally, objects are compressed with LZ4.
-    """
-    if decrypted_cache and (pack or unpack or transform):
-        raise ValueError('decrypted_cache and pack/unpack/transform are incompatible')
-    elif decrypted_cache:
-        key = decrypted_cache
-        # 32 bit csize, 64 bit (8 byte) xxh64
-        cache_struct = struct.Struct('=I8s')
-        compressor = LZ4()
-
-        def pack(data):
-            csize, decrypted = data
-            compressed = compressor.compress(decrypted)
-            return cache_struct.pack(csize, xxh64(compressed)) + compressed
-
-        def unpack(data):
-            data = memoryview(data)
-            csize, checksum = cache_struct.unpack(data[:cache_struct.size])
-            compressed = data[cache_struct.size:]
-            if checksum != xxh64(compressed):
-                raise IntegrityError('detected corrupted data in metadata cache')
-            return csize, compressor.decompress(compressed)
-
-        def transform(id_, data):
-            csize = len(data)
-            decrypted = key.decrypt(id_, data)
-            return csize, decrypted
-
-    if isinstance(repository, RemoteRepository) or force_cache:
-        return RepositoryCache(repository, pack, unpack, transform)
-    else:
-        return RepositoryNoCache(repository, transform)

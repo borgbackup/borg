@@ -10,7 +10,7 @@ from .logger import create_logger
 
 logger = create_logger()
 
-from .constants import CACHE_README, DEFAULT_FILES_CACHE_MODE
+from .constants import CACHE_README, DEFAULT_FILES_CACHE_MODE, LIST_SCAN_LIMIT
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Location
 from .helpers import Error
@@ -30,8 +30,7 @@ from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError
 from .locking import Lock
 from .platform import SaveFile
-from .remote import cache_if_remote
-from .repository import LIST_SCAN_LIMIT
+from .repository import cache_if_remote
 
 # note: cmtime might me either a ctime or a mtime timestamp
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size cmtime chunk_ids')

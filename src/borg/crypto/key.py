@@ -231,7 +231,7 @@ class KeyBase:
         unpacked = unpacker.unpack()
         if b'tam' not in unpacked:
             if tam_required:
-                raise TAMRequiredError(self.repository._location.canonical_path())
+                raise TAMRequiredError(self.repository.location.canonical_path())
             else:
                 logger.debug('TAM not found and not required')
                 return unpacked, False
@@ -549,7 +549,7 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
 
     @classmethod
     def detect(cls, repository, manifest_data):
-        prompt = 'Enter passphrase for %s: ' % repository._location.canonical_path()
+        prompt = 'Enter passphrase for %s: ' % repository.location.canonical_path()
         key = cls(repository)
         passphrase = Passphrase.env_passphrase()
         if passphrase is None:
@@ -706,9 +706,9 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             # we do the magic / id check in binary mode to avoid stumbling over
             # decoding errors if somebody has binary files in the keys dir for some reason.
             if fd.read(len(file_id)) != file_id:
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+                raise KeyfileInvalidError(self.repository.location.canonical_path(), filename)
             if fd.read(len(repo_id)) != repo_id:
-                raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
+                raise KeyfileMismatchError(self.repository.location.canonical_path(), filename)
             return filename
 
     def find_key(self):
@@ -723,7 +723,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
                 return self.sanity_check(filename, id)
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
-        raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
+        raise KeyfileNotFoundError(self.repository.location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):
         keyfile = os.environ.get('BORG_KEY_FILE')
@@ -761,7 +761,7 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     STORAGE = KeyBlobStorage.REPO
 
     def find_key(self):
-        loc = self.repository._location.canonical_path()
+        loc = self.repository.location.canonical_path()
         try:
             self.repository.load_key()
             return loc

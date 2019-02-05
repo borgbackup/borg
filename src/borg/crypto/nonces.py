@@ -5,7 +5,6 @@ from binascii import unhexlify
 from ..helpers import get_security_dir
 from ..helpers import bin_to_hex
 from ..platform import SaveFile
-from ..remote import InvalidRPCMethod
 
 from .low_level import bytes_to_long, long_to_bytes
 
@@ -34,14 +33,7 @@ class NonceManager:
             fd.write(bin_to_hex(long_to_bytes(next_unreserved)))
 
     def get_repo_free_nonce(self):
-        try:
-            return self.repository.get_free_nonce()
-        except InvalidRPCMethod:
-            # old server version, suppress further calls
-            sys.stderr.write("Please upgrade to borg version 1.1+ on the server for safer AES-CTR nonce handling.\n")
-            self.get_repo_free_nonce = lambda: None
-            self.commit_repo_nonce_reservation = lambda next_unreserved, start_nonce: None
-            return None
+        return self.repository.get_free_nonce()
 
     def commit_repo_nonce_reservation(self, next_unreserved, start_nonce):
         self.repository.commit_nonce_reservation(next_unreserved, start_nonce)

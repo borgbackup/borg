@@ -51,7 +51,8 @@ from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff
 from ..logger import setup_logging
-from ..remote import RemoteRepository, PathNotAllowed
+from ..repositories.local import LocalRepository
+from ..repositories.remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
@@ -1621,15 +1622,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     @pytest.mark.allow_cache_wipe
     def test_unknown_mandatory_feature_in_cache(self):
         if self.prefix:
-            path_prefix = 'ssh://__testsuite__'
+            location = Location(self.repository_location)
         else:
-            path_prefix = ''
+            location = self.repository_path
 
         print(self.cmd('init', '--encryption=repokey', self.repository_location))
 
-        with Repository(self.repository_path, exclusive=True) as repository:
-            if path_prefix:
-                repository._location = Location(self.repository_location)
+        with Repository(location, exclusive=True) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
                 cache.begin_txn()
@@ -1652,9 +1651,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
             assert called
 
-        with Repository(self.repository_path, exclusive=True) as repository:
-            if path_prefix:
-                repository._location = Location(self.repository_location)
+        with Repository(location, exclusive=True) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
                 assert cache.cache_config.mandatory_features == set([])
@@ -2340,7 +2337,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         used = set()  # counter values already used
 
         def verify_uniqueness():
-            with Repository(self.repository_path) as repository:
+            with LocalRepository(self.repository_path) as repository:
                 for id, _ in repository.open_index(repository.get_transaction_id()).iteritems():
                     data = repository.get(id)
                     hash = sha256(data).digest()
@@ -3316,7 +3313,7 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     prefix = '__testsuite__:'
 
     def open_repository(self):
-        return RemoteRepository(Location(self.repository_location))
+        return Repository(Location(self.repository_location))
 
     def test_remote_repo_restrict_to_path(self):
         # restricted to repo directory itself:

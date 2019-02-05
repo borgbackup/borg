@@ -9,14 +9,15 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import get_base_dir, get_keys_dir, get_cache_dir
 from .locking import Lock
 from .logger import create_logger
-from .repository import Repository, MAGIC
+from .repository import MAGIC
+from .repositories.local import LocalRepository
 
 logger = create_logger(__name__)
 
 ATTIC_MAGIC = b'ATTICSEG'
 
 
-class AtticRepositoryUpgrader(Repository):
+class AtticRepositoryUpgrader(LocalRepository):
     def __init__(self, *args, **kw):
         kw['lock'] = False  # do not create borg lock files (now) in attic repo
         kw['check_segment_magic'] = False  # skip the Attic check when upgrading
@@ -160,10 +161,10 @@ class AtticRepositoryUpgrader(Repository):
         `s/ATTICIDX/BORG_IDX/` in a few locations:
 
         * the repository index (in `$ATTIC_REPO/index.%d`, where `%d`
-          is the `Repository.get_index_transaction_id()`), which we
+          is the `LocalRepository.get_index_transaction_id()`), which we
           should probably update, with a lock, see
-          `Repository.open()`, which i'm not sure we should use
-          because it may write data on `Repository.close()`...
+          `LocalRepository.open()`, which i'm not sure we should use
+          because it may write data on `LocalRepository.close()`...
         """
         transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
@@ -277,7 +278,7 @@ class AtticKeyfileKey(KeyfileKey):
         raise KeyfileNotFoundError(repository.path, keys_dir)
 
 
-class BorgRepositoryUpgrader(Repository):
+class BorgRepositoryUpgrader(LocalRepository):
     def upgrade(self, dryrun=True, inplace=False, progress=False):
         """convert an old borg repository to a current borg repository
         """

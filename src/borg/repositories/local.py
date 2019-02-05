@@ -5,43 +5,35 @@ import shutil
 import stat
 import struct
 import time
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
 from datetime import datetime
 from functools import partial
 from itertools import islice
 
-from .constants import *  # NOQA
-from .hashindex import NSIndex
-from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
-from .helpers import Location
-from .helpers import ProgressIndicatorPercent
-from .helpers import bin_to_hex
-from .helpers import secure_erase, truncate_and_unlink
-from .helpers import Manifest
-from .helpers import msgpack
-from .locking import Lock, LockError, LockErrorT
-from .logger import create_logger
-from .lrucache import LRUCache
-from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
-from .algorithms.checksums import crc32
-from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
+from ..constants import *  # NOQA
+from ..hashindex import NSIndex
+from ..helpers import IntegrityError, format_file_size, parse_file_size
+from ..helpers import ProgressIndicatorPercent
+from ..helpers import bin_to_hex
+from ..helpers import secure_erase, truncate_and_unlink
+from ..helpers import Manifest
+from ..helpers import msgpack
+from ..locking import Lock, LockError, LockErrorT
+from ..logger import create_logger
+from ..lrucache import LRUCache
+from ..platform import SaveFile, SyncFile, sync_dir, safe_fadvise
+from ..repository import Repository, ATTIC_MAGIC, MAGIC, MAGIC_LEN, TAG_COMMIT, TAG_DELETE, TAG_PUT
+from ..algorithms.checksums import crc32
+from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
 logger = create_logger(__name__)
-
-MAGIC = b'BORG_SEG'
-MAGIC_LEN = len(MAGIC)
-ATTIC_MAGIC = b'ATTICSEG'
-assert len(ATTIC_MAGIC) == MAGIC_LEN
-TAG_PUT = 0
-TAG_DELETE = 1
-TAG_COMMIT = 2
 
 FreeSpace = partial(defaultdict, int)
 
 
-class Repository:
+class LocalRepository:
     """
     Filesystem based transactional key value store
 
@@ -111,49 +103,10 @@ class Repository:
     will still get rid of them.
     """
 
-    class DoesNotExist(Error):
-        """Repository {} does not exist."""
-
-    class AlreadyExists(Error):
-        """A repository already exists at {}."""
-
-    class PathAlreadyExists(Error):
-        """There is already something at {}."""
-
-    class ParentPathDoesNotExist(Error):
-        """The parent path of the repo directory [{}] does not exist."""
-
-    class InvalidRepository(Error):
-        """{} is not a valid repository. Check repo config."""
-
-    class InvalidRepositoryConfig(Error):
-        """{} does not have a valid configuration. Check repo config [{}]."""
-
-    class AtticRepository(Error):
-        """Attic repository detected. Please run "borg upgrade {}"."""
-
-    class CheckNeeded(ErrorWithTraceback):
-        """Inconsistency detected. Please run "borg check {}"."""
-
-    class ObjectNotFound(ErrorWithTraceback):
-        """Object with key {} not found in repository {}."""
-
-        def __init__(self, id, repo):
-            if isinstance(id, bytes):
-                id = bin_to_hex(id)
-            super().__init__(id, repo)
-
-    class InsufficientFreeSpaceError(Error):
-        """Insufficient free space to complete transaction (required: {}, available: {})."""
-
-    class StorageQuotaExceeded(Error):
-        """The storage quota ({}) has been exceeded ({}). Try deleting some archives."""
-
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True,
                  append_only=False, storage_quota=None, check_segment_magic=True,
                  make_parent_dirs=False):
         self.path = os.path.abspath(path)
-        self._location = Location('file://%s' % self.path)
         self.io = None  # type: LoggedIO
         self.lock = None
         self.index = None
@@ -241,9 +194,9 @@ class Repository:
         else:
             # there is something already there!
             if self.is_repository(path):
-                raise self.AlreadyExists(path)
+                raise Repository.AlreadyExists(path)
             if not stat.S_ISDIR(st.st_mode) or os.listdir(path):
-                raise self.PathAlreadyExists(path)
+                raise Repository.PathAlreadyExists(path)
             # an empty directory is acceptable for us.
 
         while True:
@@ -255,7 +208,7 @@ class Repository:
                 # We reached the root of the directory hierarchy (/.. = / and C:\.. = C:\).
                 break
             if self.is_repository(path):
-                raise self.AlreadyExists(path)
+                raise Repository.AlreadyExists(path)
 
     def create(self, path):
         """Create a new empty repository at `path`
@@ -268,7 +221,7 @@ class Repository:
             try:
                 os.mkdir(path)
             except FileNotFoundError as err:
-                raise self.ParentPathDoesNotExist(path) from err
+                raise Repository.ParentPathDoesNotExist(path) from err
         with open(os.path.join(path, 'README'), 'w') as fd:
             fd.write(REPOSITORY_README)
         os.mkdir(os.path.join(path, 'data'))
@@ -286,7 +239,9 @@ class Repository:
         config.set('repository', 'id', bin_to_hex(os.urandom(32)))
         self.save_config(path, config)
 
-    def save_config(self, path, config):
+    def save_config(self, path=None, config=None):
+        path = path or self.path
+        config = config or self.config
         config_path = os.path.join(path, 'config')
         old_config_path = os.path.join(path, 'config.old')
 
@@ -314,7 +269,7 @@ class Repository:
         assert self.config
         keydata = keydata.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
         self.config.set('repository', 'key', keydata)
-        self.save_config(self.path, self.config)
+        self.save_config()
 
     def load_key(self):
         keydata = self.config.get('repository', 'key')
@@ -369,7 +324,7 @@ class Repository:
             # filesystem or hardware malfunction. it means we have no identifiable
             # valid (committed) state of the repo which we could use.
             msg = '%s" - although likely this is "beyond repair' % self.path  # dirty hack
-            raise self.CheckNeeded(msg)
+            raise Repository.CheckNeeded(msg)
         # Attempt to automatically rebuild index if we crashed between commit
         # tag write and index save
         if index_transaction_id != segments_transaction_id:
@@ -396,9 +351,9 @@ class Repository:
         try:
             st = os.stat(path)
         except FileNotFoundError:
-            raise self.DoesNotExist(path)
+            raise Repository.DoesNotExist(path)
         if not stat.S_ISDIR(st.st_mode):
-            raise self.InvalidRepository(path)
+            raise Repository.InvalidRepository(path)
         if lock:
             self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
         else:
@@ -409,14 +364,14 @@ class Repository:
                 self.config.read_file(fd)
         except FileNotFoundError:
             self.close()
-            raise self.InvalidRepository(self.path)
+            raise Repository.InvalidRepository(self.path)
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             self.close()
-            raise self.InvalidRepository(path)
+            raise Repository.InvalidRepository(path)
         self.max_segment_size = self.config.getint('repository', 'max_segment_size')
         if self.max_segment_size >= MAX_SEGMENT_SIZE_LIMIT:
             self.close()
-            raise self.InvalidRepositoryConfig(path, 'max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)  # issue 3592
+            raise Repository.InvalidRepositoryConfig(path, 'max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)  # issue 3592
         self.segments_per_dir = self.config.getint('repository', 'segments_per_dir')
         self.additional_free_space = parse_file_size(self.config.get('repository', 'additional_free_space', fallback=0))
         # append_only can be set in the constructor
@@ -432,7 +387,7 @@ class Repository:
             segment = self.io.get_latest_segment()
             if segment is not None and self.io.get_segment_magic(segment) == ATTIC_MAGIC:
                 self.close()
-                raise self.AtticRepository(path)
+                raise Repository.AtticRepository(path)
 
     def close(self):
         if self.lock:
@@ -688,7 +643,7 @@ class Repository:
                 self._rollback(cleanup=True)
             formatted_required = format_file_size(required_free_space)
             formatted_free = format_file_size(free_space)
-            raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
+            raise Repository.InsufficientFreeSpaceError(formatted_required, formatted_free)
 
     def log_storage_quota(self):
         if self.storage_quota:
@@ -882,7 +837,7 @@ class Repository:
             else:
                 msg = 'Unexpected tag {} in segment {}'.format(tag, segment)
                 if report is None:
-                    raise self.CheckNeeded(msg)
+                    raise Repository.CheckNeeded(msg)
                 else:
                     report(msg)
         if self.segments[segment] == 0:
@@ -1131,7 +1086,7 @@ class Repository:
             segment, offset = self.index[id]
             return self.io.read(segment, offset, id)
         except KeyError:
-            raise self.ObjectNotFound(id, self.path) from None
+            raise Repository.ObjectNotFound(id, self.path) from None
 
     def get_many(self, ids, is_preloaded=False):
         for id_ in ids:
@@ -1163,7 +1118,7 @@ class Repository:
         self.segments[segment] += 1
         self.index[id] = segment, offset
         if self.storage_quota and self.storage_quota_use > self.storage_quota:
-            self.transaction_doomed = self.StorageQuotaExceeded(
+            self.transaction_doomed = Repository.StorageQuotaExceeded(
                 format_file_size(self.storage_quota), format_file_size(self.storage_quota_use))
             raise self.transaction_doomed
 
@@ -1178,7 +1133,7 @@ class Repository:
         try:
             segment, offset = self.index.pop(id)
         except KeyError:
-            raise self.ObjectNotFound(id, self.path) from None
+            raise Repository.ObjectNotFound(id, self.path) from None
         self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         size = self.io.read(segment, offset, id, read_data=False)

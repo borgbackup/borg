@@ -84,12 +84,27 @@ class FuseOperations(llfuse.Operations):
 
     def mount(self, mountpoint, mount_options, foreground=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
-        options = ['fsname=borgfs', 'ro']
+        # default_permissions enables permission checking by the kernel. Without
+        # this, any umask (or uid/gid) would not have an effect and this could
+        # cause security issues if used with allow_other mount option.
+        # When not using allow_other or allow_root, access is limited to the
+        # mounting user anyway.
+        options = ['fsname=borgfs', 'ro', 'default_permissions']
         if mount_options:
             options.extend(mount_options.split(','))
         try:
             options.remove('allow_damaged_files')
             self.allow_damaged_files = True
+        except ValueError:
+            pass
+        try:
+            options.remove('ignore_permissions')
+            # if above does not raise ValueError (meaning: ignore_permissions is present),
+            # we remove default_permissions again.
+            # in case users have a use-case that requires NOT giving "default_permissions",
+            # this is enabled by the custom "ignore_permissions" mount option which just
+            # removes "default_permissions" again:
+            options.remove('default_permissions')
         except ValueError:
             pass
         llfuse.init(self, mountpoint, options)

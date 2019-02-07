@@ -92,7 +92,16 @@ class FuseOperations(llfuse.Operations):
             self.allow_damaged_files = True
         except ValueError:
             pass
-        llfuse.init(self, mountpoint, options)
+        default_options = frozenset((  # copied from llfuse, to support pre-0.42 llfuse
+            'default_permissions',  # Enables permission checking by kernel.
+                                    # Without this any umask (or uid/gid) would not have an effect.
+            'big_writes',  # Enables larger than 4kB writes. (not used, borgfs does not support write)
+            'nonempty',  # Allows mounts over non-empty file/dir.
+            'no_splice_read', 'splice_write', 'splice_move',  # See fuse docs.
+        ))
+        default_options = getattr(llfuse, 'default_options', default_options)
+        options = set(options) | set(default_options)
+        llfuse.init(self, mountpoint, list(options))
         if not foreground:
             old_id, new_id = daemonize()
             if not isinstance(self.repository_uncached, RemoteRepository):

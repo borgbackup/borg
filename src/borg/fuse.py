@@ -490,6 +490,8 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         dir_mode = 0o40755 & ~self.umask
         self.default_dir = Item(mode=dir_mode, mtime=int(time.time() * 1e9), uid=dir_uid, gid=dir_gid)
         self._create_filesystem()
+        default_options = getattr(llfuse, 'default_options')
+        options = set(options) | set(default_options)
         llfuse.init(self, mountpoint, options)
         if not foreground:
             old_id, new_id = daemonize()

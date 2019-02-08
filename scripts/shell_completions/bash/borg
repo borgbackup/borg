@@ -12,7 +12,7 @@ _borg()
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
     local prevprev="${COMP_WORDS[COMP_CWORD-2]}"
-    local common_opts="-h --help --version --critical --error --warning --info -v --verbose --debug --debug-topic -p --progress --log-json --lock-wait --show-version --show-rc --umask --remote-path --remote-ratelimit --consider-part-files --debug-profile"
+    local common_opts="-h --help --version --critical --error --warning --info -v --verbose --debug --debug-topic -p --progress --log-json --lock-wait --show-version --show-rc --umask --remote-path --remote-ratelimit --consider-part-files --debug-profile --rsh"
     local opts="${common_opts}"
 
     # Commands
@@ -72,7 +72,7 @@ _borg()
     if [[ ${cur} == -* ]] ; then
         case "${COMP_LINE}" in
             *' init '*)
-                local opts="-e --encryption --append-only --storage-quota ${common_opts}"
+                local opts="-e --encryption --append-only --storage-quota --make-parent-dirs ${common_opts}"
                 ;;
             *' create '*)
                 local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --ignore-inode --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"

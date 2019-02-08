@@ -82,12 +82,14 @@ complete -c borg         -l 'remote-path'           -d 'Use PATH as remote borg 
 complete -c borg -f      -l 'remote-ratelimit'      -d 'Set remote network upload RATE limit'
 complete -c borg -f      -l 'consider-part-files'   -d 'Treat part files like normal files'
 complete -c borg         -l 'debug-profile'         -d 'Write execution profile into FILE'
+complete -c borg         -l 'rsh'                   -d 'Use COMMAND instead of ssh'
 
 # borg init options
 set -l encryption_modes "none keyfile keyfile-blake2 repokey repokey-blake2 authenticated authenticated-blake2"
 complete -c borg -f -s e -l 'encryption'            -d 'Encryption key MODE' -a "$encryption_modes" -n "__fish_seen_subcommand_from init"
 complete -c borg -f      -l 'append-only'           -d 'Create an append-only mode repository'      -n "__fish_seen_subcommand_from init"
 complete -c borg -f      -l 'storage-quota'         -d 'Set storage QUOTA of the repository'        -n "__fish_seen_subcommand_from init"
+complete -c borg -f      -l 'make-parent-dirs'      -d 'Create parent directories'                  -n "__fish_seen_subcommand_from init"
 
 # borg create options
 complete -c borg -f -s n -l 'dry-run'               -d 'Do not change the repository'               -n "__fish_seen_subcommand_from create"

@@ -17,7 +17,7 @@ _borg()
 
     # Commands
     if [[ ${COMP_CWORD} == 1 ]] ; then
-        local borg_commands="init create extract check rename list diff delete prune info mount umount key serve upgrade recreate export-tar with-lock break-lock benchmark config"
+        local borg_commands="init create extract check rename list diff delete prune info mount umount key serve upgrade recreate export-tar with-lock break-lock config benchmark help"
         COMPREPLY=( $(compgen -W "${borg_commands}" -- ${cur}) )
         compopt +o default
         return 0
@@ -30,6 +30,10 @@ _borg()
             ;;
         'benchmark')
             COMPREPLY=( $(compgen -W "crud" -- ${cur}) )
+            return 0
+            ;;
+        'help')
+            COMPREPLY=( $(compgen -W "patterns placeholders compression" -- ${cur}) )
             return 0
             ;;
         '--encryption' | '-e')

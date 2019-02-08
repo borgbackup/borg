@@ -50,6 +50,17 @@ end
 complete -c borg -f -n __fish_is_first_token -a 'benchmark' -d 'Benchmark borg operations'
 complete -c borg -f -n __fish_borg_seen_benchmark -a 'crud' -d 'Benchmark borg CRUD operations'
 
+function __fish_borg_seen_help
+    if __fish_seen_subcommand_from help
+        and not __fish_seen_subcommand_from patterns placeholders compression
+        return 0
+    end
+    return 1
+end
+complete -c borg -f -n __fish_is_first_token -a 'help' -d 'Miscellaneous Help'
+complete -c borg -f -n __fish_borg_seen_help -a 'patterns' -d 'Help for patterns'
+complete -c borg -f -n __fish_borg_seen_help -a 'placeholders' -d 'Help for placeholders'
+complete -c borg -f -n __fish_borg_seen_help -a 'compression' -d 'Help for compression'
 
 # Common options
 complete -c borg -f -s h -l 'help'                  -d 'Show help information'
@@ -309,6 +320,8 @@ complete -c borg -f      -l 'list'                  -d 'List the configuration o
 # borg benchmark
 # no specific options
 
+# borg help
+# no specific options
 
 # List archives
 

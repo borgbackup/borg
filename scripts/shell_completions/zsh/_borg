@@ -57,7 +57,7 @@ _borg() {
                              --consider-part-files'[treat part files like normal files (e.g. to list/extract them)]'
                              --debug-profile'[Write execution profile in Borg format into FILE.]:_files')
 
-    borg_possible_commands=(init create extract check rename list diff delete prune info mount umount key upgrade recreate export-tar serve config with-lock break-lock benchmark)
+    borg_possible_commands=(init create extract check rename list diff delete prune info mount umount key upgrade recreate export-tar serve config with-lock break-lock benchmark help)
     borg_possible_key_commands=(change-passphrase import export)
     command=""
     keyCommand=""
@@ -370,6 +370,11 @@ _borg() {
                 '4:path:_files'\
                 $borg_common_options
             ;;
+        (help)
+            _arguments \
+                '2:type:(patterns placeholders compression )'\
+                $borg_common_options
+            ;;
         *)
             commands=(
                 'init:initialize empty repository'
@@ -393,6 +398,7 @@ _borg() {
                 'with-lock:run user command with lock held'
                 'break-lock:break repository and cache locks'
                 'benchmark:benchmark command'
+                'help:miscellaneous help'
             )
 
             _describe 'values' commands

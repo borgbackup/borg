@@ -17,7 +17,7 @@ _borg()
 
     # Commands
     if [[ ${COMP_CWORD} == 1 ]] ; then
-        local borg_commands="init create extract check rename list diff delete prune info mount umount key serve upgrade recreate export-tar with-lock break-lock config benchmark help"
+        local borg_commands="init create extract check rename list diff delete prune compact info mount umount key serve upgrade recreate export-tar with-lock break-lock config benchmark help"
         COMPREPLY=( $(compgen -W "${borg_commands}" -- ${cur}) )
         compopt +o default
         return 0
@@ -96,6 +96,9 @@ _borg()
                 ;;
             *' prune '*)
                 local opts="-n --dry-run --force -s --stats --list --keep-within --keep-last --keep-secondly --keep-minutely -H --keep-hourly -d --keep-daily -w --keep-weekly -m --keep-monthly -y --keep-yearly --save-space -P --prefix -a --glob-archives ${common_opts}"
+                ;;
+            *' compact '*)
+                local opts="--cleanup-commits ${common_opts}"
                 ;;
             *' info '*)
                 local opts="--json -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"

@@ -16,6 +16,7 @@ complete -c borg -f -n __fish_is_first_token -a 'list' -d 'List archive or repos
 complete -c borg -f -n __fish_is_first_token -a 'diff' -d 'Find differences between archives'
 complete -c borg -f -n __fish_is_first_token -a 'delete' -d 'Delete a repository or archive'
 complete -c borg -f -n __fish_is_first_token -a 'prune' -d 'Prune repository archives'
+complete -c borg -f -n __fish_is_first_token -a 'compact' -d 'Free repository space'
 complete -c borg -f -n __fish_is_first_token -a 'info' -d 'Show archive details'
 complete -c borg -f -n __fish_is_first_token -a 'mount' -d 'Mount archive or a repository'
 complete -c borg -f -n __fish_is_first_token -a 'umount' -d 'Un-mount the mounted archive'
@@ -219,6 +220,9 @@ complete -c borg -f      -l 'save-space'            -d 'Work slower but using le
 # Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from prune"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from prune"
+
+# borg compact options
+complete -c borg -f -s n -l 'cleanup-commits'       -d 'Cleanup commit-only segment files'          -n "__fish_seen_subcommand_from compact"
 
 # borg info options
 complete -c borg -f      -l 'json'                  -d 'Format output in json format'               -n "__fish_seen_subcommand_from info"

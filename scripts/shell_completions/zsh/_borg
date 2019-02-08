@@ -58,7 +58,7 @@ _borg() {
                              --debug-profile'[write execution profile in Borg format into FILE.]:_files'
                              --rsh'[use COMMAND instead of ssh]:COMMAND')
 
-    borg_possible_commands=(init create extract check rename list diff delete prune info mount umount key upgrade recreate export-tar serve config with-lock break-lock benchmark help)
+    borg_possible_commands=(init create extract check rename list diff delete prune compact info mount umount key upgrade recreate export-tar serve config with-lock break-lock benchmark help)
     borg_possible_key_commands=(change-passphrase import export)
     command=""
     keyCommand=""
@@ -218,6 +218,12 @@ _borg() {
                 --save-space'[work slower, but using less space]'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
                 {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
+                $borg_common_options
+            ;;
+        (compact)
+            _arguments \
+                '2:archives:__borg_archive'\
+                --cleanup-commits'[cleanup commit-only 17-byte segment files]'\
                 $borg_common_options
             ;;
         (info)
@@ -388,6 +394,7 @@ _borg() {
                 'diff:find differences in archive contents'
                 'delete:delete archive'
                 'prune:prune archives'
+                'compact:free repository space'
                 'info:show repository or archive information'
                 'mount:mount repository'
                 'umount:umount repository'

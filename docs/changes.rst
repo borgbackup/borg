@@ -193,6 +193,10 @@ Compatibility notes:
 
 Fixes:
 
+- security fix: configure FUSE with "default_permissions", #3903
+  "default_permissions" is now enforced by borg by default to let the
+  kernel check uid/gid/mode based permissions.
+  "ignore_permissions" can be given to not enforce "default_permissions".
 - make "hostname" short, even on misconfigured systems, #4262
 - fix free space calculation on macOS (and others?), #4289
 - config: quit with error message when no key is provided, #4223
@@ -212,6 +216,12 @@ Other:
 
 - add archive name to check --repair output, #3447
 - check for unsupported msgpack versions
+- shell completions:
+
+  - new shell completions for borg 1.1.9
+  - more complete shell completions for borg mount -o
+  - added shell completions for borg help
+  - option arguments for zsh tab completion
 - docs:
 
   - add FAQ regarding free disk space check, #3905
@@ -222,6 +232,7 @@ Other:
   - add note about files changing during backup, #4081
   - work around the backslash issue, #4280
   - update release workflow using twine (docs, scripts), #4213
+  - add warnings on repository copies to avoid future problems, #4272
 - tests:
 
   - fix the homebrew 1.9 issues on travis-ci, #4254

@@ -394,7 +394,7 @@ When set, use the standard output of the command (trailing newlines are stripped
 passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo. Note that the command
-is executed without a shell. So variables, like \fB$HOME\fP\ will work, but \fB~\fP\ won't.
+is executed without a shell. So variables, like \fB$HOME\fP will work, but \fB~\fP won\(aqt.
 If BORG_PASSPHRASE is also set, it takes precedence.
 See also BORG_NEW_PASSPHRASE.
 .TP
@@ -433,8 +433,8 @@ When set, use the given filename as \fI\%INI\fP\-style logging configuration.
 .TP
 .B BORG_RSH
 When set, use this command instead of \fBssh\fP\&. This can be used to specify ssh options, such as
-a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options.
-Using the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
+a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options. Using
+the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
 .TP
 .B BORG_REMOTE_PATH
 When set, use the given path as borg executable on the remote (defaults to "borg" if unset).

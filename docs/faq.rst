@@ -26,11 +26,11 @@ or deleting archives, which may make *simultaneous* backups fail.
 Can I copy or synchronize my repo to another location?
 ------------------------------------------------------
 
-If you want to have redundant backup repositories, the recommended way
-to do that is like this:
+If you want to have redundant backup repositories (preferably at separate
+locations), the recommended way to do that is like this:
 
-- ``borg init repo1``  # at one location
-- ``borg init repo2``  # at another location
+- ``borg init repo1``
+- ``borg init repo2``
 - client machine ---borg create---> repo1
 - client machine ---borg create---> repo2
 
@@ -57,7 +57,7 @@ But think about whether that is really what you want. If something goes
 wrong in repo, you will have the same issue in copy-of-repo.
 
 Make sure you do the copy/sync while no backup is running, see
-:ref:`with-lock` about how to do that.
+:ref:`borg_with-lock` about how to do that.
 
 Also, you must not run borg against multiple instances of the same repo
 (like repo and copy-of-repo) as that would create severe issues:

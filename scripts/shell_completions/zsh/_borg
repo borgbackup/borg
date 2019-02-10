@@ -4,12 +4,12 @@
 #
 # To Install:
 #
-# Copy this file to /usr/share/zsh/site-functions/
+# Copy this file to /usr/[local]/share/zsh/site-functions/
 #
 # -------
 # borgbackup ZSH completion
 # Kevin Gravier 2017 <kevin@mrkmg.com>
-# 
+#
 # The MIT License (MIT)
 
 # Copyright (c) 2017 Kevin
@@ -72,7 +72,7 @@ _borg() {
         (init)
             _arguments \
                 '2:repo:_files'\
-                {-e,--encryption}'[select encryption key mode]:MODE'\
+                {-e,--encryption}'[select encryption key mode]:mode:(none keyfile keyfile-blake2 repokey repokey-blake2 authenticated authenticated-blake2)'\
                 --append-only'[only allow appending to repository segment files]'\
                 --storage-quota'[Override storage quota of the repository]:QUOTA'\
                 --make-parent-dirs'[create parent directories]'\
@@ -102,7 +102,7 @@ _borg() {
                 --nobirthtime'[do not store birthtime (creation date) into archive]'\
                 --nobsdflags'[do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive]'\
                 --ignore-inode'[ignore inode data in the file metadata cache used to detect unchanged files.]'\
-                --files-cache'[operate files cache in MODE. default: ctime,size,inode]:MODE'\
+                --files-cache'[operate files cache in MODE. default: ctime,size,inode]:mode:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled)'\
                 --read-special'[open and read block and char device files as well as FIFOs as if they were regular files.]'\
                 --comment'[add a comment text to the archive]:COMMENT'\
                 --timestamp'[manually specify the archive creation date/time]:TIMESTAMP'\
@@ -139,7 +139,7 @@ _borg() {
                 --save-space'[work slower, but using less space]'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
                 {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
-                --sort-by'[Comma-separated list of sorting keys]:KEYS'\
+                --sort-by'[Comma-separated list of sorting keys]:keys:(timestamp name id)'\
                 --first'[consider first N archives after other filters were applied]:N'\
                 --last'[consider last N archives after other filters were applied]:N'\
                 $borg_common_options
@@ -160,7 +160,7 @@ _borg() {
                 --json-lines'[Only valid for listing archive contents. Format output as JSON Lines. ]'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
                 {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
-                --sort-by'[Comma-separated list of sorting keys]:KEYS'\
+                --sort-by'[Comma-separated list of sorting keys]:keys:(timestamp name id)'\
                 --first'[consider first N archives after other filters were applied]:N'\
                 --last'[consider last N archives after other filters were applied]:N'\
                 {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
@@ -195,7 +195,7 @@ _borg() {
                 --save-space'[work slower, but using less space]'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
                 {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
-                --sort-by'[Comma-separated list of sorting keys]:KEYS'\
+                --sort-by'[Comma-separated list of sorting keys]:keys:(timestamp name id)'\
                 --first'[consider first N archives after other filters were applied]:N'\
                 --last'[consider last N archives after other filters were applied]:N'\
                 $borg_common_options
@@ -232,7 +232,7 @@ _borg() {
                 --json'[format output as JSON]'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
                 {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
-                --sort-by'[Comma-separated list of sorting keys]:KEYS'\
+                --sort-by'[Comma-separated list of sorting keys]:keys:(timestamp name id)'\
                 --first'[consider first N archives after other filters were applied]:N'\
                 --last'[consider last N archives after other filters were applied]:N'\
                 $borg_common_options
@@ -242,10 +242,10 @@ _borg() {
                 '2:archives:__borg_archive'\
                 '3:mountpoint:_files'\
                 {-f,--foreground}'[stay in foreground, do not daemonize]'\
-                -o'[Extra mount options]:OPTS'\
+                -o'[Extra mount options]:options:(ac_attr_timeout= allow_damaged_files allow_other allow_root attr_timeout= auto auto_cache auto_unmount default_permissions entry_timeout= gid= group_id= kernel_cache max_read= negative_timeout= noauto noforget remember= remount rootmode= uid= umask= user user_id= versions)'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
                 {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
-                --sort-by'[Comma-separated list of sorting keys]:KEYS'\
+                --sort-by'[Comma-separated list of sorting keys]:keys:(timestamp name id)'\
                 --first'[consider first N archives after other filters were applied]:N'\
                 --last'[consider last N archives after other filters were applied]:N'\
                 {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\
@@ -322,7 +322,7 @@ _borg() {
                 --comment'[add a comment text to the archive]:COMMENT'\
                 --timestamp'[manually specify the archive creation date/time]:TIMESTAMP'\
                 {-C,--compression}'[select compression algorithm]:COMPRESSION'\
-                --recompress'[recompress data chunks according to --compression if if-different]:PARAMS'\
+                --recompress'[recompress data chunks according to --compression if if-different]:params:(if-different always)'\
                 --chunker-params'[pecify the chunker parameters]:PARAMS'\
                 $borg_common_options
             ;;

@@ -57,8 +57,8 @@ _borg()
             return 0
             ;;
         '-o')
-            # FIXME there are lot more options, but not all are applicable:
-            local fuse_options="allow_other allow_root versions allow_damaged_files"
+            # FIXME This list is probably not full, but I tried to pick only those that are relevant to borg mount -o:
+            local fuse_options="ac_attr_timeout= allow_damaged_files allow_other allow_root attr_timeout= auto auto_cache auto_unmount default_permissions entry_timeout= gid= group_id= kernel_cache max_read= negative_timeout= noauto noforget remember= remount rootmode= uid= umask= user user_id= versions"
             COMPREPLY=( $(compgen -W "${fuse_options}" -- ${cur}) )
             return 0
             ;;

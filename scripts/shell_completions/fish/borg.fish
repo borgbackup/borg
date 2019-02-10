@@ -235,8 +235,8 @@ complete -c borg -f      -l 'last'                  -d 'Only last N archives'   
 
 # borg mount options
 complete -c borg -f -s f -l 'foreground'            -d 'Stay in foreground, do not daemonize'       -n "__fish_seen_subcommand_from mount"
-# FIXME there are lot more options, but not all are applicable:
-set -l fuse_options "allow_other allow_root versions allow_damaged_files uid gid umask"
+# FIXME This list is probably not full, but I tried to pick only those that are relevant to borg mount -o:
+set -l fuse_options "ac_attr_timeout= allow_damaged_files allow_other allow_root attr_timeout= auto auto_cache auto_unmount default_permissions entry_timeout= gid= group_id= kernel_cache max_read= negative_timeout= noauto noforget remember= remount rootmode= uid= umask= user user_id= versions"
 complete -c borg -f -s o                            -d 'Fuse mount OPTION' -a "$fuse_options"       -n "__fish_seen_subcommand_from mount"
 # Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from mount"

@@ -128,6 +128,40 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
+Version 1.0.13 (not released yet)
+---------------------------------
+
+Bug fixes:
+
+- xattrs: fix borg exception handling on ENOSPC error, #3808
+
+New features:
+
+- read a passphrase from a file descriptor
+  Read a passphrase from a file descriptor specified in the
+  BORG_PASSPHRASE_FD environment variable.
+
+Other changes:
+- acl platform code: fix acl set return type
+- xattr:
+
+  - add linux {list,get,set}xattr ctypes prototypes
+  - fix darwin flistxattr ctypes prototype
+- testing / travis-ci:
+
+  - fix the homebrew 1.9 issues on travis-ci, #4254
+  - travis OS X: use xcode 8.3 (not broken)
+  - tox.ini: lock requirements
+  - unbreak 1.0-maint on travis, fixes #4123
+- vagrant:
+
+  - misc. fixes
+  - FUSE for macOS: upgrade 3.7.1 to 3.8.0
+- docs:
+
+  - Update installation instructions for macOS
+  - update release workflow using twine (docs, scripts), #4213
+
 Version 1.0.12 (2018-04-08)
 ---------------------------
 

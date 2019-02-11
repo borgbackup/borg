@@ -477,9 +477,20 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             else:
                 return not_present
 
-        options = ['fsname=borgfs', 'ro']
+        # default_permissions enables permission checking by the kernel. Without
+        # this, any umask (or uid/gid) would not have an effect and this could
+        # cause security issues if used with allow_other mount option.
+        # When not using allow_other or allow_root, access is limited to the
+        # mounting user anyway.
+        options = ['fsname=borgfs', 'ro', 'default_permissions']
         if mount_options:
             options.extend(mount_options.split(','))
+        ignore_permissions = pop_option(options, 'ignore_permissions', True, False, bool)
+        if ignore_permissions:
+            # in case users have a use-case that requires NOT giving "default_permissions",
+            # this is enabled by the custom "ignore_permissions" mount option which just
+            # removes "default_permissions" again:
+            pop_option(options, 'default_permissions', True, False, bool)
         self.allow_damaged_files = pop_option(options, 'allow_damaged_files', True, False, bool)
         self.versions = pop_option(options, 'versions', True, False, bool)
         self.uid_forced = pop_option(options, 'uid', None, None, int)

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-INIT 1 "2018-12-08" "" "borg backup tool"
+.TH BORG-INIT 1 "2019-02-10" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .
@@ -186,6 +186,9 @@ create an append\-only mode repository
 .TP
 .BI \-\-storage\-quota \ QUOTA
 Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
+.TP
+.B \-\-make\-parent\-dirs
+create the parent directories of the repository directory, if they are missing.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

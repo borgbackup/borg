@@ -793,21 +793,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_mount_hardlinks(self):
         self._extract_hardlinks_setup()
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
-        with self.fuse_mount(self.repository_location + '::test', mountpoint, '--strip-components=2'), \
+        # we need to get rid of permissions checking because fakeroot causes issues with it.
+        # On all platforms, borg defaults to "default_permissions" and we need to get rid of it via "ignore_permissions".
+        # On macOS (darwin), we additionally need "defer_permissions" to switch off the checks in osxfuse.
+        if sys.platform == 'darwin':
+            ignore_perms = ['-o', 'ignore_permissions,defer_permissions']
+        else:
+            ignore_perms = ['-o', 'ignore_permissions']
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, '--strip-components=2', *ignore_perms), \
              changedir(mountpoint):
             assert os.stat('hardlink').st_nlink == 2
             assert os.stat('subdir/hardlink').st_nlink == 2
             assert open('subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('aaaa').st_nlink == 2
             assert os.stat('source2').st_nlink == 2
-        with self.fuse_mount(self.repository_location + '::test', mountpoint, 'input/dir1'), \
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, 'input/dir1', *ignore_perms), \
              changedir(mountpoint):
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
-        with self.fuse_mount(self.repository_location + '::test', mountpoint), \
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, *ignore_perms), \
              changedir(mountpoint):
             assert os.stat('input/source').st_nlink == 4
             assert os.stat('input/abba').st_nlink == 4

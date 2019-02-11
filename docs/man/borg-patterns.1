@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2018-12-08" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2019-02-10" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -58,7 +58,7 @@ These patterns use a variant of shell pattern syntax, with \(aq*\(aq matching
 any number of characters, \(aq?\(aq matching any single character, \(aq[...]\(aq
 matching any single character specified, including ranges, and \(aq[!...]\(aq
 matching any character not specified. For the purpose of these patterns,
-the path separator (\(aq\(aq for Windows and \(aq/\(aq on other systems) is not
+the path separator (backslash for Windows and \(aq/\(aq on other systems) is not
 treated specially. Wrap meta\-characters in brackets for a literal
 match (i.e. \fI[?]\fP to match the literal character \fI?\fP). For a path
 to match a pattern, the full path must match, or it must match
@@ -79,7 +79,7 @@ Regular expressions similar to those found in Perl are supported. Unlike
 shell patterns regular expressions are not required to match the full
 path and any substring match is sufficient. It is strongly recommended to
 anchor patterns to the start (\(aq^\(aq), to the end (\(aq$\(aq) or both. Path
-separators (\(aq\(aq for Windows and \(aq/\(aq on other systems) in paths are
+separators (backslash for Windows and \(aq/\(aq on other systems) in paths are
 always normalized to a forward slash (\(aq/\(aq) before applying a pattern. The
 regular expression syntax is described in the \fI\%Python documentation for
 the re module\fP\&.

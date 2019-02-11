@@ -290,7 +290,9 @@ Checklist:
     scripts/sdist-sign X.Y.Z
     scripts/upload-pypi X.Y.Z test
     scripts/upload-pypi X.Y.Z
+- put binaries into dist/borg-OSNAME and sign them:
 
+    scripts/sign-binaries 201912312359
 - close release milestone on Github
 - announce on:
 

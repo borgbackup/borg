@@ -2,7 +2,14 @@
 
 import errno
 import os
+import re
+import subprocess
+import sys
 import tempfile
+
+from distutils.version import LooseVersion
+
+from .helpers import prepare_subprocess_env
 
 from .logger import create_logger
 
@@ -10,7 +17,26 @@ logger = create_logger()
 
 from .platform import listxattr, getxattr, setxattr, ENOATTR
 
-XATTR_FAKEROOT = True  # fakeroot with xattr support required (>= 1.20.2?)
+# If we are running with fakeroot on Linux, then use the xattr functions of fakeroot. This is needed by
+# the 'test_extract_capabilities' test, but also allows xattrs to work with fakeroot on Linux in normal use.
+# TODO: Check whether fakeroot supports xattrs on all platforms supported below.
+# TODO: If that's the case then we can make Borg fakeroot-xattr-compatible on these as well.
+XATTR_FAKEROOT = False
+if sys.platform.startswith('linux'):
+    LD_PRELOAD = os.environ.get('LD_PRELOAD', '')
+    preloads = re.split("[ :]", LD_PRELOAD)
+    for preload in preloads:
+        if preload.startswith("libfakeroot"):
+            env = prepare_subprocess_env(system=True)
+            fakeroot_output = subprocess.check_output(['fakeroot', '-v'], env=env)
+            fakeroot_version = LooseVersion(fakeroot_output.decode('ascii').split()[-1])
+            if fakeroot_version >= LooseVersion("1.20.2"):
+                # 1.20.2 has been confirmed to have xattr support
+                # 1.18.2 has been confirmed not to have xattr support
+                # Versions in-between are unknown
+                libc_name = preload
+                XATTR_FAKEROOT = True
+            break
 
 
 def is_enabled(path=None):

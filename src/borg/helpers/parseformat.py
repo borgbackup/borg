@@ -113,7 +113,7 @@ def ChunkerParams(s):
     if count == 0:
         raise ValueError('no chunker params given')
     algo = params[0].lower()
-    if algo == 'fixed' and 2 <= count <= 3:  # fixed, block_size[, header_size]
+    if algo == CH_FIXED and 2 <= count <= 3:  # fixed, block_size[, header_size]
         block_size = int(params[1])
         header_size = int(params[2]) if count == 3 else 0
         if block_size < 64:
@@ -129,7 +129,7 @@ def ChunkerParams(s):
     if algo == 'default' and count == 1:  # default
         return CHUNKER_PARAMS
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
-    if algo == 'buzhash' and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
+    if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = [int(p) for p in params[count - 4:]]
         if not (chunk_min <= chunk_mask <= chunk_max):
             raise ValueError('required: chunk_min <= chunk_mask <= chunk_max')
@@ -138,7 +138,7 @@ def ChunkerParams(s):
             raise ValueError('min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)')
         if chunk_max > 23:
             raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
-        return 'buzhash', chunk_min, chunk_max, chunk_mask, window_size
+        return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
     raise ValueError('invalid chunker params')
 
 

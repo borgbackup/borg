@@ -1922,7 +1922,7 @@ class ArchiveRecreater:
         source_chunker_params = tuple(archive.metadata.get('chunker_params', []))
         if len(source_chunker_params) == 4 and isinstance(source_chunker_params[0], int):
             # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
-            source_chunker_params = ('buzhash', ) + source_chunker_params
+            source_chunker_params = (CH_BUZHASH, ) + source_chunker_params
         target.recreate_rechunkify = self.rechunkify and source_chunker_params != target.chunker_params
         if target.recreate_rechunkify:
             logger.debug('Rechunking archive from %s to %s', source_chunker_params or '(unknown)', target.chunker_params)

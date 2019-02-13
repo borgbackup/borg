@@ -36,10 +36,10 @@ Examples
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals
     # docs - same parameters as borg < 1.0 or attic):
-    $ borg create --chunker-params 10,23,16,4095 /path/to/repo::small /smallstuff
+    $ borg create --chunker-params buzhash,10,23,16,4095 /path/to/repo::small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
-    $ dd if=/dev/sdx bs=10M | borg create /path/to/repo::my-sdx -
+    $ dd if=/dev/sdx bs=4M | borg create --chunker-params fixed,4194304 /path/to/repo::my-sdx -
 
     # No compression (none)
     $ borg create --compression none /path/to/repo::arch ~

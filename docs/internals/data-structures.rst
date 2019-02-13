@@ -580,16 +580,43 @@ A chunk is stored as an object as well, of course.
 Chunks
 ~~~~~~
 
-The Borg chunker uses a rolling hash computed by the Buzhash_ algorithm.
-It triggers (chunks) when the last HASH_MASK_BITS bits of the hash are zero,
-producing chunks of 2^HASH_MASK_BITS Bytes on average.
+Borg has these chunkers:
+
+- "fixed": a simple, low cpu overhead, fixed blocksize chunker, optionally
+  supporting a header block of different size.
+- "buzhash": variable, content-defined blocksize, uses a rolling hash
+  computed by the Buzhash_ algorithm.
+
+For some more general usage hints see also ``--chunker-params``.
+
+"fixed" chunker
++++++++++++++++
+
+The fixed chunker triggers (chunks) at even-spaced offsets, e.g. every 4MiB,
+producing chunks of same block size (the last chunk is not required to be
+full-size).
+
+Optionally, it can cut the first "header" chunk with a different size (the
+default is not to have a differently sized header chunk).
+
+``borg create --chunker-params fixed,BLOCK_SIZE[,HEADER_SIZE]``
+
+- BLOCK_SIZE: no default value, multiple of the system page size (usually 4096
+  bytes) recommended. E.g.: 4194304 would cut 4MiB sized chunks.
+- HEADER_SIZE: optional, defaults to 0 (no header chunk).
+
+"buzhash" chunker
++++++++++++++++++
+
+The buzhash chunker triggers (chunks) when the last HASH_MASK_BITS bits of
+the hash are zero, producing chunks of 2^HASH_MASK_BITS Bytes on average.
 
 Buzhash is **only** used for cutting the chunks at places defined by the
 content, the buzhash value is **not** used as the deduplication criteria (we
 use a cryptographically strong hash/MAC over the chunk contents for this, the
 id_hash).
 
-``borg create --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
+``borg create --chunker-params buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
 can be used to tune the chunker parameters, the default is:
 
 - CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
@@ -601,8 +628,6 @@ The buzhash table is altered by XORing it with a seed randomly generated once
 for the repository, and stored encrypted in the keyfile. This is to prevent
 chunk size based fingerprinting attacks on your encrypted repo contents (to
 guess what files you have based on a specific set of chunk sizes).
-
-For some more general usage hints see also ``--chunker-params``.
 
 .. _cache:
 
@@ -690,7 +715,8 @@ Indexes / Caches memory usage
 
 Here is the estimated memory usage of Borg - it's complicated::
 
-  chunk_count ~= total_file_size / 2 ^ HASH_MASK_BITS
+  chunk_size ~= 2 ^ HASH_MASK_BITS  (for buzhash chunker, BLOCK_SIZE for fixed chunker)
+  chunk_count ~= total_file_size / chunk_size
 
   repo_index_usage = chunk_count * 40
 
@@ -732,11 +758,11 @@ For small hash tables, we start with a growth factor of 2, which comes down to
 
 E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 
-a) with ``create --chunker-params 10,23,16,4095`` (custom, like borg < 1.0 or attic):
+a) with ``create --chunker-params buzhash,10,23,16,4095`` (custom, like borg < 1.0 or attic):
 
   mem_usage  =  2.8GiB
 
-b) with ``create --chunker-params 19,23,21,4095`` (default):
+b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
 
   mem_usage  =  0.31GiB
 

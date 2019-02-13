@@ -376,6 +376,7 @@ The same archive with more information (``borg info --last 1 --json``)::
         "archives": [
             {
                 "chunker_params": [
+                    "buzhash",
                     13,
                     23,
                     16,

@@ -1,11 +1,26 @@
 from io import BytesIO
 
-from ..chunker import Chunker, buzhash, buzhash_update
+from ..chunker import ChunkerFixed, Chunker, get_chunker, buzhash, buzhash_update
 from ..constants import *  # NOQA
 from . import BaseTestCase
 
 # Note: these tests are part of the self test, do not use or import py.test functionality here.
 #       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+
+
+class ChunkerFixedTestCase(BaseTestCase):
+
+    def test_chunkify_just_blocks(self):
+        data = b'foobar' * 1500
+        chunker = ChunkerFixed(4096)
+        parts = [c for c in chunker.chunkify(BytesIO(data))]
+        self.assert_equal(parts, [data[0:4096], data[4096:8192], data[8192:]])
+
+    def test_chunkify_header_and_blocks(self):
+        data = b'foobar' * 1500
+        chunker = ChunkerFixed(4096, 123)
+        parts = [c for c in chunker.chunkify(BytesIO(data))]
+        self.assert_equal(parts, [data[0:123], data[123:123+4096], data[123+4096:123+8192], data[123+8192:]])
 
 
 class ChunkerTestCase(BaseTestCase):
@@ -41,5 +56,6 @@ class ChunkerTestCase(BaseTestCase):
                 self.input = self.input[:-1]
                 return self.input[:1]
 
-        reconstructed = b''.join(Chunker(0, *CHUNKER_PARAMS).chunkify(SmallReadFile()))
+        chunker = get_chunker(*CHUNKER_PARAMS, seed=0)
+        reconstructed = b''.join(chunker.chunkify(SmallReadFile()))
         assert reconstructed == b'a' * 20

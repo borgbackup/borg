@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-API_VERSION = '1.1_01'
+API_VERSION = '1.1_03'
+
+import os
 
 from libc.stdlib cimport free
 
@@ -17,7 +19,79 @@ cdef extern from "_chunker.c":
     uint32_t c_buzhash_update  "buzhash_update"(uint32_t sum, unsigned char remove, unsigned char add, size_t len, uint32_t *h)
 
 
+class ChunkerFixed:
+    """
+    Fixed blocksize Chunker, optionally supporting a header block of different size.
+
+    This is a very simple chunker for input data with known block/record sizes:
+
+    - raw disk images
+    - block devices
+    - database files with simple header + fixed-size records layout
+
+    Note: the last block of the input data may be less than the block size,
+          this is supported and not considered to be an error.
+    """
+    def __init__(self, block_size, header_size=0):
+        self.block_size = block_size
+        self.header_size = header_size
+
+    def chunkify(self, fd, fh=-1):
+        """
+        Cut a file into chunks.
+
+        :param fd: Python file object
+        :param fh: OS-level file handle (if available),
+                   defaults to -1 which means not to use OS-level fd.
+        """
+        offset = 0
+        use_fh = fh >= 0
+
+        if use_fh:
+            def read(size):
+                nonlocal offset
+                data = os.read(fh, size)
+                amount = len(data)
+                if hasattr(os, 'posix_fadvise'):
+                    # UNIX only and, in case of block sizes that are not a multiple of the
+                    # system's page size, better be used with a bug fixed linux kernel > 4.6.0,
+                    # see comment/workaround in _chunker.c and borgbackup issue #907.
+                    os.posix_fadvise(fh, offset, amount, os.POSIX_FADV_DONTNEED)
+                offset += amount
+                return data
+        else:
+            def read(size):
+                nonlocal offset
+                data = fd.read(size)
+                amount = len(data)
+                offset += amount
+                return data
+
+        if self.header_size > 0:
+            data = read(self.header_size)
+            if data:
+                yield data
+        else:
+            data = True  # get into next while loop
+        while data:
+            data = read(self.block_size)
+            if data:
+                yield data
+        # empty data means we are at EOF and we terminate the generator.
+
+
 cdef class Chunker:
+    """
+    Content-Defined Chunker, variable chunk sizes.
+
+    This chunker does quite some effort to mostly cut the same-content chunks, even if
+    the content moves to a different offset inside the file. It uses the buzhash
+    rolling-hash algorithm to identify the chunk cutting places by looking at the
+    content inside the moving window and computing the rolling hash value over the
+    window contents. If the last n bits of the rolling hash are 0, a chunk is cut.
+    Additionally it obeys some more criteria, like a minimum and maximum chunk size.
+    It also uses a per-repo random seed to avoid some chunk length fingerprinting attacks.
+    """
     cdef _Chunker *chunker
 
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
@@ -48,6 +122,24 @@ cdef class Chunker:
 
     def __next__(self):
         return chunker_process(self.chunker)
+
+
+def get_chunker(algo, *params, **kw):
+    if algo == 'buzhash':
+        seed = kw['seed']
+        return Chunker(seed, *params)
+    if algo == 'fixed':
+        return ChunkerFixed(*params)
+    raise TypeError('unsupported chunker algo %r' % algo)
+
+
+def max_chunk_size(algo, *params):
+    # see also parseformat.ChunkerParams return values
+    if algo == 'buzhash':
+        return 1 << params[1]
+    if algo == 'fixed':
+        return max(params[0], params[1])
+    raise TypeError('unsupported chunker algo %r' % algo)
 
 
 def buzhash(data, unsigned long seed):

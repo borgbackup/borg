@@ -14,15 +14,25 @@ resource usage (RAM and disk space) as the amount of resources needed is
 (also) determined by the total amount of chunks in the repository (see
 :ref:`cache-memory-usage` for details).
 
-``--chunker-params=10,23,16,4095`` results in a fine-grained deduplication|
+``--chunker-params=buzhash,10,23,16,4095`` results in a fine-grained deduplication|
 and creates a big amount of chunks and thus uses a lot of resources to manage
 them. This is good for relatively small data volumes and if the machine has a
 good amount of free RAM and disk space.
 
-``--chunker-params=19,23,21,4095`` (default) results in a coarse-grained
+``--chunker-params=buzhash,19,23,21,4095`` (default) results in a coarse-grained
 deduplication and creates a much smaller amount of chunks and thus uses less
 resources. This is good for relatively big data volumes and if the machine has
 a relatively low amount of free RAM and disk space.
+
+``--chunker-params=fixed,4194304`` results in fixed 4MiB sized block
+deduplication and is more efficient than the previous example when used for
+for block devices (like disks, partitions, LVM LVs) or raw disk image files.
+
+``--chunker-params=fixed,4096,512`` results in fixed 4kiB sized blocks,
+but the first header block will only be 512B long. This might be useful to
+dedup files with 1 header + N fixed size data blocks. Be careful to not
+produce a too big amount of chunks (like using small block size for huge
+files).
 
 If you already have made some archives in a repository and you then change
 chunker params, this of course impacts deduplication as the chunks will be

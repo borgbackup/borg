@@ -396,16 +396,27 @@ Stored chunk sizes
 A borg repository does not hide the size of the chunks it stores (size
 information is needed to operate the repository).
 
-The chunks stored are the (compressed and encrypted) output of the chunker,
-chunked according to the input data, the chunker's parameters and the secret
-chunker seed (which all influence the chunk boundary positions).
+The chunks stored in the repo are the (compressed, encrypted and authenticated)
+output of the chunker. The sizes of these stored chunks are influenced by the
+compression, encryption and authentication.
+
+buzhash chunker
++++++++++++++++
+
+The buzhash chunker chunks according to the input data, the chunker's
+parameters and the secret chunker seed (which all influence the chunk boundary
+positions).
 
 Small files below some specific threshold (default: 512kiB) result in only one
 chunk (identical content / size as the original file), bigger files result in
 multiple chunks.
 
-After chunking is done, compression, encryption and authentication are applied,
-which influence the sizes of the chunks stored into the repository.
+fixed chunker
++++++++++++++
+
+This chunker yields fixed sized chunks, with optional support of a differently
+sized header chunk. The last chunk is not required to have the full block size
+and is determined by the input file size.
 
 Within our attack model, an attacker posessing a specific set of files which
 he assumes that the victim also posesses (and backups into the repository)

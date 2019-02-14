@@ -19,7 +19,8 @@ specified when the backup was performed.
 Deduplication is performed globally across all data in the repository
 (multiple backups and even multiple hosts), both on data and file
 metadata, using :ref:`chunks` created by the chunker using the
-Buzhash_ algorithm.
+Buzhash_ algorithm ("buzhash" chunker) or a simpler fixed blocksize
+algorithm ("fixed" chunker).
 
 To actually perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks cache <cache>`, which is a

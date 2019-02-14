@@ -3151,8 +3151,8 @@ class Archiver:
                                    help='write checkpoint every SECONDS seconds (Default: 1800)')
         archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
         archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
                                    type=CompressionSpec, default=CompressionSpec('lz4'),
                                    help='select compression algorithm, see the output of the '
@@ -3768,9 +3768,9 @@ class Archiver:
                                         'do not recompress.')
         archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
-                                        'default: %d,%d,%d,%d' % CHUNKER_PARAMS)
+                                        'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),

@@ -12,7 +12,7 @@ cdef extern from "_item.c":
     object _optr_to_object(object bytes)
 
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.1_04'
 
 
 class PropDict:
@@ -325,6 +325,18 @@ class Key(PropDict):
     tam_required = PropDict._make_property('tam_required', bool)
 
 
+def tuple_encode(t):
+    """encode a tuple that might contain str items"""
+    # we have str, but want to give bytes to msgpack.pack
+    return tuple(safe_encode(e) if isinstance(e, str) else e for e in t)
+
+
+def tuple_decode(t):
+    """decode a tuple that might contain bytes items"""
+    # we get bytes objects from msgpack.unpack, but want str
+    return tuple(safe_decode(e) if isinstance(e, bytes) else e for e in t)
+
+
 class ArchiveItem(PropDict):
     """
     ArchiveItem abstraction that deals with validation and the low-level details internally:
@@ -353,7 +365,7 @@ class ArchiveItem(PropDict):
     time = PropDict._make_property('time', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     time_end = PropDict._make_property('time_end', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     comment = PropDict._make_property('comment', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    chunker_params = PropDict._make_property('chunker_params', tuple)
+    chunker_params = PropDict._make_property('chunker_params', tuple, 'chunker-params tuple', encode=tuple_encode, decode=tuple_decode)
     recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
     recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str

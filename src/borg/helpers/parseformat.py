@@ -108,12 +108,38 @@ def timestamp(s):
 
 
 def ChunkerParams(s):
-    if s.strip().lower() == "default":
+    params = s.strip().split(',')
+    count = len(params)
+    if count == 0:
+        raise ValueError('no chunker params given')
+    algo = params[0].lower()
+    if algo == CH_FIXED and 2 <= count <= 3:  # fixed, block_size[, header_size]
+        block_size = int(params[1])
+        header_size = int(params[2]) if count == 3 else 0
+        if block_size < 64:
+            # we are only disallowing the most extreme cases of abuse here - this does NOT imply
+            # that cutting chunks of the minimum allowed size is efficient concerning storage
+            # or in-memory chunk management.
+            # choose the block (chunk) size wisely: if you have a lot of data and you cut
+            # it into very small chunks, you are asking for trouble!
+            raise ValueError('block_size must not be less than 64 Bytes')
+        if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
+            raise ValueError('block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE)
+        return algo, block_size, header_size
+    if algo == 'default' and count == 1:  # default
         return CHUNKER_PARAMS
-    chunk_min, chunk_max, chunk_mask, window_size = s.split(',')
-    if int(chunk_max) > 23:
-        raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
-    return int(chunk_min), int(chunk_max), int(chunk_mask), int(window_size)
+    # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
+    if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
+        chunk_min, chunk_max, chunk_mask, window_size = [int(p) for p in params[count - 4:]]
+        if not (chunk_min <= chunk_mask <= chunk_max):
+            raise ValueError('required: chunk_min <= chunk_mask <= chunk_max')
+        if chunk_min < 6:
+            # see comment in 'fixed' algo check
+            raise ValueError('min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)')
+        if chunk_max > 23:
+            raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
+        return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
+    raise ValueError('invalid chunker params')
 
 
 def FilesCacheMode(s):

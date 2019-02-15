@@ -49,12 +49,15 @@ to tweak the performance. It sets the number of cached data chunks; additional
 memory usage can be up to ~8 MiB times this number. The default is the number
 of CPU cores.
 
-For mount options, see the fuse(8) manual page. Additional mount options
-supported by borg:
+For FUSE configuration and mount options, see the mount.fuse(8) manual page.
 
+Additional mount options supported by borg:
 - allow_damaged_files: by default damaged files (where missing chunks were
   replaced with runs of zeros by borg check --repair) are not readable and
   return EIO (I/O error). Set this option to read such files.
+- ignore_permissions: for security reasons the "default_permissions" mount
+  option is internally enforced by borg. "ignore_permissions" can be given
+  to not enforce "default_permissions".
 
 When the daemonized process receives a signal or crashes, it does not unmount.
 Unmounting in these cases could cause an active rsync or similar process

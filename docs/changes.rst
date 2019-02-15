@@ -135,19 +135,19 @@ Please note: this is very likely the last 1.0.x release, please upgrade to 1.1.x
 
 Bug fixes:
 
-- security fix: configure FUSE with "default_permissions", fixes #3903
+- security fix: configure FUSE with "default_permissions", #3903.
   "default_permissions" is now enforced by borg by default to let the
   kernel check uid/gid/mode based permissions.
   "ignore_permissions" can be given to not enforce "default_permissions".
-- xattrs: fix borg exception handling on ENOSPC error, #3808
+- xattrs: fix borg exception handling on ENOSPC error, #3808.
 
 New features:
 
-- read a passphrase from a file descriptor
-  Read a passphrase from a file descriptor specified in the
+- Read a passphrase from a file descriptor specified in the
   BORG_PASSPHRASE_FD environment variable.
 
 Other changes:
+
 - acl platform code: fix acl set return type
 - xattr:
 

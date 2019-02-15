@@ -51,6 +51,9 @@ class Cache:
 
     def __init__(self, repository, key, manifest, path=None, sync=True, do_files=False, warn_if_unencrypted=True,
                  lock_wait=None):
+        """
+        :param lock_wait: timeout for lock acquisition (int [s] or None [wait forever])
+        """
         self.lock = None
         self.timestamp = None
         self.lock = None

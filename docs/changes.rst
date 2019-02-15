@@ -131,8 +131,14 @@ Changelog
 Version 1.0.13 (not released yet)
 ---------------------------------
 
+Please note: this is very likely the last 1.0.x release, please upgrade to 1.1.x.
+
 Bug fixes:
 
+- security fix: configure FUSE with "default_permissions", fixes #3903
+  "default_permissions" is now enforced by borg by default to let the
+  kernel check uid/gid/mode based permissions.
+  "ignore_permissions" can be given to not enforce "default_permissions".
 - xattrs: fix borg exception handling on ENOSPC error, #3808
 
 New features:
@@ -156,7 +162,8 @@ Other changes:
 - vagrant:
 
   - misc. fixes
-  - FUSE for macOS: upgrade 3.7.1 to 3.8.0
+  - FUSE for macOS: upgrade 3.7.1 to 3.8.3
+  - Python: upgrade 3.5.5 to 3.5.6
 - docs:
 
   - Update installation instructions for macOS

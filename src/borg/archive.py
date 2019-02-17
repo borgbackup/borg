@@ -195,6 +195,32 @@ def backup_io_iter(iterator):
         yield item
 
 
+def stat_update_check(st_old, st_curr):
+    """
+    this checks for some race conditions between the first filename-based stat()
+    we did before dispatching to the (hopefully correct) file type backup handler
+    and the (hopefully) fd-based fstat() we did in the handler.
+
+    if there is a problematic difference (e.g. file type changed), we rather
+    skip the file than being tricked into a security problem.
+
+    such races should only happen if:
+    - we are backing up a live filesystem (no snapshot, not inactive)
+    - if files change due to normal fs activity at an unfortunate time
+    - if somebody is doing an attack against us
+    """
+    # assuming that a file type change implicates a different inode change AND that inode numbers
+    # are not duplicate in a short timeframe, this check is redundant and solved by the ino check:
+    if stat.S_IFMT(st_old.st_mode) != stat.S_IFMT(st_curr.st_mode):
+        # in this case, we dispatched to wrong handler - abort
+        raise BackupError('file type changed (race condition), skipping file')
+    if st_old.st_ino != st_curr.st_ino:
+        # in this case, the hardlinks-related code in create_helper has the wrong inode - abort!
+        raise BackupError('file inode changed (race condition), skipping file')
+    # looks ok, we are still dealing with the same thing - return current stat:
+    return st_curr
+
+
 @contextmanager
 def OsOpen(*, flags, path=None, parent_fd=None, name=None, noatime=False, op='open'):
     with backup_io(op):
@@ -1085,11 +1111,7 @@ class FilesystemObjectProcessors:
         with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):
-                    curr_st = os.fstat(fd)
-                # XXX do some checks here: st vs. curr_st
-                assert stat.S_ISFIFO(curr_st.st_mode)
-                # make sure stats refer to same object that we are processing below
-                st = curr_st
+                    st = stat_update_check(st, os.fstat(fd))
                 item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
                 return status
 
@@ -1097,11 +1119,7 @@ class FilesystemObjectProcessors:
         with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
             # looks like we can not work fd-based here without causing issues when trying to open/close the device
             with backup_io('stat'):
-                curr_st = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-            # XXX do some checks here: st vs. curr_st
-            assert stat.S_ISBLK(curr_st.st_mode) or stat.S_ISCHR(curr_st.st_mode)
-            # make sure stats refer to same object that we are processing below
-            st = curr_st
+                st = stat_update_check(st, os.stat(name, dir_fd=parent_fd, follow_symlinks=False))
             item.rdev = st.st_rdev
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
@@ -1139,11 +1157,7 @@ class FilesystemObjectProcessors:
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):
-                    curr_st = os.fstat(fd)
-                # XXX do some checks here: st vs. curr_st
-                assert stat.S_ISREG(curr_st.st_mode)
-                # make sure stats refer to same object that we are processing below
-                st = curr_st
+                    st = stat_update_check(st, os.fstat(fd))
                 is_special_file = is_special(st.st_mode)
                 if not hardlinked or hardlink_master:
                     if not is_special_file:

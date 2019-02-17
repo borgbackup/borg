@@ -34,7 +34,7 @@ from . import __version__
 from . import helpers
 from .algorithms.checksums import crc32
 from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
-from .archive import BackupError, BackupOSError, backup_io, OsOpen
+from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
 from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from .cache import Cache, assert_secure, SecurityManager
 from .constants import *  # NOQA
@@ -596,11 +596,7 @@ class Archiver:
                 with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
                             noatime=True, op='dir_open') as child_fd:
                     with backup_io('fstat'):
-                        curr_st = os.fstat(child_fd)
-                    # XXX do some checks here: st vs. curr_st
-                    assert stat.S_ISDIR(curr_st.st_mode)
-                    # make sure stats refer to same object that we are processing below
-                    st = curr_st
+                        st = stat_update_check(st, os.fstat(child_fd))
                     if recurse:
                         tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present)
                         if tag_names:
@@ -677,7 +673,7 @@ class Archiver:
             else:
                 self.print_warning('Unknown file type: %s', path)
                 return
-        except BackupOSError as e:
+        except (BackupOSError, BackupError) as e:
             self.print_warning('%s: %s', path, e)
             status = 'E'
         # Status output

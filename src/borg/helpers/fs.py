@@ -202,7 +202,7 @@ def O_(*flags):
     return result
 
 
-flags_base = O_('BINARY', 'NONBLOCK', 'NOCTTY')  # later: add 'NOFOLLOW'
+flags_base = O_('BINARY', 'NONBLOCK', 'NOCTTY', 'NOFOLLOW')
 flags_normal = flags_base | O_('RDONLY')
 flags_noatime = flags_normal | O_('NOATIME')
 flags_root = O_('RDONLY')

@@ -66,7 +66,7 @@ from .helpers import ChunkIteratorFileWrapper
 from .helpers import popen_with_error_handling, prepare_subprocess_env
 from .helpers import dash_open
 from .helpers import umount
-from .helpers import flags_root, flags_dir
+from .helpers import flags_root, flags_dir, flags_follow
 from .helpers import msgpack
 from .nanorst import rst_to_terminal
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
@@ -639,8 +639,8 @@ class Archiver:
                         else:
                             special = is_special(st_target.st_mode)
                         if special:
-                            # XXX must FOLLOW symlinks!
-                            status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target, cache=cache)
+                            status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target,
+                                                      cache=cache, flags=flags_follow)
                         else:
                             status = fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
             elif stat.S_ISFIFO(st.st_mode):

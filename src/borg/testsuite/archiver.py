@@ -2639,6 +2639,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert export_contents.startswith('<!doctype html>')
         assert export_contents.endswith('</html>')
 
+    def test_key_export_directory(self):
+        export_directory = self.output_path + '/exported'
+        os.mkdir(export_directory)
+
+        self.cmd('init', self.repository_location, '--encryption', 'repokey')
+
+        self.cmd('key', 'export', self.repository_location, export_directory, exit_code=EXIT_ERROR)
+
     def test_key_import_errors(self):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')

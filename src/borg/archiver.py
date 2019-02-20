@@ -1048,6 +1048,8 @@ class Archiver:
 
         manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
 
+        list_logger = logging.getLogger('borg.output.list')
+
         if args.location.archive or args.archives:
             archives = list(args.archives)
             if args.location.archive:
@@ -1061,6 +1063,7 @@ class Archiver:
         if args.forced == 2:
             deleted = False
             for i, archive_name in enumerate(archive_names, 1):
+                current_archive = manifest.archives[archive_name]
                 try:
                     del manifest.archives[archive_name]
                 except KeyError:
@@ -1070,6 +1073,11 @@ class Archiver:
                     deleted = True
                     msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
                     logger.info(msg.format(archive_name, i, len(archive_names)))
+                    list_msg = 'Would delete archive:' if dry_run else 'Deleted archive:'
+                    if args.output_list:
+                        list_logger.info("{message:<40} {archive}".format(
+                            message=list_msg, archive=format_archive(current_archive)
+                        ))
             if dry_run:
                 logger.info('Finished dry-run.')
             elif deleted:
@@ -1084,11 +1092,18 @@ class Archiver:
         stats = Statistics()
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             for i, archive_name in enumerate(archive_names, 1):
+                current_archive = manifest.archives[archive_name]
                 msg = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
+                list_msg = 'Would delete archive:' if dry_run else 'Deleting archive:'
                 logger.info(msg.format(archive_name, i, len(archive_names)))
                 if not dry_run:
                     Archive(repository, key, manifest, archive_name, cache=cache).delete(
                         stats, progress=args.progress, forced=args.forced)
+                if args.output_list:
+                    list_logger.info("{message:<40} {archive}".format(
+                        message=list_msg, archive=format_archive(current_archive)
+                ))
+
             if not dry_run:
                 manifest.write()
                 repository.commit(compact=False, save_space=args.save_space)
@@ -3356,6 +3371,8 @@ class Archiver:
                                help='do not change repository')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output list of archives it deletes')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
                                help='delete only the local cache for the given repository')
         subparser.add_argument('--force', dest='forced',

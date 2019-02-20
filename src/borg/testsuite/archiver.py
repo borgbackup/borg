@@ -1447,6 +1447,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test3', 'input')
         self.cmd('delete', self.repository_location + '::test1', 'test2')
         self.cmd('extract', '--dry-run', self.repository_location + '::test3')
+        output = self.cmd('delete', '--list', '--dry-run', self.repository_location, 'test3')
+        assert re.search(r'Would delete archive:\s+test3', output)
         self.cmd('delete', self.repository_location, 'test3')
         assert not self.cmd('list', self.repository_location)
 
@@ -1491,6 +1493,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             id = archive.metadata.items[0]
             repository.put(id, b'corrupted items metadata stream chunk')
             repository.commit(compact=False)
+        output = self.cmd('delete', '--list', '--dry-run', '--force', '--force', self.repository_location, 'test')
+        assert re.search(r'Would delete archive:\s+test', output)
         self.cmd('delete', '--force', '--force', self.repository_location + '::test')
         self.cmd('check', '--repair', self.repository_location)
         output = self.cmd('list', self.repository_location)

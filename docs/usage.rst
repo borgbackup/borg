@@ -17,7 +17,10 @@ Usage
 
    // Redirect to general docs
    if(hash == "") {
-       window.location.pathname = window.location.pathname.replace("usage.html", "usage/general.html");
+       var replaced = window.location.pathname.replace("usage.html", "usage/general.html");
+       if (replaced != window.location.pathname) {
+           window.location.pathname = replaced;
+       }
    }
    // Fixup anchored links from when usage.html contained all the commands
    else if(hash.startsWith("borg-key") || hash == "borg-change-passphrase") {

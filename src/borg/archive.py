@@ -38,6 +38,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import os_open, flags_normal
 from .helpers import msgpack
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
@@ -46,9 +47,6 @@ from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
 has_lchmod = hasattr(os, 'lchmod')
-
-flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
-flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
 
 
 class Statistics:
@@ -195,6 +193,42 @@ def backup_io_iter(iterator):
             except StopIteration:
                 return
         yield item
+
+
+def stat_update_check(st_old, st_curr):
+    """
+    this checks for some race conditions between the first filename-based stat()
+    we did before dispatching to the (hopefully correct) file type backup handler
+    and the (hopefully) fd-based fstat() we did in the handler.
+
+    if there is a problematic difference (e.g. file type changed), we rather
+    skip the file than being tricked into a security problem.
+
+    such races should only happen if:
+    - we are backing up a live filesystem (no snapshot, not inactive)
+    - if files change due to normal fs activity at an unfortunate time
+    - if somebody is doing an attack against us
+    """
+    # assuming that a file type change implicates a different inode change AND that inode numbers
+    # are not duplicate in a short timeframe, this check is redundant and solved by the ino check:
+    if stat.S_IFMT(st_old.st_mode) != stat.S_IFMT(st_curr.st_mode):
+        # in this case, we dispatched to wrong handler - abort
+        raise BackupError('file type changed (race condition), skipping file')
+    if st_old.st_ino != st_curr.st_ino:
+        # in this case, the hardlinks-related code in create_helper has the wrong inode - abort!
+        raise BackupError('file inode changed (race condition), skipping file')
+    # looks ok, we are still dealing with the same thing - return current stat:
+    return st_curr
+
+
+@contextmanager
+def OsOpen(*, flags, path=None, parent_fd=None, name=None, noatime=False, op='open'):
+    with backup_io(op):
+        fd = os_open(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=noatime)
+    try:
+        yield fd
+    finally:
+        os.close(fd)
 
 
 class DownloadPipeline:
@@ -827,18 +861,6 @@ Utilization of max. archive size: {csize_max:.0%}
             logger.warning('borg check --repair is required to free all space.')
 
     @staticmethod
-    def _open_rb(path):
-        try:
-            # if we have O_NOATIME, this likely will succeed if we are root or owner of file:
-            return os.open(path, flags_noatime)
-        except PermissionError:
-            if flags_noatime == flags_normal:
-                # we do not have O_NOATIME, no need to try again:
-                raise
-            # Was this EPERM due to the O_NOATIME flag? Try again without it:
-            return os.open(path, flags_normal)
-
-    @staticmethod
     def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False):
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
@@ -958,9 +980,9 @@ class MetadataCollector:
         attrs = {}
         bsdflags = 0
         with backup_io('extended stat'):
-            xattrs = xattr.get_all(fd or path, follow_symlinks=False)
             if not self.nobsdflags:
                 bsdflags = get_flags(path, st, fd=fd)
+            xattrs = xattr.get_all(fd or path, follow_symlinks=False)
             acl_get(path, attrs, st, self.numeric_owner, fd=fd)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
@@ -1080,34 +1102,41 @@ class FilesystemObjectProcessors:
         if hardlink_master:
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
 
-    def process_dir(self, path, st):
+    def process_dir(self, *, path, fd, st):
         with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
-            item.update(self.metadata_collector.stat_attrs(st, path))
+            item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
             return status
 
-    def process_fifo(self, path, st):
+    def process_fifo(self, *, path, parent_fd, name, st):
         with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
-            item.update(self.metadata_collector.stat_attrs(st, path))
-            return status
+            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
+                with backup_io('fstat'):
+                    st = stat_update_check(st, os.fstat(fd))
+                item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
+                return status
 
-    def process_dev(self, path, st, dev_type):
+    def process_dev(self, *, path, parent_fd, name, st, dev_type):
         with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
+            # looks like we can not work fd-based here without causing issues when trying to open/close the device
+            with backup_io('stat'):
+                st = stat_update_check(st, os.stat(name, dir_fd=parent_fd, follow_symlinks=False))
             item.rdev = st.st_rdev
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
-    def process_symlink(self, path, st):
+    def process_symlink(self, *, path, parent_fd, name, st):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
         # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
         with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+            fname = name if name is not None and parent_fd is not None else path
             with backup_io('readlink'):
-                source = os.readlink(path)
+                source = os.readlink(fname, dir_fd=parent_fd)
             item.source = source
-            item.update(self.metadata_collector.stat_attrs(st, path))
+            item.update(self.metadata_collector.stat_attrs(st, path))  # can't use FD here?
             return status
 
-    def process_stdin(self, path, cache):
+    def process_stdin(self, *, path, cache):
         uid, gid = 0, 0
         t = int(time.time()) * 1000000000
         item = Item(
@@ -1124,63 +1153,55 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         return 'i'  # stdin
 
-    def process_file(self, path, st, cache):
+    def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
-            md = None
-            is_special_file = is_special(st.st_mode)
-            if not hardlinked or hardlink_master:
-                if not is_special_file:
-                    path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                    known, ids = cache.file_known_and_unchanged(path_hash, st)
-                else:
-                    # in --read-special mode, we may be called for special files.
-                    # there should be no information in the cache about special files processed in
-                    # read-special mode, but we better play safe as this was wrong in the past:
-                    path_hash = None
-                    known, ids = False, None
-                chunks = None
-                if ids is not None:
-                    # Make sure all ids are available
-                    for id_ in ids:
-                        if not cache.seen_chunk(id_):
-                            status = 'M'  # cache said it is unmodified, but we lost a chunk: process file like modified
-                            break
+            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
+                with backup_io('fstat'):
+                    st = stat_update_check(st, os.fstat(fd))
+                is_special_file = is_special(st.st_mode)
+                if not hardlinked or hardlink_master:
+                    if not is_special_file:
+                        path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
+                        known, ids = cache.file_known_and_unchanged(path_hash, st)
                     else:
-                        chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
-                        status = 'U'  # regular file, unchanged
-                else:
-                    status = 'M' if known else 'A'  # regular file, modified or added
-                item.hardlink_master = hardlinked
-                item.update(self.metadata_collector.stat_simple_attrs(st))
-                # Only chunkify the file if needed
-                if chunks is not None:
-                    item.chunks = chunks
-                else:
-                    with backup_io('open'):
-                        fh = Archive._open_rb(path)
-                        try:
-                            self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fh)))
-                            md = self.metadata_collector.stat_attrs(st, path, fd=fh)
-                        finally:
-                            os.close(fh)
+                        # in --read-special mode, we may be called for special files.
+                        # there should be no information in the cache about special files processed in
+                        # read-special mode, but we better play safe as this was wrong in the past:
+                        path_hash = None
+                        known, ids = False, None
+                    chunks = None
+                    if ids is not None:
+                        # Make sure all ids are available
+                        for id_ in ids:
+                            if not cache.seen_chunk(id_):
+                                status = 'M'  # cache said it is unmodified, but we lost a chunk: process file like modified
+                                break
+                        else:
+                            chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
+                            status = 'U'  # regular file, unchanged
+                    else:
+                        status = 'M' if known else 'A'  # regular file, modified or added
+                    item.hardlink_master = hardlinked
+                    item.update(self.metadata_collector.stat_simple_attrs(st))
+                    # Only chunkify the file if needed
+                    if chunks is not None:
+                        item.chunks = chunks
+                    else:
+                        with backup_io('read'):
+                            self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
                         if not is_special_file:
                             # we must not memorize special files, because the contents of e.g. a
                             # block or char device will change without its mtime/size/inode changing.
                             cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
-                self.stats.nfiles += 1
-            if md is None:
-                fh = Archive._open_rb(path)
-                try:
-                    md = self.metadata_collector.stat_attrs(st, path, fd=fh)
-                finally:
-                    os.close(fh)
-            item.update(md)
-            item.get_size(memorize=True)
-            if is_special_file:
-                # we processed a special file like a regular file. reflect that in mode,
-                # so it can be extracted / accessed in FUSE mount like a regular file:
-                item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-            return status
+                    self.stats.nfiles += 1
+                md = self.metadata_collector.stat_attrs(st, path, fd=fd)
+                item.update(md)
+                item.get_size(memorize=True)
+                if is_special_file:
+                    # we processed a special file like a regular file. reflect that in mode,
+                    # so it can be extracted / accessed in FUSE mount like a regular file:
+                    item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
+                return status
 
 
 def valid_msgpacked_dict(d, keys_serialized):

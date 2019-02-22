@@ -15,6 +15,9 @@ from ..logger import create_logger
 logger = create_logger()
 
 
+py_37_plus = sys.version_info >= (3, 7)
+
+
 def get_base_dir():
     """Get home directory / base directory for borg:
 
@@ -103,18 +106,19 @@ def dir_is_cachedir(path):
 def dir_is_tagged(path, exclude_caches, exclude_if_present):
     """Determines whether the specified path is excluded by being a cache
     directory or containing user-specified tag files/directories. Returns a
-    list of the paths of the tag files/directories (either CACHEDIR.TAG or the
+    list of the names of the tag files/directories (either CACHEDIR.TAG or the
     matching user-specified files/directories).
     """
-    tag_paths = []
+    # TODO: do operations based on the directory fd
+    tag_names = []
     if exclude_caches and dir_is_cachedir(path):
-        tag_paths.append(os.path.join(path, CACHE_TAG_NAME))
+        tag_names.append(CACHE_TAG_NAME)
     if exclude_if_present is not None:
         for tag in exclude_if_present:
             tag_path = os.path.join(path, tag)
             if os.path.exists(tag_path):
-                tag_paths.append(tag_path)
-    return tag_paths
+                tag_names.append(tag)
+    return tag_names
 
 
 _safe_re = re.compile(r'^((\.\.)?/+)+')
@@ -144,8 +148,10 @@ def scandir_keyfunc(dirent):
         return (1, dirent.name)
 
 
-def scandir_inorder(path='.'):
-    return sorted(os.scandir(path), key=scandir_keyfunc)
+def scandir_inorder(*, path, fd=None):
+    # py37+ supports giving an fd instead of a path (no full entry.path in DirEntry in that case!)
+    arg = fd if fd is not None and py_37_plus else path
+    return sorted(os.scandir(arg), key=scandir_keyfunc)
 
 
 def secure_erase(path):
@@ -187,6 +193,53 @@ def dash_open(path, mode):
         return stream.buffer if 'b' in mode else stream
     else:
         return open(path, mode)
+
+
+def O_(*flags):
+    result = 0
+    for flag in flags:
+        result |= getattr(os, 'O_' + flag, 0)
+    return result
+
+
+flags_base = O_('BINARY', 'NONBLOCK', 'NOCTTY')
+flags_follow = flags_base | O_('RDONLY')
+flags_normal = flags_base | O_('RDONLY', 'NOFOLLOW')
+flags_noatime = flags_normal | O_('NOATIME')
+flags_root = O_('RDONLY')
+flags_dir = O_('DIRECTORY', 'RDONLY', 'NOFOLLOW')
+
+
+def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
+    """
+    Use os.open to open a fs item.
+
+    If parent_fd and name are given, they are preferred and openat will be used,
+    path is not used in this case.
+
+    :param path: full (but not necessarily absolute) path
+    :param parent_fd: open directory file descriptor
+    :param name: name relative to parent_fd
+    :param flags: open flags for os.open() (int)
+    :param noatime: True if access time shall be preserved
+    :return: file descriptor
+    """
+    fname = name if name is not None and parent_fd is not None else path
+    _flags_normal = flags
+    if noatime:
+        _flags_noatime = _flags_normal | O_('NOATIME')
+        try:
+            # if we have O_NOATIME, this likely will succeed if we are root or owner of file:
+            fd = os.open(fname, _flags_noatime, dir_fd=parent_fd)
+        except PermissionError:
+            if _flags_noatime == _flags_normal:
+                # we do not have O_NOATIME, no need to try again:
+                raise
+            # Was this EPERM due to the O_NOATIME flag? Try again without it:
+            fd = os.open(fname, _flags_normal, dir_fd=parent_fd)
+    else:
+        fd = os.open(fname, _flags_normal, dir_fd=parent_fd)
+    return fd
 
 
 def umount(mountpoint):

@@ -32,7 +32,7 @@ except ImportError:
 
 import borg
 from .. import xattr, helpers, platform
-from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
+from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, parse_storage_quota
 from ..cache import Cache, LocalCache
 from ..constants import *  # NOQA
@@ -46,6 +46,7 @@ from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
 from ..helpers import msgpack
+from ..helpers import flags_noatime, flags_normal
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff
@@ -1778,6 +1779,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # should list the file as changed
         output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
+
+    def test_create_read_special(self):
+        self.create_regular_file('regular', size=1024)
+        os.symlink(os.path.join(self.input_path, 'file'), os.path.join(self.input_path, 'link_regular'))
+        if are_fifos_supported():
+            os.mkfifo(os.path.join(self.input_path, 'fifo'))
+            os.symlink(os.path.join(self.input_path, 'fifo'), os.path.join(self.input_path, 'link_fifo'))
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', '--read-special', archive, 'input')
+        output = self.cmd('list', archive)
+        assert 'input/link_regular -> ' in output  # not pointing to special file: archived as symlink
+        if are_fifos_supported():
+            assert 'input/link_fifo\n' in output  # pointing to a special file: archived following symlink
 
     def test_create_read_special_broken_symlink(self):
         os.symlink('somewhere doesnt exist', os.path.join(self.input_path, 'link'))

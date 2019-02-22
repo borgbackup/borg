@@ -233,10 +233,11 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
     cdef char *default_text = NULL
     cdef char *access_text = NULL
 
-    if fd is None and isinstance(path, str):
-        path = os.fsencode(path)
     if stat.S_ISLNK(st.st_mode):
+        # symlinks can not have ACLs
         return
+    if isinstance(path, str):
+        path = os.fsencode(path)
     if (fd is not None and acl_extended_fd(fd) <= 0
         or
         fd is None and acl_extended_file(path) <= 0):
@@ -247,12 +248,11 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         converter = acl_append_numeric_ids
     try:
         if fd is not None:
-            # we only have a fd for FILES (not other fs objects), so we can get the access_acl:
-            assert stat.S_ISREG(st.st_mode)
             access_acl = acl_get_fd(fd)
         else:
-            # if we have no fd, it can be anything
             access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
+        if stat.S_ISDIR(st.st_mode):
+            # only directories can have a default ACL. there is no fd-based api to get it.
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
         if access_acl:
             access_text = acl_to_text(access_acl, NULL)
@@ -299,11 +299,8 @@ def acl_set(path, item, numeric_owner=False, fd=None):
         try:
             default_acl = acl_from_text(<bytes>converter(default_text))
             if default_acl:
-                # default acls apply only to directories
-                if False and fd is not None:  # Linux API seems to not support this
-                    acl_set_fd(fd, default_acl)
-                else:
-                    acl_set_file(path, ACL_TYPE_DEFAULT, default_acl)
+                # only directories can get a default ACL. there is no fd-based api to set it.
+                acl_set_file(path, ACL_TYPE_DEFAULT, default_acl)
         finally:
             acl_free(default_acl)
 

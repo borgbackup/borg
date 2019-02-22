@@ -326,10 +326,14 @@ class Archiver:
             if not args.path:
                 self.print_error("output file to export key to expected")
                 return EXIT_ERROR
-            if args.qr:
-                manager.export_qr(args.path)
-            else:
-                manager.export(args.path)
+            try:
+                if args.qr:
+                    manager.export_qr(args.path)
+                else:
+                    manager.export(args.path)
+            except IsADirectoryError:
+                self.print_error("'{}' must be a file, not a directory".format(args.path))
+                return EXIT_ERROR
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)

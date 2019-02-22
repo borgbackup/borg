@@ -1843,7 +1843,7 @@ class Archiver:
             if wanted.startswith('hex:'):
                 wanted = unhexlify(wanted[4:])
             elif wanted.startswith('str:'):
-                wanted = wanted[4:].encode('utf-8')
+                wanted = wanted[4:].encode()
             else:
                 raise ValueError('unsupported search term')
         except (ValueError, UnicodeEncodeError):

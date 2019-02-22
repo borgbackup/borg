@@ -848,7 +848,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         self.stderr_received = lines.pop()
                     # now we have complete lines in <lines> and any partial line in self.stderr_received.
                     for line in lines:
-                        handle_remote_line(line.decode('utf-8'))  # decode late, avoid partial utf-8 sequences
+                        handle_remote_line(line.decode())  # decode late, avoid partial utf-8 sequences
             if w:
                 while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:

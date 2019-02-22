@@ -34,7 +34,7 @@ def main():
         try:
             output = subprocess.check_output(objdump % filename, shell=True,
                                              stderr=subprocess.STDOUT)
-            output = output.decode('utf-8')
+            output = output.decode()
             versions = set(parse_version(match.group(1))
                            for match in glibc_re.finditer(output))
             requires_glibc = max(versions)

@@ -54,7 +54,7 @@ class Archives(abc.MutableMapping):
         values = self._archives.get(_name)
         if values is None:
             raise KeyError
-        ts = parse_timestamp(values[b'time'].decode('utf-8'))
+        ts = parse_timestamp(values[b'time'].decode())
         return ArchiveInfo(name=name, id=values[b'id'], ts=ts)
 
     def __setitem__(self, name, info):

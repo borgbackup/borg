@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 *-*
 # Support code for building docs (build_usage, build_man)
 
 import os

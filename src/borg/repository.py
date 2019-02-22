@@ -690,11 +690,11 @@ class Repository:
         """Compact sparse segments by copying data into new segments
         """
         if not self.compact:
+            logger.debug('nothing to do: compact empty')
             return
         index_transaction_id = self.get_index_transaction_id()
         segments = self.segments
         unused = []  # list of segments, that are not used anymore
-        logger = create_logger('borg.debug.compact_segments')
 
         def complete_xfer(intermediate=True):
             # complete the current transfer (when some target segment is full)
@@ -723,13 +723,17 @@ class Repository:
                 pi.show()
                 continue
             segment_size = self.io.segment_size(segment)
-            if segment_size > 0.2 * self.max_segment_size and freeable_space < 0.15 * segment_size:
-                logger.debug('not compacting segment %d (only %d bytes are sparse)', segment, freeable_space)
+            freeable_ratio = 1.0 * freeable_space / segment_size
+            # we want to compact if:
+            # - we can free a considerable relative amount of space (freeable_ratio over some threshold)
+            if not (freeable_ratio > 0.1):
+                logger.debug('not compacting segment %d (freeable: %2.2f%% [%d bytes])',
+                             segment, freeable_ratio * 100.0, freeable_space)
                 pi.show()
                 continue
             segments.setdefault(segment, 0)
-            logger.debug('compacting segment %d with usage count %d and %d freeable bytes',
-                         segment, segments[segment], freeable_space)
+            logger.debug('compacting segment %d with usage count %d (freeable: %2.2f%% [%d bytes])',
+                         segment, segments[segment], freeable_ratio * 100.0, freeable_space)
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_COMMIT:
                     continue

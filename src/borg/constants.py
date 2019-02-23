@@ -10,7 +10,7 @@ REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
                           'comment', 'chunker_params',
-                          'recreate_cmdline', 'recreate_source_id', 'recreate_args'])
+                          'recreate_cmdline', 'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',])
 
 # this is the set of keys that are always present in archives:
 REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])

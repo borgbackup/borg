@@ -549,30 +549,48 @@ Utilization of max. archive size: {csize_max:.0%}
         self.repository.commit(compact=False)
         self.cache.commit()
 
-    def calc_stats(self, cache):
-        def add(id):
-            entry = cache.chunks[id]
-            archive_index.add(id, 1, entry.size, entry.csize)
+    def calc_stats(self, cache, want_unique=True):
+        have_borg12_meta = self.metadata.get('nfiles') is not None
 
-        archive_index = ChunkIndex()
-        sync = CacheSynchronizer(archive_index)
-        add(self.id)
-        pi = ProgressIndicatorPercent(total=len(self.metadata.items), msg='Calculating statistics... %3d%%')
-        for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
-            pi.show(increase=1)
-            add(id)
-            data = self.key.decrypt(id, chunk)
-            sync.feed(data)
-        unique_csize = archive_index.stats_against(cache.chunks)[3]
-        pi.finish()
+        if have_borg12_meta and not want_unique:
+            unique_csize = 0
+        else:
+            def add(id):
+                entry = cache.chunks[id]
+                archive_index.add(id, 1, entry.size, entry.csize)
+
+            archive_index = ChunkIndex()
+            sync = CacheSynchronizer(archive_index)
+            add(self.id)
+            pi = ProgressIndicatorPercent(total=len(self.metadata.items), msg='Calculating statistics... %3d%%')
+            for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
+                pi.show(increase=1)
+                add(id)
+                data = self.key.decrypt(id, chunk)
+                sync.feed(data)
+            unique_csize = archive_index.stats_against(cache.chunks)[3]
+            pi.finish()
+
         stats = Statistics()
-        stats.nfiles = sync.num_files_totals if self.consider_part_files \
-                       else sync.num_files_totals - sync.num_files_parts
-        stats.osize = sync.size_totals if self.consider_part_files \
-                      else sync.size_totals - sync.size_parts
-        stats.csize = sync.csize_totals if self.consider_part_files \
-                      else sync.csize_totals - sync.csize_parts
         stats.usize = unique_csize  # the part files use same chunks as the full file
+        if not have_borg12_meta:
+            if self.consider_part_files:
+                stats.nfiles = sync.num_files_totals
+                stats.osize = sync.size_totals
+                stats.csize = sync.csize_totals
+            else:
+                stats.nfiles = sync.num_files_totals - sync.num_files_parts
+                stats.osize = sync.size_totals - sync.size_parts
+                stats.csize = sync.csize_totals - sync.csize_parts
+        else:
+            if self.consider_part_files:
+                stats.nfiles = self.metadata.nfiles_parts + self.metadata.nfiles
+                stats.osize = self.metadata.size_parts + self.metadata.size
+                stats.csize = self.metadata.csize_parts + self.metadata.csize
+            else:
+                stats.nfiles = self.metadata.nfiles
+                stats.osize = self.metadata.size
+                stats.csize = self.metadata.csize
         return stats
 
     @contextmanager

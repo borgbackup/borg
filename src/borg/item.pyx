@@ -12,7 +12,7 @@ cdef extern from "_item.c":
     object _optr_to_object(object bytes)
 
 
-API_VERSION = '1.1_05'
+API_VERSION = '1.1_06'
 
 
 class PropDict:
@@ -368,6 +368,12 @@ class ArchiveItem(PropDict):
     recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
     recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
+    size = PropDict._make_property('size', int)
+    csize = PropDict._make_property('csize', int)
+    nfiles = PropDict._make_property('nfiles', int)
+    size_parts = PropDict._make_property('size_parts', int)
+    csize_parts = PropDict._make_property('csize_parts', int)
+    nfiles_parts = PropDict._make_property('nfiles_parts', int)
 
 
 class ManifestItem(PropDict):

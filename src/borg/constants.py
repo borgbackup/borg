@@ -12,7 +12,7 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'us
                           'comment', 'chunker_params',
                           'recreate_cmdline',
                           'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',  # used in 1.1.0b1 .. b2
-                          ])
+                          'size', 'csize', 'nfiles', 'size_parts', 'csize_parts', 'nfiles_parts', ])
 
 # this is the set of keys that are always present in archives:
 REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])

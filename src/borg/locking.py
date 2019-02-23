@@ -173,7 +173,8 @@ class ExclusiveLock:
             if not self.kill_stale_locks:
                 if not self.stale_warning_printed:
                     # Log this at warning level to hint the user at the ability
-                    logger.warning("Found stale lock %s, but not deleting because BORG_HOSTNAME_IS_UNIQUE is False.", name)
+                    logger.warning("Found stale lock %s, but not deleting because both "
+                                   "BORG_HOSTNAME_IS_UNIQUE and BORG_MAC_IS_UNIQUE are False.", name)
                     self.stale_warning_printed = True
                 return False
 

@@ -22,7 +22,7 @@ from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
 from .helpers import get_base_dir
 from .helpers import get_limited_unpacker
-from .helpers import hostname_is_unique
+from .helpers import hostname_is_unique, mac_is_unique
 from .helpers import replace_placeholders
 from .helpers import sysinfo
 from .helpers import format_file_size
@@ -681,6 +681,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         env_vars = []
         if not hostname_is_unique():
             env_vars.append('BORG_HOSTNAME_IS_UNIQUE=no')
+        if not mac_is_unique():
+            env_vars.append('BORG_MAC_IS_UNIQUE=no')
         if testing:
             return env_vars + [sys.executable, '-m', 'borg.archiver', 'serve'] + opts + self.extra_test_args
         else:  # pragma: no cover

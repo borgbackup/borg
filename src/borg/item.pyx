@@ -1,7 +1,7 @@
 import stat
 from collections import namedtuple
 
-from .constants import ITEM_KEYS
+from .constants import ITEM_KEYS, ARCHIVE_KEYS
 from .helpers import safe_encode, safe_decode
 from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
@@ -349,10 +349,7 @@ class ArchiveItem(PropDict):
     If a ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
-                  'comment', 'chunker_params',
-                  'recreate_cmdline', 'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',
-                  }  # str-typed keys
+    VALID_KEYS = ARCHIVE_KEYS  # str-typed keys
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 

@@ -12,7 +12,7 @@ cdef extern from "_item.c":
     object _optr_to_object(object bytes)
 
 
-API_VERSION = '1.1_04'
+API_VERSION = '1.1_05'
 
 
 class PropDict:
@@ -363,8 +363,9 @@ class ArchiveItem(PropDict):
     time_end = PropDict._make_property('time_end', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     comment = PropDict._make_property('comment', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     chunker_params = PropDict._make_property('chunker_params', tuple, 'chunker-params tuple', encode=tuple_encode, decode=tuple_decode)
-    recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
     recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
+    # recreate_source_id, recreate_args, recreate_partial_chunks were used in 1.1.0b1 .. b2
+    recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
     recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
 

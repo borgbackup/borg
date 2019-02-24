@@ -903,11 +903,11 @@ class LocalCache(CacheStatsMixin):
                             id, stored_size, size))
         return refcount
 
-    def chunk_incref(self, id, stats, size=None):
+    def chunk_incref(self, id, stats, size=None, part=False):
         if not self.txn_active:
             self.begin_txn()
         count, _size, csize = self.chunks.incref(id)
-        stats.update(_size, csize, False)
+        stats.update(_size, csize, False, part=part)
         return ChunkListEntry(id, _size, csize)
 
     def chunk_decref(self, id, stats, wait=True):
@@ -1047,7 +1047,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
             self.chunks[id] = entry._replace(size=size)
         return entry.refcount
 
-    def chunk_incref(self, id, stats, size=None):
+    def chunk_incref(self, id, stats, size=None, part=False):
         if not self._txn_active:
             self.begin_txn()
         count, _size, csize = self.chunks.incref(id)
@@ -1055,7 +1055,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
         size = _size or size
         assert size
-        stats.update(size, csize, False)
+        stats.update(size, csize, False, part=part)
         return ChunkListEntry(id, size, csize)
 
     def chunk_decref(self, id, stats, wait=True):

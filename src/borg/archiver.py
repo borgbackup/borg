@@ -502,11 +502,11 @@ class Archiver:
                                   keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
                                   restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
-                archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:
                     archive.stats.show_progress(final=True)
-                args.stats |= args.json
                 archive.stats += fso.stats
+                archive.save(comment=args.comment, timestamp=args.timestamp, stats=archive.stats)
+                args.stats |= args.json
                 if args.stats:
                     if args.json:
                         json_print(basic_json_data(manifest, cache=cache, extra={

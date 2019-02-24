@@ -54,13 +54,20 @@ class Statistics:
     def __init__(self, output_json=False):
         self.output_json = output_json
         self.osize = self.csize = self.usize = self.nfiles = 0
+        self.osize_parts = self.csize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
 
-    def update(self, size, csize, unique):
-        self.osize += size
-        self.csize += csize
-        if unique:
-            self.usize += csize
+    def update(self, size, csize, unique, part=False):
+        if not part:
+            self.osize += size
+            self.csize += csize
+            if unique:
+                self.usize += csize
+        else:
+            self.osize_parts += size
+            self.csize_parts += csize
+            if unique:
+                self.usize_parts += csize
 
     def __add__(self, other):
         if not isinstance(other, Statistics):
@@ -70,6 +77,10 @@ class Statistics:
         stats.csize = self.csize + other.csize
         stats.usize = self.usize + other.usize
         stats.nfiles = self.nfiles + other.nfiles
+        stats.osize_parts = self.osize_parts + other.osize_parts
+        stats.csize_parts = self.csize_parts + other.csize_parts
+        stats.usize_parts = self.usize_parts + other.usize_parts
+        stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
         return stats
 
     summary = "{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"
@@ -492,7 +503,7 @@ Utilization of max. archive size: {csize_max:.0%}
         del self.manifest.archives[self.checkpoint_name]
         self.cache.chunk_decref(self.id, self.stats)
 
-    def save(self, name=None, comment=None, timestamp=None, additional_metadata=None):
+    def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
         name = name or self.name
         if name in self.manifest.archives:
             raise self.AlreadyExists(name)
@@ -518,6 +529,14 @@ Utilization of max. archive size: {csize_max:.0%}
             'time_end': end.strftime(ISO_FORMAT),
             'chunker_params': self.chunker_params,
         }
+        if stats is not None:
+            metadata.update({
+                'size': stats.osize,
+                'csize': stats.csize,
+                'nfiles': stats.nfiles,
+                'size_parts': stats.osize_parts,
+                'csize_parts': stats.csize_parts,
+                'nfiles_parts': stats.nfiles_parts})
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
@@ -530,30 +549,48 @@ Utilization of max. archive size: {csize_max:.0%}
         self.repository.commit(compact=False)
         self.cache.commit()
 
-    def calc_stats(self, cache):
-        def add(id):
-            entry = cache.chunks[id]
-            archive_index.add(id, 1, entry.size, entry.csize)
+    def calc_stats(self, cache, want_unique=True):
+        have_borg12_meta = self.metadata.get('nfiles') is not None
 
-        archive_index = ChunkIndex()
-        sync = CacheSynchronizer(archive_index)
-        add(self.id)
-        pi = ProgressIndicatorPercent(total=len(self.metadata.items), msg='Calculating statistics... %3d%%')
-        for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
-            pi.show(increase=1)
-            add(id)
-            data = self.key.decrypt(id, chunk)
-            sync.feed(data)
-        unique_csize = archive_index.stats_against(cache.chunks)[3]
-        pi.finish()
+        if have_borg12_meta and not want_unique:
+            unique_csize = 0
+        else:
+            def add(id):
+                entry = cache.chunks[id]
+                archive_index.add(id, 1, entry.size, entry.csize)
+
+            archive_index = ChunkIndex()
+            sync = CacheSynchronizer(archive_index)
+            add(self.id)
+            pi = ProgressIndicatorPercent(total=len(self.metadata.items), msg='Calculating statistics... %3d%%')
+            for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
+                pi.show(increase=1)
+                add(id)
+                data = self.key.decrypt(id, chunk)
+                sync.feed(data)
+            unique_csize = archive_index.stats_against(cache.chunks)[3]
+            pi.finish()
+
         stats = Statistics()
-        stats.nfiles = sync.num_files_totals if self.consider_part_files \
-                       else sync.num_files_totals - sync.num_files_parts
-        stats.osize = sync.size_totals if self.consider_part_files \
-                      else sync.size_totals - sync.size_parts
-        stats.csize = sync.csize_totals if self.consider_part_files \
-                      else sync.csize_totals - sync.csize_parts
         stats.usize = unique_csize  # the part files use same chunks as the full file
+        if not have_borg12_meta:
+            if self.consider_part_files:
+                stats.nfiles = sync.num_files_totals
+                stats.osize = sync.size_totals
+                stats.csize = sync.csize_totals
+            else:
+                stats.nfiles = sync.num_files_totals - sync.num_files_parts
+                stats.osize = sync.size_totals - sync.size_parts
+                stats.csize = sync.csize_totals - sync.csize_parts
+        else:
+            if self.consider_part_files:
+                stats.nfiles = self.metadata.nfiles_parts + self.metadata.nfiles
+                stats.osize = self.metadata.size_parts + self.metadata.size
+                stats.csize = self.metadata.csize_parts + self.metadata.csize
+            else:
+                stats.nfiles = self.metadata.nfiles
+                stats.osize = self.metadata.size
+                stats.csize = self.metadata.csize
         return stats
 
     @contextmanager
@@ -1057,9 +1094,9 @@ class ChunksProcessor:
 
                 # if we created part files, we have referenced all chunks from the part files,
                 # but we also will reference the same chunks also from the final, complete file:
-                dummy_stats = Statistics()  # do not count this data volume twice
                 for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, dummy_stats, size=chunk.size)
+                    cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
+                stats.nfiles_parts += part_number - 1
 
 
 class FilesystemObjectProcessors:
@@ -1882,7 +1919,7 @@ class ArchiveRecreater:
             return
         if comment is None:
             comment = archive.metadata.get('comment', '')
-        target.save(comment=comment, additional_metadata={
+        target.save(comment=comment, stats=target.stats, additional_metadata={
             # keep some metadata as in original archive:
             'time': archive.metadata.time,
             'time_end': archive.metadata.get('time_end') or archive.metadata.time,

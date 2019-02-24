@@ -171,14 +171,26 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0dev0 (not released yet)
-------------------------------------
+Version 1.2.0a2 and earlier (not released yet)
+----------------------------------------------
+
+Please note:
+
+This is code released for alpha testing (== helping us find bugs).
+
+It is not suitable to run against your production backup repositories!
+
+So, if you want to help testing, please run this code additionally to your
+normal backup and use a separate, fresh repository for it.
+
+See there for feedback: https://github.com/borgbackup/borg/issues/4360
 
 Compatibility notes:
 
-- dropped support / testing for Python 3.4 and 3.5, minimum requirement is 3.6.
-  In case your OS does not provide Python >= 3.6, consider using our binary,
+- dropped support / testing for Python 3.4, minimum requirement is 3.5.
+  In case your OS does not provide Python >= 3.5, consider using our binary,
   which does not need an external Python interpreter.
+  Maybe this requirement will be raised to Python 3.6 later.
 - freeing repository space only happens when "borg compact" is invoked.
 - list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
   "isomtime" was the default but produced a verbose human format,
@@ -206,16 +218,22 @@ New features:
   more robustness.
   See the docs about "borg compact" for more details.
 - "borg compact --cleanup-commits" is to cleanup the tons of 17byte long
-  commit-ony segment files caused by borg 1.1.x issue #2850.
+  commit-only segment files caused by borg 1.1.x issue #2850.
   Invoke this once after upgrading (the server side) borg to 1.2.
   Compaction now automatically removes unneeded commit-only segment files.
 - prune: Show which rule was applied to keep archive, #2886
+- add fixed blocksize chunker (see --chunker-params docs), #1086
 
 Fixes:
 
-- repository compaction now automatically removes unneeded 17byte commit-only
-  segments, #2850
 - avoid stale filehandle issues, #3265
+- use more FDs, avoid race conditions on active fs, #906, #908, #1038
+- add O_NOFOLLOW to base flags, #908
+- compact:
+
+  - require >10% freeable space in a segment, #2985
+  - repository compaction now automatically removes unneeded 17byte
+    commit-only segments, #2850
 - make swidth available on all posix platforms, #2667
 
 Other changes:
@@ -223,13 +241,21 @@ Other changes:
 - repository: better speed and less stuff moving around by using separate
   segment files for manifest DELETEs and PUTs, #3947
 - use pyinstaller v3.3.1 to build binaries
-- msgpack: switch to recent "msgpack" pypi pkg name, #3890
+- update bundled zstd code to 1.3.8, #4210
+- update bundled lz4 code to 1.8.3, #4209
+- msgpack:
+
+  - switch to recent "msgpack" pypi pkg name, #3890
+  - wrap msgpack to avoid future compat complications, #3632, #2738
+  - support msgpack 0.6.0 and 0.6.1, #4220, #4308
+
 - llfuse: modernize / simplify llfuse version requirements
 - code refactorings / internal improvements:
 
+  - include size/csize/nfiles[_parts] stats into archive, #3241
+  - calc_stats: use archive stats metadata, if available
   - crypto: refactored crypto to use an AEAD style API
   - crypto: new AES-OCB, CHACHA20-POLY1305
-  - create: be less racy, use fd for xattrs, acls, bsdflags (not path), #906
   - create: use less syscalls by not using a python file obj, #906, #3962
   - diff: refactor the diff functionality to new ItemDiff class, #2475
   - archive: create FilesystemObjectProcessors class
@@ -245,10 +271,10 @@ Other changes:
 
     - item.to_optr(), Item.from_optr()
     - fix chunker holding the GIL during blocking I/O
+  - C code portability / basic MSC compatibility, #4147, #2677
 - testing:
 
   - vagrant: new VMs for linux/bsd/darwin, most with OpenSSL 1.1 and py36
-
 
 
 Version 1.1.9 (2019-02-10)

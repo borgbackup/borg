@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-SERVE 1 "2017-11-25" "" "borg backup tool"
+.TH BORG-SERVE 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .
@@ -49,7 +49,7 @@ restrict repository access to PATH. Can be specified multiple times to allow the
 restrict repository access. Only the repository located at PATH (no sub\-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP sub\-directories are not accessible; PATH needs to directly point at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
 .TP
 .B \-\-append\-only
-only allow appending to repository segment files
+only allow appending to repository segment files. Note that this only affects the low level structure of the repository, and running \fIdelete\fP or \fIprune\fP will still be allowed. See \fIappend_only_mode\fP in Additional Notes for more details.
 .TP
 .BI \-\-storage\-quota \ QUOTA
 Override storage quota of the repository (e.g. 5G, 1.5T). When a new repository is initialized, sets the storage quota on the new repository as well. Default: no quota.

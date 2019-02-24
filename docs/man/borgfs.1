@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORGFS 1 "2017-11-25" "" "borg backup tool"
+.TH BORGFS 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .
@@ -47,8 +47,9 @@ used in fstab entries:
 To allow a regular user to use fstab entries, add the \fBuser\fP option:
 \fB/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0\fP
 .sp
-For mount options, see the fuse(8) manual page. Additional mount options
-supported by borg:
+For FUSE configuration and mount options, see the mount.fuse(8) manual page.
+.sp
+Additional mount options supported by borg:
 .INDENT 0.0
 .IP \(bu 2
 versions: when used with a repository mount, this gives a merged, versioned
@@ -57,6 +58,10 @@ view of the files in the archives. EXPERIMENTAL, layout may change in future.
 allow_damaged_files: by default damaged files (where missing chunks were
 replaced with runs of zeros by borg check \fB\-\-repair\fP) are not readable and
 return EIO (I/O error). Set this option to read such files.
+.IP \(bu 2
+ignore_permissions: for security reasons the "default_permissions" mount
+option is internally enforced by borg. "ignore_permissions" can be given to
+not enforce "default_permissions".
 .UNINDENT
 .sp
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users

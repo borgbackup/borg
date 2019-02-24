@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-INIT 1 "2017-11-25" "" "borg backup tool"
+.TH BORG-INIT 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .
@@ -182,10 +182,13 @@ repository to create
 select encryption key mode \fB(required)\fP
 .TP
 .B \-\-append\-only
-create an append\-only mode repository
+create an append\-only mode repository. Note that this only affects the low level structure of the repository, and running \fIdelete\fP or \fIprune\fP will still be allowed. See \fIappend_only_mode\fP in Additional Notes for more details.
 .TP
 .BI \-\-storage\-quota \ QUOTA
 Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
+.TP
+.B \-\-make\-parent\-dirs
+create the parent directories of the repository directory, if they are missing.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

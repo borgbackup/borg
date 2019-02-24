@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DIFF 1 "2017-11-25" "" "borg backup tool"
+.TH BORG-DIFF 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borg-diff \- Diff contents of two archives
 .
@@ -32,12 +32,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] diff [options] REPO_ARCHIVE1 ARCHIVE2 [PATH...]
+borg [common options] diff [options] REPO::ARCHIVE1 ARCHIVE2 [PATH...]
 .SH DESCRIPTION
 .sp
 This command finds differences (file contents, user/group/mode) between archives.
 .sp
-A repository location and an archive name must be specified for REPO_ARCHIVE1.
+A repository location and an archive name must be specified for REPO::ARCHIVE1.
 ARCHIVE2 is just another archive name in same repository (no repository location
 allowed).
 .sp
@@ -57,7 +57,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B REPO_ARCHIVE1
+.B REPO::ARCHIVE1
 repository location and ARCHIVE1 name
 .TP
 .B ARCHIVE2

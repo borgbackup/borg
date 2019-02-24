@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-UMOUNT 1 "2017-11-25" "" "borg backup tool"
+.TH BORG-UMOUNT 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borg-umount \- un-mount the FUSE filesystem
 .
@@ -82,6 +82,11 @@ $ borg umount /tmp/mymountpoint
 # These are especially handy for the "versions view",
 # which does not support lazy processing of archives.
 $ borg mount \-o versions \-\-glob\-archives \(aq*\-my\-home\(aq \-\-last 10 /path/to/repo /tmp/mymountpoint
+
+# Exclusion options are supported.
+# These can speed up mounting and lower memory needs significantly.
+$ borg mount /path/to/repo /tmp/mymountpoint only/that/path
+$ borg mount \-\-exclude \(aq...\(aq /path/to/repo /tmp/mymountpoint
 .ft P
 .fi
 .UNINDENT

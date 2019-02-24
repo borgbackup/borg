@@ -186,6 +186,26 @@ get other informational messages.
 .UNINDENT
 .UNINDENT
 .SH NOTES
+.SS Positional Arguments and Options: Order matters
+.sp
+Borg only supports taking options (\fB\-s\fP and \fB\-\-progress\fP in the example)
+to the left or right of all positional arguments (\fBrepo::archive\fP and \fBpath\fP
+in the example), but not in between them:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg create \-s \-\-progress repo::archive path  # good and preferred
+borg create repo::archive path \-s \-\-progress  # also works
+borg create \-s repo::archive path \-\-progress  # works, but ugly
+borg create repo::archive \-s \-\-progress path  # BAD
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+This is due to a problem in the argparse module: \fI\%http://bugs.python.org/issue15112\fP
 .SS Repository URLs
 .sp
 \fBLocal filesystem\fP (or locally mounted network filesystem):
@@ -254,7 +274,26 @@ name).
 .sp
 If you have set BORG_REPO (see above) and an archive location is needed, use
 \fB::archive_name\fP \- the repo URL part is then read from BORG_REPO.
-.SS Type of log output
+.SS Logging
+.sp
+Borg writes all log output to stderr by default. But please note that something
+showing up on stderr does \fInot\fP indicate an error condition just because it is
+on stderr. Please check the log levels of the messages and the return code of
+borg for determining error, warning or success conditions.
+.sp
+If you want to capture the log output to a file, just redirect it:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg create repo::archive myfiles 2>> logfile
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Custom logging configurations can be implemented via BORG_LOGGING_CONF.
 .sp
 The log level of the builtin logging configuration defaults to WARNING.
 This is because we want Borg to be mostly silent and only output
@@ -355,9 +394,17 @@ When set, use the standard output of the command (trailing newlines are stripped
 passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo. Note that the command
-is executed without a shell. So variables, like \fB$HOME\fP\ will work, but \fB~\fP\ won't.
+is executed without a shell. So variables, like \fB$HOME\fP will work, but \fB~\fP won\(aqt.
 If BORG_PASSPHRASE is also set, it takes precedence.
 See also BORG_NEW_PASSPHRASE.
+.TP
+.B BORG_PASSPHRASE_FD
+When set, specifies a file descriptor to read a passphrase
+from. Programs starting borg may choose to open an anonymous pipe
+and use it to pass a passphrase. This is safer than passing via
+BORG_PASSPHRASE, because on some systems (e.g. Linux) environment
+can be examined by other processes.
+If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
 .TP
 .B BORG_NEW_PASSPHRASE
 When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
@@ -373,13 +420,21 @@ Borg assumes that it can derive a unique hostname / identity (see \fBborg debug 
 If this is not the case or you do not want Borg to automatically remove stale locks,
 set this to \fIno\fP\&.
 .TP
+.B BORG_HOST_ID
+Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
+a unique id based on the MAC address of the network interface. Except if that MAC happens to be all\-zero \- in
+that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
+So, if you have a all\-zero MAC address or other reasons to better externally control the host id, just set this
+environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
+use \fI\%fqdn@uniqueid\fP\&.
+.TP
 .B BORG_LOGGING_CONF
 When set, use the given filename as \fI\%INI\fP\-style logging configuration.
 .TP
 .B BORG_RSH
 When set, use this command instead of \fBssh\fP\&. This can be used to specify ssh options, such as
-a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options.
-Using the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
+a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options. Using
+the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
 .TP
 .B BORG_REMOTE_PATH
 When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
@@ -390,8 +445,13 @@ When set to a numeric value, this determines the maximum "time to live" for the 
 entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
 The FAQ explains this more detailed in: \fIalways_chunking\fP
 .TP
+.B BORG_SHOW_SYSINFO
+When set to no (default: yes), system information (like OS, Python version, ...) in
+exceptions is not shown.
+Please only use for good reasons as it makes issues harder to analyze.
+.TP
 .B TMPDIR
-where temporary files are stored (might need a lot of temporary space for some operations)
+where temporary files are stored (might need a lot of temporary space for some operations), see \fI\%tempfile\fP for details
 .UNINDENT
 .TP
 .B Some automatic "answerers" (if set, they automatically answer confirmation questions):
@@ -420,23 +480,27 @@ allowed). So please test your scripts interactively before making them a non\-in
 .B Directories and files:
 .INDENT 7.0
 .TP
-.B BORG_KEYS_DIR
-Default to \(aq~/.config/borg/keys\(aq. This directory contains keys for encrypted repositories.
+.B BORG_BASE_DIR
+Default to \(aq$HOME\(aq, \(aq~$USER\(aq, \(aq~\(aq (in that order)\(aq.
+If we refer to ~ below, we in fact mean BORG_BASE_DIR.
 .TP
-.B BORG_KEY_FILE
-When set, use the given filename as repository key file.
+.B BORG_CONFIG_DIR
+Default to \(aq~/.config/borg\(aq. This directory contains the whole config directories.
+.TP
+.B BORG_CACHE_DIR
+Default to \(aq~/.cache/borg\(aq. This directory contains the local cache and might need a lot
+of space for dealing with big repositories.
 .TP
 .B BORG_SECURITY_DIR
 Default to \(aq~/.config/borg/security\(aq. This directory contains information borg uses to
 track its usage of NONCES ("numbers used once" \- usually in encryption context) and other
 security relevant data.
 .TP
-.B BORG_CACHE_DIR
-Default to \(aq~/.cache/borg\(aq. This directory contains the local cache and might need a lot
-of space for dealing with big repositories).
+.B BORG_KEYS_DIR
+Default to \(aq~/.config/borg/keys\(aq. This directory contains keys for encrypted repositories.
 .TP
-.B BORG_CONFIG_DIR
-Default to \(aq~/.config/borg\(aq. This directory contains the whole config directories.
+.B BORG_KEY_FILE
+When set, use the given filename as repository key file.
 .UNINDENT
 .TP
 .B Building:
@@ -445,12 +509,17 @@ Default to \(aq~/.config/borg\(aq. This directory contains the whole config dire
 .B BORG_OPENSSL_PREFIX
 Adds given OpenSSL header file directory to the default locations (setup.py).
 .TP
-.B BORG_LZ4_PREFIX
-Adds given LZ4 header file directory to the default locations (setup.py).
+.B BORG_LIBLZ4_PREFIX
+Adds given prefix directory to the default locations. If a \(aqinclude/lz4.h\(aq is found Borg
+will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
 .TP
 .B BORG_LIBB2_PREFIX
 Adds given prefix directory to the default locations. If a \(aqinclude/blake2.h\(aq is found Borg
 will be linked against the system libb2 instead of a bundled implementation. (setup.py)
+.TP
+.B BORG_LIBZSTD_PREFIX
+Adds given prefix directory to the default locations. If a \(aqinclude/zstd.h\(aq is found Borg
+will be linked against the system libzstd instead of a bundled implementation. (setup.py)
 .UNINDENT
 .UNINDENT
 .sp
@@ -522,12 +591,23 @@ server to get the approximate resource usage.
 .INDENT 0.0
 .TP
 .B CPU client:
-borg create: does chunking, hashing, compression, crypto (high CPU usage)
-chunks cache sync: quite heavy on CPU, doing lots of hashtable operations.
-borg extract: crypto, decompression (medium to high CPU usage)
-borg check: similar to extract, but depends on options given.
-borg prune / borg delete archive: low to medium CPU usage
-borg delete repo: done on the server
+.INDENT 7.0
+.IP \(bu 2
+\fBborg create:\fP does chunking, hashing, compression, crypto (high CPU usage)
+.IP \(bu 2
+\fBchunks cache sync:\fP quite heavy on CPU, doing lots of hashtable operations.
+.IP \(bu 2
+\fBborg extract:\fP crypto, decompression (medium to high CPU usage)
+.IP \(bu 2
+\fBborg check:\fP similar to extract, but depends on options given.
+.IP \(bu 2
+\fBborg prune / borg delete archive:\fP low to medium CPU usage
+.IP \(bu 2
+\fBborg delete repo:\fP done on the server
+.UNINDENT
+.IP "System Message: WARNING/2 (docs/usage_general.rst.inc:, line 354)"
+Bullet list ends without a blank line; unexpected unindent.
+.sp
 It won\(aqt go beyond 100% of 1 core as the code is currently single\-threaded.
 Especially higher zlib and lzma compression levels use significant amounts
 of CPU cycles. Crypto might be cheap on the CPU (if hardware accelerated) or
@@ -616,6 +696,8 @@ hardlinked regular files, devices, FIFOs (considering all items in the same arch
 .IP \(bu 2
 timestamps in nanosecond precision: mtime, atime, ctime
 .IP \(bu 2
+other timestamps: birthtime (on platforms supporting it)
+.IP \(bu 2
 permissions:
 .INDENT 2.0
 .IP \(bu 2
@@ -673,6 +755,8 @@ T}	T{
 Yes
 T}	T{
 Yes
+T}	T{
+Yes (all)
 T}
 _
 T{
@@ -681,6 +765,8 @@ T}	T{
 n/a
 T}	T{
 n/a
+T}	T{
+Yes (all)
 T}
 _
 T{
@@ -689,18 +775,18 @@ T}	T{
 n/a
 T}	T{
 No [2]
+T}	T{
+Yes (all)
 T}
 _
 T{
-Solaris 11
+Solaris and derivatives
+T}	T{
+No [3]
 T}	T{
 No [3]
 T}	T{
 n/a
-T}
-_
-T{
-OpenIndiana
 T}
 _
 T{

@@ -33,7 +33,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the cache. Implies not using the files cache.                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--no-files-cache``                              | do not load/update the file metadata cache used to detect unchanged files                                                                         |
+    |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: "stdin")                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                |
     |                                                                                                                                                                                                                                                               |
@@ -49,11 +49,11 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--patterns-from PATTERNFILE``                   | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--exclude-caches``                              | exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)                                              |
+    |                                                       | ``--exclude-caches``                              | exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-if-present NAME``                     | exclude directories that are tagged by containing a filesystem object with the given NAME                                                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--keep-exclude-tags``, ``--keep-tag-files``     | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                         |
+    |                                                       | ``--keep-exclude-tags``                           | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-nodump``                              | exclude files flagged NODUMP                                                                                                                      |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -71,8 +71,6 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--nobsdflags``                                  | do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive                                                                              |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--ignore-inode``                                | ignore inode data in the file metadata cache used to detect unchanged files.                                                                      |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special``                                | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files. |
@@ -85,7 +83,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095                           |
+    |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                  |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -113,7 +111,7 @@ borg create
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
         --no-cache-sync    experimental: do not synchronize the cache. Implies not using the files cache.
-        --no-files-cache    do not load/update the file metadata cache used to detect unchanged files
+        --stdin-name NAME    use NAME in archive for stdin data (default: "stdin")
 
 
     :ref:`common_options`
@@ -124,9 +122,9 @@ borg create
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
         --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
         --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
-        --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)
+        --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
-        --keep-exclude-tags, --keep-tag-files    if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
+        --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
         --exclude-nodump                  exclude files flagged NODUMP
 
 
@@ -137,7 +135,6 @@ borg create
         --noctime                 do not store ctime into archive
         --nobirthtime             do not store birthtime (creation date) into archive
         --nobsdflags              do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive
-        --ignore-inode            ignore inode data in the file metadata cache used to detect unchanged files.
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 
@@ -146,7 +143,7 @@ borg create
         --comment COMMENT                             add a comment text to the archive
         --timestamp TIMESTAMP                         manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). Alternatively, give a reference file/directory.
         -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
-        --chunker-params PARAMS                       specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: 19,23,21,4095
+        --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
 
 

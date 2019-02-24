@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CONFIG 1 "2017-12-13" "" "borg backup tool"
+.TH BORG-CONFIG 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borg-config \- get, set, and delete values in a repository or cache config file
 .
@@ -32,16 +32,18 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] config [options] REPOSITORY NAME [VALUE]
+borg [common options] config [options] REPOSITORY [NAME] [VALUE]
 .SH DESCRIPTION
 .sp
 This command gets and sets options in a local repository or cache config file.
 For security reasons, this command only works on local repositories.
 .sp
-To delete a config value entirely, use \fB\-\-delete\fP\&. To get an existing key, pass
-only the key name. To set a key, pass both the key name and the new value. Keys
-can be specified in the format "section.name" or simply "name"; the section will
-default to "repository" and "cache" for the repo and cache configs, respectively.
+To delete a config value entirely, use \fB\-\-delete\fP\&. To list the values
+of the configuration file or the default values, use \fB\-\-list\fP\&.  To get and existing
+key, pass only the key name. To set a key, pass both the key name and
+the new value. Keys can be specified in the format "section.name" or
+simply "name"; the section will default to "repository" and "cache" for
+the repo and cache configs, respectively.
 .sp
 By default, borg config manipulates the repository config file. Using \fB\-\-cache\fP
 edits the repository cache\(aqs config file instead.
@@ -68,6 +70,9 @@ get and set values from the repo cache
 .TP
 .B \-d\fP,\fB  \-\-delete
 delete the key from the config file
+.TP
+.B \-l\fP,\fB  \-\-list
+list the configuration of the repo
 .UNINDENT
 .SH EXAMPLES
 .sp

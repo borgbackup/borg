@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2018-07-14" "" "borg backup tool"
+.TH BORG-RECREATE 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .
@@ -126,12 +126,12 @@ experimental: include/exclude paths matching PATTERN
 experimental: read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .B \-\-exclude\-caches
-exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.brynosaurus.com/cachedir/spec.html\fP)
+exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.bford.info/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
-.B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
+.B \-\-keep\-exclude\-tags
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
 .UNINDENT
 .SS Archive options
@@ -156,7 +156,7 @@ select compression algorithm, see the output of the "borg help compression" comm
 recompress data chunks according to \fB\-\-compression\fP\&. MODE \fIif\-different\fP: recompress if current compression is with a different compression algorithm (the level is not considered). MODE \fIalways\fP: recompress even if current compression is with the same compression algorithm (use this to change the compression level). MODE \fInever\fP (default): do not recompress.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: 19,23,21,4095
+specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: buzhash,19,23,21,4095
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

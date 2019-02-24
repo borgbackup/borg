@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-BENCHMARK-CRUD 1 "2017-11-25" "" "borg backup tool"
+.TH BORG-BENCHMARK-CRUD 1 "2019-02-24" "" "borg backup tool"
 .SH NAME
 borg-benchmark-crud \- Benchmark Create, Read, Update, Delete for archives.
 .
@@ -39,7 +39,7 @@ This command benchmarks borg CRUD (create, read, update, delete) operations.
 .sp
 It creates input data below the given PATH and backups this data into the given REPO.
 The REPO must already exist (it could be a fresh empty repo or an existing repo, the
-command will create / read / update / delete some archives named borg\-test\-data* there.
+command will create / read / update / delete some archives named borg\-benchmark\-crud* there.
 .sp
 Make sure you have free space there, you\(aqll need about 1GB each (+ overhead).
 .sp
@@ -60,13 +60,7 @@ C\-R\- == random files. no dedup, measuring throughput through all processing st
 .B R\- == borg extract (extract archive, dry\-run, do everything, but do not write files to disk)
 R\-Z\- == all zero files. Measuring heavily duplicated files.
 R\-R\- == random files. No duplication here, measuring throughput through all processing
-.IP "System Message: ERROR/3 (docs/virtmanpage.rst:, line 56)"
-Unexpected indentation.
-.INDENT 7.0
-.INDENT 3.5
 stages, except writing to disk.
-.UNINDENT
-.UNINDENT
 .TP
 .B U\- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
 The throughput value is kind of virtual here, it does not actually read the file.

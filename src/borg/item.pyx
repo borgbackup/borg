@@ -12,7 +12,7 @@ cdef extern from "_item.c":
     object _optr_to_object(object bytes)
 
 
-API_VERSION = '1.1_06'
+API_VERSION = '1.2_01'
 
 
 class PropDict:

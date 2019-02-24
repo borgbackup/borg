@@ -25,7 +25,7 @@ except ImportError:
 
 from .helpers import Buffer, DecompressionError
 
-API_VERSION = '1.1_06'
+API_VERSION = '1.2_01'
 
 cdef extern from "algorithms/lz4-libselect.h":
     int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil

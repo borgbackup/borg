@@ -11,7 +11,7 @@ from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_CheckExact, PyBytes_GET_SIZE, PyBytes_AS_STRING
 
-API_VERSION = '1.1_07'
+API_VERSION = '1.2_01'
 
 
 cdef extern from "_hashindex.c":

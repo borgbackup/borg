@@ -4,7 +4,7 @@ from .posix import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
-API_VERSION = '1.2_03'
+API_VERSION = '1.2_04'
 
 cdef extern from "errno.h":
     int errno

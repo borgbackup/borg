@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-API_VERSION = '1.1_03'
+API_VERSION = '1.2_01'
 
 import os
 

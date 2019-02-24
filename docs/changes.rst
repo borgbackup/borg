@@ -6,6 +6,46 @@ Important notes
 
 This section provides information about security and corruption issues.
 
+.. _broken_validator:
+
+Pre-1.1.4 potential data corruption issue
+-----------------------------------------
+
+A data corruption bug was discovered in borg check --repair, see issue #3444.
+
+This is a 1.1.x regression, releases < 1.1 (e.g. 1.0.x) are not affected.
+
+To avoid data loss, you must not run borg check --repair using an unfixed version
+of borg 1.1.x. The first official release that has the fix is 1.1.4.
+
+Package maintainers may have applied the fix to updated packages of 1.1.x (x<4)
+though, see the package maintainer's package changelog to make sure.
+
+If you never had missing item metadata chunks, the bug has not affected you
+even if you did run borg check --repair with an unfixed version.
+
+When borg check --repair tried to repair corrupt archives that miss item metadata
+chunks, the resync to valid metadata in still present item metadata chunks
+malfunctioned. This was due to a broken validator that considered all (even valid)
+item metadata as invalid. As they were considered invalid, borg discarded them.
+Practically, that means the affected files, directories or other fs objects were
+discarded from the archive.
+
+Due to the malfunction, the process was extremely slow, but if you let it
+complete, borg would have created a "repaired" archive that has lost a lot of items.
+If you interrupted borg check --repair because it was so strangely slow (killing
+borg somehow, e.g. Ctrl-C) the transaction was rolled back and no corruption occurred.
+
+The log message indicating the precondition for the bug triggering looks like:
+
+    item metadata chunk missing [chunk: 001056_bdee87d...a3e50d]
+
+If you never had that in your borg check --repair runs, you're not affected.
+
+But if you're unsure or you actually have seen that, better check your archives.
+By just using "borg list repo::archive" you can see if all expected filesystem
+items are listed.
+
 .. _tam_vuln:
 
 Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)
@@ -131,14 +171,26 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0dev0 (not released yet)
-------------------------------------
+Version 1.2.0a2 and earlier (not released yet)
+----------------------------------------------
+
+Please note:
+
+This is code released for alpha testing (== helping us find bugs).
+
+It is not suitable to run against your production backup repositories!
+
+So, if you want to help testing, please run this code additionally to your
+normal backup and use a separate, fresh repository for it.
+
+See there for feedback: https://github.com/borgbackup/borg/issues/4360
 
 Compatibility notes:
 
-- dropped support / testing for Python 3.4 and 3.5, minimum requirement is 3.6.
-  In case your OS does not provide Python >= 3.6, consider using our binary,
+- dropped support / testing for Python 3.4, minimum requirement is 3.5.
+  In case your OS does not provide Python >= 3.5, consider using our binary,
   which does not need an external Python interpreter.
+  Maybe this requirement will be raised to Python 3.6 later.
 - freeing repository space only happens when "borg compact" is invoked.
 - list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
   "isomtime" was the default but produced a verbose human format,
@@ -166,16 +218,22 @@ New features:
   more robustness.
   See the docs about "borg compact" for more details.
 - "borg compact --cleanup-commits" is to cleanup the tons of 17byte long
-  commit-ony segment files caused by borg 1.1.x issue #2850.
+  commit-only segment files caused by borg 1.1.x issue #2850.
   Invoke this once after upgrading (the server side) borg to 1.2.
   Compaction now automatically removes unneeded commit-only segment files.
 - prune: Show which rule was applied to keep archive, #2886
+- add fixed blocksize chunker (see --chunker-params docs), #1086
 
 Fixes:
 
-- repository compaction now automatically removes unneeded 17byte commit-only
-  segments, #2850
 - avoid stale filehandle issues, #3265
+- use more FDs, avoid race conditions on active fs, #906, #908, #1038
+- add O_NOFOLLOW to base flags, #908
+- compact:
+
+  - require >10% freeable space in a segment, #2985
+  - repository compaction now automatically removes unneeded 17byte
+    commit-only segments, #2850
 - make swidth available on all posix platforms, #2667
 
 Other changes:
@@ -183,13 +241,21 @@ Other changes:
 - repository: better speed and less stuff moving around by using separate
   segment files for manifest DELETEs and PUTs, #3947
 - use pyinstaller v3.3.1 to build binaries
-- msgpack: switch to recent "msgpack" pypi pkg name, #3890
+- update bundled zstd code to 1.3.8, #4210
+- update bundled lz4 code to 1.8.3, #4209
+- msgpack:
+
+  - switch to recent "msgpack" pypi pkg name, #3890
+  - wrap msgpack to avoid future compat complications, #3632, #2738
+  - support msgpack 0.6.0 and 0.6.1, #4220, #4308
+
 - llfuse: modernize / simplify llfuse version requirements
 - code refactorings / internal improvements:
 
+  - include size/csize/nfiles[_parts] stats into archive, #3241
+  - calc_stats: use archive stats metadata, if available
   - crypto: refactored crypto to use an AEAD style API
   - crypto: new AES-OCB, CHACHA20-POLY1305
-  - create: be less racy, use fd for xattrs, acls, bsdflags (not path), #906
   - create: use less syscalls by not using a python file obj, #906, #3962
   - diff: refactor the diff functionality to new ItemDiff class, #2475
   - archive: create FilesystemObjectProcessors class
@@ -205,13 +271,13 @@ Other changes:
 
     - item.to_optr(), Item.from_optr()
     - fix chunker holding the GIL during blocking I/O
+  - C code portability / basic MSC compatibility, #4147, #2677
 - testing:
 
   - vagrant: new VMs for linux/bsd/darwin, most with OpenSSL 1.1 and py36
 
 
-
-Version 1.1.6 (2018-06-11)
+Version 1.1.9 (2019-02-10)
 --------------------------
 
 Compatibility notes:
@@ -230,6 +296,156 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+Fixes:
+
+- security fix: configure FUSE with "default_permissions", #3903
+  "default_permissions" is now enforced by borg by default to let the
+  kernel check uid/gid/mode based permissions.
+  "ignore_permissions" can be given to not enforce "default_permissions".
+- make "hostname" short, even on misconfigured systems, #4262
+- fix free space calculation on macOS (and others?), #4289
+- config: quit with error message when no key is provided, #4223
+- recover_segment: handle too small segment files correctly, #4272
+- correctly release memoryview, #4243
+- avoid diaper pattern in configparser by opening files, #4263
+- add "# cython: language_level=3" directive to .pyx files, #4214
+- info: consider part files for "This archive" stats, #3522
+- work around Microsoft WSL issue #645 (sync_file_range), #1961
+
+New features:
+
+- add --rsh command line option to complement BORG_RSH env var, #1701
+- init: --make-parent-dirs parent1/parent2/repo_dir, #4235
+
+Other:
+
+- add archive name to check --repair output, #3447
+- check for unsupported msgpack versions
+- shell completions:
+
+  - new shell completions for borg 1.1.9
+  - more complete shell completions for borg mount -o
+  - added shell completions for borg help
+  - option arguments for zsh tab completion
+- docs:
+
+  - add FAQ regarding free disk space check, #3905
+  - update BORG_PASSCOMMAND example and clarify variable expansion, #4249
+  - FAQ regarding change of compression settings, #4222
+  - add note about BSD flags to changelog, #4246
+  - improve logging in example automation script
+  - add note about files changing during backup, #4081
+  - work around the backslash issue, #4280
+  - update release workflow using twine (docs, scripts), #4213
+  - add warnings on repository copies to avoid future problems, #4272
+- tests:
+
+  - fix the homebrew 1.9 issues on travis-ci, #4254
+  - fix duplicate test method name, #4311
+
+
+Version 1.1.8 (2018-12-09)
+--------------------------
+
+Fixes:
+
+- enforce storage quota if set by serve-command, #4093
+- invalid locations: give err msg containing parsed location, #4179
+- list repo: add placeholders for hostname and username, #4130
+- on linux, symlinks can't have ACLs, so don't try to set any, #4044
+
+New features:
+
+- create: added PATH::archive output on INFO log level
+- read a passphrase from a file descriptor specified in the
+  BORG_PASSPHRASE_FD environment variable.
+
+Other:
+
+- docs:
+
+  - option --format is required for some expensive-to-compute values for json
+
+    borg list by default does not compute expensive values except when
+    they are needed. whether they are needed is determined by the format,
+    in standard mode as well as in --json mode.
+  - tell that our binaries are x86/x64 amd/intel, bauerj has ARM
+  - fixed wrong archive name pattern in CRUD benchmark help
+  - fixed link to cachedir spec in docs, #4140
+- tests:
+
+  - stop using fakeroot on travis, avoids sporadic EISDIR errors, #2482
+  - xattr key names must start with "user." on linux
+  - fix code so flake8 3.6 does not complain
+  - explicitly convert environment variable to str, #4136
+  - fix DeprecationWarning: Flags not at the start of the expression, #4137
+  - support pytest4, #4172
+- vagrant:
+
+  - use python 3.5.6 for builds
+
+
+Version 1.1.7 (2018-08-11)
+--------------------------
+
+Compatibility notes:
+
+- added support for Python 3.7
+
+Fixes:
+
+- cache lock: use lock_wait everywhere to fix infinite wait, see #3968
+- don't archive tagged dir when recursing an excluded dir, #3991
+- py37 argparse: work around bad default in py 3.7.0a/b/rc, #3996
+- py37 remove loggerDict.clear() from tearDown method, #3805
+- some fixes for bugs which likely did not result in problems in practice:
+
+  - fixed logic bug in platform module API version check
+  - fixed xattr/acl function prototypes, added missing ones
+
+New features:
+
+- init: add warning to store both key and passphrase at safe place(s)
+- BORG_HOST_ID env var to work around all-zero MAC address issue, #3985
+- borg debug dump-repo-objs --ghost (dump everything from segment files,
+  including deleted or superceded objects or commit tags)
+- borg debug search-repo-objs (search in repo objects for hex bytes or strings)
+
+Other changes:
+
+- add Python 3.7 support
+- updated shell completions
+- call socket.gethostname only once
+- locking: better logging, add some asserts
+- borg debug dump-repo-objs:
+
+  - filename layout improvements
+  - use repository.scan() to get on-disk order
+- docs:
+
+  - update installation instructions for macOS
+  - added instructions to install fuse via homebrew
+  - improve diff docs
+  - added note that checkpoints inside files requires 1.1+
+  - add link to tempfile module
+  - remove row/column-spanning from docs source, #4000 #3990
+- tests:
+
+  - fetch less data via os.urandom
+  - add py37 env for tox
+  - travis: add 3.7, remove 3.6-dev (we test with -dev in master)
+- vagrant / binary builds:
+
+  - use osxfuse 3.8.2
+  - use own (uptodate) openindiana box
+
+
+Version 1.1.6 (2018-06-11)
+--------------------------
+
+Compatibility notes:
+
 - 1.1.6 changes:
 
   - also allow msgpack-python 0.5.6.

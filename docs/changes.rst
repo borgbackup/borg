@@ -251,7 +251,7 @@ Other changes:
 
 
 
-Version 1.1.6 (2018-06-11)
+Version 1.1.9 (2019-02-10)
 --------------------------
 
 Compatibility notes:
@@ -270,6 +270,156 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+Fixes:
+
+- security fix: configure FUSE with "default_permissions", #3903
+  "default_permissions" is now enforced by borg by default to let the
+  kernel check uid/gid/mode based permissions.
+  "ignore_permissions" can be given to not enforce "default_permissions".
+- make "hostname" short, even on misconfigured systems, #4262
+- fix free space calculation on macOS (and others?), #4289
+- config: quit with error message when no key is provided, #4223
+- recover_segment: handle too small segment files correctly, #4272
+- correctly release memoryview, #4243
+- avoid diaper pattern in configparser by opening files, #4263
+- add "# cython: language_level=3" directive to .pyx files, #4214
+- info: consider part files for "This archive" stats, #3522
+- work around Microsoft WSL issue #645 (sync_file_range), #1961
+
+New features:
+
+- add --rsh command line option to complement BORG_RSH env var, #1701
+- init: --make-parent-dirs parent1/parent2/repo_dir, #4235
+
+Other:
+
+- add archive name to check --repair output, #3447
+- check for unsupported msgpack versions
+- shell completions:
+
+  - new shell completions for borg 1.1.9
+  - more complete shell completions for borg mount -o
+  - added shell completions for borg help
+  - option arguments for zsh tab completion
+- docs:
+
+  - add FAQ regarding free disk space check, #3905
+  - update BORG_PASSCOMMAND example and clarify variable expansion, #4249
+  - FAQ regarding change of compression settings, #4222
+  - add note about BSD flags to changelog, #4246
+  - improve logging in example automation script
+  - add note about files changing during backup, #4081
+  - work around the backslash issue, #4280
+  - update release workflow using twine (docs, scripts), #4213
+  - add warnings on repository copies to avoid future problems, #4272
+- tests:
+
+  - fix the homebrew 1.9 issues on travis-ci, #4254
+  - fix duplicate test method name, #4311
+
+
+Version 1.1.8 (2018-12-09)
+--------------------------
+
+Fixes:
+
+- enforce storage quota if set by serve-command, #4093
+- invalid locations: give err msg containing parsed location, #4179
+- list repo: add placeholders for hostname and username, #4130
+- on linux, symlinks can't have ACLs, so don't try to set any, #4044
+
+New features:
+
+- create: added PATH::archive output on INFO log level
+- read a passphrase from a file descriptor specified in the
+  BORG_PASSPHRASE_FD environment variable.
+
+Other:
+
+- docs:
+
+  - option --format is required for some expensive-to-compute values for json
+
+    borg list by default does not compute expensive values except when
+    they are needed. whether they are needed is determined by the format,
+    in standard mode as well as in --json mode.
+  - tell that our binaries are x86/x64 amd/intel, bauerj has ARM
+  - fixed wrong archive name pattern in CRUD benchmark help
+  - fixed link to cachedir spec in docs, #4140
+- tests:
+
+  - stop using fakeroot on travis, avoids sporadic EISDIR errors, #2482
+  - xattr key names must start with "user." on linux
+  - fix code so flake8 3.6 does not complain
+  - explicitly convert environment variable to str, #4136
+  - fix DeprecationWarning: Flags not at the start of the expression, #4137
+  - support pytest4, #4172
+- vagrant:
+
+  - use python 3.5.6 for builds
+
+
+Version 1.1.7 (2018-08-11)
+--------------------------
+
+Compatibility notes:
+
+- added support for Python 3.7
+
+Fixes:
+
+- cache lock: use lock_wait everywhere to fix infinite wait, see #3968
+- don't archive tagged dir when recursing an excluded dir, #3991
+- py37 argparse: work around bad default in py 3.7.0a/b/rc, #3996
+- py37 remove loggerDict.clear() from tearDown method, #3805
+- some fixes for bugs which likely did not result in problems in practice:
+
+  - fixed logic bug in platform module API version check
+  - fixed xattr/acl function prototypes, added missing ones
+
+New features:
+
+- init: add warning to store both key and passphrase at safe place(s)
+- BORG_HOST_ID env var to work around all-zero MAC address issue, #3985
+- borg debug dump-repo-objs --ghost (dump everything from segment files,
+  including deleted or superceded objects or commit tags)
+- borg debug search-repo-objs (search in repo objects for hex bytes or strings)
+
+Other changes:
+
+- add Python 3.7 support
+- updated shell completions
+- call socket.gethostname only once
+- locking: better logging, add some asserts
+- borg debug dump-repo-objs:
+
+  - filename layout improvements
+  - use repository.scan() to get on-disk order
+- docs:
+
+  - update installation instructions for macOS
+  - added instructions to install fuse via homebrew
+  - improve diff docs
+  - added note that checkpoints inside files requires 1.1+
+  - add link to tempfile module
+  - remove row/column-spanning from docs source, #4000 #3990
+- tests:
+
+  - fetch less data via os.urandom
+  - add py37 env for tox
+  - travis: add 3.7, remove 3.6-dev (we test with -dev in master)
+- vagrant / binary builds:
+
+  - use osxfuse 3.8.2
+  - use own (uptodate) openindiana box
+
+
+Version 1.1.6 (2018-06-11)
+--------------------------
+
+Compatibility notes:
+
 - 1.1.6 changes:
 
   - also allow msgpack-python 0.5.6.

@@ -12,6 +12,7 @@ import os
 # zstd files, structure as seen in zstd project repository:
 
 zstd_sources = [
+    'lib/common/debug.c',
     'lib/common/entropy_common.c',
     'lib/common/error_private.c',
     'lib/common/fse_decompress.c',
@@ -20,6 +21,7 @@ zstd_sources = [
     'lib/common/xxhash.c',
     'lib/common/zstd_common.c',
     'lib/compress/fse_compress.c',
+    'lib/compress/hist.c',
     'lib/compress/huf_compress.c',
     'lib/compress/zstd_compress.c',
     'lib/compress/zstd_double_fast.c',
@@ -29,9 +31,12 @@ zstd_sources = [
     'lib/compress/zstd_opt.c',
     'lib/compress/zstdmt_compress.c',
     'lib/decompress/huf_decompress.c',
+    'lib/decompress/zstd_ddict.c',
     'lib/decompress/zstd_decompress.c',
+    'lib/decompress/zstd_decompress_block.c',
     'lib/dictBuilder/cover.c',
     'lib/dictBuilder/divsufsort.c',
+    'lib/dictBuilder/fastcover.c',
     'lib/dictBuilder/zdict.c',
 ]
 

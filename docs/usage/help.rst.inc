@@ -6,6 +6,15 @@ borg help patterns
 ~~~~~~~~~~~~~~~~~~
 
 
+The path/filenames used as input for the pattern matching start from the
+currently active recursion root. You usually give the recursion root(s)
+when invoking borg and these can be either relative or absolute paths.
+
+So, when you give `relative/` as root, the paths going into the matcher
+will look like `relative/.../file.ext`. When you give `/absolute/` as root,
+they will look like `/absolute/.../file.ext`. This is meant when we talk
+about "full path" below.
+
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full-matches. By default, fnmatch is used for
 ``--exclude`` patterns and shell-style is used for the experimental ``--pattern``
@@ -22,11 +31,11 @@ two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
     any number of characters, '?' matching any single character, '[...]'
     matching any single character specified, including ranges, and '[!...]'
     matching any character not specified. For the purpose of these patterns,
-    the path separator ('\' for Windows and '/' on other systems) is not
+    the path separator (backslash for Windows and '/' on other systems) is not
     treated specially. Wrap meta-characters in brackets for a literal
     match (i.e. `[?]` to match the literal character `?`). For a path
-    to match a pattern, it must completely match from start to end, or
-    must match from the start to just before a path separator. Except
+    to match a pattern, the full path must match, or it must match
+    from the start of the full path to just before a path separator. Except
     for the root path, paths will never end in the path separator when
     matching is attempted.  Thus, if a given pattern ends in a path
     separator, a '\*' is appended before matching is attempted.
@@ -40,23 +49,23 @@ Shell-style patterns, selector `sh:`
 
 Regular expressions, selector `re:`
     Regular expressions similar to those found in Perl are supported. Unlike
-    shell patterns regular expressions are not required to match the complete
+    shell patterns regular expressions are not required to match the full
     path and any substring match is sufficient. It is strongly recommended to
     anchor patterns to the start ('^'), to the end ('$') or both. Path
-    separators ('\' for Windows and '/' on other systems) in paths are
+    separators (backslash for Windows and '/' on other systems) in paths are
     always normalized to a forward slash ('/') before applying a pattern. The
     regular expression syntax is described in the `Python documentation for
     the re module <https://docs.python.org/3/library/re.html>`_.
 
 Path prefix, selector `pp:`
     This pattern style is useful to match whole sub-directories. The pattern
-    `pp:/data/bar` matches `/data/bar` and everything therein.
+    `pp:root/somedir` matches `root/somedir` and everything therein.
 
 Path full-match, selector `pf:`
-    This pattern style is useful to match whole paths.
+    This pattern style is (only) useful to match full paths.
     This is kind of a pseudo pattern as it can not have any variable or
-    unspecified parts - the full, precise path must be given.
-    `pf:/data/foo.txt` matches `/data/foo.txt` only.
+    unspecified parts - the full path must be given.
+    `pf:root/file.ext` matches `root/file.txt` only.
 
     Implementation note: this is implemented via very time-efficient O(1)
     hashtable lookups (this means you can have huge amounts of such patterns
@@ -139,7 +148,16 @@ Examples::
     considered first (in the order of appearance). Then patterns from ``--patterns-from``
     are added. Exclusion patterns from ``--exclude-from`` files are appended last.
 
-    An example ``--patterns-from`` file could look like that::
+    Examples::
+
+        # backup pics, but not the ones from 2018, except the good ones:
+        # note: using = is essential to avoid cmdline argument parsing issues.
+        borg create --pattern=+pics/2018/good --pattern=-pics/2018 repo::arch pics
+
+        # use a file with patterns:
+        borg create --patterns-from patterns.lst repo::arch
+
+    The patterns.lst file could look like that::
 
         # "sh:" pattern style is the default, so the following line is not needed:
         P sh
@@ -241,7 +259,13 @@ none
     Do not compress.
 
 lz4
-    Use lz4 compression. High speed, low compression. (default)
+    Use lz4 compression. Very high speed, very low compression. (default)
+
+zstd[,L]
+    Use zstd ("zstandard") compression, a modern wide-range algorithm.
+    If you do not explicitly give the compression level L (ranging from 1
+    to 22), it will use level 3.
+    Archives compressed with zstd are not compatible with borg < 1.1.4.
 
 zlib[,L]
     Use zlib ("gz") compression. Medium speed, medium compression.
@@ -268,6 +292,8 @@ auto,C[,L]
 Examples::
 
     borg create --compression lz4 REPO::ARCHIVE data
+    borg create --compression zstd REPO::ARCHIVE data
+    borg create --compression zstd,10 REPO::ARCHIVE data
     borg create --compression zlib REPO::ARCHIVE data
     borg create --compression zlib,1 REPO::ARCHIVE data
     borg create --compression auto,lzma,6 REPO::ARCHIVE data

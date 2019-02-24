@@ -6,7 +6,7 @@ borg diff
 ---------
 .. code-block:: none
 
-    borg [common options] diff [options] REPO_ARCHIVE1 ARCHIVE2 [PATH...]
+    borg [common options] diff [options] REPO::ARCHIVE1 ARCHIVE2 [PATH...]
 
 .. only:: html
 
@@ -15,7 +15,7 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------+
     | **positional arguments**                                                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------+
-    |                                                       | ``REPO_ARCHIVE1``                     | repository location and ARCHIVE1 name                                      |
+    |                                                       | ``REPO::ARCHIVE1``                    | repository location and ARCHIVE1 name                                      |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------+
     |                                                       | ``ARCHIVE2``                          | ARCHIVE2 name (no repository location allowed)                             |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------+
@@ -54,7 +54,7 @@ borg diff
 
 .. only:: latex
 
-    REPO_ARCHIVE1
+    REPO::ARCHIVE1
         repository location and ARCHIVE1 name
     ARCHIVE2
         ARCHIVE2 name (no repository location allowed)
@@ -83,7 +83,7 @@ Description
 
 This command finds differences (file contents, user/group/mode) between archives.
 
-A repository location and an archive name must be specified for REPO_ARCHIVE1.
+A repository location and an archive name must be specified for REPO::ARCHIVE1.
 ARCHIVE2 is just another archive name in same repository (no repository location
 allowed).
 

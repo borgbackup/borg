@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a2 and earlier (not released yet)
-----------------------------------------------
+Version 1.2.0a2 and earlier (2019-02-24)
+----------------------------------------
 
 Please note:
 

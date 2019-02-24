@@ -6,6 +6,46 @@ Important notes
 
 This section provides information about security and corruption issues.
 
+.. _broken_validator:
+
+Pre-1.1.4 potential data corruption issue
+-----------------------------------------
+
+A data corruption bug was discovered in borg check --repair, see issue #3444.
+
+This is a 1.1.x regression, releases < 1.1 (e.g. 1.0.x) are not affected.
+
+To avoid data loss, you must not run borg check --repair using an unfixed version
+of borg 1.1.x. The first official release that has the fix is 1.1.4.
+
+Package maintainers may have applied the fix to updated packages of 1.1.x (x<4)
+though, see the package maintainer's package changelog to make sure.
+
+If you never had missing item metadata chunks, the bug has not affected you
+even if you did run borg check --repair with an unfixed version.
+
+When borg check --repair tried to repair corrupt archives that miss item metadata
+chunks, the resync to valid metadata in still present item metadata chunks
+malfunctioned. This was due to a broken validator that considered all (even valid)
+item metadata as invalid. As they were considered invalid, borg discarded them.
+Practically, that means the affected files, directories or other fs objects were
+discarded from the archive.
+
+Due to the malfunction, the process was extremely slow, but if you let it
+complete, borg would have created a "repaired" archive that has lost a lot of items.
+If you interrupted borg check --repair because it was so strangely slow (killing
+borg somehow, e.g. Ctrl-C) the transaction was rolled back and no corruption occurred.
+
+The log message indicating the precondition for the bug triggering looks like:
+
+    item metadata chunk missing [chunk: 001056_bdee87d...a3e50d]
+
+If you never had that in your borg check --repair runs, you're not affected.
+
+But if you're unsure or you actually have seen that, better check your archives.
+By just using "borg list repo::archive" you can see if all expected filesystem
+items are listed.
+
 .. _tam_vuln:
 
 Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)

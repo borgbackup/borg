@@ -1079,14 +1079,14 @@ class Archiver:
             deleted = False
             for i, archive_name in enumerate(archive_names, 1):
                 try:
-                    del manifest.archives[archive_name]
+                    current_archive = manifest.archives.pop(archive_name)
                 except KeyError:
                     self.exit_code = EXIT_WARNING
                     logger.warning('Archive {} not found ({}/{}).'.format(archive_name, i, len(archive_names)))
                 else:
                     deleted = True
                     msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
-                    logger.info(msg.format(archive_name, i, len(archive_names)))
+                    logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
             if dry_run:
                 logger.info('Finished dry-run.')
             elif deleted:
@@ -1102,7 +1102,7 @@ class Archiver:
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             for i, archive_name in enumerate(archive_names, 1):
                 msg = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
-                logger.info(msg.format(archive_name, i, len(archive_names)))
+                logger.info(msg.format(format_archive(manifest.archives[archive_name]), i, len(archive_names)))
                 if not dry_run:
                     Archive(repository, key, manifest, archive_name, cache=cache).delete(
                         stats, progress=args.progress, forced=args.forced)

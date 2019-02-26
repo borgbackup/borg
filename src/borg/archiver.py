@@ -50,7 +50,7 @@ from .helpers import format_timedelta, format_file_size, parse_file_size, format
 from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
 from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
 from .helpers import timestamp
-from .helpers import get_cache_dir
+from .helpers import get_cache_dir, os_stat
 from .helpers import Manifest, AI_HUMAN_SORT_KEYS
 from .helpers import hardlinkable
 from .helpers import StableDict
@@ -486,9 +486,11 @@ class Archiver:
                 path = os.path.normpath(path)
                 parent_dir = os.path.dirname(path) or '.'
                 name = os.path.basename(path)
+                # note: for path == '/':  name == '' and parent_dir == '/'.
+                # the empty name will trigger a fall-back to path-based processing in os_stat and os_open.
                 with OsOpen(path=parent_dir, flags=flags_root, noatime=True, op='open_root') as parent_fd:
                     try:
-                        st = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                        st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
                     except OSError as e:
                         self.print_warning('%s: %s', path, e)
                         continue
@@ -565,7 +567,7 @@ class Archiver:
             recurse_excluded_dir = False
             if matcher.match(path):
                 with backup_io('stat'):
-                    st = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
             else:
                 self.print_file_status('x', path)
                 # get out here as quickly as possible:
@@ -575,7 +577,7 @@ class Archiver:
                 if not matcher.recurse_dir:
                     return
                 with backup_io('stat'):
-                    st = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
                 recurse_excluded_dir = stat.S_ISDIR(st.st_mode)
                 if not recurse_excluded_dir:
                     return

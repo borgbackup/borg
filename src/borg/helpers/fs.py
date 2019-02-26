@@ -224,7 +224,11 @@ def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
     :param noatime: True if access time shall be preserved
     :return: file descriptor
     """
-    fname = name if name is not None and parent_fd is not None else path
+    if name and parent_fd is not None:
+        # name is neither None nor empty, parent_fd given.
+        fname = name  # use name relative to parent_fd
+    else:
+        fname, parent_fd = path, None  # just use the path
     _flags_normal = flags
     if noatime:
         _flags_noatime = _flags_normal | O_('NOATIME')
@@ -240,6 +244,26 @@ def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
     else:
         fd = os.open(fname, _flags_normal, dir_fd=parent_fd)
     return fd
+
+
+def os_stat(*, path=None, parent_fd=None, name=None, follow_symlinks=False):
+    """
+    Use os.stat to open a fs item.
+
+    If parent_fd and name are given, they are preferred and statat will be used,
+    path is not used in this case.
+
+    :param path: full (but not necessarily absolute) path
+    :param parent_fd: open directory file descriptor
+    :param name: name relative to parent_fd
+    :return: stat info
+    """
+    if name and parent_fd is not None:
+        # name is neither None nor empty, parent_fd given.
+        fname = name  # use name relative to parent_fd
+    else:
+        fname, parent_fd = path, None  # just use the path
+    return os.stat(fname, dir_fd=parent_fd, follow_symlinks=follow_symlinks)
 
 
 def umount(mountpoint):

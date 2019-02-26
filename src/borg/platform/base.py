@@ -61,7 +61,7 @@ def setxattr(path, name, value, *, follow_symlinks=False):
     """
 
 
-def acl_get(path, item, st, numeric_owner=False):
+def acl_get(path, item, st, numeric_owner=False, fd=None):
     """
     Saves ACL Entries
 
@@ -69,7 +69,7 @@ def acl_get(path, item, st, numeric_owner=False):
     """
 
 
-def acl_set(path, item, numeric_owner=False):
+def acl_set(path, item, numeric_owner=False, fd=None):
     """
     Restore ACL Entries
 

@@ -42,12 +42,20 @@ if sys.platform.startswith('linux'):
 def is_enabled(path=None):
     """Determine if xattr is enabled on the filesystem
     """
-    with tempfile.NamedTemporaryFile(dir=path, prefix='borg-tmp') as fd:
+    with tempfile.NamedTemporaryFile(dir=path, prefix='borg-tmp') as f:
+        fd = f.fileno()
+        name, value = b'user.name', b'value'
         try:
-            setxattr(fd.fileno(), b'user.name', b'value')
+            setxattr(fd, name, value)
         except OSError:
             return False
-        return getxattr(fd.fileno(), b'user.name') == b'value'
+        try:
+            names = listxattr(fd)
+        except OSError:
+            return False
+        if name not in names:
+            return False
+        return getxattr(fd, name) == value
 
 
 def get_all(path, follow_symlinks=False):

@@ -115,6 +115,7 @@ cdef extern from "openssl/hmac.h":
 
 cdef extern from "_crypto_helpers.h":
     long OPENSSL_VERSION_NUMBER
+    long LIBRESSL_VERSION_NUMBER
 
     ctypedef struct HMAC_CTX:
         pass
@@ -126,7 +127,7 @@ cdef extern from "_crypto_helpers.h":
     const EVP_CIPHER *EVP_chacha20_poly1305()  # dummy
 
 
-openssl10 = OPENSSL_VERSION_NUMBER < 0x10100000
+openssl10 = OPENSSL_VERSION_NUMBER < 0x10100000 or LIBRESSL_VERSION_NUMBER
 
 
 import struct
@@ -673,7 +674,7 @@ cdef class _CHACHA_BASE(_AEAD_BASE):
 cdef class AES256_OCB(_AES_BASE):
     @classmethod
     def requirements_check(cls):
-        if OPENSSL_VERSION_NUMBER < 0x10100000:
+        if openssl10:
             raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
@@ -685,7 +686,7 @@ cdef class AES256_OCB(_AES_BASE):
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
     @classmethod
     def requirements_check(cls):
-        if OPENSSL_VERSION_NUMBER < 0x10100000:
+        if openssl10:
             raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):

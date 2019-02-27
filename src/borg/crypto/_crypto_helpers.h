@@ -4,14 +4,15 @@
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
-
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)
 HMAC_CTX *HMAC_CTX_new(void);
 void HMAC_CTX_free(HMAC_CTX *ctx);
+#endif
 
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 const EVP_CIPHER *EVP_aes_256_ocb(void);  /* dummy, so that code compiles */
 const EVP_CIPHER *EVP_chacha20_poly1305(void);  /* dummy, so that code compiles */
-
 #endif
 
 

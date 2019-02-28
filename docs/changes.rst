@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a2 and earlier (2019-02-24)
-----------------------------------------
+Version 1.2.0a3 (2019-02-26)
+----------------------------
 
 Please note:
 
@@ -205,6 +205,16 @@ Compatibility notes:
   - option "--list-format" (2017-10), use "--format"
   - option "--ignore-inode" (2017-09), use "--files-cache" w/o "inode"
   - option "--no-files-cache" (2017-09), use "--files-cache=disabled"
+
+Fixes:
+
+- LibreSSL build fixes, #4403
+- dummy ACL/xattr code fixes (used by OpenBSD and others), #4403
+- create: fix openat/statat issues for root directory, #4405
+
+
+Version 1.2.0a2 and earlier (2019-02-24)
+----------------------------------------
 
 New features:
 

@@ -41,7 +41,7 @@ def packages_freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
-    pkg install -y openssl-devel liblz4 fusefs-libs pkgconf
+    pkg install -y liblz4 zstd fusefs-libs pkgconf
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python:
     pkg install -y sqlite3
@@ -272,7 +272,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd64"
+    b.vm.box = "freebsd64-12"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

@@ -75,13 +75,14 @@ def packages_darwin
     sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.2/osxfuse-3.8.2.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.3/osxfuse-3.8.3.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.2.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.3.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
     brew install openssl
+    brew install zstd
     brew install lz4
     brew install xz  # required for python lzma module
     brew install fakeroot
@@ -111,8 +112,8 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.7.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.5.0  # tests
-    pyenv install 3.6.7  # binary build, use latest 3.6.x release
+    pyenv install 3.5.3  # tests, 3.5.3 is first to support openssl 1.1<k
+    pyenv install 3.6.8  # binary build, use latest 3.6.x release
     pyenv rehash
   EOF
 end
@@ -130,8 +131,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.6 release
-    pyenv global 3.6.7
-    pyenv virtualenv 3.6.7 borg-env
+    pyenv global 3.6.8
+    pyenv virtualenv 3.6.8 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -191,8 +192,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.5.0 3.6.0 3.7.0
-      pyenv local 3.5.0 3.6.0 3.7.0
+      pyenv global 3.5.3 3.6.0 3.7.0
+      pyenv local 3.5.3 3.6.0 3.7.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then
@@ -287,7 +288,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "darwin64" do |b|
-    b.vm.box = "jhcook/yosemite-clitools"
+    b.vm.box = "jhcook/macos-sierra"
     b.vm.provider :virtualbox do |v|
       v.memory = 1536 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']

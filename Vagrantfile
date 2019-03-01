@@ -67,6 +67,19 @@ def packages_freebsd
   EOF
 end
 
+def packages_openbsd
+  return <<-EOF
+    pkg_add bash
+    chsh -s /usr/local/bin/bash vagrant
+    pkg_add lz4
+    pkg_add zstd
+    pkg_add git  # no fakeroot
+    pkg_add py3-pip
+    pkg_add py3-virtualenv
+    ln -sf /usr/local/bin/virtualenv-3 /usr/local/bin/virtualenv
+  EOF
+end
+
 def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
@@ -285,6 +298,19 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64")
+  end
+
+  config.vm.define "openbsd64" do |b|
+    b.vm.box = "openbsd64-64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.ssh.shell = "sh"
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64")
   end
 
   config.vm.define "darwin64" do |b|

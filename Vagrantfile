@@ -288,7 +288,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "darwin64" do |b|
-    b.vm.box = "jhcook/yosemite-clitools"
+    b.vm.box = "jhcook/macos-sierra"
     b.vm.provider :virtualbox do |v|
       v.memory = 1536 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']

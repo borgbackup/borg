@@ -75,9 +75,9 @@ def packages_darwin
     sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.2/osxfuse-3.8.2.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.3/osxfuse-3.8.3.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.2.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.3.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update

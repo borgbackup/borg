@@ -59,7 +59,7 @@ Raspbian     `Raspbian testing`_                           ``apt install borgbac
 Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbackup``
 ============ ============================================= =======
 
-.. _Alpine repository: https://pkgs.alpinelinux.org/packages?name=borgbackup&branch=edge
+.. _Alpine repository: https://pkgs.alpinelinux.org/packages?name=borgbackup
 .. _[community]: https://www.archlinux.org/packages/?name=borg
 .. _Debian packages: https://packages.debian.org/search?keywords=borgbackup&searchon=names&exact=1&suite=all&section=all
 .. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup

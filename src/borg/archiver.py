@@ -66,7 +66,7 @@ from .helpers import ChunkIteratorFileWrapper
 from .helpers import popen_with_error_handling, prepare_subprocess_env
 from .helpers import dash_open
 from .helpers import umount
-from .helpers import flags_root, flags_dir, flags_follow
+from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
 from .helpers import msgpack
 from .nanorst import rst_to_terminal
 from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
@@ -646,7 +646,7 @@ class Archiver:
                             special = is_special(st_target.st_mode)
                         if special:
                             status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target,
-                                                      cache=cache, flags=flags_follow)
+                                                      cache=cache, flags=flags_special_follow)
                         else:
                             status = fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
             elif stat.S_ISFIFO(st.st_mode):
@@ -654,19 +654,22 @@ class Archiver:
                     if not read_special:
                         status = fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st)
                     else:
-                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache)
+                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                                  cache=cache, flags=flags_special)
             elif stat.S_ISCHR(st.st_mode):
                 if not dry_run:
                     if not read_special:
                         status = fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='c')
                     else:
-                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache)
+                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                                  cache=cache, flags=flags_special)
             elif stat.S_ISBLK(st.st_mode):
                 if not dry_run:
                     if not read_special:
                         status = fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='b')
                     else:
-                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache)
+                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                                  cache=cache, flags=flags_special)
             elif stat.S_ISSOCK(st.st_mode):
                 # Ignore unix sockets
                 return

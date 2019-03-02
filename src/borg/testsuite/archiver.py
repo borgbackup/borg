@@ -1780,19 +1780,38 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
-    def test_create_read_special(self):
-        self.create_regular_file('regular', size=1024)
-        os.symlink(os.path.join(self.input_path, 'file'), os.path.join(self.input_path, 'link_regular'))
-        if are_fifos_supported():
-            os.mkfifo(os.path.join(self.input_path, 'fifo'))
-            os.symlink(os.path.join(self.input_path, 'fifo'), os.path.join(self.input_path, 'link_fifo'))
+    @pytest.mark.skipif(not are_fifos_supported(), reason='FIFOs not supported')
+    def test_create_read_special_symlink(self):
+        from threading import Thread
+
+        def fifo_feeder(fifo_fn, data):
+            fd = os.open(fifo_fn, os.O_WRONLY)
+            try:
+                os.write(fd, data)
+            finally:
+                os.close(fd)
+
         self.cmd('init', '--encryption=repokey', self.repository_location)
         archive = self.repository_location + '::test'
-        self.cmd('create', '--read-special', archive, 'input')
-        output = self.cmd('list', archive)
-        assert 'input/link_regular -> ' in output  # not pointing to special file: archived as symlink
-        if are_fifos_supported():
-            assert 'input/link_fifo\n' in output  # pointing to a special file: archived following symlink
+        data = b'foobar' * 1000
+
+        fifo_fn = os.path.join(self.input_path, 'fifo')
+        link_fn = os.path.join(self.input_path, 'link_fifo')
+        os.mkfifo(fifo_fn)
+        os.symlink(fifo_fn, link_fn)
+
+        t = Thread(target=fifo_feeder, args=(fifo_fn, data))
+        t.start()
+        try:
+            self.cmd('create', '--read-special', archive, 'input/link_fifo')
+        finally:
+            t.join()
+        with changedir('output'):
+            self.cmd('extract', archive)
+            fifo_fn = 'input/link_fifo'
+            with open(fifo_fn, 'rb') as f:
+                extracted_data = f.read()
+        assert extracted_data == data
 
     def test_create_read_special_broken_symlink(self):
         os.symlink('somewhere doesnt exist', os.path.join(self.input_path, 'link'))

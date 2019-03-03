@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a3 (2019-02-26)
-----------------------------
+Version 1.2.0a4 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -205,6 +205,26 @@ Compatibility notes:
   - option "--list-format" (2017-10), use "--format"
   - option "--ignore-inode" (2017-09), use "--files-cache" w/o "inode"
   - option "--no-files-cache" (2017-09), use "--files-cache=disabled"
+
+Fixes:
+
+- do not use O_NONBLOCK for special files, like FIFOs, block and char devices
+  when using --read-special. fixes backing up FIFOs. fixes to test. #4394
+- more LibreSSL build fixes: LibreSSL has HMAC_CTX_free and *HMAC_CTX_new
+
+Other changes:
+
+- docs: added Alpine Linux to distribution list
+- vagrant:
+
+  - darwin: new 10.12 box
+  - freebsd: new 12.0 box
+  - openbsd: new 6.4 box
+  - misc. updates / fixes
+
+
+Version 1.2.0a3 (2019-02-26)
+----------------------------
 
 Fixes:
 

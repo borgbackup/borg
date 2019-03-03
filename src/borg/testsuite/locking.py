@@ -67,7 +67,7 @@ class TestExclusiveLock:
         cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
 
         dead_lock = ExclusiveLock(lockpath, id=dead_id).acquire()
-        with ExclusiveLock(lockpath, id=our_id, kill_stale_locks=True):
+        with ExclusiveLock(lockpath, id=our_id):
             with pytest.raises(NotMyLock):
                 dead_lock.release()
         with pytest.raises(NotLocked):
@@ -75,7 +75,7 @@ class TestExclusiveLock:
 
         with ExclusiveLock(lockpath, id=cant_know_if_dead_id):
             with pytest.raises(LockTimeout):
-                ExclusiveLock(lockpath, id=our_id, kill_stale_locks=True, timeout=0.1).acquire()
+                ExclusiveLock(lockpath, id=our_id, timeout=0.1).acquire()
 
     def test_migrate_lock(self, lockpath):
         old_id, new_id = ID1, ID2
@@ -157,7 +157,7 @@ class TestLock:
 
         dead_lock = Lock(lockpath, id=dead_id, exclusive=True).acquire()
         roster = dead_lock._roster
-        with Lock(lockpath, id=our_id, kill_stale_locks=True):
+        with Lock(lockpath, id=our_id):
             assert roster.get(EXCLUSIVE) == set()
             assert roster.get(SHARED) == {our_id}
         assert roster.get(EXCLUSIVE) == set()
@@ -167,7 +167,7 @@ class TestLock:
 
         with Lock(lockpath, id=cant_know_if_dead_id, exclusive=True):
             with pytest.raises(LockTimeout):
-                Lock(lockpath, id=our_id, kill_stale_locks=True, timeout=0.1).acquire()
+                Lock(lockpath, id=our_id, timeout=0.1).acquire()
 
     def test_migrate_lock(self, lockpath):
         old_id, new_id = ID1, ID2
@@ -217,25 +217,29 @@ class TestLockRoster:
         host, pid, tid = our_id = get_process_id()
         dead_id = host, free_pid, tid
 
+        # put a dead local process lock into roster
         roster1 = LockRoster(rosterpath, id=dead_id)
+        roster1.kill_stale_locks = False
         assert roster1.get(SHARED) == set()
         roster1.modify(SHARED, ADD)
         assert roster1.get(SHARED) == {dead_id}
 
+        # put a unknown-state remote process lock into roster
         cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
         roster1 = LockRoster(rosterpath, id=cant_know_if_dead_id)
+        roster1.kill_stale_locks = False
         assert roster1.get(SHARED) == {dead_id}
         roster1.modify(SHARED, ADD)
         assert roster1.get(SHARED) == {dead_id, cant_know_if_dead_id}
 
-        killer_roster = LockRoster(rosterpath, kill_stale_locks=True)
-        # Did kill the dead processes lock (which was alive ... I guess?!)
+        killer_roster = LockRoster(rosterpath)
+        # Active kill_stale_locks here - does it kill the dead_id lock?
         assert killer_roster.get(SHARED) == {cant_know_if_dead_id}
         killer_roster.modify(SHARED, ADD)
         assert killer_roster.get(SHARED) == {our_id, cant_know_if_dead_id}
 
-        other_killer_roster = LockRoster(rosterpath, kill_stale_locks=True)
-        # Did not kill us, since we're alive
+        other_killer_roster = LockRoster(rosterpath)
+        # Active kill_stale_locks here - must not kill our_id lock since we're alive.
         assert other_killer_roster.get(SHARED) == {our_id, cant_know_if_dead_id}
 
     def test_migrate_lock(self, rosterpath):

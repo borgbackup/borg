@@ -19,7 +19,7 @@ from .helpers import get_cache_dir, get_security_dir
 from .helpers import int_to_bigint, bigint_to_int, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size
 from .helpers import safe_ns
-from .helpers import yes, hostname_is_unique
+from .helpers import yes
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .helpers import set_ec, EXIT_WARNING
@@ -256,8 +256,7 @@ class CacheConfig:
             config.write(fd)
 
     def open(self):
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=self.lock_wait,
-                         kill_stale_locks=hostname_is_unique()).acquire()
+        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=self.lock_wait).acquire()
         self.load()
 
     def load(self):

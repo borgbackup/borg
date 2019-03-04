@@ -102,7 +102,3 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
             output(retry_msg, 'prompt_retry', is_prompt=True)
         # in case we used an environment variable and it gave an invalid answer, do not use it again:
         env_var_override = None
-
-
-def hostname_is_unique():
-    return yes(env_var_override='BORG_HOSTNAME_IS_UNIQUE', prompt=False, env_msg=None, default=True)

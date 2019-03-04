@@ -101,13 +101,13 @@ class ExclusiveLock:
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
-    def __init__(self, path, timeout=None, sleep=None, id=None, kill_stale_locks=False):
+    def __init__(self, path, timeout=None, sleep=None, id=None):
         self.timeout = timeout
         self.sleep = sleep
         self.path = os.path.abspath(path)
         self.id = id or platform.get_process_id()
         self.unique_name = os.path.join(self.path, "%s.%d-%x" % self.id)
-        self.kill_stale_locks = kill_stale_locks
+        self.kill_stale_locks = True
         self.stale_warning_printed = False
 
     def __enter__(self):
@@ -173,7 +173,7 @@ class ExclusiveLock:
             if not self.kill_stale_locks:
                 if not self.stale_warning_printed:
                     # Log this at warning level to hint the user at the ability
-                    logger.warning("Found stale lock %s, but not deleting because BORG_HOSTNAME_IS_UNIQUE is False.", name)
+                    logger.warning("Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name)
                     self.stale_warning_printed = True
                 return False
 
@@ -223,10 +223,10 @@ class LockRoster:
     Note: you usually should call the methods with an exclusive lock held,
     to avoid conflicting access by multiple threads/processes/machines.
     """
-    def __init__(self, path, id=None, kill_stale_locks=False):
+    def __init__(self, path, id=None):
         self.path = path
         self.id = id or platform.get_process_id()
-        self.kill_stale_locks = kill_stale_locks
+        self.kill_stale_locks = True
 
     def load(self):
         try:
@@ -320,18 +320,18 @@ class Lock:
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
-    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None, kill_stale_locks=False):
+    def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None):
         self.path = path
         self.is_exclusive = exclusive
         self.sleep = sleep
         self.timeout = timeout
         self.id = id or platform.get_process_id()
         # globally keeping track of shared and exclusive lockers:
-        self._roster = LockRoster(path + '.roster', id=id, kill_stale_locks=kill_stale_locks)
+        self._roster = LockRoster(path + '.roster', id=id)
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
         # - holding while the Lock itself is exclusive
-        self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout, kill_stale_locks=kill_stale_locks)
+        self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
 
     def __enter__(self):
         return self.acquire()

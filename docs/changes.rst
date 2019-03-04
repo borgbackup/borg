@@ -205,6 +205,13 @@ Compatibility notes:
   - option "--list-format" (2017-10), use "--format"
   - option "--ignore-inode" (2017-09), use "--files-cache" w/o "inode"
   - option "--no-files-cache" (2017-09), use "--files-cache=disabled"
+- removed BORG_HOSTNAME_IS_UNIQUE env var.
+  to use borg you must implement one of these 2 scenarios:
+  - 1) the combination of FQDN and result of uuid.getnode() must be unique
+       and stable (this should be the case for almost everybody, except when
+       having duplicate FQDN *and* MAC address or all-zero MAC address)
+  - 2) if you are aware that 1) is not the case for you, you must set
+       BORG_HOST_ID env var to something unique.
 
 Fixes:
 

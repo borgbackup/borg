@@ -17,7 +17,6 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
-from .helpers import hostname_is_unique
 from .helpers import secure_erase, truncate_and_unlink
 from .helpers import Manifest
 from .helpers import msgpack
@@ -390,7 +389,7 @@ class Repository:
         if not os.path.isdir(path):
             raise self.DoesNotExist(path)
         if lock:
-            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait, kill_stale_locks=hostname_is_unique()).acquire()
+            self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
         else:
             self.lock = None
         self.config = ConfigParser(interpolation=None)

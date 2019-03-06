@@ -293,6 +293,13 @@ class Archiver:
         if args.repair and args.max_duration:
             self.print_error("--repair does not allow --max-duration argument.")
             return EXIT_ERROR
+        if args.max_duration and not args.repo_only:
+            # when doing a partial repo check, we can only check crc32 checksums in segment files,
+            # we can't build a fresh repo index in memory to verify the on-disk index against it.
+            # thus, we should not do an archives check based on a unknown-quality on-disk repo index.
+            # also, there is no max_duration support in the archives check code anyway.
+            self.print_error("--repository-only is required for --max-duration support.")
+            return EXIT_ERROR
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
                 return EXIT_WARNING

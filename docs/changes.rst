@@ -219,9 +219,22 @@ Fixes:
   when using --read-special. fixes backing up FIFOs. fixes to test. #4394
 - more LibreSSL build fixes: LibreSSL has HMAC_CTX_free and *HMAC_CTX_new
 
+New features:
+
+- check: incremental repo check (only checks crc32 for segment entries), #1657
+  borg check --repository-only --max-duration SECONDS ...
+- delete: timestamp for borg delete --info added, #4359
+
 Other changes:
 
-- docs: added Alpine Linux to distribution list
+- redo stale lock handling, #3986
+  drop BORG_HOSTNAME_IS_UNIQUE (please use BORG_HOST_ID if needed).
+  borg now always assumes it has a unique host id - either automatically
+  from fqdn plus uuid.getnode() or overridden via BORG_HOST_ID.
+- docs:
+
+  - added Alpine Linux to distribution list
+  - elaborate on append-only mode docs
 - vagrant:
 
   - darwin: new 10.12 box

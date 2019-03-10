@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-SERVE 1 "2019-02-24" "" "borg backup tool"
+.TH BORG-SERVE 1 "2019-03-10" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .
@@ -65,7 +65,7 @@ that it is also \fBborg serve\fP and enforce path restriction(s) as given by the
 forced command. That way, other options given by the client (like \fB\-\-info\fP or
 \fB\-\-umask\fP) are preserved (and are not fixed by the forced command).
 .sp
-Environment variables (such as BORG_HOSTNAME_IS_UNIQUE) contained in the original
+Environment variables (such as BORG_XXX) contained in the original
 command sent by the client are \fInot\fP interpreted, but ignored. If BORG_XXX environment
 variables should be set on the \fBborg serve\fP side, then these must be set in system\-specific
 locations like \fB/etc/environment\fP or in the forced command itself (example below).

@@ -208,6 +208,9 @@ To activate append-only mode, set ``append_only`` to 1 in the repository config:
 
     borg config /path/to/repo append_only 1
 
+Note that you can go back-and-forth between normal and append-only operation with
+``borg config``; it's not a "one way trip."
+
 In append-only mode Borg will create a transaction log in the ``transactions`` file,
 where each line is a transaction and a UTC timestamp.
 
@@ -278,10 +281,19 @@ won't free disk space, they merely tag data as deleted in a new transaction.
 Be aware that as soon as you write to the repo in non-append-only mode (e.g. prune,
 delete or create archives from an admin machine), it will remove the deleted objects
 permanently (including the ones that were already marked as deleted, but not removed,
-in append-only mode).
+in append-only mode). Automated edits to the repository (such as a cron job running
+``borg prune``) will render append-only mode moot if data is deleted.
 
-Note that you can go back-and-forth between normal and append-only operation by editing
-the configuration file, it's not a "one way trip".
+Even if an archive appears to be available, it is possible an attacker could delete
+just a few chunks from an archive and silently corrupt its data. While in append-only
+mode, this is reversible, but ``borg check`` should be run before a writing/pruning
+operation on an append-only repository to catch accidental or malicious corruption::
+
+    # run without append-only mode
+    borg check --verify-data repo && borg compact repo
+
+Aside from checking repository & archive integrity you may want to also manually check
+backups to ensure their content seems correct.
 
 Further considerations
 ++++++++++++++++++++++

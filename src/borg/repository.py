@@ -890,7 +890,7 @@ class Repository:
                 # The outcome of the DELETE has been recorded in the PUT branch already
                 self.compact[segment] += size
 
-    def check(self, repair=False, save_space=False):
+    def check(self, repair=False, save_space=False, max_duration=0):
         """Check repository consistency
 
         This method verifies all segment checksums and makes sure
@@ -932,10 +932,26 @@ class Repository:
         self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
         segment_count = sum(1 for _ in self.io.segment_iterator())
         logger.debug('Found %d segments', segment_count)
+
+        partial = bool(max_duration)
+        assert not (repair and partial)
+        mode = 'partial' if partial else 'full'
+        if partial:
+            # continue a past partial check (if any) or start one from beginning
+            last_segment_checked = self.config.getint('repository', 'last_segment_checked', fallback=-1)
+            logger.info('skipping to segments >= %d', last_segment_checked + 1)
+        else:
+            # start from the beginning and also forget about any potential past partial checks
+            last_segment_checked = -1
+            self.config.remove_option('repository', 'last_segment_checked')
+            self.save_config(self.path, self.config)
+        t_start = time.monotonic()
         pi = ProgressIndicatorPercent(total=segment_count, msg='Checking segments %3.1f%%', step=0.1,
                                       msgid='repository.check')
         for i, (segment, filename) in enumerate(self.io.segment_iterator()):
             pi.show(i)
+            if segment <= last_segment_checked:
+                continue
             if segment > transaction_id:
                 continue
             try:
@@ -946,7 +962,18 @@ class Repository:
                 if repair:
                     self.io.recover_segment(segment, filename)
                     objects = list(self.io.iter_objects(segment))
-            self._update_index(segment, objects, report_error)
+            if not partial:
+                self._update_index(segment, objects, report_error)
+            if partial and time.monotonic() > t_start + max_duration:
+                logger.info('finished partial segment check, last segment checked is %d', segment)
+                self.config.set('repository', 'last_segment_checked', str(segment))
+                self.save_config(self.path, self.config)
+                break
+        else:
+            logger.info('finished segment check at segment %d', segment)
+            self.config.remove_option('repository', 'last_segment_checked')
+            self.save_config(self.path, self.config)
+
         pi.finish()
         # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>
         # We might need to add a commit tag if no committed segment is found
@@ -954,42 +981,43 @@ class Repository:
             report_error('Adding commit tag to segment {}'.format(transaction_id))
             self.io.segment = transaction_id + 1
             self.io.write_commit()
-        logger.info('Starting repository index check')
-        if current_index and not repair:
-            # current_index = "as found on disk"
-            # self.index = "as rebuilt in-memory from segments"
-            if len(current_index) != len(self.index):
-                report_error('Index object count mismatch.')
-                logger.error('committed index: %d objects', len(current_index))
-                logger.error('rebuilt index:   %d objects', len(self.index))
+        if not partial:
+            logger.info('Starting repository index check')
+            if current_index and not repair:
+                # current_index = "as found on disk"
+                # self.index = "as rebuilt in-memory from segments"
+                if len(current_index) != len(self.index):
+                    report_error('Index object count mismatch.')
+                    logger.error('committed index: %d objects', len(current_index))
+                    logger.error('rebuilt index:   %d objects', len(self.index))
 
-                line_format = '%-64s %-16s %-16s'
-                not_found = '<not found>'
-                logger.warning(line_format, 'ID', 'rebuilt index', 'committed index')
-                for key, value in self.index.iteritems():
-                    current_value = current_index.get(key, not_found)
-                    if current_value != value:
-                        logger.warning(line_format, bin_to_hex(key), value, current_value)
-                for key, current_value in current_index.iteritems():
-                    if key in self.index:
-                        continue
-                    value = self.index.get(key, not_found)
-                    if current_value != value:
-                        logger.warning(line_format, bin_to_hex(key), value, current_value)
-            elif current_index:
-                for key, value in self.index.iteritems():
-                    if current_index.get(key, (-1, -1)) != value:
-                        report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
-        if repair:
-            self.write_index()
+                    line_format = '%-64s %-16s %-16s'
+                    not_found = '<not found>'
+                    logger.warning(line_format, 'ID', 'rebuilt index', 'committed index')
+                    for key, value in self.index.iteritems():
+                        current_value = current_index.get(key, not_found)
+                        if current_value != value:
+                            logger.warning(line_format, bin_to_hex(key), value, current_value)
+                    for key, current_value in current_index.iteritems():
+                        if key in self.index:
+                            continue
+                        value = self.index.get(key, not_found)
+                        if current_value != value:
+                            logger.warning(line_format, bin_to_hex(key), value, current_value)
+                elif current_index:
+                    for key, value in self.index.iteritems():
+                        if current_index.get(key, (-1, -1)) != value:
+                            report_error('Index mismatch for key {}. {} != {}'.format(key, value, current_index.get(key, (-1, -1))))
+            if repair:
+                self.write_index()
         self.rollback()
         if error_found:
             if repair:
-                logger.info('Completed repository check, errors found and repaired.')
+                logger.info('Finished %s repository check, errors found and repaired.', mode)
             else:
-                logger.error('Completed repository check, errors found.')
+                logger.error('Finished %s repository check, errors found.', mode)
         else:
-            logger.info('Completed repository check, no problems found.')
+            logger.info('Finished %s repository check, no problems found.', mode)
         return not error_found or repair
 
     def scan_low_level(self):

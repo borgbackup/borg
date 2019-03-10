@@ -290,8 +290,18 @@ class Archiver:
         if args.repo_only and any((args.verify_data, args.first, args.last, args.prefix)):
             self.print_error("--repository-only contradicts --first, --last, --prefix and --verify-data arguments.")
             return EXIT_ERROR
+        if args.repair and args.max_duration:
+            self.print_error("--repair does not allow --max-duration argument.")
+            return EXIT_ERROR
+        if args.max_duration and not args.repo_only:
+            # when doing a partial repo check, we can only check crc32 checksums in segment files,
+            # we can't build a fresh repo index in memory to verify the on-disk index against it.
+            # thus, we should not do an archives check based on a unknown-quality on-disk repo index.
+            # also, there is no max_duration support in the archives check code anyway.
+            self.print_error("--repository-only is required for --max-duration support.")
+            return EXIT_ERROR
         if not args.archives_only:
-            if not repository.check(repair=args.repair, save_space=args.save_space):
+            if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
                 return EXIT_WARNING
         if args.prefix:
             args.glob_archives = args.prefix + '*'
@@ -2871,6 +2881,9 @@ class Archiver:
                                help='attempt to repair any inconsistencies found')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
+        subparser.add_argument('--max-duration', metavar='SECONDS', dest='max_duration',
+                                   type=int, default=0,
+                                   help='do only a partial repo check for max. SECONDS seconds (Default: unlimited)')
         define_archive_filters_group(subparser)
 
         subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,

@@ -893,8 +893,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
              make_parent_dirs=False):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version('1.0.0'))
-    def check(self, repair=False, save_space=False):
+    @api(since=parse_version('1.0.0'),
+         max_duration={'since': parse_version('1.2.0a4'), 'previously': 0})
+    def check(self, repair=False, save_space=False, max_duration=0):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'),

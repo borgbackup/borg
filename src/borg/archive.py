@@ -1226,9 +1226,22 @@ class FilesystemObjectProcessors:
                     else:
                         with backup_io('read'):
                             self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
-                        if not is_special_file:
+                        if is_win32:
+                            changed_while_backup = False  # TODO
+                        else:
+                            with backup_io('fstat2'):
+                                st2 = os.fstat(fd)
+                            # special files:
+                            # - fifos change naturally, because they are fed from the other side. no problem.
+                            # - blk/chr devices don't change ctime anyway.
+                            changed_while_backup = not is_special_file and st.st_ctime_ns != st2.st_ctime_ns
+                        if changed_while_backup:
+                            status = 'C'  # regular file changed while we backed it up, might be inconsistent/corrupt!
+                        if not is_special_file and not changed_while_backup:
                             # we must not memorize special files, because the contents of e.g. a
                             # block or char device will change without its mtime/size/inode changing.
+                            # also, we must not memorize a potentially inconsistent/corrupt file that
+                            # changed while we backed it up.
                             cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                     self.stats.nfiles += 1
                 md = self.metadata_collector.stat_attrs(st, path, fd=fd)

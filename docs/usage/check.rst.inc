@@ -29,6 +29,8 @@ borg check
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--save-space``                      | work slower, but using less space                                                                                                                      |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--max-duration SECONDS``            | do only a partial repo check for max. SECONDS seconds (Default: unlimited)                                                                             |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                               |
     |                                                                                                                                                                                                                                                                              |
     | :ref:`common_options`                                                                                                                                                                                                                                                        |
@@ -66,6 +68,7 @@ borg check
         --verify-data     perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)
         --repair          attempt to repair any inconsistencies found
         --save-space      work slower, but using less space
+        --max-duration SECONDS    do only a partial repo check for max. SECONDS seconds (Default: unlimited)
 
 
     :ref:`common_options`

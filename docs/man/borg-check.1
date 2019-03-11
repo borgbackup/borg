@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CHECK 1 "2019-02-24" "" "borg backup tool"
+.TH BORG-CHECK 1 "2019-03-10" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .
@@ -120,6 +120,9 @@ attempt to repair any inconsistencies found
 .TP
 .B \-\-save\-space
 work slower, but using less space
+.TP
+.BI \-\-max\-duration \ SECONDS
+do only a partial repo check for max. SECONDS seconds (Default: unlimited)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

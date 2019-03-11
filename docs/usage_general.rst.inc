@@ -351,6 +351,7 @@ CPU client:
     - **borg check:** similar to extract, but depends on options given.
     - **borg prune / borg delete archive:** low to medium CPU usage
     - **borg delete repo:** done on the server
+
     It won't go beyond 100% of 1 core as the code is currently single-threaded.
     Especially higher zlib and lzma compression levels use significant amounts
     of CPU cycles. Crypto might be cheap on the CPU (if hardware accelerated) or

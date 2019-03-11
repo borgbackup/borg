@@ -316,7 +316,7 @@ protocol within Borg.
 The assumed worst-case a server can inflict to a client is a
 denial of repository service.
 
-The situation were a server can create a general DoS on the client
+The situation where a server can create a general DoS on the client
 should be avoided, but might be possible by e.g. forcing the client to
 allocate large amounts of memory to decode large messages (or messages
 that merely indicate a large amount of data follows). The RPC protocol
@@ -407,7 +407,7 @@ The buzhash chunker chunks according to the input data, the chunker's
 parameters and the secret chunker seed (which all influence the chunk boundary
 positions).
 
-Small files below some specific threshold (default: 512kiB) result in only one
+Small files below some specific threshold (default: 512 KiB) result in only one
 chunk (identical content / size as the original file), bigger files result in
 multiple chunks.
 
@@ -418,8 +418,8 @@ This chunker yields fixed sized chunks, with optional support of a differently
 sized header chunk. The last chunk is not required to have the full block size
 and is determined by the input file size.
 
-Within our attack model, an attacker posessing a specific set of files which
-he assumes that the victim also posesses (and backups into the repository)
+Within our attack model, an attacker possessing a specific set of files which
+he assumes that the victim also possesses (and backups into the repository)
 could try a brute force fingerprinting attack based on the chunk sizes in the
 repository to prove his assumption.
 

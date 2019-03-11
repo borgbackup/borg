@@ -50,7 +50,6 @@ class LRUCache:
             self._dispose(value)
         self._cache.clear()
 
-    # useful for testing
     def items(self):
         return self._cache.items()
 

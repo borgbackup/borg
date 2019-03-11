@@ -1216,6 +1216,7 @@ class LoggedIO:
         self.segments_per_dir = segments_per_dir
         self.offset = 0
         self._write_fd = None
+        self._fds_cleaned = 0
 
     def close(self):
         self.close_segment()
@@ -1346,20 +1347,26 @@ class LoggedIO:
             self.fds[segment] = (now, fd)
             return fd
 
+        def clean_old():
+            # we regularly get rid of all old FDs here:
+            if now - self._fds_cleaned > FD_MAX_AGE // 8:
+                self._fds_cleaned = now
+                for k, ts_fd in list(self.fds.items()):
+                    ts, fd = ts_fd
+                    if now - ts > FD_MAX_AGE:
+                        # we do not want to touch long-unused file handles to
+                        # avoid ESTALE issues (e.g. on network filesystems).
+                        del self.fds[k]
+
+        clean_old()
         try:
             ts, fd = self.fds[segment]
         except KeyError:
             fd = open_fd()
         else:
-            if now - ts > FD_MAX_AGE:
-                # we do not want to touch long-unused file handles to
-                # avoid ESTALE issues (e.g. on network filesystems).
-                del self.fds[segment]
-                fd = open_fd()
-            else:
-                # fd is fresh enough, so we use it.
-                # also, we update the timestamp of the lru cache entry.
-                self.fds.upd(segment, (now, fd))
+            # we only have fresh enough stuff here.
+            # update the timestamp of the lru cache entry.
+            self.fds.upd(segment, (now, fd))
         return fd
 
     def close_segment(self):

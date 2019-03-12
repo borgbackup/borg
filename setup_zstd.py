@@ -11,6 +11,9 @@ import os
 
 # zstd files, structure as seen in zstd project repository:
 
+# bundled_path: relative (to this file) path to the bundled library source code files
+bundled_path = 'src/borg/algorithms/zstd'
+
 zstd_sources = [
     'lib/common/debug.c',
     'lib/common/entropy_common.c',
@@ -67,10 +70,9 @@ zstd_includes_legacy = [
 ]
 
 
-def zstd_ext_kwargs(bundled_path, prefer_system, multithreaded=False, legacy=False, **kwargs):
+def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False, **kwargs):
     """amend kwargs with zstd suff for a distutils.extension.Extension initialization.
 
-    bundled_path: relative (to this file) path to the bundled library source code files
     prefer_system: prefer the system-installed library (if found) over the bundled C code
     multithreaded: True: define ZSTD_MULTITHREAD
     legacy: include legacy API support

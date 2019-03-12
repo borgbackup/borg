@@ -11,6 +11,9 @@ import os
 
 # lz4 files, structure as seen in lz4 project repository:
 
+# bundled_path: relative (to this file) path to the bundled library source code files
+bundled_path = 'src/borg/algorithms/lz4'
+
 lz4_sources = [
     'lib/lz4.c',
 ]
@@ -20,10 +23,9 @@ lz4_includes = [
 ]
 
 
-def lz4_ext_kwargs(bundled_path, prefer_system, **kwargs):
+def lz4_ext_kwargs(prefer_system, **kwargs):
     """amend kwargs with lz4 stuff for a distutils.extension.Extension initialization.
 
-    bundled_path: relative (to this file) path to the bundled library source code files
     prefer_system: prefer the system-installed library (if found) over the bundled C code
     kwargs: distutils.extension.Extension kwargs that should be amended
     returns: amended kwargs

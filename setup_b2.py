@@ -11,6 +11,9 @@ import os
 
 # b2 files, structure as seen in BLAKE2 (reference implementation) project repository:
 
+# bundled_path: relative (to this file) path to the bundled library source code files
+bundled_path = 'src/borg/algorithms/blake2'
+
 b2_sources = [
     'ref/blake2b-ref.c',
 ]
@@ -20,10 +23,9 @@ b2_includes = [
 ]
 
 
-def b2_ext_kwargs(bundled_path, prefer_system, **kwargs):
+def b2_ext_kwargs(prefer_system, **kwargs):
     """amend kwargs with b2 stuff for a distutils.extension.Extension initialization.
 
-    bundled_path: relative (to this file) path to the bundled library source code files
     prefer_system: prefer the system-installed library (if found) over the bundled C code
     kwargs: distutils.extension.Extension kwargs that should be amended
     returns: amended kwargs

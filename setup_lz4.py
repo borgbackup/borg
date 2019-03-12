@@ -20,27 +20,28 @@ lz4_includes = [
 ]
 
 
-def lz4_system_prefix(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'lz4.h')
-        if os.path.exists(filename):
-            with open(filename, 'rb') as fd:
-                if b'LZ4_compress_default' in fd.read():  # requires lz4 >= 1.7.0 (r129)
-                    return prefix
-
-
-def lz4_ext_kwargs(bundled_path, system_prefix=None, system=False, **kwargs):
+def lz4_ext_kwargs(bundled_path, prefer_system, **kwargs):
     """amend kwargs with lz4 stuff for a distutils.extension.Extension initialization.
 
     bundled_path: relative (to this file) path to the bundled library source code files
-    system_prefix: where the system-installed library can be found
-    system: True: use the system-installed shared library, False: use the bundled library code
+    prefer_system: prefer the system-installed library (if found) over the bundled C code
     kwargs: distutils.extension.Extension kwargs that should be amended
     returns: amended kwargs
     """
     def multi_join(paths, *path_segments):
         """apply os.path.join on a list of paths"""
         return [os.path.join(*(path_segments + (path, ))) for path in paths]
+
+    define_macros = kwargs.get('define_macros', [])
+
+    system_prefix = os.environ.get('BORG_LIBLZ4_PREFIX')
+    if prefer_system and system_prefix:
+        print('Detected and preferring liblz4 over bundled LZ4')
+        define_macros.append(('BORG_USE_LIBLZ4', 'YES'))
+        system = True
+    else:
+        print('Using bundled LZ4')
+        system = False
 
     use_system = system and system_prefix is not None
 

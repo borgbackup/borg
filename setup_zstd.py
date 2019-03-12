@@ -67,21 +67,11 @@ zstd_includes_legacy = [
 ]
 
 
-def zstd_system_prefix(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'zstd.h')
-        if os.path.exists(filename):
-            with open(filename, 'rb') as fd:
-                if b'ZSTD_getFrameContentSize' in fd.read():  # checks for zstd >= 1.3.0
-                    return prefix
-
-
-def zstd_ext_kwargs(bundled_path, system_prefix=None, system=False, multithreaded=False, legacy=False, **kwargs):
+def zstd_ext_kwargs(bundled_path, prefer_system, multithreaded=False, legacy=False, **kwargs):
     """amend kwargs with zstd suff for a distutils.extension.Extension initialization.
 
     bundled_path: relative (to this file) path to the bundled library source code files
-    system_prefix: where the system-installed library can be found
-    system: True: use the system-installed shared library, False: use the bundled library code
+    prefer_system: prefer the system-installed library (if found) over the bundled C code
     multithreaded: True: define ZSTD_MULTITHREAD
     legacy: include legacy API support
     kwargs: distutils.extension.Extension kwargs that should be amended
@@ -90,6 +80,17 @@ def zstd_ext_kwargs(bundled_path, system_prefix=None, system=False, multithreade
     def multi_join(paths, *path_segments):
         """apply os.path.join on a list of paths"""
         return [os.path.join(*(path_segments + (path, ))) for path in paths]
+
+    define_macros = kwargs.get('define_macros', [])
+
+    system_prefix = os.environ.get('BORG_LIBZSTD_PREFIX')
+    if prefer_system and system_prefix:
+        print('Detected and preferring libzstd over bundled ZSTD')
+        define_macros.append(('BORG_USE_LIBZSTD', 'YES'))
+        system = True
+    else:
+        print('Using bundled ZSTD')
+        system = False
 
     use_system = system and system_prefix is not None
 

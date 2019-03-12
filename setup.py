@@ -124,43 +124,6 @@ include_dirs.append(os.path.join(ssl_prefix, 'include'))
 library_dirs.append(os.path.join(ssl_prefix, 'lib'))
 
 
-possible_liblz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4',
-                         '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LIBLZ4_PREFIX'):
-    possible_liblz4_prefixes.insert(0, os.environ.get('BORG_LIBLZ4_PREFIX'))
-liblz4_prefix = setup_lz4.lz4_system_prefix(possible_liblz4_prefixes)
-if prefer_system_liblz4 and liblz4_prefix:
-    print('Detected and preferring liblz4 over bundled LZ4')
-    define_macros.append(('BORG_USE_LIBLZ4', 'YES'))
-    liblz4_system = True
-else:
-    liblz4_system = False
-
-possible_libb2_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libb2', '/usr/local/libb2',
-                           '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LIBB2_PREFIX'):
-    possible_libb2_prefixes.insert(0, os.environ.get('BORG_LIBB2_PREFIX'))
-libb2_prefix = setup_b2.b2_system_prefix(possible_libb2_prefixes)
-if prefer_system_libb2 and libb2_prefix:
-    print('Detected and preferring libb2 over bundled BLAKE2')
-    define_macros.append(('BORG_USE_LIBB2', 'YES'))
-    libb2_system = True
-else:
-    libb2_system = False
-
-possible_libzstd_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libzstd', '/usr/local/libzstd',
-                             '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LIBZSTD_PREFIX'):
-    possible_libzstd_prefixes.insert(0, os.environ.get('BORG_LIBZSTD_PREFIX'))
-libzstd_prefix = setup_zstd.zstd_system_prefix(possible_libzstd_prefixes)
-if prefer_system_libzstd and libzstd_prefix:
-    print('Detected and preferring libzstd over bundled ZSTD')
-    define_macros.append(('BORG_USE_LIBZSTD', 'YES'))
-    libzstd_system = True
-else:
-    libzstd_system = False
-
-
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
     # remove header, but have one \n before first headline
@@ -205,15 +168,15 @@ if not on_rtd:
     compress_ext_kwargs = dict(sources=[compress_source], include_dirs=include_dirs, library_dirs=library_dirs,
                                define_macros=define_macros)
     compress_ext_kwargs = setup_lz4.lz4_ext_kwargs(bundled_path='src/borg/algorithms/lz4',
-                                                   system_prefix=liblz4_prefix, system=liblz4_system,
+                                                   prefer_system=prefer_system_liblz4,
                                                    **compress_ext_kwargs)
     compress_ext_kwargs = setup_zstd.zstd_ext_kwargs(bundled_path='src/borg/algorithms/zstd',
-                                                     system_prefix=libzstd_prefix, system=libzstd_system,
+                                                     prefer_system=prefer_system_libzstd,
                                                      multithreaded=False, legacy=False, **compress_ext_kwargs)
     crypto_ext_kwargs = dict(sources=[crypto_ll_source, crypto_helpers], libraries=['crypto'],
                              include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros)
     crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
-                                               system_prefix=libb2_prefix, system=libb2_system,
+                                               prefer_system=prefer_system_libb2,
                                                **crypto_ext_kwargs)
     ext_modules += [
         Extension('borg.compress', **compress_ext_kwargs),

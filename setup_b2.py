@@ -20,27 +20,28 @@ b2_includes = [
 ]
 
 
-def b2_system_prefix(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'blake2.h')
-        if os.path.exists(filename):
-            with open(filename, 'rb') as fd:
-                if b'blake2b_init' in fd.read():
-                    return prefix
-
-
-def b2_ext_kwargs(bundled_path, system_prefix=None, system=False, **kwargs):
+def b2_ext_kwargs(bundled_path, prefer_system, **kwargs):
     """amend kwargs with b2 stuff for a distutils.extension.Extension initialization.
 
     bundled_path: relative (to this file) path to the bundled library source code files
-    system_prefix: where the system-installed library can be found
-    system: True: use the system-installed shared library, False: use the bundled library code
+    prefer_system: prefer the system-installed library (if found) over the bundled C code
     kwargs: distutils.extension.Extension kwargs that should be amended
     returns: amended kwargs
     """
     def multi_join(paths, *path_segments):
         """apply os.path.join on a list of paths"""
         return [os.path.join(*(path_segments + (path, ))) for path in paths]
+
+    define_macros = kwargs.get('define_macros', [])
+
+    system_prefix = os.environ.get('BORG_LIBB2_PREFIX')
+    if prefer_system and system_prefix:
+        print('Detected and preferring libb2 over bundled BLAKE2')
+        define_macros.append(('BORG_USE_LIBB2', 'YES'))
+        system = True
+    else:
+        print('Using bundled BLAKE2')
+        system = False
 
     use_system = system and system_prefix is not None
 

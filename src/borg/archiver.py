@@ -695,6 +695,8 @@ class Archiver:
         except (BackupOSError, BackupError) as e:
             self.print_warning('%s: %s', path, e)
             status = 'E'
+        if status == 'C':
+            self.print_warning('%s: file changed while we backed it up', path)
         # Status output
         if status is None:
             if not dry_run:
@@ -3106,6 +3108,7 @@ class Archiver:
         - 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
         - 'M' = regular file, modified
         - 'U' = regular file, unchanged
+        - 'C' = regular file, it changed while we backed it up
         - 'E' = regular file, an error happened while accessing/reading *this* file
 
         A lowercase character means a file type other than a regular file,

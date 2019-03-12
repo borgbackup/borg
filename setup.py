@@ -24,6 +24,7 @@ except ImportError:
 import setup_lz4
 import setup_zstd
 import setup_b2
+import setup_crypto
 import setup_docs
 
 # True: use the shared liblz4 (>= 1.7.0 / r129) from the system, False: use the bundled lz4 code
@@ -100,30 +101,6 @@ else:
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
-def detect_openssl(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'openssl', 'evp.h')
-        if os.path.exists(filename):
-            with open(filename, 'rb') as fd:
-                if b'PKCS5_PBKDF2_HMAC(' in fd.read():
-                    return prefix
-
-
-include_dirs = []
-library_dirs = []
-define_macros = []
-
-possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
-                             '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_OPENSSL_PREFIX'):
-    possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
-ssl_prefix = detect_openssl(possible_openssl_prefixes)
-if not ssl_prefix:
-    raise Exception('Unable to find OpenSSL >= 1.0 headers. (Looked here: {})'.format(', '.join(possible_openssl_prefixes)))
-include_dirs.append(os.path.join(ssl_prefix, 'include'))
-library_dirs.append(os.path.join(ssl_prefix, 'lib'))
-
-
 with open('README.rst', 'r') as fd:
     long_description = fd.read()
     # remove header, but have one \n before first headline
@@ -165,6 +142,9 @@ cmdclass = {
 
 ext_modules = []
 if not on_rtd:
+    include_dirs = []
+    library_dirs = []
+    define_macros = []
     compress_ext_kwargs = dict(sources=[compress_source], include_dirs=include_dirs, library_dirs=library_dirs,
                                define_macros=define_macros)
     compress_ext_kwargs = setup_lz4.lz4_ext_kwargs(bundled_path='src/borg/algorithms/lz4',
@@ -173,8 +153,9 @@ if not on_rtd:
     compress_ext_kwargs = setup_zstd.zstd_ext_kwargs(bundled_path='src/borg/algorithms/zstd',
                                                      prefer_system=prefer_system_libzstd,
                                                      multithreaded=False, legacy=False, **compress_ext_kwargs)
-    crypto_ext_kwargs = dict(sources=[crypto_ll_source, crypto_helpers], libraries=['crypto'],
-                             include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros)
+    crypto_ext_kwargs = dict(sources=[crypto_ll_source, crypto_helpers], include_dirs=include_dirs,
+                             library_dirs=library_dirs, define_macros=define_macros)
+    crypto_ext_kwargs = setup_crypto.crypto_ext_kwargs(**crypto_ext_kwargs)
     crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
                                                prefer_system=prefer_system_libb2,
                                                **crypto_ext_kwargs)

@@ -21,7 +21,7 @@ def multi_join(paths, *path_segments):
     return [os.path.join(*(path_segments + (path,))) for path in paths]
 
 
-def b2_ext_kwargs(prefer_system):
+def b2_ext_kwargs(pc, prefer_system):
     if prefer_system:
         system_prefix = os.environ.get('BORG_LIBB2_PREFIX')
         if system_prefix:
@@ -30,11 +30,9 @@ def b2_ext_kwargs(prefer_system):
                         library_dirs=[os.path.join(system_prefix, 'lib')],
                         libraries=['b2'])
 
-        import pkgconfig
-
-        if pkgconfig.installed('libb2', '>= 0.98.1'):
+        if pc and pc.installed('libb2', '>= 0.98.1'):
             print('Detected and preferring libb2 [via pkg-config]')
-            return pkgconfig.parse('libb2')
+            return pc.parse('libb2')
 
     print('Using bundled BLAKE2')
     sources = multi_join(b2_sources, bundled_path)

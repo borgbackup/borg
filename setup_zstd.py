@@ -68,7 +68,7 @@ def multi_join(paths, *path_segments):
     return [os.path.join(*(path_segments + (path,))) for path in paths]
 
 
-def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False):
+def zstd_ext_kwargs(pc, prefer_system, multithreaded=False, legacy=False):
     if prefer_system:
         system_prefix = os.environ.get('BORG_LIBZSTD_PREFIX')
         if system_prefix:
@@ -77,11 +77,9 @@ def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False):
                         library_dirs=[os.path.join(system_prefix, 'lib')],
                         libraries=['zstd'])
 
-        import pkgconfig
-
-        if pkgconfig.installed('libzstd', '>= 1.3.0'):
+        if pc and pc.installed('libzstd', '>= 1.3.0'):
             print('Detected and preferring libzstd [via pkg-config]')
-            return pkgconfig.parse('libzstd')
+            return pc.parse('libzstd')
 
     print('Using bundled ZSTD')
     sources = multi_join(zstd_sources, bundled_path)

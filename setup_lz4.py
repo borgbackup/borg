@@ -21,7 +21,7 @@ def multi_join(paths, *path_segments):
     return [os.path.join(*(path_segments + (path,))) for path in paths]
 
 
-def lz4_ext_kwargs(prefer_system):
+def lz4_ext_kwargs(pc, prefer_system):
     if prefer_system:
         system_prefix = os.environ.get('BORG_LIBLZ4_PREFIX')
         if system_prefix:
@@ -30,11 +30,9 @@ def lz4_ext_kwargs(prefer_system):
                         library_dirs=[os.path.join(system_prefix, 'lib')],
                         libraries=['lz4'])
 
-        import pkgconfig
-
-        if pkgconfig.installed('liblz4', '>= 1.7.0'):
+        if pc and pc.installed('liblz4', '>= 1.7.0'):
             print('Detected and preferring liblz4 [via pkg-config]')
-            return pkgconfig.parse('liblz4')
+            return pc.parse('liblz4')
 
     print('Using bundled LZ4')
     sources = multi_join(lz4_sources, bundled_path)

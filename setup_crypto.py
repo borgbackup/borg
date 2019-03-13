@@ -10,11 +10,10 @@
 import os
 
 
-def crypto_ext_kwargs(**kwargs):
-    """amend kwargs with crypto stuff for a distutils.extension.Extension initialization.
+def crypto_ext_kwargs():
+    """return kwargs with crypto stuff for a distutils.extension.Extension initialization.
 
-    kwargs: distutils.extension.Extension kwargs that should be amended
-    returns: amended kwargs
+    returns: kwargs for this lib
     """
     def multi_join(paths, *path_segments):
         """apply os.path.join on a list of paths"""
@@ -26,15 +25,8 @@ def crypto_ext_kwargs(**kwargs):
     else:
         raise Exception('Could not find OpenSSL lib/headers, please set BORG_OPENSSL_PREFIX')
 
-    include_dirs = kwargs.get('include_dirs', [])
-    include_dirs += multi_join(['include'], system_prefix)
+    include_dirs = multi_join(['include'], system_prefix)
+    library_dirs = multi_join(['lib'], system_prefix)
+    libraries = ['crypto', ]
 
-    library_dirs = kwargs.get('library_dirs', [])
-    library_dirs += multi_join(['lib'], system_prefix)
-
-    libraries = kwargs.get('libraries', [])
-    libraries += ['crypto', ]
-
-    ret = dict(**kwargs)
-    ret.update(dict(include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries))
-    return ret
+    return dict(include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries)

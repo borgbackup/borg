@@ -23,18 +23,17 @@ lz4_includes = [
 ]
 
 
-def lz4_ext_kwargs(prefer_system, **kwargs):
-    """amend kwargs with lz4 stuff for a distutils.extension.Extension initialization.
+def lz4_ext_kwargs(prefer_system):
+    """return kwargs with lz4 stuff for a distutils.extension.Extension initialization.
 
     prefer_system: prefer the system-installed library (if found) over the bundled C code
-    kwargs: distutils.extension.Extension kwargs that should be amended
-    returns: amended kwargs
+    returns: kwargs for this lib
     """
     def multi_join(paths, *path_segments):
         """apply os.path.join on a list of paths"""
         return [os.path.join(*(path_segments + (path, ))) for path in paths]
 
-    define_macros = kwargs.get('define_macros', [])
+    define_macros = []
 
     system_prefix = os.environ.get('BORG_LIBLZ4_PREFIX')
     if prefer_system and system_prefix:
@@ -47,29 +46,18 @@ def lz4_ext_kwargs(prefer_system, **kwargs):
 
     use_system = system and system_prefix is not None
 
-    sources = kwargs.get('sources', [])
-    if not use_system:
-        sources += multi_join(lz4_sources, bundled_path)
-
-    include_dirs = kwargs.get('include_dirs', [])
     if use_system:
-        include_dirs += multi_join(['include'], system_prefix)
+        sources = []
+        include_dirs = multi_join(['include'], system_prefix)
+        library_dirs = multi_join(['lib'], system_prefix)
+        libraries = ['lz4', ]
     else:
-        include_dirs += multi_join(lz4_includes, bundled_path)
+        sources = multi_join(lz4_sources, bundled_path)
+        include_dirs = multi_join(lz4_includes, bundled_path)
+        library_dirs = []
+        libraries = []
 
-    library_dirs = kwargs.get('library_dirs', [])
-    if use_system:
-        library_dirs += multi_join(['lib'], system_prefix)
+    extra_compile_args = []
 
-    libraries = kwargs.get('libraries', [])
-    if use_system:
-        libraries += ['lz4', ]
-
-    extra_compile_args = kwargs.get('extra_compile_args', [])
-    if not use_system:
-        extra_compile_args += []  # not used yet
-
-    ret = dict(**kwargs)
-    ret.update(dict(sources=sources, define_macros=define_macros, extra_compile_args=extra_compile_args,
-                    include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries))
-    return ret
+    return dict(sources=sources, define_macros=define_macros, extra_compile_args=extra_compile_args,
+               include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries)

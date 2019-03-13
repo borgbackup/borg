@@ -70,20 +70,19 @@ zstd_includes_legacy = [
 ]
 
 
-def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False, **kwargs):
-    """amend kwargs with zstd suff for a distutils.extension.Extension initialization.
+def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False):
+    """return kwargs with zstd suff for a distutils.extension.Extension initialization.
 
     prefer_system: prefer the system-installed library (if found) over the bundled C code
     multithreaded: True: define ZSTD_MULTITHREAD
     legacy: include legacy API support
-    kwargs: distutils.extension.Extension kwargs that should be amended
-    returns: amended kwargs
+    returns: kwargs for this lib
     """
     def multi_join(paths, *path_segments):
         """apply os.path.join on a list of paths"""
         return [os.path.join(*(path_segments + (path, ))) for path in paths]
 
-    define_macros = kwargs.get('define_macros', [])
+    define_macros = []
 
     system_prefix = os.environ.get('BORG_LIBZSTD_PREFIX')
     if prefer_system and system_prefix:
@@ -96,29 +95,22 @@ def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False, **kwargs):
 
     use_system = system and system_prefix is not None
 
-    sources = kwargs.get('sources', [])
-    if not use_system:
-        sources += multi_join(zstd_sources, bundled_path)
+    if use_system:
+        sources = []
+        include_dirs = multi_join(['include'], system_prefix)
+        library_dirs = multi_join(['lib'], system_prefix)
+        libraries = ['zstd', ]
+    else:
+        sources = multi_join(zstd_sources, bundled_path)
         if legacy:
             sources += multi_join(zstd_sources_legacy, bundled_path)
-
-    include_dirs = kwargs.get('include_dirs', [])
-    if use_system:
-        include_dirs += multi_join(['include'], system_prefix)
-    else:
-        include_dirs += multi_join(zstd_includes, bundled_path)
+        include_dirs = multi_join(zstd_includes, bundled_path)
         if legacy:
             include_dirs += multi_join(zstd_includes_legacy, bundled_path)
+        library_dirs = []
+        libraries = []
 
-    library_dirs = kwargs.get('library_dirs', [])
-    if use_system:
-        library_dirs += multi_join(['lib'], system_prefix)
-
-    libraries = kwargs.get('libraries', [])
-    if use_system:
-        libraries += ['zstd', ]
-
-    extra_compile_args = kwargs.get('extra_compile_args', [])
+    extra_compile_args = []
     if multithreaded:
         extra_compile_args += ['-DZSTD_MULTITHREAD', ]
     if not use_system:
@@ -127,7 +119,5 @@ def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False, **kwargs):
         if legacy:
             extra_compile_args += ['-DZSTD_LEGACY_SUPPORT=1', ]
 
-    ret = dict(**kwargs)
-    ret.update(dict(sources=sources, define_macros=define_macros, extra_compile_args=extra_compile_args,
-                    include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries))
-    return ret
+    return dict(sources=sources, define_macros=define_macros, extra_compile_args=extra_compile_args,
+                include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries)

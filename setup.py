@@ -2,6 +2,7 @@ import os
 import io
 import re
 import sys
+from collections import defaultdict
 from collections import OrderedDict
 from datetime import datetime
 from glob import glob
@@ -142,13 +143,27 @@ cmdclass = {
 
 ext_modules = []
 if not on_rtd:
-    compress_ext_kwargs = dict(sources=[compress_source])
-    compress_ext_kwargs = setup_lz4.lz4_ext_kwargs(prefer_system_liblz4, **compress_ext_kwargs)
-    compress_ext_kwargs = setup_zstd.zstd_ext_kwargs(prefer_system_libzstd,
-                                                     multithreaded=False, legacy=False, **compress_ext_kwargs)
-    crypto_ext_kwargs = dict(sources=[crypto_ll_source, crypto_helpers])
-    crypto_ext_kwargs = setup_crypto.crypto_ext_kwargs(**crypto_ext_kwargs)
-    crypto_ext_kwargs = setup_b2.b2_ext_kwargs(prefer_system_libb2, **crypto_ext_kwargs)
+
+    def members_appended(*ds):
+        result = defaultdict(list)
+        for d in ds:
+            for k, v in d.items():
+                assert isinstance(v, list)
+                result[k].extend(v)
+        return result
+
+    compress_ext_kwargs = members_appended(
+        dict(sources=[compress_source]),
+        setup_lz4.lz4_ext_kwargs(prefer_system_liblz4),
+        setup_zstd.zstd_ext_kwargs(prefer_system_libzstd, multithreaded=False, legacy=False),
+    )
+
+    crypto_ext_kwargs = members_appended(
+        dict(sources=[crypto_ll_source, crypto_helpers]),
+        setup_crypto.crypto_ext_kwargs(),
+        setup_b2.b2_ext_kwargs(prefer_system_libb2),
+    )
+
     ext_modules += [
         Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),

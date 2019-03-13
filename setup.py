@@ -34,7 +34,7 @@ prefer_system_liblz4 = True
 # True: use the shared libzstd (>= 1.3.0) from the system, False: use the bundled zstd code
 prefer_system_libzstd = True
 
-# True: use the shared libb2 from the system, False: use the bundled blake2 code
+# True: use the shared libb2 (>= 0.98.1) from the system, False: use the bundled blake2 code
 prefer_system_libb2 = True
 
 cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1

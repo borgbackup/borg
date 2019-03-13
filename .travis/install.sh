@@ -42,7 +42,8 @@ else
     sudo apt-get install -y fakeroot
     sudo apt-get install -y liblz4-dev
     sudo apt-get install -y libacl1-dev
-    sudo apt-get install -y libfuse-dev fuse pkg-config  # optional, for FUSE support
+    sudo apt-get install -y pkg-config
+    sudo apt-get install -y libfuse-dev fuse  # optional, for FUSE support
 fi
 
 python -m virtualenv ~/.venv

@@ -1,11 +1,4 @@
-# Support code for building a C extension with zstd files
-#
-# Copyright (c) 2016-present, Gregory Szorc
-#               2017-present, Thomas Waldmann (mods to make it more generic)
-# All rights reserved.
-#
-# This software may be modified and distributed under the terms
-# of the BSD license. See the LICENSE file for details.
+# Support code for building a C extension with zstd
 
 import os
 
@@ -70,54 +63,39 @@ zstd_includes_legacy = [
 ]
 
 
+def multi_join(paths, *path_segments):
+    """apply os.path.join on a list of paths"""
+    return [os.path.join(*(path_segments + (path,))) for path in paths]
+
+
 def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False):
-    """return kwargs with zstd suff for a distutils.extension.Extension initialization.
+    if prefer_system:
+        system_prefix = os.environ.get('BORG_LIBZSTD_PREFIX')
+        if system_prefix:
+            print('Detected and preferring libzstd [via BORG_LIBZSTD_PREFIX]')
+            return dict(include_dirs=[os.path.join(system_prefix, 'include')],
+                        library_dirs=[os.path.join(system_prefix, 'lib')],
+                        libraries=['zstd'])
 
-    prefer_system: prefer the system-installed library (if found) over the bundled C code
-    multithreaded: True: define ZSTD_MULTITHREAD
-    legacy: include legacy API support
-    returns: kwargs for this lib
-    """
-    def multi_join(paths, *path_segments):
-        """apply os.path.join on a list of paths"""
-        return [os.path.join(*(path_segments + (path, ))) for path in paths]
+        import pkgconfig
 
-    define_macros = []
+        if pkgconfig.installed('libzstd', '>= 1.3.0'):
+            print('Detected and preferring libzstd [via pkg-config]')
+            return pkgconfig.parse('libzstd')
 
-    system_prefix = os.environ.get('BORG_LIBZSTD_PREFIX')
-    if prefer_system and system_prefix:
-        print('Detected and preferring libzstd over bundled ZSTD')
-        define_macros.append(('BORG_USE_LIBZSTD', 'YES'))
-        system = True
-    else:
-        print('Using bundled ZSTD')
-        system = False
-
-    use_system = system and system_prefix is not None
-
-    if use_system:
-        sources = []
-        include_dirs = multi_join(['include'], system_prefix)
-        library_dirs = multi_join(['lib'], system_prefix)
-        libraries = ['zstd', ]
-    else:
-        sources = multi_join(zstd_sources, bundled_path)
-        if legacy:
-            sources += multi_join(zstd_sources_legacy, bundled_path)
-        include_dirs = multi_join(zstd_includes, bundled_path)
-        if legacy:
-            include_dirs += multi_join(zstd_includes_legacy, bundled_path)
-        library_dirs = []
-        libraries = []
-
-    extra_compile_args = []
+    print('Using bundled ZSTD')
+    sources = multi_join(zstd_sources, bundled_path)
+    if legacy:
+        sources += multi_join(zstd_sources_legacy, bundled_path)
+    include_dirs = multi_join(zstd_includes, bundled_path)
+    if legacy:
+        include_dirs += multi_join(zstd_includes_legacy, bundled_path)
+    extra_compile_args = ['-DZSTDLIB_VISIBILITY=', '-DZDICTLIB_VISIBILITY=', '-DZSTDERRORLIB_VISIBILITY=', ]
+    # '-fvisibility=hidden' does not work, doesn't find PyInit_compress then
+    if legacy:
+        extra_compile_args += ['-DZSTD_LEGACY_SUPPORT=1', ]
     if multithreaded:
         extra_compile_args += ['-DZSTD_MULTITHREAD', ]
-    if not use_system:
-        extra_compile_args += ['-DZSTDLIB_VISIBILITY=', '-DZDICTLIB_VISIBILITY=', '-DZSTDERRORLIB_VISIBILITY=', ]
-                               # '-fvisibility=hidden' does not work, doesn't find PyInit_compress then
-        if legacy:
-            extra_compile_args += ['-DZSTD_LEGACY_SUPPORT=1', ]
-
-    return dict(sources=sources, define_macros=define_macros, extra_compile_args=extra_compile_args,
-                include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries)
+    define_macros = [('BORG_USE_BUNDLED_ZSTD', 'YES')]
+    return dict(sources=sources, include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args, define_macros=define_macros)

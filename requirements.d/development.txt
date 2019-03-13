@@ -3,6 +3,7 @@ setuptools_scm
 pip
 virtualenv
 tox
+pkgconfig
 pytest
 pytest-xdist
 pytest-cov

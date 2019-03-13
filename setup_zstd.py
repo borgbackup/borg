@@ -128,6 +128,6 @@ def zstd_ext_kwargs(prefer_system, multithreaded=False, legacy=False, **kwargs):
             extra_compile_args += ['-DZSTD_LEGACY_SUPPORT=1', ]
 
     ret = dict(**kwargs)
-    ret.update(dict(sources=sources, extra_compile_args=extra_compile_args,
+    ret.update(dict(sources=sources, define_macros=define_macros, extra_compile_args=extra_compile_args,
                     include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries))
     return ret

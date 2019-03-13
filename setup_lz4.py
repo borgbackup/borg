@@ -70,6 +70,6 @@ def lz4_ext_kwargs(prefer_system, **kwargs):
         extra_compile_args += []  # not used yet
 
     ret = dict(**kwargs)
-    ret.update(dict(sources=sources, extra_compile_args=extra_compile_args,
+    ret.update(dict(sources=sources, define_macros=define_macros, extra_compile_args=extra_compile_args,
                     include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries))
     return ret

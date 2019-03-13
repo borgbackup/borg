@@ -152,21 +152,21 @@ if not on_rtd:
                 result[k].extend(v)
         return result
 
-    compress_ext_kwargs = members_appended(
-        dict(sources=[compress_source]),
-        setup_lz4.lz4_ext_kwargs(prefer_system_liblz4),
-        setup_zstd.zstd_ext_kwargs(prefer_system_libzstd, multithreaded=False, legacy=False),
-    )
-
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source, crypto_helpers]),
         setup_crypto.crypto_ext_kwargs(),
         setup_b2.b2_ext_kwargs(prefer_system_libb2),
     )
 
+    compress_ext_kwargs = members_appended(
+        dict(sources=[compress_source]),
+        setup_lz4.lz4_ext_kwargs(prefer_system_liblz4),
+        setup_zstd.zstd_ext_kwargs(prefer_system_libzstd, multithreaded=False, legacy=False),
+    )
+
     ext_modules += [
-        Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),
+        Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.hashindex', [hashindex_source]),
         Extension('borg.item', [item_source]),
         Extension('borg.chunker', [chunker_source]),

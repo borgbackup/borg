@@ -1,7 +1,6 @@
 # borgbackup - main setup code (see also other setup_*.py files)
 
 import os
-import re
 import sys
 from collections import defaultdict
 from glob import glob
@@ -99,18 +98,6 @@ else:
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
-with open('README.rst', 'r') as fd:
-    long_description = fd.read()
-    # remove header, but have one \n before first headline
-    start = long_description.find('What is BorgBackup?')
-    assert start >= 0
-    long_description = '\n' + long_description[start:]
-    # remove badges
-    long_description = re.compile(r'^\.\. start-badges.*^\.\. end-badges', re.M | re.S).sub('', long_description)
-    # remove unknown directives
-    long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
-
-
 def rm(file):
     try:
         os.unlink(file)
@@ -206,6 +193,7 @@ if not on_rtd:
         cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], **cython_opts)
         ext_modules = cythonize(ext_modules, **cython_opts)
 
+
 setup(
     name='borgbackup',
     use_scm_version={
@@ -215,7 +203,7 @@ setup(
     author_email='borgbackup@python.org',
     url='https://borgbackup.readthedocs.io/',
     description='Deduplicated, encrypted, authenticated and compressed backups',
-    long_description=long_description,
+    long_description=setup_docs.long_desc_from_readme(),
     license='BSD',
     platforms=['Linux', 'MacOS X', 'FreeBSD', 'OpenBSD', 'NetBSD', ],
     classifiers=[

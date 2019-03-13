@@ -8,8 +8,6 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     # set our flags to use homebrew openssl
     export ARCHFLAGS="-arch x86_64"
     export PKG_CONFIG_PATH="/usr/local/opt/openssl/lib/pkgconfig:$PKG_CONFIG_PATH"
-    #export LDFLAGS="-L/usr/local/opt/openssl/lib"
-    #export CFLAGS="-I/usr/local/opt/openssl/include"
 fi
 
 # do not use fakeroot, but run as root on travis.

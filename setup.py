@@ -1,10 +1,9 @@
+# borgbackup - main setup code (see also other setup_*.py files)
+
 import os
-import io
 import re
 import sys
 from collections import defaultdict
-from collections import OrderedDict
-from datetime import datetime
 from glob import glob
 
 try:

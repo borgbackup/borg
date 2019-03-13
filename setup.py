@@ -22,9 +22,7 @@ try:
 except ImportError:
     cythonize = None
 
-import setup_lz4
-import setup_zstd
-import setup_b2
+import setup_compress
 import setup_crypto
 import setup_docs
 
@@ -161,13 +159,13 @@ if not on_rtd:
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source, crypto_helpers]),
         setup_crypto.crypto_ext_kwargs(pc),
-        setup_b2.b2_ext_kwargs(pc, prefer_system_libb2),
+        setup_crypto.b2_ext_kwargs(pc, prefer_system_libb2),
     )
 
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
-        setup_lz4.lz4_ext_kwargs(pc, prefer_system_liblz4),
-        setup_zstd.zstd_ext_kwargs(pc, prefer_system_libzstd, multithreaded=False, legacy=False),
+        setup_compress.lz4_ext_kwargs(pc, prefer_system_liblz4),
+        setup_compress.zstd_ext_kwargs(pc, prefer_system_libzstd, multithreaded=False, legacy=False),
     )
 
     ext_modules += [

@@ -1,9 +1,8 @@
+# borgbackup - main setup code (see also other setup_*.py files)
+
 import os
-import io
-import re
 import sys
-from collections import OrderedDict
-from datetime import datetime
+from collections import defaultdict
 from glob import glob
 
 try:
@@ -21,19 +20,41 @@ try:
 except ImportError:
     cythonize = None
 
-import setup_lz4
-import setup_zstd
-import setup_b2
+import setup_compress
+import setup_crypto
 import setup_docs
 
-# True: use the shared liblz4 (>= 1.7.0 / r129) from the system, False: use the bundled lz4 code
-prefer_system_liblz4 = True
+# How the build process finds the system libs / uses the bundled code:
+#
+# 1. it will try to use (system) libs (see 1.1. and 1.2.),
+#    except if you use these env vars to force using the bundled code:
+#    BORG_USE_BUNDLED_XXX undefined  -->  try using system lib
+#    BORG_USE_BUNDLED_XXX=YES        -->  use the bundled code
+#    Note: do not use =NO, that is not supported!
+# 1.1. if BORG_LIBXXX_PREFIX is set, it will use headers and libs from there.
+# 1.2. if not and pkg-config can locate the lib, the lib located by
+#      pkg-config will be used. We use the pkg-config tool via the pkgconfig
+#      python package, which must be installed before invoking setup.py.
+#      if pkgconfig is not installed, this step is skipped.
+# 2. if no system lib could be located via 1.1. or 1.2., it will fall back
+#    to using the bundled code.
 
-# True: use the shared libzstd (>= 1.3.0) from the system, False: use the bundled zstd code
-prefer_system_libzstd = True
+# OpenSSL is required as a (system) lib in any case as we do not bundle it.
+# Thus, only step 1.1. and 1.2. apply to openssl (but not 1. and 2.).
+# needed: openssl >=1.0.2 or >=1.1.0 (or compatible)
+system_prefix_openssl = os.environ.get('BORG_OPENSSL_PREFIX')
 
-# True: use the shared libb2 from the system, False: use the bundled blake2 code
-prefer_system_libb2 = True
+# needed: blake2 (>= 0.98.1)
+prefer_system_libb2 = not bool(os.environ.get('BORG_USE_BUNDLED_B2'))
+system_prefix_libb2 = os.environ.get('BORG_LIBB2_PREFIX')
+
+# needed: lz4 (>= 1.7.0 / r129)
+prefer_system_liblz4 = not bool(os.environ.get('BORG_USE_BUNDLED_LZ4'))
+system_prefix_liblz4 = os.environ.get('BORG_LIBLZ4_PREFIX')
+
+# needed: zstd (>= 1.3.0)
+prefer_system_libzstd = not bool(os.environ.get('BORG_USE_BUNDLED_ZSTD'))
+system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
 
 cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1
 
@@ -100,79 +121,6 @@ else:
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
-def detect_openssl(prefixes):
-    for prefix in prefixes:
-        filename = os.path.join(prefix, 'include', 'openssl', 'evp.h')
-        if os.path.exists(filename):
-            with open(filename, 'rb') as fd:
-                if b'PKCS5_PBKDF2_HMAC(' in fd.read():
-                    return prefix
-
-
-include_dirs = []
-library_dirs = []
-define_macros = []
-
-possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
-                             '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_OPENSSL_PREFIX'):
-    possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
-ssl_prefix = detect_openssl(possible_openssl_prefixes)
-if not ssl_prefix:
-    raise Exception('Unable to find OpenSSL >= 1.0 headers. (Looked here: {})'.format(', '.join(possible_openssl_prefixes)))
-include_dirs.append(os.path.join(ssl_prefix, 'include'))
-library_dirs.append(os.path.join(ssl_prefix, 'lib'))
-
-
-possible_liblz4_prefixes = ['/usr', '/usr/local', '/usr/local/opt/lz4', '/usr/local/lz4',
-                         '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LIBLZ4_PREFIX'):
-    possible_liblz4_prefixes.insert(0, os.environ.get('BORG_LIBLZ4_PREFIX'))
-liblz4_prefix = setup_lz4.lz4_system_prefix(possible_liblz4_prefixes)
-if prefer_system_liblz4 and liblz4_prefix:
-    print('Detected and preferring liblz4 over bundled LZ4')
-    define_macros.append(('BORG_USE_LIBLZ4', 'YES'))
-    liblz4_system = True
-else:
-    liblz4_system = False
-
-possible_libb2_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libb2', '/usr/local/libb2',
-                           '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LIBB2_PREFIX'):
-    possible_libb2_prefixes.insert(0, os.environ.get('BORG_LIBB2_PREFIX'))
-libb2_prefix = setup_b2.b2_system_prefix(possible_libb2_prefixes)
-if prefer_system_libb2 and libb2_prefix:
-    print('Detected and preferring libb2 over bundled BLAKE2')
-    define_macros.append(('BORG_USE_LIBB2', 'YES'))
-    libb2_system = True
-else:
-    libb2_system = False
-
-possible_libzstd_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libzstd', '/usr/local/libzstd',
-                             '/usr/local/borg', '/opt/local', '/opt/pkg', ]
-if os.environ.get('BORG_LIBZSTD_PREFIX'):
-    possible_libzstd_prefixes.insert(0, os.environ.get('BORG_LIBZSTD_PREFIX'))
-libzstd_prefix = setup_zstd.zstd_system_prefix(possible_libzstd_prefixes)
-if prefer_system_libzstd and libzstd_prefix:
-    print('Detected and preferring libzstd over bundled ZSTD')
-    define_macros.append(('BORG_USE_LIBZSTD', 'YES'))
-    libzstd_system = True
-else:
-    libzstd_system = False
-
-
-with open('README.rst', 'r') as fd:
-    long_description = fd.read()
-    # remove header, but have one \n before first headline
-    start = long_description.find('What is BorgBackup?')
-    assert start >= 0
-    long_description = '\n' + long_description[start:]
-    # remove badges
-    long_description = re.compile(r'^\.\. start-badges.*^\.\. end-badges', re.M | re.S).sub('', long_description)
-    # remove unknown directives
-    long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
-
-
 def rm(file):
     try:
         os.unlink(file)
@@ -202,22 +150,37 @@ cmdclass = {
 
 ext_modules = []
 if not on_rtd:
-    compress_ext_kwargs = dict(sources=[compress_source], include_dirs=include_dirs, library_dirs=library_dirs,
-                               define_macros=define_macros)
-    compress_ext_kwargs = setup_lz4.lz4_ext_kwargs(bundled_path='src/borg/algorithms/lz4',
-                                                   system_prefix=liblz4_prefix, system=liblz4_system,
-                                                   **compress_ext_kwargs)
-    compress_ext_kwargs = setup_zstd.zstd_ext_kwargs(bundled_path='src/borg/algorithms/zstd',
-                                                     system_prefix=libzstd_prefix, system=libzstd_system,
-                                                     multithreaded=False, legacy=False, **compress_ext_kwargs)
-    crypto_ext_kwargs = dict(sources=[crypto_ll_source, crypto_helpers], libraries=['crypto'],
-                             include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros)
-    crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
-                                               system_prefix=libb2_prefix, system=libb2_system,
-                                               **crypto_ext_kwargs)
+
+    def members_appended(*ds):
+        result = defaultdict(list)
+        for d in ds:
+            for k, v in d.items():
+                assert isinstance(v, list)
+                result[k].extend(v)
+        return result
+
+    try:
+        import pkgconfig as pc
+    except ImportError:
+        print('Warning: can not import pkgconfig python package.')
+        pc = None
+
+    crypto_ext_kwargs = members_appended(
+        dict(sources=[crypto_ll_source, crypto_helpers]),
+        setup_crypto.crypto_ext_kwargs(pc, system_prefix_openssl),
+        setup_crypto.b2_ext_kwargs(pc, prefer_system_libb2, system_prefix_libb2),
+    )
+
+    compress_ext_kwargs = members_appended(
+        dict(sources=[compress_source]),
+        setup_compress.lz4_ext_kwargs(pc, prefer_system_liblz4, system_prefix_liblz4),
+        setup_compress.zstd_ext_kwargs(pc, prefer_system_libzstd, system_prefix_libzstd,
+                                       multithreaded=False, legacy=False),
+    )
+
     ext_modules += [
-        Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),
+        Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.hashindex', [hashindex_source]),
         Extension('borg.item', [item_source]),
         Extension('borg.chunker', [chunker_source]),
@@ -254,6 +217,7 @@ if not on_rtd:
         cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], **cython_opts)
         ext_modules = cythonize(ext_modules, **cython_opts)
 
+
 setup(
     name='borgbackup',
     use_scm_version={
@@ -263,7 +227,7 @@ setup(
     author_email='borgbackup@python.org',
     url='https://borgbackup.readthedocs.io/',
     description='Deduplicated, encrypted, authenticated and compressed backups',
-    long_description=long_description,
+    long_description=setup_docs.long_desc_from_readme(),
     license='BSD',
     platforms=['Linux', 'MacOS X', 'FreeBSD', 'OpenBSD', 'NetBSD', ],
     classifiers=[

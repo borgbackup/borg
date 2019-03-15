@@ -24,14 +24,19 @@ import setup_compress
 import setup_crypto
 import setup_docs
 
-# True: use the shared liblz4 (>= 1.7.0 / r129) from the system, False: use the bundled lz4 code
-prefer_system_liblz4 = True
+# BORG_USE_BUNDLED_XXX=YES  -->  use the bundled code
+# BORG_USE_BUNDLED_XXX undefined  -->  try using system lib
+# Note: do not use =NO, that is not supported!
 
-# True: use the shared libzstd (>= 1.3.0) from the system, False: use the bundled zstd code
-prefer_system_libzstd = True
+# needed: lz4 (>= 1.7.0 / r129)
+prefer_system_liblz4 = not bool(os.environ.get('BORG_USE_BUNDLED_LZ4'))
 
-# True: use the shared libb2 (>= 0.98.1) from the system, False: use the bundled blake2 code
-prefer_system_libb2 = True
+# needed: zstd (>= 1.3.0)
+prefer_system_libzstd = not bool(os.environ.get('BORG_USE_BUNDLED_ZSTD'))
+
+# needed: blake2 (>= 0.98.1)
+prefer_system_libb2 = not bool(os.environ.get('BORG_USE_BUNDLED_B2'))
+
 
 cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1
 

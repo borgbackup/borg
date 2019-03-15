@@ -69,9 +69,8 @@ zstd_includes_legacy = [
 ]
 
 
-def zstd_ext_kwargs(pc, prefer_system, multithreaded=False, legacy=False):
+def zstd_ext_kwargs(pc, prefer_system, system_prefix, multithreaded=False, legacy=False):
     if prefer_system:
-        system_prefix = os.environ.get('BORG_LIBZSTD_PREFIX')
         if system_prefix:
             print('Detected and preferring libzstd [via BORG_LIBZSTD_PREFIX]')
             return dict(include_dirs=[os.path.join(system_prefix, 'include')],
@@ -114,9 +113,8 @@ lz4_includes = [
 ]
 
 
-def lz4_ext_kwargs(pc, prefer_system):
+def lz4_ext_kwargs(pc, prefer_system, system_prefix):
     if prefer_system:
-        system_prefix = os.environ.get('BORG_LIBLZ4_PREFIX')
         if system_prefix:
             print('Detected and preferring liblz4 [via BORG_LIBLZ4_PREFIX]')
             return dict(include_dirs=[os.path.join(system_prefix, 'include')],

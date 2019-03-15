@@ -8,8 +8,7 @@ def multi_join(paths, *path_segments):
     return [os.path.join(*(path_segments + (path,))) for path in paths]
 
 
-def crypto_ext_kwargs(pc):
-    system_prefix = os.environ.get('BORG_OPENSSL_PREFIX')
+def crypto_ext_kwargs(pc, system_prefix):
     if system_prefix:
         print('Detected OpenSSL [via BORG_OPENSSL_PREFIX]')
         return dict(include_dirs=[os.path.join(system_prefix, 'include')],
@@ -37,9 +36,8 @@ b2_includes = [
 ]
 
 
-def b2_ext_kwargs(pc, prefer_system):
+def b2_ext_kwargs(pc, prefer_system, system_prefix):
     if prefer_system:
-        system_prefix = os.environ.get('BORG_LIBB2_PREFIX')
         if system_prefix:
             print('Detected and preferring libb2 [via BORG_LIBB2_PREFIX]')
             return dict(include_dirs=[os.path.join(system_prefix, 'include')],

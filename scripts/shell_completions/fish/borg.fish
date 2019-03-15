@@ -117,7 +117,6 @@ complete -c borg -f      -l 'noatime'               -d 'Do not store atime'     
 complete -c borg -f      -l 'noctime'               -d 'Do not store ctime'                         -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'nobirthtime'           -d 'Do not store creation date'                 -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'nobsdflags'            -d 'Do not store bsdflags'                      -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'ignore-inode'          -d 'Ignore inode data in file metadata cache'   -n "__fish_seen_subcommand_from create"
 set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
 complete -c borg -f      -l 'files-cache'           -d 'Operate files cache in MODE' -a "$files_cache_mode" -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'read-special'          -d 'Open device files like regular files'       -n "__fish_seen_subcommand_from create"
@@ -150,6 +149,7 @@ complete -c borg -f      -l 'archives-only'         -d 'Only perform archives ch
 complete -c borg -f      -l 'verify-data'           -d 'Cryptographic integrity verification'       -n "__fish_seen_subcommand_from check"
 complete -c borg -f      -l 'repair'                -d 'Attempt to repair found inconsistencies'    -n "__fish_seen_subcommand_from check"
 complete -c borg -f      -l 'save-space'            -d 'Work slower but using less space'           -n "__fish_seen_subcommand_from check"
+complete -c borg -f      -l 'max-duration'          -d 'Partial repo check for max. SECONDS'        -n "__fish_seen_subcommand_from check"
 # Archive filters
 complete -c borg -f -s P -l 'prefix'                -d 'Only archive names starting with PREFIX'    -n "__fish_seen_subcommand_from check"
 complete -c borg -f -s a -l 'glob-archives'         -d 'Only archive names matching GLOB'           -n "__fish_seen_subcommand_from check"
@@ -163,7 +163,6 @@ complete -c borg -f      -l 'last'                  -d 'Only last N archives'   
 
 # borg list options
 complete -c borg -f      -l 'short'                 -d 'Only print file/directory names'            -n "__fish_seen_subcommand_from list"
-complete -c borg -f      -l 'list-format'           -d 'Specify FORMAT for file listing'            -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'format'                -d 'Specify FORMAT for file listing'            -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'json'                  -d 'List contents in json format'               -n "__fish_seen_subcommand_from list"
 complete -c borg -f      -l 'json-lines'            -d 'List contents in json lines format'         -n "__fish_seen_subcommand_from list"
@@ -284,7 +283,6 @@ complete -c borg         -l 'patterns-from'         -d 'Include/exclude paths fr
 complete -c borg -f      -l 'exclude-caches'        -d 'Exclude directories tagged as cache'        -n "__fish_seen_subcommand_from recreate"
 complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that contain FILENAME'  -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from recreate"
-complete -c borg -f      -l 'keep-tag-files'        -d 'Keep tag files of excluded directories'     -n "__fish_seen_subcommand_from recreate"
 # Archive options
 complete -c borg -f      -l 'target'                -d "Create a new ARCHIVE"                       -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f -s c -l 'checkpoint-interval'   -d 'Write checkpoint every N seconds [1800]'    -n "__fish_seen_subcommand_from recreate"

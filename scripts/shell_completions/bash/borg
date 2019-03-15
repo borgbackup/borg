@@ -75,18 +75,18 @@ _borg()
                 local opts="-e --encryption --append-only --storage-quota --make-parent-dirs ${common_opts}"
                 ;;
             *' create '*)
-                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --ignore-inode --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
                 ;;
             *' extract '*)
                 local opts="--list -n --dry-run --numeric-owner --nobsdflags --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
                 ;;
             *' check '*)
-                local opts="--repository-only --archives-only --verify-data --repair --save-space -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
+                local opts="--repository-only --archives-only --verify-data --repair --save-space --max-duration -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
                 ;;
             # rename
             #   no specific options
             *" list "*)
-                local opts="--short --list-format --format --json --json-lines -P --prefix -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
+                local opts="--short --format --json --json-lines -P --prefix -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
                 ;;
             *' diff '*)
                 local opts="--numeric-owner --same-chunker-params --sort -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
@@ -120,7 +120,7 @@ _borg()
                 local opts="-n --dry-run --inplace --force --tam --disable-tam ${common_opts}"
                 ;;
             *' recreate '*)
-                local opts="--list --filter -n dry-run -s stats -e exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --keep-tag-files --target -c checkpoint-interval --comment --timestamp --timestamp -C compression --recompress --chunker-params ${common_opts}"
+                local opts="--list --filter -n dry-run -s stats -e exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --target -c checkpoint-interval --comment --timestamp --timestamp -C compression --recompress --chunker-params ${common_opts}"
                 ;;
             *' export-tar '*)
                 local opts="--tar-filter --list -e exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"

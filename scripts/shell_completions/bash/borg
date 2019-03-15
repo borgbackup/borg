@@ -156,6 +156,12 @@ _borg()
         repository_name=${prevprev}
         typed_word=${cur}
     fi
+    # Second archive listing for borg diff
+    if [[ ${COMP_LINE} =~ ^.*\ diff\ .*::[^\ ]+\ ${cur}$ ]] ; then
+        repository_name=`expr match "${COMP_LINE}" "\(.*\)::"`
+        repository_name=${repository_name##* }
+        typed_word=${cur}
+    fi
     if [[ ${repository_name} != "" ]] ; then
         if [[ ${COMP_LINE} == *" ::"* ]] ; then
             # There is a space before the "::"

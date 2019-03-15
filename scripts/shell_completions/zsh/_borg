@@ -172,7 +172,7 @@ _borg() {
         (diff)
             _arguments \
                 '2:archives:__borg_archive'\
-                '3:archives:__borg_archive'\
+                '3:archives:__borg_archive2'\
                 '*:path:_files'\
                 --numeric-owner'[only obey numeric user and group identifiers]'\
                 --same-chunker-params'[override check of chunker parameters.]'\
@@ -418,15 +418,26 @@ _borg() {
 }
 
 __borg_archive() {
+    __borg_list_archives 1
+}
+__borg_archive2() {
+    __borg_list_archives 2
+}
+
+__borg_list_archives() {
     local -a items
-    if (($+BORG_REPO)); then
-        items=("${(@f)$(borg list $cpath --short 2>/dev/null | sed "s#^#::#")}")
-    else
-        local cpath
-        cpath=$words[-1]
-        cpath=${cpath%::*}
-        items=("${(@f)$(borg list $cpath --short 2>/dev/null | sed "s#^#${cpath}::#")}")
+    local cpath
+    cpath=`expr match "${words}" "\(.*\)::"`
+    cpath=${cpath##* }
+    if (( $1 == 1 )); then
+        # To achieve "repository::archive" listing:
+        prefix_repo="${cpath}::"
     fi
+    if (( $1 == 2 )); then
+        # To achieve only "archive" listing:
+        prefix_repo=
+    fi
+    items=("${(@f)$(borg list --format=$prefix_repo\{archive\}\{NEWLINE\} $cpath 2>/dev/null)}")
     if [[ $items[1] == "" ]]; then
         _files -/
     else

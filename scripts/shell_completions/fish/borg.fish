@@ -341,3 +341,17 @@ function __fish_borg_list_archives
 end
 
 complete -c borg -f -n __fish_borg_is_repository -a '(__fish_borg_list_archives)'
+
+# Second archive listing for borg diff
+
+function __fish_borg_is_diff_second_archive
+    return (string match --quiet --regex ' diff .*::[^ ]+ '(commandline --current-token)'$' (commandline))
+end
+
+function __fish_borg_list_diff_archives
+    set -l repository_name (string match --regex '[^ ]*::' (commandline))
+    set -l repository_name (string replace '::' '' $repository_name)
+    borg list --format="{archive}{NEWLINE}" "$repository_name" ^/dev/null
+end
+
+complete -c borg -f -n __fish_borg_is_diff_second_archive -a '(__fish_borg_list_diff_archives)'

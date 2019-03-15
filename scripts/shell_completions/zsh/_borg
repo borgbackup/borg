@@ -95,13 +95,12 @@ _borg() {
                 --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
                 --exclude-caches'[exclude directories that contain a CACHEDIR.TAG file ]'\
                 --exclude-if-present'[exclude directories that are tagged by containing a filesystem object with the given NAME]:NAME'\
-                {--keep-exclude-tags,--keep-tag-files}'[if tag objects are specified with --exclude-if-present, don’t omit the tag objects themselves]'\
+                --keep-exclude-tags'[if tag objects are specified with --exclude-if-present, don’t omit the tag objects themselves]'\
                 {-x,--one-file-system}'[stay in the same file system ]'\
                 --numeric-owner'[only store numeric user and group identifiers]'\
                 --noatime'[do not store atime into archive]'\
                 --nobirthtime'[do not store birthtime (creation date) into archive]'\
                 --nobsdflags'[do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive]'\
-                --ignore-inode'[ignore inode data in the file metadata cache used to detect unchanged files.]'\
                 --files-cache'[operate files cache in MODE. default: ctime,size,inode]:mode:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled)'\
                 --read-special'[open and read block and char device files as well as FIFOs as if they were regular files.]'\
                 --comment'[add a comment text to the archive]:COMMENT'\
@@ -137,6 +136,7 @@ _borg() {
                 --verify-data'[perform cryptographic archive data integrity verification]'\
                 --repair'[attempt to repair any inconsistencies found]'\
                 --save-space'[work slower, but using less space]'\
+                --max-duration'[partial repo check for max. SECONDS]:SECONDS'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
                 {-a,--glob-archives}'[only consider archive names matching the glob]:GLOB'\
                 --sort-by'[Comma-separated list of sorting keys]:keys:(timestamp name id)'\
@@ -155,7 +155,7 @@ _borg() {
                 '2:archives:__borg_archive'\
                 '*:path:_files'\
                 --short'[only print file/directory names, nothing else]'\
-                {--format,--list-format}'[specify format for file listing]:FORMAT'\
+                --format'[specify format for file listing]:FORMAT'\
                 --json'[Only valid for listing repository contents. Format output as JSON.]'\
                 --json-lines'[Only valid for listing archive contents. Format output as JSON Lines. ]'\
                 {-P,--prefix}'[only consider archive names starting with this prefix.]:PREFIX'\
@@ -172,7 +172,7 @@ _borg() {
         (diff)
             _arguments \
                 '2:archives:__borg_archive'\
-                '3:archives:__borg_archive'\
+                '3:archives:__borg_archive2'\
                 '*:path:_files'\
                 --numeric-owner'[only obey numeric user and group identifiers]'\
                 --same-chunker-params'[override check of chunker parameters.]'\
@@ -316,7 +316,7 @@ _borg() {
                 --patterns-from'[experimental: read include/exclude patterns from PATTERNFILE, one per line]:_files'\
                 --exclude-caches'[exclude directories that contain a CACHEDIR.TAG file ]'\
                 --exclude-if-present'[exclude directories that are tagged by containing a filesystem object with the given NAME]:NAME'\
-                {--keep-exclude-tags,--keep-tag-files}'[if tag objects are specified with --exclude-if-present, don’t omit the tag objects themselves]'\
+                --keep-exclude-tags'[if tag objects are specified with --exclude-if-present, don’t omit the tag objects themselves]'\
                 --target'[create a new archive with the name ARCHIVE]:ARCHIVE'\
                 {-c,--checkpoint-interval}'[write checkpoint every SECONDS seconds]:SECONDS'\
                 --comment'[add a comment text to the archive]:COMMENT'\
@@ -418,15 +418,26 @@ _borg() {
 }
 
 __borg_archive() {
+    __borg_list_archives 1
+}
+__borg_archive2() {
+    __borg_list_archives 2
+}
+
+__borg_list_archives() {
     local -a items
-    if (($+BORG_REPO)); then
-        items=("${(@f)$(borg list $cpath --short 2>/dev/null | sed "s#^#::#")}")
-    else
-        local cpath
-        cpath=$words[-1]
-        cpath=${cpath%::*}
-        items=("${(@f)$(borg list $cpath --short 2>/dev/null | sed "s#^#${cpath}::#")}")
+    local cpath
+    cpath=`expr match "${words}" "\(.*\)::"`
+    cpath=${cpath##* }
+    if (( $1 == 1 )); then
+        # To achieve "repository::archive" listing:
+        prefix_repo="${cpath}::"
     fi
+    if (( $1 == 2 )); then
+        # To achieve only "archive" listing:
+        prefix_repo=
+    fi
+    items=("${(@f)$(borg list --format=$prefix_repo\{archive\}\{NEWLINE\} $cpath 2>/dev/null)}")
     if [[ $items[1] == "" ]]; then
         _files -/
     else

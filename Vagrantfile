@@ -13,7 +13,7 @@ def packages_debianoid(user)
     # install all the (security and other) updates
     apt dist-upgrade -y
     # for building borgbackup and dependencies:
-    apt install -y libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config
+    apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev libfuse-dev fuse pkg-config
     usermod -a -G fuse #{user}
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
@@ -64,6 +64,7 @@ def packages_freebsd
     # install all the (security and other) updates, packages
     pkg update
     yes | pkg upgrade
+    echo 'export BORG_OPENSSL_PREFIX=/usr' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -93,14 +94,16 @@ def packages_darwin
     && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.3.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-    brew update
+    brew update > /dev/null
+    brew install pkg-config
+    brew install readline
     brew install openssl
     brew install zstd
     brew install lz4
     brew install xz  # required for python lzma module
     brew install fakeroot
     brew install git
-    brew install pkg-config
+    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig' >> ~vagrant/.bash_profile
   EOF
 end
 

@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a4 (2019-03-11)
-----------------------------
+Version 1.2.0a5 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -207,17 +207,45 @@ Compatibility notes:
   - option "--no-files-cache" (2017-09), use "--files-cache=disabled"
 - removed BORG_HOSTNAME_IS_UNIQUE env var.
   to use borg you must implement one of these 2 scenarios:
+
   - 1) the combination of FQDN and result of uuid.getnode() must be unique
        and stable (this should be the case for almost everybody, except when
        having duplicate FQDN *and* MAC address or all-zero MAC address)
   - 2) if you are aware that 1) is not the case for you, you must set
        BORG_HOST_ID env var to something unique.
 
+
+Fixes:
+
+- warn if a file has changed while being backed up, #1750
+- lrucache: regularly remove old FDs, #4427
+
+Other changes:
+
+- major setup code refactoring (especially how libraries like openssl, liblz4,
+  libzstd, libb2 are discovered and how it falls back to code bundled with
+  borg), new: uses pkg-config now (and needs python "pkgconfig" package
+  installed), #1925
+
+  if you are a borg package maintainer, please try packaging this
+  (see comments in setup.py).
+- Vagrantfile: add zstd, reorder, build env vars, #4444
+- travis: install script improvements
+- update shell completions
+- docs:
+
+  - add a sample logging.conf in docs/misc, #4380
+  - fix spelling errors
+
+
+Version 1.2.0a4 (2019-03-11)
+----------------------------
+
 Fixes:
 
 - do not use O_NONBLOCK for special files, like FIFOs, block and char devices
   when using --read-special. fixes backing up FIFOs. fixes to test. #4394
-- more LibreSSL build fixes: LibreSSL has HMAC_CTX_free and *HMAC_CTX_new
+- more LibreSSL build fixes: LibreSSL has HMAC_CTX_free and HMAC_CTX_new
 
 New features:
 

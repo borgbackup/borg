@@ -35,5 +35,5 @@ def check_extension_modules():
         raise ExtensionModuleError
     if item.API_VERSION != '1.2_01':
         raise ExtensionModuleError
-    if platform.API_VERSION != platform.OS_API_VERSION or platform.API_VERSION != '1.2_04':
+    if platform.API_VERSION != platform.OS_API_VERSION or platform.API_VERSION != '1.2_05':
         raise ExtensionModuleError

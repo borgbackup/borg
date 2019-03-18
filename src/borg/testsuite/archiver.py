@@ -2240,7 +2240,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     else:
                         assert False, "expected OSError(ENOATTR), but no error was raised"
             except OSError as err:
-                if sys.platform.startswith(('freebsd', )) and err.errno == errno.ENOTSUP:
+                if sys.platform.startswith(('nothing_here_now', )) and err.errno == errno.ENOTSUP:
                     # some systems have no xattr support on FUSE
                     pass
                 else:

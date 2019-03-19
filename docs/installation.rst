@@ -182,7 +182,6 @@ Install the dependencies with development headers::
     sudo apt-get install python3 python3-dev python3-pip python-virtualenv \
     libssl-dev openssl \
     libacl1-dev libacl1 \
-    libzmq3-dev libzmq3 \
     build-essential
     sudo apt-get install libfuse-dev fuse pkg-config    # optional, for FUSE support
 

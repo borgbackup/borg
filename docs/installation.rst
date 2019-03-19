@@ -151,8 +151,13 @@ following dependencies first:
 
   - liblz4_ >= 1.7.0 (r129)
   - libzstd_ >= 1.3.0
-  - libb2_
-* some Python dependencies, pip will automatically install them for you
+  - libb2_ >= 0.98.1 (older do not have pkg-config support)
+* pkg-config (cli tool) and pkgconfig python package (borg uses these to
+  discover header and library location - if it can't import pkgconfig and
+  is not pointed to header/library locations via env vars [see setup.py],
+  it will fall back to using the bundled code, see above).
+  These must be present before invoking setup.py!
+* some other Python dependencies, pip will automatically install them for you.
 * optionally, the llfuse_ Python package is required if you wish to mount an
   archive as a FUSE filesystem. See setup.py about the version requirements.
 

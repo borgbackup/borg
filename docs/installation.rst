@@ -145,7 +145,6 @@ following dependencies first:
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
 * libacl_ (which depends on libattr_), both plus development headers.
-* ZeroMQ_ >= 4.0.0, plus development headers.
 * We have bundled code of the following packages, but borg by default (see
   setup.py if you want to change that) prefers a shared library if it can
   be found on the system (lib + dev headers) at build time:

@@ -10,7 +10,9 @@ REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
                           'comment', 'chunker_params',
-                          'recreate_cmdline', 'recreate_source_id', 'recreate_args'])
+                          'recreate_cmdline',
+                          'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',  # used in 1.1.0b1 .. b2
+                          ])
 
 # this is the set of keys that are always present in archives:
 REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])
@@ -51,6 +53,8 @@ MAX_ARCHIVES = 400000
 LIST_SCAN_LIMIT = 100000
 
 DEFAULT_SEGMENTS_PER_DIR = 1000
+
+FD_MAX_AGE = 4 * 60  # 4 minutes
 
 CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8MiB

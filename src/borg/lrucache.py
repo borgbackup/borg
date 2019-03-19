@@ -39,12 +39,17 @@ class LRUCache:
         self._lru.append(key)
         return value
 
+    def upd(self, key, value):
+        # special use only: update the value for an existing key without having to dispose it first
+        # this method complements __setitem__ which should be used for the normal use case.
+        assert key in self._cache, "Unexpected attempt to update a non-existing item."
+        self._cache[key] = value
+
     def clear(self):
         for value in self._cache.values():
             self._dispose(value)
         self._cache.clear()
 
-    # useful for testing
     def items(self):
         return self._cache.items()
 

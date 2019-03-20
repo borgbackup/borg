@@ -1,82 +1,93 @@
-import argparse
-import collections
-import configparser
-import faulthandler
-import functools
-import hashlib
-import inspect
-import itertools
-import json
-import logging
-import os
-import re
-import shlex
-import shutil
-import signal
-import stat
-import subprocess
+# borg cli interface / toplevel archiver code
+
 import sys
-import tarfile
-import textwrap
-import time
 import traceback
-from binascii import unhexlify
-from contextlib import contextmanager
-from datetime import datetime, timedelta
-from itertools import zip_longest
 
-from .logger import create_logger, setup_logging
+try:
+    import argparse
+    import collections
+    import configparser
+    import faulthandler
+    import functools
+    import hashlib
+    import inspect
+    import itertools
+    import json
+    import logging
+    import os
+    import re
+    import shlex
+    import shutil
+    import signal
+    import stat
+    import subprocess
+    import tarfile
+    import textwrap
+    import time
+    from binascii import unhexlify
+    from contextlib import contextmanager
+    from datetime import datetime, timedelta
 
-logger = create_logger()
+    from .logger import create_logger, setup_logging
 
-import borg
-from . import __version__
-from . import helpers
-from .algorithms.checksums import crc32
-from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
-from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
-from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
-from .cache import Cache, assert_secure, SecurityManager
-from .constants import *  # NOQA
-from .compress import CompressionSpec
-from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
-from .crypto.keymanager import KeyManager
-from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
-from .helpers import Error, NoManifestError, set_ec
-from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
-from .helpers import PrefixSpec, SortBySpec, FilesCacheMode
-from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
-from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
-from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
-from .helpers import timestamp
-from .helpers import get_cache_dir, os_stat
-from .helpers import Manifest, AI_HUMAN_SORT_KEYS
-from .helpers import hardlinkable
-from .helpers import StableDict
-from .helpers import check_python, check_extension_modules
-from .helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
-from .helpers import log_multi
-from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
-from .helpers import ErrorIgnoringTextIOWrapper
-from .helpers import ProgressIndicatorPercent
-from .helpers import basic_json_data, json_print
-from .helpers import replace_placeholders
-from .helpers import ChunkIteratorFileWrapper
-from .helpers import popen_with_error_handling, prepare_subprocess_env
-from .helpers import dash_open
-from .helpers import umount
-from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
-from .helpers import msgpack
-from .nanorst import rst_to_terminal
-from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
-from .patterns import PatternMatcher
-from .item import Item
-from .platform import get_flags, get_process_id, SyncFile
-from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
-from .selftest import selftest
-from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
+    logger = create_logger()
+
+    import borg
+    from . import __version__
+    from . import helpers
+    from .algorithms.checksums import crc32
+    from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
+    from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
+    from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
+    from .cache import Cache, assert_secure, SecurityManager
+    from .constants import *  # NOQA
+    from .compress import CompressionSpec
+    from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
+    from .crypto.keymanager import KeyManager
+    from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+    from .helpers import Error, NoManifestError, set_ec
+    from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
+    from .helpers import PrefixSpec, SortBySpec, FilesCacheMode
+    from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
+    from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
+    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
+    from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
+    from .helpers import timestamp
+    from .helpers import get_cache_dir, os_stat
+    from .helpers import Manifest, AI_HUMAN_SORT_KEYS
+    from .helpers import hardlinkable
+    from .helpers import StableDict
+    from .helpers import check_python, check_extension_modules
+    from .helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
+    from .helpers import log_multi
+    from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
+    from .helpers import ErrorIgnoringTextIOWrapper
+    from .helpers import ProgressIndicatorPercent
+    from .helpers import basic_json_data, json_print
+    from .helpers import replace_placeholders
+    from .helpers import ChunkIteratorFileWrapper
+    from .helpers import popen_with_error_handling, prepare_subprocess_env
+    from .helpers import dash_open
+    from .helpers import umount
+    from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
+    from .helpers import msgpack
+    from .nanorst import rst_to_terminal
+    from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
+    from .patterns import PatternMatcher
+    from .item import Item
+    from .platform import get_flags, get_process_id, SyncFile
+    from .remote import RepositoryServer, RemoteRepository, cache_if_remote
+    from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
+    from .selftest import selftest
+    from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
+except BaseException:
+    # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
+    # default behavior, see issue #4424.
+    # as borg defines rc 1 as WARNING, this would be a mismatch, because a crash should be an ERROR (rc 2).
+    traceback.print_exc()
+    sys.exit(2)  # == EXIT_ERROR
+
+assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND exception handler right above this line."
 
 
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"

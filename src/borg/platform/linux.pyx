@@ -13,7 +13,7 @@ from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_str
 from libc cimport errno
 from libc.stdint cimport int64_t
 
-API_VERSION = '1.2_04'
+API_VERSION = '1.2_05'
 
 cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size)

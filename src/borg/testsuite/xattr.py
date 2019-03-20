@@ -56,13 +56,13 @@ class XattrTestCase(BaseTestCase):
         tmp_fn = os.fsencode(self.tmpfile.name)
         # make it work even with ext4, which imposes rather low limits
         buffer.resize(size=64, init=True)
-        # xattr raw key list will be size 9 * (10 + 1), which is > 64
-        keys = [b'user.attr%d' % i for i in range(9)]
+        # xattr raw key list will be > 64
+        keys = [b'user.attr%d' % i for i in range(20)]
         for key in keys:
             setxattr(tmp_fn, key, b'x')
         got_keys = listxattr(tmp_fn)
         self.assert_equal_se(got_keys, keys)
-        self.assert_equal(len(buffer), 128)
+        self.assert_true(len(buffer) > 64)
 
     def test_getxattr_buffer_growth(self):
         tmp_fn = os.fsencode(self.tmpfile.name)

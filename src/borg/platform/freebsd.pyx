@@ -4,7 +4,7 @@ from .posix import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
-API_VERSION = '1.2_04'
+API_VERSION = '1.2_05'
 
 cdef extern from "errno.h":
     int errno
@@ -51,43 +51,57 @@ cdef extern from "unistd.h":
 
 
 def listxattr(path, *, follow_symlinks=False):
+    ns, prefix = EXTATTR_NAMESPACE_USER, b'user.'
+
     def func(path, buf, size):
         if isinstance(path, int):
-            return c_extattr_list_fd(path, EXTATTR_NAMESPACE_USER, <char *> buf, size)
+            return c_extattr_list_fd(path, ns, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_extattr_list_file(path, EXTATTR_NAMESPACE_USER, <char *> buf, size)
+                return c_extattr_list_file(path, ns, <char *> buf, size)
             else:
-                return c_extattr_list_link(path, EXTATTR_NAMESPACE_USER, <char *> buf, size)
+                return c_extattr_list_link(path, ns, <char *> buf, size)
 
     n, buf = _listxattr_inner(func, path)
-    return [name for name in split_lstring(buf[:n]) if name]
+    return [prefix + name for name in split_lstring(buf[:n]) if name]
 
 
 def getxattr(path, name, *, follow_symlinks=False):
+    ns, prefix = EXTATTR_NAMESPACE_USER, b'user.'
+
     def func(path, name, buf, size):
         if isinstance(path, int):
-            return c_extattr_get_fd(path, EXTATTR_NAMESPACE_USER, name, <char *> buf, size)
+            return c_extattr_get_fd(path, ns, name, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_extattr_get_file(path, EXTATTR_NAMESPACE_USER, name, <char *> buf, size)
+                return c_extattr_get_file(path, ns, name, <char *> buf, size)
             else:
-                return c_extattr_get_link(path, EXTATTR_NAMESPACE_USER, name, <char *> buf, size)
+                return c_extattr_get_link(path, ns, name, <char *> buf, size)
 
+    # strip namespace if there, but ignore if not there.
+    # older borg / attic versions did not prefix the namespace to the names.
+    if name.startswith(prefix):
+        name = name[len(prefix):]
     n, buf = _getxattr_inner(func, path, name)
     return bytes(buf[:n])
 
 
 def setxattr(path, name, value, *, follow_symlinks=False):
+    ns, prefix = EXTATTR_NAMESPACE_USER, b'user.'
+
     def func(path, name, value, size):
         if isinstance(path, int):
-            return c_extattr_set_fd(path, EXTATTR_NAMESPACE_USER, name, <char *> value, size)
+            return c_extattr_set_fd(path, ns, name, <char *> value, size)
         else:
             if follow_symlinks:
-                return c_extattr_set_file(path, EXTATTR_NAMESPACE_USER, name, <char *> value, size)
+                return c_extattr_set_file(path, ns, name, <char *> value, size)
             else:
-                return c_extattr_set_link(path, EXTATTR_NAMESPACE_USER, name, <char *> value, size)
+                return c_extattr_set_link(path, ns, name, <char *> value, size)
 
+    # strip namespace if there, but ignore if not there.
+    # older borg / attic versions did not prefix the namespace to the names.
+    if name.startswith(prefix):
+        name = name[len(prefix):]
     _setxattr_inner(func, path, name, value)
 
 

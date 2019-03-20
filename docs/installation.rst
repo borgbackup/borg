@@ -145,15 +145,19 @@ following dependencies first:
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
 * libacl_ (which depends on libattr_), both plus development headers.
-* ZeroMQ_ >= 4.0.0, plus development headers.
 * We have bundled code of the following packages, but borg by default (see
   setup.py if you want to change that) prefers a shared library if it can
   be found on the system (lib + dev headers) at build time:
 
   - liblz4_ >= 1.7.0 (r129)
   - libzstd_ >= 1.3.0
-  - libb2_
-* some Python dependencies, pip will automatically install them for you
+  - libb2_ >= 0.98.1 (older do not have pkg-config support)
+* pkg-config (cli tool) and pkgconfig python package (borg uses these to
+  discover header and library location - if it can't import pkgconfig and
+  is not pointed to header/library locations via env vars [see setup.py],
+  it will fall back to using the bundled code, see above).
+  These must be present before invoking setup.py!
+* some other Python dependencies, pip will automatically install them for you.
 * optionally, the llfuse_ Python package is required if you wish to mount an
   archive as a FUSE filesystem. See setup.py about the version requirements.
 
@@ -176,34 +180,32 @@ Debian / Ubuntu
 Install the dependencies with development headers::
 
     sudo apt-get install python3 python3-dev python3-pip python-virtualenv \
-    libssl-dev openssl \
     libacl1-dev libacl1 \
-    libzmq3-dev libzmq3 \
-    build-essential
-    sudo apt-get install libfuse-dev fuse pkg-config    # optional, for FUSE support
+    libssl-dev libb2-dev \
+    liblz4-dev libzstd-dev \
+    build-essential \
+    pkg-config python3-pkgconfig
+    sudo apt-get install libfuse-dev fuse    # optional, for FUSE support
 
 In case you get complaints about permission denied on ``/etc/fuse.conf``: on
 Ubuntu this means your user is not in the ``fuse`` group. Add yourself to that
 group, log out and log in again.
 
-Fedora / Korora
-+++++++++++++++
-
-.. todo:: use python 3.6
+Fedora
+++++++
 
 Install the dependencies with development headers::
 
-    sudo dnf install python3 python3-devel python3-pip python3-virtualenv
-    sudo dnf install openssl-devel openssl
-    sudo dnf install libacl-devel libacl
-    sudo dnf install gcc gcc-c++
-    sudo dnf install redhat-rpm-config                 # not needed in Korora
-    sudo dnf install fuse-devel fuse pkgconfig         # optional, for FUSE support
+    sudo dnf install python3 python3-devel python3-pip python3-virtualenv \
+    libacl-devel libacl \
+    openssl-devel libb2-devel \
+    lz4-devel libzstd-devel \
+    pkgconf python3-pkgconfig
+    sudo dnf install gcc gcc-c++ redhat-rpm-config
+    sudo dnf install fuse-devel fuse         # optional, for FUSE support
 
 openSUSE Tumbleweed / Leap
 ++++++++++++++++++++++++++
-
-.. todo:: use python 3.6
 
 Install the dependencies automatically using zypper::
 
@@ -220,13 +222,11 @@ Alternatively, you can enumerate all build dependencies in the command line::
 Mac OS X
 ++++++++
 
-.. todo:: use python 3.6
-
 Assuming you have installed homebrew_, the following steps will install all the
 dependencies::
 
     brew install python3 openssl
-    brew install pkg-config                            # optional, for FUSE support
+    brew install pkg-config
     pip3 install virtualenv
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of
@@ -240,16 +240,17 @@ FUSE for OS X, which is available via github_, or via homebrew::
 FreeBSD
 ++++++++
 
-.. todo:: use python 3.6
-
 Listed below are packages you will need to install Borg, its dependencies,
 and commands to make FUSE work for using the mount command.
 
 ::
 
-     pkg install -y python3 openssl fusefs-libs pkgconf
+     pkg install -y python3 pkgconf
+     pkg install openssl
+     pkg install liblz4 zstd
+     pkg install fusefs-libs
      pkg install -y git
-     python3.4 -m ensurepip # to install pip for Python3
+     python3.5 -m ensurepip # to install pip for Python3
      To use the mount command:
      echo 'fuse_load="YES"' >> /boot/loader.conf
      echo 'vfs.usermount=1' >> /etc/sysctl.conf
@@ -272,8 +273,6 @@ Cygwin
 .. note::
     Running under Cygwin is experimental and has not been tested much yet.
 
-.. todo:: use python 3.6
-
 Use the Cygwin installer to install the dependencies::
 
     python3 python3-devel libcrypt-devel python3-setuptools
@@ -283,7 +282,7 @@ Use the Cygwin installer to install the dependencies::
 
 You can then install ``pip`` and ``virtualenv``::
 
-    easy_install-3.4 pip
+    easy_install-3.5 pip
     pip install virtualenv
 
 
@@ -343,7 +342,8 @@ While we try not to break master, there are no guarantees on anything. ::
     # requires fakeroot, available through your package manager
     fakeroot -u tox
 
-By default the system installation of python will be used. If you need to use a different version of Python you can install this using ``pyenv``: ::
+By default the system installation of python will be used.
+If you need to use a different version of Python you can install this using ``pyenv``: ::
 
     ...
     # create a virtual environment

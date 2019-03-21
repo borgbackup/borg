@@ -257,6 +257,7 @@ chunks are stored. For 'U' all data chunks refer to already existing chunks.
 - 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
 - 'M' = regular file, modified
 - 'U' = regular file, unchanged
+- 'C' = regular file, it changed while we backed it up
 - 'E' = regular file, an error happened while accessing/reading *this* file
 
 A lowercase character means a file type other than a regular file,

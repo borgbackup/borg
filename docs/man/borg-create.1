@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2019-03-10" "" "borg backup tool"
+.TH BORG-CREATE 1 "2019-03-21" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -334,6 +334,8 @@ chunks are stored. For \(aqU\(aq all data chunks refer to already existing chunk
 \(aqM\(aq = regular file, modified
 .IP \(bu 2
 \(aqU\(aq = regular file, unchanged
+.IP \(bu 2
+\(aqC\(aq = regular file, it changed while we backed it up
 .IP \(bu 2
 \(aqE\(aq = regular file, an error happened while accessing/reading \fIthis\fP file
 .UNINDENT

@@ -219,6 +219,8 @@ Fixes:
 
 - warn if a file has changed while being backed up, #1750
 - lrucache: regularly remove old FDs, #4427
+- borg command shall terminate with rc 2 for ImportErrors, #4424
+- make freebsd xattr platform code api compatible with linux, #3952
 
 Other changes:
 
@@ -236,6 +238,7 @@ Other changes:
 
   - add a sample logging.conf in docs/misc, #4380
   - fix spelling errors
+  - update requirements / install docs, #4374
 
 
 Version 1.2.0a4 (2019-03-11)

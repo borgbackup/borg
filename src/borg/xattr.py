@@ -323,7 +323,7 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
     libc.extattr_set_file.argtypes = (c_char_p, c_int, c_char_p, c_char_p, c_size_t)
     libc.extattr_set_file.restype = c_int
     ns = EXTATTR_NAMESPACE_USER = 0x0001
-    prefix = 'user.'
+    prefix, prefix_b = 'user.', b'user.'
 
     def listxattr(path, *, follow_symlinks=True):
         def func(path, buf, size):
@@ -350,8 +350,9 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
 
         # strip namespace if there, but ignore if not there.
         # older borg / attic versions did not prefix the namespace to the names.
-        if name.startswith(prefix):
-            name = name[len(prefix):]
+        _prefix = prefix if isinstance(name, str) else prefix_b
+        if name.startswith(_prefix):
+            name = name[len(_prefix):]
         n, buf = _getxattr_inner(func, path, name)
         return buf[:n] or None
 
@@ -367,8 +368,9 @@ elif sys.platform.startswith('freebsd'):  # pragma: freebsd only
 
         # strip namespace if there, but ignore if not there.
         # older borg / attic versions did not prefix the namespace to the names.
-        if name.startswith(prefix):
-            name = name[len(prefix):]
+        _prefix = prefix if isinstance(name, str) else prefix_b
+        if name.startswith(_prefix):
+            name = name[len(_prefix):]
         _setxattr_inner(func, path, name, value)
 
 else:  # pragma: unknown platform only

@@ -13,6 +13,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 from .time import to_localtime
+from . import msgpack
 from .. import __version__ as borg_version
 from .. import chunker
 
@@ -81,12 +82,17 @@ def sysinfo():
             linux_distribution = ('Unknown Linux', '', '')
     else:
         linux_distribution = None
+    try:
+        msgpack_version = '.'.join(str(v) for v in msgpack.version)
+    except:
+        msgpack_version = 'unknown'
     info = []
     if uname is not None:
         info.append('Platform: %s' % (' '.join(uname), ))
     if linux_distribution is not None:
         info.append('Linux: %s %s %s' % linux_distribution)
-    info.append('Borg: %s  Python: %s %s' % (borg_version, python_implementation, python_version))
+    info.append('Borg: %s  Python: %s %s msgpack: %s' % (
+                borg_version, python_implementation, python_version, msgpack_version))
     info.append('PID: %d  CWD: %s' % (os.getpid(), os.getcwd()))
     info.append('sys.argv: %r' % sys.argv)
     info.append('SSH_ORIGINAL_COMMAND: %r' % os.environ.get('SSH_ORIGINAL_COMMAND'))

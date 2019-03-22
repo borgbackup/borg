@@ -24,9 +24,13 @@ from msgpack import pack as mp_pack
 from msgpack import Unpacker as mp_Unpacker
 from msgpack import unpackb as mp_unpackb
 from msgpack import unpack as mp_unpack
+from msgpack import version as mp_version
 
 from msgpack import ExtType
 from msgpack import OutOfData
+
+
+version = mp_version
 
 
 class PackException(Exception):

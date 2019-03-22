@@ -4230,6 +4230,9 @@ class Archiver:
         args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
+        if all((hasattr(args, x) for x in ('stats', 'dry_run'))) and all((args.stats, args.dry_run)):
+            logger.error("--stats and --dry-run shouldn't be used together")
+            return self.exit_code
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
         self.prerun_checks(logger)

@@ -1,0 +1,12 @@
+setuptools==40.8.0
+setuptools-scm==3.2.0
+pip==19.0.3
+virtualenv==16.4.3
+pluggy==0.9.0
+tox==3.7.0
+pytest==4.3.1
+pytest-xdist==1.27.0
+pytest-cov==2.6.1
+pytest-benchmark==3.2.2
+Cython==0.29.6
+twine==1.13.0

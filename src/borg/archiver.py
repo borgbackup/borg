@@ -4230,7 +4230,7 @@ class Archiver:
         args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
-        if all((hasattr(args, x) for x in ('stats', 'dry_run'))) and all((args.stats, args.dry_run)):
+        if getattr(args, 'stats', False) and getattr(args, 'dry_run', False):
             logger.error("--stats and --dry-run shouldn't be used together")
             return self.exit_code
         if args.show_version:

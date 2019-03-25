@@ -4241,6 +4241,9 @@ class Archiver:
         args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
+        if getattr(args, 'stats', False) and getattr(args, 'dry_run', False):
+            logger.error("--stats does not work with --dry-run.")
+            return self.exit_code
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
         self.prerun_checks(logger)

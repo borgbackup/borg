@@ -2684,6 +2684,79 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository for which to break the locks')
 
+        # borg check
+        check_epilog = process_epilog("""
+        The check command verifies the consistency of a repository and the corresponding archives.
+
+        First, the underlying repository data files are checked:
+
+        - For all segments the segment magic (header) is checked
+        - For all objects stored in the segments, all metadata (e.g. crc and size) and
+          all data is read. The read data is checked by size and CRC. Bit rot and other
+          types of accidental damage can be detected this way.
+        - If we are in repair mode and a integrity error is detected for a segment,
+          we try to recover as many objects from the segment as possible.
+        - In repair mode, it makes sure that the index is consistent with the data
+          stored in the segments.
+        - If you use a remote repo server via ssh:, the repo check is executed on the
+          repo server without causing significant network traffic.
+        - The repository check can be skipped using the ``--archives-only`` option.
+
+        Second, the consistency and correctness of the archive metadata is verified:
+
+        - Is the repo manifest present? If not, it is rebuilt from archive metadata
+          chunks (this requires reading and decrypting of all metadata and data).
+        - Check if archive metadata chunk is present. if not, remove archive from
+          manifest.
+        - For all files (items) in the archive, for all chunks referenced by these
+          files, check if chunk is present.
+          If a chunk is not present and we are in repair mode, replace it with a same-size
+          replacement chunk of zeros.
+          If a previously lost chunk reappears (e.g. via a later backup) and we are in
+          repair mode, the all-zero replacement chunk will be replaced by the correct chunk.
+          This requires reading of archive and file metadata, but not data.
+        - If we are in repair mode and we checked all the archives: delete orphaned
+          chunks from the repo.
+        - if you use a remote repo server via ssh:, the archive check is executed on
+          the client machine (because if encryption is enabled, the checks will require
+          decryption and this is always done client-side, because key access will be
+          required).
+        - The archive checks can be time consuming, they can be skipped using the
+          ``--repository-only`` option.
+
+        The ``--verify-data`` option will perform a full integrity verification (as opposed to
+        checking the CRC32 of the segment) of data, which means reading the data from the
+        repository, decrypting and decompressing it. This is a cryptographic verification,
+        which will detect (accidental) corruption. For encrypted repositories it is
+        tamper-resistant as well, unless the attacker has access to the keys.
+
+        It is also very slow.
+        """)
+        subparser = subparsers.add_parser('check', parents=[common_parser], add_help=False,
+                                          description=self.do_check.__doc__,
+                                          epilog=check_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='verify repository')
+        subparser.set_defaults(func=self.do_check)
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='repository or archive to check consistency of')
+        subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
+                               help='only perform repository checks')
+        subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
+                               help='only perform archives checks')
+        subparser.add_argument('--verify-data', dest='verify_data', action='store_true',
+                               help='perform cryptographic archive data integrity verification '
+                                    '(conflicts with ``--repository-only``)')
+        subparser.add_argument('--repair', dest='repair', action='store_true',
+                               help='attempt to repair any inconsistencies found')
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               help='work slower, but using less space')
+        subparser.add_argument('--max-duration', metavar='SECONDS', dest='max_duration',
+                                   type=int, default=0,
+                                   help='do only a partial repo check for max. SECONDS seconds (Default: unlimited)')
+        define_archive_filters_group(subparser)
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -2910,79 +2983,6 @@ class Archiver:
                                help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
         subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
                                help='create the parent directories of the repository directory, if they are missing.')
-
-        # borg check
-        check_epilog = process_epilog("""
-        The check command verifies the consistency of a repository and the corresponding archives.
-
-        First, the underlying repository data files are checked:
-
-        - For all segments the segment magic (header) is checked
-        - For all objects stored in the segments, all metadata (e.g. crc and size) and
-          all data is read. The read data is checked by size and CRC. Bit rot and other
-          types of accidental damage can be detected this way.
-        - If we are in repair mode and a integrity error is detected for a segment,
-          we try to recover as many objects from the segment as possible.
-        - In repair mode, it makes sure that the index is consistent with the data
-          stored in the segments.
-        - If you use a remote repo server via ssh:, the repo check is executed on the
-          repo server without causing significant network traffic.
-        - The repository check can be skipped using the ``--archives-only`` option.
-
-        Second, the consistency and correctness of the archive metadata is verified:
-
-        - Is the repo manifest present? If not, it is rebuilt from archive metadata
-          chunks (this requires reading and decrypting of all metadata and data).
-        - Check if archive metadata chunk is present. if not, remove archive from
-          manifest.
-        - For all files (items) in the archive, for all chunks referenced by these
-          files, check if chunk is present.
-          If a chunk is not present and we are in repair mode, replace it with a same-size
-          replacement chunk of zeros.
-          If a previously lost chunk reappears (e.g. via a later backup) and we are in
-          repair mode, the all-zero replacement chunk will be replaced by the correct chunk.
-          This requires reading of archive and file metadata, but not data.
-        - If we are in repair mode and we checked all the archives: delete orphaned
-          chunks from the repo.
-        - if you use a remote repo server via ssh:, the archive check is executed on
-          the client machine (because if encryption is enabled, the checks will require
-          decryption and this is always done client-side, because key access will be
-          required).
-        - The archive checks can be time consuming, they can be skipped using the
-          ``--repository-only`` option.
-
-        The ``--verify-data`` option will perform a full integrity verification (as opposed to
-        checking the CRC32 of the segment) of data, which means reading the data from the
-        repository, decrypting and decompressing it. This is a cryptographic verification,
-        which will detect (accidental) corruption. For encrypted repositories it is
-        tamper-resistant as well, unless the attacker has access to the keys.
-
-        It is also very slow.
-        """)
-        subparser = subparsers.add_parser('check', parents=[common_parser], add_help=False,
-                                          description=self.do_check.__doc__,
-                                          epilog=check_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='verify repository')
-        subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
-                               type=location_validator(),
-                               help='repository or archive to check consistency of')
-        subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
-                               help='only perform repository checks')
-        subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
-                               help='only perform archives checks')
-        subparser.add_argument('--verify-data', dest='verify_data', action='store_true',
-                               help='perform cryptographic archive data integrity verification '
-                                    '(conflicts with ``--repository-only``)')
-        subparser.add_argument('--repair', dest='repair', action='store_true',
-                               help='attempt to repair any inconsistencies found')
-        subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               help='work slower, but using less space')
-        subparser.add_argument('--max-duration', metavar='SECONDS', dest='max_duration',
-                                   type=int, default=0,
-                                   help='do only a partial repo check for max. SECONDS seconds (Default: unlimited)')
-        define_archive_filters_group(subparser)
 
         # borg key
         subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,

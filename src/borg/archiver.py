@@ -3505,6 +3505,25 @@ class Archiver:
         if parser.prog == 'borgfs':
             return parser
 
+        # borg rename
+        rename_epilog = process_epilog("""
+        This command renames an archive in the repository.
+
+        This results in a different archive ID.
+        """)
+        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
+                                          description=self.do_rename.__doc__,
+                                          epilog=rename_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='rename archive')
+        subparser.set_defaults(func=self.do_rename)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to rename')
+        subparser.add_argument('name', metavar='NEWNAME',
+                               type=archivename_validator(),
+                               help='the new archive name to use')
+
         # borg serve
         serve_epilog = process_epilog("""
         This command starts a repository server process. This command is usually not used manually.
@@ -3775,25 +3794,6 @@ class Archiver:
         subparser.set_defaults(func=self.do_migrate_to_repokey)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
-
-        # borg rename
-        rename_epilog = process_epilog("""
-        This command renames an archive in the repository.
-
-        This results in a different archive ID.
-        """)
-        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
-                                          description=self.do_rename.__doc__,
-                                          epilog=rename_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='rename archive')
-        subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to rename')
-        subparser.add_argument('name', metavar='NEWNAME',
-                               type=archivename_validator(),
-                               help='the new archive name to use')
 
         # borg list
         list_epilog = process_epilog("""

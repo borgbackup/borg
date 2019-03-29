@@ -2602,6 +2602,8 @@ class Archiver:
         mid_common_parser.set_defaults(paths=[], patterns=[])
         parser.common_options.add_common_group(mid_common_parser, '_midcommand')
 
+        subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -2649,7 +2651,6 @@ class Archiver:
             parser.help = 'mount repository'
             subparser = parser
         else:
-            subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
             subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
                                             description=self.do_mount.__doc__,
                                             epilog=mount_epilog,

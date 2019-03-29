@@ -3033,6 +3033,236 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to archive')
 
+        # borg debug
+        debug_epilog = process_epilog("""
+        These commands are not intended for normal use and potentially very
+        dangerous if used incorrectly.
+
+        They exist to improve debugging capabilities without direct system access, e.g.
+        in case you ever run into some severe malfunction. Use them only if you know
+        what you are doing or if a trusted developer tells you what to do.""")
+
+        subparser = subparsers.add_parser('debug', parents=[mid_common_parser], add_help=False,
+                                          description='debugging command (not intended for normal use)',
+                                          epilog=debug_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='debugging command (not intended for normal use)')
+
+        debug_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
+
+        debug_info_epilog = process_epilog("""
+        This command displays some system information that might be useful for bug
+        reports and debugging problems. If a traceback happens, this information is
+        already appended at the end of the traceback.
+        """)
+        subparser = debug_parsers.add_parser('info', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_info.__doc__,
+                                          epilog=debug_info_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show system infos for debugging / bug reports (debug)')
+        subparser.set_defaults(func=self.do_debug_info)
+
+        debug_dump_archive_items_epilog = process_epilog("""
+        This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
+        """)
+        subparser = debug_parsers.add_parser('dump-archive-items', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_archive_items.__doc__,
+                                          epilog=debug_dump_archive_items_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump archive items (metadata) (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_archive_items)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to dump')
+
+        debug_dump_archive_epilog = process_epilog("""
+        This command dumps all metadata of an archive in a decoded form to a file.
+        """)
+        subparser = debug_parsers.add_parser('dump-archive', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_archive.__doc__,
+                                          epilog=debug_dump_archive_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump decoded archive metadata (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_archive)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to dump')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to dump data into')
+
+        debug_dump_manifest_epilog = process_epilog("""
+        This command dumps manifest metadata of a repository in a decoded form to a file.
+        """)
+        subparser = debug_parsers.add_parser('dump-manifest', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_manifest.__doc__,
+                                          epilog=debug_dump_manifest_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump decoded repository metadata (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_manifest)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to dump')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to dump data into')
+
+        debug_dump_repo_objs_epilog = process_epilog("""
+        This command dumps raw (but decrypted and decompressed) repo objects to files.
+        """)
+        subparser = debug_parsers.add_parser('dump-repo-objs', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_repo_objs.__doc__,
+                                          epilog=debug_dump_repo_objs_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump repo objects (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to dump')
+        subparser.add_argument('--ghost', dest='ghost', action='store_true',
+                               help='dump all segment file contents, including deleted/uncommitted objects and commits.')
+
+        debug_search_repo_objs_epilog = process_epilog("""
+        This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.
+        """)
+        subparser = debug_parsers.add_parser('search-repo-objs', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_search_repo_objs.__doc__,
+                                          epilog=debug_search_repo_objs_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='search repo objects (debug)')
+        subparser.set_defaults(func=self.do_debug_search_repo_objs)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repo to search')
+        subparser.add_argument('wanted', metavar='WANTED', type=str,
+                               help='term to search the repo for, either 0x1234abcd hex term or a string')
+
+        debug_get_obj_epilog = process_epilog("""
+        This command gets an object from the repository.
+        """)
+        subparser = debug_parsers.add_parser('get-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_get_obj.__doc__,
+                                          epilog=debug_get_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='get object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_get_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('id', metavar='ID', type=str,
+                               help='hex object ID to get from the repo')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to write object data into')
+
+        debug_put_obj_epilog = process_epilog("""
+        This command puts objects into the repository.
+        """)
+        subparser = debug_parsers.add_parser('put-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_put_obj.__doc__,
+                                          epilog=debug_put_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='put object to repository (debug)')
+        subparser.set_defaults(func=self.do_debug_put_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
+                               help='file(s) to read and create object(s) from')
+
+        debug_delete_obj_epilog = process_epilog("""
+        This command deletes objects from the repository.
+        """)
+        subparser = debug_parsers.add_parser('delete-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_delete_obj.__doc__,
+                                          epilog=debug_delete_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_delete_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to delete from the repo')
+
+        debug_refcount_obj_epilog = process_epilog("""
+        This command displays the reference count for objects from the repository.
+        """)
+        subparser = debug_parsers.add_parser('refcount-obj', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_refcount_obj.__doc__,
+                                          epilog=debug_refcount_obj_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show refcount for object from repository (debug)')
+        subparser.set_defaults(func=self.do_debug_refcount_obj)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to use')
+        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
+                               help='hex object ID(s) to show refcounts for')
+
+        debug_convert_profile_epilog = process_epilog("""
+        Convert a Borg profile to a Python cProfile compatible profile.
+        """)
+        subparser = debug_parsers.add_parser('convert-profile', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_convert_profile.__doc__,
+                                          epilog=debug_convert_profile_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='convert Borg profile to Python profile (debug)')
+        subparser.set_defaults(func=self.do_debug_convert_profile)
+        subparser.add_argument('input', metavar='INPUT', type=argparse.FileType('rb'),
+                               help='Borg profile')
+        subparser.add_argument('output', metavar='OUTPUT', type=argparse.FileType('wb'),
+                               help='Output file')
+
+        # borg delete
+        delete_epilog = process_epilog("""
+        This command deletes an archive from the repository or the complete repository.
+
+        Important: When deleting archives, repository disk space is **not** freed until
+        you run ``borg compact``.
+
+        If you delete the complete repository, the local cache for it (if any) is
+        also deleted. Alternatively, you can delete just the local cache with the
+        ``--cache-only`` option.
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after deletion.
+
+        You can delete multiple archives by specifying their common prefix, if they
+        have one, using the ``--prefix PREFIX`` option. You can also specify a shell
+        pattern to match multiple archives using the ``--glob-archives GLOB`` option
+        (for more info on these patterns, see ``borg help patterns``). Note that these
+        two options are mutually exclusive.
+
+        To avoid accidentally deleting archives, especially when using glob patterns,
+        it might be helpful to use the ``--dry-run`` to test out the command without
+        actually making any changes to the repository.
+        """)
+        subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
+                                          description=self.do_delete.__doc__,
+                                          epilog=delete_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete archive')
+        subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+                               help='print statistics for the deleted archive')
+        subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
+                               help='delete only the local cache for the given repository')
+        subparser.add_argument('--force', dest='forced',
+                               action='count', default=0,
+                               help='force deletion of corrupted archives, '
+                                    'use ``--force --force`` in case ``--force`` does not work.')
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               help='work slower, but using less space')
+        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
+                               type=location_validator(),
+                               help='archive or repository to delete')
+        subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
+                               help='archives to delete')
+        define_archive_filters_group(subparser)
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3534,57 +3764,6 @@ class Archiver:
                                type=archivename_validator(),
                                help='the new archive name to use')
 
-        # borg delete
-        delete_epilog = process_epilog("""
-        This command deletes an archive from the repository or the complete repository.
-
-        Important: When deleting archives, repository disk space is **not** freed until
-        you run ``borg compact``.
-
-        If you delete the complete repository, the local cache for it (if any) is
-        also deleted. Alternatively, you can delete just the local cache with the
-        ``--cache-only`` option.
-
-        When using ``--stats``, you will get some statistics about how much data was
-        deleted - the "Deleted data" deduplicated size there is most interesting as
-        that is how much your repository will shrink.
-        Please note that the "All archives" stats refer to the state after deletion.
-
-        You can delete multiple archives by specifying their common prefix, if they
-        have one, using the ``--prefix PREFIX`` option. You can also specify a shell
-        pattern to match multiple archives using the ``--glob-archives GLOB`` option
-        (for more info on these patterns, see ``borg help patterns``). Note that these
-        two options are mutually exclusive.
-
-        To avoid accidentally deleting archives, especially when using glob patterns,
-        it might be helpful to use the ``--dry-run`` to test out the command without
-        actually making any changes to the repository.
-        """)
-        subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
-                                          description=self.do_delete.__doc__,
-                                          epilog=delete_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='delete archive')
-        subparser.set_defaults(func=self.do_delete)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change repository')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
-                               help='print statistics for the deleted archive')
-        subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
-                               help='delete only the local cache for the given repository')
-        subparser.add_argument('--force', dest='forced',
-                               action='count', default=0,
-                               help='force deletion of corrupted archives, '
-                                    'use ``--force --force`` in case ``--force`` does not work.')
-        subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               help='work slower, but using less space')
-        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
-                               type=location_validator(),
-                               help='archive or repository to delete')
-        subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
-                               help='archives to delete')
-        define_archive_filters_group(subparser)
-
         # borg list
         list_epilog = process_epilog("""
         This command lists the contents of a repository or an archive.
@@ -4012,185 +4191,6 @@ class Archiver:
                                help='command to run')
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
-
-        # borg debug
-        debug_epilog = process_epilog("""
-        These commands are not intended for normal use and potentially very
-        dangerous if used incorrectly.
-
-        They exist to improve debugging capabilities without direct system access, e.g.
-        in case you ever run into some severe malfunction. Use them only if you know
-        what you are doing or if a trusted developer tells you what to do.""")
-
-        subparser = subparsers.add_parser('debug', parents=[mid_common_parser], add_help=False,
-                                          description='debugging command (not intended for normal use)',
-                                          epilog=debug_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='debugging command (not intended for normal use)')
-
-        debug_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
-        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
-
-        debug_info_epilog = process_epilog("""
-        This command displays some system information that might be useful for bug
-        reports and debugging problems. If a traceback happens, this information is
-        already appended at the end of the traceback.
-        """)
-        subparser = debug_parsers.add_parser('info', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_info.__doc__,
-                                          epilog=debug_info_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='show system infos for debugging / bug reports (debug)')
-        subparser.set_defaults(func=self.do_debug_info)
-
-        debug_dump_archive_items_epilog = process_epilog("""
-        This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
-        """)
-        subparser = debug_parsers.add_parser('dump-archive-items', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_archive_items.__doc__,
-                                          epilog=debug_dump_archive_items_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump archive items (metadata) (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to dump')
-
-        debug_dump_archive_epilog = process_epilog("""
-        This command dumps all metadata of an archive in a decoded form to a file.
-        """)
-        subparser = debug_parsers.add_parser('dump-archive', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_archive.__doc__,
-                                          epilog=debug_dump_archive_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump decoded archive metadata (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_archive)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to dump')
-        subparser.add_argument('path', metavar='PATH', type=str,
-                               help='file to dump data into')
-
-        debug_dump_manifest_epilog = process_epilog("""
-        This command dumps manifest metadata of a repository in a decoded form to a file.
-        """)
-        subparser = debug_parsers.add_parser('dump-manifest', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_manifest.__doc__,
-                                          epilog=debug_dump_manifest_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump decoded repository metadata (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_manifest)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repository to dump')
-        subparser.add_argument('path', metavar='PATH', type=str,
-                               help='file to dump data into')
-
-        debug_dump_repo_objs_epilog = process_epilog("""
-        This command dumps raw (but decrypted and decompressed) repo objects to files.
-        """)
-        subparser = debug_parsers.add_parser('dump-repo-objs', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_dump_repo_objs.__doc__,
-                                          epilog=debug_dump_repo_objs_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='dump repo objects (debug)')
-        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repo to dump')
-        subparser.add_argument('--ghost', dest='ghost', action='store_true',
-                               help='dump all segment file contents, including deleted/uncommitted objects and commits.')
-
-        debug_search_repo_objs_epilog = process_epilog("""
-        This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.
-        """)
-        subparser = debug_parsers.add_parser('search-repo-objs', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_search_repo_objs.__doc__,
-                                          epilog=debug_search_repo_objs_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='search repo objects (debug)')
-        subparser.set_defaults(func=self.do_debug_search_repo_objs)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repo to search')
-        subparser.add_argument('wanted', metavar='WANTED', type=str,
-                               help='term to search the repo for, either 0x1234abcd hex term or a string')
-
-        debug_get_obj_epilog = process_epilog("""
-        This command gets an object from the repository.
-        """)
-        subparser = debug_parsers.add_parser('get-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_get_obj.__doc__,
-                                          epilog=debug_get_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='get object from repository (debug)')
-        subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('id', metavar='ID', type=str,
-                               help='hex object ID to get from the repo')
-        subparser.add_argument('path', metavar='PATH', type=str,
-                               help='file to write object data into')
-
-        debug_put_obj_epilog = process_epilog("""
-        This command puts objects into the repository.
-        """)
-        subparser = debug_parsers.add_parser('put-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_put_obj.__doc__,
-                                          epilog=debug_put_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='put object to repository (debug)')
-        subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
-                               help='file(s) to read and create object(s) from')
-
-        debug_delete_obj_epilog = process_epilog("""
-        This command deletes objects from the repository.
-        """)
-        subparser = debug_parsers.add_parser('delete-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_delete_obj.__doc__,
-                                          epilog=debug_delete_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='delete object from repository (debug)')
-        subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
-                               help='hex object ID(s) to delete from the repo')
-
-        debug_refcount_obj_epilog = process_epilog("""
-        This command displays the reference count for objects from the repository.
-        """)
-        subparser = debug_parsers.add_parser('refcount-obj', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_refcount_obj.__doc__,
-                                          epilog=debug_refcount_obj_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='show refcount for object from repository (debug)')
-        subparser.set_defaults(func=self.do_debug_refcount_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to use')
-        subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
-                               help='hex object ID(s) to show refcounts for')
-
-        debug_convert_profile_epilog = process_epilog("""
-        Convert a Borg profile to a Python cProfile compatible profile.
-        """)
-        subparser = debug_parsers.add_parser('convert-profile', parents=[common_parser], add_help=False,
-                                          description=self.do_debug_convert_profile.__doc__,
-                                          epilog=debug_convert_profile_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='convert Borg profile to Python profile (debug)')
-        subparser.set_defaults(func=self.do_debug_convert_profile)
-        subparser.add_argument('input', metavar='INPUT', type=argparse.FileType('rb'),
-                               help='Borg profile')
-        subparser.add_argument('output', metavar='OUTPUT', type=argparse.FileType('wb'),
-                               help='Output file')
 
         return parser
 

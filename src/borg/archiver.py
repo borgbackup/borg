@@ -3882,6 +3882,115 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to prune')
 
+        # borg recreate
+        recreate_epilog = process_epilog("""
+        Recreate the contents of existing archives.
+
+        This is an *experimental* feature. Do *not* use this on your only backup.
+
+        Important: Repository disk space is **not** freed until you run ``borg compact``.
+
+        ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
+        have the exact same semantics as in "borg create". If PATHs are specified the
+        resulting archive will only contain files from these PATHs.
+
+        Note that all paths in an archive are relative, therefore absolute patterns/paths
+        will *not* match (``--exclude``, ``--exclude-from``, PATHs).
+
+        ``--recompress`` allows one to change the compression of existing data in archives.
+        Due to how Borg stores compressed size information this might display
+        incorrect information for archives that were not recreated at the same time.
+        There is no risk of data loss by this.
+
+        ``--chunker-params`` will re-chunk all files in the archive, this can be
+        used to have upgraded Borg 0.xx or Attic archives deduplicate with
+        Borg 1.x archives.
+
+        **USE WITH CAUTION.**
+        Depending on the PATHs and patterns given, recreate can be used to permanently
+        delete files from archives.
+        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
+        interpreted.
+
+        The archive being recreated is only removed after the operation completes. The
+        archive that is built during the operation exists at the same time at
+        "<ARCHIVE>.recreate". The new archive will have a different archive ID.
+
+        With ``--target`` the original archive is not replaced, instead a new archive is created.
+
+        When rechunking (or recompressing), space usage can be substantial - expect
+        at least the entire deduplicated size of the archives using the previous
+        chunker (or compression) params.
+
+        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
+        replacement chunks, please first run another backup for the same data and re-run
+        borg check --repair afterwards to heal any archives that had lost chunks which are
+        still generated from the input data.
+
+        Important: running borg recreate to re-chunk will remove the chunks_healthy
+        metadata of all items with replacement chunks, so healing will not be possible
+        any more after re-chunking (it is also unlikely it would ever work: due to the
+        change of chunking parameters, the missing chunk likely will never be seen again
+        even if you still have the data that produced it).
+        """)
+        subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
+                                          description=self.do_recreate.__doc__,
+                                          epilog=recreate_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help=self.do_recreate.__doc__)
+        subparser.set_defaults(func=self.do_recreate)
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
+                               help='only display items with the given status characters (listed in borg create --help)')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change anything')
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+                               help='print statistics at end')
+
+        define_exclusion_group(subparser, tag_files=True)
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
+                                   type=archivename_validator(),
+                                   help='create a new archive with the name ARCHIVE, do not replace existing archive '
+                                        '(only applies for a single archive)')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=1800, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
+                                        'alternatively, give a reference file/directory.')
+        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'),
+                                   help='select compression algorithm, see the output of the '
+                                        '"borg help compression" command for details.')
+        archive_group.add_argument('--recompress', metavar='MODE', dest='recompress', nargs='?',
+                                   default='never', const='if-different', choices=('never', 'if-different', 'always'),
+                                   help='recompress data chunks according to ``--compression``. '
+                                        'MODE `if-different`: '
+                                        'recompress if current compression is with a different compression algorithm '
+                                        '(the level is not considered). '
+                                        'MODE `always`: '
+                                        'recompress even if current compression is with the same compression algorithm '
+                                        '(use this to change the compression level). '
+                                        'MODE `never` (default): '
+                                        'do not recompress.')
+        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
+                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
+                                        'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
+
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='repository/archive to recreate')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to recreate; patterns are supported')
+
         # borg rename
         rename_epilog = process_epilog("""
         This command renames an archive in the repository.
@@ -4052,115 +4161,6 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
-
-        # borg recreate
-        recreate_epilog = process_epilog("""
-        Recreate the contents of existing archives.
-
-        This is an *experimental* feature. Do *not* use this on your only backup.
-
-        Important: Repository disk space is **not** freed until you run ``borg compact``.
-
-        ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
-        have the exact same semantics as in "borg create". If PATHs are specified the
-        resulting archive will only contain files from these PATHs.
-
-        Note that all paths in an archive are relative, therefore absolute patterns/paths
-        will *not* match (``--exclude``, ``--exclude-from``, PATHs).
-
-        ``--recompress`` allows one to change the compression of existing data in archives.
-        Due to how Borg stores compressed size information this might display
-        incorrect information for archives that were not recreated at the same time.
-        There is no risk of data loss by this.
-
-        ``--chunker-params`` will re-chunk all files in the archive, this can be
-        used to have upgraded Borg 0.xx or Attic archives deduplicate with
-        Borg 1.x archives.
-
-        **USE WITH CAUTION.**
-        Depending on the PATHs and patterns given, recreate can be used to permanently
-        delete files from archives.
-        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
-        interpreted.
-
-        The archive being recreated is only removed after the operation completes. The
-        archive that is built during the operation exists at the same time at
-        "<ARCHIVE>.recreate". The new archive will have a different archive ID.
-
-        With ``--target`` the original archive is not replaced, instead a new archive is created.
-
-        When rechunking (or recompressing), space usage can be substantial - expect
-        at least the entire deduplicated size of the archives using the previous
-        chunker (or compression) params.
-
-        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
-        replacement chunks, please first run another backup for the same data and re-run
-        borg check --repair afterwards to heal any archives that had lost chunks which are
-        still generated from the input data.
-
-        Important: running borg recreate to re-chunk will remove the chunks_healthy
-        metadata of all items with replacement chunks, so healing will not be possible
-        any more after re-chunking (it is also unlikely it would ever work: due to the
-        change of chunking parameters, the missing chunk likely will never be seen again
-        even if you still have the data that produced it).
-        """)
-        subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
-                                          description=self.do_recreate.__doc__,
-                                          epilog=recreate_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help=self.do_recreate.__doc__)
-        subparser.set_defaults(func=self.do_recreate)
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
-                               help='only display items with the given status characters (listed in borg create --help)')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change anything')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
-                               help='print statistics at end')
-
-        define_exclusion_group(subparser, tag_files=True)
-
-        archive_group = subparser.add_argument_group('Archive options')
-        archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
-                                   type=archivename_validator(),
-                                   help='create a new archive with the name ARCHIVE, do not replace existing archive '
-                                        '(only applies for a single archive)')
-        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                                   type=int, default=1800, metavar='SECONDS',
-                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
-        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
-                                   help='add a comment text to the archive')
-        archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
-                                   type=timestamp, default=None,
-                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
-                                        'alternatively, give a reference file/directory.')
-        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
-                                   type=CompressionSpec, default=CompressionSpec('lz4'),
-                                   help='select compression algorithm, see the output of the '
-                                        '"borg help compression" command for details.')
-        archive_group.add_argument('--recompress', metavar='MODE', dest='recompress', nargs='?',
-                                   default='never', const='if-different', choices=('never', 'if-different', 'always'),
-                                   help='recompress data chunks according to ``--compression``. '
-                                        'MODE `if-different`: '
-                                        'recompress if current compression is with a different compression algorithm '
-                                        '(the level is not considered). '
-                                        'MODE `always`: '
-                                        'recompress even if current compression is with the same compression algorithm '
-                                        '(use this to change the compression level). '
-                                        'MODE `never` (default): '
-                                        'do not recompress.')
-        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
-                                   type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
-                                        'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
-
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
-                               type=location_validator(),
-                               help='repository/archive to recreate')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to recreate; patterns are supported')
 
         # borg with-lock
         with_lock_epilog = process_epilog("""

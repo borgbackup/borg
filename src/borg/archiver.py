@@ -3304,6 +3304,61 @@ class Archiver:
                                help='paths of items inside the archives to compare; patterns are supported')
         define_exclusion_group(subparser)
 
+        # borg export-tar
+        export_tar_epilog = process_epilog("""
+        This command creates a tarball from an archive.
+
+        When giving '-' as the output FILE, Borg will write a tar stream to standard output.
+
+        By default (``--tar-filter=auto``) Borg will detect whether the FILE should be compressed
+        based on its file extension and pipe the tarball through an appropriate filter
+        before writing it to FILE:
+
+        - .tar.gz: gzip
+        - .tar.bz2: bzip2
+        - .tar.xz: xz
+
+        Alternatively a ``--tar-filter`` program may be explicitly specified. It should
+        read the uncompressed tar stream from stdin and write a compressed/filtered
+        tar stream to stdout.
+
+        The generated tarball uses the GNU tar format.
+
+        export-tar is a lossy conversion:
+        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
+        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
+        otherwise supported by Borg.
+
+        A ``--sparse`` option (as found in borg extract) is not supported.
+
+        By default the entire archive is extracted but a subset of files and directories
+        can be selected by passing a list of ``PATHs`` as arguments.
+        The file selection can further be restricted by using the ``--exclude`` option.
+
+        See the output of the "borg help patterns" command for more help on exclude patterns.
+
+        ``--progress`` can be slower than no progress display, since it makes one additional
+        pass over the archive metadata.
+        """)
+        subparser = subparsers.add_parser('export-tar', parents=[common_parser], add_help=False,
+                                          description=self.do_export_tar.__doc__,
+                                          epilog=export_tar_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create tarball from archive')
+        subparser.set_defaults(func=self.do_export_tar)
+        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
+                               help='filter program to pipe data through')
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to export')
+        subparser.add_argument('tarfile', metavar='FILE',
+                               help='output tar file. "-" to write to stdout instead.')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+        define_exclusion_group(subparser, strip_components=True)
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3686,61 +3741,6 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
-        define_exclusion_group(subparser, strip_components=True)
-
-        # borg export-tar
-        export_tar_epilog = process_epilog("""
-        This command creates a tarball from an archive.
-
-        When giving '-' as the output FILE, Borg will write a tar stream to standard output.
-
-        By default (``--tar-filter=auto``) Borg will detect whether the FILE should be compressed
-        based on its file extension and pipe the tarball through an appropriate filter
-        before writing it to FILE:
-
-        - .tar.gz: gzip
-        - .tar.bz2: bzip2
-        - .tar.xz: xz
-
-        Alternatively a ``--tar-filter`` program may be explicitly specified. It should
-        read the uncompressed tar stream from stdin and write a compressed/filtered
-        tar stream to stdout.
-
-        The generated tarball uses the GNU tar format.
-
-        export-tar is a lossy conversion:
-        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-        otherwise supported by Borg.
-
-        A ``--sparse`` option (as found in borg extract) is not supported.
-
-        By default the entire archive is extracted but a subset of files and directories
-        can be selected by passing a list of ``PATHs`` as arguments.
-        The file selection can further be restricted by using the ``--exclude`` option.
-
-        See the output of the "borg help patterns" command for more help on exclude patterns.
-
-        ``--progress`` can be slower than no progress display, since it makes one additional
-        pass over the archive metadata.
-        """)
-        subparser = subparsers.add_parser('export-tar', parents=[common_parser], add_help=False,
-                                          description=self.do_export_tar.__doc__,
-                                          epilog=export_tar_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='create tarball from archive')
-        subparser.set_defaults(func=self.do_export_tar)
-        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
-                               help='filter program to pipe data through')
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to export')
-        subparser.add_argument('tarfile', metavar='FILE',
-                               help='output tar file. "-" to write to stdout instead.')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)

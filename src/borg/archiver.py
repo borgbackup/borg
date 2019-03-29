@@ -3405,6 +3405,37 @@ class Archiver:
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
 
+        # borg info
+        info_epilog = process_epilog("""
+        This command displays detailed information about the specified archive or repository.
+
+        Please note that the deduplicated sizes of the individual archives do not add
+        up to the deduplicated size of the repository ("all archives"), because the two
+        are meaning different things:
+
+        This archive / deduplicated size = amount of data stored ONLY for this archive
+        = unique chunks of this archive.
+        All archives / deduplicated size = amount of data stored in the repo
+        = all chunks in the repository.
+
+        Borg archives can only contain a limited amount of file metadata.
+        The size of an archive relative to this limit depends on a number of factors,
+        mainly the number of files, the lengths of paths and other metadata stored for files.
+        This is shown as *utilization of maximum supported archive size*.
+        """)
+        subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
+                                          description=self.do_info.__doc__,
+                                          epilog=info_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show repository or archive information')
+        subparser.set_defaults(func=self.do_info)
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='archive or repository to display information about')
+        subparser.add_argument('--json', action='store_true',
+                               help='format output as JSON')
+        define_archive_filters_group(subparser)
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3830,37 +3861,6 @@ class Archiver:
         subparser.set_defaults(func=self.do_umount)
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='mountpoint of the filesystem to umount')
-
-        # borg info
-        info_epilog = process_epilog("""
-        This command displays detailed information about the specified archive or repository.
-
-        Please note that the deduplicated sizes of the individual archives do not add
-        up to the deduplicated size of the repository ("all archives"), because the two
-        are meaning different things:
-
-        This archive / deduplicated size = amount of data stored ONLY for this archive
-        = unique chunks of this archive.
-        All archives / deduplicated size = amount of data stored in the repo
-        = all chunks in the repository.
-
-        Borg archives can only contain a limited amount of file metadata.
-        The size of an archive relative to this limit depends on a number of factors,
-        mainly the number of files, the lengths of paths and other metadata stored for files.
-        This is shown as *utilization of maximum supported archive size*.
-        """)
-        subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
-                                          description=self.do_info.__doc__,
-                                          epilog=info_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='show repository or archive information')
-        subparser.set_defaults(func=self.do_info)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
-                               type=location_validator(),
-                               help='archive or repository to display information about')
-        subparser.add_argument('--json', action='store_true',
-                               help='format output as JSON')
-        define_archive_filters_group(subparser)
 
         # borg prune
         prune_epilog = process_epilog("""

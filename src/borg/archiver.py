@@ -3795,73 +3795,6 @@ class Archiver:
         if parser.prog == 'borgfs':
             return parser
 
-        # borg rename
-        rename_epilog = process_epilog("""
-        This command renames an archive in the repository.
-
-        This results in a different archive ID.
-        """)
-        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
-                                          description=self.do_rename.__doc__,
-                                          epilog=rename_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='rename archive')
-        subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to rename')
-        subparser.add_argument('name', metavar='NEWNAME',
-                               type=archivename_validator(),
-                               help='the new archive name to use')
-
-        # borg serve
-        serve_epilog = process_epilog("""
-        This command starts a repository server process. This command is usually not used manually.
-        """)
-        subparser = subparsers.add_parser('serve', parents=[common_parser], add_help=False,
-                                          description=self.do_serve.__doc__, epilog=serve_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='start repository server process')
-        subparser.set_defaults(func=self.do_serve)
-        subparser.add_argument('--restrict-to-path', metavar='PATH', dest='restrict_to_paths', action='append',
-                               help='restrict repository access to PATH. '
-                                    'Can be specified multiple times to allow the client access to several directories. '
-                                    'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
-        subparser.add_argument('--restrict-to-repository', metavar='PATH', dest='restrict_to_repositories', action='append',
-                                help='restrict repository access. Only the repository located at PATH '
-                                     '(no sub-directories are considered) is accessible. '
-                                     'Can be specified multiple times to allow the client access to several repositories. '
-                                     'Unlike ``--restrict-to-path`` sub-directories are not accessible; '
-                                     'PATH needs to directly point at a repository location. '
-                                     'PATH may be an empty directory or the last element of PATH may not exist, in which case '
-                                     'the client may initialize a repository there.')
-        subparser.add_argument('--append-only', dest='append_only', action='store_true',
-                               help='only allow appending to repository segment files. Note that this only '
-                                    'affects the low level structure of the repository, and running `delete` '
-                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in Additional '
-                                    'Notes for more details.')
-        subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
-                               type=parse_storage_quota, default=None,
-                               help='Override storage quota of the repository (e.g. 5G, 1.5T). '
-                                    'When a new repository is initialized, sets the storage quota on the new '
-                                    'repository as well. Default: no quota.')
-
-        # borg umount
-        umount_epilog = process_epilog("""
-        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
-
-        This is a convenience wrapper that just calls the platform-specific shell
-        command - usually this is either umount or fusermount -u.
-        """)
-        subparser = subparsers.add_parser('umount', parents=[common_parser], add_help=False,
-                                          description=self.do_umount.__doc__,
-                                          epilog=umount_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='umount repository')
-        subparser.set_defaults(func=self.do_umount)
-        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
-                               help='mountpoint of the filesystem to umount')
-
         # borg prune
         prune_epilog = process_epilog("""
         The prune command prunes a repository by deleting all archives not matching
@@ -3948,6 +3881,73 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')
+
+        # borg rename
+        rename_epilog = process_epilog("""
+        This command renames an archive in the repository.
+
+        This results in a different archive ID.
+        """)
+        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
+                                          description=self.do_rename.__doc__,
+                                          epilog=rename_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='rename archive')
+        subparser.set_defaults(func=self.do_rename)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to rename')
+        subparser.add_argument('name', metavar='NEWNAME',
+                               type=archivename_validator(),
+                               help='the new archive name to use')
+
+        # borg serve
+        serve_epilog = process_epilog("""
+        This command starts a repository server process. This command is usually not used manually.
+        """)
+        subparser = subparsers.add_parser('serve', parents=[common_parser], add_help=False,
+                                          description=self.do_serve.__doc__, epilog=serve_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='start repository server process')
+        subparser.set_defaults(func=self.do_serve)
+        subparser.add_argument('--restrict-to-path', metavar='PATH', dest='restrict_to_paths', action='append',
+                               help='restrict repository access to PATH. '
+                                    'Can be specified multiple times to allow the client access to several directories. '
+                                    'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
+        subparser.add_argument('--restrict-to-repository', metavar='PATH', dest='restrict_to_repositories', action='append',
+                                help='restrict repository access. Only the repository located at PATH '
+                                     '(no sub-directories are considered) is accessible. '
+                                     'Can be specified multiple times to allow the client access to several repositories. '
+                                     'Unlike ``--restrict-to-path`` sub-directories are not accessible; '
+                                     'PATH needs to directly point at a repository location. '
+                                     'PATH may be an empty directory or the last element of PATH may not exist, in which case '
+                                     'the client may initialize a repository there.')
+        subparser.add_argument('--append-only', dest='append_only', action='store_true',
+                               help='only allow appending to repository segment files. Note that this only '
+                                    'affects the low level structure of the repository, and running `delete` '
+                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in Additional '
+                                    'Notes for more details.')
+        subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
+                               type=parse_storage_quota, default=None,
+                               help='Override storage quota of the repository (e.g. 5G, 1.5T). '
+                                    'When a new repository is initialized, sets the storage quota on the new '
+                                    'repository as well. Default: no quota.')
+
+        # borg umount
+        umount_epilog = process_epilog("""
+        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
+
+        This is a convenience wrapper that just calls the platform-specific shell
+        command - usually this is either umount or fusermount -u.
+        """)
+        subparser = subparsers.add_parser('umount', parents=[common_parser], add_help=False,
+                                          description=self.do_umount.__doc__,
+                                          epilog=umount_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='umount repository')
+        subparser.set_defaults(func=self.do_umount)
+        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+                               help='mountpoint of the filesystem to umount')
 
         # borg upgrade
         upgrade_epilog = process_epilog("""

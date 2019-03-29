@@ -2822,14 +2822,6 @@ class Archiver:
         subparser.add_argument('value', metavar='VALUE', nargs='?',
                                help='new value for key')
 
-        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
-                                          description='Extra help')
-        subparser.add_argument('--epilog-only', dest='epilog_only', action='store_true')
-        subparser.add_argument('--usage-only', dest='usage_only', action='store_true')
-        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
-        subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
-                               help='additional help on TOPIC')
-
         # borg create
         create_epilog = process_epilog("""
         This command creates a backup archive containing all files found while recursively
@@ -3404,6 +3396,15 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
+
+        # borg help
+        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
+                                          description='Extra help')
+        subparser.add_argument('--epilog-only', dest='epilog_only', action='store_true')
+        subparser.add_argument('--usage-only', dest='usage_only', action='store_true')
+        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
+        subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
+                               help='additional help on TOPIC')
 
         # borg info
         info_epilog = process_epilog("""

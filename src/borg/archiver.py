@@ -2602,6 +2602,7 @@ class Archiver:
         mid_common_parser.set_defaults(paths=[], patterns=[])
         parser.common_options.add_common_group(mid_common_parser, '_midcommand')
 
+        # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
         browsing an archive or restoring individual files. Unless the ``--foreground``
@@ -2671,6 +2672,7 @@ class Archiver:
         if parser.prog == 'borgfs':
             return parser
 
+        # borg serve
         serve_epilog = process_epilog("""
         This command starts a repository server process. This command is usually not used manually.
         """)
@@ -2702,6 +2704,7 @@ class Archiver:
                                     'When a new repository is initialized, sets the storage quota on the new '
                                     'repository as well. Default: no quota.')
 
+        # borg init
         init_epilog = process_epilog("""
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
@@ -2827,6 +2830,7 @@ class Archiver:
         subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
                                help='create the parent directories of the repository directory, if they are missing.')
 
+        # borg check
         check_epilog = process_epilog("""
         The check command verifies the consistency of a repository and the corresponding archives.
 
@@ -2899,6 +2903,7 @@ class Archiver:
                                    help='do only a partial repo check for max. SECONDS seconds (Default: unlimited)')
         define_archive_filters_group(subparser)
 
+        # borg key
         subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
                                           description="Manage a keyfile or repokey of a repository",
                                           epilog="",
@@ -3011,6 +3016,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 
+        # borg create
         create_epilog = process_epilog("""
         This command creates a backup archive containing all files found while recursively
         traversing all paths specified. Paths are added to the archive as they are given,
@@ -3213,6 +3219,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to archive')
 
+        # borg extract
         extract_epilog = process_epilog("""
         This command extracts the contents of an archive. By default the entire
         archive is extracted but a subset of files and directories can be selected
@@ -3258,6 +3265,7 @@ class Archiver:
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
 
+        # borg export-tar
         export_tar_epilog = process_epilog("""
         This command creates a tarball from an archive.
 
@@ -3312,6 +3320,7 @@ class Archiver:
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
 
+        # borg diff
         diff_epilog = process_epilog("""
             This command finds differences (file contents, user/group/mode) between archives.
 
@@ -3352,6 +3361,7 @@ class Archiver:
                                help='paths of items inside the archives to compare; patterns are supported')
         define_exclusion_group(subparser)
 
+        # borg rename
         rename_epilog = process_epilog("""
         This command renames an archive in the repository.
 
@@ -3370,6 +3380,7 @@ class Archiver:
                                type=archivename_validator(),
                                help='the new archive name to use')
 
+        # borg delete
         delete_epilog = process_epilog("""
         This command deletes an archive from the repository or the complete repository.
 
@@ -3420,6 +3431,7 @@ class Archiver:
                                help='archives to delete')
         define_archive_filters_group(subparser)
 
+        # borg list
         list_epilog = process_epilog("""
         This command lists the contents of a repository or an archive.
 
@@ -3470,6 +3482,7 @@ class Archiver:
         define_archive_filters_group(subparser)
         define_exclusion_group(subparser)
 
+        # borg umount
         umount_epilog = process_epilog("""
         This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
 
@@ -3485,6 +3498,7 @@ class Archiver:
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='mountpoint of the filesystem to umount')
 
+        # borg info
         info_epilog = process_epilog("""
         This command displays detailed information about the specified archive or repository.
 
@@ -3515,6 +3529,7 @@ class Archiver:
                                help='format output as JSON')
         define_archive_filters_group(subparser)
 
+        # borg break-lock
         break_lock_epilog = process_epilog("""
         This command breaks the repository and cache locks.
         Please use carefully and only while no borg process (on any machine) is
@@ -3530,6 +3545,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository for which to break the locks')
 
+        # borg prune
         prune_epilog = process_epilog("""
         The prune command prunes a repository by deleting all archives not matching
         any of the specified retention options.
@@ -3616,6 +3632,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to prune')
 
+        # borg upgrade
         upgrade_epilog = process_epilog("""
         Upgrade an existing, local Borg repository.
 
@@ -3719,6 +3736,7 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')
 
+        # borg recreate
         recreate_epilog = process_epilog("""
         Recreate the contents of existing archives.
 
@@ -3827,6 +3845,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
 
+        # borg with-lock
         with_lock_epilog = process_epilog("""
         This command runs a user-specified command while the repository lock is held.
 
@@ -3856,6 +3875,7 @@ class Archiver:
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
 
+        # borg compact
         compact_epilog = process_epilog("""
         This command frees repository space by compacting segments.
 
@@ -3881,6 +3901,7 @@ class Archiver:
         subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
                                help='cleanup commit-only 17-byte segment files')
 
+        # borg config
         config_epilog = process_epilog("""
         This command gets and sets options in a local repository or cache config file.
         For security reasons, this command only works on local repositories.
@@ -3927,6 +3948,7 @@ class Archiver:
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
 
+        # borg debug
         debug_epilog = process_epilog("""
         These commands are not intended for normal use and potentially very
         dangerous if used incorrectly.
@@ -4105,6 +4127,7 @@ class Archiver:
         subparser.add_argument('output', metavar='OUTPUT', type=argparse.FileType('wb'),
                                help='Output file')
 
+        # borg benchmark
         benchmark_epilog = process_epilog("These commands do various benchmarks.")
 
         subparser = subparsers.add_parser('benchmark', parents=[mid_common_parser], add_help=False,

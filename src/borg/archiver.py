@@ -3359,6 +3359,52 @@ class Archiver:
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
 
+        # borg extract
+        extract_epilog = process_epilog("""
+        This command extracts the contents of an archive. By default the entire
+        archive is extracted but a subset of files and directories can be selected
+        by passing a list of ``PATHs`` as arguments. The file selection can further
+        be restricted by using the ``--exclude`` option.
+
+        See the output of the "borg help patterns" command for more help on exclude patterns.
+
+        By using ``--dry-run``, you can do all extraction steps except actually writing the
+        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
+        decrypting, decompressing.
+
+        ``--progress`` can be slower than no progress display, since it makes one additional
+        pass over the archive metadata.
+
+        .. note::
+
+            Currently, extract always writes into the current working directory ("."),
+            so make sure you ``cd`` to the right place before calling ``borg extract``.
+        """)
+        subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
+                                          description=self.do_extract.__doc__,
+                                          epilog=extract_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='extract archive contents')
+        subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not actually change any files')
+        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+                               help='only obey numeric user and group identifiers')
+        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
+                               help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
+        subparser.add_argument('--stdout', dest='stdout', action='store_true',
+                               help='write all extracted data to stdout')
+        subparser.add_argument('--sparse', dest='sparse', action='store_true',
+                               help='create holes in output sparse file from all-zero chunks')
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to extract')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+        define_exclusion_group(subparser, strip_components=True)
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3698,52 +3744,6 @@ class Archiver:
         subparser.set_defaults(func=self.do_migrate_to_repokey)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
-
-        # borg extract
-        extract_epilog = process_epilog("""
-        This command extracts the contents of an archive. By default the entire
-        archive is extracted but a subset of files and directories can be selected
-        by passing a list of ``PATHs`` as arguments. The file selection can further
-        be restricted by using the ``--exclude`` option.
-
-        See the output of the "borg help patterns" command for more help on exclude patterns.
-
-        By using ``--dry-run``, you can do all extraction steps except actually writing the
-        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
-        decrypting, decompressing.
-
-        ``--progress`` can be slower than no progress display, since it makes one additional
-        pass over the archive metadata.
-
-        .. note::
-
-            Currently, extract always writes into the current working directory ("."),
-            so make sure you ``cd`` to the right place before calling ``borg extract``.
-        """)
-        subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
-                                          description=self.do_extract.__doc__,
-                                          epilog=extract_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='extract archive contents')
-        subparser.set_defaults(func=self.do_extract)
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not actually change any files')
-        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
-                               help='only obey numeric user and group identifiers')
-        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                               help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
-        subparser.add_argument('--stdout', dest='stdout', action='store_true',
-                               help='write all extracted data to stdout')
-        subparser.add_argument('--sparse', dest='sparse', action='store_true',
-                               help='create holes in output sparse file from all-zero chunks')
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to extract')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
-        define_exclusion_group(subparser, strip_components=True)
 
         # borg rename
         rename_epilog = process_epilog("""

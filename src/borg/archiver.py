@@ -3263,6 +3263,47 @@ class Archiver:
                                help='archives to delete')
         define_archive_filters_group(subparser)
 
+        # borg diff
+        diff_epilog = process_epilog("""
+            This command finds differences (file contents, user/group/mode) between archives.
+
+            A repository location and an archive name must be specified for REPO::ARCHIVE1.
+            ARCHIVE2 is just another archive name in same repository (no repository location
+            allowed).
+
+            For archives created with Borg 1.1 or newer diff automatically detects whether
+            the archives are created with the same chunker params. If so, only chunk IDs
+            are compared, which is very fast.
+
+            For archives prior to Borg 1.1 chunk contents are compared by default.
+            If you did not create the archives with different chunker params,
+            pass ``--same-chunker-params``.
+            Note that the chunker params changed from Borg 0.xx to 1.0.
+
+            See the output of the "borg help patterns" command for more help on exclude patterns.
+            """)
+        subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
+                                          description=self.do_diff.__doc__,
+                                          epilog=diff_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='find differences in archive contents')
+        subparser.set_defaults(func=self.do_diff)
+        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+                               help='only consider numeric user and group identifiers')
+        subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
+                               help='Override check of chunker parameters.')
+        subparser.add_argument('--sort', dest='sort', action='store_true',
+                               help='Sort the output lines by file path.')
+        subparser.add_argument('location', metavar='REPO::ARCHIVE1',
+                               type=location_validator(archive=True),
+                               help='repository location and ARCHIVE1 name')
+        subparser.add_argument('archive2', metavar='ARCHIVE2',
+                               type=archivename_validator(),
+                               help='ARCHIVE2 name (no repository location allowed)')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths of items inside the archives to compare; patterns are supported')
+        define_exclusion_group(subparser)
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3703,47 +3744,6 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
-
-        # borg diff
-        diff_epilog = process_epilog("""
-            This command finds differences (file contents, user/group/mode) between archives.
-
-            A repository location and an archive name must be specified for REPO::ARCHIVE1.
-            ARCHIVE2 is just another archive name in same repository (no repository location
-            allowed).
-
-            For archives created with Borg 1.1 or newer diff automatically detects whether
-            the archives are created with the same chunker params. If so, only chunk IDs
-            are compared, which is very fast.
-
-            For archives prior to Borg 1.1 chunk contents are compared by default.
-            If you did not create the archives with different chunker params,
-            pass ``--same-chunker-params``.
-            Note that the chunker params changed from Borg 0.xx to 1.0.
-
-            See the output of the "borg help patterns" command for more help on exclude patterns.
-            """)
-        subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
-                                          description=self.do_diff.__doc__,
-                                          epilog=diff_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='find differences in archive contents')
-        subparser.set_defaults(func=self.do_diff)
-        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
-                               help='only consider numeric user and group identifiers')
-        subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
-                               help='Override check of chunker parameters.')
-        subparser.add_argument('--sort', dest='sort', action='store_true',
-                               help='Sort the output lines by file path.')
-        subparser.add_argument('location', metavar='REPO::ARCHIVE1',
-                               type=location_validator(archive=True),
-                               help='repository location and ARCHIVE1 name')
-        subparser.add_argument('archive2', metavar='ARCHIVE2',
-                               type=archivename_validator(),
-                               help='ARCHIVE2 name (no repository location allowed)')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths of items inside the archives to compare; patterns are supported')
-        define_exclusion_group(subparser)
 
         # borg rename
         rename_epilog = process_epilog("""

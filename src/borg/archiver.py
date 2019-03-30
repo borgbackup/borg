@@ -2602,231 +2602,89 @@ class Archiver:
         mid_common_parser.set_defaults(paths=[], patterns=[])
         parser.common_options.add_common_group(mid_common_parser, '_midcommand')
 
-        mount_epilog = process_epilog("""
-        This command mounts an archive as a FUSE filesystem. This can be useful for
-        browsing an archive or restoring individual files. Unless the ``--foreground``
-        option is given the command will run in the background until the filesystem
-        is ``umounted``.
+        subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
-        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
-        used in fstab entries:
-        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
+        # borg benchmark
+        benchmark_epilog = process_epilog("These commands do various benchmarks.")
 
-        To allow a regular user to use fstab entries, add the ``user`` option:
-        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
-
-        For FUSE configuration and mount options, see the mount.fuse(8) manual page.
-
-        Additional mount options supported by borg:
-
-        - versions: when used with a repository mount, this gives a merged, versioned
-          view of the files in the archives. EXPERIMENTAL, layout may change in future.
-        - allow_damaged_files: by default damaged files (where missing chunks were
-          replaced with runs of zeros by borg check ``--repair``) are not readable and
-          return EIO (I/O error). Set this option to read such files.
-        - ignore_permissions: for security reasons the "default_permissions" mount
-          option is internally enforced by borg. "ignore_permissions" can be given to
-          not enforce "default_permissions".
-
-        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
-        to tweak the performance. It sets the number of cached data chunks; additional
-        memory usage can be up to ~8 MiB times this number. The default is the number
-        of CPU cores.
-
-        When the daemonized process receives a signal or crashes, it does not unmount.
-        Unmounting in these cases could cause an active rsync or similar process
-        to unintentionally delete data.
-
-        When running in the foreground ^C/SIGINT unmounts cleanly, but other
-        signals or crashes do not.
-        """)
-
-        if parser.prog == 'borgfs':
-            parser.description = self.do_mount.__doc__
-            parser.epilog = mount_epilog
-            parser.formatter_class = argparse.RawDescriptionHelpFormatter
-            parser.help = 'mount repository'
-            subparser = parser
-        else:
-            subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
-            subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
-                                            description=self.do_mount.__doc__,
-                                            epilog=mount_epilog,
-                                            formatter_class=argparse.RawDescriptionHelpFormatter,
-                                            help='mount repository')
-        subparser.set_defaults(func=self.do_mount)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
-                            help='repository/archive to mount')
-        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
-                            help='where to mount filesystem')
-        subparser.add_argument('-f', '--foreground', dest='foreground',
-                            action='store_true',
-                            help='stay in foreground, do not daemonize')
-        subparser.add_argument('-o', dest='options', type=str,
-                            help='Extra mount options')
-        define_archive_filters_group(subparser)
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
-        define_exclusion_group(subparser, strip_components=True)
-        if parser.prog == 'borgfs':
-            return parser
-
-        serve_epilog = process_epilog("""
-        This command starts a repository server process. This command is usually not used manually.
-        """)
-        subparser = subparsers.add_parser('serve', parents=[common_parser], add_help=False,
-                                          description=self.do_serve.__doc__, epilog=serve_epilog,
+        subparser = subparsers.add_parser('benchmark', parents=[mid_common_parser], add_help=False,
+                                          description='benchmark command',
+                                          epilog=benchmark_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='start repository server process')
-        subparser.set_defaults(func=self.do_serve)
-        subparser.add_argument('--restrict-to-path', metavar='PATH', dest='restrict_to_paths', action='append',
-                               help='restrict repository access to PATH. '
-                                    'Can be specified multiple times to allow the client access to several directories. '
-                                    'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
-        subparser.add_argument('--restrict-to-repository', metavar='PATH', dest='restrict_to_repositories', action='append',
-                                help='restrict repository access. Only the repository located at PATH '
-                                     '(no sub-directories are considered) is accessible. '
-                                     'Can be specified multiple times to allow the client access to several repositories. '
-                                     'Unlike ``--restrict-to-path`` sub-directories are not accessible; '
-                                     'PATH needs to directly point at a repository location. '
-                                     'PATH may be an empty directory or the last element of PATH may not exist, in which case '
-                                     'the client may initialize a repository there.')
-        subparser.add_argument('--append-only', dest='append_only', action='store_true',
-                               help='only allow appending to repository segment files. Note that this only '
-                                    'affects the low level structure of the repository, and running `delete` '
-                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in Additional '
-                                    'Notes for more details.')
-        subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
-                               type=parse_storage_quota, default=None,
-                               help='Override storage quota of the repository (e.g. 5G, 1.5T). '
-                                    'When a new repository is initialized, sets the storage quota on the new '
-                                    'repository as well. Default: no quota.')
+                                          help='benchmark command')
 
-        init_epilog = process_epilog("""
-        This command initializes an empty repository. A repository is a filesystem
-        directory containing the deduplicated data from zero or more archives.
+        benchmark_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
 
-        Encryption can be enabled at repository init time. It cannot be changed later.
+        bench_crud_epilog = process_epilog("""
+        This command benchmarks borg CRUD (create, read, update, delete) operations.
 
-        It is not recommended to work without encryption. Repository encryption protects
-        you e.g. against the case that an attacker has access to your backup repository.
+        It creates input data below the given PATH and backups this data into the given REPO.
+        The REPO must already exist (it could be a fresh empty repo or an existing repo, the
+        command will create / read / update / delete some archives named borg-benchmark-crud\\* there.
 
-        But be careful with the key / the passphrase:
+        Make sure you have free space there, you'll need about 1GB each (+ overhead).
 
-        If you want "passphrase-only" security, use one of the repokey modes. The
-        key will be stored inside the repository (in its "config" file). In above
-        mentioned attack scenario, the attacker will have the key (but not the
-        passphrase).
+        If your repository is encrypted and borg needs a passphrase to unlock the key, use:
 
-        If you want "passphrase and having-the-key" security, use one of the keyfile
-        modes. The key will be stored in your home directory (in .config/borg/keys).
-        In the attack scenario, the attacker who has just access to your repo won't
-        have the key (and also not the passphrase).
+        BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
 
-        Make a backup copy of the key file (keyfile mode) or repo config file
-        (repokey mode) and keep it at a safe place, so you still have the key in
-        case it gets corrupted or lost. Also keep the passphrase at a safe place.
-        The backup that is encrypted with that key won't help you with that, of course.
+        Measurements are done with different input file sizes and counts.
+        The file contents are very artificial (either all zero or all random),
+        thus the measurement results do not necessarily reflect performance with real data.
+        Also, due to the kind of content used, no compression is used in these benchmarks.
 
-        Make sure you use a good passphrase. Not too short, not too simple. The real
-        encryption / decryption key is encrypted with / locked by your passphrase.
-        If an attacker gets your key, he can't unlock and use it without knowing the
-        passphrase.
+        C- == borg create (1st archive creation, no compression, do not use files cache)
+              C-Z- == all-zero files. full dedup, this is primarily measuring reader/chunker/hasher.
+              C-R- == random files. no dedup, measuring throughput through all processing stages.
 
-        Be careful with special or non-ascii characters in your passphrase:
+        R- == borg extract (extract archive, dry-run, do everything, but do not write files to disk)
+              R-Z- == all zero files. Measuring heavily duplicated files.
+              R-R- == random files. No duplication here, measuring throughput through all processing
+              stages, except writing to disk.
 
-        - Borg processes the passphrase as unicode (and encodes it as utf-8),
-          so it does not have problems dealing with even the strangest characters.
-        - BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
+        U- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
+              The throughput value is kind of virtual here, it does not actually read the file.
+              U-Z- == needs to check the 2 all-zero chunks' existence in the repo.
+              U-R- == needs to check existence of a lot of different chunks in the repo.
 
-        So better use a long passphrase made from simple ascii chars than one that
-        includes non-ascii stuff or characters that are hard/impossible to enter on
-        a different keyboard layout.
+        D- == borg delete archive (delete last remaining archive, measure deletion + compaction)
+              D-Z- == few chunks to delete / few segments to compact/remove.
+              D-R- == many chunks to delete / many segments to compact/remove.
 
-        You can change your passphrase for existing repos at any time, it won't affect
-        the encryption/decryption key or other secrets.
-
-        Encryption modes
-        ++++++++++++++++
-
-        .. nanorst: inline-fill
-
-        +----------+---------------+------------------------+--------------------------+
-        | Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
-        |          | no auth       | but authenticated      | and authenticated        |
-        +----------+---------------+------------------------+--------------------------+
-        | SHA-256  | none          | `authenticated`        | repokey                  |
-        |          |               |                        | keyfile                  |
-        +----------+---------------+------------------------+--------------------------+
-        | BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`         |
-        |          |               |                        | `keyfile-blake2`         |
-        +----------+---------------+------------------------+--------------------------+
-
-        .. nanorst: inline-replace
-
-        `Marked modes` are new in Borg 1.1 and are not backwards-compatible with Borg 1.0.x.
-
-        On modern Intel/AMD CPUs (except very cheap ones), AES is usually
-        hardware-accelerated.
-        BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs
-        (except AMD Ryzen and future CPUs with SHA extensions),
-        which makes `authenticated-blake2` faster than `none` and `authenticated`.
-
-        On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
-        than BLAKE2b-256 there. NEON accelerates AES as well.
-
-        Hardware acceleration is always used automatically when available.
-
-        `repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
-        authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
-        is HMAC-SHA256 as well (with a separate key).
-        These modes are compatible with Borg 1.0.x.
-
-        `repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
-        but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
-        hash is a keyed BLAKE2b-256 hash.
-        These modes are new and *not* compatible with Borg 1.0.x.
-
-        `authenticated` mode uses no encryption, but authenticates repository contents
-        through the same HMAC-SHA256 hash as the `repokey` and `keyfile` modes (it uses it
-        as the chunk ID hash). The key is stored like `repokey`.
-        This mode is new and *not* compatible with Borg 1.0.x.
-
-        `authenticated-blake2` is like `authenticated`, but uses the keyed BLAKE2b-256 hash
-        from the other blake2 modes.
-        This mode is new and *not* compatible with Borg 1.0.x.
-
-        `none` mode uses no encryption and no authentication. It uses SHA256 as chunk
-        ID hash. Not recommended, rather consider using an authenticated or
-        authenticated/encrypted mode. This mode has possible denial-of-service issues
-        when running ``borg create`` on contents controlled by an attacker.
-        Use it only for new repositories where no encryption is wanted **and** when compatibility
-        with 1.0.x is important. If compatibility with 1.0.x is not important, use
-        `authenticated-blake2` or `authenticated` instead.
-        This mode is compatible with Borg 1.0.x.
+        Please note that there might be quite some variance in these measurements.
+        Try multiple measurements and having a otherwise idle machine (and network, if you use it).
         """)
-        subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
-                                          description=self.do_init.__doc__, epilog=init_epilog,
+        subparser = benchmark_parsers.add_parser('crud', parents=[common_parser], add_help=False,
+                                                 description=self.do_benchmark_crud.__doc__,
+                                                 epilog=bench_crud_epilog,
+                                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                                 help='benchmarks borg CRUD (create, extract, update, delete).')
+        subparser.set_defaults(func=self.do_benchmark_crud)
+
+        subparser.add_argument('location', metavar='REPO',
+                               type=location_validator(archive=False),
+                               help='repo to use for benchmark (must exist)')
+
+        subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
+
+        # borg break-lock
+        break_lock_epilog = process_epilog("""
+        This command breaks the repository and cache locks.
+        Please use carefully and only while no borg process (on any machine) is
+        trying to access the Cache or the Repository.
+        """)
+        subparser = subparsers.add_parser('break-lock', parents=[common_parser], add_help=False,
+                                          description=self.do_break_lock.__doc__,
+                                          epilog=break_lock_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='initialize empty repository')
-        subparser.set_defaults(func=self.do_init)
+                                          help='break repository and cache locks')
+        subparser.set_defaults(func=self.do_break_lock)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
-                               help='repository to create')
-        subparser.add_argument('-e', '--encryption', metavar='MODE', dest='encryption', required=True,
-                               choices=key_argument_names(),
-                               help='select encryption key mode **(required)**')
-        subparser.add_argument('--append-only', dest='append_only', action='store_true',
-                               help='create an append-only mode repository. Note that this only affects '
-                                    'the low level structure of the repository, and running `delete` '
-                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in '
-                                    'Additional Notes for more details.')
-        subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota', default=None,
-                               type=parse_storage_quota,
-                               help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
-        subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
-                               help='create the parent directories of the repository directory, if they are missing.')
+                               help='repository for which to break the locks')
 
+        # borg check
         check_epilog = process_epilog("""
         The check command verifies the consistency of a repository and the corresponding archives.
 
@@ -2899,118 +2757,72 @@ class Archiver:
                                    help='do only a partial repo check for max. SECONDS seconds (Default: unlimited)')
         define_archive_filters_group(subparser)
 
-        subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
-                                          description="Manage a keyfile or repokey of a repository",
-                                          epilog="",
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='manage repository key')
+        # borg compact
+        compact_epilog = process_epilog("""
+        This command frees repository space by compacting segments.
 
-        key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
-        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
+        Use this regularly to avoid running out of space - you do not need to use this
+        after each borg command though.
 
-        key_export_epilog = process_epilog("""
-        If repository encryption is used, the repository is inaccessible
-        without the key. This command allows one to backup this essential key.
-        Note that the backup produced does not include the passphrase itself
-        (i.e. the exported key stays encrypted). In order to regain access to a
-        repository, one needs both the exported key and the original passphrase.
+        borg compact does not need a key, so it is possible to invoke it from the
+        client or also from the server.
 
-        There are three backup formats. The normal backup format is suitable for
-        digital storage as a file. The ``--paper`` backup format is optimized
-        for printing and typing in while importing, with per line checks to
-        reduce problems with manual input. The ``--qr-html`` creates a printable
-        HTML template with a QR code and a copy of the ``--paper``-formatted key.
+        Depending on the amount of segments that need compaction, it may take a while.
 
-        For repositories using keyfile encryption the key is saved locally
-        on the system that is capable of doing backups. To guard against loss
-        of this key, the key needs to be backed up independently of the main
-        data backup.
-
-        For repositories using the repokey encryption the key is saved in the
-        repository in the config file. A backup is thus not strictly needed,
-        but guards against the repository becoming inaccessible if the file
-        is damaged for some reason.
+        See :ref:`separate_compaction` in Additional Notes for more details.
         """)
-        subparser = key_parsers.add_parser('export', parents=[common_parser], add_help=False,
-                                          description=self.do_key_export.__doc__,
-                                          epilog=key_export_epilog,
+        subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
+                                          description=self.do_compact.__doc__,
+                                          epilog=compact_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='export repository key for backup')
-        subparser.set_defaults(func=self.do_key_export)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
-        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
-                               help='where to store the backup')
-        subparser.add_argument('--paper', dest='paper', action='store_true',
-                               help='Create an export suitable for printing and later type-in')
-        subparser.add_argument('--qr-html', dest='qr', action='store_true',
-                               help='Create an html file suitable for printing and later type-in or qr scan')
+                                          help='compact segment files / free space in repo')
+        subparser.set_defaults(func=self.do_compact)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to compact')
+        subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
+                               help='cleanup commit-only 17-byte segment files')
 
-        key_import_epilog = process_epilog("""
-        This command restores a key previously backed up with the export command.
+        # borg config
+        config_epilog = process_epilog("""
+        This command gets and sets options in a local repository or cache config file.
+        For security reasons, this command only works on local repositories.
 
-        If the ``--paper`` option is given, the import will be an interactive
-        process in which each line is checked for plausibility before
-        proceeding to the next line. For this format PATH must not be given.
+        To delete a config value entirely, use ``--delete``. To list the values
+        of the configuration file or the default values, use ``--list``.  To get and existing
+        key, pass only the key name. To set a key, pass both the key name and
+        the new value. Keys can be specified in the format "section.name" or
+        simply "name"; the section will default to "repository" and "cache" for
+        the repo and cache configs, respectively.
+
+
+        By default, borg config manipulates the repository config file. Using ``--cache``
+        edits the repository cache's config file instead.
         """)
-        subparser = key_parsers.add_parser('import', parents=[common_parser], add_help=False,
-                                          description=self.do_key_import.__doc__,
-                                          epilog=key_import_epilog,
+        subparser = subparsers.add_parser('config', parents=[common_parser], add_help=False,
+                                          description=self.do_config.__doc__,
+                                          epilog=config_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='import repository key from backup')
-        subparser.set_defaults(func=self.do_key_import)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
-        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
-                               help='path to the backup (\'-\' to read from stdin)')
-        subparser.add_argument('--paper', dest='paper', action='store_true',
-                               help='interactively import from a backup done with ``--paper``')
+                                          help='get and set configuration values')
+        subparser.set_defaults(func=self.do_config)
+        subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
+                               help='get and set values from the repo cache')
 
-        change_passphrase_epilog = process_epilog("""
-        The key files used for repository encryption are optionally passphrase
-        protected. This command can be used to change this passphrase.
+        group = subparser.add_mutually_exclusive_group()
+        group.add_argument('-d', '--delete', dest='delete', action='store_true',
+                               help='delete the key from the config file')
+        group.add_argument('-l', '--list', dest='list', action='store_true',
+                               help='list the configuration of the repo')
 
-        Please note that this command only changes the passphrase, but not any
-        secret protected by it (like e.g. encryption/MAC keys or chunker seed).
-        Thus, changing the passphrase after passphrase and borg key got compromised
-        does not protect future (nor past) backups to the same repository.
-        """)
-        subparser = key_parsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
-                                          description=self.do_change_passphrase.__doc__,
-                                          epilog=change_passphrase_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='change repository passphrase')
-        subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False, proto='file'),
+                               help='repository to configure')
+        subparser.add_argument('name', metavar='NAME', nargs='?',
+                               help='name of config key')
+        subparser.add_argument('value', metavar='VALUE', nargs='?',
+                               help='new value for key')
 
-        migrate_to_repokey_epilog = process_epilog("""
-        This command migrates a repository from passphrase mode (removed in Borg 1.0)
-        to repokey mode.
-
-        You will be first asked for the repository passphrase (to open it in passphrase
-        mode). This is the same passphrase as you used to use for this repo before 1.0.
-
-        It will then derive the different secrets from this passphrase.
-
-        Then you will be asked for a new passphrase (twice, for safety). This
-        passphrase will be used to protect the repokey (which contains these same
-        secrets in encrypted form). You may use the same passphrase as you used to
-        use, but you may also use a different one.
-
-        After migrating to repokey mode, you can change the passphrase at any time.
-        But please note: the secrets will always stay the same and they could always
-        be derived from your (old) passphrase-mode passphrase.
-        """)
-        subparser = key_parsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
-                                          description=self.do_migrate_to_repokey.__doc__,
-                                          epilog=migrate_to_repokey_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='migrate passphrase-mode repository to repokey')
-        subparser.set_defaults(func=self.do_migrate_to_repokey)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
-
+        # borg create
         create_epilog = process_epilog("""
         This command creates a backup archive containing all files found while recursively
         traversing all paths specified. Paths are added to the archive as they are given,
@@ -3213,720 +3025,7 @@ class Archiver:
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to archive')
 
-        extract_epilog = process_epilog("""
-        This command extracts the contents of an archive. By default the entire
-        archive is extracted but a subset of files and directories can be selected
-        by passing a list of ``PATHs`` as arguments. The file selection can further
-        be restricted by using the ``--exclude`` option.
-
-        See the output of the "borg help patterns" command for more help on exclude patterns.
-
-        By using ``--dry-run``, you can do all extraction steps except actually writing the
-        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
-        decrypting, decompressing.
-
-        ``--progress`` can be slower than no progress display, since it makes one additional
-        pass over the archive metadata.
-
-        .. note::
-
-            Currently, extract always writes into the current working directory ("."),
-            so make sure you ``cd`` to the right place before calling ``borg extract``.
-        """)
-        subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
-                                          description=self.do_extract.__doc__,
-                                          epilog=extract_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='extract archive contents')
-        subparser.set_defaults(func=self.do_extract)
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not actually change any files')
-        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
-                               help='only obey numeric user and group identifiers')
-        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                               help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
-        subparser.add_argument('--stdout', dest='stdout', action='store_true',
-                               help='write all extracted data to stdout')
-        subparser.add_argument('--sparse', dest='sparse', action='store_true',
-                               help='create holes in output sparse file from all-zero chunks')
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to extract')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
-        define_exclusion_group(subparser, strip_components=True)
-
-        export_tar_epilog = process_epilog("""
-        This command creates a tarball from an archive.
-
-        When giving '-' as the output FILE, Borg will write a tar stream to standard output.
-
-        By default (``--tar-filter=auto``) Borg will detect whether the FILE should be compressed
-        based on its file extension and pipe the tarball through an appropriate filter
-        before writing it to FILE:
-
-        - .tar.gz: gzip
-        - .tar.bz2: bzip2
-        - .tar.xz: xz
-
-        Alternatively a ``--tar-filter`` program may be explicitly specified. It should
-        read the uncompressed tar stream from stdin and write a compressed/filtered
-        tar stream to stdout.
-
-        The generated tarball uses the GNU tar format.
-
-        export-tar is a lossy conversion:
-        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-        otherwise supported by Borg.
-
-        A ``--sparse`` option (as found in borg extract) is not supported.
-
-        By default the entire archive is extracted but a subset of files and directories
-        can be selected by passing a list of ``PATHs`` as arguments.
-        The file selection can further be restricted by using the ``--exclude`` option.
-
-        See the output of the "borg help patterns" command for more help on exclude patterns.
-
-        ``--progress`` can be slower than no progress display, since it makes one additional
-        pass over the archive metadata.
-        """)
-        subparser = subparsers.add_parser('export-tar', parents=[common_parser], add_help=False,
-                                          description=self.do_export_tar.__doc__,
-                                          epilog=export_tar_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='create tarball from archive')
-        subparser.set_defaults(func=self.do_export_tar)
-        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
-                               help='filter program to pipe data through')
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to export')
-        subparser.add_argument('tarfile', metavar='FILE',
-                               help='output tar file. "-" to write to stdout instead.')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
-        define_exclusion_group(subparser, strip_components=True)
-
-        diff_epilog = process_epilog("""
-            This command finds differences (file contents, user/group/mode) between archives.
-
-            A repository location and an archive name must be specified for REPO::ARCHIVE1.
-            ARCHIVE2 is just another archive name in same repository (no repository location
-            allowed).
-
-            For archives created with Borg 1.1 or newer diff automatically detects whether
-            the archives are created with the same chunker params. If so, only chunk IDs
-            are compared, which is very fast.
-
-            For archives prior to Borg 1.1 chunk contents are compared by default.
-            If you did not create the archives with different chunker params,
-            pass ``--same-chunker-params``.
-            Note that the chunker params changed from Borg 0.xx to 1.0.
-
-            See the output of the "borg help patterns" command for more help on exclude patterns.
-            """)
-        subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
-                                          description=self.do_diff.__doc__,
-                                          epilog=diff_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='find differences in archive contents')
-        subparser.set_defaults(func=self.do_diff)
-        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
-                               help='only consider numeric user and group identifiers')
-        subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
-                               help='Override check of chunker parameters.')
-        subparser.add_argument('--sort', dest='sort', action='store_true',
-                               help='Sort the output lines by file path.')
-        subparser.add_argument('location', metavar='REPO::ARCHIVE1',
-                               type=location_validator(archive=True),
-                               help='repository location and ARCHIVE1 name')
-        subparser.add_argument('archive2', metavar='ARCHIVE2',
-                               type=archivename_validator(),
-                               help='ARCHIVE2 name (no repository location allowed)')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths of items inside the archives to compare; patterns are supported')
-        define_exclusion_group(subparser)
-
-        rename_epilog = process_epilog("""
-        This command renames an archive in the repository.
-
-        This results in a different archive ID.
-        """)
-        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
-                                          description=self.do_rename.__doc__,
-                                          epilog=rename_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='rename archive')
-        subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='archive to rename')
-        subparser.add_argument('name', metavar='NEWNAME',
-                               type=archivename_validator(),
-                               help='the new archive name to use')
-
-        delete_epilog = process_epilog("""
-        This command deletes an archive from the repository or the complete repository.
-
-        Important: When deleting archives, repository disk space is **not** freed until
-        you run ``borg compact``.
-
-        If you delete the complete repository, the local cache for it (if any) is
-        also deleted. Alternatively, you can delete just the local cache with the
-        ``--cache-only`` option.
-
-        When using ``--stats``, you will get some statistics about how much data was
-        deleted - the "Deleted data" deduplicated size there is most interesting as
-        that is how much your repository will shrink.
-        Please note that the "All archives" stats refer to the state after deletion.
-
-        You can delete multiple archives by specifying their common prefix, if they
-        have one, using the ``--prefix PREFIX`` option. You can also specify a shell
-        pattern to match multiple archives using the ``--glob-archives GLOB`` option
-        (for more info on these patterns, see ``borg help patterns``). Note that these
-        two options are mutually exclusive.
-
-        To avoid accidentally deleting archives, especially when using glob patterns,
-        it might be helpful to use the ``--dry-run`` to test out the command without
-        actually making any changes to the repository.
-        """)
-        subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
-                                          description=self.do_delete.__doc__,
-                                          epilog=delete_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='delete archive')
-        subparser.set_defaults(func=self.do_delete)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change repository')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
-                               help='print statistics for the deleted archive')
-        subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
-                               help='delete only the local cache for the given repository')
-        subparser.add_argument('--force', dest='forced',
-                               action='count', default=0,
-                               help='force deletion of corrupted archives, '
-                                    'use ``--force --force`` in case ``--force`` does not work.')
-        subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               help='work slower, but using less space')
-        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
-                               type=location_validator(),
-                               help='archive or repository to delete')
-        subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
-                               help='archives to delete')
-        define_archive_filters_group(subparser)
-
-        list_epilog = process_epilog("""
-        This command lists the contents of a repository or an archive.
-
-        See the "borg help patterns" command for more help on exclude patterns.
-
-        .. man NOTES
-
-        The following keys are available for ``--format``:
-
-
-        """) + BaseFormatter.keys_help() + textwrap.dedent("""
-
-        Keys for listing repository archives:
-
-        """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
-
-        Keys for listing archive files:
-
-        """) + ItemFormatter.keys_help()
-        subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
-                                          description=self.do_list.__doc__,
-                                          epilog=list_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='list archive or repository contents')
-        subparser.set_defaults(func=self.do_list)
-        subparser.add_argument('--short', dest='short', action='store_true',
-                               help='only print file/directory names, nothing else')
-        subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',
-                               help='specify format for file listing '
-                                    '(default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")')
-        subparser.add_argument('--json', action='store_true',
-                               help='Only valid for listing repository contents. Format output as JSON. '
-                                    'The form of ``--format`` is ignored, '
-                                    'but keys used in it are added to the JSON output. '
-                                    'Some keys are always present. Note: JSON can only represent text. '
-                                    'A "barchive" key is therefore not available.')
-        subparser.add_argument('--json-lines', action='store_true',
-                               help='Only valid for listing archive contents. Format output as JSON Lines. '
-                                    'The form of ``--format`` is ignored, '
-                                    'but keys used in it are added to the JSON output. '
-                                    'Some keys are always present. Note: JSON can only represent text. '
-                                    'A "bpath" key is therefore not available.')
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
-                               type=location_validator(),
-                               help='repository/archive to list contents of')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to list; patterns are supported')
-        define_archive_filters_group(subparser)
-        define_exclusion_group(subparser)
-
-        umount_epilog = process_epilog("""
-        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
-
-        This is a convenience wrapper that just calls the platform-specific shell
-        command - usually this is either umount or fusermount -u.
-        """)
-        subparser = subparsers.add_parser('umount', parents=[common_parser], add_help=False,
-                                          description=self.do_umount.__doc__,
-                                          epilog=umount_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='umount repository')
-        subparser.set_defaults(func=self.do_umount)
-        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
-                               help='mountpoint of the filesystem to umount')
-
-        info_epilog = process_epilog("""
-        This command displays detailed information about the specified archive or repository.
-
-        Please note that the deduplicated sizes of the individual archives do not add
-        up to the deduplicated size of the repository ("all archives"), because the two
-        are meaning different things:
-
-        This archive / deduplicated size = amount of data stored ONLY for this archive
-        = unique chunks of this archive.
-        All archives / deduplicated size = amount of data stored in the repo
-        = all chunks in the repository.
-
-        Borg archives can only contain a limited amount of file metadata.
-        The size of an archive relative to this limit depends on a number of factors,
-        mainly the number of files, the lengths of paths and other metadata stored for files.
-        This is shown as *utilization of maximum supported archive size*.
-        """)
-        subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
-                                          description=self.do_info.__doc__,
-                                          epilog=info_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='show repository or archive information')
-        subparser.set_defaults(func=self.do_info)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
-                               type=location_validator(),
-                               help='archive or repository to display information about')
-        subparser.add_argument('--json', action='store_true',
-                               help='format output as JSON')
-        define_archive_filters_group(subparser)
-
-        break_lock_epilog = process_epilog("""
-        This command breaks the repository and cache locks.
-        Please use carefully and only while no borg process (on any machine) is
-        trying to access the Cache or the Repository.
-        """)
-        subparser = subparsers.add_parser('break-lock', parents=[common_parser], add_help=False,
-                                          description=self.do_break_lock.__doc__,
-                                          epilog=break_lock_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='break repository and cache locks')
-        subparser.set_defaults(func=self.do_break_lock)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository for which to break the locks')
-
-        prune_epilog = process_epilog("""
-        The prune command prunes a repository by deleting all archives not matching
-        any of the specified retention options.
-
-        Important: Repository disk space is **not** freed until you run ``borg compact``.
-
-        This command is normally used by automated backup scripts wanting to keep a
-        certain number of historic backups.
-
-        Also, prune automatically removes checkpoint archives (incomplete archives left
-        behind by interrupted backup runs) except if the checkpoint is the latest
-        archive (and thus still needed). Checkpoint archives are not considered when
-        comparing archive counts against the retention limits (``--keep-X``).
-
-        If a prefix is set with -P, then only archives that start with the prefix are
-        considered for deletion and only those archives count towards the totals
-        specified by the rules.
-        Otherwise, *all* archives in the repository are candidates for deletion!
-        There is no automatic distinction between archives representing different
-        contents. These need to be distinguished by specifying matching prefixes.
-
-        If you have multiple sequences of archives with different data sets (e.g.
-        from different machines) in one shared repository, use one prune call per
-        data set that matches only the respective archives using the -P option.
-
-        The ``--keep-within`` option takes an argument of the form "<int><char>",
-        where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
-        to keep all archives that were created within the past 48 hours.
-        "1m" is taken to mean "31d". The archives kept with this option do not
-        count towards the totals specified by any other options.
-
-        A good procedure is to thin out more and more the older your backups get.
-        As an example, ``--keep-daily 7`` means to keep the latest backup on each day,
-        up to 7 most recent days with backups (days without backups do not count).
-        The rules are applied from secondly to yearly, and backups selected by previous
-        rules do not count towards those of later rules. The time that each backup
-        starts is used for pruning purposes. Dates and times are interpreted in
-        the local timezone, and weeks go from Monday to Sunday. Specifying a
-        negative number of archives to keep means that there is no limit.
-
-        The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
-        keep the last N archives under the assumption that you do not create more than one
-        backup archive in the same second).
-
-        When using ``--stats``, you will get some statistics about how much data was
-        deleted - the "Deleted data" deduplicated size there is most interesting as
-        that is how much your repository will shrink.
-        Please note that the "All archives" stats refer to the state after pruning.
-        """)
-        subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
-                                          description=self.do_prune.__doc__,
-                                          epilog=prune_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='prune archives')
-        subparser.set_defaults(func=self.do_prune)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change repository')
-        subparser.add_argument('--force', dest='forced', action='store_true',
-                               help='force pruning of corrupted archives')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
-                               help='print statistics for the deleted archive')
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of archives it keeps/prunes')
-        subparser.add_argument('--keep-within', metavar='INTERVAL', dest='within', type=interval,
-                               help='keep all archives within this time interval')
-        subparser.add_argument('--keep-last', '--keep-secondly', dest='secondly', type=int, default=0,
-                               help='number of secondly archives to keep')
-        subparser.add_argument('--keep-minutely', dest='minutely', type=int, default=0,
-                               help='number of minutely archives to keep')
-        subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,
-                               help='number of hourly archives to keep')
-        subparser.add_argument('-d', '--keep-daily', dest='daily', type=int, default=0,
-                               help='number of daily archives to keep')
-        subparser.add_argument('-w', '--keep-weekly', dest='weekly', type=int, default=0,
-                               help='number of weekly archives to keep')
-        subparser.add_argument('-m', '--keep-monthly', dest='monthly', type=int, default=0,
-                               help='number of monthly archives to keep')
-        subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
-                               help='number of yearly archives to keep')
-        define_archive_filters_group(subparser, sort_by=False, first_last=False)
-        subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               help='work slower, but using less space')
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='repository to prune')
-
-        upgrade_epilog = process_epilog("""
-        Upgrade an existing, local Borg repository.
-
-        When you do not need borg upgrade
-        +++++++++++++++++++++++++++++++++
-
-        Not every change requires that you run ``borg upgrade``.
-
-        You do **not** need to run it when:
-
-        - moving your repository to a different place
-        - upgrading to another point release (like 1.0.x to 1.0.y),
-          except when noted otherwise in the changelog
-        - upgrading from 1.0.x to 1.1.x,
-          except when noted otherwise in the changelog
-
-        Borg 1.x.y upgrades
-        +++++++++++++++++++
-
-        Use ``borg upgrade --tam REPO`` to require manifest authentication
-        introduced with Borg 1.0.9 to address security issues. This means
-        that modifying the repository after doing this with a version prior
-        to 1.0.9 will raise a validation error, so only perform this upgrade
-        after updating all clients using the repository to 1.0.9 or newer.
-
-        This upgrade should be done on each client for safety reasons.
-
-        If a repository is accidentally modified with a pre-1.0.9 client after
-        this upgrade, use ``borg upgrade --tam --force REPO`` to remedy it.
-
-        If you routinely do this you might not want to enable this upgrade
-        (which will leave you exposed to the security issue). You can
-        reverse the upgrade by issuing ``borg upgrade --disable-tam REPO``.
-
-        See
-        https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability
-        for details.
-
-        Attic and Borg 0.xx to Borg 1.x
-        +++++++++++++++++++++++++++++++
-
-        This currently supports converting an Attic repository to Borg and also
-        helps with converting Borg 0.xx to 1.0.
-
-        Currently, only LOCAL repositories can be upgraded (issue #465).
-
-        Please note that ``borg create`` (since 1.0.0) uses bigger chunks by
-        default than old borg or attic did, so the new chunks won't deduplicate
-        with the old chunks in the upgraded repository.
-        See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.
-
-        ``borg upgrade`` will change the magic strings in the repository's
-        segments to match the new Borg magic strings. The keyfiles found in
-        $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
-        copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
-
-        The cache files are converted, from $ATTIC_CACHE_DIR or
-        ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
-        cache layout between Borg and Attic changed, so it is possible
-        the first backup after the conversion takes longer than expected
-        due to the cache resync.
-
-        Upgrade should be able to resume if interrupted, although it
-        will still iterate over all segments. If you want to start
-        from scratch, use `borg delete` over the copied repository to
-        make sure the cache files are also removed:
-
-            borg delete borg
-
-        Unless ``--inplace`` is specified, the upgrade process first creates a backup
-        copy of the repository, in REPOSITORY.before-upgrade-DATETIME, using hardlinks.
-        This requires that the repository and its parent directory reside on same
-        filesystem so the hardlink copy can work.
-        This takes longer than in place upgrades, but is much safer and gives
-        progress information (as opposed to ``cp -al``). Once you are satisfied
-        with the conversion, you can safely destroy the backup copy.
-
-        WARNING: Running the upgrade in place will make the current
-        copy unusable with older version, with no way of going back
-        to previous versions. This can PERMANENTLY DAMAGE YOUR
-        REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
-        magic strings have changed. You have been warned.""")
-        subparser = subparsers.add_parser('upgrade', parents=[common_parser], add_help=False,
-                                          description=self.do_upgrade.__doc__,
-                                          epilog=upgrade_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='upgrade repository format')
-        subparser.set_defaults(func=self.do_upgrade)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change repository')
-        subparser.add_argument('--inplace', dest='inplace', action='store_true',
-                               help='rewrite repository in place, with no chance of going back '
-                                    'to older versions of the repository.')
-        subparser.add_argument('--force', dest='force', action='store_true',
-                               help='Force upgrade')
-        subparser.add_argument('--tam', dest='tam', action='store_true',
-                               help='Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).')
-        subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
-                               help='Disable manifest authentication (in key and cache).')
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False),
-                               help='path to the repository to be upgraded')
-
-        recreate_epilog = process_epilog("""
-        Recreate the contents of existing archives.
-
-        This is an *experimental* feature. Do *not* use this on your only backup.
-
-        Important: Repository disk space is **not** freed until you run ``borg compact``.
-
-        ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
-        have the exact same semantics as in "borg create". If PATHs are specified the
-        resulting archive will only contain files from these PATHs.
-
-        Note that all paths in an archive are relative, therefore absolute patterns/paths
-        will *not* match (``--exclude``, ``--exclude-from``, PATHs).
-
-        ``--recompress`` allows one to change the compression of existing data in archives.
-        Due to how Borg stores compressed size information this might display
-        incorrect information for archives that were not recreated at the same time.
-        There is no risk of data loss by this.
-
-        ``--chunker-params`` will re-chunk all files in the archive, this can be
-        used to have upgraded Borg 0.xx or Attic archives deduplicate with
-        Borg 1.x archives.
-
-        **USE WITH CAUTION.**
-        Depending on the PATHs and patterns given, recreate can be used to permanently
-        delete files from archives.
-        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
-        interpreted.
-
-        The archive being recreated is only removed after the operation completes. The
-        archive that is built during the operation exists at the same time at
-        "<ARCHIVE>.recreate". The new archive will have a different archive ID.
-
-        With ``--target`` the original archive is not replaced, instead a new archive is created.
-
-        When rechunking (or recompressing), space usage can be substantial - expect
-        at least the entire deduplicated size of the archives using the previous
-        chunker (or compression) params.
-
-        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
-        replacement chunks, please first run another backup for the same data and re-run
-        borg check --repair afterwards to heal any archives that had lost chunks which are
-        still generated from the input data.
-
-        Important: running borg recreate to re-chunk will remove the chunks_healthy
-        metadata of all items with replacement chunks, so healing will not be possible
-        any more after re-chunking (it is also unlikely it would ever work: due to the
-        change of chunking parameters, the missing chunk likely will never be seen again
-        even if you still have the data that produced it).
-        """)
-        subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
-                                          description=self.do_recreate.__doc__,
-                                          epilog=recreate_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help=self.do_recreate.__doc__)
-        subparser.set_defaults(func=self.do_recreate)
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
-                               help='only display items with the given status characters (listed in borg create --help)')
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change anything')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
-                               help='print statistics at end')
-
-        define_exclusion_group(subparser, tag_files=True)
-
-        archive_group = subparser.add_argument_group('Archive options')
-        archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
-                                   type=archivename_validator(),
-                                   help='create a new archive with the name ARCHIVE, do not replace existing archive '
-                                        '(only applies for a single archive)')
-        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
-                                   type=int, default=1800, metavar='SECONDS',
-                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
-        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
-                                   help='add a comment text to the archive')
-        archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
-                                   type=timestamp, default=None,
-                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
-                                        'alternatively, give a reference file/directory.')
-        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
-                                   type=CompressionSpec, default=CompressionSpec('lz4'),
-                                   help='select compression algorithm, see the output of the '
-                                        '"borg help compression" command for details.')
-        archive_group.add_argument('--recompress', metavar='MODE', dest='recompress', nargs='?',
-                                   default='never', const='if-different', choices=('never', 'if-different', 'always'),
-                                   help='recompress data chunks according to ``--compression``. '
-                                        'MODE `if-different`: '
-                                        'recompress if current compression is with a different compression algorithm '
-                                        '(the level is not considered). '
-                                        'MODE `always`: '
-                                        'recompress even if current compression is with the same compression algorithm '
-                                        '(use this to change the compression level). '
-                                        'MODE `never` (default): '
-                                        'do not recompress.')
-        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
-                                   type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
-                                        'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
-
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
-                               type=location_validator(),
-                               help='repository/archive to recreate')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to recreate; patterns are supported')
-
-        with_lock_epilog = process_epilog("""
-        This command runs a user-specified command while the repository lock is held.
-
-        It will first try to acquire the lock (make sure that no other operation is
-        running in the repo), then execute the given command as a subprocess and wait
-        for its termination, release the lock and return the user command's return
-        code as borg's return code.
-
-        .. note::
-
-            If you copy a repository with the lock held, the lock will be present in
-            the copy. Thus, before using borg on the copy from a different host,
-            you need to use "borg break-lock" on the copied repository, because
-            Borg is cautious and does not automatically remove stale locks made by a different host.
-        """)
-        subparser = subparsers.add_parser('with-lock', parents=[common_parser], add_help=False,
-                                          description=self.do_with_lock.__doc__,
-                                          epilog=with_lock_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='run user command with lock held')
-        subparser.set_defaults(func=self.do_with_lock)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repository to lock')
-        subparser.add_argument('command', metavar='COMMAND',
-                               help='command to run')
-        subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
-                               help='command arguments')
-
-        compact_epilog = process_epilog("""
-        This command frees repository space by compacting segments.
-
-        Use this regularly to avoid running out of space - you do not need to use this
-        after each borg command though.
-
-        borg compact does not need a key, so it is possible to invoke it from the
-        client or also from the server.
-
-        Depending on the amount of segments that need compaction, it may take a while.
-
-        See :ref:`separate_compaction` in Additional Notes for more details.
-        """)
-        subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
-                                          description=self.do_compact.__doc__,
-                                          epilog=compact_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='compact segment files / free space in repo')
-        subparser.set_defaults(func=self.do_compact)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repository to compact')
-        subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
-                               help='cleanup commit-only 17-byte segment files')
-
-        config_epilog = process_epilog("""
-        This command gets and sets options in a local repository or cache config file.
-        For security reasons, this command only works on local repositories.
-
-        To delete a config value entirely, use ``--delete``. To list the values
-        of the configuration file or the default values, use ``--list``.  To get and existing
-        key, pass only the key name. To set a key, pass both the key name and
-        the new value. Keys can be specified in the format "section.name" or
-        simply "name"; the section will default to "repository" and "cache" for
-        the repo and cache configs, respectively.
-
-
-        By default, borg config manipulates the repository config file. Using ``--cache``
-        edits the repository cache's config file instead.
-        """)
-        subparser = subparsers.add_parser('config', parents=[common_parser], add_help=False,
-                                          description=self.do_config.__doc__,
-                                          epilog=config_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='get and set configuration values')
-        subparser.set_defaults(func=self.do_config)
-        subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
-                               help='get and set values from the repo cache')
-
-        group = subparser.add_mutually_exclusive_group()
-        group.add_argument('-d', '--delete', dest='delete', action='store_true',
-                               help='delete the key from the config file')
-        group.add_argument('-l', '--list', dest='list', action='store_true',
-                               help='list the configuration of the repo')
-
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False, proto='file'),
-                               help='repository to configure')
-        subparser.add_argument('name', metavar='NAME', nargs='?',
-                               help='name of config key')
-        subparser.add_argument('value', metavar='VALUE', nargs='?',
-                               help='new value for key')
-
-        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
-                                          description='Extra help')
-        subparser.add_argument('--epilog-only', dest='epilog_only', action='store_true')
-        subparser.add_argument('--usage-only', dest='usage_only', action='store_true')
-        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
-        subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
-                               help='additional help on TOPIC')
-
+        # borg debug
         debug_epilog = process_epilog("""
         These commands are not intended for normal use and potentially very
         dangerous if used incorrectly.
@@ -4105,68 +3204,994 @@ class Archiver:
         subparser.add_argument('output', metavar='OUTPUT', type=argparse.FileType('wb'),
                                help='Output file')
 
-        benchmark_epilog = process_epilog("These commands do various benchmarks.")
+        # borg delete
+        delete_epilog = process_epilog("""
+        This command deletes an archive from the repository or the complete repository.
 
-        subparser = subparsers.add_parser('benchmark', parents=[mid_common_parser], add_help=False,
-                                          description='benchmark command',
-                                          epilog=benchmark_epilog,
+        Important: When deleting archives, repository disk space is **not** freed until
+        you run ``borg compact``.
+
+        If you delete the complete repository, the local cache for it (if any) is
+        also deleted. Alternatively, you can delete just the local cache with the
+        ``--cache-only`` option.
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after deletion.
+
+        You can delete multiple archives by specifying their common prefix, if they
+        have one, using the ``--prefix PREFIX`` option. You can also specify a shell
+        pattern to match multiple archives using the ``--glob-archives GLOB`` option
+        (for more info on these patterns, see ``borg help patterns``). Note that these
+        two options are mutually exclusive.
+
+        To avoid accidentally deleting archives, especially when using glob patterns,
+        it might be helpful to use the ``--dry-run`` to test out the command without
+        actually making any changes to the repository.
+        """)
+        subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
+                                          description=self.do_delete.__doc__,
+                                          epilog=delete_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='benchmark command')
+                                          help='delete archive')
+        subparser.set_defaults(func=self.do_delete)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+                               help='print statistics for the deleted archive')
+        subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
+                               help='delete only the local cache for the given repository')
+        subparser.add_argument('--force', dest='forced',
+                               action='count', default=0,
+                               help='force deletion of corrupted archives, '
+                                    'use ``--force --force`` in case ``--force`` does not work.')
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               help='work slower, but using less space')
+        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
+                               type=location_validator(),
+                               help='archive or repository to delete')
+        subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
+                               help='archives to delete')
+        define_archive_filters_group(subparser)
 
-        benchmark_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
+        # borg diff
+        diff_epilog = process_epilog("""
+            This command finds differences (file contents, user/group/mode) between archives.
+
+            A repository location and an archive name must be specified for REPO::ARCHIVE1.
+            ARCHIVE2 is just another archive name in same repository (no repository location
+            allowed).
+
+            For archives created with Borg 1.1 or newer diff automatically detects whether
+            the archives are created with the same chunker params. If so, only chunk IDs
+            are compared, which is very fast.
+
+            For archives prior to Borg 1.1 chunk contents are compared by default.
+            If you did not create the archives with different chunker params,
+            pass ``--same-chunker-params``.
+            Note that the chunker params changed from Borg 0.xx to 1.0.
+
+            See the output of the "borg help patterns" command for more help on exclude patterns.
+            """)
+        subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
+                                          description=self.do_diff.__doc__,
+                                          epilog=diff_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='find differences in archive contents')
+        subparser.set_defaults(func=self.do_diff)
+        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+                               help='only consider numeric user and group identifiers')
+        subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
+                               help='Override check of chunker parameters.')
+        subparser.add_argument('--sort', dest='sort', action='store_true',
+                               help='Sort the output lines by file path.')
+        subparser.add_argument('location', metavar='REPO::ARCHIVE1',
+                               type=location_validator(archive=True),
+                               help='repository location and ARCHIVE1 name')
+        subparser.add_argument('archive2', metavar='ARCHIVE2',
+                               type=archivename_validator(),
+                               help='ARCHIVE2 name (no repository location allowed)')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths of items inside the archives to compare; patterns are supported')
+        define_exclusion_group(subparser)
+
+        # borg export-tar
+        export_tar_epilog = process_epilog("""
+        This command creates a tarball from an archive.
+
+        When giving '-' as the output FILE, Borg will write a tar stream to standard output.
+
+        By default (``--tar-filter=auto``) Borg will detect whether the FILE should be compressed
+        based on its file extension and pipe the tarball through an appropriate filter
+        before writing it to FILE:
+
+        - .tar.gz: gzip
+        - .tar.bz2: bzip2
+        - .tar.xz: xz
+
+        Alternatively a ``--tar-filter`` program may be explicitly specified. It should
+        read the uncompressed tar stream from stdin and write a compressed/filtered
+        tar stream to stdout.
+
+        The generated tarball uses the GNU tar format.
+
+        export-tar is a lossy conversion:
+        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
+        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
+        otherwise supported by Borg.
+
+        A ``--sparse`` option (as found in borg extract) is not supported.
+
+        By default the entire archive is extracted but a subset of files and directories
+        can be selected by passing a list of ``PATHs`` as arguments.
+        The file selection can further be restricted by using the ``--exclude`` option.
+
+        See the output of the "borg help patterns" command for more help on exclude patterns.
+
+        ``--progress`` can be slower than no progress display, since it makes one additional
+        pass over the archive metadata.
+        """)
+        subparser = subparsers.add_parser('export-tar', parents=[common_parser], add_help=False,
+                                          description=self.do_export_tar.__doc__,
+                                          epilog=export_tar_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create tarball from archive')
+        subparser.set_defaults(func=self.do_export_tar)
+        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
+                               help='filter program to pipe data through')
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to export')
+        subparser.add_argument('tarfile', metavar='FILE',
+                               help='output tar file. "-" to write to stdout instead.')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+        define_exclusion_group(subparser, strip_components=True)
+
+        # borg extract
+        extract_epilog = process_epilog("""
+        This command extracts the contents of an archive. By default the entire
+        archive is extracted but a subset of files and directories can be selected
+        by passing a list of ``PATHs`` as arguments. The file selection can further
+        be restricted by using the ``--exclude`` option.
+
+        See the output of the "borg help patterns" command for more help on exclude patterns.
+
+        By using ``--dry-run``, you can do all extraction steps except actually writing the
+        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
+        decrypting, decompressing.
+
+        ``--progress`` can be slower than no progress display, since it makes one additional
+        pass over the archive metadata.
+
+        .. note::
+
+            Currently, extract always writes into the current working directory ("."),
+            so make sure you ``cd`` to the right place before calling ``borg extract``.
+        """)
+        subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
+                                          description=self.do_extract.__doc__,
+                                          epilog=extract_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='extract archive contents')
+        subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not actually change any files')
+        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+                               help='only obey numeric user and group identifiers')
+        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
+                               help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
+        subparser.add_argument('--stdout', dest='stdout', action='store_true',
+                               help='write all extracted data to stdout')
+        subparser.add_argument('--sparse', dest='sparse', action='store_true',
+                               help='create holes in output sparse file from all-zero chunks')
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to extract')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+        define_exclusion_group(subparser, strip_components=True)
+
+        # borg help
+        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
+                                          description='Extra help')
+        subparser.add_argument('--epilog-only', dest='epilog_only', action='store_true')
+        subparser.add_argument('--usage-only', dest='usage_only', action='store_true')
+        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
+        subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
+                               help='additional help on TOPIC')
+
+        # borg info
+        info_epilog = process_epilog("""
+        This command displays detailed information about the specified archive or repository.
+
+        Please note that the deduplicated sizes of the individual archives do not add
+        up to the deduplicated size of the repository ("all archives"), because the two
+        are meaning different things:
+
+        This archive / deduplicated size = amount of data stored ONLY for this archive
+        = unique chunks of this archive.
+        All archives / deduplicated size = amount of data stored in the repo
+        = all chunks in the repository.
+
+        Borg archives can only contain a limited amount of file metadata.
+        The size of an archive relative to this limit depends on a number of factors,
+        mainly the number of files, the lengths of paths and other metadata stored for files.
+        This is shown as *utilization of maximum supported archive size*.
+        """)
+        subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
+                                          description=self.do_info.__doc__,
+                                          epilog=info_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show repository or archive information')
+        subparser.set_defaults(func=self.do_info)
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='archive or repository to display information about')
+        subparser.add_argument('--json', action='store_true',
+                               help='format output as JSON')
+        define_archive_filters_group(subparser)
+
+        # borg init
+        init_epilog = process_epilog("""
+        This command initializes an empty repository. A repository is a filesystem
+        directory containing the deduplicated data from zero or more archives.
+
+        Encryption can be enabled at repository init time. It cannot be changed later.
+
+        It is not recommended to work without encryption. Repository encryption protects
+        you e.g. against the case that an attacker has access to your backup repository.
+
+        But be careful with the key / the passphrase:
+
+        If you want "passphrase-only" security, use one of the repokey modes. The
+        key will be stored inside the repository (in its "config" file). In above
+        mentioned attack scenario, the attacker will have the key (but not the
+        passphrase).
+
+        If you want "passphrase and having-the-key" security, use one of the keyfile
+        modes. The key will be stored in your home directory (in .config/borg/keys).
+        In the attack scenario, the attacker who has just access to your repo won't
+        have the key (and also not the passphrase).
+
+        Make a backup copy of the key file (keyfile mode) or repo config file
+        (repokey mode) and keep it at a safe place, so you still have the key in
+        case it gets corrupted or lost. Also keep the passphrase at a safe place.
+        The backup that is encrypted with that key won't help you with that, of course.
+
+        Make sure you use a good passphrase. Not too short, not too simple. The real
+        encryption / decryption key is encrypted with / locked by your passphrase.
+        If an attacker gets your key, he can't unlock and use it without knowing the
+        passphrase.
+
+        Be careful with special or non-ascii characters in your passphrase:
+
+        - Borg processes the passphrase as unicode (and encodes it as utf-8),
+          so it does not have problems dealing with even the strangest characters.
+        - BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
+
+        So better use a long passphrase made from simple ascii chars than one that
+        includes non-ascii stuff or characters that are hard/impossible to enter on
+        a different keyboard layout.
+
+        You can change your passphrase for existing repos at any time, it won't affect
+        the encryption/decryption key or other secrets.
+
+        Encryption modes
+        ++++++++++++++++
+
+        .. nanorst: inline-fill
+
+        +----------+---------------+------------------------+--------------------------+
+        | Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
+        |          | no auth       | but authenticated      | and authenticated        |
+        +----------+---------------+------------------------+--------------------------+
+        | SHA-256  | none          | `authenticated`        | repokey                  |
+        |          |               |                        | keyfile                  |
+        +----------+---------------+------------------------+--------------------------+
+        | BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`         |
+        |          |               |                        | `keyfile-blake2`         |
+        +----------+---------------+------------------------+--------------------------+
+
+        .. nanorst: inline-replace
+
+        `Marked modes` are new in Borg 1.1 and are not backwards-compatible with Borg 1.0.x.
+
+        On modern Intel/AMD CPUs (except very cheap ones), AES is usually
+        hardware-accelerated.
+        BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs
+        (except AMD Ryzen and future CPUs with SHA extensions),
+        which makes `authenticated-blake2` faster than `none` and `authenticated`.
+
+        On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
+        than BLAKE2b-256 there. NEON accelerates AES as well.
+
+        Hardware acceleration is always used automatically when available.
+
+        `repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
+        authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
+        is HMAC-SHA256 as well (with a separate key).
+        These modes are compatible with Borg 1.0.x.
+
+        `repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
+        but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
+        hash is a keyed BLAKE2b-256 hash.
+        These modes are new and *not* compatible with Borg 1.0.x.
+
+        `authenticated` mode uses no encryption, but authenticates repository contents
+        through the same HMAC-SHA256 hash as the `repokey` and `keyfile` modes (it uses it
+        as the chunk ID hash). The key is stored like `repokey`.
+        This mode is new and *not* compatible with Borg 1.0.x.
+
+        `authenticated-blake2` is like `authenticated`, but uses the keyed BLAKE2b-256 hash
+        from the other blake2 modes.
+        This mode is new and *not* compatible with Borg 1.0.x.
+
+        `none` mode uses no encryption and no authentication. It uses SHA256 as chunk
+        ID hash. Not recommended, rather consider using an authenticated or
+        authenticated/encrypted mode. This mode has possible denial-of-service issues
+        when running ``borg create`` on contents controlled by an attacker.
+        Use it only for new repositories where no encryption is wanted **and** when compatibility
+        with 1.0.x is important. If compatibility with 1.0.x is not important, use
+        `authenticated-blake2` or `authenticated` instead.
+        This mode is compatible with Borg 1.0.x.
+        """)
+        subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
+                                          description=self.do_init.__doc__, epilog=init_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='initialize empty repository')
+        subparser.set_defaults(func=self.do_init)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to create')
+        subparser.add_argument('-e', '--encryption', metavar='MODE', dest='encryption', required=True,
+                               choices=key_argument_names(),
+                               help='select encryption key mode **(required)**')
+        subparser.add_argument('--append-only', dest='append_only', action='store_true',
+                               help='create an append-only mode repository. Note that this only affects '
+                                    'the low level structure of the repository, and running `delete` '
+                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in '
+                                    'Additional Notes for more details.')
+        subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota', default=None,
+                               type=parse_storage_quota,
+                               help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
+        subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
+                               help='create the parent directories of the repository directory, if they are missing.')
+
+        # borg key
+        subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
+                                          description="Manage a keyfile or repokey of a repository",
+                                          epilog="",
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='manage repository key')
+
+        key_parsers = subparser.add_subparsers(title='required arguments', metavar='<command>')
         subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
 
-        bench_crud_epilog = process_epilog("""
-        This command benchmarks borg CRUD (create, read, update, delete) operations.
+        key_export_epilog = process_epilog("""
+        If repository encryption is used, the repository is inaccessible
+        without the key. This command allows one to backup this essential key.
+        Note that the backup produced does not include the passphrase itself
+        (i.e. the exported key stays encrypted). In order to regain access to a
+        repository, one needs both the exported key and the original passphrase.
 
-        It creates input data below the given PATH and backups this data into the given REPO.
-        The REPO must already exist (it could be a fresh empty repo or an existing repo, the
-        command will create / read / update / delete some archives named borg-benchmark-crud\\* there.
+        There are three backup formats. The normal backup format is suitable for
+        digital storage as a file. The ``--paper`` backup format is optimized
+        for printing and typing in while importing, with per line checks to
+        reduce problems with manual input. The ``--qr-html`` creates a printable
+        HTML template with a QR code and a copy of the ``--paper``-formatted key.
 
-        Make sure you have free space there, you'll need about 1GB each (+ overhead).
+        For repositories using keyfile encryption the key is saved locally
+        on the system that is capable of doing backups. To guard against loss
+        of this key, the key needs to be backed up independently of the main
+        data backup.
 
-        If your repository is encrypted and borg needs a passphrase to unlock the key, use:
-
-        BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
-
-        Measurements are done with different input file sizes and counts.
-        The file contents are very artificial (either all zero or all random),
-        thus the measurement results do not necessarily reflect performance with real data.
-        Also, due to the kind of content used, no compression is used in these benchmarks.
-
-        C- == borg create (1st archive creation, no compression, do not use files cache)
-              C-Z- == all-zero files. full dedup, this is primarily measuring reader/chunker/hasher.
-              C-R- == random files. no dedup, measuring throughput through all processing stages.
-
-        R- == borg extract (extract archive, dry-run, do everything, but do not write files to disk)
-              R-Z- == all zero files. Measuring heavily duplicated files.
-              R-R- == random files. No duplication here, measuring throughput through all processing
-              stages, except writing to disk.
-
-        U- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
-              The throughput value is kind of virtual here, it does not actually read the file.
-              U-Z- == needs to check the 2 all-zero chunks' existence in the repo.
-              U-R- == needs to check existence of a lot of different chunks in the repo.
-
-        D- == borg delete archive (delete last remaining archive, measure deletion + compaction)
-              D-Z- == few chunks to delete / few segments to compact/remove.
-              D-R- == many chunks to delete / many segments to compact/remove.
-
-        Please note that there might be quite some variance in these measurements.
-        Try multiple measurements and having a otherwise idle machine (and network, if you use it).
+        For repositories using the repokey encryption the key is saved in the
+        repository in the config file. A backup is thus not strictly needed,
+        but guards against the repository becoming inaccessible if the file
+        is damaged for some reason.
         """)
-        subparser = benchmark_parsers.add_parser('crud', parents=[common_parser], add_help=False,
-                                                 description=self.do_benchmark_crud.__doc__,
-                                                 epilog=bench_crud_epilog,
-                                                 formatter_class=argparse.RawDescriptionHelpFormatter,
-                                                 help='benchmarks borg CRUD (create, extract, update, delete).')
-        subparser.set_defaults(func=self.do_benchmark_crud)
+        subparser = key_parsers.add_parser('export', parents=[common_parser], add_help=False,
+                                          description=self.do_key_export.__doc__,
+                                          epilog=key_export_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='export repository key for backup')
+        subparser.set_defaults(func=self.do_key_export)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
+                               help='where to store the backup')
+        subparser.add_argument('--paper', dest='paper', action='store_true',
+                               help='Create an export suitable for printing and later type-in')
+        subparser.add_argument('--qr-html', dest='qr', action='store_true',
+                               help='Create an html file suitable for printing and later type-in or qr scan')
 
-        subparser.add_argument('location', metavar='REPO',
+        key_import_epilog = process_epilog("""
+        This command restores a key previously backed up with the export command.
+
+        If the ``--paper`` option is given, the import will be an interactive
+        process in which each line is checked for plausibility before
+        proceeding to the next line. For this format PATH must not be given.
+        """)
+        subparser = key_parsers.add_parser('import', parents=[common_parser], add_help=False,
+                                          description=self.do_key_import.__doc__,
+                                          epilog=key_import_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='import repository key from backup')
+        subparser.set_defaults(func=self.do_key_import)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
+                               help='path to the backup (\'-\' to read from stdin)')
+        subparser.add_argument('--paper', dest='paper', action='store_true',
+                               help='interactively import from a backup done with ``--paper``')
+
+        change_passphrase_epilog = process_epilog("""
+        The key files used for repository encryption are optionally passphrase
+        protected. This command can be used to change this passphrase.
+
+        Please note that this command only changes the passphrase, but not any
+        secret protected by it (like e.g. encryption/MAC keys or chunker seed).
+        Thus, changing the passphrase after passphrase and borg key got compromised
+        does not protect future (nor past) backups to the same repository.
+        """)
+        subparser = key_parsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
+                                          description=self.do_change_passphrase.__doc__,
+                                          epilog=change_passphrase_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='change repository passphrase')
+        subparser.set_defaults(func=self.do_change_passphrase)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+
+        migrate_to_repokey_epilog = process_epilog("""
+        This command migrates a repository from passphrase mode (removed in Borg 1.0)
+        to repokey mode.
+
+        You will be first asked for the repository passphrase (to open it in passphrase
+        mode). This is the same passphrase as you used to use for this repo before 1.0.
+
+        It will then derive the different secrets from this passphrase.
+
+        Then you will be asked for a new passphrase (twice, for safety). This
+        passphrase will be used to protect the repokey (which contains these same
+        secrets in encrypted form). You may use the same passphrase as you used to
+        use, but you may also use a different one.
+
+        After migrating to repokey mode, you can change the passphrase at any time.
+        But please note: the secrets will always stay the same and they could always
+        be derived from your (old) passphrase-mode passphrase.
+        """)
+        subparser = key_parsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
+                                          description=self.do_migrate_to_repokey.__doc__,
+                                          epilog=migrate_to_repokey_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='migrate passphrase-mode repository to repokey')
+        subparser.set_defaults(func=self.do_migrate_to_repokey)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+
+        # borg list
+        list_epilog = process_epilog("""
+        This command lists the contents of a repository or an archive.
+
+        See the "borg help patterns" command for more help on exclude patterns.
+
+        .. man NOTES
+
+        The following keys are available for ``--format``:
+
+
+        """) + BaseFormatter.keys_help() + textwrap.dedent("""
+
+        Keys for listing repository archives:
+
+        """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
+
+        Keys for listing archive files:
+
+        """) + ItemFormatter.keys_help()
+        subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
+                                          description=self.do_list.__doc__,
+                                          epilog=list_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='list archive or repository contents')
+        subparser.set_defaults(func=self.do_list)
+        subparser.add_argument('--short', dest='short', action='store_true',
+                               help='only print file/directory names, nothing else')
+        subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',
+                               help='specify format for file listing '
+                                    '(default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")')
+        subparser.add_argument('--json', action='store_true',
+                               help='Only valid for listing repository contents. Format output as JSON. '
+                                    'The form of ``--format`` is ignored, '
+                                    'but keys used in it are added to the JSON output. '
+                                    'Some keys are always present. Note: JSON can only represent text. '
+                                    'A "barchive" key is therefore not available.')
+        subparser.add_argument('--json-lines', action='store_true',
+                               help='Only valid for listing archive contents. Format output as JSON Lines. '
+                                    'The form of ``--format`` is ignored, '
+                                    'but keys used in it are added to the JSON output. '
+                                    'Some keys are always present. Note: JSON can only represent text. '
+                                    'A "bpath" key is therefore not available.')
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='repository/archive to list contents of')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to list; patterns are supported')
+        define_archive_filters_group(subparser)
+        define_exclusion_group(subparser)
+
+        # borg mount
+        mount_epilog = process_epilog("""
+        This command mounts an archive as a FUSE filesystem. This can be useful for
+        browsing an archive or restoring individual files. Unless the ``--foreground``
+        option is given the command will run in the background until the filesystem
+        is ``umounted``.
+
+        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
+        used in fstab entries:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
+
+        To allow a regular user to use fstab entries, add the ``user`` option:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
+
+        For FUSE configuration and mount options, see the mount.fuse(8) manual page.
+
+        Additional mount options supported by borg:
+
+        - versions: when used with a repository mount, this gives a merged, versioned
+          view of the files in the archives. EXPERIMENTAL, layout may change in future.
+        - allow_damaged_files: by default damaged files (where missing chunks were
+          replaced with runs of zeros by borg check ``--repair``) are not readable and
+          return EIO (I/O error). Set this option to read such files.
+        - ignore_permissions: for security reasons the "default_permissions" mount
+          option is internally enforced by borg. "ignore_permissions" can be given to
+          not enforce "default_permissions".
+
+        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
+        to tweak the performance. It sets the number of cached data chunks; additional
+        memory usage can be up to ~8 MiB times this number. The default is the number
+        of CPU cores.
+
+        When the daemonized process receives a signal or crashes, it does not unmount.
+        Unmounting in these cases could cause an active rsync or similar process
+        to unintentionally delete data.
+
+        When running in the foreground ^C/SIGINT unmounts cleanly, but other
+        signals or crashes do not.
+        """)
+
+        if parser.prog == 'borgfs':
+            parser.description = self.do_mount.__doc__
+            parser.epilog = mount_epilog
+            parser.formatter_class = argparse.RawDescriptionHelpFormatter
+            parser.help = 'mount repository'
+            subparser = parser
+        else:
+            subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
+                                            description=self.do_mount.__doc__,
+                                            epilog=mount_epilog,
+                                            formatter_class=argparse.RawDescriptionHelpFormatter,
+                                            help='mount repository')
+        subparser.set_defaults(func=self.do_mount)
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+                            help='repository/archive to mount')
+        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+                            help='where to mount filesystem')
+        subparser.add_argument('-f', '--foreground', dest='foreground',
+                            action='store_true',
+                            help='stay in foreground, do not daemonize')
+        subparser.add_argument('-o', dest='options', type=str,
+                            help='Extra mount options')
+        define_archive_filters_group(subparser)
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to extract; patterns are supported')
+        define_exclusion_group(subparser, strip_components=True)
+        if parser.prog == 'borgfs':
+            return parser
+
+        # borg prune
+        prune_epilog = process_epilog("""
+        The prune command prunes a repository by deleting all archives not matching
+        any of the specified retention options.
+
+        Important: Repository disk space is **not** freed until you run ``borg compact``.
+
+        This command is normally used by automated backup scripts wanting to keep a
+        certain number of historic backups.
+
+        Also, prune automatically removes checkpoint archives (incomplete archives left
+        behind by interrupted backup runs) except if the checkpoint is the latest
+        archive (and thus still needed). Checkpoint archives are not considered when
+        comparing archive counts against the retention limits (``--keep-X``).
+
+        If a prefix is set with -P, then only archives that start with the prefix are
+        considered for deletion and only those archives count towards the totals
+        specified by the rules.
+        Otherwise, *all* archives in the repository are candidates for deletion!
+        There is no automatic distinction between archives representing different
+        contents. These need to be distinguished by specifying matching prefixes.
+
+        If you have multiple sequences of archives with different data sets (e.g.
+        from different machines) in one shared repository, use one prune call per
+        data set that matches only the respective archives using the -P option.
+
+        The ``--keep-within`` option takes an argument of the form "<int><char>",
+        where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
+        to keep all archives that were created within the past 48 hours.
+        "1m" is taken to mean "31d". The archives kept with this option do not
+        count towards the totals specified by any other options.
+
+        A good procedure is to thin out more and more the older your backups get.
+        As an example, ``--keep-daily 7`` means to keep the latest backup on each day,
+        up to 7 most recent days with backups (days without backups do not count).
+        The rules are applied from secondly to yearly, and backups selected by previous
+        rules do not count towards those of later rules. The time that each backup
+        starts is used for pruning purposes. Dates and times are interpreted in
+        the local timezone, and weeks go from Monday to Sunday. Specifying a
+        negative number of archives to keep means that there is no limit.
+
+        The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
+        keep the last N archives under the assumption that you do not create more than one
+        backup archive in the same second).
+
+        When using ``--stats``, you will get some statistics about how much data was
+        deleted - the "Deleted data" deduplicated size there is most interesting as
+        that is how much your repository will shrink.
+        Please note that the "All archives" stats refer to the state after pruning.
+        """)
+        subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
+                                          description=self.do_prune.__doc__,
+                                          epilog=prune_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='prune archives')
+        subparser.set_defaults(func=self.do_prune)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('--force', dest='forced', action='store_true',
+                               help='force pruning of corrupted archives')
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+                               help='print statistics for the deleted archive')
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of archives it keeps/prunes')
+        subparser.add_argument('--keep-within', metavar='INTERVAL', dest='within', type=interval,
+                               help='keep all archives within this time interval')
+        subparser.add_argument('--keep-last', '--keep-secondly', dest='secondly', type=int, default=0,
+                               help='number of secondly archives to keep')
+        subparser.add_argument('--keep-minutely', dest='minutely', type=int, default=0,
+                               help='number of minutely archives to keep')
+        subparser.add_argument('-H', '--keep-hourly', dest='hourly', type=int, default=0,
+                               help='number of hourly archives to keep')
+        subparser.add_argument('-d', '--keep-daily', dest='daily', type=int, default=0,
+                               help='number of daily archives to keep')
+        subparser.add_argument('-w', '--keep-weekly', dest='weekly', type=int, default=0,
+                               help='number of weekly archives to keep')
+        subparser.add_argument('-m', '--keep-monthly', dest='monthly', type=int, default=0,
+                               help='number of monthly archives to keep')
+        subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
+                               help='number of yearly archives to keep')
+        define_archive_filters_group(subparser, sort_by=False, first_last=False)
+        subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                               help='work slower, but using less space')
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
-                               help='repo to use for benchmark (must exist)')
+                               help='repository to prune')
 
-        subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
+        # borg recreate
+        recreate_epilog = process_epilog("""
+        Recreate the contents of existing archives.
+
+        This is an *experimental* feature. Do *not* use this on your only backup.
+
+        Important: Repository disk space is **not** freed until you run ``borg compact``.
+
+        ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
+        have the exact same semantics as in "borg create". If PATHs are specified the
+        resulting archive will only contain files from these PATHs.
+
+        Note that all paths in an archive are relative, therefore absolute patterns/paths
+        will *not* match (``--exclude``, ``--exclude-from``, PATHs).
+
+        ``--recompress`` allows one to change the compression of existing data in archives.
+        Due to how Borg stores compressed size information this might display
+        incorrect information for archives that were not recreated at the same time.
+        There is no risk of data loss by this.
+
+        ``--chunker-params`` will re-chunk all files in the archive, this can be
+        used to have upgraded Borg 0.xx or Attic archives deduplicate with
+        Borg 1.x archives.
+
+        **USE WITH CAUTION.**
+        Depending on the PATHs and patterns given, recreate can be used to permanently
+        delete files from archives.
+        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
+        interpreted.
+
+        The archive being recreated is only removed after the operation completes. The
+        archive that is built during the operation exists at the same time at
+        "<ARCHIVE>.recreate". The new archive will have a different archive ID.
+
+        With ``--target`` the original archive is not replaced, instead a new archive is created.
+
+        When rechunking (or recompressing), space usage can be substantial - expect
+        at least the entire deduplicated size of the archives using the previous
+        chunker (or compression) params.
+
+        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
+        replacement chunks, please first run another backup for the same data and re-run
+        borg check --repair afterwards to heal any archives that had lost chunks which are
+        still generated from the input data.
+
+        Important: running borg recreate to re-chunk will remove the chunks_healthy
+        metadata of all items with replacement chunks, so healing will not be possible
+        any more after re-chunking (it is also unlikely it would ever work: due to the
+        change of chunking parameters, the missing chunk likely will never be seen again
+        even if you still have the data that produced it).
+        """)
+        subparser = subparsers.add_parser('recreate', parents=[common_parser], add_help=False,
+                                          description=self.do_recreate.__doc__,
+                                          epilog=recreate_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help=self.do_recreate.__doc__)
+        subparser.set_defaults(func=self.do_recreate)
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
+                               help='only display items with the given status characters (listed in borg create --help)')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change anything')
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+                               help='print statistics at end')
+
+        define_exclusion_group(subparser, tag_files=True)
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
+                                   type=archivename_validator(),
+                                   help='create a new archive with the name ARCHIVE, do not replace existing archive '
+                                        '(only applies for a single archive)')
+        archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
+                                   type=int, default=1800, metavar='SECONDS',
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
+                                        'alternatively, give a reference file/directory.')
+        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'),
+                                   help='select compression algorithm, see the output of the '
+                                        '"borg help compression" command for details.')
+        archive_group.add_argument('--recompress', metavar='MODE', dest='recompress', nargs='?',
+                                   default='never', const='if-different', choices=('never', 'if-different', 'always'),
+                                   help='recompress data chunks according to ``--compression``. '
+                                        'MODE `if-different`: '
+                                        'recompress if current compression is with a different compression algorithm '
+                                        '(the level is not considered). '
+                                        'MODE `always`: '
+                                        'recompress even if current compression is with the same compression algorithm '
+                                        '(use this to change the compression level). '
+                                        'MODE `never` (default): '
+                                        'do not recompress.')
+        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
+                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
+                                        'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
+
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
+                               type=location_validator(),
+                               help='repository/archive to recreate')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to recreate; patterns are supported')
+
+        # borg rename
+        rename_epilog = process_epilog("""
+        This command renames an archive in the repository.
+
+        This results in a different archive ID.
+        """)
+        subparser = subparsers.add_parser('rename', parents=[common_parser], add_help=False,
+                                          description=self.do_rename.__doc__,
+                                          epilog=rename_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='rename archive')
+        subparser.set_defaults(func=self.do_rename)
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='archive to rename')
+        subparser.add_argument('name', metavar='NEWNAME',
+                               type=archivename_validator(),
+                               help='the new archive name to use')
+
+        # borg serve
+        serve_epilog = process_epilog("""
+        This command starts a repository server process. This command is usually not used manually.
+        """)
+        subparser = subparsers.add_parser('serve', parents=[common_parser], add_help=False,
+                                          description=self.do_serve.__doc__, epilog=serve_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='start repository server process')
+        subparser.set_defaults(func=self.do_serve)
+        subparser.add_argument('--restrict-to-path', metavar='PATH', dest='restrict_to_paths', action='append',
+                               help='restrict repository access to PATH. '
+                                    'Can be specified multiple times to allow the client access to several directories. '
+                                    'Access to all sub-directories is granted implicitly; PATH doesn\'t need to directly point to a repository.')
+        subparser.add_argument('--restrict-to-repository', metavar='PATH', dest='restrict_to_repositories', action='append',
+                                help='restrict repository access. Only the repository located at PATH '
+                                     '(no sub-directories are considered) is accessible. '
+                                     'Can be specified multiple times to allow the client access to several repositories. '
+                                     'Unlike ``--restrict-to-path`` sub-directories are not accessible; '
+                                     'PATH needs to directly point at a repository location. '
+                                     'PATH may be an empty directory or the last element of PATH may not exist, in which case '
+                                     'the client may initialize a repository there.')
+        subparser.add_argument('--append-only', dest='append_only', action='store_true',
+                               help='only allow appending to repository segment files. Note that this only '
+                                    'affects the low level structure of the repository, and running `delete` '
+                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in Additional '
+                                    'Notes for more details.')
+        subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
+                               type=parse_storage_quota, default=None,
+                               help='Override storage quota of the repository (e.g. 5G, 1.5T). '
+                                    'When a new repository is initialized, sets the storage quota on the new '
+                                    'repository as well. Default: no quota.')
+
+        # borg umount
+        umount_epilog = process_epilog("""
+        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
+
+        This is a convenience wrapper that just calls the platform-specific shell
+        command - usually this is either umount or fusermount -u.
+        """)
+        subparser = subparsers.add_parser('umount', parents=[common_parser], add_help=False,
+                                          description=self.do_umount.__doc__,
+                                          epilog=umount_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='umount repository')
+        subparser.set_defaults(func=self.do_umount)
+        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+                               help='mountpoint of the filesystem to umount')
+
+        # borg upgrade
+        upgrade_epilog = process_epilog("""
+        Upgrade an existing, local Borg repository.
+
+        When you do not need borg upgrade
+        +++++++++++++++++++++++++++++++++
+
+        Not every change requires that you run ``borg upgrade``.
+
+        You do **not** need to run it when:
+
+        - moving your repository to a different place
+        - upgrading to another point release (like 1.0.x to 1.0.y),
+          except when noted otherwise in the changelog
+        - upgrading from 1.0.x to 1.1.x,
+          except when noted otherwise in the changelog
+
+        Borg 1.x.y upgrades
+        +++++++++++++++++++
+
+        Use ``borg upgrade --tam REPO`` to require manifest authentication
+        introduced with Borg 1.0.9 to address security issues. This means
+        that modifying the repository after doing this with a version prior
+        to 1.0.9 will raise a validation error, so only perform this upgrade
+        after updating all clients using the repository to 1.0.9 or newer.
+
+        This upgrade should be done on each client for safety reasons.
+
+        If a repository is accidentally modified with a pre-1.0.9 client after
+        this upgrade, use ``borg upgrade --tam --force REPO`` to remedy it.
+
+        If you routinely do this you might not want to enable this upgrade
+        (which will leave you exposed to the security issue). You can
+        reverse the upgrade by issuing ``borg upgrade --disable-tam REPO``.
+
+        See
+        https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability
+        for details.
+
+        Attic and Borg 0.xx to Borg 1.x
+        +++++++++++++++++++++++++++++++
+
+        This currently supports converting an Attic repository to Borg and also
+        helps with converting Borg 0.xx to 1.0.
+
+        Currently, only LOCAL repositories can be upgraded (issue #465).
+
+        Please note that ``borg create`` (since 1.0.0) uses bigger chunks by
+        default than old borg or attic did, so the new chunks won't deduplicate
+        with the old chunks in the upgraded repository.
+        See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.
+
+        ``borg upgrade`` will change the magic strings in the repository's
+        segments to match the new Borg magic strings. The keyfiles found in
+        $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
+        copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
+
+        The cache files are converted, from $ATTIC_CACHE_DIR or
+        ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
+        cache layout between Borg and Attic changed, so it is possible
+        the first backup after the conversion takes longer than expected
+        due to the cache resync.
+
+        Upgrade should be able to resume if interrupted, although it
+        will still iterate over all segments. If you want to start
+        from scratch, use `borg delete` over the copied repository to
+        make sure the cache files are also removed:
+
+            borg delete borg
+
+        Unless ``--inplace`` is specified, the upgrade process first creates a backup
+        copy of the repository, in REPOSITORY.before-upgrade-DATETIME, using hardlinks.
+        This requires that the repository and its parent directory reside on same
+        filesystem so the hardlink copy can work.
+        This takes longer than in place upgrades, but is much safer and gives
+        progress information (as opposed to ``cp -al``). Once you are satisfied
+        with the conversion, you can safely destroy the backup copy.
+
+        WARNING: Running the upgrade in place will make the current
+        copy unusable with older version, with no way of going back
+        to previous versions. This can PERMANENTLY DAMAGE YOUR
+        REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
+        magic strings have changed. You have been warned.""")
+        subparser = subparsers.add_parser('upgrade', parents=[common_parser], add_help=False,
+                                          description=self.do_upgrade.__doc__,
+                                          epilog=upgrade_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='upgrade repository format')
+        subparser.set_defaults(func=self.do_upgrade)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('--inplace', dest='inplace', action='store_true',
+                               help='rewrite repository in place, with no chance of going back '
+                                    'to older versions of the repository.')
+        subparser.add_argument('--force', dest='force', action='store_true',
+                               help='Force upgrade')
+        subparser.add_argument('--tam', dest='tam', action='store_true',
+                               help='Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).')
+        subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
+                               help='Disable manifest authentication (in key and cache).')
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='path to the repository to be upgraded')
+
+        # borg with-lock
+        with_lock_epilog = process_epilog("""
+        This command runs a user-specified command while the repository lock is held.
+
+        It will first try to acquire the lock (make sure that no other operation is
+        running in the repo), then execute the given command as a subprocess and wait
+        for its termination, release the lock and return the user command's return
+        code as borg's return code.
+
+        .. note::
+
+            If you copy a repository with the lock held, the lock will be present in
+            the copy. Thus, before using borg on the copy from a different host,
+            you need to use "borg break-lock" on the copied repository, because
+            Borg is cautious and does not automatically remove stale locks made by a different host.
+        """)
+        subparser = subparsers.add_parser('with-lock', parents=[common_parser], add_help=False,
+                                          description=self.do_with_lock.__doc__,
+                                          epilog=with_lock_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='run user command with lock held')
+        subparser.set_defaults(func=self.do_with_lock)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to lock')
+        subparser.add_argument('command', metavar='COMMAND',
+                               help='command to run')
+        subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
+                               help='command arguments')
 
         return parser
 

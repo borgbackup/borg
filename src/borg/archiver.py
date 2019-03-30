@@ -2830,6 +2830,209 @@ class Archiver:
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
 
+        # borg create
+        create_epilog = process_epilog("""
+        This command creates a backup archive containing all files found while recursively
+        traversing all paths specified. Paths are added to the archive as they are given,
+        that means if relative paths are desired, the command has to be run from the correct
+        directory.
+
+        When giving '-' as path, borg will read data from standard input and create a
+        file 'stdin' in the created archive from that data.
+
+        The archive will consume almost no disk space for files or parts of files that
+        have already been stored in other archives.
+
+        The archive name needs to be unique. It must not end in '.checkpoint' or
+        '.checkpoint.N' (with N being a number), because these names are used for
+        checkpoints and treated in special ways.
+
+        In the archive name, you may use the following placeholders:
+        {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
+
+        Backup speed is increased by not reprocessing files that are already part of
+        existing archives and weren't modified. The detection of unmodified files is
+        done by comparing multiple file metadata values with previous values kept in
+        the files cache.
+
+        This comparison can operate in different modes as given by ``--files-cache``:
+
+        - ctime,size,inode (default)
+        - mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+        - ctime,size (ignore the inode number)
+        - mtime,size (ignore the inode number)
+        - rechunk,ctime (all files are considered modified - rechunk, cache ctime)
+        - rechunk,mtime (all files are considered modified - rechunk, cache mtime)
+        - disabled (disable the files cache, all files considered modified - rechunk)
+
+        inode number: better safety, but often unstable on network filesystems
+
+        Normally, detecting file modifications will take inode information into
+        consideration to improve the reliability of file change detection.
+        This is problematic for files located on sshfs and similar network file
+        systems which do not provide stable inode numbers, such files will always
+        be considered modified. You can use modes without `inode` in this case to
+        improve performance, but reliability of change detection might be reduced.
+
+        ctime vs. mtime: safety vs. speed
+
+        - ctime is a rather safe way to detect changes to a file (metadata and contents)
+          as it can not be set from userspace. But, a metadata-only change will already
+          update the ctime, so there might be some unnecessary chunking/hashing even
+          without content changes. Some filesystems do not support ctime (change time).
+        - mtime usually works and only updates if file contents were changed. But mtime
+          can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+          it had before a content change happened. This can be used maliciously as well as
+          well-meant, but in both cases mtime based cache modes can be problematic.
+
+        The mount points of filesystems or filesystem snapshots should be the same for every
+        creation of a new archive to ensure fast operation. This is because the file cache that
+        is used to determine changed files quickly uses absolute filenames.
+        If this is not possible, consider creating a bind mount to a stable location.
+
+        The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
+        (O, C and D, respectively), then the Number of files (N) processed so far, followed by
+        the currently processed path.
+
+        When using ``--stats``, you will get some statistics about how much data was
+        added - the "This Archive" deduplicated size there is most interesting as that is
+        how much your repository will grow. Please note that the "All archives" stats refer to
+        the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
+        exclusive because the data is not actually compressed and deduplicated during a dry run.
+
+        See the output of the "borg help patterns" command for more help on exclude patterns.
+        See the output of the "borg help placeholders" command for more help on placeholders.
+
+        .. man NOTES
+
+        The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
+        exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
+        '\\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
+        more information.
+
+        In addition to using ``--exclude`` patterns, it is possible to use
+        ``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file
+        or folder name) which, when contained within another folder, will prevent the
+        containing folder from being backed up.  By default, the containing folder and
+        all of its contents will be omitted from the backup.  If, however, you wish to
+        only include the objects specified by ``--exclude-if-present`` in your backup,
+        and not include any other contents of the containing folder, this can be enabled
+        through using the ``--keep-exclude-tags`` option.
+
+        Item flags
+        ++++++++++
+
+        ``--list`` outputs a list of all files, directories and other
+        file system items it considered (no matter whether they had content changes
+        or not). For each item, it prefixes a single-letter flag that indicates type
+        and/or status of the item.
+
+        If you are interested only in a subset of that output, you can give e.g.
+        ``--filter=AME`` and it will only show regular files with A, M or E status (see
+        below).
+
+        A uppercase character represents the status of a regular file relative to the
+        "files" cache (not relative to the repo -- this is an issue if the files cache
+        is not used). Metadata is stored in any case and for 'A' and 'M' also new data
+        chunks are stored. For 'U' all data chunks refer to already existing chunks.
+
+        - 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
+        - 'M' = regular file, modified
+        - 'U' = regular file, unchanged
+        - 'C' = regular file, it changed while we backed it up
+        - 'E' = regular file, an error happened while accessing/reading *this* file
+
+        A lowercase character means a file type other than a regular file,
+        borg usually just stores their metadata:
+
+        - 'd' = directory
+        - 'b' = block device
+        - 'c' = char device
+        - 'h' = regular file, hardlink (to already seen inodes)
+        - 's' = symlink
+        - 'f' = fifo
+
+        Other flags used include:
+
+        - 'i' = backup data was read from standard input (stdin)
+        - '-' = dry run, item was *not* backed up
+        - 'x' = excluded, item was *not* backed up
+        - '?' = missing status code (if you see this, please file a bug report!)
+        """)
+
+        subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
+                                          description=self.do_create.__doc__,
+                                          epilog=create_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='create backup')
+        subparser.set_defaults(func=self.do_create)
+
+        dryrun_group = subparser.add_mutually_exclusive_group()
+        dryrun_group.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not create a backup archive')
+        dryrun_group.add_argument('-s', '--stats', dest='stats', action='store_true',
+                               help='print statistics for the created archive')
+
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
+                               help='only display items with the given status characters (see description)')
+        subparser.add_argument('--json', action='store_true',
+                               help='output stats as JSON. Implies ``--stats``.')
+        subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
+                               help='experimental: do not synchronize the cache. Implies not using the files cache.')
+        subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
+                               help='use NAME in archive for stdin data (default: "stdin")')
+
+        exclude_group = define_exclusion_group(subparser, tag_files=True)
+        exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',
+                                   help='exclude files flagged NODUMP')
+
+        fs_group = subparser.add_argument_group('Filesystem options')
+        fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
+                              help='stay in the same file system and do not store mount points of other file systems')
+        fs_group.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+                              help='only store numeric user and group identifiers')
+        fs_group.add_argument('--noatime', dest='noatime', action='store_true',
+                              help='do not store atime into archive')
+        fs_group.add_argument('--noctime', dest='noctime', action='store_true',
+                              help='do not store ctime into archive')
+        fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
+                              help='do not store birthtime (creation date) into archive')
+        fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
+                              help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
+        fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
+                              type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
+                              help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
+        fs_group.add_argument('--read-special', dest='read_special', action='store_true',
+                              help='open and read block and char device files as well as FIFOs as if they were '
+                                   'regular files. Also follows symlinks pointing to these kinds of files.')
+
+        archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
+                                   help='add a comment text to the archive')
+        archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
+                                   type=timestamp, default=None,
+                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
+                                        'Alternatively, give a reference file/directory.')
+        archive_group.add_argument('-c', '--checkpoint-interval', metavar='SECONDS', dest='checkpoint_interval',
+                                   type=int, default=1800,
+                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
+        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
+                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
+        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'),
+                                   help='select compression algorithm, see the output of the '
+                                        '"borg help compression" command for details.')
+
+        subparser.add_argument('location', metavar='ARCHIVE',
+                               type=location_validator(archive=True),
+                               help='name of archive to create (must be also a valid directory name)')
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                               help='paths to archive')
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3169,209 +3372,6 @@ class Archiver:
         subparser.set_defaults(func=self.do_migrate_to_repokey)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
-
-        # borg create
-        create_epilog = process_epilog("""
-        This command creates a backup archive containing all files found while recursively
-        traversing all paths specified. Paths are added to the archive as they are given,
-        that means if relative paths are desired, the command has to be run from the correct
-        directory.
-
-        When giving '-' as path, borg will read data from standard input and create a
-        file 'stdin' in the created archive from that data.
-
-        The archive will consume almost no disk space for files or parts of files that
-        have already been stored in other archives.
-
-        The archive name needs to be unique. It must not end in '.checkpoint' or
-        '.checkpoint.N' (with N being a number), because these names are used for
-        checkpoints and treated in special ways.
-
-        In the archive name, you may use the following placeholders:
-        {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
-
-        Backup speed is increased by not reprocessing files that are already part of
-        existing archives and weren't modified. The detection of unmodified files is
-        done by comparing multiple file metadata values with previous values kept in
-        the files cache.
-
-        This comparison can operate in different modes as given by ``--files-cache``:
-
-        - ctime,size,inode (default)
-        - mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
-        - ctime,size (ignore the inode number)
-        - mtime,size (ignore the inode number)
-        - rechunk,ctime (all files are considered modified - rechunk, cache ctime)
-        - rechunk,mtime (all files are considered modified - rechunk, cache mtime)
-        - disabled (disable the files cache, all files considered modified - rechunk)
-
-        inode number: better safety, but often unstable on network filesystems
-
-        Normally, detecting file modifications will take inode information into
-        consideration to improve the reliability of file change detection.
-        This is problematic for files located on sshfs and similar network file
-        systems which do not provide stable inode numbers, such files will always
-        be considered modified. You can use modes without `inode` in this case to
-        improve performance, but reliability of change detection might be reduced.
-
-        ctime vs. mtime: safety vs. speed
-
-        - ctime is a rather safe way to detect changes to a file (metadata and contents)
-          as it can not be set from userspace. But, a metadata-only change will already
-          update the ctime, so there might be some unnecessary chunking/hashing even
-          without content changes. Some filesystems do not support ctime (change time).
-        - mtime usually works and only updates if file contents were changed. But mtime
-          can be arbitrarily set from userspace, e.g. to set mtime back to the same value
-          it had before a content change happened. This can be used maliciously as well as
-          well-meant, but in both cases mtime based cache modes can be problematic.
-
-        The mount points of filesystems or filesystem snapshots should be the same for every
-        creation of a new archive to ensure fast operation. This is because the file cache that
-        is used to determine changed files quickly uses absolute filenames.
-        If this is not possible, consider creating a bind mount to a stable location.
-
-        The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
-        (O, C and D, respectively), then the Number of files (N) processed so far, followed by
-        the currently processed path.
-
-        When using ``--stats``, you will get some statistics about how much data was
-        added - the "This Archive" deduplicated size there is most interesting as that is
-        how much your repository will grow. Please note that the "All archives" stats refer to
-        the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
-        exclusive because the data is not actually compressed and deduplicated during a dry run.
-
-        See the output of the "borg help patterns" command for more help on exclude patterns.
-        See the output of the "borg help placeholders" command for more help on placeholders.
-
-        .. man NOTES
-
-        The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
-        exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
-        '\\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
-        more information.
-
-        In addition to using ``--exclude`` patterns, it is possible to use
-        ``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file
-        or folder name) which, when contained within another folder, will prevent the
-        containing folder from being backed up.  By default, the containing folder and
-        all of its contents will be omitted from the backup.  If, however, you wish to
-        only include the objects specified by ``--exclude-if-present`` in your backup,
-        and not include any other contents of the containing folder, this can be enabled
-        through using the ``--keep-exclude-tags`` option.
-
-        Item flags
-        ++++++++++
-
-        ``--list`` outputs a list of all files, directories and other
-        file system items it considered (no matter whether they had content changes
-        or not). For each item, it prefixes a single-letter flag that indicates type
-        and/or status of the item.
-
-        If you are interested only in a subset of that output, you can give e.g.
-        ``--filter=AME`` and it will only show regular files with A, M or E status (see
-        below).
-
-        A uppercase character represents the status of a regular file relative to the
-        "files" cache (not relative to the repo -- this is an issue if the files cache
-        is not used). Metadata is stored in any case and for 'A' and 'M' also new data
-        chunks are stored. For 'U' all data chunks refer to already existing chunks.
-
-        - 'A' = regular file, added (see also :ref:`a_status_oddity` in the FAQ)
-        - 'M' = regular file, modified
-        - 'U' = regular file, unchanged
-        - 'C' = regular file, it changed while we backed it up
-        - 'E' = regular file, an error happened while accessing/reading *this* file
-
-        A lowercase character means a file type other than a regular file,
-        borg usually just stores their metadata:
-
-        - 'd' = directory
-        - 'b' = block device
-        - 'c' = char device
-        - 'h' = regular file, hardlink (to already seen inodes)
-        - 's' = symlink
-        - 'f' = fifo
-
-        Other flags used include:
-
-        - 'i' = backup data was read from standard input (stdin)
-        - '-' = dry run, item was *not* backed up
-        - 'x' = excluded, item was *not* backed up
-        - '?' = missing status code (if you see this, please file a bug report!)
-        """)
-
-        subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
-                                          description=self.do_create.__doc__,
-                                          epilog=create_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='create backup')
-        subparser.set_defaults(func=self.do_create)
-
-        dryrun_group = subparser.add_mutually_exclusive_group()
-        dryrun_group.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not create a backup archive')
-        dryrun_group.add_argument('-s', '--stats', dest='stats', action='store_true',
-                               help='print statistics for the created archive')
-
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
-                               help='only display items with the given status characters (see description)')
-        subparser.add_argument('--json', action='store_true',
-                               help='output stats as JSON. Implies ``--stats``.')
-        subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
-                               help='experimental: do not synchronize the cache. Implies not using the files cache.')
-        subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
-                               help='use NAME in archive for stdin data (default: "stdin")')
-
-        exclude_group = define_exclusion_group(subparser, tag_files=True)
-        exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',
-                                   help='exclude files flagged NODUMP')
-
-        fs_group = subparser.add_argument_group('Filesystem options')
-        fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
-                              help='stay in the same file system and do not store mount points of other file systems')
-        fs_group.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
-                              help='only store numeric user and group identifiers')
-        fs_group.add_argument('--noatime', dest='noatime', action='store_true',
-                              help='do not store atime into archive')
-        fs_group.add_argument('--noctime', dest='noctime', action='store_true',
-                              help='do not store ctime into archive')
-        fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
-                              help='do not store birthtime (creation date) into archive')
-        fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                              help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
-        fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
-                              type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
-                              help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
-        fs_group.add_argument('--read-special', dest='read_special', action='store_true',
-                              help='open and read block and char device files as well as FIFOs as if they were '
-                                   'regular files. Also follows symlinks pointing to these kinds of files.')
-
-        archive_group = subparser.add_argument_group('Archive options')
-        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
-                                   help='add a comment text to the archive')
-        archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
-                                   type=timestamp, default=None,
-                                   help='manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). '
-                                        'Alternatively, give a reference file/directory.')
-        archive_group.add_argument('-c', '--checkpoint-interval', metavar='SECONDS', dest='checkpoint_interval',
-                                   type=int, default=1800,
-                                   help='write checkpoint every SECONDS seconds (Default: 1800)')
-        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
-                                   type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
-        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
-                                   type=CompressionSpec, default=CompressionSpec('lz4'),
-                                   help='select compression algorithm, see the output of the '
-                                        '"borg help compression" command for details.')
-
-        subparser.add_argument('location', metavar='ARCHIVE',
-                               type=location_validator(archive=True),
-                               help='name of archive to create (must be also a valid directory name)')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to archive')
 
         # borg extract
         extract_epilog = process_epilog("""

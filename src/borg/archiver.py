@@ -2757,6 +2757,79 @@ class Archiver:
                                    help='do only a partial repo check for max. SECONDS seconds (Default: unlimited)')
         define_archive_filters_group(subparser)
 
+        # borg compact
+        compact_epilog = process_epilog("""
+        This command frees repository space by compacting segments.
+
+        Use this regularly to avoid running out of space - you do not need to use this
+        after each borg command though.
+
+        borg compact does not need a key, so it is possible to invoke it from the
+        client or also from the server.
+
+        Depending on the amount of segments that need compaction, it may take a while.
+
+        See :ref:`separate_compaction` in Additional Notes for more details.
+        """)
+        subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
+                                          description=self.do_compact.__doc__,
+                                          epilog=compact_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='compact segment files / free space in repo')
+        subparser.set_defaults(func=self.do_compact)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to compact')
+        subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
+                               help='cleanup commit-only 17-byte segment files')
+
+        # borg config
+        config_epilog = process_epilog("""
+        This command gets and sets options in a local repository or cache config file.
+        For security reasons, this command only works on local repositories.
+
+        To delete a config value entirely, use ``--delete``. To list the values
+        of the configuration file or the default values, use ``--list``.  To get and existing
+        key, pass only the key name. To set a key, pass both the key name and
+        the new value. Keys can be specified in the format "section.name" or
+        simply "name"; the section will default to "repository" and "cache" for
+        the repo and cache configs, respectively.
+
+
+        By default, borg config manipulates the repository config file. Using ``--cache``
+        edits the repository cache's config file instead.
+        """)
+        subparser = subparsers.add_parser('config', parents=[common_parser], add_help=False,
+                                          description=self.do_config.__doc__,
+                                          epilog=config_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='get and set configuration values')
+        subparser.set_defaults(func=self.do_config)
+        subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
+                               help='get and set values from the repo cache')
+
+        group = subparser.add_mutually_exclusive_group()
+        group.add_argument('-d', '--delete', dest='delete', action='store_true',
+                               help='delete the key from the config file')
+        group.add_argument('-l', '--list', dest='list', action='store_true',
+                               help='list the configuration of the repo')
+
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False, proto='file'),
+                               help='repository to configure')
+        subparser.add_argument('name', metavar='NAME', nargs='?',
+                               help='name of config key')
+        subparser.add_argument('value', metavar='VALUE', nargs='?',
+                               help='new value for key')
+
+        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
+                                          description='Extra help')
+        subparser.add_argument('--epilog-only', dest='epilog_only', action='store_true')
+        subparser.add_argument('--usage-only', dest='usage_only', action='store_true')
+        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
+        subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
+                               help='additional help on TOPIC')
+
         # borg mount
         mount_epilog = process_epilog("""
         This command mounts an archive as a FUSE filesystem. This can be useful for
@@ -3939,79 +4012,6 @@ class Archiver:
                                help='command to run')
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
-
-        # borg compact
-        compact_epilog = process_epilog("""
-        This command frees repository space by compacting segments.
-
-        Use this regularly to avoid running out of space - you do not need to use this
-        after each borg command though.
-
-        borg compact does not need a key, so it is possible to invoke it from the
-        client or also from the server.
-
-        Depending on the amount of segments that need compaction, it may take a while.
-
-        See :ref:`separate_compaction` in Additional Notes for more details.
-        """)
-        subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
-                                          description=self.do_compact.__doc__,
-                                          epilog=compact_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='compact segment files / free space in repo')
-        subparser.set_defaults(func=self.do_compact)
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False),
-                               help='repository to compact')
-        subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
-                               help='cleanup commit-only 17-byte segment files')
-
-        # borg config
-        config_epilog = process_epilog("""
-        This command gets and sets options in a local repository or cache config file.
-        For security reasons, this command only works on local repositories.
-
-        To delete a config value entirely, use ``--delete``. To list the values
-        of the configuration file or the default values, use ``--list``.  To get and existing
-        key, pass only the key name. To set a key, pass both the key name and
-        the new value. Keys can be specified in the format "section.name" or
-        simply "name"; the section will default to "repository" and "cache" for
-        the repo and cache configs, respectively.
-
-
-        By default, borg config manipulates the repository config file. Using ``--cache``
-        edits the repository cache's config file instead.
-        """)
-        subparser = subparsers.add_parser('config', parents=[common_parser], add_help=False,
-                                          description=self.do_config.__doc__,
-                                          epilog=config_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='get and set configuration values')
-        subparser.set_defaults(func=self.do_config)
-        subparser.add_argument('-c', '--cache', dest='cache', action='store_true',
-                               help='get and set values from the repo cache')
-
-        group = subparser.add_mutually_exclusive_group()
-        group.add_argument('-d', '--delete', dest='delete', action='store_true',
-                               help='delete the key from the config file')
-        group.add_argument('-l', '--list', dest='list', action='store_true',
-                               help='list the configuration of the repo')
-
-        subparser.add_argument('location', metavar='REPOSITORY',
-                               type=location_validator(archive=False, proto='file'),
-                               help='repository to configure')
-        subparser.add_argument('name', metavar='NAME', nargs='?',
-                               help='name of config key')
-        subparser.add_argument('value', metavar='VALUE', nargs='?',
-                               help='new value for key')
-
-        subparser = subparsers.add_parser('help', parents=[common_parser], add_help=False,
-                                          description='Extra help')
-        subparser.add_argument('--epilog-only', dest='epilog_only', action='store_true')
-        subparser.add_argument('--usage-only', dest='usage_only', action='store_true')
-        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
-        subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
-                               help='additional help on TOPIC')
 
         # borg debug
         debug_epilog = process_epilog("""

@@ -2701,6 +2701,7 @@ class Archiver:
         - If you use a remote repo server via ssh:, the repo check is executed on the
           repo server without causing significant network traffic.
         - The repository check can be skipped using the ``--archives-only`` option.
+        - A repository check can be time consuming. Partial checks are possible with the ``--max-duration`` option.
 
         Second, the consistency and correctness of the archive metadata is verified:
 
@@ -2723,6 +2724,17 @@ class Archiver:
           required).
         - The archive checks can be time consuming, they can be skipped using the
           ``--repository-only`` option.
+
+        The ``--max-duration`` option can be used to split a long-running repository check into multiple partial checks.
+        After the given number of seconds the check is interrupted. The next partial check will continue where the
+        previous one stopped, until 100% of the repository have been checked. Example: Running a check with
+        ``--max-duration=3600`` (one hour) every night that checks approx. 14.3% of the repository would mean one full
+        check per week.
+
+        Attention: Partial checks can only do way less checks than a full check (only the CRC32 checks on segment file
+        entries are done) and cannot be combined with ``--repair``. Partial checks may therefore be useful only with very
+        large repositories where a full check would last too long. Doing a full repository check resets the partial
+        check position to zero.
 
         The ``--verify-data`` option will perform a full integrity verification (as opposed to
         checking the CRC32 of the segment) of data, which means reading the data from the

@@ -2727,14 +2727,13 @@ class Archiver:
 
         The ``--max-duration`` option can be used to split a long-running repository check into multiple partial checks.
         After the given number of seconds the check is interrupted. The next partial check will continue where the
-        previous one stopped, until 100% of the repository have been checked. Example: Running a check with
-        ``--max-duration=3600`` (one hour) every night that checks approx. 14.3% of the repository would mean one full
-        check per week.
+        previous one stopped, until the complete repository has been checked. Example: Assuming a full check took 7
+        hours, then running a daily check with --max-duration=3600 (1 hour) would result in one full check per week.
 
         Attention: Partial checks can only do way less checks than a full check (only the CRC32 checks on segment file
         entries are done) and cannot be combined with ``--repair``. Partial checks may therefore be useful only with very
-        large repositories where a full check would last too long. Doing a full repository check resets the partial
-        check position to zero.
+        large repositories where a full check would take too long. Doing a full repository check aborts a partial check;
+        the next partial check will start from the beginning.
 
         The ``--verify-data`` option will perform a full integrity verification (as opposed to
         checking the CRC32 of the segment) of data, which means reading the data from the

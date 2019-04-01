@@ -1,5 +1,17 @@
 # borgbackup - main setup code (see also other setup_*.py files)
 
+# NOTE(pabelanger): This tries to workaround the chicken/egg issue where we
+# now need pkgconfig / Cython installed before we can properly compile our
+# setup.py script.
+from setuptools.command import easy_install
+easy_install.main(['pkgconfig'])
+easy_install.main(['Cython'])
+
+# We need to reload setup.py to ensure modules above are not in PYTHONPATH.
+import importlib
+import site
+importlib.reload(site)
+
 import os
 import sys
 from collections import defaultdict

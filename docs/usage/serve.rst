@@ -55,7 +55,7 @@ In the client side's ``~/.ssh/config`` file:
 
 Replacing ``backupserver`` with the hostname, FQDN or IP address of the borg server.
 
-This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the connection will be terminated, causing the borg process to terminate gracefully.
+This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the ssh client process will be terminated, causing the borg process to terminate gracefully.
 
 On the server side's ``sshd`` configuration file (typically ``/etc/ssh/sshd_config``):
 ::

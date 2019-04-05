@@ -63,7 +63,7 @@ On the server side's ``sshd`` configuration file (typically ``/etc/ssh/sshd_conf
     ClientAliveInterval 10
     ClientAliveCountMax 30
 
-This will cause the server to send a keep alive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the connection will be terminated, causing the ``borg serve`` process to terminate gracefully and release the lock on the repository.
+This will cause the server to send a keep alive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server's sshd process will be terminated, causing the ``borg serve`` process to terminate gracefully and release the lock on the repository.
 
 If you then run borg commands with ``--lock-wait 600``, this gives sufficient time for the borg serve processes to terminate after the SSH connection is torn down after the 300 second wait for the keepalives to fail.
 

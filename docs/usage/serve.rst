@@ -53,7 +53,7 @@ In the client side's ``~/.ssh/config`` file:
             ServerAliveInterval 10
             ServerAliveCountMax 30
 
-Replacing ``backupserver`` with the hostname or FQDN of of the borg server.
+Replacing ``backupserver`` with the hostname, FQDN or IP address of the borg server.
 
 This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the connection will be terminated, causing the borg process to terminate gracefully.
 

@@ -14,7 +14,7 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     brew outdated pkg-config || brew upgrade pkg-config
     # do NOT update openssl 1.0.x, brew will also update a lot of dependent pkgs (and their dependencies) then!
     #brew outdated openssl || brew upgrade openssl
-    export PKG_CONFIG_PATH="/usr/local/opt/openssl/lib/pkgconfig:$PKG_CONFIG_PATH"
+    export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
     brew install readline
     export PKG_CONFIG_PATH="/usr/local/opt/readline/lib/pkgconfig:$PKG_CONFIG_PATH"
     brew install zstd
@@ -29,8 +29,8 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
 
     case "${TOXENV}" in
         py35)
-            pyenv install 3.5.2
-            pyenv global 3.5.2
+            pyenv install 3.5.3  # minimum for openssl 1.1.x
+            pyenv global 3.5.3
             ;;
         py36)
             pyenv install 3.6.0

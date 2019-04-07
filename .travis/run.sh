@@ -7,7 +7,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     eval "$(pyenv init -)"
     # set our flags to use homebrew openssl
     export ARCHFLAGS="-arch x86_64"
-    export PKG_CONFIG_PATH="/usr/local/opt/openssl/lib/pkgconfig:$PKG_CONFIG_PATH"
+    export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
 fi
 
 # do not use fakeroot, but run as root on travis.

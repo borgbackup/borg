@@ -109,7 +109,7 @@ Examples::
     $ borg create -e /home/user/cache/ backup /
 
     # The file '/home/user/cache/important' is *not* backed up:
-    $ borg create -e /home/user/cache/ backup / /home/user/cache/important
+    $ borg create -e /home/user/cache/important backup /
 
     # The contents of directories in '/home' are not backed up when their name
     # ends in '.tmp'
@@ -120,7 +120,7 @@ Examples::
     # Comment line
     /home/*/junk
     *.tmp
-    fm:aa:something/*
+    fm:something/*
     re:^/home/[^/]\.tmp/
     sh:/home/*/.thumbnails
     EOF

@@ -46,7 +46,7 @@ SSH Configuration
 
 In order to avoid this, it is recommended to perform the following additional SSH configuration:
 
-In the client side's ``~/.ssh/config`` file:
+Either in the client side's ``~/.ssh/config`` file, or in the client's ``/etc/ssh/ssh_config`` file:
 ::
 
     Host backupserver

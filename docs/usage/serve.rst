@@ -39,3 +39,32 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     has been introduced in v7.2. We recommend to use
     ``no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc``
     in this case.
+    
+SSH Configuration
+~~~~~~~~~~~~~~~~~
+``borg serve``'s pipes (``stdin``/``stdout``/``stderr``) are connected to the ``sshd`` process on the server side. In the event that the SSH connection between ``borg serve`` and the client is disconnected or stuck abnormally (for example, due to a network outage), it can take a long time for ``sshd`` to notice the client is disconnected. In the meantime, ``sshd`` continues running, and as a result so does the ``borg serve`` process holding the lock on the repository. This can cause subsequent ``borg`` operations on the remote repository to fail with the error: ``Failed to create/acquire the lock``.
+
+In order to avoid this, it is recommended to perform the following additional SSH configuration:
+
+Either in the client side's ``~/.ssh/config`` file, or in the client's ``/etc/ssh/ssh_config`` file:
+::
+
+    Host backupserver
+            ServerAliveInterval 10
+            ServerAliveCountMax 30
+
+Replacing ``backupserver`` with the hostname, FQDN or IP address of the borg server.
+
+This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the ssh client process will be terminated, causing the borg process to terminate gracefully.
+
+On the server side's ``sshd`` configuration file (typically ``/etc/ssh/sshd_config``):
+::
+
+    ClientAliveInterval 10
+    ClientAliveCountMax 30
+
+This will cause the server to send a keep alive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server's sshd process will be terminated, causing the ``borg serve`` process to terminate gracefully and release the lock on the repository.
+
+If you then run borg commands with ``--lock-wait 600``, this gives sufficient time for the borg serve processes to terminate after the SSH connection is torn down after the 300 second wait for the keepalives to fail.
+
+You may, of course, modify the timeout values demonstrated above to values that suit your environment and use case.

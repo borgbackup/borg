@@ -1195,6 +1195,7 @@ class FilesystemObjectProcessors:
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io('fstat'):
                     st = stat_update_check(st, os.fstat(fd))
+                item.update(self.metadata_collector.stat_simple_attrs(st))
                 is_special_file = is_special(st.st_mode)
                 if not hardlinked or hardlink_master:
                     if not is_special_file:
@@ -1219,7 +1220,6 @@ class FilesystemObjectProcessors:
                     else:
                         status = 'M' if known else 'A'  # regular file, modified or added
                     item.hardlink_master = hardlinked
-                    item.update(self.metadata_collector.stat_simple_attrs(st))
                     # Only chunkify the file if needed
                     if chunks is not None:
                         item.chunks = chunks
@@ -1244,8 +1244,7 @@ class FilesystemObjectProcessors:
                             # changed while we backed it up.
                             cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                     self.stats.nfiles += 1
-                md = self.metadata_collector.stat_attrs(st, path, fd=fd)
-                item.update(md)
+                item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
                 item.get_size(memorize=True)
                 if is_special_file:
                     # we processed a special file like a regular file. reflect that in mode,

@@ -1605,7 +1605,9 @@ class Archiver:
                             archives_deleted += 1
                             list_logger.info('Pruning archive: %s (%d/%d)' % (format_archive(archive),
                                                                               archives_deleted, to_delete_len))
-                        Archive(repository, key, manifest, archive.name, cache).delete(stats, forced=args.forced)
+                        archive = Archive(repository, key, manifest, archive.name, cache,
+                                          consider_part_files=args.consider_part_files)
+                        archive.delete(stats, forced=args.forced)
                 else:
                     if args.output_list:
                         list_logger.info('Keeping archive: %s' % format_archive(archive))

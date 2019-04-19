@@ -1132,8 +1132,9 @@ class Archiver:
                 msg = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
                 logger.info(msg.format(format_archive(manifest.archives[archive_name]), i, len(archive_names)))
                 if not dry_run:
-                    Archive(repository, key, manifest, archive_name, cache=cache).delete(
-                        stats, progress=args.progress, forced=args.forced)
+                    archive = Archive(repository, key, manifest, archive_name, cache=cache,
+                                      consider_part_files=args.consider_part_files)
+                    archive.delete(stats, progress=args.progress, forced=args.forced)
             if not dry_run:
                 manifest.write()
                 repository.commit(compact=False, save_space=args.save_space)
@@ -1430,7 +1431,9 @@ class Archiver:
                     else:
                         archives_deleted += 1
                         log_message = 'Pruning archive (%d/%d):' % (archives_deleted, to_delete_len)
-                        Archive(repository, key, manifest, archive.name, cache).delete(stats, forced=args.forced)
+                        archive = Archive(repository, key, manifest, archive.name, cache,
+                                          consider_part_files=args.consider_part_files)
+                        archive.delete(stats, forced=args.forced)
                 else:
                     if is_checkpoint(archive.name):
                         log_message = 'Keeping checkpoint archive:'

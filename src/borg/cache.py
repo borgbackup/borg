@@ -909,16 +909,16 @@ class LocalCache(CacheStatsMixin):
         stats.update(_size, csize, False, part=part)
         return ChunkListEntry(id, _size, csize)
 
-    def chunk_decref(self, id, stats, wait=True):
+    def chunk_decref(self, id, stats, wait=True, part=False):
         if not self.txn_active:
             self.begin_txn()
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, -csize, True)
+            stats.update(-size, -csize, True, part=part)
         else:
-            stats.update(-size, -csize, False)
+            stats.update(-size, -csize, False, part=part)
 
     def file_known_and_unchanged(self, path_hash, st):
         """
@@ -1057,16 +1057,16 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         stats.update(size, csize, False, part=part)
         return ChunkListEntry(id, size, csize)
 
-    def chunk_decref(self, id, stats, wait=True):
+    def chunk_decref(self, id, stats, wait=True, part=False):
         if not self._txn_active:
             self.begin_txn()
         count, size, csize = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, -csize, True)
+            stats.update(-size, -csize, True, part=part)
         else:
-            stats.update(-size, -csize, False)
+            stats.update(-size, -csize, False, part=part)
 
     def commit(self):
         if not self._txn_active:

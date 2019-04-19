@@ -1431,7 +1431,9 @@ class Archiver:
                     else:
                         archives_deleted += 1
                         log_message = 'Pruning archive (%d/%d):' % (archives_deleted, to_delete_len)
-                        Archive(repository, key, manifest, archive.name, cache).delete(stats, forced=args.forced)
+                        archive = Archive(repository, key, manifest, archive.name, cache,
+                                          consider_part_files=args.consider_part_files)
+                        archive.delete(stats, forced=args.forced)
                 else:
                     if is_checkpoint(archive.name):
                         log_message = 'Keeping checkpoint archive:'

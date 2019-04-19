@@ -845,9 +845,9 @@ Utilization of max. archive size: {csize_max:.0%}
                 error = True
                 return exception_ignored  # must not return None here
 
-        def chunk_decref(id, stats):
+        def chunk_decref(id, stats, part=False):
             try:
-                self.cache.chunk_decref(id, stats, wait=False)
+                self.cache.chunk_decref(id, stats, wait=False, part=part)
             except KeyError:
                 cid = bin_to_hex(id)
                 raise ChunksIndexError(cid)
@@ -869,8 +869,9 @@ Utilization of max. archive size: {csize_max:.0%}
                     for item in unpacker:
                         item = Item(internal_dict=item)
                         if 'chunks' in item:
+                            part = not self.consider_part_files and 'part' in item
                             for chunk_id, size, csize in item.chunks:
-                                chunk_decref(chunk_id, stats)
+                                chunk_decref(chunk_id, stats, part=part)
                 except (TypeError, ValueError):
                     # if items metadata spans multiple chunks and one chunk got dropped somehow,
                     # it could be that unpacker yields bad types

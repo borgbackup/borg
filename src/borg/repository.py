@@ -393,8 +393,12 @@ class Repository:
         else:
             self.lock = None
         self.config = ConfigParser(interpolation=None)
-        with open(os.path.join(self.path, 'config')) as fd:
-            self.config.read_file(fd)
+        try:
+            with open(os.path.join(self.path, 'config')) as fd:
+                self.config.read_file(fd)
+        except FileNotFoundError:
+            self.close()
+            raise self.InvalidRepository(self.path)
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             self.close()
             raise self.InvalidRepository(path)

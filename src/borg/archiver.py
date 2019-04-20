@@ -157,7 +157,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
-                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
+                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE),
+                               consider_part_files=getattr(args, 'consider_part_files', False)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)

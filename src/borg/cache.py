@@ -358,15 +358,17 @@ class Cache:
             shutil.rmtree(path)
 
     def __new__(cls, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
-                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE):
+                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE,
+                consider_part_files=False):
 
         def local():
             return LocalCache(repository=repository, key=key, manifest=manifest, path=path, sync=sync,
                               warn_if_unencrypted=warn_if_unencrypted, progress=progress,
-                              lock_wait=lock_wait, cache_mode=cache_mode)
+                              lock_wait=lock_wait, cache_mode=cache_mode, consider_part_files=consider_part_files)
 
         def adhoc():
-            return AdHocCache(repository=repository, key=key, manifest=manifest, lock_wait=lock_wait)
+            return AdHocCache(repository=repository, key=key, manifest=manifest, lock_wait=lock_wait,
+                              consider_part_files=consider_part_files)
 
         if not permit_adhoc_cache:
             return local()
@@ -402,8 +404,24 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
                                      'total_chunks'])
 
     def stats(self):
+        from .archive import Archive
         # XXX: this should really be moved down to `hashindex.pyx`
-        stats = self.Summary(*self.chunks.summarize())._asdict()
+        total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks = self.chunks.summarize()
+        # the above values have the problem that they do not consider part files,
+        # thus the total_size and total_csize might be too high (chunks referenced
+        # by the part files AND by the complete file).
+        # since borg 1.2 we have new archive metadata telling the total size and
+        # csize per archive, so we can just sum up all archives to get the "all
+        # archives" stats:
+        total_size, total_csize = 0, 0
+        for archive_name in self.manifest.archives:
+            archive = Archive(self.repository, self.key, self.manifest, archive_name,
+                              consider_part_files=self.consider_part_files)
+            stats = archive.calc_stats(self, want_unique=False)
+            total_size += stats.osize
+            total_csize += stats.csize
+        stats = self.Summary(total_size, total_csize, unique_size, unique_csize,
+                             total_unique_chunks, total_chunks)._asdict()
         return stats
 
     def format_tuple(self):
@@ -422,7 +440,7 @@ class LocalCache(CacheStatsMixin):
     """
 
     def __init__(self, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
-                 progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE):
+                 progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE, consider_part_files=False):
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
         :param lock_wait: timeout for lock acquisition (int [s] or None [wait forever])
@@ -434,6 +452,7 @@ class LocalCache(CacheStatsMixin):
         self.manifest = manifest
         self.progress = progress
         self.cache_mode = cache_mode
+        self.consider_part_files = consider_part_files
         self.timestamp = None
         self.txn_active = False
 
@@ -992,10 +1011,11 @@ All archives:                unknown              unknown              unknown
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
-    def __init__(self, repository, key, manifest, warn_if_unencrypted=True, lock_wait=None):
+    def __init__(self, repository, key, manifest, warn_if_unencrypted=True, lock_wait=None, consider_part_files=False):
         self.repository = repository
         self.key = key
         self.manifest = manifest
+        self.consider_part_files = consider_part_files
         self._txn_active = False
 
         self.security_manager = SecurityManager(repository)

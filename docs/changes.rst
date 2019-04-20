@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a5 (2019-03-21)
-----------------------------
+Version 1.2.0a6 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -214,6 +214,34 @@ Compatibility notes:
   - 2) if you are aware that 1) is not the case for you, you must set
        BORG_HOST_ID env var to something unique.
 
+
+Fixes:
+
+- delete / prune: consider part files correctly for stats, #4507
+- create: only run stat_simple_attrs() once
+- create: --stats does not work with --dry-run, exit with error msg, #4373
+- give "invalid repo" error msg if repo config not found, #4411
+
+New features:
+
+- display msgpack version as part of sysinfo (e.g. in tracebacks)
+
+Other changes:
+
+- docs:
+
+  - sdd "SSH Configuration" section, #4493, #3988, #636, #4485
+  - better document borg check --max-duration, #4473
+  - sorted commands help in multiple steps, #4471
+- testing:
+
+  - travis: use py 3.5.3 and 3.6.7 on macOS to get a pyenv-based python
+    build with openssl 1.1
+  - pytest: -v and default XDISTN to 1, #4481
+
+
+Version 1.2.0a5 (2019-03-21)
+----------------------------
 
 Fixes:
 

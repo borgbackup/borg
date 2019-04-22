@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a6 (not released yet)
-----------------------------------
+Version 1.2.0a6 (2019-04-22)
+----------------------------
 
 Please note:
 
@@ -218,6 +218,7 @@ Compatibility notes:
 Fixes:
 
 - delete / prune: consider part files correctly for stats, #4507
+- fix "all archives" stats considering part files, #4329
 - create: only run stat_simple_attrs() once
 - create: --stats does not work with --dry-run, exit with error msg, #4373
 - give "invalid repo" error msg if repo config not found, #4411
@@ -237,6 +238,8 @@ Other changes:
 
   - travis: use py 3.5.3 and 3.6.7 on macOS to get a pyenv-based python
     build with openssl 1.1
+  - vagrant: use py 3.5.3 and 3.6.8 on darwin64 VM to build python and
+    borg with openssl 1.1
   - pytest: -v and default XDISTN to 1, #4481
 
 

@@ -4243,8 +4243,10 @@ class Archiver:
             parser.error('Need at least one PATH argument.')
         return args
 
-    def prerun_checks(self, logger):
-        check_python()
+    def prerun_checks(self, logger, is_serve):
+        if not is_serve:
+            # this is the borg *client*, we need to check the python:
+            check_python()
         check_extension_modules()
         selftest(logger)
 
@@ -4286,7 +4288,7 @@ class Archiver:
             return self.exit_code
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
-        self.prerun_checks(logger)
+        self.prerun_checks(logger, is_serve)
         if not is_supported_msgpack():
             logger.error("You do not have a supported version of the msgpack python package installed. Terminating.")
             logger.error("This should never happen as specific, supported versions are required by our setup.py.")

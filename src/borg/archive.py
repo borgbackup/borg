@@ -999,6 +999,7 @@ Utilization of max. archive size: {csize_max:.0%}
 
     def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
+            item.update(self.metadata_collector.stat_simple_attrs(st))
             is_special_file = is_special(st.st_mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
@@ -1023,7 +1024,6 @@ Utilization of max. archive size: {csize_max:.0%}
                 else:
                     status = 'M' if known else 'A'  # regular file, modified or added
                 item.hardlink_master = hardlinked
-                item.update(self.stat_simple_attrs(st))
                 # Only chunkify the file if needed
                 if chunks is not None:
                     item.chunks = chunks

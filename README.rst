@@ -126,15 +126,16 @@ Now doing another backup, just to show off the great deduplication::
 
 For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
-Helping, Donations and Bounties
--------------------------------
+Helping, Donations and Bounties, becoming a Patron
+--------------------------------------------------
 
 Your help is always welcome!
+
 Spread the word, give feedback, help with documentation, testing or development.
 
 You can also give monetary support to the project, see there for details:
 
-https://www.borgbackup.org/support/free.html#bounties-and-fundraisers
+https://www.borgbackup.org/support/fund.html
 
 Links
 -----

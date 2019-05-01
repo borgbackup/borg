@@ -999,6 +999,7 @@ Utilization of max. archive size: {csize_max:.0%}
 
     def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
+            item.update(self.stat_simple_attrs(st))
             is_special_file = is_special(st.st_mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
@@ -1023,7 +1024,6 @@ Utilization of max. archive size: {csize_max:.0%}
                 else:
                     status = 'M' if known else 'A'  # regular file, modified or added
                 item.hardlink_master = hardlinked
-                item.update(self.stat_simple_attrs(st))
                 # Only chunkify the file if needed
                 if chunks is not None:
                     item.chunks = chunks
@@ -1037,7 +1037,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         # block or char device will change without its mtime/size/inode changing.
                         cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                 self.stats.nfiles += 1
-            item.update(self.stat_attrs(st, path))
+            item.update(self.stat_ext_attrs(st, path))
             item.get_size(memorize=True)
             if is_special_file:
                 # we processed a special file like a regular file. reflect that in mode,

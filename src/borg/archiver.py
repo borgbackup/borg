@@ -2788,6 +2788,10 @@ class Archiver:
 
         When using ``--verbose``, borg will output an estimate of the freed space.
 
+        After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
+        to clean up the numerous 17byte commit-only segments that borg 1.1 did not clean up
+        due to a bug. It is enough to do that once per repository.
+
         See :ref:`separate_compaction` in Additional Notes for more details.
         """)
         subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,

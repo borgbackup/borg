@@ -2777,12 +2777,20 @@ class Archiver:
         This command frees repository space by compacting segments.
 
         Use this regularly to avoid running out of space - you do not need to use this
-        after each borg command though.
+        after each borg command though. It is especially useful after deleting archives,
+        because only compaction will really free repository space.
 
         borg compact does not need a key, so it is possible to invoke it from the
         client or also from the server.
 
-        Depending on the amount of segments that need compaction, it may take a while.
+        Depending on the amount of segments that need compaction, it may take a while,
+        so consider using the ``--progress`` option.
+
+        When using ``--verbose``, borg will output an estimate of the freed space.
+
+        After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
+        to clean up the numerous 17byte commit-only segments that borg 1.1 did not clean up
+        due to a bug. It is enough to do that once per repository.
 
         See :ref:`separate_compaction` in Additional Notes for more details.
         """)

@@ -109,19 +109,14 @@ end
 
 def packages_openbsd
   return <<-EOF
-    echo 'installpath = http://ftp.hostserver.de/pub/OpenBSD/6.0/packages/amd64/' > /etc/pkg.conf
-    echo 'export PKG_PATH=http://ftp.hostserver.de/pub/OpenBSD/6.0/packages/amd64/' >> ~/.profile
-    . ~/.profile
     pkg_add bash
     chsh -s /usr/local/bin/bash vagrant
-    pkg_add openssl
     pkg_add lz4
+    pkg_add zstd
     pkg_add git  # no fakeroot
-    pkg_add py3-setuptools
-    ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
-    ln -sf /usr/local/bin/python3.4 /usr/local/bin/python
-    easy_install-3.4 pip
-    pip3 install virtualenv
+    pkg_add py3-pip
+    pkg_add py3-virtualenv
+    ln -sf /usr/local/bin/virtualenv-3 /usr/local/bin/virtualenv
   EOF
 end
 
@@ -543,7 +538,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "openbsd60-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
+    b.vm.box = "openbsd64-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.9 (2019-02-10)
---------------------------
+Version 1.1.10 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -190,6 +190,10 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+
+Version 1.1.9 (2019-02-10)
+--------------------------
 
 Fixes:
 

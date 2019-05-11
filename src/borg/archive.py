@@ -248,7 +248,7 @@ class DownloadPipeline:
         self.repository = repository
         self.key = key
 
-    def unpack_many(self, ids, filter=None, preload=False):
+    def unpack_many(self, ids, filter=None, partial_extract=False, preload=False, hardlink_masters=None):
         """
         Return iterator of items.
 
@@ -265,12 +265,40 @@ class DownloadPipeline:
             for item in items:
                 if 'chunks' in item:
                     item.chunks = [ChunkListEntry(*e) for e in item.chunks]
+
+            def preload(chunks):
+                self.repository.preload([c.id for c in chunks])
+
             if filter:
                 items = [item for item in items if filter(item)]
+
             if preload:
-                for item in items:
-                    if 'chunks' in item:
-                        self.repository.preload([c.id for c in item.chunks])
+                if filter and partial_extract:
+                    # if we do only a partial extraction, it gets a bit
+                    # complicated with computing the preload items: if a hardlink master item is not
+                    # selected (== not extracted), we will still need to preload its chunks if a
+                    # corresponding hardlink slave is selected (== is extracted).
+                    # due to a side effect of the filter() call, we now have hardlink_masters dict populated.
+                    masters_preloaded = set()
+                    for item in items:
+                        if 'chunks' in item:  # regular file, maybe a hardlink master
+                            preload(item.chunks)
+                            # if this is a hardlink master, remember that we already preloaded it:
+                            if 'source' not in item and hardlinkable(item.mode) and item.get('hardlink_master', True):
+                                masters_preloaded.add(item.path)
+                        elif 'source' in item and hardlinkable(item.mode):  # hardlink slave
+                            source = item.source
+                            if source not in masters_preloaded:
+                                # we only need to preload *once* (for the 1st selected slave)
+                                chunks, _ = hardlink_masters[source]
+                                preload(chunks)
+                                masters_preloaded.add(source)
+                else:
+                    # easy: we do not have a filter, thus all items are selected, thus we need to preload all chunks.
+                    for item in items:
+                        if 'chunks' in item:
+                            preload(item.chunks)
+
             for item in items:
                 yield item
 
@@ -486,8 +514,10 @@ Utilization of max. archive size: {csize_max:.0%}
             return False
         return filter(item) if filter else True
 
-    def iter_items(self, filter=None, preload=False):
-        for item in self.pipeline.unpack_many(self.metadata.items, preload=preload,
+    def iter_items(self, filter=None, partial_extract=False, preload=False, hardlink_masters=None):
+        assert not (filter and partial_extract and preload) or hardlink_masters is not None
+        for item in self.pipeline.unpack_many(self.metadata.items, partial_extract=partial_extract,
+                                              preload=preload, hardlink_masters=hardlink_masters,
                                               filter=lambda item: self.item_filter(item, filter)):
             yield item
 

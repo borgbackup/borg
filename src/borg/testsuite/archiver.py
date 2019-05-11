@@ -824,7 +824,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     @requires_hardlinks
-    def test_extract_hardlinks(self):
+    def test_extract_hardlinks1(self):
+        self._extract_hardlinks_setup()
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/source').st_nlink == 4
+            assert os.stat('input/abba').st_nlink == 4
+            assert os.stat('input/dir1/hardlink').st_nlink == 4
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
+
+    @requires_hardlinks
+    def test_extract_hardlinks2(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
@@ -840,13 +851,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
-        with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
-            assert os.stat('input/source').st_nlink == 4
-            assert os.stat('input/abba').st_nlink == 4
-            assert os.stat('input/dir1/hardlink').st_nlink == 4
-            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
-            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     def test_extract_include_exclude(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

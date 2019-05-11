@@ -4224,20 +4224,43 @@ class Archiver:
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
         result = self.parse_args(argv[1:])
         if cmd is not None and result.func == self.do_serve:
-            forced_result = result
-            argv = shlex.split(cmd)
+            # borg serve case:
+            # - "result" is how borg got invoked (e.g. via forced command from authorized_keys),
+            # - "client_result" (from "cmd") refers to the command the client wanted to execute,
+            #   which might be different in the case of a forced command or same otherwise.
+            client_argv = shlex.split(cmd)
             # Drop environment variables (do *not* interpret them) before trying to parse
             # the borg command line.
-            argv = list(itertools.dropwhile(lambda arg: '=' in arg, argv))
-            result = self.parse_args(argv[1:])
-            if result.func != forced_result.func:
-                # someone is trying to execute a different borg subcommand, don't do that!
-                return forced_result
-            # we only take specific options from the forced "borg serve" command:
-            result.restrict_to_paths = forced_result.restrict_to_paths
-            result.restrict_to_repositories = forced_result.restrict_to_repositories
-            result.append_only = forced_result.append_only
-            result.storage_quota = forced_result.storage_quota
+            client_argv = list(itertools.dropwhile(lambda arg: '=' in arg, client_argv))
+            client_result = self.parse_args(client_argv[1:])
+            if client_result.func == result.func:
+                # make sure we only process like normal if the client is executing
+                # the same command as specified in the forced command, otherwise
+                # just skip this block and return the forced command (== result).
+                # client is allowed to specify the whitelisted options,
+                # everything else comes from the forced "borg serve" command (or the defaults).
+                # stuff from blacklist must never be used from the client.
+                blacklist = {
+                    'restrict_to_paths',
+                    'restrict_to_repositories',
+                    'append_only',
+                    'storage_quota',
+                }
+                whitelist = {
+                    'debug_topics',
+                    'lock_wait',
+                    'log_level',
+                    'umask',
+                }
+                not_present = object()
+                for attr_name in whitelist:
+                    assert attr_name not in blacklist, 'whitelist has blacklisted attribute name %s' % attr_name
+                    value = getattr(client_result, attr_name, not_present)
+                    if value is not not_present:
+                        # note: it is not possible to specify a whitelisted option via a forced command,
+                        # it always gets overridden by the value specified (or defaulted to) by the client commmand.
+                        setattr(result, attr_name, value)
+
         return result
 
     def parse_args(self, args=None):

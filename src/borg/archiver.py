@@ -47,7 +47,7 @@ try:
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
     from .helpers import Error, NoManifestError, set_ec
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
-    from .helpers import PrefixSpec, SortBySpec, FilesCacheMode
+    from .helpers import PrefixSpec, GlobSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
     from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
@@ -2180,8 +2180,8 @@ class Archiver:
                 # don't backup the other home directories
                 - /home/*\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
-        Repository (or Archive) URLs, ``--prefix`` and ``--remote-path`` values support these
-        placeholders:
+        Repository (or Archive) URLs, ``--prefix``, ``--glob-archives`` and ``--remote-path``
+        values support these placeholders:
 
         {hostname}
             The (short) hostname of the machine.
@@ -2568,7 +2568,8 @@ class Archiver:
             group = filters_group.add_mutually_exclusive_group()
             group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, default='',
                                help='only consider archive names starting with this prefix.')
-            group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives', default=None,
+            group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
+                               type=GlobSpec, default=None,
                                help='only consider archive names matching the glob. '
                                     'sh: rules apply, see "borg help patterns". '
                                     '``--prefix`` and ``--glob-archives`` are mutually exclusive.')

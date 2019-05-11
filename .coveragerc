@@ -1,5 +1,6 @@
 [run]
 branch = True
+disable_warnings = module-not-measured
 source = src/borg
 omit =
     */borg/__init__.py

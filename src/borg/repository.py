@@ -11,8 +11,6 @@ from datetime import datetime
 from functools import partial
 from itertools import islice
 
-import msgpack
-
 from .constants import *  # NOQA
 from .hashindex import NSIndex
 from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
@@ -21,6 +19,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import hostname_is_unique
 from .helpers import secure_erase, truncate_and_unlink
+from .helpers import msgpack
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache

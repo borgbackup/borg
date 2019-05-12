@@ -13,8 +13,6 @@ from io import BytesIO
 from itertools import groupby
 from shutil import get_terminal_size
 
-import msgpack
-
 from .logger import create_logger
 
 logger = create_logger()
@@ -38,6 +36,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import msgpack
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname

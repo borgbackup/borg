@@ -31,8 +31,20 @@ from operator import attrgetter
 from string import Formatter
 from shutil import get_terminal_size
 
-import msgpack
-import msgpack.fallback
+prefer_system_msgpack = False
+
+try:
+    if prefer_system_msgpack:
+        raise ImportError
+    # use the bundled msgpack 0.5.6 known-good version - other code only imports it from here:
+    import borg.algorithms.msgpack as msgpack
+    from borg.algorithms.msgpack import fallback as msgpack_fallback
+except ImportError:
+    # when using a system msgpack, make sure it satisfies the requirements, see setup.py.
+    # also, you must make sure it actually gets installed as a dependency.
+    import msgpack
+    from msgpack import fallback as msgpack_fallback
+
 
 from .logger import create_logger
 logger = create_logger()
@@ -1287,7 +1299,7 @@ def int_to_bigint(value):
 
 
 def is_slow_msgpack():
-    return msgpack.Packer is msgpack.fallback.Packer
+    return msgpack.Packer is msgpack_fallback.Packer
 
 
 def is_supported_msgpack():

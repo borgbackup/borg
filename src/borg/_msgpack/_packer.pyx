@@ -5,8 +5,8 @@ from cpython cimport *
 from cpython.version cimport PY_MAJOR_VERSION
 from cpython.exc cimport PyErr_WarnEx
 
-from msgpack.exceptions import PackValueError, PackOverflowError
-from msgpack import ExtType
+from .exceptions import PackValueError, PackOverflowError
+from . import ExtType
 
 
 cdef extern from "Python.h":

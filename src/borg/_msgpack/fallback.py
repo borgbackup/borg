@@ -49,7 +49,7 @@ else:
     newlist_hint = lambda size: []
 
 
-from msgpack.exceptions import (
+from .exceptions import (
     BufferFull,
     OutOfData,
     UnpackValueError,
@@ -57,7 +57,7 @@ from msgpack.exceptions import (
     PackOverflowError,
     ExtraData)
 
-from msgpack import ExtType
+from . import ExtType
 
 
 EX_SKIP                 = 0

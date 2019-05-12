@@ -32,13 +32,13 @@ from libc.string cimport *
 from libc.limits cimport *
 ctypedef unsigned long long uint64_t
 
-from msgpack.exceptions import (
+from .exceptions import (
     BufferFull,
     OutOfData,
     UnpackValueError,
     ExtraData,
 )
-from msgpack import ExtType
+from . import ExtType
 
 
 cdef extern from "unpack.h":

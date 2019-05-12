@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.9 (2019-02-10)
---------------------------
+Version 1.1.10 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -190,6 +190,48 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+Fixes:
+
+- extract: hang on partial extraction with ssh: repo, when hardlink master
+  is not matched/extracted and borg hangs on related slave hardlink, #4350
+- lrucache: regularly remove old FDs, #4427
+- avoid stale filehandle issues, #3265
+- freebsd: make xattr platform code api compatible with linux, #3952
+- use whitelist approach for borg serve, #4097
+- borg command shall terminate with rc 2 for ImportErrors, #4424
+- create: only run stat_simple_attrs() once, this increases
+  backup with lots of unchanged files performance by ~ 5%.
+- prune: fix incorrect borg prune --stats output with --dry-run, #4373
+- key export: emit user-friendly error if repo key is exported to a directory,
+  #4348
+
+New features:
+
+- display msgpack version as part of sysinfo (e.g. in tracebacks)
+- timestamp for borg delete --info added, #4359
+
+Other:
+
+- shell completions: borg diff second archive
+- release scripts: signing binaries with Qubes OS support
+- testing:
+
+  - vagrant: upgrade openbsd box to 6.4
+  - travis-ci: lock test env to py 3.4 compatible versions, #4343
+  - get rid of confusing coverage warning, #2069
+- docs:
+
+  - add "SSH Configuration" section to "borg serve", #3988, #636, #4485
+  - README: new URL for funding options
+  - add a sample logging.conf in docs/misc, #4380
+  - elaborate on append-only mode docs, #3504
+  - installation: added Alpine Linux to distribution list, #4415
+  - usage.html: only modify window.location when redirecting, #4133
+
+
+Version 1.1.9 (2019-02-10)
+--------------------------
 
 Fixes:
 
@@ -237,6 +279,7 @@ Other:
 
   - fix the homebrew 1.9 issues on travis-ci, #4254
   - fix duplicate test method name, #4311
+  - test_mount_hardlinks: get rid of fakeroot-caused test fails, #3389
 
 
 Version 1.1.8 (2018-12-09)

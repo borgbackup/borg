@@ -791,7 +791,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @requires_hardlinks
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
-    def test_mount_hardlinks(self):
+    def test_fuse_mount_hardlinks(self):
         self._extract_hardlinks_setup()
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # we need to get rid of permissions checking because fakeroot causes issues with it.

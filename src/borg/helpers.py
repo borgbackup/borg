@@ -31,6 +31,30 @@ from operator import attrgetter
 from string import Formatter
 from shutil import get_terminal_size
 
+# MSGPACK =====================================================================
+# we are rather picky about msgpack versions, because a good working msgpack is
+# very important for borg, see https://github.com/borgbackup/borg/issues/3753
+#
+# because some linux distributions didn't get their dependency management right
+# and broke borgbackup by upgrading msgpack to incompatible versions, we now
+# bundle msgpack-python 0.5.6, which is the latest and best msgpack that is
+# still compatible with borg 1.1.x and we use the bundled version by default.
+#
+# if you are a package maintainer and don't like bundled library code, feel
+# free to not use the bundled code:
+# - set prefer_system_msgpack = True
+# - make sure that an external msgpack-python gets installed
+# - make sure the external msgpack-python always stays at supported versions.
+# - best versions seem to be 0.4.6, 0.4.7, 0.4.8 and 0.5.6.
+# - if you can't satisfy the above requirement, these are versions that might
+#   also work ok, IF you make sure to use the COMPILED version of
+#   msgpack-python NOT the PURE PYTHON fallback implementation: 0.5.1 and 0.5.4
+#
+# Please note:
+# - using any other version is not supported by borg development and
+#   any feedback related to issues caused by this will be ignored.
+# - especially, it is known that msgpack 0.6.x does NOT work for borg 1.1.x.
+
 prefer_system_msgpack = False
 
 try:
@@ -40,8 +64,7 @@ try:
     import borg.algorithms.msgpack as msgpack
     from borg.algorithms.msgpack import fallback as msgpack_fallback
 except ImportError:
-    # when using a system msgpack, make sure it satisfies the requirements, see setup.py.
-    # also, you must make sure it actually gets installed as a dependency.
+    # use an external msgpack version
     import msgpack
     from msgpack import fallback as msgpack_fallback
 

@@ -25,6 +25,8 @@ prefer_system_libzstd = True
 # True: use the shared libb2 from the system, False: use the bundled blake2 code
 prefer_system_libb2 = True
 
+# prefer_system_msgpack is another option, but you need to set it in src/borg/helpers.py.
+
 min_python = (3, 4)
 my_python = sys.version_info
 
@@ -35,19 +37,7 @@ if my_python < min_python:
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
-install_requires = [
-    # we are rather picky about msgpack versions, because a good working msgpack is
-    # very important for borg, see https://github.com/borgbackup/borg/issues/3753
-    # best versions seem to be 0.4.6, 0.4.7, 0.4.8 and 0.5.6:
-    #'msgpack-python >=0.4.6, <=0.5.6, !=0.5.0, !=0.5.1, !=0.5.2, !=0.5.3, !=0.5.4, !=0.5.5',
-    # if you can't satisfy the above requirement, these are versions that might
-    # also work ok, IF you make sure to use the COMPILED version of msgpack-python,
-    # NOT the PURE PYTHON fallback implementation: ==0.5.1, ==0.5.4
-    #
-    # Please note:
-    # using any other version is not supported by borg development and
-    # any feedback related to issues caused by this will be ignored.
-]
+install_requires = []
 
 # note for package maintainers: if you package borgbackup for distribution,
 # please add llfuse as a *requirement* on all platforms that have a working

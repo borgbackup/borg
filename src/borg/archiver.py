@@ -92,6 +92,8 @@ assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND excep
 
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
 
+PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
+
 
 def argument(args, str_or_bool):
     """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
@@ -4328,7 +4330,7 @@ class Archiver:
             logger.error("Do not contact borgbackup support about this.")
             return set_ec(EXIT_ERROR)
         if is_slow_msgpack():
-            logger.warning("Using a pure-python msgpack! This will result in lower performance.")
+            logger.warning(PURE_PYTHON_MSGPACK_WARNING)
         if args.debug_profile:
             # Import only when needed - avoids a further increase in startup time
             import cProfile

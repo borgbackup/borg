@@ -227,6 +227,8 @@ PrefixSpec = replace_placeholders
 
 GlobSpec = replace_placeholders
 
+CommentSpec = replace_placeholders
+
 
 def SortBySpec(text):
     from .manifest import AI_HUMAN_SORT_KEYS

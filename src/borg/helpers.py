@@ -685,6 +685,9 @@ def replace_placeholders(text):
 
 PrefixSpec = replace_placeholders
 
+GlobSpec = replace_placeholders
+
+CommentSpec = replace_placeholders
 
 HUMAN_SORT_KEYS = ['timestamp'] + list(ArchiveInfo._fields)
 HUMAN_SORT_KEYS.remove('ts')

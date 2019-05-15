@@ -33,8 +33,6 @@ try:
 
     logger = create_logger()
 
-    import msgpack
-
     import borg
     from . import __version__
     from . import helpers
@@ -72,6 +70,7 @@ try:
     from .helpers import popen_with_error_handling, prepare_subprocess_env
     from .helpers import dash_open
     from .helpers import umount
+    from .helpers import msgpack, msgpack_fallback
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
@@ -1957,7 +1956,7 @@ class Archiver:
 
         data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
 
-        meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
+        meta = prepare_dump_dict(msgpack_fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
 
         with dash_open(args.path, 'w') as fd:
             json.dump(meta, fd, indent=4)

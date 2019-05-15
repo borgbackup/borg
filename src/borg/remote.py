@@ -16,8 +16,6 @@ import time
 import traceback
 from subprocess import Popen, PIPE
 
-import msgpack
-
 from . import __version__
 from .compress import LZ4
 from .constants import *  # NOQA
@@ -32,6 +30,7 @@ from .helpers import format_file_size
 from .helpers import truncate_and_unlink
 from .helpers import prepare_subprocess_env
 from .logger import create_logger, setup_logging
+from .helpers import msgpack
 from .repository import Repository
 from .version import parse_version, format_version
 from .algorithms.checksums import xxh64

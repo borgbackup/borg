@@ -25,6 +25,8 @@ prefer_system_libzstd = True
 # True: use the shared libb2 from the system, False: use the bundled blake2 code
 prefer_system_libb2 = True
 
+# prefer_system_msgpack is another option, but you need to set it in src/borg/helpers.py.
+
 min_python = (3, 4)
 my_python = sys.version_info
 
@@ -35,19 +37,7 @@ if my_python < min_python:
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
-install_requires = [
-    # we are rather picky about msgpack versions, because a good working msgpack is
-    # very important for borg, see https://github.com/borgbackup/borg/issues/3753
-    # best versions seem to be 0.4.6, 0.4.7, 0.4.8 and 0.5.6:
-    'msgpack-python >=0.4.6, <=0.5.6, !=0.5.0, !=0.5.1, !=0.5.2, !=0.5.3, !=0.5.4, !=0.5.5',
-    # if you can't satisfy the above requirement, these are versions that might
-    # also work ok, IF you make sure to use the COMPILED version of msgpack-python,
-    # NOT the PURE PYTHON fallback implementation: ==0.5.1, ==0.5.4
-    #
-    # Please note:
-    # using any other version is not supported by borg development and
-    # any feedback related to issues caused by this will be ignored.
-]
+install_requires = []
 
 # note for package maintainers: if you package borgbackup for distribution,
 # please add llfuse as a *requirement* on all platforms that have a working
@@ -88,8 +78,11 @@ platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
 platform_freebsd_source = 'src/borg/platform/freebsd.pyx'
+msgpack_packer_source = 'src/borg/algorithms/msgpack/_packer.pyx'
+msgpack_unpacker_source = 'src/borg/algorithms/msgpack/_unpacker.pyx'
 
-cython_sources = [
+cython_c_sources = [
+    # these .pyx will get compiled to .c
     compress_source,
     crypto_ll_source,
     chunker_source,
@@ -103,14 +96,22 @@ cython_sources = [
     platform_darwin_source,
 ]
 
+cython_cpp_sources = [
+    # these .pyx will get compiled to .cpp
+    msgpack_packer_source,
+    msgpack_unpacker_source,
+]
+
 try:
     from Cython.Distutils import build_ext
     import Cython.Compiler.Main as cython_compiler
 
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
-            for src in cython_sources:
+            for src in cython_c_sources:
                 cython_compiler.compile(src, cython_compiler.default_options)
+            for src in cython_cpp_sources:
+                cython_compiler.compile(src, cplus=True)
             super().__init__(*args, **kwargs)
 
         def make_distribution(self):
@@ -129,6 +130,8 @@ try:
                 'src/borg/platform/linux.c',
                 'src/borg/platform/freebsd.c',
                 'src/borg/platform/darwin.c',
+                'src/borg/algorithms/msgpack/_packer.cpp',
+                'src/borg/algorithms/msgpack/_unpacker.cpp',
             ])
             super().make_distribution()
 
@@ -147,10 +150,15 @@ except ImportError:
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
+
+    msgpack_packer_source = msgpack_packer_source.replace('.pyx', '.cpp')
+    msgpack_unpacker_source = msgpack_unpacker_source.replace('.pyx', '.cpp')
+
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, checksums_source,
-        platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
+        platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source,
+        msgpack_packer_source, msgpack_unpacker_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
@@ -758,9 +766,13 @@ def rm(file):
 class Clean(clean):
     def run(self):
         super().run()
-        for source in cython_sources:
+        for source in cython_c_sources:
             genc = source.replace('.pyx', '.c')
             rm(genc)
+        for source in cython_cpp_sources:
+            gencpp = source.replace('.pyx', '.cpp')
+            rm(gencpp)
+        for source in cython_c_sources + cython_cpp_sources:
             compiled_glob = source.replace('.pyx', '.cpython*')
             for compiled in sorted(glob(compiled_glob)):
                 rm(compiled)
@@ -788,7 +800,27 @@ if not on_rtd:
     crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
                                                system_prefix=libb2_prefix, system=libb2_system,
                                                **crypto_ext_kwargs)
+
+    msgpack_endian = '__BIG_ENDIAN__' if (sys.byteorder == 'big') else '__LITTLE_ENDIAN__'
+    msgpack_macros = [(msgpack_endian, '1')]
+    msgpack_packer_ext_kwargs = dict(
+        sources=[msgpack_packer_source],
+        include_dirs=include_dirs,
+        library_dirs=library_dirs,
+        define_macros=msgpack_macros,
+        language='c++',
+    )
+    msgpack_unpacker_ext_kwargs = dict(
+        sources=[msgpack_unpacker_source],
+        include_dirs=include_dirs,
+        library_dirs=library_dirs,
+        define_macros=msgpack_macros,
+        language='c++',
+    )
+
     ext_modules += [
+        Extension('borg.algorithms.msgpack._packer', **msgpack_packer_ext_kwargs),
+        Extension('borg.algorithms.msgpack._unpacker', **msgpack_unpacker_ext_kwargs),
         Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),
         Extension('borg.hashindex', [hashindex_source]),

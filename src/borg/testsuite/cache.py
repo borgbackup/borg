@@ -1,8 +1,6 @@
 import io
 import os.path
 
-from msgpack import packb
-
 import pytest
 
 from .hashindex import H
@@ -13,7 +11,10 @@ from ..compress import CompressionSpec
 from ..crypto.key import RepoKey
 from ..hashindex import ChunkIndex, CacheSynchronizer
 from ..helpers import Manifest
+from ..helpers import msgpack
 from ..repository import Repository
+
+packb = msgpack.packb
 
 
 class TestCacheSynchronizer:

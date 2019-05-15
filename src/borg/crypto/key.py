@@ -9,8 +9,6 @@ from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, sha512, pbkdf2_hmac
 from hmac import HMAC, compare_digest
 
-import msgpack
-
 from borg.logger import create_logger
 
 logger = create_logger()
@@ -24,6 +22,7 @@ from ..helpers import get_keys_dir, get_security_dir
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers import prepare_subprocess_env
+from ..helpers import msgpack
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 from .nonces import NonceManager

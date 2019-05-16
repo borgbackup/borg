@@ -178,8 +178,8 @@ borg help placeholders
 ~~~~~~~~~~~~~~~~~~~~~~
 
 
-Repository (or Archive) URLs, ``--prefix`` and ``--remote-path`` values support these
-placeholders:
+Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
+and ``--remote-path`` values support these placeholders:
 
 {hostname}
     The (short) hostname of the machine.

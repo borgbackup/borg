@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.10 (not released yet)
----------------------------------
+Version 1.1.10 (2019-05-16)
+---------------------------
 
 Compatibility notes:
 
@@ -208,11 +208,19 @@ Fixes:
 
 New features:
 
+- bundle latest supported msgpack-python release (0.5.6), remove msgpack-python
+  from setup.py install_requires - by default we use the bundled code now.
+  optionally, we still support using an external msgpack (see hints in
+  setup.py), but this requires solid requirements management within
+  distributions and is not recommended.
+  borgbackup will break if you upgrade msgpack to an unsupported version.
 - display msgpack version as part of sysinfo (e.g. in tracebacks)
 - timestamp for borg delete --info added, #4359
+- enable placeholder usage in --comment and --glob-archives, #4559, #4495
 
 Other:
 
+- serve: do not check python/libc for borg serve, #4483
 - shell completions: borg diff second archive
 - release scripts: signing binaries with Qubes OS support
 - testing:
@@ -220,6 +228,9 @@ Other:
   - vagrant: upgrade openbsd box to 6.4
   - travis-ci: lock test env to py 3.4 compatible versions, #4343
   - get rid of confusing coverage warning, #2069
+  - rename test_mount_hardlinks to test_fuse_mount_hardlinks,
+    so both can be excluded by "not test_fuse".
+  - pure-py msgpack warning shall not make a lot of tests fail, #4558
 - docs:
 
   - add "SSH Configuration" section to "borg serve", #3988, #636, #4485
@@ -228,6 +239,11 @@ Other:
   - elaborate on append-only mode docs, #3504
   - installation: added Alpine Linux to distribution list, #4415
   - usage.html: only modify window.location when redirecting, #4133
+  - add msgpack license to docs/3rd_party/msgpack
+- vagrant / binary builds:
+
+  - use python 3.5.7 for builds
+  - use osxfuse 3.8.3
 
 
 Version 1.1.9 (2019-02-10)

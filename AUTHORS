@@ -52,6 +52,12 @@ Folding CRC32
 Borg includes an extremely fast folding implementation of CRC32, Copyright 2013 Intel Corporation,
 licensed under the terms of the zlib license.
 
+msgpack
+-------
+
+Borg includes Python msgpack, Copyright 2008-2011 INADA Naoki
+licensed under the terms of the Apache License 2.0.
+
 xxHash
 ------
 

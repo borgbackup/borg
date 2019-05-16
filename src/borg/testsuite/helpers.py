@@ -619,7 +619,7 @@ def test_is_slow_msgpack():
         assert is_slow_msgpack()
     finally:
         msgpack.Packer = saved_packer
-    # this assumes that we have fast msgpack on test platform:
+    # this tests that we have fast msgpack on test platform:
     assert not is_slow_msgpack()
 
 

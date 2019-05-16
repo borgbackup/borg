@@ -33,7 +33,7 @@ except ImportError:
 import borg
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
-from ..archiver import Archiver, parse_storage_quota
+from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
 from ..cache import Cache, LocalCache
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_cipher_blocks
@@ -284,12 +284,19 @@ class ArchiverTestCaseBase(BaseTestCase):
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
         fork = kw.pop('fork', None)
+        binary_output = kw.get('binary_output', False)
         if fork is None:
             fork = self.FORK_DEFAULT
         ret, output = exec_cmd(*args, fork=fork, exe=self.EXE, archiver=self.archiver, **kw)
         if ret != exit_code:
             print(output)
         self.assert_equal(ret, exit_code)
+        # if tests are run with the pure-python msgpack, there will be warnings about
+        # this in the output, which would make a lot of tests fail.
+        pp_msg = PURE_PYTHON_MSGPACK_WARNING.encode() if binary_output else PURE_PYTHON_MSGPACK_WARNING
+        empty = b'' if binary_output else ''
+        output = empty.join(line for line in output.splitlines(keepends=True)
+                            if pp_msg not in line)
         return output
 
     def create_src_archive(self, name):

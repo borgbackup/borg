@@ -2672,9 +2672,9 @@ class Archiver:
                                                  help='benchmarks borg CRUD (create, extract, update, delete).')
         subparser.set_defaults(func=self.do_benchmark_crud)
 
-        subparser.add_argument('location', metavar='REPO',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='repo to use for benchmark (must exist)')
+                               help='repository to use for benchmark (must exist)')
 
         subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
 
@@ -3138,7 +3138,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_debug_dump_repo_objs)
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='repo to dump')
+                               help='repository to dump')
         subparser.add_argument('--ghost', dest='ghost', action='store_true',
                                help='dump all segment file contents, including deleted/uncommitted objects and commits.')
 
@@ -3153,7 +3153,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_debug_search_repo_objs)
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='repo to search')
+                               help='repository to search')
         subparser.add_argument('wanted', metavar='WANTED', type=str,
                                help='term to search the repo for, either 0x1234abcd hex term or a string')
 
@@ -3277,9 +3277,9 @@ class Archiver:
                                     'use ``--force --force`` in case ``--force`` does not work.')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
-        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='archive or repository to delete')
+                               help='repository or archive to delete')
         subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
                                help='archives to delete')
         define_archive_filters_group(subparser)
@@ -3461,7 +3461,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='archive or repository to display information about')
+                               help='repository or archive to display information about')
         subparser.add_argument('--json', action='store_true',
                                help='format output as JSON')
         define_archive_filters_group(subparser)
@@ -3750,7 +3750,7 @@ class Archiver:
                                     'A "bpath" key is therefore not available.')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='repository/archive to list contents of')
+                               help='repository or archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
         define_archive_filters_group(subparser)
@@ -3810,7 +3810,7 @@ class Archiver:
                                             help='mount repository')
         subparser.set_defaults(func=self.do_mount)
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
-                            help='repository/archive to mount')
+                            help='repository or archive to mount')
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                             help='where to mount filesystem')
         subparser.add_argument('-f', '--foreground', dest='foreground',
@@ -4017,7 +4017,7 @@ class Archiver:
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='repository/archive to recreate')
+                               help='repository or archive to recreate')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
 

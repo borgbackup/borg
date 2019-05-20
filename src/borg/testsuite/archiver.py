@@ -2242,7 +2242,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     assert xattr.getxattr(out_fn, b'user.foo') == b'bar'
                     assert xattr.getxattr(out_fn, b'user.empty') == b''
                 else:
-                    assert xattr.listxattr(out_fn) == []
+                    assert no_selinux(xattr.listxattr(out_fn)) == []
                     try:
                         xattr.getxattr(out_fn, b'user.foo')
                     except OSError as e:

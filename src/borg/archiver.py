@@ -4035,7 +4035,7 @@ class Archiver:
         group.add_argument('-l', '--list', dest='list', action='store_true',
                                help='list the configuration of the repo')
 
-        subparser.add_argument('location', metavar='REPOSITORY',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False, proto='file'),
                                help='repository to configure')
         subparser.add_argument('name', metavar='NAME', nargs='?',
@@ -4162,7 +4162,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='get object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('id', metavar='ID', type=str,
@@ -4179,7 +4179,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='put object to repository (debug)')
         subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
@@ -4194,7 +4194,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='delete object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
@@ -4209,7 +4209,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='show refcount for object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_refcount_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,

@@ -27,6 +27,8 @@ Some of them refer to attic, but you can do the same stuff (and more) with borgb
 
 - `Evolution of Borg (youtube) <https://www.youtube.com/watch?v=K4k_4wDkG6Q>`_
 
+.. _software:
+
 Software
 --------
 

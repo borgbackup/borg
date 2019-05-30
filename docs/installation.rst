@@ -72,7 +72,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
 .. _OpenIndiana hipster repository: http://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
 .. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
-.. _Brew cask: https://caskroom.github.io/
+.. _Brew cask: https://formulae.brew.sh/cask/borgbackup
 .. _Raspbian testing: http://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
 .. _Ubuntu packages: http://packages.ubuntu.com/xenial/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup

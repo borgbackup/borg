@@ -2181,7 +2181,9 @@ class Archiver:
                 # include susans home
                 + /home/susan
                 # don't backup the other home directories
-                - /home/*\n\n''')
+                - /home/*
+                # don't even look in /proc
+                ! /proc\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
         and ``--remote-path`` values support these placeholders:

@@ -20,6 +20,7 @@ try:
 except ImportError:
     cythonize = None
 
+import setup_checksums
 import setup_compress
 import setup_crypto
 import setup_docs
@@ -55,6 +56,9 @@ system_prefix_liblz4 = os.environ.get('BORG_LIBLZ4_PREFIX')
 # needed: zstd (>= 1.3.0)
 prefer_system_libzstd = not bool(os.environ.get('BORG_USE_BUNDLED_ZSTD'))
 system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
+
+prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
+system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
 
 cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1
 
@@ -178,13 +182,18 @@ if not on_rtd:
                                        multithreaded=False, legacy=False),
     )
 
+    checksums_ext_kwargs = members_appended(
+        dict(sources=[checksums_source]),
+        setup_checksums.xxhash_ext_kwargs(pc, prefer_system_libxxhash, system_prefix_libxxhash),
+    )
+
     ext_modules += [
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),
         Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.hashindex', [hashindex_source]),
         Extension('borg.item', [item_source]),
         Extension('borg.chunker', [chunker_source]),
-        Extension('borg.algorithms.checksums', [checksums_source]),
+        Extension('borg.algorithms.checksums', **checksums_ext_kwargs),
     ]
 
     posix_ext = Extension('borg.platform.posix', [platform_posix_source])

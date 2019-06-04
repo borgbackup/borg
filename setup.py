@@ -115,9 +115,8 @@ else:
         def __init__(self, *args, **kwargs):
             raise Exception('Cython is required to run sdist')
 
-    if not on_rtd and not all(os.path.exists(path) for path in [
-        compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, checksums_source,
-        platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source]):
+    cython_c_files = [fn.replace('.pyx', '.c') for fn in cython_sources]
+    if not on_rtd and not all(os.path.exists(path) for path in cython_c_files):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 

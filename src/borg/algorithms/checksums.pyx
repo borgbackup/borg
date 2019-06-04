@@ -12,7 +12,7 @@ cdef extern from "crc32_dispatch.c":
     int _have_clmul "have_clmul"()
 
 
-cdef extern from "xxh64/xxhash.c":
+cdef extern from "xxhash-libselect.h":
     ctypedef struct XXH64_canonical_t:
         char digest[8]
 
@@ -25,6 +25,8 @@ cdef extern from "xxh64/xxhash.c":
         XXH_OK,
         XXH_ERROR
 
+    XXH64_state_t* XXH64_createState();
+    XXH_errorcode XXH64_freeState(XXH64_state_t* statePtr);
     XXH64_hash_t XXH64(const void* input, size_t length, unsigned long long seed);
 
     XXH_errorcode XXH64_reset(XXH64_state_t* statePtr, unsigned long long seed);
@@ -80,17 +82,21 @@ def xxh64(data, seed=0):
 
 
 cdef class StreamingXXH64:
-    cdef XXH64_state_t state
+    cdef XXH64_state_t* state
 
     def __cinit__(self, seed=0):
+        self.state = XXH64_createState()
         cdef unsigned long long _seed = seed
-        if XXH64_reset(&self.state, _seed) != XXH_OK:
+        if XXH64_reset(self.state, _seed) != XXH_OK:
             raise Exception('XXH64_reset failed')
+
+    def __dealloc__(self):
+        XXH64_freeState(self.state)
 
     def update(self, data):
         cdef Py_buffer data_buf = ro_buffer(data)
         try:
-            if XXH64_update(&self.state, data_buf.buf, data_buf.len) != XXH_OK:
+            if XXH64_update(self.state, data_buf.buf, data_buf.len) != XXH_OK:
                 raise Exception('XXH64_update failed')
         finally:
             PyBuffer_Release(&data_buf)
@@ -98,7 +104,7 @@ cdef class StreamingXXH64:
     def digest(self):
         cdef XXH64_hash_t hash
         cdef XXH64_canonical_t digest
-        hash = XXH64_digest(&self.state)
+        hash = XXH64_digest(self.state)
         XXH64_canonicalFromHash(&digest, hash)
         return PyBytes_FromStringAndSize(<const char*> digest.digest, 8)
 

@@ -39,7 +39,8 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     has been introduced in v7.2. We recommend to use
     ``no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc``
     in this case.
-    
+
+
 SSH Configuration
 ~~~~~~~~~~~~~~~~~
 ``borg serve``'s pipes (``stdin``/``stdout``/``stderr``) are connected to the ``sshd`` process on the server side. In the event that the SSH connection between ``borg serve`` and the client is disconnected or stuck abnormally (for example, due to a network outage), it can take a long time for ``sshd`` to notice the client is disconnected. In the meantime, ``sshd`` continues running, and as a result so does the ``borg serve`` process holding the lock on the repository. This can cause subsequent ``borg`` operations on the remote repository to fail with the error: ``Failed to create/acquire the lock``.

@@ -25,6 +25,9 @@ Examples
     # use zlib compression (good, but slow) - default is lz4 (fast, low compression ratio)
     $ borg create -C zlib,6 --one-file-system /path/to/repo::root-{now:%Y-%m-%d} /
 
+    # Backup onto a remote host ("push" style)
+    $ borg create user@backup.example.com:/path/to/repo::example.com-root-{now:%Y-%m-%d} /
+
     # Backup a remote host locally ("pull" style) using sshfs
     $ mkdir sshfs-mount
     $ sshfs root@example.com:/ sshfs-mount

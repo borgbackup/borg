@@ -103,6 +103,11 @@ Are there other known limitations?
 
   :ref:`borg_info` shows how large (relative to the maximum size) existing
   archives are.
+- borg extract only supports restoring into an empty destination. After that,
+  the destination will exactly have the contents of the extracted archive.
+  If you extract into a non-empty destination, borg will (for example) not
+  remove files which are in the destination, but not in the archive.
+  See :issue:`4598` for a workaround and more details.
 
 .. _checkpoints_parts:
 

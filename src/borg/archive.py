@@ -258,6 +258,7 @@ class DownloadPipeline:
         Warning: if *preload* is True then all data chunks of every yielded item have to be retrieved,
         otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
         """
+        masters_preloaded = set()
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
             unpacker.feed(data)
@@ -279,7 +280,6 @@ class DownloadPipeline:
                     # selected (== not extracted), we will still need to preload its chunks if a
                     # corresponding hardlink slave is selected (== is extracted).
                     # due to a side effect of the filter() call, we now have hardlink_masters dict populated.
-                    masters_preloaded = set()
                     for item in items:
                         if 'chunks' in item:  # regular file, maybe a hardlink master
                             preload(item.chunks)

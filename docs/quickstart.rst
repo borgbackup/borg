@@ -172,10 +172,8 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     # Setting this, so the repo does not need to be given on the commandline:
     export BORG_REPO=ssh://username@example.com:2022/~/backup/main
 
-    # Setting this, so you won't be asked for your repository passphrase:
+    # See the section "Passphrase notes" for more infos.
     export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
-    # or this to ask an external program to supply the passphrase:
-    export BORG_PASSCOMMAND='pass show backup'
 
     # some helpers and error handling:
     info() { printf "\n%s %s\n\n" "$( date )" "$*" >&2; }
@@ -271,6 +269,50 @@ the sudoers(5) man page.
 .. Tip::
     To debug what your borg process is actually seeing, find its PID
     (``ps aux|grep borg``) and then look into ``/proc/<PID>/environ``.
+
+.. passphrase_notes:
+
+Passphrase notes
+----------------
+
+If you use encryption (or authentication), Borg will interactively ask you
+for a passphrase to encrypt/decrypt the keyfile / repokey.
+
+A passphrase should be a single line of text, a trailing linefeed will be
+stripped.
+
+For your own safety, you maybe want to avoid empty passphrases as well
+extremely long passphrase (much more than 256 bits of entropy).
+
+Also avoid passphrases containing non-ASCII characters.
+Borg is technically able to process all unicode text, but you might get into
+trouble reproducing the same encoded utf-8 bytes or with keyboard layouts,
+so better just avoid non-ASCII stuff.
+
+If you want to automate, you can alternatively supply the passphrase
+directly or indirectly using some environment variables.
+
+You can directly give a passphrase::
+
+    # use this passphrase (use safe permissions on the script!):
+    export BORG_PASSPHRASE='my super secret passphrase'
+
+Or ask an external program to supply the passphrase::
+
+    # use the "pass" password manager to get the passphrase:
+    export BORG_PASSCOMMAND='pass show backup'
+
+    # use GPG to get the passphrase contained in a gpg-encrypted file:
+    export BORG_PASSCOMMAND='gpg --decrypt borg-passphrase.gpg'
+
+Or read the passphrase from an open file descriptor::
+
+    export BORG_PASSPHRASE_FD=42
+
+Using hardware crypto devices (like Nitrokey, Yubikey and others) is not
+directly supported by borg, but you can use these indirectly.
+E.g. if your crypto device supports GPG and borg calls ``gpg`` via
+``BORG_PASSCOMMAND``, it should just work.
 
 .. backup_compression:
 

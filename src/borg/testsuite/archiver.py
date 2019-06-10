@@ -2219,7 +2219,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     # Special case: getxattr returns None (not b'') when reading an empty xattr.
                     assert xattr.getxattr(out_fn, 'user.empty') is None
                 else:
-                    assert xattr.listxattr(out_fn) == []
+                    assert no_selinux(xattr.listxattr(out_fn)) == []
                     try:
                         xattr.getxattr(out_fn, 'user.foo')
                     except OSError as e:

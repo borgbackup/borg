@@ -131,7 +131,7 @@ Imagine you have made some snapshots of logical volumes (LVs) you want to backup
 
     For some scenarios, this is a good method to get "crash-like" consistency
     (I call it crash-like because it is the same as you would get if you just
-    hit the reset button or your machine would abrubtly and completely crash).
+    hit the reset button or your machine would abruptly and completely crash).
     This is better than no consistency at all and a good method for some use
     cases, but likely not good enough if you have databases running.
 

@@ -107,6 +107,18 @@ def packages_darwin
   EOF
 end
 
+def packages_openindiana
+  return <<-EOF
+    # needs separate provisioning step + reboot:
+    #pkg update
+    # already installed:
+    #pkg install python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
+    ln -sf /usr/bin/python3.5 /usr/bin/pyton3
+    ln -sf /usr/bin/virtualenv-3.5 /usr/bin/virtualenv
+    ln -sf /usr/bin/pip-3.5 /usr/bin/pip
+  EOF
+end
+
 def install_pyenv(boxname)
   return <<-EOF
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
@@ -338,6 +350,20 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64")
+  end
+
+  # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
+  # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
+  config.vm.define "openindiana64" do |b|
+    b.vm.box = "openindiana"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1536 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64")
   end
 
   # TODO: create more VMs with python 3.5+ and openssl 1.1.

@@ -692,7 +692,8 @@ Now Borg will be bandwidth limited. Nice thing about pv is that you can change r
 I am having troubles with some network/FUSE/special filesystem, why?
 --------------------------------------------------------------------
 
-Borg is doing nothing special in the filesystem, it only uses very
+In general, Borg just needs a well-working filesystem: It is doing
+nothing special in the filesystem, it only uses very
 common and compatible operations (even the locking is just "mkdir").
 
 So, if you are encountering issues like slowness, corruption or malfunction
@@ -705,8 +706,18 @@ recommended that you talk to the developers / support of the network fs and
 maybe open an issue in their issue tracker. Do not file an issue in the
 Borg issue tracker.
 
-If you can reproduce the issue with the proven filesystem, please file an
-issue in the Borg issue tracker about that.
+A common issue is ``OSError: [Errno 5] Input/output error`` which might
+randomly appear during the backup process while writing to a cifs-mounted
+volume. See issues
+`#4056 <https://github.com/borgbackup/borg/issues/4056>`_,
+`#4059 <https://github.com/borgbackup/borg/issues/4059>`_,
+`#4086 <https://github.com/borgbackup/borg/issues/4086>`_ or
+`#4211 <https://github.com/borgbackup/borg/issues/4211>`_ for example,
+where you can find further information and some useful mount options which
+might resolve the issue.
+
+However, if you *can* reproduce the issue with the proven filesystem, please
+do file an issue in the Borg issue tracker about that.
 
 
 Why does running 'borg check --repair' warn about data loss?

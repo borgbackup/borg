@@ -71,6 +71,7 @@ try:
     from .helpers import umount
     from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
     from .helpers import msgpack
+    from .helpers import sig_int
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
@@ -531,7 +532,12 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 archive.stats += fso.stats
-                archive.save(comment=args.comment, timestamp=args.timestamp, stats=archive.stats)
+                if sig_int:
+                    # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
+                    # we already have a checkpoint archive in this case.
+                    self.print_error("Got Ctrl-C / SIGINT.")
+                else:
+                    archive.save(comment=args.comment, timestamp=args.timestamp, stats=archive.stats)
                 args.stats |= args.json
                 if args.stats:
                     if args.json:
@@ -587,6 +593,10 @@ class Archiver:
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
+        if sig_int and sig_int.action_done():
+            # the user says "get out of here!" and we have already completed the desired action.
+            return
+
         try:
             recurse_excluded_dir = False
             if matcher.match(path):
@@ -4431,7 +4441,8 @@ def main():  # pragma: no cover
                 print(tb, file=sys.stderr)
             sys.exit(e.exit_code)
         try:
-            exit_code = archiver.run(args)
+            with sig_int:
+                exit_code = archiver.run(args)
         except Error as e:
             msg = e.get_message()
             msgid = type(e).__qualname__

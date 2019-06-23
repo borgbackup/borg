@@ -1071,8 +1071,7 @@ class Archiver:
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        name = replace_placeholders(args.name)
-        archive.rename(name)
+        archive.rename(args.name)
         manifest.write()
         repository.commit(compact=False)
         cache.commit()
@@ -1545,11 +1544,10 @@ class Archiver:
 
         if args.location.archive:
             name = args.location.archive
-            target = replace_placeholders(args.target) if args.target else None
             if recreater.is_temporary_archive(name):
                 self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                 return self.exit_code
-            if not recreater.recreate(name, args.comment, target):
+            if not recreater.recreate(name, args.comment, args.target):
                 self.print_error('Nothing to do. Archive was not processed.\n'
                                  'Specify at least one pattern, PATH, --comment, re-compression or re-chunking option.')
         else:

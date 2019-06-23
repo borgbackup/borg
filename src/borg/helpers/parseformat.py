@@ -648,8 +648,6 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    from ..algorithms.checksums import StreamingXXH64
-    xxh64 = StreamingXXH64
     hash_algorithms = hashlib.algorithms_guaranteed.union({'xxh64'})
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
@@ -714,6 +712,8 @@ class ItemFormatter(BaseFormatter):
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format, *, json_lines=False):
+        from ..algorithms.checksums import StreamingXXH64
+        self.xxh64 = StreamingXXH64
         self.archive = archive
         self.json_lines = json_lines
         static_keys = {

@@ -498,6 +498,7 @@ def location_validator(archive=None, proto=None):
 
 def archivename_validator():
     def validator(text):
+        text = replace_placeholders(text)
         if '/' in text or '::' in text or not text:
             raise argparse.ArgumentTypeError('Invalid repository name: "%s"' % text)
         return text

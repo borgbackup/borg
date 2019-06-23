@@ -741,7 +741,7 @@ class ItemFormatter(BaseFormatter):
             'ctime': partial(self.format_time, 'ctime'),
             'atime': partial(self.format_time, 'atime'),
         }
-        for hash_function in self.__class__.hash_algorithms:
+        for hash_function in self.hash_algorithms:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
@@ -818,7 +818,7 @@ class ItemFormatter(BaseFormatter):
         if hash_function in hashlib.algorithms_guaranteed:
             hash = hashlib.new(hash_function)
         elif hash_function == 'xxh64':
-            hash = self.__class__.xxh64()
+            hash = self.xxh64()
         for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()

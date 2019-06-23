@@ -648,7 +648,7 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    from .algorithms.checksums import StreamingXXH64
+    from ..algorithms.checksums import StreamingXXH64
     xxh64 = StreamingXXH64
     hash_algorithms = hashlib.algorithms_guaranteed.union({'xxh64'})
     KEY_DESCRIPTIONS = {

@@ -648,6 +648,9 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
+    from .algorithms.checksums import StreamingXXH64
+    xxh64 = StreamingXXH64
+    hash_algorithms = hashlib.algorithms_guaranteed.union({'xxh64'})
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
@@ -664,7 +667,7 @@ class ItemFormatter(BaseFormatter):
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
         ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
-        tuple(sorted(hashlib.algorithms_guaranteed)),
+        tuple(sorted(hash_algorithms)),
         ('archiveid', 'archivename', 'extra'),
         ('health', )
     )
@@ -738,7 +741,7 @@ class ItemFormatter(BaseFormatter):
             'ctime': partial(self.format_time, 'ctime'),
             'atime': partial(self.format_time, 'atime'),
         }
-        for hash_function in hashlib.algorithms_guaranteed:
+        for hash_function in self.__class__.hash_algorithms:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
@@ -812,7 +815,10 @@ class ItemFormatter(BaseFormatter):
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:
             return ""
-        hash = hashlib.new(hash_function)
+        if hash_function in hashlib.algorithms_guaranteed:
+            hash = hashlib.new(hash_function)
+        elif hash_function == 'xxh64':
+            hash = self.__class__.xxh64()
         for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()

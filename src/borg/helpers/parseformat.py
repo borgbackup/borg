@@ -661,6 +661,7 @@ class ItemFormatter(BaseFormatter):
         'dcsize': 'deduplicated compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
+        'xxh64': 'XXH64 checksum of this file (note: this is NOT a cryptographic hash!)',
         'health': 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (

@@ -230,11 +230,10 @@ dependencies::
     pip3 install virtualenv
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of
-FUSE for OS X, which is available via github_, or via homebrew::
+FUSE for OS X, which is available via `github <https://github.com/osxfuse/osxfuse/releases/latest>`__,
+or via homebrew::
 
     brew cask install osxfuse
-
-.. _github: https://github.com/osxfuse/osxfuse/releases/latest
 
 
 FreeBSD

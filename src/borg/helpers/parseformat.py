@@ -649,6 +649,7 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
+    hash_algorithms = hashlib.algorithms_guaranteed.union({'xxh64'})
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
@@ -659,13 +660,14 @@ class ItemFormatter(BaseFormatter):
         'dcsize': 'deduplicated compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
+        'xxh64': 'XXH64 checksum of this file (note: this is NOT a cryptographic hash!)',
         'health': 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
         ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
-        tuple(sorted(hashlib.algorithms_guaranteed)),
+        tuple(sorted(hash_algorithms)),
         ('archiveid', 'archivename', 'extra'),
         ('health', )
     )
@@ -711,6 +713,8 @@ class ItemFormatter(BaseFormatter):
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format, *, json_lines=False):
+        from ..algorithms.checksums import StreamingXXH64
+        self.xxh64 = StreamingXXH64
         self.archive = archive
         self.json_lines = json_lines
         static_keys = {
@@ -739,7 +743,7 @@ class ItemFormatter(BaseFormatter):
             'ctime': partial(self.format_time, 'ctime'),
             'atime': partial(self.format_time, 'atime'),
         }
-        for hash_function in hashlib.algorithms_guaranteed:
+        for hash_function in self.hash_algorithms:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
@@ -813,7 +817,10 @@ class ItemFormatter(BaseFormatter):
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:
             return ""
-        hash = hashlib.new(hash_function)
+        if hash_function in hashlib.algorithms_guaranteed:
+            hash = hashlib.new(hash_function)
+        elif hash_function == 'xxh64':
+            hash = self.xxh64()
         for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()

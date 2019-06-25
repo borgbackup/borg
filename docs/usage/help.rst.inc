@@ -58,8 +58,16 @@ Regular expressions, selector `re:`
     the re module <https://docs.python.org/3/library/re.html>`_.
 
 Path prefix, selector `pp:`
-    This pattern style is useful to match whole sub-directories. The pattern
-    `pp:root/somedir` matches `root/somedir` and everything therein.
+    This pattern style is useful to match whole sub-directories without worrying
+    about escaping special characters. Otherwise, you can just use the default
+    `fm:` or `sh:` styles, which also match whole sub-directories. Unlike those
+    styles, a trailing slash here has no effect on what gets matched. The pattern
+    `pp:root/somedir` (and `pp:root/somedir/`) matches `root/somedir` and
+    everything therein.
+
+    When using exclude-norecurse rules, this style is equivalent to `pf:`,
+    except that `pf:` won't match patterns with trailing slashes (and `pp:`
+    won't be as efficient, though that may be optimized in the future).
 
 Path full-match, selector `pf:`
     This pattern style is (only) useful to match full paths.
@@ -138,7 +146,8 @@ Examples::
     path. The first matching pattern is used so if an include pattern matches before
     an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
     a directory, it won't recurse into it and won't discover any potential matches for
-    include rules below that directory.
+    include rules below that directory. Note that this is the behavior that gets applied
+    to all patterns from `--exclude` and `--exclude-from`.
 
     Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
     shell style (`sh:`), so those patterns behave similar to rsync include/exclude

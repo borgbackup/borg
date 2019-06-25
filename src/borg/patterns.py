@@ -71,6 +71,7 @@ class PatternMatcher:
     *fallback* is a boolean value that *match()* returns if no matching patterns are found.
 
     """
+
     def __init__(self, fallback=None):
         self._items = []
 
@@ -340,6 +341,10 @@ def parse_pattern(pattern, fallback=FnmatchPattern, recurse_dir=True):
     """Read pattern from string and return an instance of the appropriate implementation class.
 
     """
+    # Potential optimization for fm, sh, and pf patterns: if recurse_dir is False and the pattern
+    # doesn't do any special matching, it could be converted to a PathFullPattern (we would also
+    # need to remove any trailing slashes from pf patterns, and exclude fm and sh patterns with
+    # trailing slashes from the optimization).
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
         cls = get_pattern_class(style)

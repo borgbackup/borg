@@ -71,7 +71,6 @@ class PatternMatcher:
     *fallback* is a boolean value that *match()* returns if no matching patterns are found.
 
     """
-
     def __init__(self, fallback=None):
         self._items = []
 

@@ -212,7 +212,7 @@ class PatternBase:
 
 
 class PathFullPattern(PatternBase):
-    """Full match of a path."""
+    """Full match of a path.  A trailing slash makes no difference."""
     PREFIX = "pf"
 
     def _prepare(self, pattern):
@@ -236,6 +236,7 @@ class PathPrefixPattern(PatternBase):
     PREFIX = "pp"
 
     def _prepare(self, pattern):
+        # rstrip is for when normpath is "/"
         self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
 
     def _match(self, path):
@@ -250,6 +251,7 @@ class FnmatchPattern(PatternBase):
 
     def _prepare(self, pattern):
         if pattern.endswith(os.path.sep):
+            # rstrip is for when normpath is "/"
             pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep + '*' + os.path.sep
         else:
             pattern = os.path.normpath(pattern) + os.path.sep + '*'
@@ -274,6 +276,7 @@ class ShellPattern(PatternBase):
         sep = os.path.sep
 
         if pattern.endswith(sep):
+            # rstrip is for when normpath is "/"
             pattern = os.path.normpath(pattern).rstrip(sep) + sep + "**" + sep + "*" + sep
         else:
             pattern = os.path.normpath(pattern) + sep + "**" + sep + "*"
@@ -341,10 +344,6 @@ def parse_pattern(pattern, fallback=FnmatchPattern, recurse_dir=True):
     """Read pattern from string and return an instance of the appropriate implementation class.
 
     """
-    # Potential optimization for fm, sh, and pf patterns: if recurse_dir is False and the pattern
-    # doesn't do any special matching, it could be converted to a PathFullPattern (we would also
-    # need to remove any trailing slashes from pf patterns, and exclude fm and sh patterns with
-    # trailing slashes from the optimization).
     if len(pattern) > 2 and pattern[2] == ":" and pattern[:2].isalnum():
         (style, pattern) = (pattern[:2], pattern[3:])
         cls = get_pattern_class(style)

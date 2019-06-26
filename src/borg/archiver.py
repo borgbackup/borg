@@ -2067,14 +2067,21 @@ class Archiver:
             the re module <https://docs.python.org/3/library/re.html>`_.
 
         Path prefix, selector `pp:`
-            This pattern style is useful to match whole sub-directories. The pattern
-            `pp:root/somedir` matches `root/somedir` and everything therein.
+            This pattern style is useful to match whole sub-directories without worrying
+            about escaping special characters. Otherwise, you can just use the default
+            `fm:` or `sh:` styles, which also match whole sub-directories. Unlike those
+            styles, a trailing slash here makes no difference. The pattern `pp:root/somedir`
+            (and `pp:root/somedir/`) matches `root/somedir` and everything therein.
+
+            When used with exclude-norecurse rules, this style is equivalent to `pf:`
+            (except not as efficient).
 
         Path full-match, selector `pf:`
             This pattern style is (only) useful to match full paths.
             This is kind of a pseudo pattern as it can not have any variable or
-            unspecified parts - the full path must be given.
-            `pf:root/file.ext` matches `root/file.txt` only.
+            unspecified parts - the full path must be given. Trailing slashes make no
+            difference. `pf:root/file.ext` (and `pp:root/file.ext/`) matches `root/file.txt`
+            only.
 
             Implementation note: this is implemented via very time-efficient O(1)
             hashtable lookups (this means you can have huge amounts of such patterns
@@ -2147,7 +2154,8 @@ class Archiver:
             path. The first matching pattern is used so if an include pattern matches before
             an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
             a directory, it won't recurse into it and won't discover any potential matches for
-            include rules below that directory.
+            include rules below that directory. Note that this is the behavior that gets applied
+            to all patterns from `--exclude` and `--exclude-from`.
 
             Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
             shell style (`sh:`), so those patterns behave similar to rsync include/exclude

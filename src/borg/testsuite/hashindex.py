@@ -321,7 +321,8 @@ class HashIndexDataTestCase(BaseTestCase):
         idx1[H(2)] = 2**31 - 1, 0, 0
         idx1[H(3)] = 4294962296, 0, 0  # 4294962296 is -5000 interpreted as an uint32_t
 
-        assert self._serialize_hashindex(idx1) == self.HASHINDEX
+        serialized = self._serialize_hashindex(idx1)
+        assert self._unpack(serialized) == self._unpack(self.HASHINDEX)
 
     def test_read_known_good(self):
         idx1 = self._deserialize_hashindex(self.HASHINDEX)

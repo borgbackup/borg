@@ -31,7 +31,7 @@ except ImportError:
 
 try:
     from pytest import raises
-except ImportError:
+except:  # noqa
     raises = None
 
 has_lchflags = hasattr(os, 'lchflags') or sys.platform.startswith('linux')

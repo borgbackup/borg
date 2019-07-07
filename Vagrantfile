@@ -146,10 +146,13 @@ end
 
 def packages_openindiana
   return <<-EOF
-    #pkg update  # XXX needs separate provisioning step + reboot
-    pkg install python-34 clang-40 lz4 git
-    python3 -m ensurepip
-    pip3 install -U setuptools pip wheel virtualenv
+    # needs separate provisioning step + reboot:
+    #pkg update
+    # already installed:
+    #pkg install python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
+    ln -sf /usr/bin/python3.5 /usr/bin/pyton3
+    ln -sf /usr/bin/virtualenv-3.5 /usr/bin/virtualenv
+    ln -sf /usr/bin/pip-3.5 /usr/bin/pip
   EOF
 end
 
@@ -565,7 +568,7 @@ Vagrant.configure(2) do |config|
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
   config.vm.define "openindiana64" do |b|
-    b.vm.box = "openindiana-64"
+    b.vm.box = "openindiana"
     b.vm.provider :virtualbox do |v|
       v.memory = 1536 + $wmem
     end

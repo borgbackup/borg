@@ -872,7 +872,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         if self.dictFormat:
                             self.to_send = msgpack.packb({MSGID: self.msgid, MSG: 'get', ARGS: args})
                         else:
-                            self.to_send = msgpack.packb((1, self.msgid, 'get', self.named_to_positional(cmd, args)))
+                            self.to_send = msgpack.packb((1, self.msgid, 'get', self.named_to_positional('get', args)))
 
                 if self.to_send:
                     try:

@@ -249,7 +249,7 @@ copy just in case something goes wrong during the recovery. Since recovery is do
 deleting some files, a hard link copy (``cp -al``) is sufficient.
 
 The first step to reset the repository to transaction 5, the last uncompromised transaction,
-is to remove the ``hints.N``, ``index.N`` and ``integrity.N``files in the repository (these
+is to remove the ``hints.N``, ``index.N`` and ``integrity.N`` files in the repository (these
 files are always expendable). In this example N is 13.
 
 Then remove or move all segment files from the segment directories in ``data/`` starting

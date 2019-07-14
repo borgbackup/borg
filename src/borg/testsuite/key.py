@@ -264,9 +264,8 @@ class TestKey:
         assert len(key.id_key) == 32
         plaintext = b'123456789'
         authenticated = key.encrypt(plaintext)
-        # 0x07 is the key TYPE, 0x0100 identifies LZ4 compression, 0x90 is part of LZ4 and means that an uncompressed
-        # block of length nine follows (the plaintext).
-        assert authenticated == b'\x07\x01\x00\x90' + plaintext
+        # 0x07 is the key TYPE, \x0000 identifies no compression.
+        assert authenticated == b'\x07\x00\x00' + plaintext
 
     def test_blake2_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -275,9 +274,8 @@ class TestKey:
         assert len(key.id_key) == 128
         plaintext = b'123456789'
         authenticated = key.encrypt(plaintext)
-        # 0x06 is the key TYPE, 0x0100 identifies LZ4 compression, 0x90 is part of LZ4 and means that an uncompressed
-        # block of length nine follows (the plaintext).
-        assert authenticated == b'\x06\x01\x00\x90' + plaintext
+        # 0x06 is the key TYPE, 0x0000 identifies no compression.
+        assert authenticated == b'\x06\x00\x00' + plaintext
 
 
 class TestPassphrase:

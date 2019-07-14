@@ -16,7 +16,7 @@ import traceback
 from subprocess import Popen, PIPE
 
 from . import __version__
-from .compress import LZ4
+from .compress import Compressor
 from .constants import *  # NOQA
 from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
@@ -1215,7 +1215,7 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
         key = decrypted_cache
         # 32 bit csize, 64 bit (8 byte) xxh64
         cache_struct = struct.Struct('=I8s')
-        compressor = LZ4()
+        compressor = Compressor('lz4')
 
         def pack(data):
             csize, decrypted = data

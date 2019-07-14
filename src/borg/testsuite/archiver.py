@@ -2140,7 +2140,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_compression_lz4_uncompressible(self):
         size, csize = self._get_sizes('lz4', compressible=False)
-        assert csize >= size
+        assert csize == size + 3  # same as compression 'none'
 
     def test_compression_lzma_compressible(self):
         size, csize = self._get_sizes('lzma', compressible=True)
@@ -2148,7 +2148,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_compression_lzma_uncompressible(self):
         size, csize = self._get_sizes('lzma', compressible=False)
-        assert csize >= size
+        assert csize == size + 3  # same as compression 'none'
+
+    def test_compression_zstd_compressible(self):
+        size, csize = self._get_sizes('zstd', compressible=True)
+        assert csize < size * 0.1
+
+    def test_compression_zstd_uncompressible(self):
+        size, csize = self._get_sizes('zstd', compressible=False)
+        assert csize == size + 3  # same as compression 'none'
 
     def test_change_passphrase(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

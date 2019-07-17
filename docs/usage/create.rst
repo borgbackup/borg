@@ -58,7 +58,7 @@ Examples
 
     # Use short hostname, user name and current time in archive name
     $ borg create /path/to/repo::{hostname}-{user}-{now} ~
-    # Similar, use the same datetime format as borg 1.1 will have as default
+    # Similar, use the same datetime format that is default as of borg 1.1
     $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S} ~
     # As above, but add nanoseconds
     $ borg create /path/to/repo::{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S.%f} ~

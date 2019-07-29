@@ -2,6 +2,7 @@ import errno
 import mmap
 import os
 import shutil
+import stat
 import struct
 import time
 from binascii import hexlify, unhexlify
@@ -386,8 +387,12 @@ class Repository:
 
     def open(self, path, exclusive, lock_wait=None, lock=True):
         self.path = path
-        if not os.path.isdir(path):
+        try:
+            st = os.stat(path)
+        except FileNotFoundError:
             raise self.DoesNotExist(path)
+        if not stat.S_ISDIR(st.st_mode):
+            raise self.InvalidRepository(path)
         if lock:
             self.lock = Lock(os.path.join(path, 'lock'), exclusive, timeout=lock_wait).acquire()
         else:

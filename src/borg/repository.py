@@ -234,11 +234,17 @@ class Repository:
             repository, user's can only use the quota'd repository, when their --restrict-to-path points
             at the user's repository.
         """
-        if os.path.exists(path):
+        try:
+            st = os.stat(path)
+        except FileNotFoundError:
+            pass  # nothing there!
+        else:
+            # there is something already there!
             if self.is_repository(path):
                 raise self.AlreadyExists(path)
-            if not os.path.isdir(path) or os.listdir(path):
+            if not stat.S_ISDIR(st.st_mode) or os.listdir(path):
                 raise self.PathAlreadyExists(path)
+            # an empty directory is acceptable for us.
 
         while True:
             # Check all parent directories for Borg's repository README

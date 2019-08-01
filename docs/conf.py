@@ -35,6 +35,10 @@ source_suffix = '.rst'
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
 
+# Disable the use of smartquotes, which converts quotes and dashes to
+# typographically correct entities.
+smartquotes = False
+
 # The master toctree document.
 master_doc = 'index'
 
@@ -150,10 +154,6 @@ html_extra_path = ['../src/borg/paperkey.html']
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
 html_last_updated_fmt = '%Y-%m-%d'
-
-# If true, SmartyPants will be used to convert quotes and dashes to
-# typographically correct entities.
-html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {

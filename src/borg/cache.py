@@ -73,7 +73,8 @@ class SecurityManager:
             shutil.rmtree(path)
 
     def known(self):
-        return os.path.exists(self.key_type_file)
+        return all(os.path.exists(f)
+                   for f in (self.key_type_file, self.location_file, self.manifest_ts_file))
 
     def key_matches(self, key):
         if not self.known():

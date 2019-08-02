@@ -1291,7 +1291,7 @@ class Archiver:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
                 repository.commit()
-                logger.info('Done. Run "borg check --repair" to clean up the mess.')
+                logger.warning('Done. Run "borg check --repair" to clean up the mess.')
             else:
                 logger.warning('Aborted.')
             return self.exit_code

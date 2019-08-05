@@ -198,12 +198,12 @@ Important notes:
 Running more checks using coala
 -------------------------------
 
-First install coala and some checkers ("bears"):
+First install coala and some checkers ("bears"): ::
 
   pip install -r requirements.d/coala.txt
 
 You can now run coala from the toplevel directory; it will read its settings
-from ``.coafile`` there:
+from ``.coafile`` there: ::
 
   coala
 
@@ -338,7 +338,7 @@ Checklist:
     scripts/sdist-sign X.Y.Z
     scripts/upload-pypi X.Y.Z test
     scripts/upload-pypi X.Y.Z
-- put binaries into dist/borg-OSNAME and sign them:
+- put binaries into dist/borg-OSNAME and sign them: ::
 
     scripts/sign-binaries 201912312359
 - close the release milestone on GitHub

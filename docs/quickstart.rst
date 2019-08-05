@@ -327,7 +327,7 @@ compression) using N=1 to high compression (and lower speed) using N=22.
 
 zstd is a modern compression algorithm and might be preferable over zlib and
 lzma, except if you need compatibility to older borg versions (< 1.1.4) that
-did not yet offer zstd.
+did not yet offer zstd.::
 
     $ borg create --compression zstd,N /path/to/repo::arch ~
 

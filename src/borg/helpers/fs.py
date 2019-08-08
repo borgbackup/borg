@@ -8,6 +8,7 @@ import sys
 import textwrap
 
 from .process import prepare_subprocess_env
+from ..platformflags import is_win32
 
 from ..constants import *  # NOQA
 
@@ -230,6 +231,9 @@ def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
         fname = name  # use name relative to parent_fd
     else:
         fname, parent_fd = path, None  # just use the path
+    if is_win32 and os.path.isdir(fname):
+        # Directories can not be opened on Windows.
+        return None
     _flags_normal = flags
     if noatime:
         _flags_noatime = _flags_normal | O_('NOATIME')

@@ -239,7 +239,9 @@ def OsOpen(*, flags, path=None, parent_fd=None, name=None, noatime=False, op='op
     try:
         yield fd
     finally:
-        os.close(fd)
+        # On windows fd is None for directories.
+        if fd is not None:
+            os.close(fd)
 
 
 class DownloadPipeline:

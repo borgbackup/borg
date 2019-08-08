@@ -25,6 +25,8 @@ import setup_compress
 import setup_crypto
 import setup_docs
 
+is_win32 = sys.platform.startswith('win32')
+
 # How the build process finds the system libs / uses the bundled code:
 #
 # 1. it will try to use (system) libs (see 1.1. and 1.2.),
@@ -60,6 +62,7 @@ system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
 prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
 system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
 
+# Number of threads to use for cythonize, not used on windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1
 
 # Are we building on ReadTheDocs?
@@ -97,6 +100,7 @@ platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
 platform_freebsd_source = 'src/borg/platform/freebsd.pyx'
+platform_windows_source = 'src/borg/platform/windows.pyx'
 
 cython_sources = [
     compress_source,
@@ -110,6 +114,7 @@ cython_sources = [
     platform_linux_source,
     platform_freebsd_source,
     platform_darwin_source,
+    platform_windows_source,
 ]
 
 if cythonize:
@@ -199,9 +204,12 @@ if not on_rtd:
     linux_ext = Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'])
     freebsd_ext = Extension('borg.platform.freebsd', [platform_freebsd_source])
     darwin_ext = Extension('borg.platform.darwin', [platform_darwin_source])
+    windows_ext = Extension('borg.platform.windows', [platform_windows_source])
 
-    if not sys.platform.startswith(('win32', )):
+    if not is_win32:
         ext_modules.append(posix_ext)
+    else:
+        ext_modules.append(windows_ext)
     if sys.platform == 'linux':
         ext_modules.append(linux_ext)
     elif sys.platform.startswith('freebsd'):
@@ -216,13 +224,15 @@ if not on_rtd:
 
     if cythonize and cythonizing:
         cython_opts = dict(
-            # compile .pyx extensions to .c in parallel
-            nthreads=cpu_threads + 1,
             # default language_level will be '3str' starting from Cython 3.0.0,
             # but old cython versions (< 0.29) do not know that, thus we use 3 for now.
             compiler_directives={'language_level': 3},
         )
-        cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext], **cython_opts)
+        if not is_win32:
+            # compile .pyx extensions to .c in parallel, does not work on windows
+            cython_opts['nthreads'] = cpu_threads + 1
+
+        cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext, windows_ext], **cython_opts)
         ext_modules = cythonize(ext_modules, **cython_opts)
 
 

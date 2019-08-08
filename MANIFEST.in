@@ -4,4 +4,4 @@
 exclude .coafile .editorconfig .gitattributes .gitignore .mailmap .travis.yml Vagrantfile
 prune .travis
 prune .github
-include src/borg/platform/darwin.c src/borg/platform/freebsd.c src/borg/platform/linux.c src/borg/platform/posix.c
+include src/borg/platform/darwin.c src/borg/platform/freebsd.c src/borg/platform/linux.c src/borg/platform/posix.c src/borg/platform/windows.c

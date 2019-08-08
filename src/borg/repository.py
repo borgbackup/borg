@@ -662,17 +662,12 @@ class Repository:
             else:
                 # Keep one full worst-case segment free in non-append-only mode
                 required_free_space += full_segment_size
+
         try:
-            st_vfs = os.statvfs(self.path)
+            free_space = shutil.disk_usage(self.path).free
         except OSError as os_error:
             logger.warning('Failed to check free space before committing: ' + str(os_error))
             return
-        except AttributeError:
-            # TODO move the call to statvfs to platform
-            logger.warning('Failed to check free space before committing: no statvfs method available')
-            return
-        # f_bavail: even as root - don't touch the Federal Block Reserve!
-        free_space = st_vfs.f_bavail * st_vfs.f_frsize
         logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
         if free_space < required_free_space:
             if self.created:

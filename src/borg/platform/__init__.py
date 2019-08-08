@@ -22,6 +22,10 @@ if not is_win32:
     from .posix import get_errno
     from .posix import uid2user, user2uid, gid2group, group2gid, getosusername
 
+else:
+    from .windows import process_alive, local_pid_alive
+    from .windows import uid2user, user2uid, gid2group, group2gid, getosusername
+
 if is_linux:  # pragma: linux only
     from .linux import API_VERSION as OS_API_VERSION
     from .linux import listxattr, getxattr, setxattr

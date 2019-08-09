@@ -151,7 +151,7 @@ really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
-Note that checkpoints inside files are created only since version 1.1, 
+Note that checkpoints inside files are created only since version 1.1,
 make sure you have an up-to-date version of borgbackup if you want to continue instead of retransferring a huge file.
 In some cases, there is only an outdated version shipped with your distribution (e.g. Debian). See :ref:`installation`.
 
@@ -601,15 +601,15 @@ I am seeing 'A' (added) status for an unchanged file!?
 
 The files cache is used to determine whether Borg already
 "knows" / has backed up a file and if so, to skip the file from
-chunking. It does intentionally *not* contain files that have a modification
-time (mtime) same as the newest mtime in the created archive.
+chunking. It does intentionally *not* contain files that have a timestamp
+same as the newest timestamp in the created archive.
 
 So, if you see an 'A' status for unchanged file(s), they are likely the files
-with the most recent mtime in that archive.
+with the most recent timestamp in that archive.
 
 This is expected: it is to avoid data loss with files that are backed up from
 a snapshot and that are immediately changed after the snapshot (but within
-mtime granularity time, so the mtime would not change). Without the code that
+timestamp granularity time, so the timestamp would not change). Without the code that
 removes these files from the files cache, the change that happened right after
 the snapshot would not be contained in the next backup as Borg would
 think the file is unchanged.
@@ -620,7 +620,7 @@ mentioned rare condition), it will just re-use them as usual and not store new
 data chunks.
 
 If you want to avoid unnecessary chunking, just create or touch a small or
-empty file in your backup source file set (so that one has the latest mtime,
+empty file in your backup source file set (so that one has the latest timestamp,
 not your 50GB VM disk image) and, if you do snapshots, do the snapshot after
 that.
 
@@ -628,13 +628,16 @@ Since only the files cache is used in the display of files status,
 those files are reported as being added when, really, chunks are
 already used.
 
+By default, ctime (change time) is used for the timestamps to have a rather
+safe change detection (see also the --files-cache option).
+
 
 .. _always_chunking:
 
 It always chunks all my files, even unchanged ones!
 ---------------------------------------------------
 
-Borg maintains a files cache where it remembers the mtime, size and
+Borg maintains a files cache where it remembers the timestamp, size and
 inode of files. When Borg does a new backup and starts processing a
 file, it first looks whether the file has changed (compared to the values
 stored in the files cache). If the values are the same, the file is assumed

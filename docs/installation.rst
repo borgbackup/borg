@@ -309,7 +309,9 @@ Using git
 ~~~~~~~~~
 
 This uses latest, unreleased development code from git.
-While we try not to break master, there are no guarantees on anything. ::
+While we try not to break master, there are no guarantees on anything.
+
+::
 
     # get borg from github
     git clone https://github.com/borgbackup/borg.git

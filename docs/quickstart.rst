@@ -224,7 +224,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     # actually free repo disk space by compacting segments
 
     info "Compacting repository"
-    
+
     borg compact
 
     compact_exit=$?
@@ -240,7 +240,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     else
         info "Backup, Prune, and/or Compact finished with errors"
     fi
-    
+
     exit ${global_exit}
 
 Pitfalls with shell variables and environment variables
@@ -338,12 +338,16 @@ If you have a fast repo storage and you want minimum CPU usage, no compression::
     $ borg create --compression none /path/to/repo::arch ~
 
 If you have a less fast repo storage and you want a bit more compression (N=0..9,
-0 means no compression, 9 means high compression): ::
+0 means no compression, 9 means high compression):
+
+::
 
     $ borg create --compression zlib,N /path/to/repo::arch ~
 
 If you have a very slow repo storage and you want high compression (N=0..9, 0 means
-low compression, 9 means high compression): ::
+low compression, 9 means high compression):
+
+::
 
     $ borg create --compression lzma,N /path/to/repo::arch ~
 

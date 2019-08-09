@@ -151,7 +151,7 @@ really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
-Note that checkpoints inside files are created only since version 1.1, 
+Note that checkpoints inside files are created only since version 1.1,
 make sure you have an up-to-date version of borgbackup if you want to continue instead of retransferring a huge file.
 In some cases, there is only an outdated version shipped with your distribution (e.g. Debian). See :ref:`installation`.
 
@@ -670,7 +670,9 @@ There is no built-in way to limit *download*
 (i.e. :ref:`borg_extract`) bandwidth, but limiting download bandwidth
 can be accomplished with pipeviewer_:
 
-Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
+Create a wrapper script:  /usr/local/bin/pv-wrapper
+
+::
 
     #!/bin/sh
         ## -q, --quiet              do not output any transfer information at all
@@ -678,11 +680,15 @@ Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
     RATE=307200
     pv -q -L $RATE  | "$@"
 
-Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::
+Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh.
+
+::
 
     export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
 
-Now Borg will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
+Now Borg will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly:
+
+::
 
     pv -R $(pidof pv) -L 102400
 

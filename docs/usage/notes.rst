@@ -142,14 +142,18 @@ original volumes continue changing the data stored there.
 You also add the output of ``lvdisplay`` to your backup, so you can see the LV
 sizes in case you ever need to recreate and restore them.
 
-After the backup has completed, you remove the snapshots again. ::
+After the backup has completed, you remove the snapshots again.
+
+::
 
     $ # create snapshots here
     $ lvdisplay > lvdisplay.txt
     $ borg create --read-special /path/to/repo::arch lvdisplay.txt /dev/vg0/*-snapshot
     $ # remove snapshots here
 
-Now, let's see how to restore some LVs from such a backup. ::
+Now, let's see how to restore some LVs from such a backup.
+
+::
 
     $ borg extract /path/to/repo::arch lvdisplay.txt
     $ # create empty LVs with correct sizes here (look into lvdisplay.txt).
@@ -204,7 +208,9 @@ append-only is useful for scenarios where a backup client machine backups
 remotely to a backup server using ``borg serve``, since a hacked client machine
 cannot delete backups on the server permanently.
 
-To activate append-only mode, set ``append_only`` to 1 in the repository config::
+To activate append-only mode, set ``append_only`` to 1 in the repository config:
+
+::
 
     borg config /path/to/repo append_only 1
 
@@ -216,7 +222,9 @@ where each line is a transaction and a UTC timestamp.
 
 In addition, ``borg serve`` can act as if a repository is in append-only mode with
 its option ``--append-only``. This can be very useful for fine-tuning access control
-in ``.ssh/authorized_keys`` ::
+in ``.ssh/authorized_keys``:
+
+::
 
     command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustable backup clients>
     command="borg serve ..." ssh-rsa <key used for backup management>
@@ -229,7 +237,9 @@ Example
 +++++++
 
 Suppose an attacker remotely deleted all backups, but your repository was in append-only
-mode. A transaction log in this situation might look like this: ::
+mode. A transaction log in this situation might look like this:
+
+::
 
     transaction 1, UTC time 2016-03-31T15:53:27.383532
     transaction 5, UTC time 2016-03-31T15:53:52.588922

@@ -2633,9 +2633,9 @@ class Archiver:
 
         Make sure you have free space there, you'll need about 1GB each (+ overhead).
 
-        If your repository is encrypted and borg needs a passphrase to unlock the key, use:
+        If your repository is encrypted and borg needs a passphrase to unlock the key, use::
 
-        BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
+            BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
 
         Measurements are done with different input file sizes and counts.
         The file contents are very artificial (either all zero or all random),
@@ -4152,7 +4152,7 @@ class Archiver:
         Upgrade should be able to resume if interrupted, although it
         will still iterate over all segments. If you want to start
         from scratch, use `borg delete` over the copied repository to
-        make sure the cache files are also removed:
+        make sure the cache files are also removed::
 
             borg delete borg
 

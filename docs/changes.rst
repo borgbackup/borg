@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.10 (2019-05-16)
----------------------------
+Version 1.1.11 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -190,6 +190,49 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+
+Fixes:
+
+- extract: fix KeyError for "partial" extraction, #4607
+- fix preloading for old (0.xx) remote servers, #4652
+- SecurityManager.known(): check all files, #4614
+- after double-force delete, warn about necessary repair, #4704
+- Repository.open: use stat() to check for repo dir, #4695
+- Repository.check_can_create_repository: use stat() to check, #4695
+- fix invalid archive error message
+- fix optional/non-optional location arg, #4541
+
+New features:
+
+- enable placeholder usage in all extra archive arguments
+
+Other:
+
+- argparser: always use REPOSITORY in metavar, also use more consistent help phrasing.
+- vagrant: add up-to-date openindiana box
+- tests:
+
+  - cope with ANY error when importing pytest into borg.testsuite, #4652
+  - fix broken test that relied on improper zlib assumptions
+  - test_fuse: filter out selinux xattrs, #4574
+- docs:
+
+  - timestamps in the files cache are now usually ctime, #4583
+  - fix bad reference to borg compact (does not exist in 1.1), #4660
+  - create: borg 1.1 is not future any more
+  - extract: document limitation "needs empty destination", #4598
+  - how to supply a passphrase, use crypto devices, #4549
+  - fix osxfuse github link in installation docs
+  - add example of exclude-norecurse rule in help patterns
+  - update macOS Brew link
+  - add note about software for automating backups, #4581
+  - AUTHORS: mention copyright+license for bundled msgpack
+  - fix various code blocks in the docs, #4708
+  - updated docs to cover use of temp directory on remote, #4545
+
+
+Version 1.1.10 (2019-05-16)
+---------------------------
 
 Fixes:
 

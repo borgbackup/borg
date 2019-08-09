@@ -245,7 +245,7 @@ mode, this is reversible, but ``borg check`` should be run before a writing/prun
 operation on an append-only repository to catch accidental or malicious corruption::
 
     # run without append-only mode
-    borg check --verify-data repo && borg compact repo
+    borg check --verify-data repo
 
 Aside from checking repository & archive integrity you may want to also manually check
 backups to ensure their content seems correct.

@@ -461,6 +461,14 @@ The **user** might be:
 - some specific user using sudo to execute borg as root
 - some specific user (if backups of that user's files were made)
 
+A borg **backup repository** can be either:
+
+- in a local directory (like e.g. a locally mounted USB disk)
+- on a remote backup server machine that is reachable via ssh (client/server)
+
+If the repository is encrypted, you will also need the **key** and the **passphrase**
+(which is protecting the key).
+
 The **key** can be located:
 
 - in the repository (**repokey** mode).
@@ -478,20 +486,11 @@ The **key** can be located:
 
 The **passphrase** for the key has been either:
 
-- entered interacticely at backup time
+- entered interactively at backup time
   (not practical if backup is automated / unattended).
 - acquired via some environment variable driven mechanism in the backup script
   (look there for BORG_PASSPHRASE, BORG_PASSCOMMAND, etc. and just do it like
   that).
-
-A borg **backup repository** can be either:
-
-- in a local directory (like e.g. a locally mounted USB disk)
-- on a remote backup server machine that is reachable via ssh (client/server)
-
-If the repository is encrypted, you will also need the **key** and the **passphrase**
-(which is protecting the key).
-
 
 There are **2 ways to restore** files from a borg backup repository:
 

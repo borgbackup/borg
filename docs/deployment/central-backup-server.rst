@@ -91,15 +91,21 @@ Client
 
 The client needs to initialize the `pictures` repository like this:
 
+::
+
  borg init backup@backup01.srv.local:pictures
 
 Or with the full path (should actually never be used, as only for demonstrational purposes).
 The server should automatically change the current working directory to the `<client fqdn>` folder.
 
+::
+
   borg init backup@backup01.srv.local:/home/backup/repos/johndoe.clnt.local/pictures
 
 When `johndoe.clnt.local` tries to access a not restricted path the following error is raised.
 John Doe tries to backup into the Web 01 path:
+
+::
 
   borg init backup@backup01.srv.local:/home/backup/repos/web01.srv.local/pictures
 

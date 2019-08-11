@@ -404,7 +404,16 @@ Temporary files (client):
     won't be locally cached.
 
 Temporary files (server):
-    None.
+    A non-trivial amount of data will be stored on the remote temp directory
+    for each client that connects to it. For some remotes, this can fill the
+    default temporary directory at /tmp. This can be remediated by ensuring the
+    $TMPDIR, $TEMP, or $TMP environment variable is properly set for the sshd
+    process.
+    For some OSes, this can be done just by setting the correct value in the
+    .bashrc (or equivalent login config file for other shells), however in
+    other cases it may be neccessary to first enable ``PermitUserEnvironment yes``
+    in your ``sshd_config`` file, then add ``environment="TMPDIR=/my/big/tmpdir"``
+    at the start of the public key to be used in the ``authorized_hosts`` file.
 
 Cache files (client only):
     Contains the chunks index and files index (plus a collection of single-

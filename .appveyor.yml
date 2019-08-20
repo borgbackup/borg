@@ -1,0 +1,27 @@
+version: '{build}'
+
+environment:  
+  matrix:
+    - PYTHON: C:\Python37-x64
+
+# Disable automatic builds
+build: off
+
+# Build artifacts: all wheel and exe files in the dist folder
+artifacts:
+  - path: 'dist\*.whl'
+  - path: 'dist\*.exe'
+
+install:
+- ps: scripts\win-download-openssl.ps1
+- ps: |
+    & $env:PYTHON\python.exe -m venv borg-env
+    borg-env\Scripts\activate.ps1
+    python -m pip install -U pip
+    pip install -r requirements.d/development.txt
+    pip install wheel pyinstaller
+
+build_script:
+- ps: |
+    borg-env\Scripts\activate.ps1
+    scripts\win-build.ps1

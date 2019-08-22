@@ -293,7 +293,8 @@ class DownloadPipeline:
                             if source not in masters_preloaded:
                                 # we only need to preload *once* (for the 1st selected slave)
                                 chunks, _ = hardlink_masters[source]
-                                preload(chunks)
+                                if chunks is not None:
+                                    preload(chunks)
                                 masters_preloaded.add(source)
                 else:
                     # easy: we do not have a filter, thus all items are selected, thus we need to preload all chunks.

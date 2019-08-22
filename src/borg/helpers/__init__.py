@@ -21,6 +21,11 @@ from .yes import *  # NOQA
 from .msgpack import is_slow_msgpack, is_supported_msgpack, int_to_bigint, bigint_to_int, get_limited_unpacker
 from . import msgpack
 
+# generic mechanism to enable users to invoke workarounds by setting the
+# BORG_WORKAROUNDS environment variable to a list of comma-separated strings.
+# see the docs for a list of known workaround strings.
+workarounds = tuple(os.environ.get('BORG_WORKAROUNDS', '').split(','))
+
 """
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
 warning or error occurred during their operation. This is different from archiver.exit_code, which is only accessible

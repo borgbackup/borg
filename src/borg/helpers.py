@@ -81,6 +81,12 @@ from . import shellpattern
 from .constants import *  # NOQA
 
 
+# generic mechanism to enable users to invoke workarounds by setting the
+# BORG_WORKAROUNDS environment variable to a list of comma-separated strings.
+# see the docs for a list of known workaround strings.
+workarounds = tuple(os.environ.get('BORG_WORKAROUNDS', '').split(','))
+
+
 '''
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
 warning or error occurred during their operation. This is different from archiver.exit_code, which is only accessible

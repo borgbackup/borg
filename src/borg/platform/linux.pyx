@@ -5,6 +5,7 @@ import re
 import stat
 import subprocess
 
+from ..helpers import workarounds
 from ..helpers import posix_acl_use_stored_uid_gid
 from ..helpers import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
@@ -240,23 +241,11 @@ cdef _sync_file_range(fd, offset, length, flags):
 cdef unsigned PAGE_MASK = sysconf(_SC_PAGESIZE) - 1
 
 
-def _is_WSL():
-    """detect Windows Subsystem for Linux"""
-    try:
-        with open('/proc/version') as fd:
-            linux_version = fd.read()
-        # hopefully no non-WSL Linux will ever mention 'Microsoft' in the kernel version:
-        return 'Microsoft' in linux_version
-    except:  # noqa
-        # make sure to never ever crash due to this check.
-        return False
-
-
-if _is_WSL():
+if 'basesyncfile' in workarounds:
     class SyncFile(BaseSyncFile):
-        # if we are on Microsoft's "Windows Subsytem for Linux", use the
-        # more generic BaseSyncFile to avoid issues like seen there:
-        # https://github.com/borgbackup/borg/issues/1961
+        # if we are on platforms with a broken or not implemented sync_file_range,
+        # use the more generic BaseSyncFile to avoid issues.
+        # see basesyncfile description in our docs for details.
         pass
 else:
     # a real Linux, so we can do better. :)

@@ -625,8 +625,10 @@ class Archiver:
             elif stat.S_ISDIR(st.st_mode):
                 with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
                             noatime=True, op='dir_open') as child_fd:
-                    with backup_io('fstat'):
-                        st = stat_update_check(st, os.fstat(child_fd))
+                    # child_fd is None for directories on windows, in that case a race condition check is not possible.
+                    if child_fd is not None:
+                        with backup_io('fstat'):
+                            st = stat_update_check(st, os.fstat(child_fd))
                     if recurse:
                         tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present)
                         if tag_names:

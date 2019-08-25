@@ -4,6 +4,7 @@ import socket
 import uuid
 
 from borg.helpers import truncate_and_unlink
+from borg.platformflags import is_win32
 
 """
 platform base module
@@ -94,6 +95,10 @@ def get_flags(path, st, fd=None):
 
 
 def sync_dir(path):
+    if is_win32:
+        # Opening directories is not supported on windows.
+        # TODO: do we need to handle this in some other way?
+        return
     fd = os.open(path, os.O_RDONLY)
     try:
         os.fsync(fd)

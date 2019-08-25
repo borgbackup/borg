@@ -14,9 +14,11 @@ src/borg/platform/darwin.c
 src/borg/platform/freebsd.c
 src/borg/platform/linux.c
 src/borg/platform/posix.c
+src/borg/platform/windows.c
 src/borg/_version.py
 *.egg-info
 *.pyc
+*.pyd
 *.so
 .idea/
 .cache/

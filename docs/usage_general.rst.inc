@@ -218,6 +218,18 @@ General:
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.
         Please only use for good reasons as it makes issues harder to analyze.
+    BORG_WORKAROUNDS
+        A list of comma separated strings that trigger workarounds in borg,
+        e.g. to work around bugs in other software.
+
+        Currently known strings are:
+
+        basesyncfile
+            Use the more simple BaseSyncFile code to avoid issues with sync_file_range.
+            You might need this to run borg on WSL (Windows Subsystem for Linux) or
+            in systemd.nspawn containers on some architectures (e.g. ARM).
+            Using this does not affect data safety, but might result in a more bursty
+            write to disk behaviour (not continuously streaming to disk).
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations), see tempfile_ for details
 

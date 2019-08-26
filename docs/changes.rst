@@ -190,10 +190,17 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+- 1.1.11 removes WSL autodetection (Windows 10 Subsystem for Linux).
+  If WSL still has a problem with sync_file_range, you need to set
+  BORG_WORKAROUNDS=basesyncfile in the borg process environment to
+  work around the WSL issue.
 
 Fixes:
 
-- extract: fix KeyError for "partial" extraction, #4607
+- extract:
+
+  - fix KeyError for "partial" extraction, #4607
+  - fix "partial" extract for hardlinked contentless file types, #4725
 - fix preloading for old (0.xx) remote servers, #4652
 - SecurityManager.known(): check all files, #4614
 - after double-force delete, warn about necessary repair, #4704
@@ -205,6 +212,7 @@ Fixes:
 New features:
 
 - enable placeholder usage in all extra archive arguments
+- new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
 
 Other:
 
@@ -229,6 +237,7 @@ Other:
   - AUTHORS: mention copyright+license for bundled msgpack
   - fix various code blocks in the docs, #4708
   - updated docs to cover use of temp directory on remote, #4545
+  - add restore docs, #4670
 
 
 Version 1.1.10 (2019-05-16)

@@ -602,7 +602,7 @@ I am seeing 'A' (added) status for an unchanged file!?
 The files cache is used to determine whether Borg already
 "knows" / has backed up a file and if so, to skip the file from
 chunking. It does intentionally *not* contain files that have a timestamp
-same as the newest timestamp in the created archive.
+same as the newest timestamp in the created archive. 
 
 So, if you see an 'A' status for unchanged file(s), they are likely the files
 with the most recent timestamp in that archive.
@@ -631,6 +631,9 @@ already used.
 By default, ctime (change time) is used for the timestamps to have a rather
 safe change detection (see also the --files-cache option).
 
+Furthermore, pathnames recorded in files cache are always absolute, even if you specify
+source directories with relative pathname. If relative pathnames are stable, but absolute are
+not (for example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable), borg will assume that files are different and will report them as 'added', even though no new chunks will be actually recorded for them.
 
 .. _always_chunking:
 
@@ -660,7 +663,8 @@ it would be much faster.
 Another possible reason is that files don't always have the same path, for
 example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable.
 If the directory where you mount a filesystem is different every time,
-Borg assume they are different files.
+Borg assume they are different files. This is true even if you backup these files with relative pathnames -- borg uses full
+pathnames in files cache regardless.
 
 
 Is there a way to limit bandwidth with Borg?

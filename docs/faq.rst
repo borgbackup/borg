@@ -663,7 +663,7 @@ it would be much faster.
 Another possible reason is that files don't always have the same path, for
 example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable.
 If the directory where you mount a filesystem is different every time,
-Borg assume they are different files. This is true even if you backup these files with relative pathnames - borg uses full
+Borg assumes they are different files. This is true even if you backup these files with relative pathnames - borg uses full
 pathnames in files cache regardless.
 
 

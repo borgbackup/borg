@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a6 (2019-04-22)
-----------------------------
+Version 1.2.0a7 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -214,6 +214,74 @@ Compatibility notes:
   - 2) if you are aware that 1) is not the case for you, you must set
        BORG_HOST_ID env var to something unique.
 
+Fixes:
+
+- slave hardlinks extraction issue, see #4350
+- extract: fix KeyError for "partial" extraction, #4607
+- preload chunks for hardlink slaves w/o preloaded master, #4350
+- fix preloading for old remote servers, #4652
+- fix partial extract for hardlinked contentless file types, #4725
+- Repository.open: use stat() to check for repo dir, #4695
+- Repository.check_can_create_repository: use stat() to check, ~ #4695.
+- SecurityManager.known(): check all files, #4614
+- after double-force delete, warn about necessary repair, #4704
+- cope with ANY error when importing pytest into borg.testsuite, #4652
+- fix invalid archive error message
+- setup.py: fix detection of missing Cython
+- filter out selinux xattrs, #4574
+- location arg - should it be optional? #4541
+- enable placeholder usage in --comment, #4559
+- use whitelist approach for borg serve, #4097
+
+New features:
+
+- minimal native Windows support, see windows readme (work in progress)
+- new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
+- remove WSL autodetection. if WSL still has this problem, you need to
+  set BORG_WORKAROUNDS=basesyncfile in the borg process environment to
+  work around it.
+- support xxh64 checksum in addition to the hashlib hashes in borg list
+- enable placeholder usage in all extra archive arguments
+- enable placeholder usage in --comment, #4559
+- enable placeholder usage in --glob-archives, #4495
+- ability to use a system-provided version of "xxhash"
+
+Other changes:
+
+- argparser: always use REPOSITORY in metavar
+- do not check python/libc for borg serve, #4483
+- small borg compact improvements, #4522
+- compact: log freed space at INFO level
+- tests:
+
+  - tox / travis: add testing on py38-dev
+  - fix broken test that relied on improper zlib assumptions
+  - pure-py msgpack warning shall not make a lot of tests fail, #4558
+  - rename test_mount_hardlinks to test_fuse_mount_hardlinks (master)
+  - vagrant: add up-to-date openindiana box (py35, openssl10)
+  - get rid of confusing coverage warning, #2069
+- docs:
+
+  - reiterate that 'file cache names are absolute' in FAQ,
+    mention bind mount solution, #4738
+  - add restore docs, #4670
+  - updated docs to cover use of temp directory on remote, #4545
+  - add a push-style example to borg-create(1), #4613
+  - timestamps in the files cache are now usually ctime, #4583
+  - benchmark crud: clarify that space is used until compact
+  - update documentation of borg create,
+    corrects a mention of borg 1.1 as a future version.
+  - fix osxfuse github link in installation docs
+  - how to supply a passphrase, use crypto devices, #4549
+  - extract: document limitation "needs empty destination",  #4598
+  - update macOS Brew link
+  - add note about software for automating backup
+  - compact: improve docs,
+  - README: new URL for funding options
+
+
+Version 1.2.0a6 (2019-04-22)
+----------------------------
 
 Fixes:
 

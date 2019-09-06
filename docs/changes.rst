@@ -192,6 +192,8 @@ Compatibility notes:
   which does not need an external Python interpreter.
   Maybe this requirement will be raised to Python 3.6 later.
 - freeing repository space only happens when "borg compact" is invoked.
+- borg create --noatime is deprecated. Not storing atime is the default behaviour
+  now (use --atime if you want to store the atime).
 - list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
   "isomtime" was the default but produced a verbose human format,
   while "mtime" produced a ISO-8601-like format.
@@ -245,6 +247,16 @@ New features:
 - enable placeholder usage in --comment, #4559
 - enable placeholder usage in --glob-archives, #4495
 - ability to use a system-provided version of "xxhash"
+- create:
+
+  - changed the default behaviour to not store the atime of fs items. atime is
+    often rather not interesting and fragile - it easily changes even if nothing
+    else has changed and, if stored into the archive, spoils deduplication of
+    the archive metadata stream.
+  - if you give the --noatime option, borg will output a deprecation warning
+    because it is currently ignored / does nothing.
+    Please remove the --noatime option when using borg 1.2.
+  - added a --atime option for storing files' atime into an archive
 
 Other changes:
 

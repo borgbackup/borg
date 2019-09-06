@@ -567,11 +567,11 @@ class Archiver:
                        cache_mode=args.files_cache_mode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
-                                  numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime,
+                                  numeric_owner=args.numeric_owner, noatime=not args.atime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
-                metadata_collector = MetadataCollector(noatime=args.noatime, noctime=args.noctime,
+                metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
                     nobsdflags=args.nobsdflags, numeric_owner=args.numeric_owner, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
@@ -2342,6 +2342,7 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
+            ('--noatime', None, 'Warning: "--noatime" has been deprecated because it is the default now.')
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -3024,8 +3025,12 @@ class Archiver:
                               help='stay in the same file system and do not store mount points of other file systems')
         fs_group.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                               help='only store numeric user and group identifiers')
+        # --noatime is the default now and the flag is deprecated. args.noatime is not used any more.
+        # use --atime if you want to store the atime (default behaviour before borg 1.2.0a7)..
         fs_group.add_argument('--noatime', dest='noatime', action='store_true',
                               help='do not store atime into archive')
+        fs_group.add_argument('--atime', dest='atime', action='store_true',
+                              help='do store atime into archive')
         fs_group.add_argument('--noctime', dest='noctime', action='store_true',
                               help='do not store ctime into archive')
         fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',

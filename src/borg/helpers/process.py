@@ -86,6 +86,52 @@ def raising_signal_handler(exc_cls):
     return handler
 
 
+class SigIntManager:
+    def __init__(self):
+        self._sig_int_triggered = False
+        self._action_triggered = False
+        self._action_done = False
+        self.ctx = signal_handler('SIGINT', self.handler)
+
+    def __bool__(self):
+        # this will be True (and stay True) after the first Ctrl-C/SIGINT
+        return self._sig_int_triggered
+
+    def action_triggered(self):
+        # this is True to indicate that the action shall be done
+        return self._action_triggered
+
+    def action_done(self):
+        # this will be True after the action has completed
+        return self._action_done
+
+    def action_completed(self):
+        # this must be called when the action triggered is completed,
+        # to avoid that the action is repeatedly triggered.
+        self._action_triggered = False
+        self._action_done = True
+
+    def handler(self, sig_no, stack):
+        # handle the first ctrl-c / SIGINT.
+        self.__exit__(None, None, None)
+        self._sig_int_triggered = True
+        self._action_triggered = True
+
+    def __enter__(self):
+        self.ctx.__enter__()
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        # restore the original ctrl-c handler, so the next ctrl-c / SIGINT does the normal thing:
+        if self.ctx:
+            self.ctx.__exit__(exception_type, exception_value, traceback)
+            self.ctx = None
+
+
+# global flag which might trigger some special behaviour on first ctrl-c / SIGINT,
+# e.g. if this is interrupting "borg create", it shall try to create a checkpoint.
+sig_int = SigIntManager()
+
+
 def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
     """
     Handle typical errors raised by subprocess.Popen. Return None if an error occurred,

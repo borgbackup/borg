@@ -501,7 +501,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         have_noatime = has_noatime('input/file1')
         os.utime('input/file1', (atime, mtime))
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd('create', '--atime', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
@@ -2172,8 +2172,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_test_files()
         have_noatime = has_noatime('input/file1')
-        self.cmd('create', '--exclude-nodump', self.repository_location + '::archive', 'input')
-        self.cmd('create', '--exclude-nodump', self.repository_location + '::archive2', 'input')
+        self.cmd('create', '--exclude-nodump', '--atime', self.repository_location + '::archive', 'input')
+        self.cmd('create', '--exclude-nodump', '--atime', self.repository_location + '::archive2', 'input')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
             os.remove(os.path.join('input', 'flagfile'))

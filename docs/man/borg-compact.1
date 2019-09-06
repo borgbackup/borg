@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMPACT 1 "2019-03-21" "" "borg backup tool"
+.TH BORG-COMPACT 1 "2019-09-06" "" "borg backup tool"
 .SH NAME
 borg-compact \- compact segment files in the repository
 .
@@ -32,18 +32,26 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] compact [options] REPOSITORY
+borg [common options] compact [options] [REPOSITORY]
 .SH DESCRIPTION
 .sp
 This command frees repository space by compacting segments.
 .sp
 Use this regularly to avoid running out of space \- you do not need to use this
-after each borg command though.
+after each borg command though. It is especially useful after deleting archives,
+because only compaction will really free repository space.
 .sp
 borg compact does not need a key, so it is possible to invoke it from the
 client or also from the server.
 .sp
-Depending on the amount of segments that need compaction, it may take a while.
+Depending on the amount of segments that need compaction, it may take a while,
+so consider using the \fB\-\-progress\fP option.
+.sp
+When using \fB\-\-verbose\fP, borg will output an estimate of the freed space.
+.sp
+After upgrading borg (server) to 1.2+, you can use \fBborg compact \-\-cleanup\-commits\fP
+to clean up the numerous 17byte commit\-only segments that borg 1.1 did not clean up
+due to a bug. It is enough to do that once per repository.
 .sp
 See \fIseparate_compaction\fP in Additional Notes for more details.
 .SH OPTIONS
@@ -70,9 +78,7 @@ cleanup commit\-only 17\-byte segment files
 # compact segments and free repo disk space
 $ borg compact /path/to/repo
 
-# same as above plus clean up 17byte commit\-only segments,
-# use this one time after upgrading borg (server) to 1.2+
-# to clean up the tiny segments files created by borg 1.1:
+# same as above plus clean up 17byte commit\-only segments
 $ borg compact \-\-cleanup\-commits /path/to/repo
 .ft P
 .fi

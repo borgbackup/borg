@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2019-03-21" "" "borg backup tool"
+.TH BORG-LIST 1 "2019-09-06" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -45,7 +45,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .B REPOSITORY_OR_ARCHIVE
-repository/archive to list contents of
+repository or archive to list contents of
 .TP
 .B PATH
 paths to list; patterns are supported
@@ -235,6 +235,8 @@ sha256
 sha384
 .IP \(bu 2
 sha512
+.IP \(bu 2
+xxh64: XXH64 checksum of this file (note: this is NOT a cryptographic hash!)
 .IP \(bu 2
 archiveid
 .IP \(bu 2

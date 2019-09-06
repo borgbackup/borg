@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-BENCHMARK-CRUD 1 "2019-04-22" "" "borg backup tool"
+.TH BORG-BENCHMARK-CRUD 1 "2019-09-06" "" "borg backup tool"
 .SH NAME
 borg-benchmark-crud \- Benchmark Create, Read, Update, Delete for archives.
 .
@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] benchmark crud [options] REPO PATH
+borg [common options] benchmark crud [options] REPOSITORY PATH
 .SH DESCRIPTION
 .sp
 This command benchmarks borg CRUD (create, read, update, delete) operations.
@@ -44,8 +44,16 @@ command will create / read / update / delete some archives named borg\-benchmark
 Make sure you have free space there, you\(aqll need about 1GB each (+ overhead).
 .sp
 If your repository is encrypted and borg needs a passphrase to unlock the key, use:
+.INDENT 0.0
+.INDENT 3.5
 .sp
+.nf
+.ft C
 BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .sp
 Measurements are done with different input file sizes and counts.
 The file contents are very artificial (either all zero or all random),
@@ -80,8 +88,8 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B REPO
-repo to use for benchmark (must exist)
+.B REPOSITORY
+repository to use for benchmark (must exist)
 .TP
 .B PATH
 path were to create benchmark input data

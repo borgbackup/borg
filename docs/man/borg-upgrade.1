@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-UPGRADE 1 "2019-03-21" "" "borg backup tool"
+.TH BORG-UPGRADE 1 "2019-09-06" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .
@@ -100,7 +100,12 @@ from scratch, use \fIborg delete\fP over the copied repository to
 make sure the cache files are also removed:
 .INDENT 0.0
 .INDENT 3.5
+.sp
+.nf
+.ft C
 borg delete borg
+.ft P
+.fi
 .UNINDENT
 .UNINDENT
 .sp

@@ -65,6 +65,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--noatime``                                     | do not store atime into archive                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--atime``                                       | do store atime into archive                                                                                                                       |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--noctime``                                     | do not store ctime into archive                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--nobirthtime``                                 | do not store birthtime (creation date) into archive                                                                                               |
@@ -132,6 +134,7 @@ borg create
         -x, --one-file-system     stay in the same file system and do not store mount points of other file systems
         --numeric-owner           only store numeric user and group identifiers
         --noatime                 do not store atime into archive
+        --atime                   do store atime into archive
         --noctime                 do not store ctime into archive
         --nobirthtime             do not store birthtime (creation date) into archive
         --nobsdflags              do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive

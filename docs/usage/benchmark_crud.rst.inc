@@ -6,23 +6,23 @@ borg benchmark crud
 -------------------
 .. code-block:: none
 
-    borg [common options] benchmark crud [options] REPO PATH
+    borg [common options] benchmark crud [options] REPOSITORY PATH
 
 .. only:: html
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+----------+------------------------------------------+
-    | **positional arguments**                                                                                    |
-    +-------------------------------------------------------+----------+------------------------------------------+
-    |                                                       | ``REPO`` | repo to use for benchmark (must exist)   |
-    +-------------------------------------------------------+----------+------------------------------------------+
-    |                                                       | ``PATH`` | path were to create benchmark input data |
-    +-------------------------------------------------------+----------+------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                              |
-    |                                                                                                             |
-    | :ref:`common_options`                                                                                       |
-    +-------------------------------------------------------+----------+------------------------------------------+
+    +-------------------------------------------------------+----------------+----------------------------------------------+
+    | **positional arguments**                                                                                              |
+    +-------------------------------------------------------+----------------+----------------------------------------------+
+    |                                                       | ``REPOSITORY`` | repository to use for benchmark (must exist) |
+    +-------------------------------------------------------+----------------+----------------------------------------------+
+    |                                                       | ``PATH``       | path were to create benchmark input data     |
+    +-------------------------------------------------------+----------------+----------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                        |
+    |                                                                                                                       |
+    | :ref:`common_options`                                                                                                 |
+    +-------------------------------------------------------+----------------+----------------------------------------------+
 
     .. raw:: html
 
@@ -34,8 +34,8 @@ borg benchmark crud
 
 .. only:: latex
 
-    REPO
-        repo to use for benchmark (must exist)
+    REPOSITORY
+        repository to use for benchmark (must exist)
     PATH
         path were to create benchmark input data
 
@@ -54,12 +54,9 @@ command will create / read / update / delete some archives named borg-benchmark-
 
 Make sure you have free space there, you'll need about 1GB each (+ overhead).
 
-Important: The space used in the repository will **not** be freed until you run
-``borg compact``.
+If your repository is encrypted and borg needs a passphrase to unlock the key, use::
 
-If your repository is encrypted and borg needs a passphrase to unlock the key, use:
-
-BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
+    BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
 
 Measurements are done with different input file sizes and counts.
 The file contents are very artificial (either all zero or all random),

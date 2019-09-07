@@ -171,6 +171,8 @@ Examples::
         + /home/susan
         # don't backup the other home directories
         - /home/*
+        # don't even look in /proc
+        ! /proc
 
 .. _borg_placeholders:
 
@@ -178,8 +180,8 @@ borg help placeholders
 ~~~~~~~~~~~~~~~~~~~~~~
 
 
-Repository (or Archive) URLs, ``--prefix`` and ``--remote-path`` values support these
-placeholders:
+Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
+and ``--remote-path`` values support these placeholders:
 
 {hostname}
     The (short) hostname of the machine.

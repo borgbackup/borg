@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a7 (not released yet)
-----------------------------------
+Version 1.2.0a7 (2019-09-07)
+----------------------------
 
 Please note:
 
@@ -238,6 +238,7 @@ Fixes:
 New features:
 
 - minimal native Windows support, see windows readme (work in progress)
+- create: first ctrl-c (SIGINT) triggers checkpoint and abort, #4606
 - new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
 - remove WSL autodetection. if WSL still has this problem, you need to
   set BORG_WORKAROUNDS=basesyncfile in the borg process environment to

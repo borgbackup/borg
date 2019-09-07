@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-SERVE 1 "2019-03-21" "" "borg backup tool"
+.TH BORG-SERVE 1 "2019-09-06" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .
@@ -102,6 +102,48 @@ has been introduced in v7.2. We recommend to use
 in this case.
 .UNINDENT
 .UNINDENT
+.SS SSH Configuration
+.sp
+\fBborg serve\fP\(aqs pipes (\fBstdin\fP/\fBstdout\fP/\fBstderr\fP) are connected to the \fBsshd\fP process on the server side. In the event that the SSH connection between \fBborg serve\fP and the client is disconnected or stuck abnormally (for example, due to a network outage), it can take a long time for \fBsshd\fP to notice the client is disconnected. In the meantime, \fBsshd\fP continues running, and as a result so does the \fBborg serve\fP process holding the lock on the repository. This can cause subsequent \fBborg\fP operations on the remote repository to fail with the error: \fBFailed to create/acquire the lock\fP\&.
+.sp
+In order to avoid this, it is recommended to perform the following additional SSH configuration:
+.sp
+Either in the client side\(aqs \fB~/.ssh/config\fP file, or in the client\(aqs \fB/etc/ssh/ssh_config\fP file:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+Host backupserver
+        ServerAliveInterval 10
+        ServerAliveCountMax 30
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Replacing \fBbackupserver\fP with the hostname, FQDN or IP address of the borg server.
+.sp
+This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the ssh client process will be terminated, causing the borg process to terminate gracefully.
+.sp
+On the server side\(aqs \fBsshd\fP configuration file (typically \fB/etc/ssh/sshd_config\fP):
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+ClientAliveInterval 10
+ClientAliveCountMax 30
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+This will cause the server to send a keep alive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server\(aqs sshd process will be terminated, causing the \fBborg serve\fP process to terminate gracefully and release the lock on the repository.
+.sp
+If you then run borg commands with \fB\-\-lock\-wait 600\fP, this gives sufficient time for the borg serve processes to terminate after the SSH connection is torn down after the 300 second wait for the keepalives to fail.
+.sp
+You may, of course, modify the timeout values demonstrated above to values that suit your environment and use case.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP

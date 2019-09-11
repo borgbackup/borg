@@ -1,0 +1,196 @@
+#!/bin/bash
+
+# Program information
+prog_name="BorgBackup"
+version="1.1.10"
+signature="BSD License (BSD)"
+git_url="https://github.com/borgbackup/borg"
+installation_path=/usr/local/bin
+
+# System information
+SYS=$(uname -s | awk '{print tolower($0)}')
+OS=$(awk '/DISTRIB_ID=/' /etc/*-release | sed 's/DISTRIB_ID=//' | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m | sed 's/x86_//;s/i[3-6]86/32/')
+VERSION=$(awk '/DISTRIB_RELEASE=/' /etc/*-release | sed 's/DISTRIB_RELEASE=//' | sed 's/[.]0/./')
+
+
+
+install_all_dependencies(){
+  if [[ $OS == 'debian' || $OS == 'ubuntu' ]]; then
+    sudo apt-get install -y python3 python3-dev python3-pip python-virtualenv \
+    libssl-dev openssl \
+    libacl1-dev libacl1 \
+    build-essential
+    sudo apt-get install -y libfuse-dev fuse pkg-config
+
+  elif [[ $OS == 'arch' ]]; then
+    sudo pacman -S python3 python3-dev python3-pip python-virtualenv \
+    libssl-dev openssl \
+    libacl1-dev libacl1 \
+    build-essential libfuse-dev \
+    fuse pkg-config
+
+  elif [[ $OS == 'fedora' ]]; then
+    sudo dnf install python3 python3-devel python3-pip python3-virtualenv
+    sudo dnf install openssl-devel openssl
+    sudo dnf install libacl-devel libacl
+    sudo dnf install gcc gcc-c++
+    sudo dnf install redhat-rpm-config
+    sudo dnf install fuse-devel fuse pkgconfig
+
+  elif [[ $OSTYPE == 'darwin' ]]; then
+    brew install python3 openssl
+    brew install pkg-config
+    pip3 install virtualenv
+    brew cask install osxfuse
+
+  elif [[ "$OSTYPE" == "freebsd"* ]]; then
+    pkg install -y python3 openssl fusefs-libs pkgconf
+    pkg install -y git
+    python3.4 -m ensurepip # to install pip for Python3
+    To use the mount command:
+    echo 'fuse_load="YES"' >> /boot/loader.conf
+    echo 'vfs.usermount=1' >> /etc/sysctl.conf
+    kldload fuse
+    sysctl vfs.usermount=1
+
+  else; then
+    echo \n "We can't install the dependencies on this system"
+    echo "Try manually" \n
+
+  fi
+}
+
+install_dependencies(){
+  if [[ $OS == 'debian' || $OS == 'ubuntu' ]]; then
+    sudo apt-get install -y wget gpg
+
+  elif [[ $OS == 'arch' ]]; then
+    sudo pacman -S wget gpg
+
+  elif [[ $OS == 'fedora' ]]; then
+    sudo dnf install wget gpg
+
+  elif [[ $OSTYPE == 'darwin' ]]; then
+    brew install wget gpg
+
+  elif [[ "$OSTYPE" == "freebsd"* ]]; then
+    pkg install -y wget gpg
+
+  else; then
+    echo \n "We can't install the dependencies on this system"
+    echo "Try manually: wget gpg" \n
+
+  fi
+}
+
+upgrade_os(){
+  if [[ $OS == 'debian' || $OS == 'ubuntu' ]]; then
+    sudo apt-get update  > /dev/null
+    sudo apt-get upgrade -y  > /dev/null
+
+  elif [[ $OS == 'arch' ]]; then
+    sudo pacman -Su  > /dev/null
+
+  elif [[ $OS == 'fedora' ]]; then
+    sudo yum update > /dev/null
+    sudo yum upgrade -y > /dev/null
+
+  elif [[ "$OSTYPE" == "freebsd"* ]]; then
+    freebsd-update fetch
+    freebsd-update install
+  fi
+}
+
+from_source(){
+  upgrade_os
+
+  install_all_dependencies
+
+  # get borg from github
+  git clone https://github.com/borgbackup/borg.git
+
+  virtualenv --python=python3 borg-env
+  source borg-env/bin/activate   # always before using!
+
+  # install borg + dependencies into virtualenv
+  cd borg
+  pip install -r requirements.d/development.txt
+  pip install -r requirements.d/docs.txt  # optional, to build the docs
+  pip install -r requirements.d/fuse.txt  # optional, for FUSE support
+  pip install -e .  # in-place editable mode
+
+  # optional: run all the tests, on all supported Python versions
+  # requires fakeroot, available through your package manager
+  fakeroot -u tox
+}
+
+download_and_check_PGP(){
+  echo "Download... "
+  wget -q --show-progress $git_url/releases/download/$version/borg-$SYS$ARCH
+
+  echo "Download GPG signature..."
+  wget -q --show-progress $git_url/releases/download/$version/borg-$SYS$ARCH.asc
+
+  gpg --keyserver hkp://keyserver.ubuntu.com:80
+  \ --recv-keys "6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393"
+
+  gpg --verify borg-$SYS$ARCH.asc
+
+
+  if [ $? -eq 0 ]
+  then
+    echo "All is well."
+  else
+    echo "Problem with signature."
+    exit -1
+  fi
+}
+
+
+
+if [[ $1 = "--release" ]]; then
+  if [[ $2 = "" ]]; then
+    echo "[ Oops ] You missend the number release"
+    exit -1
+  else
+    $version = $2
+  fi
+else
+  $version = "1.1.10"
+fi
+
+if [[ $1 = "--from-source" ]]; then
+  from_source
+  exit 0
+fi
+
+
+upgrade_os
+install_dependencies
+download_and_check_PGP
+
+echo "Now install it:"
+sudo cp borg-$SYS$ARCH $installation_path/borg
+sudo chown root:root $installation_path/borg
+
+echo "and make it executable…"
+sudo chmod 755 $installation_path/borg
+
+read -p "Do you want to delete the installation files? [y/N]" delete_install_files
+
+if [[ $delete_install_files = 'Y' || $delete_install_files = 'y' | $delete_install_files = 'Yes' | $delete_install_files = 'yes' ]]; then
+  echo Delete borg-$SYS$ARCH
+  rm -f borg-$SYS$ARCH
+
+  echo Delete borg-$SYS$ARCH.asc
+  rm -f borg-$SYS$ARCH.asc
+
+  echo \n "Done!"
+fi
+
+echo \n "All done!"
+echo \n "Your borg version is..." \n
+borg -V
+
+exit 0

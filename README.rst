@@ -14,6 +14,21 @@ since only changes are stored.
 The authenticated encryption technique makes it suitable for backups to not
 fully trusted targets.
 
+Quick Install
+~~~~~~~~~~~~~
+
+Open a terminal in the folder where you downloaded Borg Backup and run (without "$"):
+
+``$ chmod +x scripts/install``
+
+And after:
+
+``$./scripts/install``
+
+
+Probably ask you to enter your password, and it's done!
+
+
 See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 There is also an `offline documentation`_ available, in multiple formats.

@@ -17,33 +17,33 @@ Contributions
 
 Some guidance for contributors:
 
-- discuss changes on the GitHub issue tracker, on IRC or on the mailing list
+- Discuss changes on the GitHub issue tracker, on IRC or on the mailing list.
 
-- make your PRs on the ``master`` branch (see `Branching Model`_ for details)
+- Make your PRs on the ``master`` branch (see `Branching Model`_ for details).
 
-- do clean changesets:
+- Do clean changesets:
 
-  - focus on some topic, resist changing anything else.
-  - do not do style changes mixed with functional changes.
-  - try to avoid refactorings mixed with functional changes.
-  - if you need to fix something after commit/push:
+  - Focus on some topic, resist changing anything else.
+  - Do not do style changes mixed with functional changes.
+  - Try to avoid refactorings mixed with functional changes.
+  - If you need to fix something after commit/push:
 
-    - if there are ongoing reviews: do a fixup commit you can
+    - If there are ongoing reviews: do a fixup commit you can
       squash into the bad commit later.
-    - if there are no ongoing reviews or you did not push the
+    - If there are no ongoing reviews or you did not push the
       bad commit yet: amend the commit to include your fix or
       merge the fixup commit before pushing.
-  - have a nice, clear, typo-free commit comment
-  - if you fixed an issue, refer to it in your commit comment
-  - follow the style guide (see below)
+  - Have a nice, clear, typo-free commit comment.
+  - If you fixed an issue, refer to it in your commit comment.
+  - Follow the style guide (see below).
 
-- if you write new code, please add tests and docs for it
+- If you write new code, please add tests and docs for it.
 
-- run the tests, fix any issues that come up
+- Run the tests, fix any issues that come up.
 
-- make a pull request on GitHub
+- Make a pull request on GitHub.
 
-- wait for review by other developers
+- Wait for review by other developers.
 
 Branching model
 ---------------
@@ -66,10 +66,10 @@ be applied.
 
 Changes that are typically considered for backporting:
 
-- Data loss, corruption and inaccessibility fixes
-- Security fixes
-- Forward-compatibility improvements
-- Documentation corrections
+- Data loss, corruption and inaccessibility fixes.
+- Security fixes.
+- Forward-compatibility improvements.
+- Documentation corrections.
 
 .. rubric:: Maintainer part
 
@@ -311,23 +311,23 @@ Creating a new release
 
 Checklist:
 
-- make sure all issues for this milestone are closed or moved to the
-  next milestone
-- check if there are any pending fixes for security issues
-- find and fix any low hanging fruit left on the issue tracker
-- check that Travis CI is happy
-- update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
-- check version number of upcoming release in ``CHANGES.rst``
-- verify that ``MANIFEST.in`` and ``setup.py`` are complete
+- Make sure all issues for this milestone are closed or moved to the
+  next milestone.
+- Check if there are any pending fixes for security issues.
+- Find and fix any low hanging fruit left on the issue tracker.
+- Check that Travis CI is happy.
+- Update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``.
+- Check version number of upcoming release in ``CHANGES.rst``.
+- Verify that ``MANIFEST.in`` and ``setup.py`` are complete.
 - ``python setup.py build_usage ; python setup.py build_man`` and
   commit (be sure to build with Python 3.5 as Python 3.6 added `more
   guaranteed hashing algorithms
-  <https://github.com/borgbackup/borg/issues/2123>`_)
-- tag the release::
+  <https://github.com/borgbackup/borg/issues/2123>`_).
+- Tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
 
-- create a clean repo and use it for the following steps::
+- Create a clean repo and use it for the following steps::
 
     git clone borg borg-clean
 
@@ -335,32 +335,32 @@ Checklist:
   It will also reveal uncommitted required files.
   Moreover, it makes sure the vagrant machines only get committed files and
   do a fresh start based on that.
-- run tox and/or binary builds on all supported platforms via vagrant,
-  check for test failures
-- create sdist, sign it, upload release to (test) PyPi:
+- Run tox and/or binary builds on all supported platforms via vagrant,
+  check for test failures.
+- Create sdist, sign it, upload release to (test) PyPi:
 
   ::
 
     scripts/sdist-sign X.Y.Z
     scripts/upload-pypi X.Y.Z test
     scripts/upload-pypi X.Y.Z
-- put binaries into dist/borg-OSNAME and sign them:
+- Put binaries into dist/borg-OSNAME and sign them:
 
   ::
 
     scripts/sign-binaries 201912312359
-- close the release milestone on GitHub
-- announce on:
+- Close the release milestone on GitHub.
+- Announce on:
 
- - Mailing list
- - Twitter
- - IRC channel (change ``/topic``)
+ - Mailing list.
+ - Twitter.
+ - IRC channel (change ``/topic``).
 
-- create a GitHub release, include:
+- Create a GitHub release, include:
 
-  * standalone binaries (see above for how to create them)
+  * Standalone binaries (see above for how to create them).
 
-    + for OS X, document the OS X Fuse version in the README of the binaries.
+    + For OS X, document the OS X Fuse version in the README of the binaries.
       OS X FUSE uses a kernel extension that needs to be compatible with the
       code contained in the binary.
-  * a link to ``CHANGES.rst``
+  * A link to ``CHANGES.rst``.

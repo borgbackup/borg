@@ -423,7 +423,7 @@ Temporary files (server):
     process.
     For some OSes, this can be done just by setting the correct value in the
     .bashrc (or equivalent login config file for other shells), however in
-    other cases it may be neccessary to first enable ``PermitUserEnvironment yes``
+    other cases it may be necessary to first enable ``PermitUserEnvironment yes``
     in your ``sshd_config`` file, then add ``environment="TMPDIR=/my/big/tmpdir"``
     at the start of the public key to be used in the ``authorized_hosts`` file.
 

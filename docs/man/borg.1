@@ -680,7 +680,7 @@ $TMPDIR, $TEMP, or $TMP environment variable is properly set for the sshd
 process.
 For some OSes, this can be done just by setting the correct value in the
 .bashrc (or equivalent login config file for other shells), however in
-other cases it may be neccessary to first enable \fBPermitUserEnvironment yes\fP
+other cases it may be necessary to first enable \fBPermitUserEnvironment yes\fP
 in your \fBsshd_config\fP file, then add \fBenvironment="TMPDIR=/my/big/tmpdir"\fP
 at the start of the public key to be used in the \fBauthorized_hosts\fP file.
 .TP

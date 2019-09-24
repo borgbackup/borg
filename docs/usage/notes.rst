@@ -184,7 +184,7 @@ This has some notable consequences:
   it contains data in a more sequential manner, historic manifests, multiple
   commits - until you run ``borg compact``)
 - user can choose when to run compaction (it should be done regularly, but not
-  neccessarily after each single borg command)
+  necessarily after each single borg command)
 - user can choose from where to invoke ``borg compact`` to do the compaction
   (from client or from server, it does not need a key)
 - less repo sync data traffic in case you create a copy of your repository by

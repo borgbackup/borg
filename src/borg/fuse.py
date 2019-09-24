@@ -556,10 +556,12 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             entry.st_mtime_ns = mtime_ns
             entry.st_atime_ns = item.get('atime', mtime_ns)
             entry.st_ctime_ns = item.get('ctime', mtime_ns)
+            entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
         else:
             entry.st_mtime = mtime_ns / 1e9
             entry.st_atime = item.get('atime', mtime_ns) / 1e9
             entry.st_ctime = item.get('ctime', mtime_ns) / 1e9
+            entry.st_birthtime = item.get('birthtime', mtime_ns) / 1e9
         return entry
 
     def listxattr(self, inode, ctx=None):

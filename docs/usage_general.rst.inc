@@ -495,7 +495,7 @@ For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
     Feature request :issue:`618` for more flags.
 .. [2] Feature request :issue:`1332`
 .. [3] Feature request :issue:`1337`
-.. [4] Cygwin tries to map NTFS ACLs to permissions with varying degress of success.
+.. [4] Cygwin tries to map NTFS ACLs to permissions with varying degrees of success.
 
 .. [#acls] The native access control list mechanism of the OS. This normally limits access to
     non-native ACLs. For example, NTFS ACLs aren't completely accessible on Linux with ntfs-3g.

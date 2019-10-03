@@ -302,7 +302,8 @@ class Archiver:
                        truish=('YES', ), retry=False,
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
-        if args.repo_only and any((args.verify_data, args.first, args.last, args.prefix)):
+        if args.repo_only and any(
+           (args.verify_data, args.first, args.last, args.prefix is not None, args.glob_archives)):
             self.print_error("--repository-only contradicts --first, --last, --prefix and --verify-data arguments.")
             return EXIT_ERROR
         if args.repair and args.max_duration:
@@ -318,7 +319,7 @@ class Archiver:
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
                 return EXIT_WARNING
-        if args.prefix:
+        if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.location.archive,
@@ -1092,7 +1093,7 @@ class Archiver:
     @with_repository(exclusive=True, manifest=False)
     def do_delete(self, args, repository):
         """Delete an existing repository or archives"""
-        archive_filter_specified = args.first or args.last or args.prefix or args.glob_archives
+        archive_filter_specified = any((args.first, args.last, args.prefix is not None, args.glob_archives))
         explicit_archives_specified = args.location.archive or args.archives
         if archive_filter_specified and explicit_archives_specified:
             self.print_error('Mixing archive filters and explicitly named archives is not supported.')
@@ -1301,7 +1302,7 @@ class Archiver:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
-        if any((args.location.archive, args.first, args.last, args.prefix, args.glob_archives)):
+        if any((args.location.archive, args.first, args.last, args.prefix is not None, args.glob_archives)):
             return self._info_archives(args, repository, manifest, key, cache)
         else:
             return self._info_repository(args, repository, manifest, key, cache)
@@ -1397,7 +1398,7 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        if args.prefix:
+        if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         checkpoint_re = r'\.checkpoint(\.\d+)?'
         archives_checkpoints = manifest.archives.list(glob=args.glob_archives,
@@ -2582,7 +2583,7 @@ class Archiver:
             filters_group = subparser.add_argument_group('Archive filters',
                                                          'Archive filters can be applied to repository targets.')
             group = filters_group.add_mutually_exclusive_group()
-            group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, default='',
+            group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, default=None,
                                help='only consider archive names starting with this prefix.')
             group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
                                type=GlobSpec, default=None,

@@ -396,8 +396,8 @@ class Repository:
         try:
             st = os.stat(path)
         except FileNotFoundError:
-            logger.warning("%s is not a valid borgbackup directory." % (path))
-            os.exit(2)
+            self.close()
+            raise self.InvalidRepository(self.path)
         if not stat.S_ISDIR(st.st_mode):
             raise self.InvalidRepository(path)
         if lock:

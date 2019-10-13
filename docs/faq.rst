@@ -702,6 +702,36 @@ Now Borg will be bandwidth limited. Nice thing about pv is that you can change r
 .. _pipeviewer: http://www.ivarch.com/programs/pv.shtml
 
 
+How can I restore from a BTRFS snapshot to the original path?
+-------------------------------------------------------------
+
+When I do a backup of a BTRFS file system I first do a readonly snapshot and
+then back it up:
+
+::
+
+    btrfs subvolume snapshot -r /home /.snapshots/home
+    borg create /mnt/borg::home123 /.snapshots/home
+    btrfs subvolume delete /.snapshots/home
+
+The problem with this approach is that in a restore instead of paths starting with /home I
+have now /.snapshots/home.
+
+Solution 1: Run ``borg_create`` from within the snapshot directory.
+
+::
+
+    cd /.snapshots
+    borg create /mnt/borg::home123 home
+
+Solution 2: Use partial ``extract`` / ``mount`` by specifying a PATH.
+
+::
+
+    borg extract /mnt/borg::home123 /.snapshots/home
+    borg mount /mnt/borg::home123 /mnt/restore /.snapshots/home
+
+
 I am having troubles with some network/FUSE/special filesystem, why?
 --------------------------------------------------------------------
 

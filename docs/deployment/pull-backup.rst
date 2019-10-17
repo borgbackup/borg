@@ -7,16 +7,22 @@ Backing up in pull mode
 Assuming you have a pull backup system set up with borg, where a backup server
 pulls the data from the target via sshfs.
 
-In this mode, the backup client's file system is mounted via sshfs on the backup
+In this mode, the backup client's file system is mounted remotely on the backup
 server. Pull mode is even possible if the SSH connection must be established by
-the client via a remote tunnel.
+the client via a remote tunnel. Other network file systems like NFS or SMB could
+be used as well, but sshfs is very simple to set up and probably the most secure
+one.
 
-There are some restrictions caused by sshfs. Unless you define UID and GID
-mappings when mounting via sshfs, owners and groups of the mounted file system
-will probably change, and you may not have access to those files if BorgBackup
-is not run with root privileges.
+There are some restrictions caused by sshfs. For example, unless you define UID
+and GID mappings when mounting via sshfs, owners and groups of the mounted file
+system will probably change, and you may not have access to those files if
+BorgBackup is not run with root privileges.
 
-[ADD MORE RESTRICTIONS HERE: filename encoding, xattrs, ACLs, bsdflags...]
+The sshfs is a FUSE file system and uses the SFTP protocol, so there may be also
+other unsupported features that the actual implementations of sshfs, libfuse and
+sftp on the backup server do not support, like file name encodings, ACLs, xattrs
+or bsdflags. So there is no guarantee that you are able to restore a system
+completely in every aspect from such a backup.
 
 To mount the client's root file system you will need root access to the client.
 This contradicts to the usual threat model of BorgBackup, where clients don't

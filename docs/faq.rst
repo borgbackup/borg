@@ -516,15 +516,30 @@ When I do a ``borg extract``, after a while all activity stops, no cpu usage,
 no downloads.
 
 This may happen when SSH terminates the connection on server side. You can
-configure SSH on client side to prevent this, for example in ~/.ssh/config:
+configure SSH on client side to prevent this by sending keep-alive requests,
+for example in ~/.ssh/config:
 
 ::
 
     Host borg.example.com
-        ServerAliveInterval 300
+        # Client kills connection after 3*30 seconds without server response:
+        ServerAliveInterval 30
         ServerAliveCountMax 3
 
-Other solutions to work around the issues could be:
+You can also do the opposite and configure SSH on server side in
+/etc/ssh/sshd_config, to make the server send keep-alive requests to the client:
+
+::
+
+    # Server kills connection after 3*30 seconds without client response:
+    ClientAliveInterval 30
+    ClientAliveCountMax 3
+
+How can I deal with my very unstable SSH connection?
+----------------------------------------------------
+
+If you have issues with lost connections during long-running borg commands, you
+could try to work around:
 
 - Make partial extracts like ``borg extract REPO PATTERN`` to do multiple
   smaller extraction runs that complete before your connection has issues.

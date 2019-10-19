@@ -509,6 +509,46 @@ Please disclose security issues responsibly.
 Common issues
 #############
 
+Why does Borg extract hang after some time?
+-------------------------------------------
+
+When I do a ``borg extract``, after a while all activity stops, no cpu usage,
+no downloads.
+
+This may happen when the SSH connection is stuck on server side. You can
+configure SSH on client side to prevent this by sending keep-alive requests,
+for example in ~/.ssh/config:
+
+::
+
+    Host borg.example.com
+        # Client kills connection after 3*30 seconds without server response:
+        ServerAliveInterval 30
+        ServerAliveCountMax 3
+
+You can also do the opposite and configure SSH on server side in
+/etc/ssh/sshd_config, to make the server send keep-alive requests to the client:
+
+::
+
+    # Server kills connection after 3*30 seconds without client response:
+    ClientAliveInterval 30
+    ClientAliveCountMax 3
+
+How can I deal with my very unstable SSH connection?
+----------------------------------------------------
+
+If you have issues with lost connections during long-running borg commands, you
+could try to work around:
+
+- Make partial extracts like ``borg extract REPO PATTERN`` to do multiple
+  smaller extraction runs that complete before your connection has issues.
+- Try using ``borg mount REPO MOUNTPOINT`` and ``rsync -avH`` from
+  ``MOUNTPOINT`` to your desired extraction directory. If the connection breaks
+  down, just repeat that over and over again until rsync does not find anything
+  to do any more. Due to the way borg mount works, this might be less efficient
+  than borg extract for bigger volumes of data.
+
 Why do I get "connection closed by remote" after a while?
 ---------------------------------------------------------
 

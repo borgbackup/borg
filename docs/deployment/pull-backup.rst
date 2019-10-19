@@ -26,9 +26,9 @@ completely in every aspect from such a backup.
 
 To mount the client's root file system you will need root access to the client.
 This contradicts to the usual threat model of BorgBackup, where clients don't
-need to trust the backup server can encrypt their data. In pull mode the server
+need to trust the backup server (data is encrypted). In pull mode the server
 (when logged in as root) could cause unlimited damage to the client. Therefore,
-pull mode should be used only from servers you own or trust yourself!
+pull mode should be used only from servers you do fully trust!
 
 Creating a backup
 -----------------
@@ -45,10 +45,10 @@ the mount point prefix, e.g. /mnt/sshfs/bin/bash instead of /bin/bash).
     sshfs root@host:/ /mnt/sshfs
     # Change into mount dir and back up.
     cd /mnt/sshfs
-    borg create /borg/to/repo::archive
+    borg create /path/to/repo::archive .
     # Unmount client.
     cd ~
-    fusermount -u /mnt/sshfs
+    umount /mnt/sshfs
 
 Restoring a full backup
 -----------------------
@@ -71,7 +71,7 @@ installed on the client.
     sshfs root@host:/ /tmp/sshfs
     # Mount BorgBackup repository inside it.
     mkdir /tmp/sshfs/borgrepo
-    mount --bind /REPOSITORY /tmp/sshfs/borgrepo
+    mount --bind /path/to/repo /tmp/sshfs/borgrepo
     # Make borg executable available.
     cp /usr/local/bin/borg /tmp/sshfs/usr/local/bin/borg
     # Mount important system directories and enter chroot.
@@ -92,11 +92,11 @@ stuff:
 
 ::
 
-    exit #ext chroot
+    exit # exit chroot
     cd /tmp/sshfs
     for i in dev proc sys borgrepo; do umount ./$i; done
     cd ~
-    fusermount -u /tmp/sshfs
+    umount /tmp/sshfs
 
 Thanks to secuser on IRC for this howto.
 

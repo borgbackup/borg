@@ -2155,6 +2155,13 @@ class Archiver:
             A root path starts with the prefix `R`, followed by a path (a plain path, not a
             file pattern). An include rule starts with the prefix +, an exclude rule starts
             with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
+
+            .. note::
+
+                Via ``--pattern`` or ``--patterns-from`` you can define BOTH inclusion and exclusion
+                of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
+                ``--exlude-from`` ONLY excludes are defined.
+
             Inclusion patterns are useful to include paths that are contained in an excluded
             path. The first matching pattern is used so if an include pattern matches before
             an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches

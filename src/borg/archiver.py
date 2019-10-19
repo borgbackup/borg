@@ -2159,9 +2159,8 @@ class Archiver:
             .. note::
 
                 Via ``--pattern`` or ``--patterns-from`` you can define BOTH inclusion and exclusion
-                of files using pattern prefixes ``+`` and ``-``, so the PATH argument of the command
-                can be omitted. With ``--exclude`` and ``--exlude-from`` ONLY excludes are defined,
-                and the PATH argument defines the includes.
+                of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
+                ``--exlude-from`` ONLY excludes are defined.
 
             Inclusion patterns are useful to include paths that are contained in an excluded
             path. The first matching pattern is used so if an include pattern matches before

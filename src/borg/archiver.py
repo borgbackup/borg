@@ -2604,21 +2604,21 @@ class Archiver:
                 group.add_argument('--last', metavar='N', dest='last', default=0, type=positive_int_validator,
                                    help='consider last N archives after other filters were applied')
 
-        def define_borg_mount(subparser):
-            subparser.set_defaults(func=self.do_mount)
-            subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+        def define_borg_mount(parser):
+            parser.set_defaults(func=self.do_mount)
+            parser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                 help='repository or archive to mount')
-            subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+            parser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                 help='where to mount filesystem')
-            subparser.add_argument('-f', '--foreground', dest='foreground',
+            parser.add_argument('-f', '--foreground', dest='foreground',
                                 action='store_true',
                                 help='stay in foreground, do not daemonize')
-            subparser.add_argument('-o', dest='options', type=str,
+            parser.add_argument('-o', dest='options', type=str,
                                 help='Extra mount options')
-            define_archive_filters_group(subparser)
-            subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+            define_archive_filters_group(parser)
+            parser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                    help='paths to extract; patterns are supported')
-            define_exclusion_group(subparser, strip_components=True)
+            define_exclusion_group(parser, strip_components=True)
 
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
@@ -2684,8 +2684,7 @@ class Archiver:
             parser.epilog = mount_epilog
             parser.formatter_class = argparse.RawDescriptionHelpFormatter
             parser.help = 'mount repository'
-            subparser = parser
-            define_borg_mount(subparser)
+            define_borg_mount(parser)
             return parser
 
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')

@@ -33,8 +33,6 @@ try:
 
     logger = create_logger()
 
-    import msgpack
-
     import borg
     from . import __version__
     from . import helpers
@@ -50,7 +48,7 @@ try:
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
     from .helpers import Error, NoManifestError, set_ec
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
-    from .helpers import PrefixSpec, SortBySpec, HUMAN_SORT_KEYS, FilesCacheMode
+    from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, HUMAN_SORT_KEYS, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
     from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
@@ -72,6 +70,7 @@ try:
     from .helpers import popen_with_error_handling, prepare_subprocess_env
     from .helpers import dash_open
     from .helpers import umount
+    from .helpers import msgpack, msgpack_fallback
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
@@ -91,6 +90,8 @@ except BaseException:
 assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND exception handler right above this line."
 
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
+
+PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
 
 def argument(args, str_or_bool):
@@ -755,7 +756,8 @@ class Archiver:
         else:
             pi = None
 
-        for item in archive.iter_items(filter, preload=True):
+        for item in archive.iter_items(filter, partial_extract=partial_extract,
+                                       preload=True, hardlink_masters=hardlink_masters):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -997,7 +999,7 @@ class Archiver:
                 return None, stream
             return tarinfo, stream
 
-        for item in archive.iter_items(filter, preload=True):
+        for item in archive.iter_items(filter, preload=True, hardlink_masters=hardlink_masters):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -1236,8 +1238,7 @@ class Archiver:
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        name = replace_placeholders(args.name)
-        archive.rename(name)
+        archive.rename(args.name)
         manifest.write()
         repository.commit()
         cache.commit()
@@ -1290,7 +1291,7 @@ class Archiver:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
                 repository.commit()
-                logger.info('Done. Run "borg check --repair" to clean up the mess.')
+                logger.warning('Done. Run "borg check --repair" to clean up the mess.')
             else:
                 logger.warning('Aborted.')
             return self.exit_code
@@ -1704,11 +1705,10 @@ class Archiver:
 
         if args.location.archive:
             name = args.location.archive
-            target = replace_placeholders(args.target) if args.target else None
             if recreater.is_temporary_archive(name):
                 self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                 return self.exit_code
-            if not recreater.recreate(name, args.comment, target):
+            if not recreater.recreate(name, args.comment, args.target):
                 self.print_error('Nothing to do. Archive was not processed.\n'
                                  'Specify at least one pattern, PATH, --comment, re-compression or re-chunking option.')
         else:
@@ -1954,7 +1954,7 @@ class Archiver:
 
         data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
 
-        meta = prepare_dump_dict(msgpack.fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
+        meta = prepare_dump_dict(msgpack_fallback.unpackb(data, object_hook=StableDict, unicode_errors='surrogateescape'))
 
         with dash_open(args.path, 'w') as fd:
             json.dump(meta, fd, indent=4)
@@ -2331,10 +2331,12 @@ class Archiver:
                 # include susans home
                 + /home/susan
                 # don't backup the other home directories
-                - /home/*\n\n''')
+                - /home/*
+                # don't even look in /proc
+                ! /proc\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
-        Repository (or Archive) URLs, ``--prefix`` and ``--remote-path`` values support these
-        placeholders:
+        Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
+        and ``--remote-path`` values support these placeholders:
 
         {hostname}
             The (short) hostname of the machine.
@@ -2724,7 +2726,8 @@ class Archiver:
             group = filters_group.add_mutually_exclusive_group()
             group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, default='',
                                help='only consider archive names starting with this prefix.')
-            group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives', default=None,
+            group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
+                               type=GlobSpec, default=None,
                                help='only consider archive names matching the glob. '
                                     'sh: rules apply, see "borg help patterns". '
                                     '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
@@ -2816,7 +2819,7 @@ class Archiver:
                                             help='mount repository')
         subparser.set_defaults(func=self.do_mount)
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
-                            help='repository/archive to mount')
+                            help='repository or archive to mount')
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                             help='where to mount filesystem')
         subparser.add_argument('-f', '--foreground', dest='foreground',
@@ -3353,7 +3356,7 @@ class Archiver:
                                    'regular files. Also follows symlinks pointing to these kinds of files.')
 
         archive_group = subparser.add_argument_group('Archive options')
-        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default='',
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', type=CommentSpec, default='',
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
                                    type=timestamp, default=None,
@@ -3562,9 +3565,9 @@ class Archiver:
                                     'use ``--force --force`` in case ``--force`` does not work.')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
-        subparser.add_argument('location', metavar='TARGET', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='archive or repository to delete')
+                               help='repository or archive to delete')
         subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
                                help='archives to delete')
         define_archive_filters_group(subparser)
@@ -3613,7 +3616,7 @@ class Archiver:
                                     'A "bpath" key is therefore not available.')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='repository/archive to list contents of')
+                               help='repository or archive to list contents of')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
         define_archive_filters_group(subparser)
@@ -3659,7 +3662,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='archive or repository to display information about')
+                               help='repository or archive to display information about')
         subparser.add_argument('--json', action='store_true',
                                help='format output as JSON')
         define_archive_filters_group(subparser)
@@ -3826,7 +3829,7 @@ class Archiver:
         Upgrade should be able to resume if interrupted, although it
         will still iterate over all segments. If you want to start
         from scratch, use `borg delete` over the copied repository to
-        make sure the cache files are also removed:
+        make sure the cache files are also removed::
 
             borg delete borg
 
@@ -3938,7 +3941,7 @@ class Archiver:
         archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                    type=int, default=1800, metavar='SECONDS',
                                    help='write checkpoint every SECONDS seconds (Default: 1800)')
-        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', default=None,
+        archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', type=CommentSpec, default=None,
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
                                    type=timestamp, default=None,
@@ -3967,7 +3970,7 @@ class Archiver:
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
-                               help='repository/archive to recreate')
+                               help='repository or archive to recreate')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
 
@@ -4030,7 +4033,7 @@ class Archiver:
         group.add_argument('-l', '--list', dest='list', action='store_true',
                                help='list the configuration of the repo')
 
-        subparser.add_argument('location', metavar='REPOSITORY',
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False, proto='file'),
                                help='repository to configure')
         subparser.add_argument('name', metavar='NAME', nargs='?',
@@ -4129,7 +4132,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_debug_dump_repo_objs)
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='repo to dump')
+                               help='repository to dump')
         subparser.add_argument('--ghost', dest='ghost', action='store_true',
                                help='dump all segment file contents, including deleted/uncommitted objects and commits.')
 
@@ -4144,7 +4147,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_debug_search_repo_objs)
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='repo to search')
+                               help='repository to search')
         subparser.add_argument('wanted', metavar='WANTED', type=str,
                                help='term to search the repo for, either 0x1234abcd hex term or a string')
 
@@ -4157,7 +4160,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='get object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('id', metavar='ID', type=str,
@@ -4174,7 +4177,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='put object to repository (debug)')
         subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
@@ -4189,7 +4192,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='delete object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
@@ -4204,7 +4207,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='show refcount for object from repository (debug)')
         subparser.set_defaults(func=self.do_debug_refcount_obj)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
@@ -4244,9 +4247,9 @@ class Archiver:
 
         Make sure you have free space there, you'll need about 1GB each (+ overhead).
 
-        If your repository is encrypted and borg needs a passphrase to unlock the key, use:
+        If your repository is encrypted and borg needs a passphrase to unlock the key, use::
 
-        BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
+            BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
 
         Measurements are done with different input file sizes and counts.
         The file contents are very artificial (either all zero or all random),
@@ -4281,9 +4284,9 @@ class Archiver:
                                                  help='benchmarks borg CRUD (create, extract, update, delete).')
         subparser.set_defaults(func=self.do_benchmark_crud)
 
-        subparser.add_argument('location', metavar='REPO',
+        subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
-                               help='repo to use for benchmark (must exist)')
+                               help='repository to use for benchmark (must exist)')
 
         subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
 
@@ -4293,20 +4296,43 @@ class Archiver:
         """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
         result = self.parse_args(argv[1:])
         if cmd is not None and result.func == self.do_serve:
-            forced_result = result
-            argv = shlex.split(cmd)
+            # borg serve case:
+            # - "result" is how borg got invoked (e.g. via forced command from authorized_keys),
+            # - "client_result" (from "cmd") refers to the command the client wanted to execute,
+            #   which might be different in the case of a forced command or same otherwise.
+            client_argv = shlex.split(cmd)
             # Drop environment variables (do *not* interpret them) before trying to parse
             # the borg command line.
-            argv = list(itertools.dropwhile(lambda arg: '=' in arg, argv))
-            result = self.parse_args(argv[1:])
-            if result.func != forced_result.func:
-                # someone is trying to execute a different borg subcommand, don't do that!
-                return forced_result
-            # we only take specific options from the forced "borg serve" command:
-            result.restrict_to_paths = forced_result.restrict_to_paths
-            result.restrict_to_repositories = forced_result.restrict_to_repositories
-            result.append_only = forced_result.append_only
-            result.storage_quota = forced_result.storage_quota
+            client_argv = list(itertools.dropwhile(lambda arg: '=' in arg, client_argv))
+            client_result = self.parse_args(client_argv[1:])
+            if client_result.func == result.func:
+                # make sure we only process like normal if the client is executing
+                # the same command as specified in the forced command, otherwise
+                # just skip this block and return the forced command (== result).
+                # client is allowed to specify the whitelisted options,
+                # everything else comes from the forced "borg serve" command (or the defaults).
+                # stuff from blacklist must never be used from the client.
+                blacklist = {
+                    'restrict_to_paths',
+                    'restrict_to_repositories',
+                    'append_only',
+                    'storage_quota',
+                }
+                whitelist = {
+                    'debug_topics',
+                    'lock_wait',
+                    'log_level',
+                    'umask',
+                }
+                not_present = object()
+                for attr_name in whitelist:
+                    assert attr_name not in blacklist, 'whitelist has blacklisted attribute name %s' % attr_name
+                    value = getattr(client_result, attr_name, not_present)
+                    if value is not not_present:
+                        # note: it is not possible to specify a whitelisted option via a forced command,
+                        # it always gets overridden by the value specified (or defaulted to) by the client commmand.
+                        setattr(result, attr_name, value)
+
         return result
 
     def parse_args(self, args=None):
@@ -4322,8 +4348,10 @@ class Archiver:
             parser.error('Need at least one PATH argument.')
         return args
 
-    def prerun_checks(self, logger):
-        check_python()
+    def prerun_checks(self, logger, is_serve):
+        if not is_serve:
+            # this is the borg *client*, we need to check the python:
+            check_python()
         check_extension_modules()
         selftest(logger)
 
@@ -4360,16 +4388,19 @@ class Archiver:
         args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
+        if getattr(args, 'stats', False) and getattr(args, 'dry_run', False):
+            logger.error("--stats does not work with --dry-run.")
+            return self.exit_code
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
-        self.prerun_checks(logger)
+        self.prerun_checks(logger, is_serve)
         if not is_supported_msgpack():
             logger.error("You do not have a supported msgpack[-python] version installed. Terminating.")
             logger.error("This should never happen as specific, supported versions are required by our setup.py.")
             logger.error("Do not contact borgbackup support about this.")
             return set_ec(EXIT_ERROR)
         if is_slow_msgpack():
-            logger.warning("Using a pure-python msgpack! This will result in lower performance.")
+            logger.warning(PURE_PYTHON_MSGPACK_WARNING)
         if args.debug_profile:
             # Import only when needed - avoids a further increase in startup time
             import cProfile

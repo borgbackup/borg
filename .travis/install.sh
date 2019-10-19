@@ -51,7 +51,7 @@ fi
 
 python -m virtualenv ~/.venv
 source ~/.venv/bin/activate
-pip install -r requirements.d/development.txt
+pip install -r requirements.d/development.lock.txt
 pip install codecov
 python setup.py --version
 pip install -e .[fuse]

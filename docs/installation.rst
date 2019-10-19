@@ -72,7 +72,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
 .. _OpenIndiana hipster repository: http://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
 .. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
-.. _Brew cask: https://caskroom.github.io/
+.. _Brew cask: https://formulae.brew.sh/cask/borgbackup
 .. _Raspbian testing: http://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
 .. _Ubuntu packages: http://packages.ubuntu.com/xenial/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
@@ -222,11 +222,10 @@ dependencies::
     pip3 install virtualenv
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of
-FUSE for OS X, which is available via github_, or via homebrew::
+FUSE for OS X, which is available via `github <https://github.com/osxfuse/osxfuse/releases/latest>`__,
+or via homebrew::
 
     brew cask install osxfuse
-
-.. _github: https://github.com/osxfuse/osxfuse/releases/latest
 
 
 FreeBSD
@@ -310,7 +309,9 @@ Using git
 ~~~~~~~~~
 
 This uses latest, unreleased development code from git.
-While we try not to break master, there are no guarantees on anything. ::
+While we try not to break master, there are no guarantees on anything.
+
+::
 
     # get borg from github
     git clone https://github.com/borgbackup/borg.git

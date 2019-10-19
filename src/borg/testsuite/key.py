@@ -4,7 +4,6 @@ import re
 import tempfile
 from binascii import hexlify, unhexlify
 
-import msgpack
 import pytest
 
 from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
@@ -18,6 +17,7 @@ from ..helpers import IntegrityError
 from ..helpers import Location
 from ..helpers import StableDict
 from ..helpers import get_security_dir
+from ..helpers import msgpack
 
 
 class TestKey:

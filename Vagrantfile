@@ -63,9 +63,9 @@ def packages_darwin
     sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.2/osxfuse-3.8.2.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.3/osxfuse-3.8.3.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.2.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.3.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
@@ -109,19 +109,14 @@ end
 
 def packages_openbsd
   return <<-EOF
-    echo 'installpath = http://ftp.hostserver.de/pub/OpenBSD/6.0/packages/amd64/' > /etc/pkg.conf
-    echo 'export PKG_PATH=http://ftp.hostserver.de/pub/OpenBSD/6.0/packages/amd64/' >> ~/.profile
-    . ~/.profile
     pkg_add bash
     chsh -s /usr/local/bin/bash vagrant
-    pkg_add openssl
     pkg_add lz4
+    pkg_add zstd
     pkg_add git  # no fakeroot
-    pkg_add py3-setuptools
-    ln -sf /usr/local/bin/python3.4 /usr/local/bin/python3
-    ln -sf /usr/local/bin/python3.4 /usr/local/bin/python
-    easy_install-3.4 pip
-    pip3 install virtualenv
+    pkg_add py3-pip
+    pkg_add py3-virtualenv
+    ln -sf /usr/local/bin/virtualenv-3 /usr/local/bin/virtualenv
   EOF
 end
 
@@ -151,10 +146,13 @@ end
 
 def packages_openindiana
   return <<-EOF
-    #pkg update  # XXX needs separate provisioning step + reboot
-    pkg install python-34 clang-40 lz4 git
-    python3 -m ensurepip
-    pip3 install -U setuptools pip wheel virtualenv
+    # needs separate provisioning step + reboot:
+    #pkg update
+    # already installed:
+    #pkg install python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
+    ln -sf /usr/bin/python3.5 /usr/bin/pyton3
+    ln -sf /usr/bin/virtualenv-3.5 /usr/bin/virtualenv
+    ln -sf /usr/bin/pip-3.5 /usr/bin/pip
   EOF
 end
 
@@ -234,7 +232,7 @@ def install_pythons(boxname)
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.5.6  # binary build, use latest 3.5.x release
+    pyenv install 3.5.7  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -252,8 +250,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.6
-    pyenv virtualenv 3.5.6 borg-env
+    pyenv global 3.5.7
+    pyenv virtualenv 3.5.7 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -543,7 +541,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "openbsd60-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
+    b.vm.box = "openbsd64-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -570,7 +568,7 @@ Vagrant.configure(2) do |config|
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
   config.vm.define "openindiana64" do |b|
-    b.vm.box = "openindiana-64"
+    b.vm.box = "openindiana"
     b.vm.provider :virtualbox do |v|
       v.memory = 1536 + $wmem
     end

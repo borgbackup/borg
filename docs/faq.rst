@@ -103,6 +103,11 @@ Are there other known limitations?
 
   :ref:`borg_info` shows how large (relative to the maximum size) existing
   archives are.
+- borg extract only supports restoring into an empty destination. After that,
+  the destination will exactly have the contents of the extracted archive.
+  If you extract into a non-empty destination, borg will (for example) not
+  remove files which are in the destination, but not in the archive.
+  See :issue:`4598` for a workaround and more details.
 
 .. _checkpoints_parts:
 
@@ -636,15 +641,15 @@ I am seeing 'A' (added) status for an unchanged file!?
 
 The files cache is used to determine whether |project_name| already
 "knows" / has backed up a file and if so, to skip the file from
-chunking. It does intentionally *not* contain files that have a modification
-time (mtime) same as the newest mtime in the created archive.
+chunking. It does intentionally *not* contain files that have a timestamp
+same as the newest timestamp in the created archive.
 
 So, if you see an 'A' status for unchanged file(s), they are likely the files
-with the most recent mtime in that archive.
+with the most recent timestamp in that archive.
 
 This is expected: it is to avoid data loss with files that are backed up from
 a snapshot and that are immediately changed after the snapshot (but within
-mtime granularity time, so the mtime would not change). Without the code that
+timestamp granularity time, so the timestamp would not change). Without the code that
 removes these files from the files cache, the change that happened right after
 the snapshot would not be contained in the next backup as |project_name| would
 think the file is unchanged.
@@ -655,7 +660,7 @@ mentioned rare condition), it will just re-use them as usual and not store new
 data chunks.
 
 If you want to avoid unnecessary chunking, just create or touch a small or
-empty file in your backup source file set (so that one has the latest mtime,
+empty file in your backup source file set (so that one has the latest timestamp,
 not your 50GB VM disk image) and, if you do snapshots, do the snapshot after
 that.
 
@@ -663,15 +668,21 @@ Since only the files cache is used in the display of files status,
 those files are reported as being added when, really, chunks are
 already used.
 
+By default, ctime (change time) is used for the timestamps to have a rather
+safe change detection (see also the --files-cache option).
+
+Furthermore, pathnames recorded in files cache are always absolute, even if you specify
+source directories with relative pathname. If relative pathnames are stable, but absolute are
+not (for example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable), borg will assume that files are different and will report them as 'added', even though no new chunks will be actually recorded for them. To avoid this, you could bind mount your source directory in a directory with the stable path.
 
 .. _always_chunking:
 
 It always chunks all my files, even unchanged ones!
 ---------------------------------------------------
 
-|project_name| maintains a files cache where it remembers the mtime, size and
-inode of files. When |project_name| does a new backup and starts processing a
-file, it first looks whether the file has changed (compared to the values
+|project_name| maintains a files cache where it remembers the timestamp, size
+and inode of files. When |project_name| does a new backup and starts processing
+a file, it first looks whether the file has changed (compared to the values
 stored in the files cache). If the values are the same, the file is assumed
 unchanged and thus its contents won't get chunked (again).
 
@@ -692,7 +703,8 @@ it would be much faster.
 Another possible reason is that files don't always have the same path, for
 example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable.
 If the directory where you mount a filesystem is different every time,
-|project_name| assume they are different files.
+|project_name| assumes they are different files. This is true even if you backup these files with relative pathnames - borg uses full
+pathnames in files cache regardless.
 
 
 Is there a way to limit bandwidth with |project_name|?
@@ -705,7 +717,9 @@ There is no built-in way to limit *download*
 (i.e. :ref:`borg_extract`) bandwidth, but limiting download bandwidth
 can be accomplished with pipeviewer_:
 
-Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
+Create a wrapper script:  /usr/local/bin/pv-wrapper
+
+::
 
     #!/bin/sh
         ## -q, --quiet              do not output any transfer information at all
@@ -713,11 +727,15 @@ Create a wrapper script:  /usr/local/bin/pv-wrapper  ::
     RATE=307200
     pv -q -L $RATE  | "$@"
 
-Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh. ::
+Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh.
+
+::
 
     export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
 
-Now |project_name| will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly: ::
+Now |project_name| will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly:
+
+::
 
     pv -R $(pidof pv) -L 102400
 

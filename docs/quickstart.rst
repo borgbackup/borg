@@ -158,6 +158,11 @@ your setup.
 Do not forget to test your created backups to make sure everything you need is being
 backed up and that the ``prune`` command is keeping and deleting the correct backups.
 
+.. note::
+
+    Please see the :ref:`software` section for related tooling for automating
+    backups.
+
 ::
 
     #!/bin/sh
@@ -165,10 +170,8 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     # Setting this, so the repo does not need to be given on the commandline:
     export BORG_REPO=ssh://username@example.com:2022/~/backup/main
 
-    # Setting this, so you won't be asked for your repository passphrase:
+    # See the section "Passphrase notes" for more infos.
     export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
-    # or this to ask an external program to supply the passphrase:
-    export BORG_PASSCOMMAND='pass show backup'
 
     # some helpers and error handling:
     info() { printf "\n%s %s\n\n" "$( date )" "$*" >&2; }
@@ -226,7 +229,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     else
         info "Backup and/or Prune finished with errors"
     fi
-    
+
     exit ${global_exit}
 
 Pitfalls with shell variables and environment variables
@@ -256,6 +259,50 @@ the sudoers(5) man page.
     To debug what your borg process is actually seeing, find its PID
     (``ps aux|grep borg``) and then look into ``/proc/<PID>/environ``.
 
+.. passphrase_notes:
+
+Passphrase notes
+----------------
+
+If you use encryption (or authentication), Borg will interactively ask you
+for a passphrase to encrypt/decrypt the keyfile / repokey.
+
+A passphrase should be a single line of text, a trailing linefeed will be
+stripped.
+
+For your own safety, you maybe want to avoid empty passphrases as well
+extremely long passphrase (much more than 256 bits of entropy).
+
+Also avoid passphrases containing non-ASCII characters.
+Borg is technically able to process all unicode text, but you might get into
+trouble reproducing the same encoded utf-8 bytes or with keyboard layouts,
+so better just avoid non-ASCII stuff.
+
+If you want to automate, you can alternatively supply the passphrase
+directly or indirectly using some environment variables.
+
+You can directly give a passphrase::
+
+    # use this passphrase (use safe permissions on the script!):
+    export BORG_PASSPHRASE='my super secret passphrase'
+
+Or ask an external program to supply the passphrase::
+
+    # use the "pass" password manager to get the passphrase:
+    export BORG_PASSCOMMAND='pass show backup'
+
+    # use GPG to get the passphrase contained in a gpg-encrypted file:
+    export BORG_PASSCOMMAND='gpg --decrypt borg-passphrase.gpg'
+
+Or read the passphrase from an open file descriptor::
+
+    export BORG_PASSPHRASE_FD=42
+
+Using hardware crypto devices (like Nitrokey, Yubikey and others) is not
+directly supported by borg, but you can use these indirectly.
+E.g. if your crypto device supports GPG and borg calls ``gpg`` via
+``BORG_PASSCOMMAND``, it should just work.
+
 .. backup_compression:
 
 Backup compression
@@ -269,7 +316,7 @@ compression) using N=1 to high compression (and lower speed) using N=22.
 
 zstd is a modern compression algorithm and might be preferable over zlib and
 lzma, except if you need compatibility to older borg versions (< 1.1.4) that
-did not yet offer zstd.
+did not yet offer zstd.::
 
     $ borg create --compression zstd,N /path/to/repo::arch ~
 
@@ -280,12 +327,16 @@ If you have a fast repo storage and you want minimum CPU usage, no compression::
     $ borg create --compression none /path/to/repo::arch ~
 
 If you have a less fast repo storage and you want a bit more compression (N=0..9,
-0 means no compression, 9 means high compression): ::
+0 means no compression, 9 means high compression):
+
+::
 
     $ borg create --compression zlib,N /path/to/repo::arch ~
 
 If you have a very slow repo storage and you want high compression (N=0..9, 0 means
-low compression, 9 means high compression): ::
+low compression, 9 means high compression):
+
+::
 
     $ borg create --compression lzma,N /path/to/repo::arch ~
 
@@ -370,3 +421,153 @@ mounting the remote filesystem, for example, using sshfs::
 You can also use other remote filesystems in a similar way. Just be careful,
 not all filesystems out there are really stable and working good enough to
 be acceptable for backup usage.
+
+
+Restoring a backup
+------------------
+
+Please note that we are only describing the most basic commands and options
+here - please refer to the command reference to see more.
+
+For restoring, you usually want to work **on the same machine as the same user**
+that was also used to create the backups of the wanted files. Doing it like
+that avoids quite some issues:
+
+- no confusion relating to pathes
+- same mapping of user/group names to user/group IDs
+- no permission issues
+- you likely already have a working borg setup there,
+
+  - maybe including a environment variable for the key passphrase (for encrypted repos),
+  - maybe including a keyfile for the repo (not needed for repokey mode),
+  - maybe including a ssh key for the repo server (not needed for locally mounted repos),
+  - maybe including a valid borg cache for that repo (quicker than cache rebuild).
+
+The **user** might be:
+
+- root (if full backups, backups including system stuff or multiple
+  users' files were made)
+- some specific user using sudo to execute borg as root
+- some specific user (if backups of that user's files were made)
+
+A borg **backup repository** can be either:
+
+- in a local directory (like e.g. a locally mounted USB disk)
+- on a remote backup server machine that is reachable via ssh (client/server)
+
+If the repository is encrypted, you will also need the **key** and the **passphrase**
+(which is protecting the key).
+
+The **key** can be located:
+
+- in the repository (**repokey** mode).
+
+  Easy, this will usually "just work".
+- in the home directory of the user who did the backup (**keyfile** mode).
+
+  This may cause a bit more effort:
+
+  - if you have just lost that home directory and you first need to restore the
+    borg key (e.g. from the separate backup you have made of it or from another
+    user or machine accessing the same repository).
+  - if you first must find out the correct machine / user / home directory
+    (where the borg client was run to make the backups).
+
+The **passphrase** for the key has been either:
+
+- entered interactively at backup time
+  (not practical if backup is automated / unattended).
+- acquired via some environment variable driven mechanism in the backup script
+  (look there for BORG_PASSPHRASE, BORG_PASSCOMMAND, etc. and just do it like
+  that).
+
+There are **2 ways to restore** files from a borg backup repository:
+
+- **borg mount** - use this if:
+
+  - you don't precisely know what files you want to restore
+  - you don't know which archive contains the files (in the state) you want
+  - you need to look into files / directories before deciding what you want
+  - you need a relatively low volume of data restored
+  - you don't care for restoring stuff that the FUSE mount is not implementing yet
+    (like special fs flags, ACLs)
+  - you have a client with good resources (RAM, CPU, temp. disk space)
+  - you want to rather use some filemanager to restore (copy) files than borg
+    extract shell commands
+
+- **borg extract** - use this if:
+
+  - you precisely know what you want (repo, archive, path)
+  - you need a high volume of files restored (best speed)
+  - you want a as-complete-as-it-gets reproduction of file metadata
+    (like special fs flags, ACLs)
+  - you have a client with low resources (RAM, CPU, temp. disk space)
+
+
+Example with **borg mount**:
+
+::
+
+    # open a new, separate terminal (this terminal will be blocked until umount)
+
+    # now we find out the archive names we have in the repo:
+    borg list /mnt/backup/borg_repo
+
+    # mount one archive from a borg repo:
+    borg mount /mnt/backup/borg_repo::myserver-system-2019-08-11 /mnt/borg
+
+    # alternatively, mount all archives from a borg repo (slower):
+    borg mount /mnt/backup/borg_repo /mnt/borg
+
+    # it may take a while until you will see stuff in /mnt/borg.
+
+    # now use another terminal or file browser and look into /mnt/borg.
+    # when finished, umount to unlock the repo and unblock the terminal:
+    borg umount /mnt/borg
+
+
+Example with **borg extract**:
+
+::
+
+    # borg extract always extracts into current directory and that directory
+    # should be empty (borg does not support transforming a non-empty dir to
+    # the state as present in your backup archive).
+    mkdir borg_restore
+    cd borg_restore
+
+    # now we find out the archive names we have in the repo:
+    borg list /mnt/backup/borg_repo
+
+    # we could find out the archive contents, esp. the path layout:
+    borg list /mnt/backup/borg_repo::myserver-system-2019-08-11
+
+    # we extract only some specific path (note: no leading / !):
+    borg extract /mnt/backup/borg_repo::myserver-system-2019-08-11 path/to/extract
+
+    # alternatively, we could fully extract the archive:
+    borg extract /mnt/backup/borg_repo::myserver-system-2019-08-11
+
+    # now move the files to the correct place...
+
+
+Difference when using a **remote borg backup server**:
+
+It is basically all the same as with the local repository, but you need to
+refer to the repo using a ``ssh://`` URL.
+
+In the given example, ``borg`` is the user name used to log into the machine
+``backup.example.org`` which runs ssh on port ``2222`` and has the borg repo
+in ``/path/to/repo``.
+
+Instead of giving a FQDN or a hostname, you can also give an IP address.
+
+As usual, you either need a password to log in or the backup server might
+have authentication set up via ssh ``authorized_keys`` (which is likely the
+case if unattended, automated backups were done).
+
+::
+
+    borg mount ssh://borg@backup.example.org:2222/path/to/repo /mnt/borg
+    # or
+    borg extract ssh://borg@backup.example.org:2222/path/to/repo

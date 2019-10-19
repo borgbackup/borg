@@ -13,8 +13,6 @@ from io import BytesIO
 from itertools import groupby
 from shutil import get_terminal_size
 
-import msgpack
-
 from .logger import create_logger
 
 logger = create_logger()
@@ -38,6 +36,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import msgpack
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
@@ -192,7 +191,7 @@ class DownloadPipeline:
         self.repository = repository
         self.key = key
 
-    def unpack_many(self, ids, filter=None, preload=False):
+    def unpack_many(self, ids, filter=None, partial_extract=False, preload=False, hardlink_masters=None):
         """
         Return iterator of items.
 
@@ -202,6 +201,7 @@ class DownloadPipeline:
         Warning: if *preload* is True then all data chunks of every yielded item have to be retrieved,
         otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
         """
+        masters_preloaded = set()
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
             unpacker.feed(data)
@@ -209,12 +209,40 @@ class DownloadPipeline:
             for item in items:
                 if 'chunks' in item:
                     item.chunks = [ChunkListEntry(*e) for e in item.chunks]
+
+            def preload(chunks):
+                self.repository.preload([c.id for c in chunks])
+
             if filter:
                 items = [item for item in items if filter(item)]
+
             if preload:
-                for item in items:
-                    if 'chunks' in item:
-                        self.repository.preload([c.id for c in item.chunks])
+                if filter and partial_extract:
+                    # if we do only a partial extraction, it gets a bit
+                    # complicated with computing the preload items: if a hardlink master item is not
+                    # selected (== not extracted), we will still need to preload its chunks if a
+                    # corresponding hardlink slave is selected (== is extracted).
+                    # due to a side effect of the filter() call, we now have hardlink_masters dict populated.
+                    for item in items:
+                        if 'chunks' in item:  # regular file, maybe a hardlink master
+                            preload(item.chunks)
+                            # if this is a hardlink master, remember that we already preloaded it:
+                            if 'source' not in item and hardlinkable(item.mode) and item.get('hardlink_master', True):
+                                masters_preloaded.add(item.path)
+                        elif 'source' in item and hardlinkable(item.mode):  # hardlink slave
+                            source = item.source
+                            if source not in masters_preloaded:
+                                # we only need to preload *once* (for the 1st selected slave)
+                                chunks, _ = hardlink_masters[source]
+                                if chunks is not None:
+                                    preload(chunks)
+                                masters_preloaded.add(source)
+                else:
+                    # easy: we do not have a filter, thus all items are selected, thus we need to preload all chunks.
+                    for item in items:
+                        if 'chunks' in item:
+                            preload(item.chunks)
+
             for item in items:
                 yield item
 
@@ -433,8 +461,10 @@ Utilization of max. archive size: {csize_max:.0%}
             return False
         return filter(item) if filter else True
 
-    def iter_items(self, filter=None, preload=False):
-        for item in self.pipeline.unpack_many(self.metadata.items, preload=preload,
+    def iter_items(self, filter=None, partial_extract=False, preload=False, hardlink_masters=None):
+        assert not (filter and partial_extract and preload) or hardlink_masters is not None
+        for item in self.pipeline.unpack_many(self.metadata.items, partial_extract=partial_extract,
+                                              preload=preload, hardlink_masters=hardlink_masters,
                                               filter=lambda item: self.item_filter(item, filter)):
             yield item
 
@@ -999,6 +1029,7 @@ Utilization of max. archive size: {csize_max:.0%}
 
     def process_file(self, path, st, cache):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
+            item.update(self.stat_simple_attrs(st))
             is_special_file = is_special(st.st_mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
@@ -1023,7 +1054,6 @@ Utilization of max. archive size: {csize_max:.0%}
                 else:
                     status = 'M' if known else 'A'  # regular file, modified or added
                 item.hardlink_master = hardlinked
-                item.update(self.stat_simple_attrs(st))
                 # Only chunkify the file if needed
                 if chunks is not None:
                     item.chunks = chunks
@@ -1037,7 +1067,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         # block or char device will change without its mtime/size/inode changing.
                         cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
                 self.stats.nfiles += 1
-            item.update(self.stat_attrs(st, path))
+            item.update(self.stat_ext_attrs(st, path))
             item.get_size(memorize=True)
             if is_special_file:
                 # we processed a special file like a regular file. reflect that in mode,

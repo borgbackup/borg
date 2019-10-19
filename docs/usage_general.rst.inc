@@ -218,6 +218,18 @@ General:
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.
         Please only use for good reasons as it makes issues harder to analyze.
+    BORG_WORKAROUNDS
+        A list of comma separated strings that trigger workarounds in borg,
+        e.g. to work around bugs in other software.
+
+        Currently known strings are:
+
+        basesyncfile
+            Use the more simple BaseSyncFile code to avoid issues with sync_file_range.
+            You might need this to run borg on WSL (Windows Subsystem for Linux) or
+            in systemd.nspawn containers on some architectures (e.g. ARM).
+            Using this does not affect data safety, but might result in a more bursty
+            write to disk behaviour (not continuously streaming to disk).
     TMPDIR
         where temporary files are stored (might need a lot of temporary space for some operations), see tempfile_ for details
 
@@ -404,7 +416,16 @@ Temporary files (client):
     won't be locally cached.
 
 Temporary files (server):
-    None.
+    A non-trivial amount of data will be stored on the remote temp directory
+    for each client that connects to it. For some remotes, this can fill the
+    default temporary directory at /tmp. This can be remediated by ensuring the
+    $TMPDIR, $TEMP, or $TMP environment variable is properly set for the sshd
+    process.
+    For some OSes, this can be done just by setting the correct value in the
+    .bashrc (or equivalent login config file for other shells), however in
+    other cases it may be neccessary to first enable ``PermitUserEnvironment yes``
+    in your ``sshd_config`` file, then add ``environment="TMPDIR=/my/big/tmpdir"``
+    at the start of the public key to be used in the ``authorized_hosts`` file.
 
 Cache files (client only):
     Contains the chunks index and files index (plus a collection of single-

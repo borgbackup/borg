@@ -22,7 +22,6 @@ from hashlib import sha256
 from io import BytesIO, StringIO
 from unittest.mock import patch
 
-import msgpack
 import pytest
 
 try:
@@ -33,7 +32,7 @@ except ImportError:
 import borg
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
-from ..archiver import Archiver, parse_storage_quota
+from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
 from ..cache import Cache, LocalCache
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_aes_blocks
@@ -45,6 +44,7 @@ from ..helpers import Manifest, MandatoryFeatureUnsupported
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
+from ..helpers import msgpack
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item
@@ -284,12 +284,19 @@ class ArchiverTestCaseBase(BaseTestCase):
     def cmd(self, *args, **kw):
         exit_code = kw.pop('exit_code', 0)
         fork = kw.pop('fork', None)
+        binary_output = kw.get('binary_output', False)
         if fork is None:
             fork = self.FORK_DEFAULT
         ret, output = exec_cmd(*args, fork=fork, exe=self.EXE, archiver=self.archiver, **kw)
         if ret != exit_code:
             print(output)
         self.assert_equal(ret, exit_code)
+        # if tests are run with the pure-python msgpack, there will be warnings about
+        # this in the output, which would make a lot of tests fail.
+        pp_msg = PURE_PYTHON_MSGPACK_WARNING.encode() if binary_output else PURE_PYTHON_MSGPACK_WARNING
+        empty = b'' if binary_output else ''
+        output = empty.join(line for line in output.splitlines(keepends=True)
+                            if pp_msg not in line)
         return output
 
     def create_src_archive(self, name):
@@ -790,7 +797,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @requires_hardlinks
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')
-    def test_mount_hardlinks(self):
+    def test_fuse_mount_hardlinks(self):
         self._extract_hardlinks_setup()
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # we need to get rid of permissions checking because fakeroot causes issues with it.
@@ -823,7 +830,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     @requires_hardlinks
-    def test_extract_hardlinks(self):
+    def test_extract_hardlinks1(self):
+        self._extract_hardlinks_setup()
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/source').st_nlink == 4
+            assert os.stat('input/abba').st_nlink == 4
+            assert os.stat('input/dir1/hardlink').st_nlink == 4
+            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
+            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
+
+    @requires_hardlinks
+    def test_extract_hardlinks2(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
@@ -839,13 +857,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
-        with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
-            assert os.stat('input/source').st_nlink == 4
-            assert os.stat('input/abba').st_nlink == 4
-            assert os.stat('input/dir1/hardlink').st_nlink == 4
-            assert os.stat('input/dir1/subdir/hardlink').st_nlink == 4
-            assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
 
     def test_extract_include_exclude(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -1844,10 +1855,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test1', src_dir)
         self.cmd('create', self.repository_location + '::test2', src_dir)
-        output = self.cmd('prune', '--list', '--stats', '--dry-run', self.repository_location, '--keep-daily=2')
+        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=2')
         self.assert_in('Keeping archive: test2', output)
         self.assert_in('Would prune:     test1', output)
-        self.assert_in('Deleted data:', output)
         output = self.cmd('list', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
@@ -2209,7 +2219,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     # Special case: getxattr returns None (not b'') when reading an empty xattr.
                     assert xattr.getxattr(out_fn, 'user.empty') is None
                 else:
-                    assert xattr.listxattr(out_fn) == []
+                    assert no_selinux(xattr.listxattr(out_fn)) == []
                     try:
                         xattr.getxattr(out_fn, 'user.foo')
                     except OSError as e:

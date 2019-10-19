@@ -42,13 +42,13 @@ SSH access to safe operations only.
 	with no control characters and that it consists of three parts separated
 	by a single space. Ensure that no newlines are contained within the key.
 
-The `restrict` keyword enables all restrictions, i.e. disables port, agent
+The ``restrict`` keyword enables all restrictions, i.e. disables port, agent
 and X11 forwarding, as well as disabling PTY allocation and execution of ~/.ssh/rc.
 If any future restriction capabilities are added to authorized_keys
 files they will be included in this set.
 
-The `command` keyword forces execution of the specified command line
-upon login. This must be ``borg serve``. The `--restrict-to-repository`
+The ``command`` keyword forces execution of the specified command line
+upon login. This must be ``borg serve``. The ``--restrict-to-repository``
 option permits access to exactly **one** repository. It can be given
 multiple times to permit access to more than one repository.
 

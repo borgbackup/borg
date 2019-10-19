@@ -171,8 +171,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.9 (2019-02-10)
---------------------------
+Version 1.1.11 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -190,6 +190,116 @@ Compatibility notes:
     You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
     mode (but that is less safe for detecting changed files than the default).
     See the --files-cache docs for details.
+- 1.1.11 removes WSL autodetection (Windows 10 Subsystem for Linux).
+  If WSL still has a problem with sync_file_range, you need to set
+  BORG_WORKAROUNDS=basesyncfile in the borg process environment to
+  work around the WSL issue.
+
+Fixes:
+
+- extract:
+
+  - fix KeyError for "partial" extraction, #4607
+  - fix "partial" extract for hardlinked contentless file types, #4725
+- fix preloading for old (0.xx) remote servers, #4652
+- SecurityManager.known(): check all files, #4614
+- after double-force delete, warn about necessary repair, #4704
+- Repository.open: use stat() to check for repo dir, #4695
+- Repository.check_can_create_repository: use stat() to check, #4695
+- fix invalid archive error message
+- fix optional/non-optional location arg, #4541
+
+New features:
+
+- enable placeholder usage in all extra archive arguments
+- new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
+
+Other:
+
+- argparser: always use REPOSITORY in metavar, also use more consistent help phrasing.
+- vagrant: add up-to-date openindiana box
+- tests:
+
+  - cope with ANY error when importing pytest into borg.testsuite, #4652
+  - fix broken test that relied on improper zlib assumptions
+  - test_fuse: filter out selinux xattrs, #4574
+- docs:
+
+  - timestamps in the files cache are now usually ctime, #4583
+  - fix bad reference to borg compact (does not exist in 1.1), #4660
+  - create: borg 1.1 is not future any more
+  - extract: document limitation "needs empty destination", #4598
+  - how to supply a passphrase, use crypto devices, #4549
+  - fix osxfuse github link in installation docs
+  - add example of exclude-norecurse rule in help patterns
+  - update macOS Brew link
+  - add note about software for automating backups, #4581
+  - AUTHORS: mention copyright+license for bundled msgpack
+  - fix various code blocks in the docs, #4708
+  - updated docs to cover use of temp directory on remote, #4545
+  - add restore docs, #4670
+
+
+Version 1.1.10 (2019-05-16)
+---------------------------
+
+Fixes:
+
+- extract: hang on partial extraction with ssh: repo, when hardlink master
+  is not matched/extracted and borg hangs on related slave hardlink, #4350
+- lrucache: regularly remove old FDs, #4427
+- avoid stale filehandle issues, #3265
+- freebsd: make xattr platform code api compatible with linux, #3952
+- use whitelist approach for borg serve, #4097
+- borg command shall terminate with rc 2 for ImportErrors, #4424
+- create: only run stat_simple_attrs() once, this increases
+  backup with lots of unchanged files performance by ~ 5%.
+- prune: fix incorrect borg prune --stats output with --dry-run, #4373
+- key export: emit user-friendly error if repo key is exported to a directory,
+  #4348
+
+New features:
+
+- bundle latest supported msgpack-python release (0.5.6), remove msgpack-python
+  from setup.py install_requires - by default we use the bundled code now.
+  optionally, we still support using an external msgpack (see hints in
+  setup.py), but this requires solid requirements management within
+  distributions and is not recommended.
+  borgbackup will break if you upgrade msgpack to an unsupported version.
+- display msgpack version as part of sysinfo (e.g. in tracebacks)
+- timestamp for borg delete --info added, #4359
+- enable placeholder usage in --comment and --glob-archives, #4559, #4495
+
+Other:
+
+- serve: do not check python/libc for borg serve, #4483
+- shell completions: borg diff second archive
+- release scripts: signing binaries with Qubes OS support
+- testing:
+
+  - vagrant: upgrade openbsd box to 6.4
+  - travis-ci: lock test env to py 3.4 compatible versions, #4343
+  - get rid of confusing coverage warning, #2069
+  - rename test_mount_hardlinks to test_fuse_mount_hardlinks,
+    so both can be excluded by "not test_fuse".
+  - pure-py msgpack warning shall not make a lot of tests fail, #4558
+- docs:
+
+  - add "SSH Configuration" section to "borg serve", #3988, #636, #4485
+  - README: new URL for funding options
+  - add a sample logging.conf in docs/misc, #4380
+  - elaborate on append-only mode docs, #3504
+  - installation: added Alpine Linux to distribution list, #4415
+  - usage.html: only modify window.location when redirecting, #4133
+  - add msgpack license to docs/3rd_party/msgpack
+- vagrant / binary builds:
+
+  - use python 3.5.7 for builds
+  - use osxfuse 3.8.3
+
+
+Version 1.1.9 (2019-02-10)
+--------------------------
 
 Fixes:
 
@@ -237,6 +347,7 @@ Other:
 
   - fix the homebrew 1.9 issues on travis-ci, #4254
   - fix duplicate test method name, #4311
+  - test_mount_hardlinks: get rid of fakeroot-caused test fails, #3389
 
 
 Version 1.1.8 (2018-12-09)

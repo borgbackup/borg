@@ -6,8 +6,6 @@ from binascii import unhexlify
 from collections import namedtuple
 from time import perf_counter
 
-import msgpack
-
 from .logger import create_logger
 
 logger = create_logger()
@@ -26,6 +24,7 @@ from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .helpers import set_ec, EXIT_WARNING
 from .helpers import truncate_and_unlink
+from .helpers import msgpack
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError
@@ -74,7 +73,8 @@ class SecurityManager:
             shutil.rmtree(path)
 
     def known(self):
-        return os.path.exists(self.key_type_file)
+        return all(os.path.exists(f)
+                   for f in (self.key_type_file, self.location_file, self.manifest_ts_file))
 
     def key_matches(self, key):
         if not self.known():

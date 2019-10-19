@@ -707,8 +707,8 @@ How can I avoid unwanted base directories getting stored into archives?
 
 Possible use cases:
 
-* Another file system is mounted and you want to backup it with original paths.
-* You have created a BTRFS snapshot in a ``/.snapshots`` directory for backup.
+- Another file system is mounted and you want to backup it with original paths.
+- You have created a BTRFS snapshot in a ``/.snapshots`` directory for backup.
 
 To achieve this, run ``borg_create`` within the mountpoint/snapshot directory:
 

@@ -711,13 +711,13 @@ then back it up:
 ::
 
     btrfs subvolume snapshot -r /home /.snapshots/home
-    borg create /path/to/repo::home_backup /.snapshots/home
+    cd /.snapshots
+    borg create /path/to/repo::home_backup
     btrfs subvolume delete /.snapshots/home
 
-The problem with this approach is that in a restore instead of paths starting with /home I
-have now /.snapshots/home.
-
-Solution: Run ``borg_create`` from within the snapshot directory.
+Note that ``borg_create`` should be run from within the snapshot directory,
+because in the backup you don't want to have paths starting with the
+``.snapshots`` prefix; that might cause trouble when restoring from the backup.
 
 ::
 

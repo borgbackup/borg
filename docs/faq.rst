@@ -146,7 +146,7 @@ really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
-Note that checkpoints inside files are created only since version 1.1, 
+Note that checkpoints inside files are created only since version 1.1,
 make sure you have an up-to-date version of borgbackup if you want to continue instead of retransferring a huge file.
 In some cases, there is only an outdated version shipped with your distribution (e.g. Debian). See :ref:`_installation`
 
@@ -357,7 +357,7 @@ Using ``BORG_PASSCOMMAND`` with a properly permissioned file
   directory and use permissions to keep anyone else from reading it. For
   example, first create a key::
 
-    head -c 1024 /dev/urandom | base64 > ~/.borg-passphrase
+    head -c 32 /dev/urandom | base64 -w 0 > ~/.borg-passphrase
     chmod 400 ~/.borg-passphrase
 
   Then in an automated script one can put::
@@ -382,7 +382,7 @@ Using ``BORG_PASSCOMMAND`` with macOS Keychain
   First generate a passphrase and use ``security`` to save it to your login
   (default) keychain::
 
-    security add-generic-password -D secret -U -a $USER -s borg-passphrase -w $(head -c 1024 /dev/urandom | base64)
+    security add-generic-password -D secret -U -a $USER -s borg-passphrase -w $(head -c 32 /dev/urandom | base64 -w 0)
 
   In your backup script retrieve it in the ``BORG_PASSCOMMAND``::
 
@@ -400,7 +400,7 @@ Using ``BORG_PASSCOMMAND`` with GNOME Keyring
 
   Then add a secret to the login keyring::
 
-    head -c 1024 /dev/urandom | base64 | secret-tool store borg-repository repo-name --label="Borg Passphrase"
+    head -c 32 /dev/urandom | base64 -w 0 | secret-tool store borg-repository repo-name --label="Borg Passphrase"
 
   If a dialog box pops up prompting you to pick a password for a new keychain, use your
   login password. If there is a checkbox for automatically unlocking on login, check it
@@ -424,7 +424,7 @@ Using ``BORG_PASSCOMMAND`` with KWallet
   ``kwalletcli`` can be used to store and retrieve secrets. Ensure ``kwalletcli``
   is installed, generate a passphrase, and store it in your "wallet"::
 
-    head -c 1024 /dev/urandom | base64 | kwalletcli -Pe borg-passphrase -f Passwords
+    head -c 32 /dev/urandom | base64 -w 0 | kwalletcli -Pe borg-passphrase -f Passwords
 
   Once the secret is saved, retrieve it in a backup script using ``BORG_PASSCOMMAND``::
 

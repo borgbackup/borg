@@ -2604,6 +2604,22 @@ class Archiver:
                 group.add_argument('--last', metavar='N', dest='last', default=0, type=positive_int_validator,
                                    help='consider last N archives after other filters were applied')
 
+        def define_borg_mount(parser):
+            parser.set_defaults(func=self.do_mount)
+            parser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
+                                help='repository or archive to mount')
+            parser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
+                                help='where to mount filesystem')
+            parser.add_argument('-f', '--foreground', dest='foreground',
+                                action='store_true',
+                                help='stay in foreground, do not daemonize')
+            parser.add_argument('-o', dest='options', type=str,
+                                help='Extra mount options')
+            define_archive_filters_group(parser)
+            parser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+                                   help='paths to extract; patterns are supported')
+            define_exclusion_group(parser, strip_components=True)
+
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
                                          add_help=False)
         # paths and patterns must have an empty list as default everywhere
@@ -2622,6 +2638,54 @@ class Archiver:
         mid_common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
         mid_common_parser.set_defaults(paths=[], patterns=[])
         parser.common_options.add_common_group(mid_common_parser, '_midcommand')
+
+        # borg mount
+        mount_epilog = process_epilog("""
+        This command mounts an archive as a FUSE filesystem. This can be useful for
+        browsing an archive or restoring individual files. Unless the ``--foreground``
+        option is given the command will run in the background until the filesystem
+        is ``umounted``.
+
+        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
+        used in fstab entries:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
+
+        To allow a regular user to use fstab entries, add the ``user`` option:
+        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
+
+        For FUSE configuration and mount options, see the mount.fuse(8) manual page.
+
+        Additional mount options supported by borg:
+
+        - versions: when used with a repository mount, this gives a merged, versioned
+          view of the files in the archives. EXPERIMENTAL, layout may change in future.
+        - allow_damaged_files: by default damaged files (where missing chunks were
+          replaced with runs of zeros by borg check ``--repair``) are not readable and
+          return EIO (I/O error). Set this option to read such files.
+        - ignore_permissions: for security reasons the "default_permissions" mount
+          option is internally enforced by borg. "ignore_permissions" can be given to
+          not enforce "default_permissions".
+
+        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
+        to tweak the performance. It sets the number of cached data chunks; additional
+        memory usage can be up to ~8 MiB times this number. The default is the number
+        of CPU cores.
+
+        When the daemonized process receives a signal or crashes, it does not unmount.
+        Unmounting in these cases could cause an active rsync or similar process
+        to unintentionally delete data.
+
+        When running in the foreground ^C/SIGINT unmounts cleanly, but other
+        signals or crashes do not.
+        """)
+
+        if parser.prog == 'borgfs':
+            parser.description = self.do_mount.__doc__
+            parser.epilog = mount_epilog
+            parser.formatter_class = argparse.RawDescriptionHelpFormatter
+            parser.help = 'mount repository'
+            define_borg_mount(parser)
+            return parser
 
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
@@ -3771,74 +3835,12 @@ class Archiver:
         define_archive_filters_group(subparser)
         define_exclusion_group(subparser)
 
-        # borg mount
-        mount_epilog = process_epilog("""
-        This command mounts an archive as a FUSE filesystem. This can be useful for
-        browsing an archive or restoring individual files. Unless the ``--foreground``
-        option is given the command will run in the background until the filesystem
-        is ``umounted``.
-
-        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
-        used in fstab entries:
-        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
-
-        To allow a regular user to use fstab entries, add the ``user`` option:
-        ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
-
-        For FUSE configuration and mount options, see the mount.fuse(8) manual page.
-
-        Additional mount options supported by borg:
-
-        - versions: when used with a repository mount, this gives a merged, versioned
-          view of the files in the archives. EXPERIMENTAL, layout may change in future.
-        - allow_damaged_files: by default damaged files (where missing chunks were
-          replaced with runs of zeros by borg check ``--repair``) are not readable and
-          return EIO (I/O error). Set this option to read such files.
-        - ignore_permissions: for security reasons the "default_permissions" mount
-          option is internally enforced by borg. "ignore_permissions" can be given to
-          not enforce "default_permissions".
-
-        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
-        to tweak the performance. It sets the number of cached data chunks; additional
-        memory usage can be up to ~8 MiB times this number. The default is the number
-        of CPU cores.
-
-        When the daemonized process receives a signal or crashes, it does not unmount.
-        Unmounting in these cases could cause an active rsync or similar process
-        to unintentionally delete data.
-
-        When running in the foreground ^C/SIGINT unmounts cleanly, but other
-        signals or crashes do not.
-        """)
-
-        if parser.prog == 'borgfs':
-            parser.description = self.do_mount.__doc__
-            parser.epilog = mount_epilog
-            parser.formatter_class = argparse.RawDescriptionHelpFormatter
-            parser.help = 'mount repository'
-            subparser = parser
-        else:
-            subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
-                                            description=self.do_mount.__doc__,
-                                            epilog=mount_epilog,
-                                            formatter_class=argparse.RawDescriptionHelpFormatter,
-                                            help='mount repository')
-        subparser.set_defaults(func=self.do_mount)
-        subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
-                            help='repository or archive to mount')
-        subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
-                            help='where to mount filesystem')
-        subparser.add_argument('-f', '--foreground', dest='foreground',
-                            action='store_true',
-                            help='stay in foreground, do not daemonize')
-        subparser.add_argument('-o', dest='options', type=str,
-                            help='Extra mount options')
-        define_archive_filters_group(subparser)
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
-                               help='paths to extract; patterns are supported')
-        define_exclusion_group(subparser, strip_components=True)
-        if parser.prog == 'borgfs':
-            return parser
+        subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
+                                        description=self.do_mount.__doc__,
+                                        epilog=mount_epilog,
+                                        formatter_class=argparse.RawDescriptionHelpFormatter,
+                                        help='mount repository')
+        define_borg_mount(subparser)
 
         # borg prune
         prune_epilog = process_epilog("""

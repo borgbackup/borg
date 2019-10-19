@@ -103,7 +103,7 @@ class Archives(abc.MutableMapping):
         """
         if args.location.archive:
             raise Error('The options --first, --last, --prefix and --glob-archives can only be used on repository targets.')
-        if args.prefix:
+        if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         return self.list(sort_by=args.sort_by.split(','), glob=args.glob_archives, first=args.first, last=args.last)
 

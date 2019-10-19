@@ -515,7 +515,7 @@ Why does Borg extract hang after some time?
 When I do a ``borg extract``, after a while all activity stops, no cpu usage,
 no downloads.
 
-This may happen when SSH terminates the connection on server side. You can
+This may happen when the SSH connection is stuck on server side. You can
 configure SSH on client side to prevent this by sending keep-alive requests,
 for example in ~/.ssh/config:
 

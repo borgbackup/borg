@@ -24,17 +24,19 @@ sftp on the backup server do not support, like file name encodings, ACLs, xattrs
 or bsdflags. So there is no guarantee that you are able to restore a system
 completely in every aspect from such a backup.
 
-To mount the client's root file system you will need root access to the client.
-This contradicts to the usual threat model of BorgBackup, where clients don't
-need to trust the backup server (data is encrypted). In pull mode the server
-(when logged in as root) could cause unlimited damage to the client. Therefore,
-pull mode should be used only from servers you do fully trust!
+.. warning::
+
+    To mount the client's root file system you will need root access to the client.
+    This contradicts to the usual threat model of BorgBackup, where clients don't
+    need to trust the backup server (data is encrypted). In pull mode the server
+    (when logged in as root) could cause unlimited damage to the client. Therefore,
+    pull mode should be used only from servers you do fully trust!
 
 Creating a backup
 -----------------
 
 In this approach the client file system is simply mounted and then backed up.
-Note that the backup is created from within the mount point, so that all files
+Note that the backup is created from within the mount point so that all files
 in the archive have their original paths (otherwise they would be backed up with
 the mount point prefix, e.g. /mnt/sshfs/bin/bash instead of /bin/bash).
 

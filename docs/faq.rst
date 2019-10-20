@@ -146,7 +146,7 @@ really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
-Note that checkpoints inside files are created only since version 1.1, 
+Note that checkpoints inside files are created only since version 1.1,
 make sure you have an up-to-date version of borgbackup if you want to continue instead of retransferring a huge file.
 In some cases, there is only an outdated version shipped with your distribution (e.g. Debian). See :ref:`_installation`
 
@@ -682,6 +682,23 @@ Now |project_name| will be bandwidth limited. Nice thing about pv is that you ca
     pv -R $(pidof pv) -L 102400
 
 .. _pipeviewer: http://www.ivarch.com/programs/pv.shtml
+
+
+How can I avoid unwanted base directories getting stored into archives?
+-----------------------------------------------------------------------
+
+Possible use cases:
+
+- Another file system is mounted and you want to backup it with original paths.
+- You have created a BTRFS snapshot in a ``/.snapshots`` directory for backup.
+
+To achieve this, run ``borg create`` within the mountpoint/snapshot directory:
+
+::
+
+    # Example: Some file system mounted in /mnt/rootfs.
+    cd /mnt/rootfs
+    borg create /path/to/repo::rootfs_backup .
 
 
 I am having troubles with some network/FUSE/special filesystem, why?

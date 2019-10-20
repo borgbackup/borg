@@ -742,6 +742,23 @@ Now Borg will be bandwidth limited. Nice thing about pv is that you can change r
 .. _pipeviewer: http://www.ivarch.com/programs/pv.shtml
 
 
+How can I avoid unwanted base directories getting stored into archives?
+-----------------------------------------------------------------------
+
+Possible use cases:
+
+- Another file system is mounted and you want to backup it with original paths.
+- You have created a BTRFS snapshot in a ``/.snapshots`` directory for backup.
+
+To achieve this, run ``borg create`` within the mountpoint/snapshot directory:
+
+::
+
+    # Example: Some file system mounted in /mnt/rootfs.
+    cd /mnt/rootfs
+    borg create /path/to/repo::rootfs_backup .
+
+
 I am having troubles with some network/FUSE/special filesystem, why?
 --------------------------------------------------------------------
 

@@ -42,13 +42,9 @@ the mount point prefix, e.g. /mnt/sshfs/bin/bash instead of /bin/bash).
 
 ::
 
-    # Mount client root file system.
-    mkdir /mnt/sshfs
     sshfs root@host:/ /mnt/sshfs
-    # Change into mount dir and back up.
     cd /mnt/sshfs
-    borg create /path/to/repo::archive .
-    # Unmount client.
+    borg create /path/to/repo::archive . # note the dot!
     cd ~
     umount /mnt/sshfs
 
@@ -89,16 +85,19 @@ repository in ``/borgrepo``, and can run a simple
 
     borg extract /borgrepo::archive
 
-to restore the whole archive. Finally we need to exit chroot and unmount all the
-stuff:
+to restore the whole archive. Finally we need to exit chroot, unmount all the
+stuff and clean up:
 
 ::
 
     exit # exit chroot
     cd /tmp/sshfs
+    rm usr/local/bin/borg
     for i in dev proc sys borgrepo; do umount ./$i; done
+    rmdir borgrepo
     cd ~
     umount /tmp/sshfs
+    rmdir /tmp/sshfs
 
 Thanks to secuser on IRC for this howto.
 
@@ -110,7 +109,7 @@ have not changed, a simple full restore can be achieved with
 
 ::
 
-    borg export-tar /path/to/repo::archive | ssh root@host 'tar xf -'
+    borg export-tar /path/to/repo::archive | ssh root@host 'tar -C / -x'
 
-(let Borg export the archive in tar format, upload it to the client and directly
+(let Borg export the archive in tar format, stream it to the client and directly
 extract it in root file system).

@@ -1616,8 +1616,8 @@ class Archiver:
         # see the comment in do_with_lock about why we do it like this:
         data = repository.get(Manifest.MANIFEST_ID)
         repository.put(Manifest.MANIFEST_ID, data)
-        percent = args.threshold / 100
-        repository.commit(compact=True, threshold=percent, cleanup_commits=args.cleanup_commits)
+        threshold = args.threshold / 100
+        repository.commit(compact=True, threshold=threshold, cleanup_commits=args.cleanup_commits)
         return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)

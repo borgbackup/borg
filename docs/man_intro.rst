@@ -1,16 +1,3 @@
-====
-borg
-====
-
-----------------------------------------
-deduplicating and encrypting backup tool
-----------------------------------------
-
-:Author: The Borg Collective
-:Date: 2017-02-05
-:Manual section: 1
-:Manual group: borg backup tool
-
 SYNOPSIS
 --------
 

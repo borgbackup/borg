@@ -423,8 +423,13 @@ def api(*, since, **kwargs_decorator):
     """Check version requirements and use self.call to do the remote method call.
 
     <since> specifies the version in which borg introduced this method,
-    calling this method when connected to an older version will fail without transmiting
+    calling this method when connected to an older version will fail without transmitting
     anything to the server.
+
+    <previously> is the value resulting in the behaviour before introducing the new version.
+
+    <dontcare> is a flag to set the behaviour if an old version is called the new way. If set to True, the method is
+    called as defined by <previously>. If False, an exception is generated.
 
     Further kwargs can be used to encode version specific restrictions.
     If a previous hardcoded behaviour is parameterized in a version, this allows calls that

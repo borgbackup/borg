@@ -723,7 +723,7 @@ class Repository:
                 del self.compact[segment]
             unused = []
 
-        logger.debug('compaction started.')
+        logger.debug('Compaction started (threshold is %i%%).', threshold * 100)
         pi = ProgressIndicatorPercent(total=len(self.compact), msg='Compacting segments %3.0f%%', step=1,
                                       msgid='repository.compact_segments')
         for segment, freeable_space in sorted(self.compact.items()):

@@ -425,10 +425,11 @@ def api(*, since, **kwargs_decorator):
     <since> specifies the version in which borg introduced this method.
     Calling this method when connected to an older version will fail without transmitting anything to the server.
 
-    <previously> is the value resulting in the behaviour before introducing the new version.
+    <previously> is the value resulting in the behaviour before introducing the new parameter.
 
     <dontcare> is a flag to set the behaviour if an old version is called the new way.
-    If set to True, the method is called as defined by <previously>. If False, an exception is generated.
+    If set to True, the method is called without the (not yet supported) parameter (this should be done if that is the
+    more desirable behaviour). If False, an exception is generated.
 
     Further kwargs can be used to encode version specific restrictions.
     If a previous hardcoded behaviour is parameterized in a version, this allows calls that use the previously

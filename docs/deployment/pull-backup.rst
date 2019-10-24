@@ -68,7 +68,7 @@ create the backup, retaining the original paths, excluding the repository:
 
 ::
 
-    borg create -e /borgrepo /borgrepo::archive /
+    borg create --exclude /borgrepo /borgrepo::archive /
 
 (For the sake of simplicity only ``/borgrepo`` is excluded here. You may want to
 set up an exclude file with additional files and folders to be excluded.)
@@ -166,7 +166,7 @@ directly extract it without the need of mounting with SSHFS:
 
 ::
 
-    borg export-tar /path/to/repo::archive | ssh root@host 'tar -C / -x'
+    borg export-tar /path/to/repo::archive - | ssh root@host 'tar -C / -x'
 
 Note that in this scenario the tar format is the limiting factor – it cannot
 restore all the advanced features that BorgBackup supports. See

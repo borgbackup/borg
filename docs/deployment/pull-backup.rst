@@ -65,7 +65,7 @@ results, because after a reinstall the name-to-ID mapping might have changed.
 The workaround is chrooting into an sshfs mounted directory. In this example the
 whole client root file system is mounted. We use the stand-alone BorgBackup
 executable and copy it into the mounted file system to make Borg available after
-entering chroot; this can be skipped of Borg is already installed on the client.
+entering chroot; this can be skipped if Borg is already installed on the client.
 
 ::
 
@@ -97,8 +97,8 @@ all the stuff and clean up:
 ::
 
     exit # exit chroot
+    rm /tmp/sshfs/usr/local/bin/borg
     cd /tmp/sshfs
-    rm usr/local/bin/borg
     for i in dev proc sys borgrepo; do umount ./$i; done
     rmdir borgrepo
     cd ~
@@ -122,8 +122,8 @@ extract a backup, using the numeric IDs to get a consistent restore:
     cd ~
     umount /mnt/sshfs
 
-Alternative full restore
-~~~~~~~~~~~~~~~~~~~~~~~~
+Simple (lossy) full restore
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Using ``borg export-tar`` it is possible to stream a backup to the client and
 directly extract it without the need of mounting with SSHFS:

@@ -442,7 +442,7 @@ class Repository:
             self.lock.release()
             self.lock = None
 
-    def commit(self, save_space=False, compact=True, cleanup_commits=False):
+    def commit(self, save_space=False, compact=True, threshold=0.1, cleanup_commits=False):
         """Commit transaction
         """
         # save_space is not used anymore, but stays for RPC/API compatibility.
@@ -463,7 +463,7 @@ class Repository:
                     if os.path.getsize(filename) == 17:
                         self.segments[segment] = 0
                         self.compact[segment] = LoggedIO.header_fmt.size
-            self.compact_segments()
+            self.compact_segments(threshold)
         self.write_index()
         self.rollback()
 
@@ -695,7 +695,7 @@ class Repository:
             logger.info('Storage quota: %s out of %s used.',
                         format_file_size(self.storage_quota_use), format_file_size(self.storage_quota))
 
-    def compact_segments(self):
+    def compact_segments(self, threshold):
         """Compact sparse segments by copying data into new segments
         """
         if not self.compact:
@@ -723,7 +723,7 @@ class Repository:
                 del self.compact[segment]
             unused = []
 
-        logger.debug('compaction started.')
+        logger.debug('Compaction started (threshold is %i%%).', threshold * 100)
         pi = ProgressIndicatorPercent(total=len(self.compact), msg='Compacting segments %3.0f%%', step=1,
                                       msgid='repository.compact_segments')
         for segment, freeable_space in sorted(self.compact.items()):
@@ -736,7 +736,7 @@ class Repository:
             freeable_ratio = 1.0 * freeable_space / segment_size
             # we want to compact if:
             # - we can free a considerable relative amount of space (freeable_ratio over some threshold)
-            if not (freeable_ratio > 0.1):
+            if not (freeable_ratio > threshold):
                 logger.debug('not compacting segment %d (freeable: %2.2f%% [%d bytes])',
                              segment, freeable_ratio * 100.0, freeable_space)
                 pi.show()

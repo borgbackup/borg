@@ -1616,7 +1616,8 @@ class Archiver:
         # see the comment in do_with_lock about why we do it like this:
         data = repository.get(Manifest.MANIFEST_ID)
         repository.put(Manifest.MANIFEST_ID, data)
-        repository.commit(compact=True, cleanup_commits=args.cleanup_commits)
+        threshold = args.threshold / 100
+        repository.commit(compact=True, threshold=threshold, cleanup_commits=args.cleanup_commits)
         return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)
@@ -2875,6 +2876,8 @@ class Archiver:
         Depending on the amount of segments that need compaction, it may take a while,
         so consider using the ``--progress`` option.
 
+        A segment is compacted if the amount of saved space is above the percentage value
+        given by the ``--threshold`` option. If ommitted, a threshold of 10% is used.
         When using ``--verbose``, borg will output an estimate of the freed space.
 
         After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
@@ -2894,6 +2897,9 @@ class Archiver:
                                help='repository to compact')
         subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
                                help='cleanup commit-only 17-byte segment files')
+        subparser.add_argument('--threshold', metavar='PERCENT', dest='threshold',
+                               type=int, default=10,
+                               help='set minimum threshold for saved space in PERCENT (Default: 10)')
 
         # borg config
         config_epilog = process_epilog("""

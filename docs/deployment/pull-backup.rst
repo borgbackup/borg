@@ -5,67 +5,46 @@ Backing up in pull mode
 =======================
 
 Assuming you have a pull backup system set up with borg, where a backup server
-pulls the data from the target via sshfs. In this mode, the backup client's file
+pulls the data from the target via SSHFS. In this mode, the backup client's file
 system is mounted remotely on the backup server. Pull mode is even possible if
 the SSH connection must be established by the client via a remote tunnel. Other
-network file systems like NFS or SMB could be used as well, but sshfs is very
+network file systems like NFS or SMB could be used as well, but SSHFS is very
 simple to set up and probably the most secure one.
 
-There are some restrictions caused by sshfs. For example, unless you define UID
-and GID mappings when mounting via sshfs, owners and groups of the mounted file
-system will probably change, and you may not have access to those files if
+There are some restrictions caused by SSHFS. For example, unless you define UID
+and GID mappings when mounting via ``sshfs``, owners and groups of the mounted
+file system will probably change, and you may not have access to those files if
 BorgBackup is not run with root privileges.
 
-The sshfs is a FUSE file system and uses the SFTP protocol, so there may be also
-other unsupported features that the actual implementations of sshfs, libfuse and
+SSHFS is a FUSE file system and uses the SFTP protocol, so there may be also
+other unsupported features that the actual implementations of ssfs, libfuse and
 sftp on the backup server do not support, like file name encodings, ACLs, xattrs
 or bsdflags. So there is no guarantee that you are able to restore a system
 completely in every aspect from such a backup.
 
 .. warning::
 
-    To mount the client's root file system you will need root access to the client.
-    This contradicts to the usual threat model of BorgBackup, where clients don't
-    need to trust the backup server (data is encrypted). In pull mode the server
-    (when logged in as root) could cause unlimited damage to the client. Therefore,
-    pull mode should be used only from servers you do fully trust!
+    To mount the client's root file system you will need root access to the
+    client. This contradicts to the usual threat model of BorgBackup, where
+    clients don't need to trust the backup server (data is encrypted). In pull
+    mode the server (when logged in as root) could cause unlimited damage to the
+    client. Therefore, pull mode should be used only from servers you do fully
+    trust!
 
 Creating a backup
 -----------------
 
-In this approach the client file system is simply mounted and then backed up.
-Note that the backup is created from within the mount point so that all files
-in the archive have their original paths (otherwise they would be backed up with
-the mount point prefix, e.g. /mnt/sshfs/bin/bash instead of /bin/bash).
+Generally, in a pull backup situation there is no direct way for borg to know
+the client's original UID:GID name mapping of files, because Borg would use
+``/etc/passwd`` and ``/etc/group`` of the backup server to map the names. To
+derive the right names, Borg needs to have access to the client's passwd and
+group files and use them in the backup process.
 
-::
-
-    sshfs root@host:/ /mnt/sshfs
-    cd /mnt/sshfs
-    borg create /path/to/repo::archive . # note the dot!
-    cd ~
-    umount /mnt/sshfs
-
-Restore methods
----------------
-
-The counterpart of a pull backup is a push restore. When restoring from a
-backup, you might have to take a closer look on the user and group IDs and names
-of the backup content. Depending on the type of restore – full restore or
-partial restore – there are different methods to make sure the correct IDs are
-restored. Generally, there is no direct way for borg to know the correct UID:GID
-of files, because it uses the ``/etc/passwd`` and the ``/etc/group`` of the
-backup server.
-
-Partial restore
-~~~~~~~~~~~~~~~
-
-In case of a partial restore, using the archived UIDs/GIDs might lead to wrong
-results, because after a reinstall the name-to-ID mapping might have changed.
-The workaround is chrooting into an sshfs mounted directory. In this example the
-whole client root file system is mounted. We use the stand-alone BorgBackup
-executable and copy it into the mounted file system to make Borg available after
-entering chroot; this can be skipped if Borg is already installed on the client.
+The solution to this problem is chrooting into an sshfs mounted directory. In
+this example the whole client root file system is mounted. We use the
+stand-alone BorgBackup executable and copy it into the mounted file system to
+make Borg available after entering chroot; this can be skipped if Borg is
+already installed on the client.
 
 ::
 
@@ -82,17 +61,19 @@ entering chroot; this can be skipped if Borg is already installed on the client.
     for i in dev proc sys; do mount --bind /$i $i; done
     chroot /tmp/sshfs
 
-Now we are on the backup system but inside a chroot with the target's root file
+Now we are on the backup system but inside a chroot with the client's root file
 system. We have a copy of Borg binary in ``/usr/local/bin`` and the repository
-in ``/borgrepo``. Now Borg is able to map the user/group names of the backup
-files to the actual IDs on the client, and we can run
+in ``/borgrepo``. Borg will back up the client's user/group names, and we can
+create the backup, retaining the original paths, excluding the repository:
 
 ::
 
-    borg extract /borgrepo::archive PATH
+    borg create -e /borgrepo /borgrepo::archive /
 
-to partially restore whatever we like. Finally we need to exit chroot, unmount
-all the stuff and clean up:
+(For the sake of simplicity only ``/borgrepo`` is excluded here. You may want to
+set up an exclude file with additional files and folders to be excluded.)
+
+Finally, we need to exit chroot, unmount all the stuff and clean up:
 
 ::
 
@@ -107,18 +88,73 @@ all the stuff and clean up:
 
 Thanks to secuser on IRC for this how-to!
 
+Restore methods
+---------------
+
+The counterpart of a pull backup is a push restore. Depending on the type of
+restore – full restore or partial restore – there are different methods to make
+sure the correct IDs are restored.
+
+Partial restore
+~~~~~~~~~~~~~~~
+
+In case of a partial restore, using the archived UIDs/GIDs might lead to wrong
+results if the name-to-ID mapping on the target system has changed compared to
+backup time (might be the case e.g. for a fresh OS install).
+
+The workaround again is chrooting into an sshfs mounted directory, so Borg is
+able to map the user/group names of the backup files to the actual IDs on the
+client. This example is similar to the backup above – only the Borg command is
+different:
+
+::
+
+    # Mount client root file system.
+    mkdir /tmp/sshfs
+    sshfs root@host:/ /tmp/sshfs
+    # Mount BorgBackup repository inside it.
+    mkdir /tmp/sshfs/borgrepo
+    mount --bind /path/to/repo /tmp/sshfs/borgrepo
+    # Make borg executable available.
+    cp /usr/local/bin/borg /tmp/sshfs/usr/local/bin/borg
+    # Mount important system directories and enter chroot.
+    cd /tmp/sshfs
+    for i in dev proc sys; do mount --bind /$i $i; done
+    chroot /tmp/sshfs
+
+Now we can run
+
+::
+
+    borg extract /borgrepo::archive PATH
+
+to partially restore whatever we like. Finally, do the clean-up:
+
+::
+
+    exit # exit chroot
+    rm /tmp/sshfs/usr/local/bin/borg
+    cd /tmp/sshfs
+    for i in dev proc sys borgrepo; do umount ./$i; done
+    rmdir borgrepo
+    cd ~
+    umount /tmp/sshfs
+    rmdir /tmp/sshfs
+
 Full restore
 ~~~~~~~~~~~~
 
-In a full restore differences between backup and client do not matter, so there
-is no need for a chroot environment. We just mount the client file system and
-extract a backup, using the numeric IDs to get a consistent restore:
+When doing a full restore, we restore all files (including the ones containing
+the ID-to-name mapping, ``/etc/passwd`` and ``/etc/group``). Everything will be
+consistent automatically if we restore the numeric IDs stored in the archive. So
+there is no need for a chroot environment; we just mount the client file system
+and extract a backup, utilizing the ``--numeric-owner`` option:
 
 ::
 
     sshfs root@host:/ /mnt/sshfs
     cd /mnt/sshfs
-    borg extract --numeric owner /path/to/repo::archive
+    borg extract --numeric-owner /path/to/repo::archive
     cd ~
     umount /mnt/sshfs
 

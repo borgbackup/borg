@@ -424,10 +424,15 @@ class build_man(Command):
             self.gen_man_page(man_title, doc.getvalue())
 
     def build_intro_page(self):
+        doc, write = self.new_doc()
+        man_title = 'borg'
         print('building man page borg(1)', file=sys.stderr)
+
         with open('docs/man_intro.rst') as fd:
             man_intro = fd.read()
-        self.gen_man_page('borg', self.rst_prelude + man_intro)
+
+        self.write_man_header(write, man_title, "deduplicating and encrypting backup tool")
+        self.gen_man_page(man_title, doc.getvalue() + man_intro)
 
     def new_doc(self):
         doc = io.StringIO(self.rst_prelude)

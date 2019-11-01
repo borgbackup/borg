@@ -2,6 +2,7 @@ MANIFEST
 docs/_build
 build
 dist
+external
 borg-env
 .tox
 src/borg/compress.c

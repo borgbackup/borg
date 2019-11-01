@@ -8,7 +8,9 @@ Build Requirements
 ------------------
 
 - VC 14.0 Compiler
-- OpenSSL Library v1.1.1c, 64bit (available at https://slproweb.com/products/Win32OpenSSL.html)
+- OpenSSL Library v1.1.1c, 64bit (available at https://github.com/python/cpython-bin-deps)
+  Please use the `win-download-openssl.ps1` script to download and extract the library to
+  the correct location. See also the OpenSSL section below.
 - Patience and a lot of coffee / beer
 
 What's working
@@ -32,3 +34,13 @@ What's NOT working
 
 - Extracting a backup which was created on windows machine on a non windows machine will fail.
 - And many things more.
+
+
+OpenSSL, Windows and Python
+---------------------------
+Windows does not ship OpenSSL by default, so we need to get the library from somewhere else.
+However, a default python installation does include `libcrypto` which is required by borg.
+The only things which are missing to build borg are the header and `*.lib` files.
+Luckily the python developers provide all required files in a separate repository.
+The `win-download-openssl.ps1` script can be used to download the package from
+https://github.com/python/cpython-bin-deps and extract the files to the correct location.

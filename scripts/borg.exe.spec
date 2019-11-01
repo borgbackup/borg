@@ -3,17 +3,27 @@
 
 import os, sys
 
-basepath = '/vagrant/borg/borg'
+is_win32 = sys.platform.startswith('win32')
+
+# Note: SPEC contains the spec file argument given to pyinstaller
+here = os.path.dirname(os.path.abspath(SPEC))
+
+if is_win32:
+    basepath = os.path.abspath(os.path.join(here, '..'))
+    hiddenimports = []
+else:
+    basepath = '/vagrant/borg/borg'
+    hiddenimports = ['borg.platform.posix']
 
 block_cipher = None
 
-a = Analysis([os.path.join(basepath, 'src/borg/__main__.py'), ],
+a = Analysis([os.path.join(basepath, 'src', 'borg', '__main__.py'), ],
              pathex=[basepath, ],
              binaries=[],
              datas=[
-                 ('../src/borg/paperkey.html', 'borg'),
+                (os.path.join(basepath, 'src', 'borg', 'paperkey.html'), 'borg'),
              ],
-             hiddenimports=['borg.platform.posix'],
+             hiddenimports=hiddenimports,
              hookspath=[],
              runtime_hooks=[],
              excludes=[
@@ -39,7 +49,7 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=True )
+          console=True)
 
 if False:
     # Enable this block to build a directory-based binary instead of

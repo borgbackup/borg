@@ -11,13 +11,6 @@ the SSH connection must be established by the client via a remote tunnel. Other
 network file systems like NFS or SMB could be used as well, but SSHFS is very
 simple to set up and probably the most secure one.
 
-.. note::
-
-    There are user reports that SSHFS can be extremely slow over high latency
-    networks. Using SSHFS also means Borg does all the checksumming over the
-    network which is also very slow. You should benchmark your connection's
-    throughput first before deploying a huge setup.
-
 There are some restrictions caused by SSHFS. For example, unless you define UID
 and GID mappings when mounting via ``sshfs``, owners and groups of the mounted
 file system will probably change, and you may not have access to those files if
@@ -79,9 +72,9 @@ create the backup, retaining the original paths, excluding the repository:
 
 For the sake of simplicity only ``/borgrepo`` is excluded here. You may want to
 set up an exclude file with additional files and folders to be excluded. Also
-note that we have to modify Borg's file change detection behaviour – SSHFS does
-not support real inode numbers, so we have to supply the ``--files-cache``
-option.
+note that we have to modify Borg's file change detection behaviour – SSHFS
+cannot guarantee stable inode numbers, so we have to supply the
+``--files-cache`` option.
 
 Finally, we need to exit chroot, unmount all the stuff and clean up:
 

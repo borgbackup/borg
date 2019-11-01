@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2019-09-06" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2019-11-01" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -170,6 +170,16 @@ may specify the backup roots (starting points) and patterns for inclusion/exclus
 A root path starts with the prefix \fIR\fP, followed by a path (a plain path, not a
 file pattern). An include rule starts with the prefix +, an exclude rule starts
 with the prefix \-, an exclude\-norecurse rule starts with !, all followed by a pattern.
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Via \fB\-\-pattern\fP or \fB\-\-patterns\-from\fP you can define BOTH inclusion and exclusion
+of files using pattern prefixes \fB+\fP and \fB\-\fP\&. With \fB\-\-exclude\fP and
+\fB\-\-exlude\-from\fP ONLY excludes are defined.
+.UNINDENT
+.UNINDENT
+.sp
 Inclusion patterns are useful to include paths that are contained in an excluded
 path. The first matching pattern is used so if an include pattern matches before
 an exclude pattern, the file is backed up. If an exclude\-norecurse pattern matches

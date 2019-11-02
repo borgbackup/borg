@@ -1852,7 +1852,7 @@ class ArchiveRecreater:
                  exclude_caches=False, exclude_if_present=None, keep_exclude_tags=False,
                  chunker_params=None, compression=None, recompress=False, always_recompress=False,
                  dry_run=False, stats=False, progress=False, file_status_printer=None,
-                 checkpoint_interval=1800):
+                 timestamp=None, checkpoint_interval=1800):
         self.repository = repository
         self.key = key
         self.manifest = manifest
@@ -1872,6 +1872,7 @@ class ArchiveRecreater:
         self.compression = compression or CompressionSpec('none')
         self.seen_chunks = set()
 
+        self.timestamp = timestamp
         self.dry_run = dry_run
         self.stats = stats
         self.progress = progress
@@ -1976,10 +1977,27 @@ class ArchiveRecreater:
             return
         if comment is None:
             comment = archive.metadata.get('comment', '')
-        target.save(comment=comment, stats=target.stats, additional_metadata={
+        duration = timedelta(seconds=time.monotonic() - target.start_monotonic)
+
+        # Keep for the statistics if necessary
+        if self.stats:
+            _start = target.start
+
+        if self.timestamp is None:
+            end = archive.metadata.get('time_end') or archive.metadata.time
+            start = archive.metadata.time
+            logger.info(archive.metadata.time)
+        else:
+            end = (self.timestamp + duration).strftime(ISO_FORMAT)
+            start = self.timestamp.strftime(ISO_FORMAT)
+
+        target.start = start
+        target.end = end
+
+        target.save(comment=comment, timestamp=self.timestamp, stats=target.stats, additional_metadata={
             # keep some metadata as in original archive:
-            'time': archive.metadata.time,
-            'time_end': archive.metadata.get('time_end') or archive.metadata.time,
+            'time': start,
+            'time_end': end,
             'cmdline': archive.metadata.cmdline,
             # but also remember recreate metadata:
             'recreate_cmdline': sys.argv,
@@ -1988,6 +2006,7 @@ class ArchiveRecreater:
             archive.delete(Statistics(), progress=self.progress)
             target.rename(archive.name)
         if self.stats:
+            target.start = _start
             target.end = datetime.utcnow()
             log_multi(DASHES,
                       str(target),

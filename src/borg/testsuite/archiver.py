@@ -2551,6 +2551,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert int(csize) < int(size)
         assert sha256_before == sha256_after
 
+    def test_recreate_timestamp(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        archive = self.repository_location + '::test0'
+        self.cmd('create', archive, 'input')
+        self.cmd('recreate', '--timestamp', "1970-01-01T00:00:00", '--comment',
+                 'test', archive)
+        info = self.cmd('info', archive).splitlines()
+        assert any([re.search(r'Time \(start\).+ 1970-01-01', item) for item in info])
+
     def test_recreate_dry_run(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -2560,6 +2570,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.check_cache()
         archives_after = self.cmd('list', self.repository_location + '::test')
         assert archives_after == archives_before
+
 
     def test_recreate_skips_nothing_to_do(self):
         self.create_regular_file('file1', size=1024 * 80)

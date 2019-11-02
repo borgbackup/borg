@@ -13,3 +13,4 @@ This chapter details deployment strategies for the following scenarios.
    deployment/hosting-repositories
    deployment/automated-local
    deployment/image-backup
+   deployment/pull-backup

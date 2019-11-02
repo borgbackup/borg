@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMPACT 1 "2019-09-06" "" "borg backup tool"
+.TH BORG-COMPACT 1 "2019-11-01" "" "borg backup tool"
 .SH NAME
 borg-compact \- compact segment files in the repository
 .
@@ -47,6 +47,8 @@ client or also from the server.
 Depending on the amount of segments that need compaction, it may take a while,
 so consider using the \fB\-\-progress\fP option.
 .sp
+A segment is compacted if the amount of saved space is above the percentage value
+given by the \fB\-\-threshold\fP option. If ommitted, a threshold of 10% is used.
 When using \fB\-\-verbose\fP, borg will output an estimate of the freed space.
 .sp
 After upgrading borg (server) to 1.2+, you can use \fBborg compact \-\-cleanup\-commits\fP
@@ -68,6 +70,9 @@ repository to compact
 .TP
 .B \-\-cleanup\-commits
 cleanup commit\-only 17\-byte segment files
+.TP
+.BI \-\-threshold \ PERCENT
+set minimum threshold for saved space in PERCENT (Default: 10)
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

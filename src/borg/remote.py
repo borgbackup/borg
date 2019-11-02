@@ -425,19 +425,19 @@ def api(*, since, **kwargs_decorator):
     <since> specifies the version in which borg introduced this method.
     Calling this method when connected to an older version will fail without transmitting anything to the server.
 
+    Further kwargs can be used to encode version specific restrictions:
+
     <previously> is the value resulting in the behaviour before introducing the new parameter.
+    If a previous hardcoded behaviour is parameterized in a version, this allows calls that use the previously
+    hardcoded behaviour to pass through and generates an error if another behaviour is requested by the client.
+    E.g. when 'append_only' was introduced in 1.0.7 the previous behaviour was what now is append_only=False.
+    Thus @api(..., append_only={'since': parse_version('1.0.7'), 'previously': False}) allows calls
+    with append_only=False for all version but rejects calls using append_only=True on versions older than 1.0.7.
 
     <dontcare> is a flag to set the behaviour if an old version is called the new way.
     If set to True, the method is called without the (not yet supported) parameter (this should be done if that is the
     more desirable behaviour). If False, an exception is generated.
-
-    Further kwargs can be used to encode version specific restrictions.
-    If a previous hardcoded behaviour is parameterized in a version, this allows calls that use the previously
-    hardcoded behaviour to pass through and generates an error if another behaviour is requested by the client.
-
-    E.g. when 'append_only' was introduced in 1.0.7 the previous behaviour was what now is append_only=False.
-    Thus @api(..., append_only={'since': parse_version('1.0.7'), 'previously': False}) allows calls
-    with append_only=False for all version but rejects calls using append_only=True on versions older than 1.0.7.
+    E.g. before 'threshold' was introduced in 1.2.0a8, a hardcoded threshold of 0.1 was used in commit().
     """
     def decorator(f):
         @functools.wraps(f)

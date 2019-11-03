@@ -10,6 +10,7 @@ from time import sleep
 import pytest
 
 from .. import platform
+from ..platformflags import is_win32
 from ..constants import MAX_DATA_SIZE
 from ..helpers import Location
 from ..helpers import Buffer
@@ -219,6 +220,7 @@ class TestLocationWithoutEnv:
             assert Location(location).canonical_path() == \
                 Location(Location(location).canonical_path()).canonical_path(), "failed: %s" % location
 
+    @pytest.mark.skipif(is_win32, reason='Used date format (%s) not supported on windows.')
     def test_format_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         test_pid = os.getpid()

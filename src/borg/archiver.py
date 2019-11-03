@@ -1145,12 +1145,16 @@ class Archiver:
         stats = Statistics()
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             for i, archive_name in enumerate(archive_names, 1):
-                msg = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
-                logger.info(msg.format(format_archive(manifest.archives[archive_name]), i, len(archive_names)))
-                if not dry_run:
-                    archive = Archive(repository, key, manifest, archive_name, cache=cache,
-                                      consider_part_files=args.consider_part_files)
-                    archive.delete(stats, progress=args.progress, forced=args.forced)
+                try:
+                    msg = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
+                    logger.info(msg.format(format_archive(manifest.archives[archive_name]), i, len(archive_names)))
+                    if not dry_run:
+                        archive = Archive(repository, key, manifest, archive_name, cache=cache,
+                                          consider_part_files=args.consider_part_files)
+                        archive.delete(stats, progress=args.progress, forced=args.forced)
+                except KeyError:
+                    logger.warning('Archive {} not found ({}/{}).'.format(archive_name, i, len(archive_names)))
+
             if not dry_run:
                 manifest.write()
                 repository.commit(compact=False, save_space=args.save_space)

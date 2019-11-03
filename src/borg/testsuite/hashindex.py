@@ -181,9 +181,16 @@ class HashIndexSizeTestCase(BaseTestCase):
         idx = ChunkIndex()
         for i in range(1234):
             idx[H(i)] = i, i**2, i**3
-        with tempfile.NamedTemporaryFile() as file:
-            idx.write(file.name)
-            size = os.path.getsize(file.name)
+            
+        file, name = tempfile.mkstemp()
+        try:
+            # Close the file, on windows a file cannot be opened multiple times.
+            os.close(file)
+            idx.write(name)
+            size = os.path.getsize(name)
+        finally:
+            os.unlink(name)
+
         assert idx.size() == size
 
 

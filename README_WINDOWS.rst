@@ -44,3 +44,5 @@ The only things which are missing to build borg are the header and `*.lib` files
 Luckily the python developers provide all required files in a separate repository.
 The `win-download-openssl.ps1` script can be used to download the package from
 https://github.com/python/cpython-bin-deps and extract the files to the correct location.
+For Anaconda, the required libraries can be installed with `conda install -c anaconda openssl`.
+

@@ -669,7 +669,13 @@ class Repository:
             if len(self.compact) < 10:
                 # This is mostly for the test suite to avoid overestimated free space needs. This can be annoying
                 # if TMP is a small-ish tmpfs.
-                compact_working_space = sum(self.io.segment_size(segment) - free for segment, free in self.compact.items())
+                compact_working_space = 0
+                for segment, free in self.compact.items():
+                    try:
+                        compact_working_space += self.io.segment_size(segment) - free
+                    except FileNotFoundError:
+                        # looks like self.compact is referring to a non-existent segment file, ignore it.
+                        pass
                 logger.debug('check_free_space: few segments, not requiring a full free segment')
                 compact_working_space = min(compact_working_space, full_segment_size)
                 logger.debug('check_free_space: calculated working space for compact as %d bytes', compact_working_space)

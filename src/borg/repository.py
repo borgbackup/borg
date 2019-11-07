@@ -1024,9 +1024,8 @@ class Repository:
                     logger.error('rebuilt index:   %d objects', len(self.index))
                 else:
                     logger.info('Index object count match.')
-                line_format = '%-64s %-16s %-16s'
+                line_format = 'ID: %-64s rebuilt index: %-16s committed index: %-16s'
                 not_found = '<not found>'
-                logger.warning(line_format, 'ID', 'rebuilt index', 'committed index')
                 for key, value in self.index.iteritems():
                     current_value = current_index.get(key, not_found)
                     if current_value != value:

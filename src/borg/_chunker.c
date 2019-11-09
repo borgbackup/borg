@@ -247,7 +247,7 @@ static PyObject *
 chunker_process(Chunker *c)
 {
     uint32_t sum, chunk_mask = c->chunk_mask;
-    size_t n = 0, old_last, min_size = c->min_size, window_size = c->window_size;
+    size_t n, old_last, min_size = c->min_size, window_size = c->window_size;
 
     if(c->done) {
         if(c->bytes_read == c->bytes_yielded)
@@ -282,15 +282,19 @@ chunker_process(Chunker *c)
      */
     c->position += min_size;
     c->remaining -= min_size;
-    n += min_size;
     sum = buzhash(c->data + c->position, window_size, c->table);
     while(c->remaining > c->window_size && (sum & chunk_mask)) {
-        sum = buzhash_update(sum, c->data[c->position],
-                             c->data[c->position + window_size],
-                             window_size, c->table);
-        c->position++;
-        c->remaining--;
-        n++;
+        uint8_t *p = c->data + c->position;
+        uint8_t *stop_at = p + c->remaining - window_size;
+        size_t did_bytes;
+        while (p < stop_at && (sum & chunk_mask)) {
+            sum = buzhash_update(sum, p[0], p[window_size],
+                                 window_size, c->table);
+            p++;
+        }
+        did_bytes = p - (c->data + c->position);
+        c->position += did_bytes;
+        c->remaining -= did_bytes;
         if(c->remaining <= window_size) {
             if(!chunker_fill(c)) {
                 return NULL;

@@ -21,6 +21,9 @@ from ..constants import *  # NOQA
 class NoManifestError(Error):
     """Repository has no manifest."""
 
+class NoArchiveError(KeyError):
+    """Archive not present in the Archives list."""
+
 
 class MandatoryFeatureUnsupported(Error):
     """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
@@ -53,7 +56,7 @@ class Archives(abc.MutableMapping):
         _name = safe_encode(name)
         values = self._archives.get(_name)
         if values is None:
-            raise KeyError
+            raise NoArchiveError
         ts = parse_timestamp(values[b'time'].decode())
         return ArchiveInfo(name=name, id=values[b'id'], ts=ts)
 

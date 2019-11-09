@@ -45,7 +45,7 @@ try:
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
-    from .helpers import Error, NoManifestError, set_ec
+    from .helpers import Error, NoManifestError, NoArchiveError, set_ec
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
@@ -1145,14 +1145,14 @@ class Archiver:
         stats = Statistics()
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             for i, archive_name in enumerate(archive_names, 1):
+                archive = Archive(repository, key, manifest, archive_name, cache=cache,
+                                  consider_part_files=args.consider_part_files)
                 try:
                     msg = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
                     logger.info(msg.format(format_archive(manifest.archives[archive_name]), i, len(archive_names)))
                     if not dry_run:
-                        archive = Archive(repository, key, manifest, archive_name, cache=cache,
-                                          consider_part_files=args.consider_part_files)
                         archive.delete(stats, progress=args.progress, forced=args.forced)
-                except KeyError:
+                except NoArchiveError:
                     logger.warning('Archive {} not found ({}/{}).'.format(archive_name, i, len(archive_names)))
 
             if not dry_run:

@@ -1986,7 +1986,6 @@ class ArchiveRecreater:
         if self.timestamp is None:
             end = archive.metadata.get('time_end') or archive.metadata.time
             start = archive.metadata.time
-            logger.info(archive.metadata.time)
         else:
             end = (self.timestamp + duration).strftime(ISO_FORMAT)
             start = self.timestamp.strftime(ISO_FORMAT)

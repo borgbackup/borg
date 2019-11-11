@@ -109,7 +109,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                     exclusive=False, manifest=True, cache=False, secure=True,
                     compatibility=None):
     """
-    Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
+    Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, &)
 
     If a parameter (where allowed) is a str the attribute named of args is used instead.
     :param fake: (str or bool) use None instead of repository, don't do anything else
@@ -2492,7 +2492,7 @@ class Archiver:
         # e.g. through "borg ... --help", define a substitution for the reference here.
         # It will replace the entire :ref:`foo` verbatim.
         rst_plain_text_references = {
-            'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
+            'a_status_oddity': '"I am seeing A (added) status for a unchanged file!?"',
             'separate_compaction': '"Separate compaction"',
         }
 
@@ -3824,6 +3824,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='list archive or repository contents')
         subparser.set_defaults(func=self.do_list)
+        subparser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
+                               help='Show checkpoints in the repository contents. (Hidden by default)')
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',

@@ -1977,7 +1977,6 @@ class ArchiveRecreater:
             return
         if comment is None:
             comment = archive.metadata.get('comment', '')
-        duration = timedelta(seconds=time.monotonic() - target.start_monotonic)
 
         # Keep for the statistics if necessary
         if self.stats:
@@ -1986,21 +1985,22 @@ class ArchiveRecreater:
         if self.timestamp is None:
             end = archive.metadata.get('time_end') or archive.metadata.time
             start = archive.metadata.time
+            additional_metadata = {
+                'time': start,
+                'time_end': end,
+                'cmdline': archive.metadata.cmdline,
+                # but also remember recreate metadata:
+                'recreate_cmdline': sys.argv,
+            }
         else:
-            end = (self.timestamp + duration).strftime(ISO_FORMAT)
-            start = self.timestamp.strftime(ISO_FORMAT)
+            additional_metadata = {
+                'cmdline': archive.metadata.cmdline,
+                # but also remember recreate metadata:
+                'recreate_cmdline': sys.argv,
+            }
 
-        target.start = start
-        target.end = end
-
-        target.save(comment=comment, timestamp=self.timestamp, stats=target.stats, additional_metadata={
-            # keep some metadata as in original archive:
-            'time': start,
-            'time_end': end,
-            'cmdline': archive.metadata.cmdline,
-            # but also remember recreate metadata:
-            'recreate_cmdline': sys.argv,
-        })
+        target.save(comment=comment, timestamp=self.timestamp,
+                    stats=target.stats, additional_metadata=additional_metadata)
         if replace_original:
             archive.delete(Statistics(), progress=self.progress)
             target.rename(archive.name)

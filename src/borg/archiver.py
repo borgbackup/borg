@@ -3825,7 +3825,7 @@ class Archiver:
                                           help='list archive or repository contents')
         subparser.set_defaults(func=self.do_list)
         subparser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
-                help='Show checkpoints in the repository contents. (Hidden by default)')
+                help='Show checkpoint archives in the repository contents list (default: hidden).')
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',

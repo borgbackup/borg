@@ -1153,9 +1153,9 @@ class Archiver:
                     logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
                     logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
-                    archive = Archive(repository, key, manifest, archive_name, cache=cache,
-                                      consider_part_files=args.consider_part_files)
                     if not dry_run:
+                        archive = Archive(repository, key, manifest, archive_name, cache=cache,
+                                          consider_part_files=args.consider_part_files)
                         archive.delete(stats, progress=args.progress, forced=args.forced)
 
             if not dry_run:

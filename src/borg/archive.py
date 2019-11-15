@@ -1983,11 +1983,9 @@ class ArchiveRecreater:
             _start = target.start
 
         if self.timestamp is None:
-            end = archive.metadata.get('time_end') or archive.metadata.time
-            start = archive.metadata.time
             additional_metadata = {
-                'time': start,
-                'time_end': end,
+                'time': archive.metadata.time,
+                'time_end': archive.metadata.get('time_end') or archive.metadata.time,
                 'cmdline': archive.metadata.cmdline,
                 # but also remember recreate metadata:
                 'recreate_cmdline': sys.argv,

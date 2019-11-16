@@ -1560,7 +1560,7 @@ class Archiver:
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      checkpoint_interval=args.checkpoint_interval,
-                                     dry_run=args.dry_run)
+                                     dry_run=args.dry_run, timestamp=args.timestamp)
 
         if args.location.archive:
             name = args.location.archive

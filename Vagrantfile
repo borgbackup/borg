@@ -232,7 +232,7 @@ def install_pythons(boxname)
     pyenv install 3.4.0  # tests
     pyenv install 3.5.0  # tests
     pyenv install 3.6.0  # tests
-    pyenv install 3.5.7  # binary build, use latest 3.5.x release
+    pyenv install 3.5.9  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -250,8 +250,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.7
-    pyenv virtualenv 3.5.7 borg-env
+    pyenv global 3.5.9
+    pyenv virtualenv 3.5.9 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end

@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import re
 import unittest
 from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
@@ -2527,6 +2528,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         size, csize, sha256_after = file_list.split(' ')
         assert int(csize) < int(size)
         assert sha256_before == sha256_after
+
+    def test_recreate_timestamp(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        archive = self.repository_location + '::test0'
+        self.cmd('create', archive, 'input')
+        self.cmd('recreate', '--timestamp', "1970-01-02T00:00:00", '--comment',
+                 'test', archive)
+        info = self.cmd('info', archive).splitlines()
+        assert any([re.search(r'Time \(start\).+ 1970-01-02', item) for item in info])
+        assert any([re.search(r'Time \(end\).+ 1970-01-02', item) for item in info])
 
     def test_recreate_dry_run(self):
         self.create_regular_file('compressible', size=10000)

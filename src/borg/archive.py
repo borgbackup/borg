@@ -1527,7 +1527,7 @@ class ArchiveChecker:
                 logger.error(msg)
 
             def list_keys_safe(keys):
-                return ', '.join((k.decode() if isinstance(k, bytes) else str(k) for k in keys))
+                return ', '.join((k.decode(errors='replace') if isinstance(k, bytes) else str(k) for k in keys))
 
             def valid_item(obj):
                 if not isinstance(obj, StableDict):

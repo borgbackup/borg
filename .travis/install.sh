@@ -30,12 +30,12 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
             pyenv global 3.4.5
             ;;
         py35)
-            pyenv install 3.5.2
-            pyenv global 3.5.2
+            pyenv install 3.5.3  # minimum for openssl 1.1.x
+            pyenv global 3.5.3
             ;;
         py36)
-            pyenv install 3.6.0
-            pyenv global 3.6.0
+            pyenv install 3.6.7  # minimum for homebrew to select openssl 1.1.x
+            pyenv global 3.6.7
             ;;
     esac
     pyenv rehash

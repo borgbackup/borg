@@ -27,10 +27,6 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     fi
 
     case "${TOXENV}" in
-        py34)
-            pyenv install 3.4.5
-            pyenv global 3.4.5
-            ;;
         py35)
             pyenv install 3.5.3  # minimum for openssl 1.1.x
             pyenv global 3.5.3

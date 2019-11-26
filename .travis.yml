@@ -27,10 +27,10 @@ matrix:
           os: linux
           dist: xenial
           env: TOXENV=py37
-        - language: generic
-          os: osx
-          osx_image: xcode8.3
-          env: TOXENV=py34
+        - python: 3.8
+          os: linux
+          dist: xenial
+          env: TOXENV=py38
         - language: generic
           os: osx
           osx_image: xcode8.3
@@ -38,7 +38,7 @@ matrix:
         - language: generic
           os: osx
           osx_image: xcode8.3
-          env: TOXENV=py36
+          env: TOXENV=py37
 
 before_install:
 - |

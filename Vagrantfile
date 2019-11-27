@@ -9,9 +9,10 @@ $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
 def packages_debianoid(user)
   return <<-EOF
-    apt update
-    # install all the (security and other) updates
-    apt dist-upgrade -y
+    # this is to avoid grub asking about which device it should install to:
+    echo "set grub-pc/install_devices /dev/sda" | debconf-communicate
+    apt-get -y -qq update
+    apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
     apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev libfuse-dev fuse pkg-config
     usermod -a -G fuse #{user}

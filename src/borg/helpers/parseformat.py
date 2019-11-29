@@ -22,6 +22,7 @@ from .time import OutputTimestamp, format_time, to_localtime, safe_timestamp, sa
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
+from ..platformflags import is_win32
 
 
 def bin_to_hex(binary):
@@ -377,6 +378,14 @@ class Location:
         |                                                   # or
         """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
+    win_file_re = re.compile(r"""
+        (?:file://)?                                        # optional file protocol
+        (?P<path>
+            (?:[a-zA-Z]:)?                                  # Drive letter followed by a colon (optional)
+            (?:[^:]+)                                       # Anything which does not contain a :, at least one character
+        )
+        """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
+
     def __init__(self, text=''):
         if not self.parse(text):
             raise ValueError('Invalid location format: "%s"' % self.orig)
@@ -404,6 +413,17 @@ class Location:
             relative = p.startswith('/./')
             p = os.path.normpath(p)
             return ('/.' + p) if relative else p
+
+        if is_win32:
+            m = self.win_file_re.match(text)
+            if m:
+                self.proto = 'file'
+                self.path = path
+                self.archive = m.group('archive')
+                return True
+
+            # On windows we currently only support windows paths
+            return False
 
         m = self.ssh_re.match(text)
         if m:

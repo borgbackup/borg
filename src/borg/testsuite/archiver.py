@@ -2563,7 +2563,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info = self.cmd('info', archive).splitlines()
         dtime = datetime(1970, 1, 2) + local_timezone.utcoffset(None)
         s_time = dtime.strftime("%Y-%m-%d")
-        assert any([re.search(r'Time \(start\).+ %s' % s_time , item) for item in info])
+        assert any([re.search(r'Time \(start\).+ %s' % s_time, item) for item in info])
         assert any([re.search(r'Time \(end\).+ %s' % s_time, item) for item in info])
 
     def test_recreate_dry_run(self):

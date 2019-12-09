@@ -18,6 +18,7 @@ import unittest
 from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
 from datetime import datetime
+from datetime import timezone
 from datetime import timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
@@ -2552,6 +2553,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert sha256_before == sha256_after
 
     def test_recreate_timestamp(self):
+        local_timezone = datetime.now(timezone(timedelta(0))).astimezone().tzinfo
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
         archive = self.repository_location + '::test0'
@@ -2559,8 +2561,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('recreate', '--timestamp', "1970-01-02T00:00:00", '--comment',
                  'test', archive)
         info = self.cmd('info', archive).splitlines()
-        assert any([re.search(r'Time \(start\).+ 1970-01-02', item) for item in info])
-        assert any([re.search(r'Time \(end\).+ 1970-01-02', item) for item in info])
+        dtime = datetime(1970, 1, 2) + local_timezone.utcoffset(None)
+        s_time = dtime.strftime("%Y-%m-%d")
+        assert any([re.search(r'Time \(start\).+ %s' % s_time, item) for item in info])
+        assert any([re.search(r'Time \(end\).+ %s' % s_time, item) for item in info])
 
     def test_recreate_dry_run(self):
         self.create_regular_file('compressible', size=10000)

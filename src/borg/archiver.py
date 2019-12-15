@@ -778,7 +778,7 @@ class Archiver:
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1, msgid='extract')
-            pi.output('Calculating size')
+            pi.output('Calculating total archive size for the progress indicator (might take long for large archives)')
             extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
             pi.total = extracted_size
         else:

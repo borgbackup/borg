@@ -58,16 +58,19 @@ end
 def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
-    sudo softwareupdate --ignore iTunesX
-    sudo softwareupdate --ignore iTunes
-    sudo softwareupdate --ignore "Install macOS High Sierra"
-    sudo softwareupdate --install --all
+    # note: the base machine is old and as uptodate as it gets,
+    # thus we do not need to install updates for the OS.
+    #sudo softwareupdate --ignore iTunesX
+    #sudo softwareupdate --ignore iTunes
+    #sudo softwareupdate --ignore "Install macOS High Sierra"
+    #sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.3/osxfuse-3.8.3.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.10.4/osxfuse-3.10.4.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.3.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.10.4.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
-    ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    # brew is already installed in the base box
+    #ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
     brew install openssl
     brew install lz4
@@ -229,9 +232,10 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.4.0  # tests
-    pyenv install 3.5.0  # tests
+    pyenv install 3.5.3  # tests, 3.5.3 is first to support openssl 1.1
     pyenv install 3.6.0  # tests
+    pyenv install 3.7.0  # tests
+    pyenv install 3.8.0  # tests
     pyenv install 3.5.9  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
@@ -311,8 +315,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.4.0 3.5.0 3.6.0
-      pyenv local 3.4.0 3.5.0 3.6.0
+      pyenv global 3.5.3 3.6.0 3.7.0 3.8.0
+      pyenv local 3.5.3 3.6.0 3.7.0 3.8.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then
@@ -498,7 +502,7 @@ Vagrant.configure(2) do |config|
 
   # OS X
   config.vm.define "darwin64" do |b|
-    b.vm.box = "jhcook/yosemite-clitools"
+    b.vm.box = "macos1010"
     b.vm.provider :virtualbox do |v|
       v.memory = 1536 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']

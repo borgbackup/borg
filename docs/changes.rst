@@ -201,23 +201,31 @@ Fixes:
 
   - fix KeyError for "partial" extraction, #4607
   - fix "partial" extract for hardlinked contentless file types, #4725
-- fix preloading for old (0.xx) remote servers, #4652
+  - fix preloading for old (0.xx) remote servers, #4652
+- delete: after double-force delete, warn about necessary repair, #4704
+- create: give invalid repo error msg if repo config not found, #4411
+- mount: fix FUSE mount missing st_birthtime, #4763 #4767
+- check: do not stumble over invalid item key, #4845
+- info: if the archive doesn't exist, print a pretty message, #4793
 - SecurityManager.known(): check all files, #4614
-- after double-force delete, warn about necessary repair, #4704
 - Repository.open: use stat() to check for repo dir, #4695
 - Repository.check_can_create_repository: use stat() to check, #4695
 - fix invalid archive error message
 - fix optional/non-optional location arg, #4541
+- commit-time free space calc: ignore bad compact map entries, #4796
+- ignore EACCES (errno 13) when hardlinking the old config, #4730
+- --prefix / -P: fix processing, avoid argparse issue, #4769
 
 New features:
 
 - enable placeholder usage in all extra archive arguments
 - new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
+- recreate: support --timestamp option, #4745
 
 Other:
 
 - argparser: always use REPOSITORY in metavar, also use more consistent help phrasing.
-- vagrant: add up-to-date openindiana box
+- check: improve error output for matching index size, see #4829
 - tests:
 
   - cope with ANY error when importing pytest into borg.testsuite, #4652
@@ -238,6 +246,26 @@ Other:
   - fix various code blocks in the docs, #4708
   - updated docs to cover use of temp directory on remote, #4545
   - add restore docs, #4670
+  - add a pull backup / push restore how-to, #1552
+  - add FAQ how to retain original paths, #4532
+  - explain difference between --exclude and --pattern, #4118
+  - add FAQs for SSH connection issues, #3866
+  - improve password FAQ, #4591
+  - reiterate that 'file cache names are absolute' in FAQ
+- travis / vagrant:
+
+  - misc python versions removed / changed (due to openssl 1.1 compatibility)
+    or added (3.7 and 3.8, for better borg compatibility testing)
+  - binary building is on python 3.5.9 now
+- vagrant:
+
+  - openindiana: add up-to-date base VM
+  - darwin: updated / better equipped the base VM
+  - darwin: updated osxfuse to 3.10.4
+- travis:
+
+  - darwin: backport some install code / order from master
+  - remove deprecated keyword "sudo" from travis config
 
 
 Version 1.1.10 (2019-05-16)

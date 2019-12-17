@@ -2126,6 +2126,9 @@ class Archiver:
         whitespace removal paths with whitespace at the beginning or end can only be
         excluded using regular expressions.
 
+        To test your exclusion patterns without performing an actual backup you can
+        run ``borg create --list --dry-run ...``.
+
         Examples::
 
             # Exclude '/home/user/file.o' but not '/home/user/file.odt':

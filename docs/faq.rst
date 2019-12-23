@@ -8,6 +8,22 @@ Frequently asked questions
 Usage & Limitations
 ###################
 
+What is the difference between a repo on an external hard drive vs. repo on a server?
+-------------------------------------------------------------------------------------
+
+If Borg is running in client/server mode, the client uses SSH as a transport to
+talk to the remote agent, which is another Borg process (Borg is installed on
+the server, too). The Borg server is doing storage-related low-level repo
+operations (get, put, commit, check, compact), while the Borg client does the
+high-level stuff: deduplication, encryption, compression, dealing with
+archives, backups, restores, etc., which reduces the amount of data that goes
+over the network.
+
+When Borg is writing to a repo on a locally mounted remote file system, e.g.
+SSHFS, the Borg client only can do file system operations and has no agent
+running on the remote side, so *every* operation needs to go over the network,
+which is slower.
+
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------
 

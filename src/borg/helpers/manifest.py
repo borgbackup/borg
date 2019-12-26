@@ -87,7 +87,7 @@ class Archives(abc.MutableMapping):
             raise TypeError('sort_by must be a sequence of str')
         regex = re.compile(shellpattern.translate(glob or '*', match_end=match_end))
         archives = [x for x in self.values() if ((regex.match(x.name) is not None) and ('checkpoint' not in x.name))]
-        if not consider_checkpoints:
+        if not consider_checkpoints: # Rebuilding the list withe everything if the setting is not included
             archives = [x for x in self.values() if regex.match(x.name) is not None]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))

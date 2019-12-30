@@ -44,6 +44,7 @@ from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
 has_lchmod = hasattr(os, 'lchmod')
+has_link = hasattr(os, 'link')
 
 flags_normal = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
 flags_noatime = flags_normal | getattr(os, 'O_NOATIME', 0)
@@ -549,7 +550,7 @@ Utilization of max. archive size: {csize_max:.0%}
         if 'source' in item:
             source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
             chunks, link_target = hardlink_masters.get(item.source, (None, source))
-            if link_target:
+            if link_target and has_link:
                 # Hard link was extracted previously, just link
                 with backup_io('link'):
                     os.link(link_target, path)

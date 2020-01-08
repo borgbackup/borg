@@ -1115,6 +1115,7 @@ class Archiver:
                 archives.insert(0, args.location.archive)
             archive_names = tuple(archives)
         else:
+            args.consider_checkpoints = True
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
                 return self.exit_code
@@ -1321,6 +1322,7 @@ class Archiver:
         if args.location.archive:
             archive_names = (args.location.archive,)
         else:
+            args.consider_checkpoints = True
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
                 return self.exit_code
@@ -1409,6 +1411,7 @@ class Archiver:
             args.glob_archives = args.prefix + '*'
         checkpoint_re = r'\.checkpoint(\.\d+)?'
         archives_checkpoints = manifest.archives.list(glob=args.glob_archives,
+                                                      consider_checkpoints=True,
                                                       match_end=r'(%s)?\Z' % checkpoint_re,
                                                       sort_by=['ts'], reverse=True)
         is_checkpoint = re.compile(r'(%s)\Z' % checkpoint_re).search
@@ -2627,6 +2630,8 @@ class Archiver:
             parser.set_defaults(func=self.do_mount)
             parser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', type=location_validator(),
                                 help='repository or archive to mount')
+            parser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
+                                help='Show checkpoint archives in the repository contents list (default: hidden).')
             parser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                 help='where to mount filesystem')
             parser.add_argument('-f', '--foreground', dest='foreground',
@@ -3834,6 +3839,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='list archive or repository contents')
         subparser.set_defaults(func=self.do_list)
+        subparser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
+                help='Show checkpoint archives in the repository contents list (default: hidden).')
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',

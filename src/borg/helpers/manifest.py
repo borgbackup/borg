@@ -74,7 +74,7 @@ class Archives(abc.MutableMapping):
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, *, glob=None, match_end=r'\Z', sort_by=(), first=None, last=None, reverse=False):
+    def list(self, *, glob=None, match_end=r'\Z', sort_by=(), consider_checkpoints=False, first=None, last=None, reverse=False):
         """
         Return list of ArchiveInfo instances according to the parameters.
 
@@ -87,6 +87,8 @@ class Archives(abc.MutableMapping):
             raise TypeError('sort_by must be a sequence of str')
         regex = re.compile(shellpattern.translate(glob or '*', match_end=match_end))
         archives = [x for x in self.values() if regex.match(x.name) is not None]
+        if not consider_checkpoints:
+            archives = [x for x in archives if '.checkpoint' not in x.name]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))
         if first:
@@ -99,13 +101,13 @@ class Archives(abc.MutableMapping):
 
     def list_considering(self, args):
         """
-        get a list of archives, considering --first/last/prefix/glob-archives/sort cmdline args
+        get a list of archives, considering --first/last/prefix/glob-archives/sort/consider-checkpoints cmdline args
         """
         if args.location.archive:
-            raise Error('The options --first, --last, --prefix and --glob-archives can only be used on repository targets.')
+            raise Error('The options --first, --last, --prefix, and --glob-archives, and --consider-checkpoints can only be used on repository targets.')
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
-        return self.list(sort_by=args.sort_by.split(','), glob=args.glob_archives, first=args.first, last=args.last)
+        return self.list(sort_by=args.sort_by.split(','), consider_checkpoints=args.consider_checkpoints, glob=args.glob_archives, first=args.first, last=args.last)
 
     def set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""

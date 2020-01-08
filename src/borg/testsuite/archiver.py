@@ -1854,14 +1854,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         # must keep the latest checkpoint archive:
         assert re.search(r'Keeping checkpoint archive:\s+test4.checkpoint', output)
-        output = self.cmd('list', self.repository_location)
+        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
         self.assert_in('test1', output)
         self.assert_in('test2', output)
         self.assert_in('test3.checkpoint', output)
         self.assert_in('test3.checkpoint.1', output)
         self.assert_in('test4.checkpoint', output)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
-        output = self.cmd('list', self.repository_location)
+        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
         self.assert_not_in('test1', output)
         # the latest non-checkpoint archive must be still there:
         self.assert_in('test2', output)
@@ -1872,7 +1872,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # now we supercede the latest checkpoint by a successful backup:
         self.cmd('create', self.repository_location + '::test5', src_dir)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
-        output = self.cmd('list', self.repository_location)
+        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
         # all checkpoints should be gone now:
         self.assert_not_in('checkpoint', output)
         # the latest archive must be still there
@@ -1979,6 +1979,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('list', '--format', '{sha256} {path}{NL}', test_archive)
         assert "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0 input/amb" in output
         assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
+
+    def test_list_consider_checkpoints(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        # these are not really a checkpoints, but they look like some:
+        self.cmd('create', self.repository_location + '::test2.checkpoint', src_dir)
+        self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
+        output = self.cmd('list', self.repository_location)
+        assert "test1" in output
+        assert "test2.checkpoint" not in output
+        assert "test3.checkpoint.1" not in output
+        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
+        assert "test1" in output
+        assert "test2.checkpoint" in output
+        assert "test3.checkpoint.1" in output
 
     def test_list_chunk_counts(self):
         self.create_regular_file('empty_file', size=0)

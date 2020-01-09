@@ -560,8 +560,14 @@ Utilization of max. archive size: {csize_max:.0%}
                 item.chunks = chunks
         yield hardlink_set
         if not hardlink_set and hardlink_masters:
-            # Update master entry with extracted item path, so that following hardlinks don't extract twice.
-            hardlink_masters[item.get('source') or original_path] = (None, path)
+            if has_link:
+                # Update master entry with extracted item path, so that following hardlinks don't extract twice.
+                # We have hardlinking support, so we will hardlink not extract.
+                hardlink_masters[item.get('source') or original_path] = (None, path)
+            else:
+                # Broken platform with no hardlinking support.
+                # In this case, we *want* to extract twice, because there is no other way.
+                pass
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
                      hardlink_masters=None, stripped_components=0, original_path=None, pi=None):

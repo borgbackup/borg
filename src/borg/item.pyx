@@ -318,7 +318,8 @@ class Key(PropDict):
     If a Key shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed', 'tam_required'}  # str-typed keys
+    VALID_KEYS = {'version', 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed',
+                  'chunk_permutation', 'tam_required'}  # str-typed keys
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
@@ -328,6 +329,7 @@ class Key(PropDict):
     enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes)
     id_key = PropDict._make_property('id_key', bytes)
     chunk_seed = PropDict._make_property('chunk_seed', int)
+    chunk_permutation = PropDict._make_property('chunk_permutation', bytes)
     tam_required = PropDict._make_property('tam_required', bool)
 
 

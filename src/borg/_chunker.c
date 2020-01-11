@@ -68,13 +68,13 @@ static uint32_t table_base[] =
 size_t pagemask;
 
 static uint32_t *
-buzhash_init_table(uint32_t seed)
+buzhash_init_table(uint32_t seed, unsigned char *permutation)
 {
     int i;
     uint32_t *table = malloc(1024);
     for(i = 0; i < 256; i++)
     {
-        table[i] = table_base[i] ^ seed;
+        table[i] = table_base[permutation[i]] ^ seed;
     }
     return table;
 }
@@ -112,13 +112,14 @@ typedef struct {
 } Chunker;
 
 static Chunker *
-chunker_init(size_t window_size, uint32_t chunk_mask, size_t min_size, size_t max_size, uint32_t seed)
+chunker_init(size_t window_size, uint32_t chunk_mask, size_t min_size, size_t max_size, uint32_t seed,
+             unsigned char *permutation)
 {
     Chunker *c = calloc(sizeof(Chunker), 1);
     c->window_size = window_size;
     c->chunk_mask = chunk_mask;
     c->min_size = min_size;
-    c->table = buzhash_init_table(seed);
+    c->table = buzhash_init_table(seed, permutation);
     c->buf_size = max_size;
     c->data = malloc(c->buf_size);
     c->fh = -1;

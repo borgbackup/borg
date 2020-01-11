@@ -10,14 +10,19 @@ cdef extern from "_chunker.c":
     ctypedef int uint32_t
     ctypedef struct _Chunker "Chunker":
         pass
-    _Chunker *chunker_init(int window_size, int chunk_mask, int min_size, int max_size, uint32_t seed)
+    _Chunker *chunker_init(int window_size, int chunk_mask, int min_size, int max_size,
+                           uint32_t seed, unsigned char *permutation)
     void chunker_set_fd(_Chunker *chunker, object f, int fd)
     void chunker_free(_Chunker *chunker)
     object chunker_process(_Chunker *chunker)
-    uint32_t *buzhash_init_table(uint32_t seed)
+    uint32_t *buzhash_init_table(uint32_t seed, unsigned char *permutation)
     uint32_t c_buzhash "buzhash"(unsigned char *data, size_t len, uint32_t *h)
     uint32_t c_buzhash_update  "buzhash_update"(uint32_t sum, unsigned char remove, unsigned char add, size_t len, uint32_t *h)
 
+# The identity permutation of input by bytes, useful for maintaining
+# backward compatibility with interfaces defined before input byte
+# permutations were introduced.
+null_permutation = bytes(range(256))
 
 class ChunkerFixed:
     """
@@ -94,13 +99,14 @@ cdef class Chunker:
     """
     cdef _Chunker *chunker
 
-    def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
+    def __cinit__(self, int seed, unsigned char *permutation, int chunk_min_exp, int chunk_max_exp,
+                  int hash_mask_bits, int hash_window_size):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         # see chunker_process, first while loop condition, first term must be able to get True:
         assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
         hash_mask = (1 << hash_mask_bits) - 1
-        self.chunker = chunker_init(hash_window_size, hash_mask, min_size, max_size, seed & 0xffffffff)
+        self.chunker = chunker_init(hash_window_size, hash_mask, min_size, max_size, seed & 0xffffffff, permutation)
 
     def chunkify(self, fd, fh=-1):
         """
@@ -127,7 +133,8 @@ cdef class Chunker:
 def get_chunker(algo, *params, **kw):
     if algo == 'buzhash':
         seed = kw['seed']
-        return Chunker(seed, *params)
+        perm = kw.get('permutation') or null_permutation
+        return Chunker(seed, perm, *params)
     if algo == 'fixed':
         return ChunkerFixed(*params)
     raise TypeError('unsupported chunker algo %r' % algo)
@@ -143,17 +150,26 @@ def max_chunk_size(algo, *params):
 
 
 def buzhash(data, unsigned long seed):
+    return buzhash_perm(data, seed, null_permutation)
+
+
+def buzhash_perm(data, unsigned long seed, unsigned char *permutation):
     cdef uint32_t *table
     cdef uint32_t sum
-    table = buzhash_init_table(seed & 0xffffffff)
+    table = buzhash_init_table(seed & 0xffffffff, permutation)
     sum = c_buzhash(<const unsigned char *> data, len(data), table)
     free(table)
     return sum
 
 
 def buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len, unsigned long seed):
+    return buzhash_update_perm(sum, remove, add, len, seed, null_permutation)
+
+
+def buzhash_update_perm(uint32_t sum, unsigned char remove, unsigned char add, size_t len,
+                        unsigned long seed, unsigned char *permutation):
     cdef uint32_t *table
-    table = buzhash_init_table(seed & 0xffffffff)
+    table = buzhash_init_table(seed & 0xffffffff, permutation)
     sum = c_buzhash_update(sum, remove, add, len, table)
     free(table)
     return sum

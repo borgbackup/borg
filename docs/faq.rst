@@ -363,6 +363,9 @@ same system which also contains the original files which are being
 backed up. So someone with access to the cache files would also have
 access the the original files anyway.
 
+If you ever need to move the cache to a different location, this can
+be achieved by using the appropriate :ref:`env_vars`.
+
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
 

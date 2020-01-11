@@ -319,7 +319,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer()
         self.chunks = []
         self.key = key
-        self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed)
+        self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed, permutation=self.key.chunk_permutation)
 
     def add(self, item):
         self.buffer.write(self.packer.pack(item.as_dict()))
@@ -1162,7 +1162,7 @@ class FilesystemObjectProcessors:
         self.hard_links = {}
         self.stats = Statistics()  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
-        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed)
+        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, permutation=key.chunk_permutation)
 
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True):
@@ -2061,7 +2061,8 @@ class ArchiveRecreater:
             cache=self.cache, key=self.key,
             add_item=target.add_item, write_checkpoint=target.write_checkpoint,
             checkpoint_interval=self.checkpoint_interval, rechunkify=target.recreate_rechunkify).process_file_chunks
-        target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed)
+        target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed,
+                                     permutation=self.key.chunk_permutation)
         return target
 
     def create_target_archive(self, name):

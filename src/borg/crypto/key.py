@@ -161,6 +161,10 @@ class KeyBase:
     # type: int
     chunk_seed = None
 
+    # The input byte permutation for the buzhash chunker
+    # type: bytes
+    chunk_permutation = None
+
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then
     # that may be *technically* called encryption, but for all intents and purposes
@@ -266,6 +270,7 @@ class PlaintextKey(KeyBase):
     STORAGE = KeyBlobStorage.NO_STORAGE
 
     chunk_seed = 0
+    chunk_permutation = None
     logically_encrypted = False
 
     def __init__(self, repository):
@@ -345,6 +350,37 @@ class ID_HMAC_SHA_256:
         return hmac_sha256(self.id_key, data)
 
 
+def _derive_byte_permutation(key_material):
+    """
+    Derive a 256-byte permutation table from the key material
+
+    There are 256! possible permutations of a byte-indexed table, and
+    we want to make an unbiased choice. Since 256! is just under 2^1684
+    (it's 0xFF578F....) we derive 1684 pseudorandom bits from the key
+    material and treat it as a single large integer. There's only a 1 in
+    350 chance that this integer is >= 256!, in which case we try again.
+    """
+    for attempt in range(10):
+        context = b"chunker input byte permutation, attempt %d" % attempt
+        key = hkdf_hmac_sha512(key_material, None, context, 211)
+        pool = int.from_bytes(key, "big")
+        pool >>= 4  # 211 bytes is 1688 bits, 4 bits more than we want
+        perm = list(range(256))
+        for i in range(256):
+            pool, offset = divmod(pool, 256-i)
+            j = i + offset
+            tmp = perm[i]
+            perm[i] = perm[j]
+            perm[j] = tmp
+
+        if pool == 0:
+            # the pool value was less than 256!, we have an unbiased choice
+            return bytes(perm)
+
+    # we're very unlikely to fall through to here. Just accept the biased permutation
+    return bytes(perm)
+
+
 class AESKeyBase(KeyBase):
     """
     Common base class shared by KeyfileKey and PassphraseKey
@@ -388,7 +424,7 @@ class AESKeyBase(KeyBase):
 
     def init_from_random_data(self, data=None):
         if data is None:
-            data = os.urandom(100)
+            data = os.urandom(132)
         self.enc_key = data[0:32]
         self.enc_hmac_key = data[32:64]
         self.id_key = data[64:96]
@@ -396,6 +432,9 @@ class AESKeyBase(KeyBase):
         # Convert to signed int32
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
+        if len(data) >= 132:
+            chunk_key = data[100:132]
+            self.chunk_permutation = _derive_byte_permutation(chunk_key)
 
     def init_ciphers(self, manifest_data=None):
         self.cipher = self.CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
@@ -620,6 +659,7 @@ class KeyfileKeyBase(AESKeyBase):
             self.enc_hmac_key = key.enc_hmac_key
             self.id_key = key.id_key
             self.chunk_seed = key.chunk_seed
+            self.chunk_permutation = key.get('chunk_permutation')
             self.tam_required = key.get('tam_required', tam_required(self.repository))
             return True
         return False
@@ -660,6 +700,7 @@ class KeyfileKeyBase(AESKeyBase):
             enc_hmac_key=self.enc_hmac_key,
             id_key=self.id_key,
             chunk_seed=self.chunk_seed,
+            chunk_permutation=self.chunk_permutation,
             tam_required=self.tam_required,
         )
         data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)

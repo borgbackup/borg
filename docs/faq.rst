@@ -352,6 +352,8 @@ to change them.
 Security
 ########
 
+.. _cache_security:
+
 Do I need to take security precautions regarding the cache?
 -----------------------------------------------------------
 

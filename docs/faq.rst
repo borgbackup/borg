@@ -352,6 +352,22 @@ to change them.
 Security
 ########
 
+.. _cache_security:
+
+Do I need to take security precautions regarding the cache?
+-----------------------------------------------------------
+
+The cache contains a lot of metadata information about the files in
+your repositories and it is not encrypted.
+
+However, the assumption is that the cache is being stored on the very
+same system which also contains the original files which are being
+backed up. So someone with access to the cache files would also have
+access the the original files anyway.
+
+If you ever need to move the cache to a different location, this can
+be achieved by using the appropriate :ref:`env_vars`.
+
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------
 

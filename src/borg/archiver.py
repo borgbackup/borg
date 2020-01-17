@@ -741,7 +741,7 @@ class Archiver:
         strip_components = args.strip_components
         dirs = []
         partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract else None
+        hardlink_masters = {} if partial_extract or not has_link else None
 
         def peek_and_store_hardlink_masters(item, matched):
             # not has_link:

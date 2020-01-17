@@ -39,6 +39,7 @@ try:
     from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
     from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
     from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
+    from .archive import has_link
     from .cache import Cache, assert_secure, SecurityManager
     from .constants import *  # NOQA
     from .compress import CompressionSpec
@@ -768,11 +769,20 @@ class Archiver:
         strip_components = args.strip_components
         dirs = []
         partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract else None
+        hardlink_masters = {} if partial_extract or not has_link else None
 
         def peek_and_store_hardlink_masters(item, matched):
-            if (partial_extract and not matched and hardlinkable(item.mode) and
-                    item.get('hardlink_master', True) and 'source' not in item):
+            # not has_link:
+            # OS does not have hardlink capability thus we need to remember the chunks so that
+            # we can extract all hardlinks as separate normal (not-hardlinked) files instead.
+            #
+            # partial_extract and not matched and hardlinkable:
+            # we do not extract the very first hardlink, so we need to remember the chunks
+            # in hardlinks_master, so we can use them when we extract some 2nd+ hardlink item
+            # that has no chunks list.
+            if ((not has_link or (partial_extract and not matched and hardlinkable(item.mode)))
+                and
+                (item.get('hardlink_master', True) and 'source' not in item)):
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)

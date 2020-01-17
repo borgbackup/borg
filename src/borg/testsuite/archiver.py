@@ -1025,7 +1025,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('cache2/%s' % CACHE_TAG_NAME,
                                  contents=b'invalid signature')
         os.mkdir('input/cache3')
-        os.link('input/cache1/%s' % CACHE_TAG_NAME, 'input/cache3/%s' % CACHE_TAG_NAME)
+        if are_hardlinks_supported():
+            os.link('input/cache1/%s' % CACHE_TAG_NAME, 'input/cache3/%s' % CACHE_TAG_NAME)
+        else:
+            self.create_regular_file('cache3/%s' % CACHE_TAG_NAME,
+                                     contents=CACHE_TAG_CONTENTS + b' extra stuff')
 
     def test_create_stdin(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -2205,8 +2209,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert sti1.st_atime == sto1.st_atime
             assert sti1.st_ctime == sto1.st_ctime
             assert sti1.st_mtime == sto1.st_mtime
-            # note: there is another hardlink to this, see below
-            assert sti1.st_nlink == sto1.st_nlink == 2
+            if are_hardlinks_supported():
+                # note: there is another hardlink to this, see below
+                assert sti1.st_nlink == sto1.st_nlink == 2
             # read
             with open(in_fn, 'rb') as in_f, open(out_fn, 'rb') as out_f:
                 assert in_f.read() == out_f.read()

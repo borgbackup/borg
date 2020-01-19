@@ -407,8 +407,8 @@ buzhash chunker
 +++++++++++++++
 
 The buzhash chunker chunks according to the input data, the chunker's
-parameters and the secret chunker seed (which all influence the chunk boundary
-positions).
+parameters and the secret chunker seed and permutation (which all influence the
+chunk boundary positions).
 
 Small files below some specific threshold (default: 512 KiB) result in only one
 chunk (identical content / size as the original file), bigger files result in

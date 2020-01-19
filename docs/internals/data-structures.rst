@@ -624,8 +624,9 @@ can be used to tune the chunker parameters, the default is:
 - HASH_MASK_BITS = 21 (target chunk size ~= 2^21 B = 2 MiB)
 - HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
 
-The buzhash table is altered by XORing it with a seed randomly generated once
-for the repository, and stored encrypted in the keyfile. This is to prevent
+The buzhash table is altered by XORing it with a seed and shuffling its
+elements. The XOR seed and shuffle pattern are randomly generated once for
+the repository, and stored encrypted in the keyfile. This is to prevent
 chunk size based fingerprinting attacks on your encrypted repo contents (to
 guess what files you have based on a specific set of chunk sizes).
 
@@ -900,6 +901,9 @@ id_key
 
 chunk_seed
   the seed for the buzhash chunking table (signed 32 bit integer)
+
+chunk_permutation
+  the permutation for shuffling the buzhash table (256 bytes)
 
 These fields are packed using msgpack_. The utf-8 encoded passphrase
 is processed with PBKDF2_ (SHA256_, 100000 iterations, random 256 bit salt)

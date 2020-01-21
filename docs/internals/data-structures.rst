@@ -977,16 +977,19 @@ Lock files
 Borg uses locks to get (exclusive or shared) access to the cache and
 the repository.
 
-The locking system is based on creating a directory `lock.exclusive` (for
-exclusive locks). Inside the lock directory, there is a file indicating
+The locking system is based on renaming a temporary directory
+to `lock.exclusive` (for
+exclusive locks). Inside this directory, there is a file indicating
 hostname, process id and thread id of the lock holder.
 
 There is also a json file `lock.roster` that keeps a directory of all shared
 and exclusive lockers.
 
-If the process can create the `lock.exclusive` directory for a resource, it has
-the lock for it. If creation fails (because the directory has already been
-created by some other process), lock acquisition fails.
+If the process is able to rename a temporary directory (with the
+host/process/thread identifier prepared inside it) in the resource directory
+to `lock.exclusive`, it has the lock for it. If renaming fails
+(because this directory already exists and its host/process/thread identifier
+denotes a thread on the host which is still alive), lock acquisition fails.
 
 The cache lock is usually in `~/.cache/borg/REPOID/lock.*`.
 The repository lock is in `repository/lock.*`.

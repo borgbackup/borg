@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+import tempfile
 import time
 
 from . import platform
@@ -124,22 +125,34 @@ class ExclusiveLock:
             timeout = self.timeout
         if sleep is None:
             sleep = self.sleep
-        timer = TimeoutTimer(timeout, sleep).start()
-        while True:
-            try:
-                os.mkdir(self.path)
-            except FileExistsError:  # already locked
-                if self.by_me():
+        parent_path, base_name = os.path.split(self.path)
+        unique_base_name = os.path.basename(self.unique_name)
+        temp_path = None
+        try:
+            temp_path = tempfile.mkdtemp(".tmp", base_name + '.', parent_path)
+            temp_unique_name = os.path.join(temp_path, unique_base_name)
+            with open(temp_unique_name, "wb"):
+                pass
+        except OSError as err:
+            raise LockFailed(self.path, str(err)) from None
+        else:
+            timer = TimeoutTimer(timeout, sleep).start()
+            while True:
+                try:
+                    os.rename(temp_path, self.path)
+                except OSError:  # already locked
+                    if self.by_me():
+                        return self
+                    self.kill_stale_lock()
+                    if timer.timed_out_or_sleep():
+                        raise LockTimeout(self.path)
+                else:
+                    temp_path = None
                     return self
-                self.kill_stale_lock()
-                if timer.timed_out_or_sleep():
-                    raise LockTimeout(self.path)
-            except OSError as err:
-                raise LockFailed(self.path, str(err)) from None
-            else:
-                with open(self.unique_name, "wb"):
-                    pass
-                return self
+        finally:
+            if temp_path is not None:  # Renaming failed for any reason, so temp_dir still exists and should be cleaned up anyway.
+                os.unlink(temp_unique_name)
+                os.rmdir(temp_path)
 
     def release(self):
         if not self.is_locked():
@@ -147,7 +160,15 @@ class ExclusiveLock:
         if not self.by_me():
             raise NotMyLock(self.path)
         os.unlink(self.unique_name)
-        os.rmdir(self.path)
+        try:
+            os.rmdir(self.path)
+        except OSError as err:
+            if err.errno == errno.ENOTEMPTY:
+                # Directory is not empty = we lost the race to somebody else--which is ok.
+                pass
+            else:
+                # EACCES or EIO or ... = we cannot operate anyway, so re-throw
+                raise err
 
     def is_locked(self):
         return os.path.exists(self.path)

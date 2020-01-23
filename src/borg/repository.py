@@ -295,14 +295,18 @@ class Repository:
             secure_erase(old_config_path)
 
         if os.path.isfile(config_path):
+            link_error_msg = ("Failed to securely erase old repository config file (hardlinks not supported>). "
+                              "Old repokey data, if any, might persist on physical storage.")
             try:
                 os.link(config_path, old_config_path)
             except OSError as e:
                 if e.errno in (errno.EMLINK, errno.ENOSYS, errno.EPERM, errno.EACCES, errno.ENOTSUP):
-                    logger.warning("Failed to securely erase old repository config file (hardlinks not supported>). "
-                                   "Old repokey data, if any, might persist on physical storage.")
+                    logger.warning(link_error_msg)
                 else:
                     raise
+            except AttributeError:
+                # some python ports have no os.link, see #4901
+                logger.warning(link_error_msg)
 
         with SaveFile(config_path) as fd:
             config.write(fd)

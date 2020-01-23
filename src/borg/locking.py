@@ -163,8 +163,8 @@ class ExclusiveLock:
         try:
             os.rmdir(self.path)
         except OSError as err:
-            if err.errno == errno.ENOTEMPTY:
-                # Directory is not empty = we lost the race to somebody else--which is ok.
+            if err.errno == errno.ENOTEMPTY or err.errno == errno.ENOENT:
+                # Directory is not empty or doesn't exist any more = we lost the race to somebody else--which is ok.
                 pass
             else:
                 # EACCES or EIO or ... = we cannot operate anyway, so re-throw
@@ -177,42 +177,46 @@ class ExclusiveLock:
         return os.path.exists(self.unique_name)
 
     def kill_stale_lock(self):
-        for name in os.listdir(self.path):
-            try:
-                host_pid, thread_str = name.rsplit('-', 1)
-                host, pid_str = host_pid.rsplit('.', 1)
-                pid = int(pid_str)
-                thread = int(thread_str)
-            except ValueError:
-                # Malformed lock name? Or just some new format we don't understand?
-                logger.error("Found malformed lock %s in %s. Please check/fix manually.", name, self.path)
-                return False
+        try:
+            for name in os.listdir(self.path):
+                try:
+                    host_pid, thread_str = name.rsplit('-', 1)
+                    host, pid_str = host_pid.rsplit('.', 1)
+                    pid = int(pid_str)
+                    thread = int(thread_str)
+                except ValueError:
+                    # Malformed lock name? Or just some new format we don't understand?
+                    logger.error("Found malformed lock %s in %s. Please check/fix manually.", name, self.path)
+                    return False
 
-            if platform.process_alive(host, pid, thread):
-                return False
+                if platform.process_alive(host, pid, thread):
+                    return False
 
-            if not self.kill_stale_locks:
-                if not self.stale_warning_printed:
-                    # Log this at warning level to hint the user at the ability
-                    logger.warning("Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name)
-                    self.stale_warning_printed = True
-                return False
+                if not self.kill_stale_locks:
+                    if not self.stale_warning_printed:
+                        # Log this at warning level to hint the user at the ability
+                        logger.warning("Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name)
+                        self.stale_warning_printed = True
+                    return False
 
-            try:
-                os.unlink(os.path.join(self.path, name))
-                logger.warning('Killed stale lock %s.', name)
-            except OSError as err:
-                if not self.stale_warning_printed:
-                    # This error will bubble up and likely result in locking failure
-                    logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
-                    self.stale_warning_printed = True
-                return False
+                try:
+                    os.unlink(os.path.join(self.path, name))
+                    logger.warning('Killed stale lock %s.', name)
+                except OSError as err:
+                    if not self.stale_warning_printed:
+                        # This error will bubble up and likely result in locking failure
+                        logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
+                        self.stale_warning_printed = True
+                    return False
+
+        except FileNotFoundError:  # Another process did our job in the meantime.
+            pass
 
         try:
             os.rmdir(self.path)
         except OSError as err:
-            if err.errno == errno.ENOTEMPTY:
-                # Directory is not empty = we lost the race to somebody else
+            if err.errno == errno.ENOTEMPTY or err.errno == errno.ENOENT:
+                # Directory is not empty or doesn't exist any more = we lost the race to somebody else--which is ok.
                 return False
             # EACCES or EIO or ... = we cannot operate anyway
             logger.error('Failed to remove lock dir: %s', str(err))

@@ -253,16 +253,16 @@ Directories and files:
     BORG_BASE_DIR
         Default to '$HOME', '~$USER', '~' (in that order)'.
         If we refer to ~ below, we in fact mean BORG_BASE_DIR.
-    BORG_CONFIG_DIR
-        Default to '~/.config/borg'. This directory contains the whole config directories.
     BORG_CACHE_DIR
         Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories. Make sure you're aware of the associated
         security aspects of the cache location: :ref:`cache_security`
+    BORG_CONFIG_DIR
+        Default to '~/.config/borg'. This directory contains the whole config directories.
     BORG_SECURITY_DIR
         Default to '~/.config/borg/security'. This directory contains information borg uses to
         track its usage of NONCES ("numbers used once" - usually in encryption context) and other
-        security relevant data.
+        security relevant data. Will move with BORG_CONFIG_DIR variable unless specified.
     BORG_KEYS_DIR
         Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
     BORG_KEY_FILE

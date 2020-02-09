@@ -5,7 +5,7 @@ import shutil
 import stat
 import struct
 import time
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
 from datetime import datetime

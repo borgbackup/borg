@@ -252,6 +252,9 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
 Directories and files:
     BORG_BASE_DIR
         Defaults to ``$HOME`` or ``~$USER`` or ``~`` (in that order).
+        If you want to move all borg-specific folders to a custom path at once, all you need to do is
+        to modify ``BORG_BASE_DIR``: the other paths for cache, config etc. will adapt accordingly.
+        (Assuming you didn't set them to a different custom value.)
     BORG_CACHE_DIR
         Defaults to ``BORG_BASE_DIR/.cache/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
         `XDG env var`_ ``XDG_CACHE_HOME`` is set, then ``XDG_CACHE_HOME/borg`` is being used instead.

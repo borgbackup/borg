@@ -18,7 +18,7 @@ from .crypto.low_level import blake2b_128
 from .archiver import Archiver
 from .archive import Archive
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
+from .helpers import daemonize, daemonizing, hardlinkable, signal_handler, format_file_size
 from .helpers import msgpack
 from .item import Item
 from .lrucache import LRUCache
@@ -510,10 +510,13 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         self._create_filesystem()
         llfuse.init(self, mountpoint, options)
         if not foreground:
-            old_id, new_id = daemonize()
-            if not isinstance(self.repository_uncached, RemoteRepository):
-                # local repo and the locking process' PID just changed, migrate it:
-                self.repository_uncached.migrate_lock(old_id, new_id)
+            if isinstance(self.repository_uncached, RemoteRepository):
+                daemonize()
+            else:
+                with daemonizing() as (old_id, new_id):
+                    # local repo: the locking process' PID is changing, migrate it:
+                    logger.debug('fuse: mount local repo, going to background: migrating lock.')
+                    self.repository_uncached.migrate_lock(old_id, new_id)
 
         # If the file system crashes, we do not want to umount because in that
         # case the mountpoint suddenly appears to become empty. This can have

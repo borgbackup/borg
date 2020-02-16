@@ -2503,6 +2503,94 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.fuse_mount(self.repository_location, mountpoint, '--prefix=nope'):
             assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_migrate_lock_alive(self):
+        """Both old_id and new_id must not be stale during lock migration / daemonization."""
+        from functools import wraps
+        import pickle
+        import traceback
+
+        # Check results are communicated from the borg mount background process
+        # to the pytest process by means of a serialized dict object stored in this file.
+        assert_data_file = os.path.join(self.tmpdir, 'migrate_lock_assert_data.pickle')
+
+        # Decorates Lock.migrate_lock() with process_alive() checks before and after.
+        # (We don't want to mix testing code into runtime.)
+        def write_assert_data(migrate_lock):
+            @wraps(migrate_lock)
+            def wrapper(self, old_id, new_id):
+                wrapper.num_calls += 1
+                assert_data = {
+                    'num_calls': wrapper.num_calls,
+                    'old_id': old_id,
+                    'new_id': new_id,
+                    'before': {
+                        'old_id_alive': platform.process_alive(*old_id),
+                        'new_id_alive': platform.process_alive(*new_id)},
+                    'exception': None,
+                    'exception.extr_tb': None,
+                    'after': {
+                        'old_id_alive': None,
+                        'new_id_alive': None}}
+                try:
+                    with open(assert_data_file, 'wb') as _out:
+                        pickle.dump(assert_data, _out)
+                except:
+                    pass
+                try:
+                    return migrate_lock(self, old_id, new_id)
+                except BaseException as e:
+                    assert_data['exception'] = e
+                    assert_data['exception.extr_tb'] = traceback.extract_tb(e.__traceback__)
+                finally:
+                    assert_data['after'].update({
+                        'old_id_alive': platform.process_alive(*old_id),
+                        'new_id_alive': platform.process_alive(*new_id)})
+                    try:
+                        with open(assert_data_file, 'wb') as _out:
+                            pickle.dump(assert_data, _out)
+                    except:
+                        pass
+            wrapper.num_calls = 0
+            return wrapper
+
+        # Decorate
+        borg.locking.Lock.migrate_lock = write_assert_data(borg.locking.Lock.migrate_lock)
+        try:
+            self.cmd('init', '--encryption=none', self.repository_location)
+            self.create_src_archive('arch')
+            mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+            # In order that the decoration is kept for the borg mount process, we must not spawn, but actually fork;
+            # not to be confused with the forking in borg.helpers.daemonize() which is done as well.
+            with self.fuse_mount(self.repository_location, mountpoint, os_fork=True):
+                pass
+            with open(assert_data_file, 'rb') as _in:
+                assert_data = pickle.load(_in)
+            print('\nLock.migrate_lock(): assert_data = %r.' % (assert_data, ), file=sys.stderr, flush=True)
+            exception = assert_data['exception']
+            if exception is not None:
+                extracted_tb = assert_data['exception.extr_tb']
+                print(
+                    'Lock.migrate_lock() raised an exception:\n',
+                    'Traceback (most recent call last):\n',
+                    *traceback.format_list(extracted_tb),
+                    *traceback.format_exception(exception.__class__, exception, None),
+                    sep='', end='', file=sys.stderr, flush=True)
+
+            assert assert_data['num_calls'] == 1, "Lock.migrate_lock() must be called exactly once."
+            assert exception is None, "Lock.migrate_lock() may not raise an exception."
+
+            assert_data_before = assert_data['before']
+            assert assert_data_before['old_id_alive'], "old_id must be alive (=must not be stale) when calling Lock.migrate_lock()."
+            assert assert_data_before['new_id_alive'], "new_id must be alive (=must not be stale) when calling Lock.migrate_lock()."
+
+            assert_data_after = assert_data['after']
+            assert assert_data_after['old_id_alive'], "old_id must be alive (=must not be stale) when Lock.migrate_lock() has returned."
+            assert assert_data_after['new_id_alive'], "new_id must be alive (=must not be stale) when Lock.migrate_lock() has returned."
+        finally:
+            # Undecorate
+            borg.locking.Lock.migrate_lock = borg.locking.Lock.migrate_lock.__wrapped__
+
     def verify_aes_counter_uniqueness(self, method):
         seen = set()  # Chunks already seen
         used = set()  # counter values already used
@@ -3568,6 +3656,10 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
     @unittest.skip('only works locally')
     def test_config(self):
+        pass
+
+    @unittest.skip('only works locally')
+    def test_migrate_lock_alive(self):
         pass
 
     def test_strip_components_doesnt_leak(self):

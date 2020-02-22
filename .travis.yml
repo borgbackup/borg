@@ -5,6 +5,7 @@ cache:
         - $HOME/.cache/pip
 
 matrix:
+    fast_finish: true
     include:
         - python: 3.5
           os: linux
@@ -42,6 +43,8 @@ matrix:
           os: osx
           osx_image: xcode8.3
           env: TOXENV=py37
+    allow_failures:
+        - os: osx
 
 before_install:
 - |

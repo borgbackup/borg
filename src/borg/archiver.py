@@ -797,7 +797,7 @@ class Archiver:
                     except BackupOSError as e:
                         self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
             if output_list:
-                logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
+                logging.getLogger('borg.output.list').info(remove_surrogates(item.path))
             try:
                 if dry_run:
                     archive.extract_item(item, dry_run=True, pi=pi)

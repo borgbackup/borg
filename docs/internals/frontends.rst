@@ -549,13 +549,17 @@ Operations
       *info* is one string element, the name of the archive currently synced.
     - repository.compact_segments
     - repository.replay_segments
-    - repository.check_segments
+    - repository.check
     - check.verify_data
+    - check.rebuild_manifest
     - extract
 
       *info* is one string element, the name of the path currently extracted.
     - extract.permissions
     - archive.delete
+    - archive.calc_stats
+    - prune
+    - upgrade.convert_segments
 
 Prompts
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK

@@ -197,11 +197,18 @@ Compatibility notes:
 
 Fixes:
 
+- fix corruption issue in hashindex_set, #4829
+  TODO: describe how to fix existing repos
+- upgrade bundled xxhash to 0.7.2, #4891
+  This is the minimum requirement for correct operations on ARMv6 in non-fixup
+  mode, where unaligned memory accesses cause bus errors.
+- fix crash when upgrading erroneous hints file, #4922
 - extract:
 
   - fix KeyError for "partial" extraction, #4607
   - fix "partial" extract for hardlinked contentless file types, #4725
   - fix preloading for old (0.xx) remote servers, #4652
+  - fix confusing output of borg extract --list --strip-components, #4934
 - delete: after double-force delete, warn about necessary repair, #4704
 - create: give invalid repo error msg if repo config not found, #4411
 - mount: fix FUSE mount missing st_birthtime, #4763 #4767
@@ -221,18 +228,23 @@ New features:
 - enable placeholder usage in all extra archive arguments
 - new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
 - recreate: support --timestamp option, #4745
+- support platforms with no os.link (e.g. Android with Termux), #4901
+  if we don't have os.link, we just extract another copy instead of making a hardlink.
+- support linux platforms without sync_file_range (e.g. Android 7 with Termux), #4905
 
 Other:
 
+- ignore --stats when given with --dry-run, but continue, #4373
+- add some ProgressIndicator msgids to code / fix docs, #4935
+- elaborate on "Calculating size" message
 - argparser: always use REPOSITORY in metavar, also use more consistent help phrasing.
 - check: improve error output for matching index size, see #4829
-- tests:
-
-  - cope with ANY error when importing pytest into borg.testsuite, #4652
-  - fix broken test that relied on improper zlib assumptions
-  - test_fuse: filter out selinux xattrs, #4574
 - docs:
 
+  - better describe BORG_SECURITY_DIR, BORG_CACHE_DIR, #4919
+  - infos about cache security assumptions, #4900
+  - add FAQ describing difference between a local repo vs. repo on a server.
+  - document how to test exclusion patterns without performing an actual backup
   - timestamps in the files cache are now usually ctime, #4583
   - fix bad reference to borg compact (does not exist in 1.1), #4660
   - create: borg 1.1 is not future any more
@@ -252,6 +264,11 @@ Other:
   - add FAQs for SSH connection issues, #3866
   - improve password FAQ, #4591
   - reiterate that 'file cache names are absolute' in FAQ
+- tests:
+
+  - cope with ANY error when importing pytest into borg.testsuite, #4652
+  - fix broken test that relied on improper zlib assumptions
+  - test_fuse: filter out selinux xattrs, #4574
 - travis / vagrant:
 
   - misc python versions removed / changed (due to openssl 1.1 compatibility)
@@ -266,6 +283,9 @@ Other:
 
   - darwin: backport some install code / order from master
   - remove deprecated keyword "sudo" from travis config
+  - allow osx builds to fail, #4955
+    this is due to travis-ci frequently being so slow that the OS X builds
+    just fail because they exceed 50 minutes and get killed by travis.
 
 
 Version 1.1.10 (2019-05-16)

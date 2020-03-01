@@ -10,6 +10,11 @@ from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
 from .base import safe_fadvise
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
+try:
+    from .syncfilerange import sync_file_range, SYNC_FILE_RANGE_WRITE, SYNC_FILE_RANGE_WAIT_BEFORE, SYNC_FILE_RANGE_WAIT_AFTER
+    SYNC_FILE_RANGE_LOADED = True
+except ImportError:
+    SYNC_FILE_RANGE_LOADED = False
 
 from libc cimport errno
 from libc.stdint cimport int64_t
@@ -49,12 +54,6 @@ cdef extern from "sys/acl.h":
 cdef extern from "acl/libacl.h":
     int acl_extended_file(const char *path)
     int acl_extended_fd(int fd)
-
-cdef extern from "fcntl.h":
-    int sync_file_range(int fd, int64_t offset, int64_t nbytes, unsigned int flags)
-    unsigned int SYNC_FILE_RANGE_WRITE
-    unsigned int SYNC_FILE_RANGE_WAIT_BEFORE
-    unsigned int SYNC_FILE_RANGE_WAIT_AFTER
 
 cdef extern from "linux/fs.h":
     # ioctls
@@ -317,7 +316,7 @@ cdef _sync_file_range(fd, offset, length, flags):
 cdef unsigned PAGE_MASK = sysconf(_SC_PAGESIZE) - 1
 
 
-if 'basesyncfile' in workarounds:
+if 'basesyncfile' in workarounds or not SYNC_FILE_RANGE_LOADED:
     class SyncFile(BaseSyncFile):
         # if we are on platforms with a broken or not implemented sync_file_range,
         # use the more generic BaseSyncFile to avoid issues.

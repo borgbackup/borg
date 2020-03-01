@@ -562,6 +562,16 @@ hashindex_set(HashIndex *index, const void *key, const void *value)
                 if(!hashindex_resize(index, index->num_buckets)) {
                     return 0;
                 }
+                /* we have just built a fresh hashtable and removed all tombstones,
+                 * so we only have EMPTY or USED buckets, but no DELETED ones any more.
+                 */
+                idx = start_idx = hashindex_index(index, key);
+                while(!BUCKET_IS_EMPTY(index, idx)) {
+                    idx++;
+                    if (idx >= index->num_buckets){
+                        idx -= index->num_buckets;
+                    }
+                }
             }
         }
         ptr = BUCKET_ADDR(index, idx);

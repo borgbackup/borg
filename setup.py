@@ -76,6 +76,7 @@ item_source = 'src/borg/item.pyx'
 checksums_source = 'src/borg/algorithms/checksums.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
+platform_syncfilerange_source = 'src/borg/platform/syncfilerange.pyx'
 platform_darwin_source = 'src/borg/platform/darwin.pyx'
 platform_freebsd_source = 'src/borg/platform/freebsd.pyx'
 msgpack_packer_source = 'src/borg/algorithms/msgpack/_packer.pyx'
@@ -92,6 +93,7 @@ cython_c_sources = [
 
     platform_posix_source,
     platform_linux_source,
+    platform_syncfilerange_source,
     platform_freebsd_source,
     platform_darwin_source,
 ]
@@ -832,6 +834,7 @@ if not on_rtd:
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
     if sys.platform == 'linux':
         ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl']))
+        ext_modules.append(Extension('borg.platform.syncfilerange', [platform_syncfilerange_source]))
     elif sys.platform.startswith('freebsd'):
         ext_modules.append(Extension('borg.platform.freebsd', [platform_freebsd_source]))
     elif sys.platform == 'darwin':

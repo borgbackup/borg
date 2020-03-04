@@ -130,6 +130,7 @@ try:
                 'src/borg/algorithms/xxh64/xxhash.h', 'src/borg/algorithms/xxh64/xxhash.c',
                 'src/borg/platform/posix.c',
                 'src/borg/platform/linux.c',
+                'src/borg/platform/syncfilerange.c',
                 'src/borg/platform/freebsd.c',
                 'src/borg/platform/darwin.c',
                 'src/borg/algorithms/msgpack/_packer.cpp',
@@ -150,6 +151,7 @@ except ImportError:
     checksums_source = checksums_source.replace('.pyx', '.c')
     platform_posix_source = platform_posix_source.replace('.pyx', '.c')
     platform_linux_source = platform_linux_source.replace('.pyx', '.c')
+    platform_syncfilerange_source = platform_syncfilerange_source.replace('.pyx', '.c')
     platform_freebsd_source = platform_freebsd_source.replace('.pyx', '.c')
     platform_darwin_source = platform_darwin_source.replace('.pyx', '.c')
 
@@ -159,7 +161,7 @@ except ImportError:
     from distutils.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, checksums_source,
-        platform_posix_source, platform_linux_source, platform_freebsd_source, platform_darwin_source,
+        platform_posix_source, platform_linux_source, platform_syncfilerange_source, platform_freebsd_source, platform_darwin_source,
         msgpack_packer_source, msgpack_unpacker_source]):
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 

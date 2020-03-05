@@ -48,6 +48,7 @@ from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
 has_lchmod = hasattr(os, 'lchmod')
+has_link = hasattr(os, 'link')
 
 
 class Statistics:
@@ -635,7 +636,7 @@ Utilization of max. archive size: {csize_max:.0%}
         if 'source' in item:
             source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
             chunks, link_target = hardlink_masters.get(item.source, (None, source))
-            if link_target:
+            if link_target and has_link:
                 # Hard link was extracted previously, just link
                 with backup_io('link'):
                     os.link(link_target, path)
@@ -645,8 +646,14 @@ Utilization of max. archive size: {csize_max:.0%}
                 item.chunks = chunks
         yield hardlink_set
         if not hardlink_set and hardlink_masters:
-            # Update master entry with extracted item path, so that following hardlinks don't extract twice.
-            hardlink_masters[item.get('source') or original_path] = (None, path)
+            if has_link:
+                # Update master entry with extracted item path, so that following hardlinks don't extract twice.
+                # We have hardlinking support, so we will hardlink not extract.
+                hardlink_masters[item.get('source') or original_path] = (None, path)
+            else:
+                # Broken platform with no hardlinking support.
+                # In this case, we *want* to extract twice, because there is no other way.
+                pass
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
                      hardlink_masters=None, stripped_components=0, original_path=None, pi=None):

@@ -141,6 +141,7 @@ def test_keys(attic_repo, attic_key_file):
     assert key_valid(keyfile_path)
 
 
+@pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
 def test_convert_all(attic_repo, attic_key_file, inplace):
     """test all conversion steps
 
@@ -166,7 +167,7 @@ def test_convert_all(attic_repo, attic_key_file, inplace):
     with AtticRepositoryUpgrader(repo_path, create=False) as repository:
         # replicate command dispatch, partly
         os.umask(UMASK_DEFAULT)
-        backup = repository.upgrade(dryrun=False, inplace=inplace)
+        backup = repository.upgrade(dryrun=False, inplace=inplace)  # note: uses hardlinks internally
         if inplace:
             assert backup is None
             assert first_inode(repository.path) == orig_inode

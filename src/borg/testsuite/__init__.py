@@ -79,6 +79,10 @@ def are_symlinks_supported():
 
 @functools.lru_cache()
 def are_hardlinks_supported():
+    if not hasattr(os, 'link'):
+        # some pythons do not have os.link
+        return False
+
     with unopened_tempfile() as file1path, unopened_tempfile() as file2path:
         open(file1path, 'w').close()
         try:

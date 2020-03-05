@@ -30,7 +30,7 @@ def xxhash_ext_kwargs(pc, prefer_system, system_prefix):
                         library_dirs=[os.path.join(system_prefix, 'lib')],
                         libraries=['xxhash'])
 
-        if pc and pc.installed('libxxhash', '>= 1.7.0'):
+        if pc and pc.installed('libxxhash', '>= 0.7.3'):
             print('Detected and preferring libxxhash [via pkg-config]')
             return pc.parse('libxxhash')
 

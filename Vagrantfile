@@ -139,11 +139,13 @@ def packages_netbsd
     pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse pkg
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python34 py34-setuptools
-    ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
-    ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
-    easy_install-3.4 pip
-    pip install virtualenv
+    pkg_add python37 py37-sqlite3 py37-pip py37-virtualenv
+    ln -s /usr/pkg/bin/python3.7 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.7 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.7 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.7 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.7 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.7 /usr/pkg/bin/virtualenv3
   EOF
 end
 

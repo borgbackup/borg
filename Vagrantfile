@@ -31,8 +31,14 @@ def packages_debianoid(user)
     # this way it works on older dists (like ubuntu 12.04) also:
     # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
     # newer versions are not compatible with py 3.2 any more.
-    easy_install3 -i https://pypi.python.org/simple/ 'pip<8.0'
-    pip3 install 'virtualenv<14.0'
+    if which easy_install3 2> /dev/null; then
+        # works up to xenial / stretch
+        easy_install3 -i https://pypi.python.org/simple/ 'pip<8.0'
+        pip3 install 'virtualenv<14.0'
+    else
+        # works on recent debian / ubuntu
+        apt-get install -y python3-pip virtualenv python3-virtualenv
+    fi
   EOF
 end
 
@@ -139,11 +145,13 @@ def packages_netbsd
     pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse pkg
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python34 py34-setuptools
-    ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python
-    ln -s /usr/pkg/bin/python3.4 /usr/pkg/bin/python3
-    easy_install-3.4 pip
-    pip install virtualenv
+    pkg_add python37 py37-sqlite3 py37-pip py37-virtualenv
+    ln -s /usr/pkg/bin/python3.7 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.7 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.7 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.7 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.7 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.7 /usr/pkg/bin/virtualenv3
   EOF
 end
 
@@ -233,7 +241,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     pyenv install 3.5.3  # tests, 3.5.3 is first to support openssl 1.1
-    pyenv install 3.6.0  # tests
+    pyenv install 3.6.2  # tests
     pyenv install 3.7.0  # tests
     pyenv install 3.8.0  # tests
     pyenv install 3.5.9  # binary build, use latest 3.5.x release
@@ -267,7 +275,7 @@ def install_borg(fuse)
     . borg-env/bin/activate
     pip install -U wheel  # upgrade wheel, too old for 3.5
     cd borg
-    pip install -r requirements.d/development.txt
+    pip install -r requirements.d/development.lock.txt
     python setup.py clean
   EOF
   if fuse
@@ -315,8 +323,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.5.3 3.6.0 3.7.0 3.8.0
-      pyenv local 3.5.3 3.6.0 3.7.0 3.8.0
+      pyenv global 3.5.3 3.6.2 3.7.0 3.8.0
+      pyenv local 3.5.3 3.6.2 3.7.0 3.8.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then
@@ -370,32 +378,28 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos7_64")
   end
 
-  config.vm.define "centos6_32" do |b|
-    b.vm.box = "centos6-32"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 768 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_32")
-  end
-
-  config.vm.define "centos6_64" do |b|
-    b.vm.box = "centos6-64"
+  config.vm.define "focal64" do |b|
+    b.vm.box = "ubuntu/focal64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("focal64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64")
+  end
+
+  config.vm.define "bionic64" do |b|
+    b.vm.box = "ubuntu/bionic64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("bionic64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64")
   end
 
   config.vm.define "xenial64" do |b|
@@ -420,6 +424,18 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
+  end
+
+  config.vm.define "buster64" do |b|
+    b.vm.box = "debian/buster64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("buster64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64")
   end
 
   config.vm.define "stretch64" do |b|

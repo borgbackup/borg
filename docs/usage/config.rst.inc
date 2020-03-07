@@ -6,7 +6,7 @@ borg config
 -----------
 .. code-block:: none
 
-    borg [common options] config [options] REPOSITORY [NAME] [VALUE]
+    borg [common options] config [options] [REPOSITORY] [NAME] [VALUE]
 
 .. only:: html
 

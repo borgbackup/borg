@@ -212,8 +212,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.11 (not released yet)
----------------------------------
+Version 1.1.11 (2020-03-08)
+---------------------------
 
 Compatibility notes:
 
@@ -245,6 +245,7 @@ Fixes:
   mode, where unaligned memory accesses cause bus errors.
   0.7.3 adds some speedups and libxxhash 0.7.3 even has a pkg-config file now.
 - upgrade bundled lz4 to 1.9.2
+- upgrade bundled zstd to 1.4.4
 - fix crash when upgrading erroneous hints file, #4922
 - extract:
 

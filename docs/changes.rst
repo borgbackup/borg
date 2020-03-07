@@ -240,9 +240,10 @@ Fixes:
 
 - fixed potential index corruption / data loss issue due to bug in hashindex_set, #4829
   Please read and follow the more detailled notes close to the top of this document.
-- upgrade bundled xxhash to 0.7.2, #4891
-  This is the minimum requirement for correct operations on ARMv6 in non-fixup
+- upgrade bundled xxhash to 0.7.3, #4891
+  0.7.2 is the minimum requirement for correct operations on ARMv6 in non-fixup
   mode, where unaligned memory accesses cause bus errors.
+  0.7.3 adds some speedups and libxxhash 0.7.3 even has a pkg-config file now.
 - fix crash when upgrading erroneous hints file, #4922
 - extract:
 
@@ -269,7 +270,7 @@ New features:
 - enable placeholder usage in all extra archive arguments
 - new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
 - recreate: support --timestamp option, #4745
-- support platforms with no os.link (e.g. Android with Termux), #4901
+- support platforms without os.link (e.g. Android with Termux), #4901
   if we don't have os.link, we just extract another copy instead of making a hardlink.
 - support linux platforms without sync_file_range (e.g. Android 7 with Termux), #4905
 
@@ -282,6 +283,7 @@ Other:
 - check: improve error output for matching index size, see #4829
 - docs:
 
+  - changelog: add advisory about hashindex_set bug #4829
   - better describe BORG_SECURITY_DIR, BORG_CACHE_DIR, #4919
   - infos about cache security assumptions, #4900
   - add FAQ describing difference between a local repo vs. repo on a server.
@@ -317,9 +319,13 @@ Other:
   - binary building is on python 3.5.9 now
 - vagrant:
 
-  - openindiana: add up-to-date base VM
-  - darwin: updated / better equipped the base VM
+  - add new boxes: ubuntu 18.04 and 20.04, debian 10
+  - update boxes: openindiana, darwin, netbsd
+  - remove old boxes: centos 6
   - darwin: updated osxfuse to 3.10.4
+  - use debian/ubuntu pip/virtualenv packages
+  - rather use python 3.6.2 than 3.6.0, fixes coverage/sqlite3 issue
+  - use requirements.d/development.lock.txt to avoid compat issues
 - travis:
 
   - darwin: backport some install code / order from master

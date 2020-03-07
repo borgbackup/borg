@@ -346,7 +346,7 @@ FORCE_INLINE unsigned FSE_highbit32 (U32 val)
     _BitScanReverse ( &r, val );
     return (unsigned) r;
 #   elif defined(__GNUC__) && (GCC_VERSION >= 304)   /* GCC Intrinsic */
-    return 31 - __builtin_clz (val);
+    return __builtin_clz (val) ^ 31;
 #   else   /* Software version */
     static const unsigned DeBruijnClz[32] = { 0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30, 8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31 };
     U32 v = val;
@@ -668,11 +668,17 @@ static size_t FSE_initDStream(FSE_DStream_t* bitD, const void* srcBuffer, size_t
         switch(srcSize)
         {
             case 7: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[6]) << (sizeof(size_t)*8 - 16);
+                    /* fallthrough */
             case 6: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[5]) << (sizeof(size_t)*8 - 24);
+                    /* fallthrough */
             case 5: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[4]) << (sizeof(size_t)*8 - 32);
+                    /* fallthrough */
             case 4: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[3]) << 24;
+                    /* fallthrough */
             case 3: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[2]) << 16;
+                    /* fallthrough */
             case 2: bitD->bitContainer += (size_t)(((const BYTE*)(bitD->start))[1]) <<  8;
+                    /* fallthrough */
             default:;
         }
         contain32 = ((const BYTE*)srcBuffer)[srcSize-1];
@@ -1067,99 +1073,102 @@ static size_t HUF_decompress_usingDTable(   /* -3% slower when non static */
     const void* cSrc, size_t cSrcSize,
     const U16* DTable)
 {
-    BYTE* const ostart = (BYTE*) dst;
-    BYTE* op = ostart;
-    BYTE* const omax = op + maxDstSize;
-    BYTE* const olimit = omax-15;
-
-    const void* ptr = DTable;
-    const HUF_DElt* const dt = (const HUF_DElt*)(ptr)+1;
-    const U32 dtLog = DTable[0];
-    size_t errorCode;
-    U32 reloadStatus;
-
-    /* Init */
-
-    const U16* jumpTable = (const U16*)cSrc;
-    const size_t length1 = FSE_readLE16(jumpTable);
-    const size_t length2 = FSE_readLE16(jumpTable+1);
-    const size_t length3 = FSE_readLE16(jumpTable+2);
-    const size_t length4 = cSrcSize - 6 - length1 - length2 - length3;   // check coherency !!
-    const char* const start1 = (const char*)(cSrc) + 6;
-    const char* const start2 = start1 + length1;
-    const char* const start3 = start2 + length2;
-    const char* const start4 = start3 + length3;
-    FSE_DStream_t bitD1, bitD2, bitD3, bitD4;
-
-    if (length1+length2+length3+6 >= cSrcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
-
-    errorCode = FSE_initDStream(&bitD1, start1, length1);
-    if (FSE_isError(errorCode)) return errorCode;
-    errorCode = FSE_initDStream(&bitD2, start2, length2);
-    if (FSE_isError(errorCode)) return errorCode;
-    errorCode = FSE_initDStream(&bitD3, start3, length3);
-    if (FSE_isError(errorCode)) return errorCode;
-    errorCode = FSE_initDStream(&bitD4, start4, length4);
-    if (FSE_isError(errorCode)) return errorCode;
-
-    reloadStatus=FSE_reloadDStream(&bitD2);
-
-    /* 16 symbols per loop */
-    for ( ; (reloadStatus<FSE_DStream_completed) && (op<olimit);  /* D2-3-4 are supposed to be synchronized and finish together */
-        op+=16, reloadStatus = FSE_reloadDStream(&bitD2) | FSE_reloadDStream(&bitD3) | FSE_reloadDStream(&bitD4), FSE_reloadDStream(&bitD1))
+    if (cSrcSize < 6) return (size_t)-FSE_ERROR_srcSize_wrong;
     {
-#define HUF_DECODE_SYMBOL_0(n, Dstream) \
-        op[n] = HUF_decodeSymbol(&Dstream, dt, dtLog);
+        BYTE* const ostart = (BYTE*) dst;
+        BYTE* op = ostart;
+        BYTE* const omax = op + maxDstSize;
+        BYTE* const olimit = omax-15;
 
-#define HUF_DECODE_SYMBOL_1(n, Dstream) \
-        op[n] = HUF_decodeSymbol(&Dstream, dt, dtLog); \
-        if (FSE_32bits() && (HUF_MAX_TABLELOG>12)) FSE_reloadDStream(&Dstream)
+        const void* ptr = DTable;
+        const HUF_DElt* const dt = (const HUF_DElt*)(ptr)+1;
+        const U32 dtLog = DTable[0];
+        size_t errorCode;
+        U32 reloadStatus;
 
-#define HUF_DECODE_SYMBOL_2(n, Dstream) \
-        op[n] = HUF_decodeSymbol(&Dstream, dt, dtLog); \
-        if (FSE_32bits()) FSE_reloadDStream(&Dstream)
+        /* Init */
 
-        HUF_DECODE_SYMBOL_1( 0, bitD1);
-        HUF_DECODE_SYMBOL_1( 1, bitD2);
-        HUF_DECODE_SYMBOL_1( 2, bitD3);
-        HUF_DECODE_SYMBOL_1( 3, bitD4);
-        HUF_DECODE_SYMBOL_2( 4, bitD1);
-        HUF_DECODE_SYMBOL_2( 5, bitD2);
-        HUF_DECODE_SYMBOL_2( 6, bitD3);
-        HUF_DECODE_SYMBOL_2( 7, bitD4);
-        HUF_DECODE_SYMBOL_1( 8, bitD1);
-        HUF_DECODE_SYMBOL_1( 9, bitD2);
-        HUF_DECODE_SYMBOL_1(10, bitD3);
-        HUF_DECODE_SYMBOL_1(11, bitD4);
-        HUF_DECODE_SYMBOL_0(12, bitD1);
-        HUF_DECODE_SYMBOL_0(13, bitD2);
-        HUF_DECODE_SYMBOL_0(14, bitD3);
-        HUF_DECODE_SYMBOL_0(15, bitD4);
-    }
+        const U16* jumpTable = (const U16*)cSrc;
+        const size_t length1 = FSE_readLE16(jumpTable);
+        const size_t length2 = FSE_readLE16(jumpTable+1);
+        const size_t length3 = FSE_readLE16(jumpTable+2);
+        const size_t length4 = cSrcSize - 6 - length1 - length2 - length3;   // check coherency !!
+        const char* const start1 = (const char*)(cSrc) + 6;
+        const char* const start2 = start1 + length1;
+        const char* const start3 = start2 + length2;
+        const char* const start4 = start3 + length3;
+        FSE_DStream_t bitD1, bitD2, bitD3, bitD4;
 
-    if (reloadStatus!=FSE_DStream_completed)   /* not complete : some bitStream might be FSE_DStream_unfinished */
-        return (size_t)-FSE_ERROR_corruptionDetected;
+        if (length1+length2+length3+6 >= cSrcSize) return (size_t)-FSE_ERROR_srcSize_wrong;
 
-    /* tail */
-    {
-        // bitTail = bitD1;   // *much* slower : -20% !??!
-        FSE_DStream_t bitTail;
-        bitTail.ptr = bitD1.ptr;
-        bitTail.bitsConsumed = bitD1.bitsConsumed;
-        bitTail.bitContainer = bitD1.bitContainer;   // required in case of FSE_DStream_endOfBuffer
-        bitTail.start = start1;
-        for ( ; (FSE_reloadDStream(&bitTail) < FSE_DStream_completed) && (op<omax) ; op++)
+        errorCode = FSE_initDStream(&bitD1, start1, length1);
+        if (FSE_isError(errorCode)) return errorCode;
+        errorCode = FSE_initDStream(&bitD2, start2, length2);
+        if (FSE_isError(errorCode)) return errorCode;
+        errorCode = FSE_initDStream(&bitD3, start3, length3);
+        if (FSE_isError(errorCode)) return errorCode;
+        errorCode = FSE_initDStream(&bitD4, start4, length4);
+        if (FSE_isError(errorCode)) return errorCode;
+
+        reloadStatus=FSE_reloadDStream(&bitD2);
+
+        /* 16 symbols per loop */
+        for ( ; (reloadStatus<FSE_DStream_completed) && (op<olimit);  /* D2-3-4 are supposed to be synchronized and finish together */
+            op+=16, reloadStatus = FSE_reloadDStream(&bitD2) | FSE_reloadDStream(&bitD3) | FSE_reloadDStream(&bitD4), FSE_reloadDStream(&bitD1))
         {
-            HUF_DECODE_SYMBOL_0(0, bitTail);
+    #define HUF_DECODE_SYMBOL_0(n, Dstream) \
+            op[n] = HUF_decodeSymbol(&Dstream, dt, dtLog);
+
+    #define HUF_DECODE_SYMBOL_1(n, Dstream) \
+            op[n] = HUF_decodeSymbol(&Dstream, dt, dtLog); \
+            if (FSE_32bits() && (HUF_MAX_TABLELOG>12)) FSE_reloadDStream(&Dstream)
+
+    #define HUF_DECODE_SYMBOL_2(n, Dstream) \
+            op[n] = HUF_decodeSymbol(&Dstream, dt, dtLog); \
+            if (FSE_32bits()) FSE_reloadDStream(&Dstream)
+
+            HUF_DECODE_SYMBOL_1( 0, bitD1);
+            HUF_DECODE_SYMBOL_1( 1, bitD2);
+            HUF_DECODE_SYMBOL_1( 2, bitD3);
+            HUF_DECODE_SYMBOL_1( 3, bitD4);
+            HUF_DECODE_SYMBOL_2( 4, bitD1);
+            HUF_DECODE_SYMBOL_2( 5, bitD2);
+            HUF_DECODE_SYMBOL_2( 6, bitD3);
+            HUF_DECODE_SYMBOL_2( 7, bitD4);
+            HUF_DECODE_SYMBOL_1( 8, bitD1);
+            HUF_DECODE_SYMBOL_1( 9, bitD2);
+            HUF_DECODE_SYMBOL_1(10, bitD3);
+            HUF_DECODE_SYMBOL_1(11, bitD4);
+            HUF_DECODE_SYMBOL_0(12, bitD1);
+            HUF_DECODE_SYMBOL_0(13, bitD2);
+            HUF_DECODE_SYMBOL_0(14, bitD3);
+            HUF_DECODE_SYMBOL_0(15, bitD4);
         }
 
-        if (FSE_endOfDStream(&bitTail))
-            return op-ostart;
+        if (reloadStatus!=FSE_DStream_completed)   /* not complete : some bitStream might be FSE_DStream_unfinished */
+            return (size_t)-FSE_ERROR_corruptionDetected;
+
+        /* tail */
+        {
+            // bitTail = bitD1;   // *much* slower : -20% !??!
+            FSE_DStream_t bitTail;
+            bitTail.ptr = bitD1.ptr;
+            bitTail.bitsConsumed = bitD1.bitsConsumed;
+            bitTail.bitContainer = bitD1.bitContainer;   // required in case of FSE_DStream_endOfBuffer
+            bitTail.start = start1;
+            for ( ; (FSE_reloadDStream(&bitTail) < FSE_DStream_completed) && (op<omax) ; op++)
+            {
+                HUF_DECODE_SYMBOL_0(0, bitTail);
+            }
+
+            if (FSE_endOfDStream(&bitTail))
+                return op-ostart;
+        }
+
+        if (op==omax) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* dst buffer is full, but cSrc unfinished */
+
+        return (size_t)-FSE_ERROR_corruptionDetected;
     }
-
-    if (op==omax) return (size_t)-FSE_ERROR_dstSize_tooSmall;   /* dst buffer is full, but cSrc unfinished */
-
-    return (size_t)-FSE_ERROR_corruptionDetected;
 }
 
 
@@ -1330,6 +1339,8 @@ static const U32 ZSTD_magicNumber = 0xFD2FB51E;   /* 3rd version : seqNb header 
 #define LITERAL_NOENTROPY 63
 #define COMMAND_NOENTROPY 7   /* to remove */
 
+#define ZSTD_CONTENTSIZE_ERROR   (0ULL - 2)
+
 static const size_t ZSTD_blockHeaderSize = 3;
 static const size_t ZSTD_frameHeaderSize = 4;
 
@@ -1346,8 +1357,6 @@ static unsigned ZSTD_isLittleEndian(void)
 }
 
 static U16    ZSTD_read16(const void* p) { U16 r; memcpy(&r, p, sizeof(r)); return r; }
-
-static U32    ZSTD_read32(const void* p) { U32 r; memcpy(&r, p, sizeof(r)); return r; }
 
 static void   ZSTD_copy4(void* dst, const void* src) { memcpy(dst, src, 4); }
 
@@ -1373,16 +1382,9 @@ static U16 ZSTD_readLE16(const void* memPtr)
     }
 }
 
-
-static U32 ZSTD_readLE32(const void* memPtr)
+static U32 ZSTD_readLE24(const void* memPtr)
 {
-    if (ZSTD_isLittleEndian())
-        return ZSTD_read32(memPtr);
-    else
-    {
-        const BYTE* p = (const BYTE*)memPtr;
-        return (U32)((U32)p[0] + ((U32)p[1]<<8) + ((U32)p[2]<<16) + ((U32)p[3]<<24));
-    }
+    return ZSTD_readLE16(memPtr) + (((const BYTE*)memPtr)[2] << 16);
 }
 
 static U32 ZSTD_readBE32(const void* memPtr)
@@ -1458,7 +1460,7 @@ unsigned ZSTDv01_isError(size_t code) { return ERR_isError(code); }
 *   Decompression code
 **************************************************************/
 
-size_t ZSTDv01_getcBlockSize(const void* src, size_t srcSize, blockProperties_t* bpPtr)
+static size_t ZSTDv01_getcBlockSize(const void* src, size_t srcSize, blockProperties_t* bpPtr)
 {
     const BYTE* const in = (const BYTE* const)src;
     BYTE headerFlags;
@@ -1511,7 +1513,7 @@ static size_t ZSTD_decompressLiterals(void* ctx,
 }
 
 
-size_t ZSTDv01_decodeLiteralsBlock(void* ctx,
+static size_t ZSTDv01_decodeLiteralsBlock(void* ctx,
                                 void* dst, size_t maxDstSize,
                           const BYTE** litStart, size_t* litSize,
                           const void* src, size_t srcSize)
@@ -1563,7 +1565,7 @@ size_t ZSTDv01_decodeLiteralsBlock(void* ctx,
 }
 
 
-size_t ZSTDv01_decodeSeqHeaders(int* nbSeq, const BYTE** dumpsPtr, size_t* dumpsLengthPtr,
+static size_t ZSTDv01_decodeSeqHeaders(int* nbSeq, const BYTE** dumpsPtr, size_t* dumpsLengthPtr,
                          FSE_DTable* DTableLL, FSE_DTable* DTableML, FSE_DTable* DTableOffb,
                          const void* src, size_t srcSize)
 {
@@ -1696,13 +1698,13 @@ static void ZSTD_decodeSequence(seq_t* seq, seqState_t* seqState)
     seqState->prevOffset = seq->offset;
     if (litLength == MaxLL)
     {
-        U32 add = dumps<de ? *dumps++ : 0;
+        const U32 add = dumps<de ? *dumps++ : 0;
         if (add < 255) litLength += add;
         else
         {
             if (dumps<=(de-3))
             {
-                litLength = ZSTD_readLE32(dumps) & 0xFFFFFF;  /* no pb : dumps is always followed by seq tables > 1 byte */
+                litLength = ZSTD_readLE24(dumps);
                 dumps += 3;
             }
         }
@@ -1724,13 +1726,13 @@ static void ZSTD_decodeSequence(seq_t* seq, seqState_t* seqState)
     matchLength = FSE_decodeSymbol(&(seqState->stateML), &(seqState->DStream));
     if (matchLength == MaxML)
     {
-        U32 add = dumps<de ? *dumps++ : 0;
+        const U32 add = dumps<de ? *dumps++ : 0;
         if (add < 255) matchLength += add;
         else
         {
             if (dumps<=(de-3))
             {
-                matchLength = ZSTD_readLE32(dumps) & 0xFFFFFF;  /* no pb : dumps is always followed by seq tables > 1 byte */
+                matchLength = ZSTD_readLE24(dumps);
                 dumps += 3;
             }
         }
@@ -1751,7 +1753,7 @@ static size_t ZSTD_execSequence(BYTE* op,
                                 BYTE* const base, BYTE* const oend)
 {
     static const int dec32table[] = {0, 1, 2, 1, 4, 4, 4, 4};   /* added */
-    static const int dec64table[] = {8, 8, 8, 7, 8, 9,10,11};   /* substracted */
+    static const int dec64table[] = {8, 8, 8, 7, 8, 9,10,11};   /* subtracted */
     const BYTE* const ostart = op;
     const size_t litLength = sequence.litLength;
     BYTE* const endMatch = op + litLength + sequence.matchLength;    /* risk : address space overflow (32-bits) */
@@ -1993,36 +1995,59 @@ size_t ZSTDv01_decompress(void* dst, size_t maxDstSize, const void* src, size_t 
     return ZSTDv01_decompressDCtx(&ctx, dst, maxDstSize, src, srcSize);
 }
 
-size_t ZSTDv01_findFrameCompressedSize(const void* src, size_t srcSize)
+/* ZSTD_errorFrameSizeInfoLegacy() :
+   assumes `cSize` and `dBound` are _not_ NULL */
+static void ZSTD_errorFrameSizeInfoLegacy(size_t* cSize, unsigned long long* dBound, size_t ret)
+{
+    *cSize = ret;
+    *dBound = ZSTD_CONTENTSIZE_ERROR;
+}
+
+void ZSTDv01_findFrameSizeInfoLegacy(const void *src, size_t srcSize, size_t* cSize, unsigned long long* dBound)
 {
     const BYTE* ip = (const BYTE*)src;
     size_t remainingSize = srcSize;
+    size_t nbBlocks = 0;
     U32 magicNumber;
     blockProperties_t blockProperties;
 
     /* Frame Header */
-    if (srcSize < ZSTD_frameHeaderSize+ZSTD_blockHeaderSize) return ERROR(srcSize_wrong);
+    if (srcSize < ZSTD_frameHeaderSize+ZSTD_blockHeaderSize) {
+        ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, ERROR(srcSize_wrong));
+        return;
+    }
     magicNumber = ZSTD_readBE32(src);
-    if (magicNumber != ZSTD_magicNumber) return ERROR(prefix_unknown);
+    if (magicNumber != ZSTD_magicNumber) {
+        ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, ERROR(prefix_unknown));
+        return;
+    }
     ip += ZSTD_frameHeaderSize; remainingSize -= ZSTD_frameHeaderSize;
 
     /* Loop on each block */
     while (1)
     {
         size_t blockSize = ZSTDv01_getcBlockSize(ip, remainingSize, &blockProperties);
-        if (ZSTDv01_isError(blockSize)) return blockSize;
+        if (ZSTDv01_isError(blockSize)) {
+            ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, blockSize);
+            return;
+        }
 
         ip += ZSTD_blockHeaderSize;
         remainingSize -= ZSTD_blockHeaderSize;
-        if (blockSize > remainingSize) return ERROR(srcSize_wrong);
+        if (blockSize > remainingSize) {
+            ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, ERROR(srcSize_wrong));
+            return;
+        }
 
         if (blockSize == 0) break;   /* bt_end */
 
         ip += blockSize;
         remainingSize -= blockSize;
+        nbBlocks++;
     }
 
-    return ip - (const BYTE*)src;
+    *cSize = ip - (const BYTE*)src;
+    *dBound = nbBlocks * BLOCKSIZE;
 }
 
 /*******************************

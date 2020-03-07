@@ -244,6 +244,7 @@ Fixes:
   0.7.2 is the minimum requirement for correct operations on ARMv6 in non-fixup
   mode, where unaligned memory accesses cause bus errors.
   0.7.3 adds some speedups and libxxhash 0.7.3 even has a pkg-config file now.
+- upgrade bundled lz4 to 1.9.2
 - fix crash when upgrading erroneous hints file, #4922
 - extract:
 

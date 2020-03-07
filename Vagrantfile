@@ -378,34 +378,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos7_64")
   end
 
-  config.vm.define "centos6_32" do |b|
-    b.vm.box = "centos6-32"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 768 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_32")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_32")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_32")
-  end
-
-  config.vm.define "centos6_64" do |b|
-    b.vm.box = "centos6-64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "install system packages", :type => :shell, :inline => packages_redhatted
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("centos6_64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("centos6_64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("centos6_64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos6_64")
-  end
-
   config.vm.define "bionic64" do |b|
     b.vm.box = "ubuntu/bionic64"
     b.vm.provider :virtualbox do |v|

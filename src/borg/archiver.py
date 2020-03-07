@@ -4371,8 +4371,10 @@ class Archiver:
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
         if getattr(args, 'stats', False) and getattr(args, 'dry_run', False):
-            logger.error("--stats does not work with --dry-run.")
-            return self.exit_code
+            # the data needed for --stats is not computed when using --dry-run, so we can't do it.
+            # for ease of scripting, we just ignore --stats when given with --dry-run.
+            logger.warning("Ignoring --stats. It is not supported when using --dry-run.")
+            args.stats = False
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
         self.prerun_checks(logger, is_serve)

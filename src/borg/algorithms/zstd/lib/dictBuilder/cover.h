@@ -39,6 +39,44 @@ typedef struct {
 } COVER_segment_t;
 
 /**
+ *Number of epochs and size of each epoch.
+ */
+typedef struct {
+  U32 num;
+  U32 size;
+} COVER_epoch_info_t;
+
+/**
+ * Struct used for the dictionary selection function.
+ */
+typedef struct COVER_dictSelection {
+  BYTE* dictContent;
+  size_t dictSize;
+  size_t totalCompressedSize;
+} COVER_dictSelection_t;
+
+/**
+ * Computes the number of epochs and the size of each epoch.
+ * We will make sure that each epoch gets at least 10 * k bytes.
+ *
+ * The COVER algorithms divide the data up into epochs of equal size and
+ * select one segment from each epoch.
+ *
+ * @param maxDictSize The maximum allowed dictionary size.
+ * @param nbDmers     The number of dmers we are training on.
+ * @param k           The parameter k (segment size).
+ * @param passes      The target number of passes over the dmer corpus.
+ *                    More passes means a better dictionary.
+ */
+COVER_epoch_info_t COVER_computeEpochs(U32 maxDictSize, U32 nbDmers,
+                                       U32 k, U32 passes);
+
+/**
+ * Warns the user when their corpus is too small.
+ */
+void COVER_warnOnSmallCorpus(size_t maxDictSize, size_t nbDmers, int displayLevel);
+
+/**
  *  Checks total compressed size of a dictionary
  */
 size_t COVER_checkTotalCompressedSize(const ZDICT_cover_params_t parameters,
@@ -78,6 +116,32 @@ void COVER_best_start(COVER_best_t *best);
  * Decrements liveJobs and signals any waiting threads if liveJobs == 0.
  * If this dictionary is the best so far save it and its parameters.
  */
-void COVER_best_finish(COVER_best_t *best, size_t compressedSize,
-                       ZDICT_cover_params_t parameters, void *dict,
-                       size_t dictSize);
+void COVER_best_finish(COVER_best_t *best, ZDICT_cover_params_t parameters,
+                       COVER_dictSelection_t selection);
+/**
+ * Error function for COVER_selectDict function. Checks if the return
+ * value is an error.
+ */
+unsigned COVER_dictSelectionIsError(COVER_dictSelection_t selection);
+
+ /**
+  * Error function for COVER_selectDict function. Returns a struct where
+  * return.totalCompressedSize is a ZSTD error.
+  */
+COVER_dictSelection_t COVER_dictSelectionError(size_t error);
+
+/**
+ * Always call after selectDict is called to free up used memory from
+ * newly created dictionary.
+ */
+void COVER_dictSelectionFree(COVER_dictSelection_t selection);
+
+/**
+ * Called to finalize the dictionary and select one based on whether or not
+ * the shrink-dict flag was enabled. If enabled the dictionary used is the
+ * smallest dictionary within a specified regression of the compressed size
+ * from the largest dictionary.
+ */
+ COVER_dictSelection_t COVER_selectDict(BYTE* customDictContent,
+                       size_t dictContentSize, const BYTE* samplesBuffer, const size_t* samplesSizes, unsigned nbFinalizeSamples,
+                       size_t nbCheckSamples, size_t nbSamples, ZDICT_cover_params_t params, size_t* offsets, size_t totalCompressedSize);

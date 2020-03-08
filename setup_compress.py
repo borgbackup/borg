@@ -26,6 +26,8 @@ zstd_sources = [
     'lib/compress/hist.c',
     'lib/compress/huf_compress.c',
     'lib/compress/zstd_compress.c',
+    'lib/compress/zstd_compress_literals.c',
+    'lib/compress/zstd_compress_sequences.c',
     'lib/compress/zstd_double_fast.c',
     'lib/compress/zstd_fast.c',
     'lib/compress/zstd_lazy.c',

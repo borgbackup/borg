@@ -126,7 +126,7 @@ due to the cache resync.
 Upgrade should be able to resume if interrupted, although it
 will still iterate over all segments. If you want to start
 from scratch, use `borg delete` over the copied repository to
-make sure the cache files are also removed:
+make sure the cache files are also removed::
 
     borg delete borg
 

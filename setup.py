@@ -236,7 +236,10 @@ if not on_rtd:
             # compile .pyx extensions to .c in parallel, does not work on windows
             cython_opts['nthreads'] = cpu_threads + 1
 
-        cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext, windows_ext], **cython_opts)
+        # generate C code from Cython for ALL supported platforms, so we have them in the sdist.
+        # the sdist does not require Cython at install time, so we need all as C.
+        cythonize([posix_ext, linux_ext, syncfilerange_ext, freebsd_ext, darwin_ext, windows_ext], **cython_opts)
+        # generate C code from Cython for THIS platform (and for all platform-independent Cython parts).
         ext_modules = cythonize(ext_modules, **cython_opts)
 
 

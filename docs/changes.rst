@@ -21,31 +21,37 @@ Data loss required even more specific conditions, so it should be rare (and
 also detectable via borg check).
 
 You might be affected if borg crashed with / complained about:
+
 - AssertionError: Corrupted segment reference count - corrupted index or hints
 - ObjectNotFound: Object with key ... not found in repository ...
 - Index mismatch for key b'...'. (..., ...) != (-1, -1)
 - ValueError: stats_against: key contained in self but not in master_index.
 
 Advised procedure to fix any related issue in your indexes/caches:
+
 - install fixed borg code (on client AND server)
 - for all of your clients and repos remove the cache by:
+
   borg delete --cache-only YOURREPO
+
   (later, the cache will be re-built automatically)
 - for all your repos, rebuild the repo index by:
+
   borg check --repair YOURREPO
+
   This will also check all archives and detect if there is any data-loss issue.
 
 Affected branches / releases:
 
-fd06497 introduced the bug into 1.1-maint branch - it affects all borg 1.1.x since 1.1.0b4.
-fd06497 introduced the bug into master branch - it affects all borg 1.2.0 alpha releases.
-c5cd882 introduced the bug into 1.0-maint branch - it affects all borg 1.0.x since 1.0.11rc1.
+- fd06497 introduced the bug into 1.1-maint branch - it affects all borg 1.1.x since 1.1.0b4.
+- fd06497 introduced the bug into master branch - it affects all borg 1.2.0 alpha releases.
+- c5cd882 introduced the bug into 1.0-maint branch - it affects all borg 1.0.x since 1.0.11rc1.
 
 The bug was fixed by:
 
-701159a fixes the bug in 1.1-maint branch - will be released with borg 1.1.11.
-fa63150 fixes the bug in master branch - will be released with borg 1.2.0a8.
-7bb90b6 fixes the bug in 1.0-maint branch. Branch is EOL, no new release is planned as of now.
+- 701159a fixes the bug in 1.1-maint branch - will be released with borg 1.1.11.
+- fa63150 fixes the bug in master branch - will be released with borg 1.2.0a8.
+- 7bb90b6 fixes the bug in 1.0-maint branch. Branch is EOL, no new release is planned as of now.
 
 .. _broken_validator:
 
@@ -238,9 +244,9 @@ Compatibility notes:
 
 Fixes:
 
-- fixed potential index corruption / data loss issue due to bug in hashindex_set, #4829
+- fixed potential index corruption / data loss issue due to bug in hashindex_set, #4829.
   Please read and follow the more detailled notes close to the top of this document.
-- upgrade bundled xxhash to 0.7.3, #4891
+- upgrade bundled xxhash to 0.7.3, #4891.
   0.7.2 is the minimum requirement for correct operations on ARMv6 in non-fixup
   mode, where unaligned memory accesses cause bus errors.
   0.7.3 adds some speedups and libxxhash 0.7.3 even has a pkg-config file now.
@@ -272,7 +278,7 @@ New features:
 - enable placeholder usage in all extra archive arguments
 - new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
 - recreate: support --timestamp option, #4745
-- support platforms without os.link (e.g. Android with Termux), #4901
+- support platforms without os.link (e.g. Android with Termux), #4901.
   if we don't have os.link, we just extract another copy instead of making a hardlink.
 - support linux platforms without sync_file_range (e.g. Android 7 with Termux), #4905
 

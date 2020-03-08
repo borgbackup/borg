@@ -236,7 +236,6 @@ if not on_rtd:
             # compile .pyx extensions to .c in parallel, does not work on windows
             cython_opts['nthreads'] = cpu_threads + 1
 
-        cythonize([posix_ext, linux_ext, freebsd_ext, darwin_ext, windows_ext], **cython_opts)
         ext_modules = cythonize(ext_modules, **cython_opts)
 
 

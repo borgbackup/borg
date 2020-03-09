@@ -261,6 +261,18 @@ Vagrant.configure(2) do |config|
     v.cpus = $cpus
   end
 
+  config.vm.define "focal64" do |b|
+    b.vm.box = "ubuntu/focal64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("focal64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64")
+  end
+
   config.vm.define "bionic64" do |b|
     b.vm.box = "ubuntu/bionic64"
     b.vm.provider :virtualbox do |v|
@@ -271,6 +283,22 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("bionic64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64")
+  end
+
+  config.vm.define "buster64" do |b|
+    b.vm.box = "debian/buster64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("buster64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("buster64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("buster64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("buster64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64")
   end
 
   config.vm.define "stretch64" do |b|

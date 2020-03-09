@@ -894,10 +894,19 @@ class Repository:
 
     def _rebuild_sparse(self, segment):
         """Rebuild sparse bytes count for a single segment relative to the current index."""
-        self.compact[segment] = 0
-        if self.segments[segment] == 0:
-            self.compact[segment] += self.io.segment_size(segment)
+        try:
+            segment_size = self.io.segment_size(segment)
+        except FileNotFoundError:
+            # segment does not exist any more, remove it from the mappings
+            # note: no need to self.compact.pop(segment), as we start from empty mapping.
+            self.segments.pop(segment)
             return
+
+        if self.segments[segment] == 0:
+            self.compact[segment] = segment_size
+            return
+
+        self.compact[segment] = 0
         for tag, key, offset, size in self.io.iter_objects(segment, read_data=False):
             if tag == TAG_PUT:
                 if self.index.get(key, (-1, -1)) != (segment, offset):

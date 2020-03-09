@@ -6,6 +6,53 @@ Important notes
 
 This section provides information about security and corruption issues.
 
+.. _hashindex_set_bug:
+
+Pre-1.1.11 potential index corruption / data loss issue
+-------------------------------------------------------
+
+A bug was discovered in our hashtable code, see issue #4829.
+The code is used for the client-side chunks cache and the server-side repo index.
+
+Although borg uses the hashtables very heavily, the index corruption did not
+happen too frequently, because it needed specific conditions to happen.
+
+Data loss required even more specific conditions, so it should be rare (and
+also detectable via borg check).
+
+You might be affected if borg crashed with / complained about:
+
+- AssertionError: Corrupted segment reference count - corrupted index or hints
+- ObjectNotFound: Object with key ... not found in repository ...
+- Index mismatch for key b'...'. (..., ...) != (-1, -1)
+- ValueError: stats_against: key contained in self but not in master_index.
+
+Advised procedure to fix any related issue in your indexes/caches:
+
+- install fixed borg code (on client AND server)
+- for all of your clients and repos remove the cache by:
+
+  borg delete --cache-only YOURREPO
+
+  (later, the cache will be re-built automatically)
+- for all your repos, rebuild the repo index by:
+
+  borg check --repair YOURREPO
+
+  This will also check all archives and detect if there is any data-loss issue.
+
+Affected branches / releases:
+
+- fd06497 introduced the bug into 1.1-maint branch - it affects all borg 1.1.x since 1.1.0b4.
+- fd06497 introduced the bug into master branch - it affects all borg 1.2.0 alpha releases.
+- c5cd882 introduced the bug into 1.0-maint branch - it affects all borg 1.0.x since 1.0.11rc1.
+
+The bug was fixed by:
+
+- 701159a fixes the bug in 1.1-maint branch - will be released with borg 1.1.11.
+- fa63150 fixes the bug in master branch - will be released with borg 1.2.0a8.
+- 7bb90b6 fixes the bug in 1.0-maint branch. Branch is EOL, no new release is planned as of now.
+
 .. _broken_validator:
 
 Pre-1.1.4 potential data corruption issue
@@ -468,6 +515,189 @@ Other changes:
 - testing:
 
   - vagrant: new VMs for linux/bsd/darwin, most with OpenSSL 1.1 and py36
+
+
+Version 1.1.11 (2020-03-08)
+---------------------------
+
+Compatibility notes:
+
+- When upgrading from borg 1.0.x to 1.1.x, please note:
+
+  - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
+  - borg upgrade: you do not need to and you also should not run it.
+  - borg might ask some security-related questions once after upgrading.
+    You can answer them either manually or via environment variable.
+    One known case is if you use unencrypted repositories, then it will ask
+    about a unknown unencrypted repository one time.
+  - your first backup with 1.1.x might be significantly slower (it might
+    completely read, chunk, hash a lot files) - this is due to the
+    --files-cache mode change (and happens every time you change mode).
+    You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
+    mode (but that is less safe for detecting changed files than the default).
+    See the --files-cache docs for details.
+- 1.1.11 removes WSL autodetection (Windows 10 Subsystem for Linux).
+  If WSL still has a problem with sync_file_range, you need to set
+  BORG_WORKAROUNDS=basesyncfile in the borg process environment to
+  work around the WSL issue.
+
+Fixes:
+
+- fixed potential index corruption / data loss issue due to bug in hashindex_set, #4829.
+  Please read and follow the more detailled notes close to the top of this document.
+- upgrade bundled xxhash to 0.7.3, #4891.
+  0.7.2 is the minimum requirement for correct operations on ARMv6 in non-fixup
+  mode, where unaligned memory accesses cause bus errors.
+  0.7.3 adds some speedups and libxxhash 0.7.3 even has a pkg-config file now.
+- upgrade bundled lz4 to 1.9.2
+- upgrade bundled zstd to 1.4.4
+- fix crash when upgrading erroneous hints file, #4922
+- extract:
+
+  - fix KeyError for "partial" extraction, #4607
+  - fix "partial" extract for hardlinked contentless file types, #4725
+  - fix preloading for old (0.xx) remote servers, #4652
+  - fix confusing output of borg extract --list --strip-components, #4934
+- delete: after double-force delete, warn about necessary repair, #4704
+- create: give invalid repo error msg if repo config not found, #4411
+- mount: fix FUSE mount missing st_birthtime, #4763 #4767
+- check: do not stumble over invalid item key, #4845
+- info: if the archive doesn't exist, print a pretty message, #4793
+- SecurityManager.known(): check all files, #4614
+- Repository.open: use stat() to check for repo dir, #4695
+- Repository.check_can_create_repository: use stat() to check, #4695
+- fix invalid archive error message
+- fix optional/non-optional location arg, #4541
+- commit-time free space calc: ignore bad compact map entries, #4796
+- ignore EACCES (errno 13) when hardlinking the old config, #4730
+- --prefix / -P: fix processing, avoid argparse issue, #4769
+
+New features:
+
+- enable placeholder usage in all extra archive arguments
+- new BORG_WORKAROUNDS mechanism, basesyncfile, #4710
+- recreate: support --timestamp option, #4745
+- support platforms without os.link (e.g. Android with Termux), #4901.
+  if we don't have os.link, we just extract another copy instead of making a hardlink.
+- support linux platforms without sync_file_range (e.g. Android 7 with Termux), #4905
+
+Other:
+
+- ignore --stats when given with --dry-run, but continue, #4373
+- add some ProgressIndicator msgids to code / fix docs, #4935
+- elaborate on "Calculating size" message
+- argparser: always use REPOSITORY in metavar, also use more consistent help phrasing.
+- check: improve error output for matching index size, see #4829
+- docs:
+
+  - changelog: add advisory about hashindex_set bug #4829
+  - better describe BORG_SECURITY_DIR, BORG_CACHE_DIR, #4919
+  - infos about cache security assumptions, #4900
+  - add FAQ describing difference between a local repo vs. repo on a server.
+  - document how to test exclusion patterns without performing an actual backup
+  - timestamps in the files cache are now usually ctime, #4583
+  - fix bad reference to borg compact (does not exist in 1.1), #4660
+  - create: borg 1.1 is not future any more
+  - extract: document limitation "needs empty destination", #4598
+  - how to supply a passphrase, use crypto devices, #4549
+  - fix osxfuse github link in installation docs
+  - add example of exclude-norecurse rule in help patterns
+  - update macOS Brew link
+  - add note about software for automating backups, #4581
+  - AUTHORS: mention copyright+license for bundled msgpack
+  - fix various code blocks in the docs, #4708
+  - updated docs to cover use of temp directory on remote, #4545
+  - add restore docs, #4670
+  - add a pull backup / push restore how-to, #1552
+  - add FAQ how to retain original paths, #4532
+  - explain difference between --exclude and --pattern, #4118
+  - add FAQs for SSH connection issues, #3866
+  - improve password FAQ, #4591
+  - reiterate that 'file cache names are absolute' in FAQ
+- tests:
+
+  - cope with ANY error when importing pytest into borg.testsuite, #4652
+  - fix broken test that relied on improper zlib assumptions
+  - test_fuse: filter out selinux xattrs, #4574
+- travis / vagrant:
+
+  - misc python versions removed / changed (due to openssl 1.1 compatibility)
+    or added (3.7 and 3.8, for better borg compatibility testing)
+  - binary building is on python 3.5.9 now
+- vagrant:
+
+  - add new boxes: ubuntu 18.04 and 20.04, debian 10
+  - update boxes: openindiana, darwin, netbsd
+  - remove old boxes: centos 6
+  - darwin: updated osxfuse to 3.10.4
+  - use debian/ubuntu pip/virtualenv packages
+  - rather use python 3.6.2 than 3.6.0, fixes coverage/sqlite3 issue
+  - use requirements.d/development.lock.txt to avoid compat issues
+- travis:
+
+  - darwin: backport some install code / order from master
+  - remove deprecated keyword "sudo" from travis config
+  - allow osx builds to fail, #4955
+    this is due to travis-ci frequently being so slow that the OS X builds
+    just fail because they exceed 50 minutes and get killed by travis.
+
+
+Version 1.1.10 (2019-05-16)
+---------------------------
+
+Fixes:
+
+- extract: hang on partial extraction with ssh: repo, when hardlink master
+  is not matched/extracted and borg hangs on related slave hardlink, #4350
+- lrucache: regularly remove old FDs, #4427
+- avoid stale filehandle issues, #3265
+- freebsd: make xattr platform code api compatible with linux, #3952
+- use whitelist approach for borg serve, #4097
+- borg command shall terminate with rc 2 for ImportErrors, #4424
+- create: only run stat_simple_attrs() once, this increases
+  backup with lots of unchanged files performance by ~ 5%.
+- prune: fix incorrect borg prune --stats output with --dry-run, #4373
+- key export: emit user-friendly error if repo key is exported to a directory,
+  #4348
+
+New features:
+
+- bundle latest supported msgpack-python release (0.5.6), remove msgpack-python
+  from setup.py install_requires - by default we use the bundled code now.
+  optionally, we still support using an external msgpack (see hints in
+  setup.py), but this requires solid requirements management within
+  distributions and is not recommended.
+  borgbackup will break if you upgrade msgpack to an unsupported version.
+- display msgpack version as part of sysinfo (e.g. in tracebacks)
+- timestamp for borg delete --info added, #4359
+- enable placeholder usage in --comment and --glob-archives, #4559, #4495
+
+Other:
+
+- serve: do not check python/libc for borg serve, #4483
+- shell completions: borg diff second archive
+- release scripts: signing binaries with Qubes OS support
+- testing:
+
+  - vagrant: upgrade openbsd box to 6.4
+  - travis-ci: lock test env to py 3.4 compatible versions, #4343
+  - get rid of confusing coverage warning, #2069
+  - rename test_mount_hardlinks to test_fuse_mount_hardlinks,
+    so both can be excluded by "not test_fuse".
+  - pure-py msgpack warning shall not make a lot of tests fail, #4558
+- docs:
+
+  - add "SSH Configuration" section to "borg serve", #3988, #636, #4485
+  - README: new URL for funding options
+  - add a sample logging.conf in docs/misc, #4380
+  - elaborate on append-only mode docs, #3504
+  - installation: added Alpine Linux to distribution list, #4415
+  - usage.html: only modify window.location when redirecting, #4133
+  - add msgpack license to docs/3rd_party/msgpack
+- vagrant / binary builds:
+
+  - use python 3.5.7 for builds
+  - use osxfuse 3.8.3
 
 
 Version 1.1.9 (2019-02-10)

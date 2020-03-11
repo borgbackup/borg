@@ -256,22 +256,22 @@ Directories and files:
         to modify ``BORG_BASE_DIR``: the other paths for cache, config etc. will adapt accordingly.
         (Assuming you didn't set them to a different custom value.)
     BORG_CACHE_DIR
-        Defaults to ``BORG_BASE_DIR/.cache/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
-        `XDG env var`_ ``XDG_CACHE_HOME`` is set, then ``XDG_CACHE_HOME/borg`` is being used instead.
+        Defaults to ``$BORG_BASE_DIR/.cache/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
+        `XDG env var`_ ``XDG_CACHE_HOME`` is set, then ``$XDG_CACHE_HOME/borg`` is being used instead.
         This directory contains the local cache and might need a lot
         of space for dealing with big repositories. Make sure you're aware of the associated
         security aspects of the cache location: :ref:`cache_security`
     BORG_CONFIG_DIR
-        Defaults to ``BORG_BASE_DIR/.config/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
-        `XDG env var`_ ``XDG_CONFIG_HOME`` is set, then ``XDG_CONFIG_HOME/borg`` is being used instead.
+        Defaults to ``$BORG_BASE_DIR/.config/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
+        `XDG env var`_ ``XDG_CONFIG_HOME`` is set, then ``$XDG_CONFIG_HOME/borg`` is being used instead.
         This directory contains the whole config directories. See FAQ
         for security advisory about the data in this directory: :ref:`home_config_borg`
     BORG_SECURITY_DIR
-        Defaults to ``BORG_CONFIG_DIR/security``.
+        Defaults to ``$BORG_CONFIG_DIR/security``.
         This directory contains information borg uses to track its usage of NONCES ("numbers used
         once" - usually in encryption context) and other security relevant data.
     BORG_KEYS_DIR
-        Defaults to ``BORG_CONFIG_DIR/keys``.
+        Defaults to ``$BORG_CONFIG_DIR/keys``.
         This directory contains keys for encrypted repositories.
     BORG_KEY_FILE
         When set, use the given filename as repository key file.

@@ -113,7 +113,8 @@ common techniques to achieve this.
 
 - Avoid running any programs that might change the files.
 
-- Snapshot files, filesystems, container storage volumes, or logical volumes.  LVM or ZFS might be useful here.
+- Snapshot files, filesystems, container storage volumes, or logical volumes.
+  LVM or ZFS might be useful here.
 
 - Dump databases or stop the database servers.
 

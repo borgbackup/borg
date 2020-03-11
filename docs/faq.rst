@@ -167,9 +167,10 @@ really desperate (e.g. if you have no completed backup of that file and you'ld
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
-Note that checkpoints inside files are created only since version 1.1,
-make sure you have an up-to-date version of borgbackup if you want to continue instead of retransferring a huge file.
-In some cases, there is only an outdated version shipped with your distribution (e.g. Debian). See :ref:`installation`.
+Note that checkpoints inside files are created only since version 1.1, make
+sure you have an up-to-date version of borgbackup if you want to continue
+instead of retransferring a huge file. In some cases, there is only an outdated
+version shipped with your distribution (e.g. Debian). See :ref:`installation`.
 
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
@@ -240,8 +241,8 @@ Apart from these very rare errors there are two main causes of errors:
 (i) Defective hardware: described below.
 (ii) Bugs in software (Borg, operating system, libraries):
      Ensure software is up to date.
-     Check whether the issue is caused by any fixed bugs described in :ref:`important_notes`.
-
+     Check whether the issue is caused by any fixed bugs described in
+     :ref:`important_notes`.
 
 .. rubric:: Finding defective hardware
 
@@ -703,9 +704,14 @@ already used.
 By default, ctime (change time) is used for the timestamps to have a rather
 safe change detection (see also the --files-cache option).
 
-Furthermore, pathnames recorded in files cache are always absolute, even if you specify
-source directories with relative pathname. If relative pathnames are stable, but absolute are
-not (for example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable), borg will assume that files are different and will report them as 'added', even though no new chunks will be actually recorded for them. To avoid this, you could bind mount your source directory in a directory with the stable path.
+Furthermore, pathnames recorded in files cache are always absolute, even if you
+specify source directories with relative pathname. If relative pathnames are
+stable, but absolute are not (for example if you mount a filesystem without
+stable mount points for each backup or if you are running the backup from a
+filesystem snapshot whose name is not stable), borg will assume that files are
+different and will report them as 'added', even though no new chunks will be
+actually recorded for them. To avoid this, you could bind mount your source
+directory in a directory with the stable path.
 
 .. _always_chunking:
 
@@ -733,10 +739,11 @@ BORG_FILES_CACHE_TTL to at least 26 (or maybe even a small multiple of that),
 it would be much faster.
 
 Another possible reason is that files don't always have the same path, for
-example if you mount a filesystem without stable mount points for each backup or if you are running the backup from a filesystem snapshot whose name is not stable.
-If the directory where you mount a filesystem is different every time,
-Borg assumes they are different files. This is true even if you backup these files with relative pathnames - borg uses full
-pathnames in files cache regardless.
+example if you mount a filesystem without stable mount points for each backup
+or if you are running the backup from a filesystem snapshot whose name is not
+stable. If the directory where you mount a filesystem is different every time,
+Borg assumes they are different files. This is true even if you backup these
+files with relative pathnames - borg uses full pathnames in files cache regardless.
 
 
 Is there a way to limit bandwidth with Borg?
@@ -765,7 +772,8 @@ Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh.
 
     export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
 
-Now Borg will be bandwidth limited. Nice thing about pv is that you can change rate-limit on the fly:
+Now Borg will be bandwidth limited. The nice thing about ``pv`` is that you can
+change rate-limit on the fly:
 
 ::
 
@@ -944,13 +952,16 @@ Borg is a fork of `Attic`_ and maintained by "`The Borg collective`_".
 
 Here's a (incomplete) list of some major changes:
 
-* lots of attic issues fixed (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_),
+* lots of attic issues fixed
+  (see `issue #5 <https://github.com/borgbackup/borg/issues/5>`_),
   including critical data corruption bugs and security issues.
-* more open, faster paced development (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
+* more open, faster paced development
+  (see `issue #1 <https://github.com/borgbackup/borg/issues/1>`_)
 * less chunk management overhead (less memory and disk usage for chunks index)
 * faster remote cache resync (useful when backing up multiple machines into same repo)
 * compression: no, lz4, zstd, zlib or lzma compression, adjustable compression levels
-* repokey replaces problematic passphrase mode (you can't change the passphrase nor the pbkdf2 iteration count in "passphrase" mode)
+* repokey replaces problematic passphrase mode (you can't change the passphrase
+  nor the pbkdf2 iteration count in "passphrase" mode)
 * simple sparse file support, great for virtual machine disk files
 * can read special files (e.g. block devices) or from stdin, write to stdout
 * mkdir-based locking is more compatible than attic's posix locking

@@ -1,5 +1,5 @@
 .. include:: ../global.rst.inc
-.. highlight:: json
+.. highlight:: none
 
 .. _json_output:
 
@@ -121,6 +121,7 @@ log_message
 See Prompts_ for the types used by prompts.
 
 .. rubric:: Examples (reformatted, each object would be on exactly one line)
+.. highlight:: json
 
 :ref:`borg_extract` progress::
 
@@ -171,6 +172,7 @@ environment variable that can be used to override the prompt. It is the same for
 messages pertaining to the same prompt.
 
 .. rubric:: Examples (reformatted, each object would be on exactly one line)
+.. highlight:: none
 
 Providing an invalid answer::
 
@@ -265,6 +267,7 @@ stats
     unique_csize
         Compressed and encrypted size of all chunks
 
+.. highlight: json
 Example *borg info* output::
 
     {

@@ -111,9 +111,10 @@ alias for ``borg mount``::
 
     ln -s /usr/local/bin/borg /usr/local/bin/borgfs
 
-Note that the binary uses /tmp to unpack Borg with all dependencies.
-It will fail if /tmp has not enough free space or is mounted with the ``noexec`` option.
-You can change the temporary directory by setting the ``TEMP`` environment variable before running Borg.
+Note that the binary uses /tmp to unpack Borg with all dependencies. It will
+fail if /tmp has not enough free space or is mounted with the ``noexec``
+option. You can change the temporary directory by setting the ``TEMP``
+environment variable before running Borg.
 
 If a new version is released, you will have to manually download it and replace
 the old version using the same steps as shown above.
@@ -230,8 +231,8 @@ dependencies::
     pip3 install virtualenv
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of
-FUSE for OS X, which is available via `github <https://github.com/osxfuse/osxfuse/releases/latest>`__,
-or via homebrew::
+FUSE for OS X, which is available via `github
+<https://github.com/osxfuse/osxfuse/releases/latest>`__, or via homebrew::
 
     brew cask install osxfuse
 

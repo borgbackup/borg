@@ -350,6 +350,9 @@ Checklist:
 
     scripts/sign-binaries 201912312359
 - close release milestone on Github
+- `update borgbackup.org
+  <https://github.com/borgbackup/borgbackup.github.io/pull/53/files>`_ with the
+  new version number and release date
 - announce on:
 
  - Mailing list

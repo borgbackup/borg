@@ -1,3 +1,5 @@
+:orphan:
+
 .. include:: global.rst.inc
 
 Borg documentation
@@ -15,5 +17,9 @@ Borg documentation
     usage
     deployment
     faq
+    support
+    resources
+    changes
     internals
     development
+    authors

@@ -230,8 +230,6 @@ General:
             in systemd.nspawn containers on some architectures (e.g. ARM).
             Using this does not affect data safety, but might result in a more bursty
             write to disk behaviour (not continuously streaming to disk).
-    TMPDIR
-        where temporary files are stored (might need a lot of temporary space for some operations), see tempfile_ for details
 
 Some automatic "answerers" (if set, they automatically answer confirmation questions):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
@@ -251,22 +249,26 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
 
 Directories and files:
     BORG_BASE_DIR
-        Default to '$HOME', '~$USER', '~' (in that order)'.
+        Defaults to '$HOME', '~$USER', '~' (in that order)'.
         If we refer to ~ below, we in fact mean BORG_BASE_DIR.
     BORG_CACHE_DIR
-        Default to '~/.cache/borg'. This directory contains the local cache and might need a lot
+        Defaults to '~/.cache/borg'. This directory contains the local cache and might need a lot
         of space for dealing with big repositories. Make sure you're aware of the associated
         security aspects of the cache location: :ref:`cache_security`
     BORG_CONFIG_DIR
-        Default to '~/.config/borg'. This directory contains the whole config directories.
+        Defaults to '~/.config/borg'. This directory contains the whole config directories. See FAQ
+        for security advisory about the data in this directory: :ref:`home_config_borg`
     BORG_SECURITY_DIR
-        Default to '~/.config/borg/security'. This directory contains information borg uses to
+        Defaults to '~/.config/borg/security'. This directory contains information borg uses to
         track its usage of NONCES ("numbers used once" - usually in encryption context) and other
         security relevant data. Will move with BORG_CONFIG_DIR variable unless specified.
     BORG_KEYS_DIR
-        Default to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
+        Defaults to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
     BORG_KEY_FILE
         When set, use the given filename as repository key file.
+    TMPDIR
+        This is where temporary files are stored (might need a lot of temporary space for some
+        operations), see tempfile_ for details.
 
 Building:
     BORG_OPENSSL_PREFIX

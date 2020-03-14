@@ -188,6 +188,7 @@ see ``docs/suppport.rst`` in the source distribution).
 .. |screencast_basic| image:: https://asciinema.org/a/133292.png
         :alt: BorgBackup Basic Usage
         :target: https://asciinema.org/a/133292?autoplay=1&speed=1
+        :width: 100%
 
 .. _installation: https://asciinema.org/a/133291?autoplay=1&speed=1
 

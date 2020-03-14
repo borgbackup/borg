@@ -272,6 +272,7 @@ stats
         Compressed and encrypted size of all chunks
 
 .. highlight: json
+
 Example *borg info* output::
 
     {

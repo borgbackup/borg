@@ -353,6 +353,28 @@ to change them.
 Security
 ########
 
+.. _home_config_borg:
+
+How important is the $HOME/.config/borg directory?
+--------------------------------------------------
+
+The Borg config directory has content that you should take care of:
+
+``security`` subdirectory
+  Each directory here represents one Borg repository by its ID and contains the last known status.
+  If a repository's status is different from this information at the beginning of BorgBackup
+  operation, Borg outputs warning messages and asks for confirmation, so make sure you do not lose
+  or manipulate these files. However, apart from those warnings, a loss of these files can be
+  recovered.
+
+``keys`` subdirectory
+  In this directory all your repository keyfiles are stored. You MUST make sure to have an
+  independent backup of these keyfiles, otherwise you cannot access your backups anymore if you lose
+  them. You also MUST keep these files secret; everyone who gains access to your repository and has
+  the corresponding keyfile (and the key passphrase) can extract it.
+
+Make sure that only you have access to the Borg config directory.
+
 .. _cache_security:
 
 Do I need to take security precautions regarding the cache?
@@ -366,8 +388,8 @@ same system which also contains the original files which are being
 backed up. So someone with access to the cache files would also have
 access the the original files anyway.
 
-If you ever need to move the cache to a different location, this can
-be achieved by using the appropriate :ref:`env_vars`.
+The Internals section contains more details about :ref:`cache`. If you ever need to move the cache
+to a different location, this can be achieved by using the appropriate :ref:`env_vars`.
 
 How can I specify the encryption passphrase programmatically?
 -------------------------------------------------------------

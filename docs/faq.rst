@@ -364,14 +364,14 @@ The Borg config directory has content that you should take care of:
   Each directory here represents one Borg repository by its ID and contains the last known status.
   If a repository's status is different from this information at the beginning of BorgBackup
   operation, Borg outputs warning messages and asks for confirmation, so make sure you do not lose
-  or manipulate these files. However, apart from that warnings, a loss of these files can be
+  or manipulate these files. However, apart from those warnings, a loss of these files can be
   recovered.
 
 ``keys`` subdirectory
   In this directory all your repository keyfiles are stored. You MUST make sure to have an
   independent backup of these keyfiles, otherwise you cannot access your backups anymore if you lose
   them. You also MUST keep these files secret; everyone who gains access to your repository and has
-  the corresponding keyfile (and the protection password) can extract it.
+  the corresponding keyfile (and the key passphrase) can extract it.
 
 Make sure that only you have access to the Borg config directory.
 

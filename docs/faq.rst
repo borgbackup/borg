@@ -187,6 +187,38 @@ all the part files and manually concatenate them together.
 
 For more details, see :ref:`checkpoints_parts`.
 
+My repository is corrupt, how can I restore from an older but working repository?
+---------------------------------------------------------------------------------
+
+If the working repo has the same ID as the corrupt one, the recommended method
+is to delete the corrupted repository, and then copy the working repository to
+the same location. The delete command will completely remove the corrupt repo
+and delete the corresponding cache and security subdirectory in
+``~/.config/borg/security``, including the nonce value (if encryption is used).
+When the working repo is used later for creating new archives, Borg would
+initialize a fresh nonce, which would be bad for security reasons (nonce values
+should never be reused). To prevent this, the security subdirectory should be
+saved before deleting, and later moved back into place.
+
+Example:
+
+::
+
+    # Get the repo ID from repo config.
+    REPO_ID=$(borg config /path/to/repo-good id)
+
+    # Rename the repo security dir so Borg won't delete it.
+    cd ~/.config/borg/security
+    mv $REPO_ID $REPO_ID.backup
+
+    # Now delete and rename the security dir back.
+    borg delete /path/to/repo
+    mv $REPO_ID.backup $REPO_ID
+
+    # Finally copy the good repo to the original place.
+    rsync -avH /path/to/repo-good /path/to/repo
+
+
 Can Borg add redundancy to the backup data to deal with hardware malfunction?
 -----------------------------------------------------------------------------
 

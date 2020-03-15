@@ -36,6 +36,10 @@ Especially for graphical frontends it is important to be able to convey and refo
 in meaningful ways. The ``--log-json`` option turns the stderr stream of Borg into a stream of JSON lines,
 where each line is a JSON object. The *type* key of the object determines its other contents.
 
+.. warning:: JSON logging requires successful argument parsing. Even with ``--log-json`` specified, a
+    parsing error will be printed in plain text, because logging set-up happens after all arguments are
+    parsed.
+
 Since JSON can only encode text, any string representing a file system path may miss non-text parts.
 
 The following types are in use. Progress information is governed by the usual rules for progress information,

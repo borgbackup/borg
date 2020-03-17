@@ -303,8 +303,6 @@ class Auto(CompressorBase):
     def __init__(self, compressor):
         super().__init__()
         self.compressor = compressor
-        self.lz4 = get_compressor('lz4')
-        self.none = get_compressor('none')
 
     def _decide(self, data):
         """
@@ -312,25 +310,25 @@ class Auto(CompressorBase):
 
         *lz4_data* is the LZ4 result if *compressor* is LZ4 as well, otherwise it is None.
         """
-        lz4_data = self.lz4.compress(data)
+        lz4_data = LZ4_COMPRESSOR.compress(data)
         ratio = len(lz4_data) / len(data)
         if ratio < 0.97:
             return self.compressor, lz4_data
         elif ratio < 1:
-            return self.lz4, lz4_data
+            return LZ4_COMPRESSOR, lz4_data
         else:
-            return self.none, None
+            return NONE_COMPRESSOR, None
 
     def decide(self, data):
         return self._decide(data)[0]
 
     def compress(self, data):
         compressor, lz4_data = self._decide(data)
-        if compressor is self.lz4:
+        if compressor is LZ4_COMPRESSOR:
             # we know that trying to compress with expensive compressor is likely pointless,
             # but lz4 managed to at least squeeze the data a bit.
             return lz4_data
-        if compressor is self.none:
+        if compressor is NONE_COMPRESSOR:
             # we know that trying to compress with expensive compressor is likely pointless
             # and also lz4 did not manage to squeeze the data (not even a bit).
             uncompressed_data = compressor.compress(data)
@@ -369,6 +367,9 @@ def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]
     return cls(**kwargs)
 
+# compressor instances to be used by all other compressors
+NONE_COMPRESSOR = get_compressor('none')
+LZ4_COMPRESSOR = get_compressor('lz4')
 
 class Compressor:
     """

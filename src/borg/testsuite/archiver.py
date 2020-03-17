@@ -2095,12 +2095,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_compression_none_compressible(self):
         size, csize = self._get_sizes('none', compressible=True)
-        assert csize >= size
         assert csize == size + 3
 
     def test_compression_none_uncompressible(self):
         size, csize = self._get_sizes('none', compressible=False)
-        assert csize >= size
         assert csize == size + 3
 
     def test_compression_zlib_compressible(self):
@@ -2119,7 +2117,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_compression_auto_uncompressible(self):
         size, csize = self._get_sizes('auto,zlib', compressible=False)
-        assert csize >= size
         assert csize == size + 3  # same as compression 'none'
 
     def test_compression_lz4_compressible(self):

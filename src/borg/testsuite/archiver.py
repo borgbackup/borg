@@ -2182,16 +2182,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # mount the whole repository, archive contents shall show up in archivename subdirs of mountpoint:
         with self.fuse_mount(self.repository_location, mountpoint):
-            # bsdflags are not supported by the FUSE mount
+            # flags are not supported by the FUSE mount
             # we also ignore xattrs here, they are tested separately
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'),
-                                   ignore_bsdflags=True, ignore_xattrs=True)
+                                   ignore_flags=True, ignore_xattrs=True)
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'),
-                                   ignore_bsdflags=True, ignore_xattrs=True)
+                                   ignore_flags=True, ignore_xattrs=True)
         # mount only 1 archive, its contents shall show up directly in mountpoint:
         with self.fuse_mount(self.repository_location + '::archive', mountpoint):
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'),
-                                   ignore_bsdflags=True, ignore_xattrs=True)
+                                   ignore_flags=True, ignore_xattrs=True)
             # regular file
             in_fn = 'input/file1'
             out_fn = os.path.join(mountpoint, 'input', 'file1')
@@ -2896,7 +2896,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with changedir('output'):
             # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
             subprocess.check_call(['tar', 'xpf', '../simple.tar', '--warning=no-timestamp'])
-        self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
+        self.assert_dirs_equal('input', 'output/input', ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
 
     @requires_gnutar
     @requires_gzip
@@ -2912,7 +2912,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'input/dir2\n' in list
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../simple.tar.gz', '--warning=no-timestamp'])
-        self.assert_dirs_equal('input', 'output/input', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
+        self.assert_dirs_equal('input', 'output/input', ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
 
     @requires_gnutar
     def test_export_tar_strip_components(self):
@@ -2928,7 +2928,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'input/dir2\n' in list
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../simple.tar', '--warning=no-timestamp'])
-        self.assert_dirs_equal('input', 'output/', ignore_bsdflags=True, ignore_xattrs=True, ignore_ns=True)
+        self.assert_dirs_equal('input', 'output/', ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
 
     @requires_hardlinks
     @requires_gnutar

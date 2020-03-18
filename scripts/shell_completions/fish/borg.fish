@@ -117,6 +117,7 @@ complete -c borg -f      -l 'noatime'               -d 'Do not store atime'     
 complete -c borg -f      -l 'noctime'               -d 'Do not store ctime'                         -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'nobirthtime'           -d 'Do not store creation date'                 -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'nobsdflags'            -d 'Do not store bsdflags'                      -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'noflags'               -d 'Do not store flags'                         -n "__fish_seen_subcommand_from create"
 set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
 complete -c borg -f      -l 'files-cache'           -d 'Operate files cache in MODE' -a "$files_cache_mode" -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'read-special'          -d 'Open device files like regular files'       -n "__fish_seen_subcommand_from create"
@@ -134,6 +135,7 @@ complete -c borg -f      -l 'list'                  -d 'Print verbose list of it
 complete -c borg -f -s n -l 'dry-run'               -d 'Do not actually extract any files'          -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'numeric-owner'         -d 'Only obey numeric user:group identifiers'   -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'nobsdflags'            -d 'Do not extract/set bsdflags'                -n "__fish_seen_subcommand_from extract"
+complete -c borg -f      -l 'noflags'               -d 'Do not extract/set flags'                   -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'stdout'                -d 'Write all extracted data to stdout'         -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'sparse'                -d 'Create holes in output sparse file'         -n "__fish_seen_subcommand_from extract"
 # Exclusion options

@@ -308,8 +308,15 @@ class Repository:
                 # some python ports have no os.link, see #4901
                 logger.warning(link_error_msg)
 
-        with SaveFile(config_path) as fd:
-            config.write(fd)
+        try:
+            with SaveFile(config_path) as fd:
+                config.write(fd)
+        except PermissionError as e:
+            # error is only a problem if we even had a lock
+            if self.do_lock:
+                raise
+            logger.warning("%s: Failed writing to '%s'. This is expected when working on "
+                           "read-only repositories." % (e.strerror, e.filename))
 
         if os.path.isfile(old_config_path):
             secure_erase(old_config_path)
@@ -325,7 +332,7 @@ class Repository:
         return keydata.encode('utf-8')  # remote repo: msgpack issue #99, returning bytes
 
     def get_free_nonce(self):
-        if not self.lock.got_exclusive_lock():
+        if self.do_lock and not self.lock.got_exclusive_lock():
             raise AssertionError("bug in code, exclusive lock should exist here")
 
         nonce_path = os.path.join(self.path, 'nonce')
@@ -336,14 +343,21 @@ class Repository:
             return None
 
     def commit_nonce_reservation(self, next_unreserved, start_nonce):
-        if not self.lock.got_exclusive_lock():
+        if self.do_lock and not self.lock.got_exclusive_lock():
             raise AssertionError("bug in code, exclusive lock should exist here")
 
         if self.get_free_nonce() != start_nonce:
             raise Exception("nonce space reservation with mismatched previous state")
         nonce_path = os.path.join(self.path, 'nonce')
-        with SaveFile(nonce_path, binary=False) as fd:
-            fd.write(bin_to_hex(next_unreserved.to_bytes(8, byteorder='big')))
+        try:
+            with SaveFile(nonce_path, binary=False) as fd:
+                fd.write(bin_to_hex(next_unreserved.to_bytes(8, byteorder='big')))
+        except PermissionError as e:
+            # error is only a problem if we even had a lock
+            if self.do_lock:
+                raise
+            logger.warning("%s: Failed writing to '%s'. This is expected when working on "
+                           "read-only repositories." % (e.strerror, e.filename))
 
     def destroy(self):
         """Destroy the repository at `self.path`
@@ -504,7 +518,7 @@ class Repository:
 
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
-        if not self.lock.got_exclusive_lock():
+        if self.do_lock and not self.lock.got_exclusive_lock():
             if self.exclusive is not None:
                 # self.exclusive is either True or False, thus a new client is active here.
                 # if it is False and we get here, the caller did not use exclusive=True although

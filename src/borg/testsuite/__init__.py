@@ -235,26 +235,66 @@ class BaseTestCase(unittest.TestCase):
             self._assert_dirs_equal_cmp(sub_diff, ignore_bsdflags=ignore_bsdflags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)
 
     @contextmanager
-    def fuse_mount(self, location, mountpoint, *options):
-        os.mkdir(mountpoint)
-        args = ['mount', location, mountpoint] + list(options)
-        self.cmd(*args, fork=True)
-        self.wait_for_mount(mountpoint)
+    def fuse_mount(self, location, mountpoint=None, *options, **kwargs):
+        if mountpoint is None:
+            mountpoint = tempfile.mkdtemp()
+        else:
+            os.mkdir(mountpoint)
+        if 'fork' not in kwargs:
+            # For a successful mount, `fork = True` is required for
+            # the borg mount daemon to work properly or the tests
+            # will just freeze. Therefore, if argument `fork` is not
+            # specified, the default value is `True`, regardless of
+            # `FORK_DEFAULT`. However, leaving the possibilty to run
+            # the command with `fork = False` is still necessary for
+            # testing for mount failures, for example attempting to
+            # mount a read-only repo.
+            kwargs['fork'] = True
+        self.cmd('mount', location, mountpoint, *options, **kwargs)
+        self.wait_for_mountstate(mountpoint, mounted=True)
         yield
         umount(mountpoint)
+        self.wait_for_mountstate(mountpoint, mounted=False)
         os.rmdir(mountpoint)
         # Give the daemon some time to exit
-        time.sleep(.2)
+        time.sleep(0.2)
 
-    def wait_for_mount(self, path, timeout=5):
-        """Wait until a filesystem is mounted on `path`
-        """
+    def wait_for_mountstate(self, mountpoint, *, mounted, timeout=5):
+        """Wait until a path meets specified mount point status"""
         timeout += time.time()
         while timeout > time.time():
-            if os.path.ismount(path):
+            if os.path.ismount(mountpoint) == mounted:
                 return
-            time.sleep(.1)
-        raise Exception('wait_for_mount(%s) timeout' % path)
+            time.sleep(0.1)
+        message = 'Waiting for %s of %s' % ('mount' if mounted else 'umount', mountpoint)
+        raise TimeoutError(message)
+
+    @contextmanager
+    def read_only(self, path):
+        """Some paths need to be made read-only for testing
+
+        Using chmod to remove write permissions is not enough due to
+        the tests running with root privileges. Instead, the folder is
+        rendered immutable with chattr or chflags, respectively.
+        """
+        if sys.platform.startswith('linux'):
+            cmd_immutable = 'chattr +i "%s"' % path
+            cmd_mutable = 'chattr -i "%s"' % path
+        elif sys.platform.startswith(('darwin', 'freebsd', 'netbsd', 'openbsd')):
+            cmd_immutable = 'chflags uchg "%s"' % path
+            cmd_mutable = 'chflags nouchg "%s"' % path
+        elif sys.platform.startswith('sunos'):  # openindiana
+            cmd_immutable = 'chmod S+vimmutable "%s"' % path
+            cmd_mutable = 'chmod S-vimmutable "%s"' % path
+        else:
+            message = 'Testing read-only repos is not supported on platform %s' % sys.platform
+            self.skipTest(message)
+        try:
+            os.system(cmd_immutable)
+            yield
+        finally:
+            # Restore permissions to ensure clean-up doesn't fail
+            os.system(cmd_mutable)
 
 
 class changedir:

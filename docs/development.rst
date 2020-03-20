@@ -17,33 +17,33 @@ Contributions
 
 Some guidance for contributors:
 
-- discuss about changes on github issue tracker, IRC or mailing list
+- Discuss changes on the GitHub issue tracker, on IRC or on the mailing list.
 
-- make your PRs on the ``master`` branch (see `Branching Model`_ for details)
+- Make your PRs on the ``master`` branch (see `Branching Model`_ for details).
 
-- do clean changesets:
+- Do clean changesets:
 
-  - focus on some topic, resist changing anything else.
-  - do not do style changes mixed with functional changes.
-  - try to avoid refactorings mixed with functional changes.
-  - if you need to fix something after commit/push:
+  - Focus on some topic, resist changing anything else.
+  - Do not do style changes mixed with functional changes.
+  - Try to avoid refactorings mixed with functional changes.
+  - If you need to fix something after commit/push:
 
-    - if there are ongoing reviews: do a fixup commit you can
-      merge into the bad commit later.
-    - if there are no ongoing reviews or you did not push the
-      bad commit yet: edit the commit to include your fix or
+    - If there are ongoing reviews: do a fixup commit you can
+      squash into the bad commit later.
+    - If there are no ongoing reviews or you did not push the
+      bad commit yet: amend the commit to include your fix or
       merge the fixup commit before pushing.
-  - have a nice, clear, typo-free commit comment
-  - if you fixed an issue, refer to it in your commit comment
-  - follow the style guide (see below)
+  - Have a nice, clear, typo-free commit comment.
+  - If you fixed an issue, refer to it in your commit comment.
+  - Follow the style guide (see below).
 
-- if you write new code, please add tests and docs for it
+- If you write new code, please add tests and docs for it.
 
-- run the tests, fix anything that comes up
+- Run the tests, fix any issues that come up.
 
-- make a pull request on github
+- Make a pull request on GitHub.
 
-- wait for review by other developers
+- Wait for review by other developers.
 
 Branching model
 ---------------
@@ -52,24 +52,24 @@ Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup mailing list to the maintainers).
 
-Stable releases are maintained on maintenance branches named x.y-maint, eg.
-the maintenance branch of the 1.0.x series is 1.0-maint.
+Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
+the maintenance branch of the 1.0.x series is ``1.0-maint``.
 
-Most PRs should be made against the ``master`` branch. Only if an
+Most PRs should be filed against the ``master`` branch. Only if an
 issue affects **only** a particular maintenance branch a PR should be
-made against it directly.
+filed against it directly.
 
 While discussing / reviewing a PR it will be decided whether the
-change should be applied to maintenance branch(es). Each maintenance
+change should be applied to maintenance branches. Each maintenance
 branch has a corresponding *backport/x.y-maint* label, which will then
 be applied.
 
 Changes that are typically considered for backporting:
 
-- Data loss, corruption and inaccessibility fixes
-- Security fixes
-- Forward-compatibility improvements
-- Documentation corrections
+- Data loss, corruption and inaccessibility fixes.
+- Security fixes.
+- Forward-compatibility improvements.
+- Documentation corrections.
 
 .. rubric:: Maintainer part
 
@@ -113,7 +113,7 @@ troublesome due to merges growing more conflict-heavy and error-prone.
 Code and issues
 ---------------
 
-Code is stored on Github, in the `Borgbackup organization
+Code is stored on GitHub, in the `Borgbackup organization
 <https://github.com/borgbackup/borg/>`_. `Issues
 <https://github.com/borgbackup/borg/issues>`_ and `pull requests
 <https://github.com/borgbackup/borg/pulls>`_ should be sent there as
@@ -226,7 +226,7 @@ parsers declared in the program and their documentation, which is
 embedded in the program (see archiver.py). These are committed to git
 for easier use by packagers downstream.
 
-When a command is added, a commandline flag changed, added or removed,
+When a command is added, a command line flag changed, added or removed,
 the usage docs need to be rebuilt as well::
 
   python setup.py build_usage
@@ -311,59 +311,60 @@ Creating a new release
 
 Checklist:
 
-- make sure all issues for this milestone are closed or moved to the
-  next milestone
-- check if there are any pending fixes for security issues
-- find and fix any low hanging fruit left on the issue tracker
-- check that Travis CI is happy
-- update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``
-- check version number of upcoming release in ``CHANGES.rst``
-- verify that ``MANIFEST.in`` and ``setup.py`` are complete
+- Make sure all issues for this milestone are closed or moved to the
+  next milestone.
+- Check if there are any pending fixes for security issues.
+- Find and fix any low hanging fruit left on the issue tracker.
+- Check that Travis CI is happy.
+- Update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``.
+- Check version number of upcoming release in ``CHANGES.rst``.
+- Render ``CHANGES.rst`` via ``make html`` and check for markup errors.
+- Verify that ``MANIFEST.in`` and ``setup.py`` are complete.
 - ``python setup.py build_usage ; python setup.py build_man`` and
   commit (be sure to build with Python 3.4 or 3.5 as Python 3.6 added `more
   guaranteed hashing algorithms
-  <https://github.com/borgbackup/borg/issues/2123>`_)
-- tag the release::
+  <https://github.com/borgbackup/borg/issues/2123>`_).
+- Tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
 
-- create a clean repo and use it for the following steps::
+- Create a clean repo and use it for the following steps::
 
     git clone borg borg-clean
 
   This makes sure no uncommitted files get into the release archive.
-  It also will find if you forgot to commit something that is needed.
-  It also makes sure the vagrant machines only get committed files and
+  It will also reveal uncommitted required files.
+  Moreover, it makes sure the vagrant machines only get committed files and
   do a fresh start based on that.
-- run tox and/or binary builds on all supported platforms via vagrant,
-  check for test failures
-- create sdist, sign it, upload release to (test) PyPi:
+- Run tox and/or binary builds on all supported platforms via vagrant,
+  check for test failures.
+- Create sdist, sign it, upload release to (test) PyPi:
 
   ::
 
     scripts/sdist-sign X.Y.Z
     scripts/upload-pypi X.Y.Z test
     scripts/upload-pypi X.Y.Z
-- put binaries into dist/borg-OSNAME and sign them:
+- Put binaries into dist/borg-OSNAME and sign them:
 
   ::
 
     scripts/sign-binaries 201912312359
-- close release milestone on Github
-- `update borgbackup.org
+- Close the release milestone on GitHub.
+- `Update borgbackup.org
   <https://github.com/borgbackup/borgbackup.github.io/pull/53/files>`_ with the
-  new version number and release date
-- announce on:
+  new version number and release date.
+- Announce on:
 
- - Mailing list
- - Twitter
- - IRC channel (change ``/topic``)
+ - Mailing list.
+ - Twitter.
+ - IRC channel (change ``/topic``).
 
-- create a Github release, include:
+- Create a GitHub release, include:
 
-  * standalone binaries (see above for how to create them)
+  * Standalone binaries (see above for how to create them).
 
-    + for OS X, document the OS X Fuse version in the README of the binaries.
+    + For OS X, document the OS X Fuse version in the README of the binaries.
       OS X FUSE uses a kernel extension that needs to be compatible with the
       code contained in the binary.
-  * a link to ``CHANGES.rst``
+  * A link to ``CHANGES.rst``.

@@ -335,11 +335,19 @@ also supports the ``--glob-archives`` parameter.
 How do I remove files from an existing backup?
 ----------------------------------------------
 
-Say you now want to remove old logfiles because you changed your
-backup policy as described above. The only way to do this is to use
-the :ref:`borg_recreate` command to rewrite all archives with a
-different ``--exclude`` pattern. See the examples in the
-:ref:`borg_recreate` manpage for more information.
+A file is only removed from a BorgBackup repository if all archives that contain
+the file are deleted and the corresponding data chunks are removed from the
+repository There are two ways how to remove files from a repository.
+
+1. Use :ref:`borg_delete` to remove all archives that contain the files. This
+will of course delete everything in the archive, not only some files.
+
+2. If you really want to remove only some specific files, you can run the
+:ref:`borg_recreate` command to rewrite all archives with a different
+``--exclude`` pattern. See the examples in the manpage for more information.
+
+Finally, run :ref:`borg_compact` with the ``--threshold 0`` option to delete the
+data chunks from the repository.
 
 Can I safely change the compression level or algorithm?
 --------------------------------------------------------

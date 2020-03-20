@@ -50,7 +50,7 @@ Main features
     and will still be found by the deduplication algorithm.
 
 **Speed**
-  * performance critical code (chunking, compression, encryption) is
+  * performance-critical code (chunking, compression, encryption) is
     implemented in C/Cython
   * local caching of files/chunks index data
   * quick detection of unmodified files
@@ -163,7 +163,7 @@ NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Security issues should be reported to the `Security contact`_ (or
-see ``docs/suppport.rst`` in the source distribution).
+see ``docs/support.rst`` in the source distribution).
 
 .. start-badges
 

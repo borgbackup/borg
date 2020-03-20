@@ -129,13 +129,11 @@ Building:
         Adds given prefix directory to the default locations. If a 'include/zstd.h' is found Borg
         will be linked against the system libzstd instead of a bundled implementation. (setup.py)
 
-
 Please note:
 
-- be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data's security/safety
-- also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions
-  (e.g. mode 600, root:root).
-
+- Be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data's security/safety.
+- Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
+mode 600, root:root).
 
 .. _INI: https://docs.python.org/3/library/logging.config.html#configuration-file-format
 

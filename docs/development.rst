@@ -318,6 +318,7 @@ Checklist:
 - Check that Travis CI is happy.
 - Update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``.
 - Check version number of upcoming release in ``CHANGES.rst``.
+- Render ``CHANGES.rst`` via ``make html`` and check for markup errors.
 - Verify that ``MANIFEST.in`` and ``setup.py`` are complete.
 - ``python setup.py build_usage ; python setup.py build_man`` and
   commit (be sure to build with Python 3.5 as Python 3.6 added `more

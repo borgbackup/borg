@@ -24,6 +24,7 @@ src/borg/_version.py
 *.so
 .idea/
 .cache/
+.vscode/
 borg.build/
 borg.dist/
 borg.exe

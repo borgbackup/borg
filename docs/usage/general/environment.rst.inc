@@ -133,7 +133,7 @@ Please note:
 
 - Be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data's security/safety.
 - Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
-mode 600, root:root).
+  mode 600, root:root).
 
 .. _INI: https://docs.python.org/3/library/logging.config.html#configuration-file-format
 

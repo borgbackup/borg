@@ -10,3 +10,4 @@ pytest-cov==2.6.1
 pytest-benchmark==3.2.2
 Cython==0.29.6
 twine==1.13.0
+readme-renderer<25.0

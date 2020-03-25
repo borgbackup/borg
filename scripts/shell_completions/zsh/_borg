@@ -101,6 +101,7 @@ _borg() {
                 --noatime'[do not store atime into archive]'\
                 --nobirthtime'[do not store birthtime (creation date) into archive]'\
                 --nobsdflags'[do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive]'\
+                --noflags'[do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive]'\
                 --files-cache'[operate files cache in MODE. default: ctime,size,inode]:mode:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled)'\
                 --read-special'[open and read block and char device files as well as FIFOs as if they were regular files.]'\
                 --comment'[add a comment text to the archive]:COMMENT'\
@@ -119,6 +120,7 @@ _borg() {
                 {-n,--dry-run}'[do not actually change any files]'\
                 --numeric-owner'[only obey numeric user and group identifiers]'\
                 --nobsdflags'[do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)]'\
+                --noflags'[do not extract/set flags (e.g. NODUMP, IMMUTABLE)]'\
                 --stdout'[write all extracted data to stdout]'\
                 --sparse'[create holes in output sparse file from all-zero chunks]'\
                 {-e,--exclude}'[exclude paths matching PATTERN]:PATTERN'\

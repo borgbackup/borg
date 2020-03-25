@@ -71,15 +71,15 @@ affect metadata stream deduplication: if only this timestamp changes between
 backups and is stored into the metadata stream, the metadata stream chunks
 won't deduplicate just because of that.
 
-``--nobsdflags``
-~~~~~~~~~~~~~~~~
+``--nobsdflags / --noflags``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use this to not query and store (or not extract and set) bsdflags -
-in case you don't need them or if they are broken somehow for your fs.
+You can use this to not query and store (or not extract and set) flags - in case
+you don't need them or if they are broken somehow for your fs.
 
-On Linux, dealing with the bsflags needs some additional syscalls.
-Especially when dealing with lots of small files, this causes a noticable
-overhead, so you can use this option also for speeding up operations.
+On Linux, dealing with the flags needs some additional syscalls. Especially when
+dealing with lots of small files, this causes a noticable overhead, so you can
+use this option also for speeding up operations.
 
 ``--umask``
 ~~~~~~~~~~~

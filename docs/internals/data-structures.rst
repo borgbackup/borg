@@ -563,7 +563,7 @@ dictionary created by the ``Item`` class that contains:
 * mtime, atime, ctime in nanoseconds
 * xattrs
 * acl (various OS-dependent fields)
-* bsdflags
+* flags
 
 All items are serialized using msgpack and the resulting byte stream
 is fed into the same chunker algorithm as used for regular file data

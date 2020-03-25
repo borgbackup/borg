@@ -175,7 +175,7 @@ def with_archive(method):
     def wrapper(self, args, repository, key, manifest, **kwargs):
         archive = Archive(repository, key, manifest, args.location.archive,
                           numeric_owner=getattr(args, 'numeric_owner', False),
-                          nobsdflags=getattr(args, 'nobsdflags', False),
+                          noflags=getattr(args, 'nobsdflags', False) or getattr(args, 'noflags', False),
                           cache=kwargs.get('cache'),
                           consider_part_files=args.consider_part_files, log_json=args.log_json)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
@@ -557,7 +557,7 @@ class Archiver:
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
-        self.nobsdflags = args.nobsdflags
+        self.noflags = args.nobsdflags or args.noflags
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
         t0 = datetime.utcnow()
@@ -574,7 +574,7 @@ class Archiver:
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
                 metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
-                    nobsdflags=args.nobsdflags, numeric_owner=args.numeric_owner, nobirthtime=args.nobirthtime)
+                    noflags=args.nobsdflags or args.noflags, numeric_owner=args.numeric_owner, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
                     checkpoint_interval=args.checkpoint_interval, rechunkify=False)
@@ -2370,7 +2370,8 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--noatime', None, 'Warning: "--noatime" has been deprecated because it is the default now.')
+            ('--noatime', None, 'Warning: "--noatime" has been deprecated because it is the default now.'),
+            ('--nobsdflags', None, 'Warning: "--nobsdflags" has been deprecated. Use --noflags instead.')
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -3133,7 +3134,9 @@ class Archiver:
         fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
                               help='do not store birthtime (creation date) into archive')
         fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                              help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
+                              help='deprecated, use ``--noflags`` instead')
+        fs_group.add_argument('--noflags', dest='noflags', action='store_true',
+                              help='do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
                               type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
                               help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
@@ -3526,7 +3529,9 @@ class Archiver:
         subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                                help='only obey numeric user and group identifiers')
         subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                               help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
+                               help='deprecated, use ``--noflags`` instead')
+        subparser.add_argument('--noflags', dest='noflags', action='store_true',
+                               help='do not extract/set flags (e.g. NODUMP, IMMUTABLE)')
         subparser.add_argument('--stdout', dest='stdout', action='store_true',
                                help='write all extracted data to stdout')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',

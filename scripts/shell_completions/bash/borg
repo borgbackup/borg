@@ -75,10 +75,10 @@ _borg()
                 local opts="-e --encryption --append-only --storage-quota --make-parent-dirs ${common_opts}"
                 ;;
             *' create '*)
-                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --noflags --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
                 ;;
             *' extract '*)
-                local opts="--list -n --dry-run --numeric-owner --nobsdflags --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
+                local opts="--list -n --dry-run --numeric-owner --nobsdflags --noflags --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
                 ;;
             *' check '*)
                 local opts="--repository-only --archives-only --verify-data --repair --save-space --max-duration -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"

@@ -186,7 +186,7 @@ class BaseTestCase(unittest.TestCase):
         diff = filecmp.dircmp(dir1, dir2)
         self._assert_dirs_equal_cmp(diff, **kwargs)
 
-    def _assert_dirs_equal_cmp(self, diff, ignore_bsdflags=False, ignore_xattrs=False, ignore_ns=False):
+    def _assert_dirs_equal_cmp(self, diff, ignore_flags=False, ignore_xattrs=False, ignore_ns=False):
         self.assert_equal(diff.left_only, [])
         self.assert_equal(diff.right_only, [])
         self.assert_equal(diff.diff_files, [])
@@ -206,7 +206,7 @@ class BaseTestCase(unittest.TestCase):
             d2 = [filename] + [getattr(s2, a) for a in attrs]
             d1.insert(1, oct(s1.st_mode))
             d2.insert(1, oct(s2.st_mode))
-            if not ignore_bsdflags:
+            if not ignore_flags:
                 d1.append(get_flags(path1, s1))
                 d2.append(get_flags(path2, s2))
             # ignore st_rdev if file is not a block/char device, fixes #203
@@ -232,7 +232,7 @@ class BaseTestCase(unittest.TestCase):
                 d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
-            self._assert_dirs_equal_cmp(sub_diff, ignore_bsdflags=ignore_bsdflags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)
+            self._assert_dirs_equal_cmp(sub_diff, ignore_flags=ignore_flags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)
 
     @contextmanager
     def fuse_mount(self, location, mountpoint, *options):

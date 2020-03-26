@@ -118,6 +118,8 @@ prompt is a set BORG_PASSPHRASE. See issue :issue:`2169` for details.
        manifest this way, while a changed layout would have broken
        compatibility.
 
+.. _security_encryption:
+
 Encryption
 ----------
 

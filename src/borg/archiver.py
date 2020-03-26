@@ -1183,6 +1183,7 @@ class Archiver:
     def _delete_repository(self, args, repository):
         """Delete a repository"""
         dry_run = args.dry_run
+        keep_security_info = args.keep_security_info
 
         if not args.cache_only:
             msg = []
@@ -1207,9 +1208,14 @@ class Archiver:
             if not dry_run:
                 repository.destroy()
                 logger.info("Repository deleted.")
-                SecurityManager.destroy(repository)
+                if not keep_security_info:
+                    SecurityManager.destroy(repository)
             else:
                 logger.info("Would delete repository.")
+                if keep_security_info:
+                    logger.info("Would keep security info.")
+                else:
+                    logger.info("Would delete security info.")
         if not dry_run:
             Cache.destroy(repository)
             logger.info("Cache deleted.")
@@ -3352,9 +3358,10 @@ class Archiver:
         Important: When deleting archives, repository disk space is **not** freed until
         you run ``borg compact``.
 
-        If you delete the complete repository, the local cache for it (if any) is
-        also deleted. Alternatively, you can delete just the local cache with the
-        ``--cache-only`` option.
+        When you delete a complete repository, the security info and local cache for it
+        (if any) is also deleted. Alternatively, you can delete just the local cache
+        with the ``--cache-only`` option, or keep the security info with the
+        ``--keep-security-info`` option.
 
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
@@ -3383,10 +3390,11 @@ class Archiver:
                                help='print statistics for the deleted archive')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
                                help='delete only the local cache for the given repository')
-        subparser.add_argument('--force', dest='forced',
-                               action='count', default=0,
+        subparser.add_argument('--force', dest='forced', action='count', default=0,
                                help='force deletion of corrupted archives, '
                                     'use ``--force --force`` in case ``--force`` does not work.')
+        subparser.add_argument('--keep-security-info', dest='keep_security_info', action='store_true',
+                               help='keep the local security info when deleting a repository')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',

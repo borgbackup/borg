@@ -1,4 +1,3 @@
-
 .. somewhat surprisingly the "bash" highlighter gives nice results with
    the pseudo-code notation used in the "Encryption" section.
 
@@ -12,6 +11,8 @@ Security
 
 Cryptography in Borg
 ====================
+
+.. _attack_model:
 
 Attack model
 ------------
@@ -200,10 +201,11 @@ between clients, which is handled through the repository. Therefore in
 a multiple-client scenario a repository can trick a client into
 reusing counter values by ignoring counter reservations and replaying
 the manifest (which will fail if the client has seen a more recent
-manifest or has a more recent nonce reservation). If the repository is
-untrusted, but a trusted synchronization channel exists between
-clients, the security database could be synchronized between them over
-said trusted channel. This is not part of Borg's functionality.
+manifest or has a more recent nonce reservation).
+
+If the repository is untrusted, there *must* exists trusted channel
+between clients and security databases *must* be synchronized with the
+outlined protocol. This is not part of Borg's functionality.
 
 .. [#] Using the :ref:`borg key migrate-to-repokey <borg_key_migrate-to-repokey>`
        command a user can convert repositories created using Attic in "passphrase"

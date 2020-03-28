@@ -27,7 +27,12 @@ which is slower.
 Can I backup from multiple servers into a single repository?
 ------------------------------------------------------------
 
-Yes, but in order for the deduplication used by Borg to work, it
+Yes, this is *possible* from the technical standpoint, but it is
+*not recommended* from the security perspective. BorgBackup is
+built upon a defined :ref:`attack_model` that cannot provide its
+guarantees for multiple clients using the same repository.
+
+In order for the deduplication used by Borg to work, it
 needs to keep a local cache containing checksums of all file
 chunks already stored in the repository. This cache is stored in
 ``~/.cache/borg/``.  If Borg detects that a repository has been
@@ -88,6 +93,10 @@ Also, you must not run borg against multiple instances of the same repo
 There is also a similar encryption security issue for the disaster case:
 If you lose repo and the borg client-side config/cache and you restore
 the repo from an older copy-of-repo, you also run into AES counter reuse.
+
+.. In issue #3428 and PR #5034 we will introduce another FAQ titled
+.. "My repository is corrupt, how can I restore from an older copy of it?"
+.. When this is merged, we can link this FAQ to that, replacing the last paragraph.
 
 Which file types, attributes, etc. are *not* preserved?
 -------------------------------------------------------

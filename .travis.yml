@@ -4,46 +4,45 @@ cache:
     directories:
         - $HOME/.cache/pip
 
-# note: use py 3.5.2, it has lzma support. 3.5(.0) on travis.org/trusty does not.
 matrix:
     fast_finish: true
     include:
-        - python: 3.4
+        - python: "3.4"
           os: linux
           dist: trusty
           env: TOXENV=flake8
-        - python: 3.4
+        - python: "3.4"
           os: linux
           dist: trusty
           env: TOXENV=py34
-        - python: 3.5.2
+        - python: "3.5.2"  # Use version 3.5.2 because it has lzma support while 3.5(.0) does not
           os: linux
           dist: trusty
           env: TOXENV=py35
-        - python: 3.6
+        - python: "3.6"
           os: linux
           dist: trusty
           env: TOXENV=py36
-        - python: 3.7
+        - python: "3.7"
           os: linux
           dist: xenial
           env: TOXENV=py37
-        - python: 3.8
+        - python: "3.8"
           os: linux
           dist: xenial
           env: TOXENV=py38
         - language: generic
           os: osx
-          osx_image: xcode8.3
+          osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions
           env: TOXENV=py35
         - language: generic
           os: osx
-          osx_image: xcode8.3
-          env: TOXENV=py37
+          osx_image: xcode11.3
+          env: TOXENV=py37 SKIPFUSE=true
     allow_failures:
-        - os: osx
+         - os: osx  # OS X builds often take too long and time out, even though tests don't actually fail
 
-before_install:
+before_install: # Abort installation and don't run tests for pull requests if commit only changed the docs
 - |
     test $TRAVIS_EVENT_TYPE != "pull_request" || {
         echo Checking whether $TRAVIS_COMMIT_RANGE changed only docs
@@ -53,15 +52,11 @@ before_install:
         }
     }
 
-install:
-    - git fetch --unshallow --tags
-    - ./.travis/install.sh
+install: ./.travis/install.sh
 
-script:
-    - ./.travis/run.sh
+script: ./.travis/run.sh
 
-after_success:
-    - ./.travis/upload_coverage.sh
+after_success: ./.travis/upload_coverage.sh
 
 notifications:
     irc:

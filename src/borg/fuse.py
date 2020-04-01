@@ -262,14 +262,14 @@ class FuseBackend(object):
     def get_item(self, inode):
         item = self._read_cache.get(inode)
         if item:
-            return item        
+            return item
         try:
             item = self._items[inode]
             self._read_cache[inode] = item
             return item
         except KeyError:
             item = self.cache.get(inode)
-            self._read_cache[inode] = item 
+            self._read_cache[inode] = item
             return item
 
     def check_pending_archive(self, inode):
@@ -621,11 +621,11 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             last_pos = (0, 0)
         if last_pos[1] > offset:
             last_pos = (0, 0)
-                    
+
         pos, poffset = last_pos
         offset -= poffset
         npos = pos
-        for id, s, csize in item.chunks[pos : ]:
+        for id, s, csize in item.chunks[pos:]:
             if s < offset:
                 offset -= s
                 poffset += s
@@ -650,7 +650,6 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     self._last_pos.upd(fh, (npos, poffset))
                 else:
                     self._last_pos[fh] = (npos, poffset)
-                    
                 break
         return b''.join(parts)
 

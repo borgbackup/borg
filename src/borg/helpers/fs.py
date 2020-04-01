@@ -60,8 +60,14 @@ def get_security_dir(repository_id=None):
 
 def get_cache_dir():
     """Determine where to repository keys and cache"""
-    xdg_cache = os.environ.get('XDG_CACHE_HOME', os.path.join(get_base_dir(), '.cache'))
-    cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(xdg_cache, 'borg'))
+    # Get cache home path
+    cache_home = os.path.join(get_base_dir(), '.cache')
+    # Try to use XDG_CACHE_HOME instead if BORG_BASE_DIR isn't explicitly set
+    if not os.environ.get('BORG_BASE_DIR'):
+        cache_home = os.environ.get('XDG_CACHE_HOME', cache_home)
+    # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
+    cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(cache_home, 'borg'))
+    # Create path if it doesn't exist yet
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
         os.chmod(cache_dir, stat.S_IRWXU)
@@ -77,8 +83,14 @@ def get_cache_dir():
 
 def get_config_dir():
     """Determine where to store whole config"""
-    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(get_base_dir(), '.config'))
-    config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(xdg_config, 'borg'))
+    # Get config home path
+    config_home = os.path.join(get_base_dir(), '.config')
+    # Try to use XDG_CONFIG_HOME instead if BORG_BASE_DIR isn't explicitly set
+    if not os.environ.get('BORG_BASE_DIR'):
+        config_home = os.environ.get('XDG_CONFIG_HOME', config_home)
+    # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
+    config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(config_home, 'borg'))
+    # Create path if it doesn't exist yet
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
         os.chmod(config_dir, stat.S_IRWXU)

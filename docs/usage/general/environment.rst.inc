@@ -95,21 +95,28 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
 
 Directories and files:
     BORG_BASE_DIR
-        Defaults to '$HOME', '~$USER', '~' (in that order)'.
-        If we refer to ~ below, we in fact mean BORG_BASE_DIR.
+        Defaults to ``$HOME`` or ``~$USER`` or ``~`` (in that order).
+        If you want to move all borg-specific folders to a custom path at once, all you need to do is
+        to modify ``BORG_BASE_DIR``: the other paths for cache, config etc. will adapt accordingly
+        (assuming you didn't set them to a different custom value).
     BORG_CACHE_DIR
-        Defaults to '~/.cache/borg'. This directory contains the local cache and might need a lot
+        Defaults to ``$BORG_BASE_DIR/.cache/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
+        `XDG env var`_ ``XDG_CACHE_HOME`` is set, then ``$XDG_CACHE_HOME/borg`` is being used instead.
+        This directory contains the local cache and might need a lot
         of space for dealing with big repositories. Make sure you're aware of the associated
         security aspects of the cache location: :ref:`cache_security`
     BORG_CONFIG_DIR
-        Defaults to '~/.config/borg'. This directory contains the whole config directories. See FAQ
-        for security advisory about the data in this directory: :ref:`home_config_borg`
+        Defaults to ``$BORG_BASE_DIR/.config/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
+        `XDG env var`_ ``XDG_CONFIG_HOME`` is set, then ``$XDG_CONFIG_HOME/borg`` is being used instead.
+        This directory contains all borg configuration directories, see the FAQ
+        for a security advisory about the data in this directory: :ref:`home_config_borg`
     BORG_SECURITY_DIR
-        Defaults to '~/.config/borg/security'. This directory contains information borg uses to
-        track its usage of NONCES ("numbers used once" - usually in encryption context) and other
-        security relevant data. Will move with BORG_CONFIG_DIR variable unless specified.
+        Defaults to ``$BORG_CONFIG_DIR/security``.
+        This directory contains information borg uses to track its usage of NONCES ("numbers used
+        once" - usually in encryption context) and other security relevant data.
     BORG_KEYS_DIR
-        Defaults to '~/.config/borg/keys'. This directory contains keys for encrypted repositories.
+        Defaults to ``$BORG_CONFIG_DIR/keys``.
+        This directory contains keys for encrypted repositories.
     BORG_KEY_FILE
         When set, use the given filename as repository key file.
     TMPDIR

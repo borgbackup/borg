@@ -82,10 +82,9 @@ install_requires = [
 # llfuse package. "borg mount" needs llfuse to work.
 # if you do not have llfuse, do not require it, most of borgbackup will work.
 extras_require = {
-    # llfuse 1.x should work, llfuse 2.0 will break API
     'fuse': [
-        'llfuse >=1.1, <2.0',
-        'llfuse >=1.3.4; python_version >="3.7"',
+        'llfuse >=1.3, <2.0',
+        'llfuse >=1.3.4, <2.0; python_version >="3.7"',
     ],
 }
 

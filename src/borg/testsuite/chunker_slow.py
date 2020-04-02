@@ -25,10 +25,10 @@ class ChunkerRegressionTestCase(BaseTestCase):
 
         # The hashes below match the existing chunker behavior. Future chunker optimisations
         # must not change this, or existing repos will bloat.
-        tests = ( (null_permutation,
-                   unhexlify("b559b0ac8df8daaa221201d018815114241ea5c6609d98913cd2246a702af4e3")),
-                  (reverse_permutation,
-                   unhexlify("6e56c9a94c29b4564c158131914ab21b34e6897002b38e71b0843be68158c00f")))
+        tests = ((null_permutation,
+                  unhexlify("b559b0ac8df8daaa221201d018815114241ea5c6609d98913cd2246a702af4e3")),
+                 (reverse_permutation,
+                  unhexlify("6e56c9a94c29b4564c158131914ab21b34e6897002b38e71b0843be68158c00f")))
 
         for permutation, expected_result in tests:
             runs = []

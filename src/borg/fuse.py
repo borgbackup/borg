@@ -28,6 +28,10 @@ from .remote import RemoteRepository
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
+# Does this version of llfuse support birthtime?
+have_fuse_birthtime = hasattr(llfuse.EntryAttributes, 'st_birthtime')  # never?
+have_fuse_birthtime_ns = hasattr(llfuse.EntryAttributes, 'st_birthtime_ns')  # since llfuse 1.3
+
 fuse_version = LooseVersion(getattr(llfuse, '__version__', '0.1'))
 if fuse_version >= '0.42':
     def fuse_main():
@@ -541,12 +545,14 @@ class FuseOperations(llfuse.Operations):
             entry.st_mtime_ns = mtime_ns
             entry.st_atime_ns = item.get('atime', mtime_ns)
             entry.st_ctime_ns = item.get('ctime', mtime_ns)
-            entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
+            if have_fuse_birthtime_ns:
+                entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
         else:
             entry.st_mtime = mtime_ns / 1e9
             entry.st_atime = item.get('atime', mtime_ns) / 1e9
             entry.st_ctime = item.get('ctime', mtime_ns) / 1e9
-            entry.st_birthtime = item.get('birthtime', mtime_ns) / 1e9
+            if have_fuse_birthtime:
+                entry.st_birthtime = item.get('birthtime', mtime_ns) / 1e9
         return entry
 
     def listxattr(self, inode, ctx=None):

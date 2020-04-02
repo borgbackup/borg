@@ -369,9 +369,7 @@ def _derive_byte_permutation(key_material):
         for i in range(256):
             pool, offset = divmod(pool, 256-i)
             j = i + offset
-            tmp = perm[i]
-            perm[i] = perm[j]
-            perm[j] = tmp
+            perm[i], perm[j] = perm[j], perm[i]
 
         if pool == 0:
             # the pool value was less than 256!, we have an unbiased choice

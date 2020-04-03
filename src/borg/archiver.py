@@ -1212,10 +1212,7 @@ class Archiver:
                     SecurityManager.destroy(repository)
             else:
                 logger.info("Would delete repository.")
-                if keep_security_info:
-                    logger.info("Would keep security info.")
-                else:
-                    logger.info("Would delete security info.")
+                logger.info("Would %s security info." % ("keep" if keep_security_info else "delete"))
         if not dry_run:
             Cache.destroy(repository)
             logger.info("Cache deleted.")
@@ -3359,7 +3356,7 @@ class Archiver:
         you run ``borg compact``.
 
         When you delete a complete repository, the security info and local cache for it
-        (if any) is also deleted. Alternatively, you can delete just the local cache
+        (if any) are also deleted. Alternatively, you can delete just the local cache
         with the ``--cache-only`` option, or keep the security info with the
         ``--keep-security-info`` option.
 

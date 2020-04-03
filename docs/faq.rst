@@ -202,9 +202,10 @@ the working repository to the same location:
 A plain delete command would remove the security info in
 ``~/.config/borg/security``, including the nonce value. In BorgBackup
 :ref:`security_encryption` is AES-CTR, where the nonce is a counter. When the
-working repo was used later for creating new archives, Borg would initialize a
-fresh nonce, which would be bad for security reasons. To prevent this, the
-``keep-security-info`` option is applied so that the nonce counter is kept.
+working repo was used later for creating new archives, Borg would re-use nonce
+values due to starting from a lower counter value given by the older copy of the
+repository. To prevent this, the ``keep-security-info`` option is applied so
+that the client-side nonce counter is kept.
 
 Can Borg add redundancy to the backup data to deal with hardware malfunction?
 -----------------------------------------------------------------------------

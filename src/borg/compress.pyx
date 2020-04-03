@@ -314,6 +314,8 @@ class Auto(CompressorBase):
         """
         lz4_data = self.lz4.compress(data)
         ratio = len(lz4_data) / len(data)
+        # lz4_data includes the compression type header, while data does not yet
+        ratio = len(lz4_data) / (len(data) + 2)
         if ratio < 0.97:
             return self.compressor, lz4_data
         elif ratio < 1:

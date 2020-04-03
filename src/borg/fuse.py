@@ -628,7 +628,10 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             chunk_no, chunk_offset = (0, 0)
 
         offset -= chunk_offset
-        for id, s, csize in item.chunks[chunk_no:]:
+        chunks = item.chunks
+        # note: using index iteration to avoid frequently copying big (sub)lists by slicing
+        for idx in range(chunk_no, len(chunks)):
+            id, s, csize = chunks[idx]
             if s < offset:
                 offset -= s
                 chunk_offset += s

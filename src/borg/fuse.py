@@ -37,6 +37,12 @@ else:
         llfuse.main(single=True)
         return None
 
+# size of some LRUCaches (1 element per simultaneously open file)
+# note: _inode_cache might have rather large elements - Item.chunks can be large!
+#       also, simultaneously reading too many files should be avoided anyway.
+#       thus, do not set FILES to high values.
+FILES = 4
+
 
 class ItemCache:
     """
@@ -223,6 +229,8 @@ class FuseBackend(object):
         # made up and are not contained in the archives. For example archive directories or intermediate directories
         # not contained in archives.
         self._items = {}
+        # cache up to <FILES> Items
+        self._inode_cache = LRUCache(capacity=FILES, dispose=lambda _: None)
         # _inode_count is the current count of synthetic inodes, i.e. those in self._items
         self.inode_count = 0
         # Maps inode numbers to the inode number of the parent
@@ -259,10 +267,17 @@ class FuseBackend(object):
                     self.pending_archives[archive_inode] = archive.name
 
     def get_item(self, inode):
+        item = self._inode_cache.get(inode)
+        if item is not None:
+            return item
         try:
+            # this is a cheap get-from-dictionary operation, no need to cache the result.
             return self._items[inode]
         except KeyError:
-            return self.cache.get(inode)
+            # while self.cache does some internal caching, it has still quite some overhead, so we cache the result.
+            item = self.cache.get(inode)
+            self._inode_cache[inode] = item
+            return item
 
     def check_pending_archive(self, inode):
         # Check if this is an archive we need to load
@@ -430,6 +445,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
         logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
+        self._last_pos = LRUCache(capacity=FILES, dispose=lambda _: None)
 
     def sig_info_handler(self, sig_no, stack):
         logger.debug('fuse: %d synth inodes, %d edges (%s)',
@@ -606,9 +622,23 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     def read(self, fh, offset, size):
         parts = []
         item = self.get_item(fh)
-        for id, s, csize in item.chunks:
+
+        # optimize for linear reads:
+        # we cache the chunk number and the in-file offset of the chunk in _last_pos[fh]
+        chunk_no, chunk_offset = self._last_pos.get(fh, (0, 0))
+        if chunk_offset > offset:
+            # this is not a linear read, so we lost track and need to start from beginning again...
+            chunk_no, chunk_offset = (0, 0)
+
+        offset -= chunk_offset
+        chunks = item.chunks
+        # note: using index iteration to avoid frequently copying big (sub)lists by slicing
+        for idx in range(chunk_no, len(chunks)):
+            id, s, csize = chunks[idx]
             if s < offset:
                 offset -= s
+                chunk_offset += s
+                chunk_no += 1
                 continue
             n = min(size, s - offset)
             if id in self.data_cache:
@@ -625,6 +655,10 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             offset = 0
             size -= n
             if not size:
+                if fh in self._last_pos:
+                    self._last_pos.upd(fh, (chunk_no, chunk_offset))
+                else:
+                    self._last_pos[fh] = (chunk_no, chunk_offset)
                 break
         return b''.join(parts)
 

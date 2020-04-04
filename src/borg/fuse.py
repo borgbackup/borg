@@ -38,7 +38,10 @@ else:
         return None
 
 # size of some LRUCaches (1 element per simultaneously open file)
-FILES = 100
+# note: _inode_cache might have rather large elements - Item.chunks can be large!
+#       also, simultaneously reading too many files should be avoided anyway.
+#       thus, do not set FILES to high values.
+FILES = 4
 
 
 class ItemCache:

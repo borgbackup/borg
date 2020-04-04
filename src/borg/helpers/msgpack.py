@@ -9,13 +9,11 @@ from ..constants import *  # NOQA
 # Packing
 # -------
 # use_bin_type = False is needed to generate the old msgpack format (not msgpack 2.0 spec) as borg always did.
-# encoding = None is needed because usage of it is deprecated
 # unicode_errors = None is needed because usage of it is deprecated
 #
 # Unpacking
 # ---------
 # raw = True is needed to unpack the old msgpack format to bytes (not str, about the decoding see item.pyx).
-# encoding = None is needed because usage of it is deprecated
 # unicode_errors = None is needed because usage of it is deprecated
 
 from msgpack import Packer as mp_Packer
@@ -32,6 +30,8 @@ from msgpack import OutOfData
 
 version = mp_version
 
+_post_100 = version >= (1, 0, 0)
+
 
 class PackException(Exception):
     """Exception while msgpack packing"""
@@ -42,13 +42,11 @@ class UnpackException(Exception):
 
 
 class Packer(mp_Packer):
-    def __init__(self, *, default=None, encoding=None, unicode_errors=None,
+    def __init__(self, *, default=None, unicode_errors=None,
                  use_single_float=False, autoreset=True, use_bin_type=False,
                  strict_types=False):
-        assert use_bin_type is False
-        assert encoding is None
         assert unicode_errors is None
-        super().__init__(default=default, encoding=encoding, unicode_errors=unicode_errors,
+        super().__init__(default=default, unicode_errors=unicode_errors,
                          use_single_float=use_single_float, autoreset=autoreset, use_bin_type=use_bin_type,
                          strict_types=strict_types)
 
@@ -59,22 +57,18 @@ class Packer(mp_Packer):
             raise PackException(e)
 
 
-def packb(o, *, use_bin_type=False, encoding=None, unicode_errors=None, **kwargs):
-    assert use_bin_type is False
-    assert encoding is None
+def packb(o, *, use_bin_type=False, unicode_errors=None, **kwargs):
     assert unicode_errors is None
     try:
-        return mp_packb(o, use_bin_type=use_bin_type, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+        return mp_packb(o, use_bin_type=use_bin_type, unicode_errors=unicode_errors, **kwargs)
     except Exception as e:
         raise PackException(e)
 
 
-def pack(o, stream, *, use_bin_type=False, encoding=None, unicode_errors=None, **kwargs):
-    assert use_bin_type is False
-    assert encoding is None
+def pack(o, stream, *, use_bin_type=False, unicode_errors=None, **kwargs):
     assert unicode_errors is None
     try:
-        return mp_pack(o, stream, use_bin_type=use_bin_type, encoding=encoding, unicode_errors=unicode_errors, **kwargs)
+        return mp_pack(o, stream, use_bin_type=use_bin_type, unicode_errors=unicode_errors, **kwargs)
     except Exception as e:
         raise PackException(e)
 
@@ -87,25 +81,28 @@ def pack(o, stream, *, use_bin_type=False, encoding=None, unicode_errors=None, *
 class Unpacker(mp_Unpacker):
     def __init__(self, file_like=None, *, read_size=0, use_list=True, raw=True,
                  object_hook=None, object_pairs_hook=None, list_hook=None,
-                 encoding=None, unicode_errors=None, max_buffer_size=0,
+                 unicode_errors=None, max_buffer_size=0,
                  ext_hook=ExtType,
+                 strict_map_key=False,
                  max_str_len=2147483647,  # 2**32-1
                  max_bin_len=2147483647,
                  max_array_len=2147483647,
                  max_map_len=2147483647,
                  max_ext_len=2147483647):
         assert raw is True
-        assert encoding is None
         assert unicode_errors is None
-        super().__init__(file_like=file_like, read_size=read_size, use_list=use_list, raw=raw,
-                         object_hook=object_hook, object_pairs_hook=object_pairs_hook, list_hook=list_hook,
-                         encoding=encoding, unicode_errors=unicode_errors, max_buffer_size=max_buffer_size,
-                         ext_hook=ext_hook,
-                         max_str_len=max_str_len,
-                         max_bin_len=max_bin_len,
-                         max_array_len=max_array_len,
-                         max_map_len=max_map_len,
-                         max_ext_len=max_ext_len)
+        kw = dict(file_like=file_like, read_size=read_size, use_list=use_list, raw=raw,
+                  object_hook=object_hook, object_pairs_hook=object_pairs_hook, list_hook=list_hook,
+                  unicode_errors=unicode_errors, max_buffer_size=max_buffer_size,
+                  ext_hook=ext_hook,
+                  max_str_len=max_str_len,
+                  max_bin_len=max_bin_len,
+                  max_array_len=max_array_len,
+                  max_map_len=max_map_len,
+                  max_ext_len=max_ext_len)
+        if _post_100:
+            kw['strict_map_key'] = strict_map_key
+        super().__init__(**kw)
 
     def unpack(self):
         try:
@@ -126,46 +123,50 @@ class Unpacker(mp_Unpacker):
     next = __next__
 
 
-def unpackb(packed, *, raw=True, encoding=None, unicode_errors=None,
+def unpackb(packed, *, raw=True, unicode_errors=None,
+            strict_map_key=False,
             max_str_len=2147483647,  # 2**32-1
             max_bin_len=2147483647,
             max_array_len=2147483647,
             max_map_len=2147483647,
             max_ext_len=2147483647,
             **kwargs):
-    assert raw is True
-    assert encoding is None
     assert unicode_errors is None
     try:
-        return mp_unpackb(packed, raw=raw, encoding=encoding, unicode_errors=unicode_errors,
-                          max_str_len=max_str_len,
-                          max_bin_len=max_bin_len,
-                          max_array_len=max_array_len,
-                          max_map_len=max_map_len,
-                          max_ext_len=max_ext_len,
-                          **kwargs)
+        kw = dict(raw=raw, unicode_errors=unicode_errors,
+                  max_str_len=max_str_len,
+                  max_bin_len=max_bin_len,
+                  max_array_len=max_array_len,
+                  max_map_len=max_map_len,
+                  max_ext_len=max_ext_len)
+        kw.update(kwargs)
+        if _post_100:
+            kw['strict_map_key'] = strict_map_key
+        return mp_unpackb(packed, **kw)
     except Exception as e:
         raise UnpackException(e)
 
 
-def unpack(stream, *, raw=True, encoding=None, unicode_errors=None,
+def unpack(stream, *, raw=True, unicode_errors=None,
+           strict_map_key=False,
            max_str_len=2147483647,  # 2**32-1
            max_bin_len=2147483647,
            max_array_len=2147483647,
            max_map_len=2147483647,
            max_ext_len=2147483647,
            **kwargs):
-    assert raw is True
-    assert encoding is None
     assert unicode_errors is None
     try:
-        return mp_unpack(stream, raw=raw, encoding=encoding, unicode_errors=unicode_errors,
-                         max_str_len=max_str_len,
-                         max_bin_len=max_bin_len,
-                         max_array_len=max_array_len,
-                         max_map_len=max_map_len,
-                         max_ext_len=max_ext_len,
-                         **kwargs)
+        kw = dict(raw=raw, unicode_errors=unicode_errors,
+                  max_str_len=max_str_len,
+                  max_bin_len=max_bin_len,
+                  max_array_len=max_array_len,
+                  max_map_len=max_map_len,
+                  max_ext_len=max_ext_len)
+        kw.update(kwargs)
+        if _post_100:
+            kw['strict_map_key'] = strict_map_key
+        return mp_unpack(stream, **kw)
     except Exception as e:
         raise UnpackException(e)
 
@@ -181,7 +182,7 @@ def is_slow_msgpack():
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
     import msgpack
-    return (0, 5, 6) <= msgpack.version <= (0, 6, 2) and \
+    return (0, 5, 6) <= msgpack.version <= (1, 0, 0) and \
            msgpack.version not in []  # < blacklist bad releases here
 
 

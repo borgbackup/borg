@@ -32,7 +32,7 @@ Yes, this is *possible* from the technical standpoint, but it is
 built upon a defined :ref:`attack_model` that cannot provide its
 guarantees for multiple clients using the same repository.
 
-Also, in order for the deduplication used by Borg to work, it
+In order for the deduplication used by Borg to work, it
 needs to keep a local cache containing checksums of all file
 chunks already stored in the repository. This cache is stored in
 ``~/.cache/borg/``.  If Borg detects that a repository has been

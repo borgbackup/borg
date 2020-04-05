@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a7 (2019-09-07)
-----------------------------
+Version 1.2.0a8 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -261,6 +261,86 @@ Compatibility notes:
        having duplicate FQDN *and* MAC address or all-zero MAC address)
   - 2) if you are aware that 1) is not the case for you, you must set
        BORG_HOST_ID env var to something unique.
+
+Fixes:
+
+- fixed potential index corruption / data loss issue due to bug in hashindex_set, #4829.
+  Please read and follow the more detailled notes close to the top of this document.
+- fix crash when upgrading erroneous hints file, #4922
+- commit-time free space calc: ignore bad compact map entries, #4796
+- info: if the archive doesn't exist, print a pretty message, #4793
+- --prefix / -P: fix processing, avoid argparse issue, #4769
+- ignore EACCES (errno 13) when hardlinking, #4730
+- add a try catch when formatting the info string, #4818
+- check: do not stumble over invalid item key, #4845
+- update prevalence of env vars to set config and cache paths
+- mount: fix FUSE low linear read speed on large files, #5032
+- extract: fix confusing output of borg extract --list --strip-components, #4934
+- recreate: support --timestamp option, #4745
+- fix ProgressIndicator msgids (JSON output), #4935
+
+New features:
+
+- chunker speedup (plus regression test)
+- added --consider-checkpoints and related test, #4788
+- added --noflags option, deprecate --nobsdflags option, #4489
+- compact: add --threshold option, #4674
+- mount: add birthtime to FUSE entries
+- support platforms with no os.link, #4901 - if we don't have os.link,
+  we just extract another copy instead of making a hardlink.
+- move sync_file_range to its own extension for better platform compatibility.
+
+Other changes:
+
+- support msgpack 0.6.2 and 1.0.0, #5065
+- upgrade bundled zstd to 1.4.4
+- upgrade bundled lz4 to 1.9.2
+- upgrade xxhash to 0.7.3
+- require recent enough llfuse for birthtime support, #5064
+- check: improve error output for matching index size, see #4829
+- ignore --stats when given with --dry-run, but continue, fixes #4373
+- replaced usage of os.statvfs with shutil.disk_usage (better cross-platform support).
+- docs:
+
+  - improve description of path variables
+  - document how to completely delete data, #2929
+  - add FAQ about Borg config dir, #4941
+  - add docs about errors not printed as JSON, #4073
+  - update usage_general.rst.inc
+  - added "Will move with BORG_CONFIG_DIR variable unless specified." to BORG_SECURITY_DIR info.
+  - put BORG_SECURITY_DIR immediately below BORG_CONFIG_DIR (and moved BORG_CACHE_DIR up before them).
+  - add paragraph regarding cache security assumptions, #4900
+  - tell about borg cache security precautions
+  - add FAQ describing difference between a local repo vs. repo on a server.
+  - document how to test exclusion patterns without performing an actual backup
+  - create: tell that "Calculating size" time and space needs are caused by --progress
+  - fix/improve documentation for @api decorator, #4674
+  - add a pull backup / push restore how-to, #1552
+  - fix man pages creation, #4752
+  - more general FAQ for backup and retain original paths, #4532
+  - explain difference between --exclude and --pattern, #4118
+  - add FAQ for preventing SSH timeout in extract, #3866
+  - improve password FAQ (decrease pw length, add -w 0 option to base64 to prevent line wrap), #4591
+- native windows port:
+
+  - update README_WINDOWS.rst
+  - updated pyinstaller spec file to support windows builds
+- testing / CI:
+
+  - improved travis config / install script, improved macOS builds
+  - allow osx builds to fail, #4955
+  - Windows 10 build on Appveyor CI
+- vagrant:
+
+  - upgrade pyinstaller to v3.5 + patch
+  - macOS: test on py35 and py37, linux: test on py37
+  - use py369 for binary build, add py380 for tests
+  - fix issue in stretch VM hanging at grub installation
+  - add a debian buster and a ubuntu focal VM
+
+
+Version 1.2.0a7 (2019-09-07)
+----------------------------
 
 Fixes:
 

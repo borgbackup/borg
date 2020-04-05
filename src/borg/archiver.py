@@ -2036,7 +2036,7 @@ class Archiver:
         """convert Borg profile to Python profile"""
         import marshal
         with args.output, args.input:
-            marshal.dump(msgpack.mp_unpack(args.input, use_list=False, raw=False), args.output)
+            marshal.dump(msgpack.unpack(args.input, use_list=False, raw=False), args.output)
         return EXIT_SUCCESS
 
     @with_repository(lock=False, manifest=False)
@@ -4424,8 +4424,7 @@ class Archiver:
                         # into a marshal file that can be read by e.g. pyprof2calltree.
                         # For local use it's unnecessary hassle, though, that's why .pyprof makes
                         # it compatible (see above).
-                        # We do not use our msgpack wrapper here, but directly call mp_pack.
-                        msgpack.mp_pack(profiler.stats, fd, use_bin_type=True)
+                        msgpack.pack(profiler.stats, fd, use_bin_type=True)
         else:
             return set_ec(func(args))
 

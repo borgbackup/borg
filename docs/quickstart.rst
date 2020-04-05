@@ -402,7 +402,8 @@ For automated backups the passphrase can be specified using the
     In case you lose your repository and the security information, but have an
     older copy of it to restore from, don't use that later for creating new
     backups – you would run into security issues (reuse of nonce counter
-    values). It is better to initialize a new Borg repository.
+    values). It is better to initialize a new Borg repository. See also:
+    :ref:`faq_corrupt_repo`
 
 .. _template: paperkey.html
 

@@ -1,4 +1,3 @@
-
 .. somewhat surprisingly the "bash" highlighter gives nice results with
    the pseudo-code notation used in the "Encryption" section.
 
@@ -12,6 +11,8 @@ Security
 
 Cryptography in Borg
 ====================
+
+.. _attack_model:
 
 Attack model
 ------------

@@ -187,6 +187,26 @@ all the part files and manually concatenate them together.
 
 For more details, see :ref:`checkpoints_parts`.
 
+My repository is corrupt, how can I restore from an older copy of it?
+---------------------------------------------------------------------
+
+If your repositories are encrypted and have the same ID, the recommended method
+is to delete the corrupted repository, but keep its security info, and then copy
+the working repository to the same location:
+
+::
+
+    borg delete --keep-security-info /path/to/repo
+    rsync -aH /path/to/repo-working/ /path/to/repo  # Note the trailing slash.
+
+A plain delete command would remove the security info in
+``~/.config/borg/security``, including the nonce value. In BorgBackup
+:ref:`security_encryption` is AES-CTR, where the nonce is a counter. When the
+working repo was used later for creating new archives, Borg would re-use nonce
+values due to starting from a lower counter value given by the older copy of the
+repository. To prevent this, the ``keep-security-info`` option is applied so
+that the client-side nonce counter is kept.
+
 Can Borg add redundancy to the backup data to deal with hardware malfunction?
 -----------------------------------------------------------------------------
 

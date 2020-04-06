@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.11 (2020-03-08)
----------------------------
+Version 1.1.12 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -240,6 +240,32 @@ Compatibility notes:
   If WSL still has a problem with sync_file_range, you need to set
   BORG_WORKAROUNDS=basesyncfile in the borg process environment to
   work around the WSL issue.
+
+Fixes:
+
+- update precedence of env vars to set config and cache paths, #4894
+- mount:
+
+  - fix FUSE low linear read speed on large files, #5067
+  - fix crash on old llfuse without birthtime attrs, #5064 - accidentally
+    we required llfuse >= 1.3. Now also old llfuse works again.
+
+Other changes:
+
+- travis: adding comments and explanations to Travis config / install script,
+  improve macOS builds.
+- docs:
+
+  - PlaceholderError not printed as JSON, #4073
+  - "How important is Borg config?", #4941
+  - make Sphinx warnings break docs build, #4587
+  - some markup / warning fixes
+  - add "updating borgbackup.org/releases" to release checklist, #4999
+  - add "rendering docs" to release checklist, #5000
+
+
+Version 1.1.11 (2020-03-08)
+---------------------------
 
 Fixes:
 

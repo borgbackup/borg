@@ -557,6 +557,8 @@ These are your options to protect against that:
 - Mount C's filesystem on another machine and then create a backup of it.
 - Do not give C filesystem-level access to S.
 
+See :ref:`hosting_repositories` for a detailed protection guide.
+
 How can I protect against a hacked backup server?
 -------------------------------------------------
 

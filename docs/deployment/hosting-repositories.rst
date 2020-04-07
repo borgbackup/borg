@@ -1,5 +1,6 @@
 .. include:: ../global.rst.inc
 .. highlight:: none
+.. _hosting_repositories:
 
 Hosting repositories
 ====================

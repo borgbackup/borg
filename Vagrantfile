@@ -79,12 +79,12 @@ def packages_darwin
     # brew is already installed in the base box
     #ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update
-    brew install openssl
-    brew install lz4
-    brew install xz  # required for python lzma module
-    brew install fakeroot
-    brew install git
-    brew install pkg-config
+    brew install openssl || brew upgrade openssl
+    brew install lz4 || brew upgrade lz4
+    brew install xz  || brew upgrade xz  # required for python lzma module
+    brew install fakeroot || brew upgrade fakeroot
+    brew install git || brew upgrade git
+    brew install pkg-config || brew upgrade pkg-config
   EOF
 end
 

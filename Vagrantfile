@@ -16,6 +16,7 @@ end
 
 def packages_debianoid(user)
   return <<-EOF
+    export DEBIAN_FRONTEND=noninteractive
     apt-get update
     # install all the (security and other) updates
     apt-get dist-upgrade -y

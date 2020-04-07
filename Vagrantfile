@@ -9,6 +9,7 @@ $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
 def packages_debianoid(user)
   return <<-EOF
+    export DEBIAN_FRONTEND=noninteractive
     # this is to avoid grub asking about which device it should install to:
     echo "set grub-pc/install_devices /dev/sda" | debconf-communicate
     apt-get -y -qq update

@@ -9,6 +9,7 @@ $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
 def packages_debianoid(user)
   return <<-EOF
+    export DEBIAN_FRONTEND=noninteractive
     # this is to avoid grub asking about which device it should install to:
     echo "set grub-pc/install_devices /dev/sda" | debconf-communicate
     apt-get -y -qq update
@@ -96,14 +97,14 @@ def packages_darwin
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update > /dev/null
-    brew install pkg-config
-    brew install readline
-    brew install openssl@1.1
-    brew install zstd
-    brew install lz4
-    brew install xz  # required for python lzma module
-    brew install fakeroot
-    brew install git
+    brew install pkg-config || brew upgrade pkg-config
+    brew install readline || brew upgrade readline
+    brew install openssl@1.1 || brew upgrade openssl@1.1
+    brew install zstd || brew upgrade zstd
+    brew install lz4 || brew upgrade lz4
+    brew install xz || brew upgrade xz  # required for python lzma module
+    brew install fakeroot || brew upgrade fakeroot
+    brew install git || brew upgrade git
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
   EOF
 end

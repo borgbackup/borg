@@ -228,10 +228,10 @@ def run_tests(boxname)
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then
       echo "Running tox WITH fakeroot -u"
-      fakeroot -u tox --skip-missing-interpreters
+      fakeroot -u tox --skip-missing-interpreters -e py35,py36,py37,py38
     else
       echo "Running tox WITHOUT fakeroot -u"
-      tox --skip-missing-interpreters
+      tox --skip-missing-interpreters -e py35,py36,py37,py38
     fi
   EOF
 end

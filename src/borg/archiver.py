@@ -134,9 +134,19 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
         if create:
             compatibility = Manifest.NO_OPERATION_CHECK
 
+    # To process the `--bypass-lock` option if specified, we need to
+    # modify `lock` inside `wrapper`. Therefore we cannot use the
+    # `nonlocal` statement to access `lock` as modifications would also
+    # affect the scope outside of `wrapper`. Subsequent calls would
+    # only see the overwritten value of `lock`, not the original one.
+    # The solution is to define a place holder variable `_lock` to
+    # propagate the value into `wrapper`.
+    _lock = lock
+
     def decorator(method):
         @functools.wraps(method)
         def wrapper(self, args, **kwargs):
+            lock = getattr(args, 'lock', _lock)
             location = args.location  # note: 'location' must be always present in args
             append_only = getattr(args, 'append_only', False)
             storage_quota = getattr(args, 'storage_quota', None)
@@ -2561,6 +2571,9 @@ class Archiver:
                               help='Output one JSON object per log line instead of formatted text.')
             add_common_option('--lock-wait', metavar='SECONDS', dest='lock_wait', type=int, default=1,
                               help='wait at most SECONDS for acquiring a repository/cache lock (default: %(default)d).')
+            add_common_option('--bypass-lock', dest='lock', action='store_false',
+                              default=argparse.SUPPRESS,  # only create args attribute if option is specified
+                              help='Bypass locking mechanism')
             add_common_option('--show-version', dest='show_version', action='store_true',
                               help='show/log the borg version')
             add_common_option('--show-rc', dest='show_rc', action='store_true',
@@ -4346,6 +4359,12 @@ class Archiver:
         if func == self.do_create and not args.paths:
             # need at least 1 path but args.paths may also be populated from patterns
             parser.error('Need at least one PATH argument.')
+        if not getattr(args, 'lock', True):  # Option --bypass-lock sets args.lock = False
+            bypass_allowed = {self.do_check, self.do_config, self.do_diff,
+                              self.do_export_tar, self.do_extract, self.do_info,
+                              self.do_list, self.do_mount, self.do_umount}
+            if func not in bypass_allowed:
+                raise Error('Not allowed to bypass locking mechanism for chosen command')
         return args
 
     def prerun_checks(self, logger, is_serve):

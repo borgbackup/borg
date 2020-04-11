@@ -51,6 +51,7 @@ from ..helpers import flags_noatime, flags_normal
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff
+from ..locking import LockFailed
 from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
@@ -1528,17 +1529,116 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('check', '--info', self.repository_location, exit_code=1)
         self.assert_in('Starting repository check', output)  # --info given for root logger
 
-    # we currently need to be able to create a lock directory inside the repo:
-    @pytest.mark.xfail(reason="we need to be able to create the lock directory inside the repo")
-    def test_readonly_repository(self):
+    def test_readonly_check(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_src_archive('test')
-        os.system('chmod -R ugo-w ' + self.repository_path)
-        try:
-            self.cmd('extract', '--dry-run', self.repository_location + '::test')
-        finally:
-            # Restore permissions so shutil.rmtree is able to delete it
-            os.system('chmod -R u+w ' + self.repository_path)
+        with self.read_only(self.repository_path):
+            # verify that command normally doesn't work with read-only repo
+            if self.FORK_DEFAULT:
+                self.cmd('check', '--verify-data', self.repository_location, exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
+                    self.cmd('check', '--verify-data', self.repository_location)
+                if isinstance(excinfo.value, RemoteRepository.RPCError):
+                    assert excinfo.value.exception_class == 'LockFailed'
+            # verify that command works with read-only repo when using --bypass-lock
+            self.cmd('check', '--verify-data', self.repository_location, '--bypass-lock')
+
+    def test_readonly_diff(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('a')
+        self.create_src_archive('b')
+        with self.read_only(self.repository_path):
+            # verify that command normally doesn't work with read-only repo
+            if self.FORK_DEFAULT:
+                self.cmd('diff', '%s::a' % self.repository_location, 'b', exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
+                    self.cmd('diff', '%s::a' % self.repository_location, 'b')
+                if isinstance(excinfo.value, RemoteRepository.RPCError):
+                    assert excinfo.value.exception_class == 'LockFailed'
+            # verify that command works with read-only repo when using --bypass-lock
+            self.cmd('diff', '%s::a' % self.repository_location, 'b', '--bypass-lock')
+
+    def test_readonly_export_tar(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('test')
+        with self.read_only(self.repository_path):
+            # verify that command normally doesn't work with read-only repo
+            if self.FORK_DEFAULT:
+                self.cmd('export-tar', '%s::test' % self.repository_location, 'test.tar', exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
+                    self.cmd('export-tar', '%s::test' % self.repository_location, 'test.tar')
+                if isinstance(excinfo.value, RemoteRepository.RPCError):
+                    assert excinfo.value.exception_class == 'LockFailed'
+            # verify that command works with read-only repo when using --bypass-lock
+            self.cmd('export-tar', '%s::test' % self.repository_location, 'test.tar', '--bypass-lock')
+
+    def test_readonly_extract(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('test')
+        with self.read_only(self.repository_path):
+            # verify that command normally doesn't work with read-only repo
+            if self.FORK_DEFAULT:
+                self.cmd('extract', '%s::test' % self.repository_location, exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
+                    self.cmd('extract', '%s::test' % self.repository_location)
+                if isinstance(excinfo.value, RemoteRepository.RPCError):
+                    assert excinfo.value.exception_class == 'LockFailed'
+            # verify that command works with read-only repo when using --bypass-lock
+            self.cmd('extract', '%s::test' % self.repository_location, '--bypass-lock')
+
+    def test_readonly_info(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('test')
+        with self.read_only(self.repository_path):
+            # verify that command normally doesn't work with read-only repo
+            if self.FORK_DEFAULT:
+                self.cmd('info', self.repository_location, exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
+                    self.cmd('info', self.repository_location)
+                if isinstance(excinfo.value, RemoteRepository.RPCError):
+                    assert excinfo.value.exception_class == 'LockFailed'
+            # verify that command works with read-only repo when using --bypass-lock
+            self.cmd('info', self.repository_location, '--bypass-lock')
+
+    def test_readonly_list(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('test')
+        with self.read_only(self.repository_path):
+            # verify that command normally doesn't work with read-only repo
+            if self.FORK_DEFAULT:
+                self.cmd('list', self.repository_location, exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
+                    self.cmd('list', self.repository_location)
+                if isinstance(excinfo.value, RemoteRepository.RPCError):
+                    assert excinfo.value.exception_class == 'LockFailed'
+            # verify that command works with read-only repo when using --bypass-lock
+            self.cmd('list', self.repository_location, '--bypass-lock')
+
+    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    def test_readonly_mount(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('test')
+        with self.read_only(self.repository_path):
+            # verify that command normally doesn't work with read-only repo
+            if self.FORK_DEFAULT:
+                with self.fuse_mount(self.repository_location, exit_code=EXIT_ERROR):
+                    pass
+            else:
+                with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
+                    # self.fuse_mount always assumes fork=True, so for this test we have to manually set fork=False
+                    with self.fuse_mount(self.repository_location, fork=False):
+                        pass
+                if isinstance(excinfo.value, RemoteRepository.RPCError):
+                    assert excinfo.value.exception_class == 'LockFailed'
+            # verify that command works with read-only repo when using --bypass-lock
+            with self.fuse_mount(self.repository_location, None, '--bypass-lock'):
+                pass
 
     @pytest.mark.skipif('BORG_TESTS_IGNORE_MODES' in os.environ, reason='modes unreliable')
     def test_umask(self):

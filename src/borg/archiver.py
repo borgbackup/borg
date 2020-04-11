@@ -3015,47 +3015,44 @@ class Archiver:
 
         First, the underlying repository data files are checked:
 
-        - For all segments the segment magic (header) is checked
-        - For all objects stored in the segments, all metadata (e.g. crc and size) and
+        - For all segments, the segment magic header is checked.
+        - For all objects stored in the segments, all metadata (e.g. CRC and size) and
           all data is read. The read data is checked by size and CRC. Bit rot and other
           types of accidental damage can be detected this way.
-        - If we are in repair mode and a integrity error is detected for a segment,
-          we try to recover as many objects from the segment as possible.
-        - In repair mode, it makes sure that the index is consistent with the data
-          stored in the segments.
-        - If you use a remote repo server via ssh:, the repo check is executed on the
-          repo server without causing significant network traffic.
+        - In repair mode, if an integrity error is detected in a segment, try to recover
+          as many objects from the segment as possible.
+        - In repair mode, make sure that the index is consistent with the data stored in
+          the segments.
+        - If checking a remote repo via ``ssh:``, the repo check is executed on the server
+          without causing significant network traffic.
         - The repository check can be skipped using the ``--archives-only`` option.
 
         Second, the consistency and correctness of the archive metadata is verified:
 
         - Is the repo manifest present? If not, it is rebuilt from archive metadata
           chunks (this requires reading and decrypting of all metadata and data).
-        - Check if archive metadata chunk is present. if not, remove archive from
-          manifest.
+        - Check if archive metadata chunk is present; if not, remove archive from manifest.
         - For all files (items) in the archive, for all chunks referenced by these
-          files, check if chunk is present.
-          If a chunk is not present and we are in repair mode, replace it with a same-size
-          replacement chunk of zeros.
-          If a previously lost chunk reappears (e.g. via a later backup) and we are in
-          repair mode, the all-zero replacement chunk will be replaced by the correct chunk.
-          This requires reading of archive and file metadata, but not data.
-        - If we are in repair mode and we checked all the archives: delete orphaned
-          chunks from the repo.
-        - if you use a remote repo server via ssh:, the archive check is executed on
-          the client machine (because if encryption is enabled, the checks will require
-          decryption and this is always done client-side, because key access will be
-          required).
-        - The archive checks can be time consuming, they can be skipped using the
+          files, check if chunk is present. In repair mode, if a chunk is not present,
+          replace it with a same-size replacement chunk of zeroes. If a previously lost
+          chunk reappears (e.g. via a later backup), in repair mode the all-zero replacement
+          chunk will be replaced by the correct chunk. This requires reading of archive and
+          file metadata, but not data.
+        - In repair mode, when all the archives were checked, orphaned chunks are deleted
+          from the repo. One cause of orphaned chunks are input file related errors (like
+          read errors) in the archive creation process.
+        - If checking a remote repo via ``ssh:``, the archive check is executed on the
+          client machine because it requires decryption, and this is always done client-side
+          as key access is needed.
+        - The archive checks can be time consuming; they can be skipped using the
           ``--repository-only`` option.
 
         The ``--verify-data`` option will perform a full integrity verification (as opposed to
         checking the CRC32 of the segment) of data, which means reading the data from the
         repository, decrypting and decompressing it. This is a cryptographic verification,
         which will detect (accidental) corruption. For encrypted repositories it is
-        tamper-resistant as well, unless the attacker has access to the keys.
-
-        It is also very slow.
+        tamper-resistant as well, unless the attacker has access to the keys. It is also very
+        slow.
         """)
         subparser = subparsers.add_parser('check', parents=[common_parser], add_help=False,
                                           description=self.do_check.__doc__,

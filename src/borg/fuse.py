@@ -24,8 +24,6 @@ from .item import Item
 from .lrucache import LRUCache
 from .remote import RemoteRepository
 
-# Does this version of llfuse support ns precision?
-have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
 def fuse_main():
     return llfuse.main(workers=1)
@@ -560,17 +558,10 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         entry.st_blksize = 512
         entry.st_blocks = (entry.st_size + entry.st_blksize - 1) // entry.st_blksize
         # note: older archives only have mtime (not atime nor ctime)
-        mtime_ns = item.mtime
-        if have_fuse_xtime_ns:
-            entry.st_mtime_ns = mtime_ns
-            entry.st_atime_ns = item.get('atime', mtime_ns)
-            entry.st_ctime_ns = item.get('ctime', mtime_ns)
-            entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
-        else:
-            entry.st_mtime = mtime_ns / 1e9
-            entry.st_atime = item.get('atime', mtime_ns) / 1e9
-            entry.st_ctime = item.get('ctime', mtime_ns) / 1e9
-            entry.st_birthtime = item.get('birthtime', mtime_ns) / 1e9
+        entry.st_mtime_ns = mtime_ns = item.mtime
+        entry.st_atime_ns = item.get('atime', mtime_ns)
+        entry.st_ctime_ns = item.get('ctime', mtime_ns)
+        entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
         return entry
 
     def listxattr(self, inode, ctx=None):

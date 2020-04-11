@@ -4,7 +4,8 @@ import borg.crypto.low_level
 
 
 class Error(Exception):
-    """Error base class"""
+    """Error: {}"""
+    # Error base class
 
     # if we raise such an Error and it is only catched by the uppermost
     # exception handler (that exits short after with the given exit_code),
@@ -24,7 +25,8 @@ class Error(Exception):
 
 
 class ErrorWithTraceback(Error):
-    """like Error, but show a traceback also"""
+    """Error: {}"""
+    # like Error, but show a traceback also
     traceback = True
 
 

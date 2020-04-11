@@ -362,8 +362,7 @@ class FuseBackend(object):
                 file_id = blake2b_128(path)
                 current_version, previous_id = self.versions_index.get(file_id, (0, None))
 
-                chunk_ids = [chunk_id for chunk_id, _, _ in item.chunks]
-                contents_id = blake2b_128(b''.join(chunk_ids))
+                contents_id = blake2b_128(b''.join(chunk_id for chunk_id, _, _ in item.chunks))
 
                 if contents_id != previous_id:
                     current_version += 1

@@ -23,15 +23,15 @@ def check_patterns(files, pattern, expected):
 @pytest.mark.parametrize("pattern, expected", [
     # "None" means all files, i.e. all match the given pattern
     ("/", []),
-    ("/home", ["/home"]),
-    ("/home///", ["/home"]),
-    ("/./home", ["/home"]),
-    ("/home/user", ["/home/user"]),
-    ("/home/user2", ["/home/user2"]),
-    ("/home/user/.bashrc", ["/home/user/.bashrc"]),
+    ("/home", ["home"]),
+    ("/home///", ["home"]),
+    ("/./home", ["home"]),
+    ("/home/user", ["home/user"]),
+    ("/home/user2", ["home/user2"]),
+    ("/home/user/.bashrc", ["home/user/.bashrc"]),
     ])
 def test_patterns_full(pattern, expected):
-    files = ["/home", "/home/user", "/home/user2", "/home/user/.bashrc", ]
+    files = ["home", "home/user", "home/user2", "home/user/.bashrc", ]
 
     check_patterns(files, PathFullPattern(pattern), expected)
 
@@ -55,16 +55,16 @@ def test_patterns_full_relative(pattern, expected):
     ("/./", None),
     ("", []),
     ("/home/u", []),
-    ("/home/user", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc", ["/etc/server/config", "/etc/server/hosts"]),
-    ("///etc//////", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv", ["/srv/messages", "/srv/dmesg"]),
+    ("/home/user", ["home/user/.profile", "home/user/.bashrc"]),
+    ("/etc", ["etc/server/config", "etc/server/hosts"]),
+    ("///etc//////", ["etc/server/config", "etc/server/hosts"]),
+    ("/./home//..//home/user2", ["home/user2/.profile", "home/user2/public_html/index.html"]),
+    ("/srv", ["srv/messages", "srv/dmesg"]),
     ])
 def test_patterns_prefix(pattern, expected):
     files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
+        "etc/server/config", "etc/server/hosts", "home", "home/user/.profile", "home/user/.bashrc",
+        "home/user2/.profile", "home/user2/public_html/index.html", "srv/messages", "srv/dmesg",
     ]
 
     check_patterns(files, PathPrefixPattern(pattern), expected)
@@ -88,25 +88,31 @@ def test_patterns_prefix_relative(pattern, expected):
     ("/*", None),
     ("/./*", None),
     ("*", None),
-    ("*/*", None),
-    ("*///*", None),
+    ("*/*",
+     ["etc/server/config", "etc/server/hosts", "home/user/.profile", "home/user/.bashrc",
+      "home/user2/.profile", "home/user2/public_html/index.html", "srv/messages", "srv/dmesg",
+      "home/foo/.thumbnails", "home/foo/bar/.thumbnails"]),
+    ("*///*",
+     ["etc/server/config", "etc/server/hosts", "home/user/.profile", "home/user/.bashrc",
+      "home/user2/.profile", "home/user2/public_html/index.html", "srv/messages", "srv/dmesg",
+      "home/foo/.thumbnails", "home/foo/bar/.thumbnails"]),
     ("/home/u", []),
     ("/home/*",
-     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
-      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("*/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
-    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv*", ["/srv/messages", "/srv/dmesg"]),
-    ("/home/*/.thumbnails", ["/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
+     ["home/user/.profile", "home/user/.bashrc", "home/user2/.profile", "home/user2/public_html/index.html",
+      "home/foo/.thumbnails", "home/foo/bar/.thumbnails"]),
+    ("/home/user/*", ["home/user/.profile", "home/user/.bashrc"]),
+    ("/etc/*", ["etc/server/config", "etc/server/hosts"]),
+    ("*/.pr????e", ["home/user/.profile", "home/user2/.profile"]),
+    ("///etc//////*", ["etc/server/config", "etc/server/hosts"]),
+    ("/./home//..//home/user2/*", ["home/user2/.profile", "home/user2/public_html/index.html"]),
+    ("/srv*", ["srv/messages", "srv/dmesg"]),
+    ("/home/*/.thumbnails", ["home/foo/.thumbnails", "home/foo/bar/.thumbnails"]),
     ])
 def test_patterns_fnmatch(pattern, expected):
     files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv/messages", "/srv/dmesg",
-        "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
+        "etc/server/config", "etc/server/hosts", "home", "home/user/.profile", "home/user/.bashrc",
+        "home/user2/.profile", "home/user2/public_html/index.html", "srv/messages", "srv/dmesg",
+        "home/foo/.thumbnails", "home/foo/bar/.thumbnails",
     ]
 
     check_patterns(files, FnmatchPattern(pattern), expected)
@@ -118,34 +124,40 @@ def test_patterns_fnmatch(pattern, expected):
     ("**/*", None),
     ("/**/*", None),
     ("/./*", None),
-    ("*/*", None),
-    ("*///*", None),
+    ("*/*",
+     ["etc/server/config", "etc/server/hosts", "home/user/.profile", "home/user/.bashrc",
+      "home/user2/.profile", "home/user2/public_html/index.html", "srv/messages", "srv/dmesg",
+      "srv2/blafasel", "home/foo/.thumbnails", "home/foo/bar/.thumbnails"]),
+    ("*///*",
+     ["etc/server/config", "etc/server/hosts", "home/user/.profile", "home/user/.bashrc",
+      "home/user2/.profile", "home/user2/public_html/index.html", "srv/messages", "srv/dmesg",
+      "srv2/blafasel", "home/foo/.thumbnails", "home/foo/bar/.thumbnails"]),
     ("/home/u", []),
     ("/home/*",
-     ["/home/user/.profile", "/home/user/.bashrc", "/home/user2/.profile", "/home/user2/public_html/index.html",
-      "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails"]),
-    ("/home/user/*", ["/home/user/.profile", "/home/user/.bashrc"]),
-    ("/etc/*/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/etc/**/*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/etc/**/*/*", ["/etc/server/config", "/etc/server/hosts"]),
+     ["home/user/.profile", "home/user/.bashrc", "home/user2/.profile", "home/user2/public_html/index.html",
+      "home/foo/.thumbnails", "home/foo/bar/.thumbnails"]),
+    ("/home/user/*", ["home/user/.profile", "home/user/.bashrc"]),
+    ("/etc/*/*", ["etc/server/config", "etc/server/hosts"]),
+    ("/etc/**/*", ["etc/server/config", "etc/server/hosts"]),
+    ("/etc/**/*/*", ["etc/server/config", "etc/server/hosts"]),
     ("*/.pr????e", []),
-    ("**/.pr????e", ["/home/user/.profile", "/home/user2/.profile"]),
-    ("///etc//////*", ["/etc/server/config", "/etc/server/hosts"]),
-    ("/./home//..//home/user2/", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/./home//..//home/user2/**/*", ["/home/user2/.profile", "/home/user2/public_html/index.html"]),
-    ("/srv*/", ["/srv/messages", "/srv/dmesg", "/srv2/blafasel"]),
-    ("/srv*", ["/srv", "/srv/messages", "/srv/dmesg", "/srv2", "/srv2/blafasel"]),
-    ("/srv/*", ["/srv/messages", "/srv/dmesg"]),
-    ("/srv2/**", ["/srv2", "/srv2/blafasel"]),
-    ("/srv2/**/", ["/srv2/blafasel"]),
-    ("/home/*/.thumbnails", ["/home/foo/.thumbnails"]),
-    ("/home/*/*/.thumbnails", ["/home/foo/bar/.thumbnails"]),
+    ("**/.pr????e", ["home/user/.profile", "home/user2/.profile"]),
+    ("///etc//////*", ["etc/server/config", "etc/server/hosts"]),
+    ("/./home//..//home/user2/", ["home/user2/.profile", "home/user2/public_html/index.html"]),
+    ("/./home//..//home/user2/**/*", ["home/user2/.profile", "home/user2/public_html/index.html"]),
+    ("/srv*/", ["srv/messages", "srv/dmesg", "srv2/blafasel"]),
+    ("/srv*", ["srv", "srv/messages", "srv/dmesg", "srv2", "srv2/blafasel"]),
+    ("/srv/*", ["srv/messages", "srv/dmesg"]),
+    ("/srv2/**", ["srv2", "srv2/blafasel"]),
+    ("/srv2/**/", ["srv2/blafasel"]),
+    ("/home/*/.thumbnails", ["home/foo/.thumbnails"]),
+    ("/home/*/*/.thumbnails", ["home/foo/bar/.thumbnails"]),
     ])
 def test_patterns_shell(pattern, expected):
     files = [
-        "/etc/server/config", "/etc/server/hosts", "/home", "/home/user/.profile", "/home/user/.bashrc",
-        "/home/user2/.profile", "/home/user2/public_html/index.html", "/srv", "/srv/messages", "/srv/dmesg",
-        "/srv2", "/srv2/blafasel", "/home/foo/.thumbnails", "/home/foo/bar/.thumbnails",
+        "etc/server/config", "etc/server/hosts", "home", "home/user/.profile", "home/user/.bashrc",
+        "home/user2/.profile", "home/user2/public_html/index.html", "srv", "srv/messages", "srv/dmesg",
+        "srv2", "srv2/blafasel", "home/foo/.thumbnails", "home/foo/bar/.thumbnails",
     ]
 
     check_patterns(files, ShellPattern(pattern), expected)
@@ -228,10 +240,10 @@ def test_invalid_unicode_pattern(pattern):
       # Empty line
       "",
       "# EOF"],
-     ["/more/data", "/home", " #/wsfoobar"]),
+     ["more/data", "home", " #/wsfoobar"]),
     ([r"re:.*"], []),
-    ([r"re:\s"], ["/data/something00.txt", "/more/data", "/home"]),
-    ([r"re:(.)(\1)"], ["/more/data", "/home", "\tstart/whitespace", "/whitespace/end\t"]),
+    ([r"re:\s"], ["data/something00.txt", "more/data", "home"]),
+    ([r"re:(.)(\1)"], ["more/data", "home", "\tstart/whitespace", "whitespace/end\t"]),
     (["", "", "",
       "# This is a test with mixed pattern styles",
       # Case-insensitive pattern
@@ -239,25 +251,26 @@ def test_invalid_unicode_pattern(pattern):
       "",
       "*whitespace*",
       "fm:*/something00*"],
-     ["/more/data"]),
-    ([r"  re:^\s  "], ["/data/something00.txt", "/more/data", "/home", "/whitespace/end\t"]),
-    ([r"  re:\s$  "], ["/data/something00.txt", "/more/data", "/home", " #/wsfoobar", "\tstart/whitespace"]),
+     ["more/data"]),
+    ([r"  re:^\s  "], ["data/something00.txt", "more/data", "home", "whitespace/end\t"]),
+    ([r"  re:\s$  "], ["data/something00.txt", "more/data", "home", " #/wsfoobar", "\tstart/whitespace"]),
     (["pp:./"], None),
-    (["pp:/"], [" #/wsfoobar", "\tstart/whitespace"]),
+    # leading slash is removed
+    (["pp:/"], []),
     (["pp:aaabbb"], None),
-    (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["/more/data", "/home"]),
+    (["pp:/data", "pp: #/", "pp:\tstart", "pp:/whitespace"], ["more/data", "home"]),
     (["/nomatch", "/more/*"],
-     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
+     ['data/something00.txt', 'home', ' #/wsfoobar', '\tstart/whitespace', 'whitespace/end\t']),
     # the order of exclude patterns shouldn't matter
     (["/more/*", "/nomatch"],
-     ['/data/something00.txt', '/home', ' #/wsfoobar', '\tstart/whitespace', '/whitespace/end\t']),
+     ['data/something00.txt', 'home', ' #/wsfoobar', '\tstart/whitespace', 'whitespace/end\t']),
     ])
 def test_exclude_patterns_from_file(tmpdir, lines, expected):
     files = [
-        '/data/something00.txt', '/more/data', '/home',
+        'data/something00.txt', 'more/data', 'home',
         ' #/wsfoobar',
         '\tstart/whitespace',
-        '/whitespace/end\t',
+        'whitespace/end\t',
     ]
 
     def evaluate(filename):
@@ -353,34 +366,34 @@ def test_load_invalid_patterns_from_file(tmpdir, lines):
     (["- *"], []),
     # default match type is sh: for patterns -> * doesn't match a /
     (["-*/something0?.txt"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt',
-      '/home', '/home/leo', '/home/leo/t', '/home/other']),
+     ['data', 'data/subdir/something01.txt',
+      'home', 'home/leo', 'home/leo/t', 'home/other']),
     (["-fm:*/something00.txt"],
-     ['/data', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t', '/home/other']),
+     ['data', 'data/subdir/something01.txt', 'home', 'home/leo', 'home/leo/t', 'home/other']),
     (["-fm:*/something0?.txt"],
-     ["/data", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+     ["data", 'home', 'home/leo', 'home/leo/t', 'home/other']),
     (["+/*/something0?.txt",
       "-/data"],
-     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+     ["data/something00.txt", 'home', 'home/leo', 'home/leo/t', 'home/other']),
     (["+fm:*/something00.txt",
       "-/data"],
-     ["/data/something00.txt", '/home', '/home/leo', '/home/leo/t', '/home/other']),
+     ["data/something00.txt", 'home', 'home/leo', 'home/leo/t', 'home/other']),
     # include /home/leo and exclude the rest of /home:
     (["+/home/leo",
       "-/home/*"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),
+     ['data', 'data/something00.txt', 'data/subdir/something01.txt', 'home', 'home/leo', 'home/leo/t']),
     # wrong order, /home/leo is already excluded by -/home/*:
     (["-/home/*",
       "+/home/leo"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home']),
+     ['data', 'data/something00.txt', 'data/subdir/something01.txt', 'home']),
     (["+fm:/home/leo",
       "-/home/"],
-     ['/data', '/data/something00.txt', '/data/subdir/something01.txt', '/home', '/home/leo', '/home/leo/t']),
+     ['data', 'data/something00.txt', 'data/subdir/something01.txt', 'home', 'home/leo', 'home/leo/t']),
 ])
 def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
     files = [
-        '/data', '/data/something00.txt', '/data/subdir/something01.txt',
-        '/home', '/home/leo', '/home/leo/t', '/home/other'
+        'data', 'data/something00.txt', 'data/subdir/something01.txt',
+        'home', 'home/leo', 'home/leo/t', 'home/other'
     ]
 
     def evaluate(filename):

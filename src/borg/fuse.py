@@ -8,7 +8,6 @@ import tempfile
 import time
 from collections import defaultdict
 from signal import SIGINT
-from distutils.version import LooseVersion
 
 import llfuse
 
@@ -28,14 +27,9 @@ from .remote import RemoteRepository
 # Does this version of llfuse support ns precision?
 have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
-fuse_version = LooseVersion(getattr(llfuse, '__version__', '0.1'))
-if fuse_version >= '0.42':
-    def fuse_main():
-        return llfuse.main(workers=1)
-else:
-    def fuse_main():
-        llfuse.main(single=True)
-        return None
+def fuse_main():
+    return llfuse.main(workers=1)
+
 
 # size of some LRUCaches (1 element per simultaneously open file)
 # note: _inode_cache might have rather large elements - Item.chunks can be large!

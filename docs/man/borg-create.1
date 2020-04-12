@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2019-11-01" "" "borg backup tool"
+.TH BORG-CREATE 1 "2020-04-12" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -201,7 +201,10 @@ do not store ctime into archive
 do not store birthtime (creation date) into archive
 .TP
 .B \-\-nobsdflags
-do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive
+deprecated, use \fB\-\-noflags\fP instead
+.TP
+.B \-\-noflags
+do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive
 .TP
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode

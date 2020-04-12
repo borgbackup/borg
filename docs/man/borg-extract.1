@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXTRACT 1 "2019-11-01" "" "borg backup tool"
+.TH BORG-EXTRACT 1 "2020-04-12" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .
@@ -81,7 +81,10 @@ do not actually change any files
 only obey numeric user and group identifiers
 .TP
 .B \-\-nobsdflags
-do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)
+deprecated, use \fB\-\-noflags\fP instead
+.TP
+.B \-\-noflags
+do not extract/set flags (e.g. NODUMP, IMMUTABLE)
 .TP
 .B \-\-stdout
 write all extracted data to stdout

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2019-11-01" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2020-04-12" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -126,6 +126,9 @@ file with one pattern per line. Lines empty or starting with the number sign
 selector prefix is also supported for patterns loaded from a file. Due to
 whitespace removal paths with whitespace at the beginning or end can only be
 excluded using regular expressions.
+.sp
+To test your exclusion patterns without performing an actual backup you can
+run \fBborg create \-\-list \-\-dry\-run ...\fP\&.
 .sp
 Examples:
 .INDENT 0.0

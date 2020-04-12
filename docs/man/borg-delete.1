@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2019-11-01" "" "borg backup tool"
+.TH BORG-DELETE 1 "2020-04-12" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .
@@ -40,9 +40,10 @@ This command deletes an archive from the repository or the complete repository.
 Important: When deleting archives, repository disk space is \fBnot\fP freed until
 you run \fBborg compact\fP\&.
 .sp
-If you delete the complete repository, the local cache for it (if any) is
-also deleted. Alternatively, you can delete just the local cache with the
-\fB\-\-cache\-only\fP option.
+When you delete a complete repository, the security info and local cache for it
+(if any) are also deleted. Alternatively, you can delete just the local cache
+with the \fB\-\-cache\-only\fP option, or keep the security info with the
+\fB\-\-keep\-security\-info\fP option.
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
 deleted \- the "Deleted data" deduplicated size there is most interesting as
@@ -84,6 +85,9 @@ delete only the local cache for the given repository
 .TP
 .B \-\-force
 force deletion of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
+.TP
+.B \-\-keep\-security\-info
+keep the local security info when deleting a repository
 .TP
 .B \-\-save\-space
 work slower, but using less space

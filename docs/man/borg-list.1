@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2019-11-01" "" "borg backup tool"
+.TH BORG-LIST 1 "2020-04-12" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -52,6 +52,9 @@ paths to list; patterns are supported
 .UNINDENT
 .SS optional arguments
 .INDENT 0.0
+.TP
+.B \-\-consider\-checkpoints
+Show checkpoint archives in the repository contents list (default: hidden).
 .TP
 .B \-\-short
 only print file/directory names, nothing else

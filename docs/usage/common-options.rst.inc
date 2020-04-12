@@ -8,6 +8,7 @@
 -p, --progress     show progress information
 --log-json         Output one JSON object per log line instead of formatted text.
 --lock-wait SECONDS    wait at most SECONDS for acquiring a repository/cache lock (default: 1).
+--bypass-lock      Bypass locking mechanism
 --show-version     show/log the borg version
 --show-rc          show/log the return code (rc)
 --umask M          set umask to M (local and remote, default: 0077)

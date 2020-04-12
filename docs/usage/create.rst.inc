@@ -71,7 +71,9 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--nobirthtime``                                 | do not store birthtime (creation date) into archive                                                                                               |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--nobsdflags``                                  | do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive                                                                              |
+    |                                                       | ``--nobsdflags``                                  | deprecated, use ``--noflags`` instead                                                                                                             |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--noflags``                                     | do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -137,7 +139,8 @@ borg create
         --atime                   do store atime into archive
         --noctime                 do not store ctime into archive
         --nobirthtime             do not store birthtime (creation date) into archive
-        --nobsdflags              do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive
+        --nobsdflags              deprecated, use ``--noflags`` instead
+        --noflags                 do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 

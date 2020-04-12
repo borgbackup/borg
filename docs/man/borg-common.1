@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMMON 1 "2019-11-01" "" "borg backup tool"
+.TH BORG-COMMON 1 "2020-04-12" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .
@@ -62,6 +62,9 @@ Output one JSON object per log line instead of formatted text.
 .TP
 .BI \-\-lock\-wait \ SECONDS
 wait at most SECONDS for acquiring a repository/cache lock (default: 1).
+.TP
+.B \-\-bypass\-lock
+Bypass locking mechanism
 .TP
 .B \-\-show\-version
 show/log the borg version

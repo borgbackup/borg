@@ -8,7 +8,6 @@ import tempfile
 import time
 from collections import defaultdict
 from signal import SIGINT
-from distutils.version import LooseVersion
 
 import llfuse
 
@@ -25,17 +24,10 @@ from .item import Item
 from .lrucache import LRUCache
 from .remote import RemoteRepository
 
-# Does this version of llfuse support ns precision?
-have_fuse_xtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
 
-fuse_version = LooseVersion(getattr(llfuse, '__version__', '0.1'))
-if fuse_version >= '0.42':
-    def fuse_main():
-        return llfuse.main(workers=1)
-else:
-    def fuse_main():
-        llfuse.main(single=True)
-        return None
+def fuse_main():
+    return llfuse.main(workers=1)
+
 
 # size of some LRUCaches (1 element per simultaneously open file)
 # note: _inode_cache might have rather large elements - Item.chunks can be large!
@@ -362,8 +354,7 @@ class FuseBackend(object):
                 file_id = blake2b_128(path)
                 current_version, previous_id = self.versions_index.get(file_id, (0, None))
 
-                chunk_ids = [chunk_id for chunk_id, _, _ in item.chunks]
-                contents_id = blake2b_128(b''.join(chunk_ids))
+                contents_id = blake2b_128(b''.join(chunk_id for chunk_id, _, _ in item.chunks))
 
                 if contents_id != previous_id:
                     current_version += 1
@@ -567,17 +558,10 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         entry.st_blksize = 512
         entry.st_blocks = (entry.st_size + entry.st_blksize - 1) // entry.st_blksize
         # note: older archives only have mtime (not atime nor ctime)
-        mtime_ns = item.mtime
-        if have_fuse_xtime_ns:
-            entry.st_mtime_ns = mtime_ns
-            entry.st_atime_ns = item.get('atime', mtime_ns)
-            entry.st_ctime_ns = item.get('ctime', mtime_ns)
-            entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
-        else:
-            entry.st_mtime = mtime_ns / 1e9
-            entry.st_atime = item.get('atime', mtime_ns) / 1e9
-            entry.st_ctime = item.get('ctime', mtime_ns) / 1e9
-            entry.st_birthtime = item.get('birthtime', mtime_ns) / 1e9
+        entry.st_mtime_ns = mtime_ns = item.mtime
+        entry.st_atime_ns = item.get('atime', mtime_ns)
+        entry.st_ctime_ns = item.get('ctime', mtime_ns)
+        entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
         return entry
 
     def listxattr(self, inode, ctx=None):

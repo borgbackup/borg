@@ -29,6 +29,8 @@ borg delete
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--force``                           | force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--keep-security-info``              | keep the local security info when deleting a repository                                                                                                |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--save-space``                      | work slower, but using less space                                                                                                                      |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                               |
@@ -69,6 +71,7 @@ borg delete
         -s, --stats     print statistics for the deleted archive
         --cache-only    delete only the local cache for the given repository
         --force         force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
+        --keep-security-info    keep the local security info when deleting a repository
         --save-space    work slower, but using less space
 
 
@@ -91,9 +94,10 @@ This command deletes an archive from the repository or the complete repository.
 Important: When deleting archives, repository disk space is **not** freed until
 you run ``borg compact``.
 
-If you delete the complete repository, the local cache for it (if any) is
-also deleted. Alternatively, you can delete just the local cache with the
-``--cache-only`` option.
+When you delete a complete repository, the security info and local cache for it
+(if any) are also deleted. Alternatively, you can delete just the local cache
+with the ``--cache-only`` option, or keep the security info with the
+``--keep-security-info`` option.
 
 When using ``--stats``, you will get some statistics about how much data was
 deleted - the "Deleted data" deduplicated size there is most interesting as

@@ -12,19 +12,21 @@ borg compact
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+-----------------------+-------------------------------------------+
-    | **positional arguments**                                                                                                  |
-    +-------------------------------------------------------+-----------------------+-------------------------------------------+
-    |                                                       | ``REPOSITORY``        | repository to compact                     |
-    +-------------------------------------------------------+-----------------------+-------------------------------------------+
-    | **optional arguments**                                                                                                    |
-    +-------------------------------------------------------+-----------------------+-------------------------------------------+
-    |                                                       | ``--cleanup-commits`` | cleanup commit-only 17-byte segment files |
-    +-------------------------------------------------------+-----------------------+-------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                            |
-    |                                                                                                                           |
-    | :ref:`common_options`                                                                                                     |
-    +-------------------------------------------------------+-----------------------+-------------------------------------------+
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    | **positional arguments**                                                                                                                         |
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    |                                                       | ``REPOSITORY``          | repository to compact                                          |
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    | **optional arguments**                                                                                                                           |
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    |                                                       | ``--cleanup-commits``   | cleanup commit-only 17-byte segment files                      |
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    |                                                       | ``--threshold PERCENT`` | set minimum threshold for saved space in PERCENT (Default: 10) |
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                   |
+    |                                                                                                                                                  |
+    | :ref:`common_options`                                                                                                                            |
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
 
     .. raw:: html
 
@@ -41,7 +43,8 @@ borg compact
 
 
     optional arguments
-        --cleanup-commits     cleanup commit-only 17-byte segment files
+        --cleanup-commits       cleanup commit-only 17-byte segment files
+        --threshold PERCENT     set minimum threshold for saved space in PERCENT (Default: 10)
 
 
     :ref:`common_options`
@@ -62,6 +65,8 @@ client or also from the server.
 Depending on the amount of segments that need compaction, it may take a while,
 so consider using the ``--progress`` option.
 
+A segment is compacted if the amount of saved space is above the percentage value
+given by the ``--threshold`` option. If ommitted, a threshold of 10% is used.
 When using ``--verbose``, borg will output an estimate of the freed space.
 
 After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``

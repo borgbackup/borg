@@ -518,6 +518,8 @@ class FuseOperations(llfuse.Operations):
         stat_.f_files = 0
         stat_.f_ffree = 0
         stat_.f_favail = 0
+        if hasattr(stat_, 'f_namemax'):  # since llfuse 1.3.0
+            stat_.f_namemax = 255  # == NAME_MAX (depends on archive source OS / FS)
         return stat_
 
     def get_item(self, inode):

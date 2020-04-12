@@ -540,6 +540,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         stat_.f_files = 0
         stat_.f_ffree = 0
         stat_.f_favail = 0
+        stat_.f_namemax = 255  # == NAME_MAX (depends on archive source OS / FS)
         return stat_
 
     def getattr(self, inode, ctx=None):

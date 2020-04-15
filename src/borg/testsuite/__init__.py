@@ -290,11 +290,13 @@ class BaseTestCase(unittest.TestCase):
             message = 'Testing read-only repos is not supported on platform %s' % sys.platform
             self.skipTest(message)
         try:
+            os.system('chmod -R ugo-w "%s"' % path)
             os.system(cmd_immutable)
             yield
         finally:
             # Restore permissions to ensure clean-up doesn't fail
             os.system(cmd_mutable)
+            os.system('chmod -R ugo+w "%s"' % path)
 
 
 class changedir:

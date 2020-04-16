@@ -106,6 +106,8 @@ def are_fifos_supported():
             pass
         except NotImplementedError:
             pass
+        except AttributeError:
+            pass
         return False
 
 

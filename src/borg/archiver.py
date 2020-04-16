@@ -3617,7 +3617,11 @@ class Archiver:
         It is not recommended to work without encryption. Repository encryption protects
         you e.g. against the case that an attacker has access to your backup repository.
 
-        But be careful with the key / the passphrase:
+        Borg relies on randomly generated key material and uses that for chunking, id
+        generation, encryption and authentication. The key material is encrypted using
+        the passphrase you give before it is stored on-disk.
+
+        You need to be careful with the key / the passphrase:
 
         If you want "passphrase-only" security, use one of the repokey modes. The
         key will be stored inside the repository (in its "config" file). In above
@@ -3655,6 +3659,12 @@ class Archiver:
         Encryption modes
         ++++++++++++++++
 
+        You can choose from the encryption modes seen in the table below on a per-repo
+        basis. The mode determines encryption algorithm, hash/MAC algorithm and also the
+        key storage location.
+
+        Example: `borg init --encryption repokey ...`
+
         .. nanorst: inline-fill
 
         +----------+---------------+------------------------+--------------------------+
@@ -3670,7 +3680,8 @@ class Archiver:
 
         .. nanorst: inline-replace
 
-        `Marked modes` are new in Borg 1.1 and are not backwards-compatible with Borg 1.0.x.
+        Modes `marked like this` in the above table are new in Borg 1.1 and are not
+        backwards-compatible with Borg 1.0.x.
 
         On modern Intel/AMD CPUs (except very cheap ones), AES is usually
         hardware-accelerated.
@@ -3703,8 +3714,8 @@ class Archiver:
         This mode is new and *not* compatible with Borg 1.0.x.
 
         `none` mode uses no encryption and no authentication. It uses SHA256 as chunk
-        ID hash. Not recommended, rather consider using an authenticated or
-        authenticated/encrypted mode. This mode has possible denial-of-service issues
+        ID hash. This mode is not recommended, you should rather consider using an authenticated
+        or authenticated/encrypted mode. This mode has possible denial-of-service issues
         when running ``borg create`` on contents controlled by an attacker.
         Use it only for new repositories where no encryption is wanted **and** when compatibility
         with 1.0.x is important. If compatibility with 1.0.x is not important, use

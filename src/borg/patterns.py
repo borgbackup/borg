@@ -215,7 +215,7 @@ class PathFullPattern(PatternBase):
     PREFIX = "pf"
 
     def _prepare(self, pattern):
-        self.pattern = os.path.normpath(pattern)
+        self.pattern = os.path.normpath(pattern).lstrip(os.path.sep)  # sep at beginning is removed
 
     def _match(self, path):
         return path == self.pattern
@@ -235,7 +235,9 @@ class PathPrefixPattern(PatternBase):
     PREFIX = "pp"
 
     def _prepare(self, pattern):
-        self.pattern = os.path.normpath(pattern).rstrip(os.path.sep) + os.path.sep
+        sep = os.path.sep
+
+        self.pattern = (os.path.normpath(pattern).rstrip(sep) + sep).lstrip(sep)  # sep at beginning is removed
 
     def _match(self, path):
         return (path + os.path.sep).startswith(self.pattern)
@@ -253,7 +255,7 @@ class FnmatchPattern(PatternBase):
         else:
             pattern = os.path.normpath(pattern) + os.path.sep + '*'
 
-        self.pattern = pattern
+        self.pattern = pattern.lstrip(os.path.sep)  # sep at beginning is removed
 
         # fnmatch and re.match both cache compiled regular expressions.
         # Nevertheless, this is about 10 times faster.
@@ -277,7 +279,7 @@ class ShellPattern(PatternBase):
         else:
             pattern = os.path.normpath(pattern) + sep + "**" + sep + "*"
 
-        self.pattern = pattern
+        self.pattern = pattern.lstrip(sep)  # sep at beginning is removed
         self.regex = re.compile(shellpattern.translate(self.pattern))
 
     def _match(self, path):
@@ -290,7 +292,7 @@ class RegexPattern(PatternBase):
     PREFIX = "re"
 
     def _prepare(self, pattern):
-        self.pattern = pattern
+        self.pattern = pattern  # sep at beginning is NOT removed
         self.regex = re.compile(pattern)
 
     def _match(self, path):

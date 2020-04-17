@@ -306,6 +306,8 @@ This will use ``pip`` to install the latest release from PyPi::
     virtualenv --python=python3 borg-env
     source borg-env/bin/activate
 
+    # might be required if your tools are outdated
+    pip install -U pip setuptools wheel
     # install Borg + Python dependencies into virtualenv
     pip install borgbackup
     # or alternatively (if you want FUSE support):

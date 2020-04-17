@@ -418,7 +418,7 @@ class Location:
             m = self.win_file_re.match(text)
             if m:
                 self.proto = 'file'
-                self.path = path
+                self.path = m.group('path')
                 self.archive = m.group('archive')
                 return True
 

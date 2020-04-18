@@ -20,7 +20,7 @@ def packages_debianoid(user)
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
     apt install -y fakeroot build-essential git curl
-    apt install -y python3-dev python3-setuptools python-virtualenv python3-virtualenv
+    apt install -y python3-dev python3-setuptools virtualenv
     # for building python:
     apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
   EOF
@@ -46,11 +46,9 @@ def packages_freebsd
     pkg install -y liblz4 zstd fusefs-libs pkgconf
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python:
-    pkg install -y sqlite3
-    pkg install -y py27-virtualenv  # provides "virtualenv" command
-    pkg install -y python36 py36-virtualenv py36-pip
+    pkg install -y python37 py37-sqlite3 py37-virtualenv py37-pip
     # make sure there is a python3 command
-    ln -s /usr/local/bin/python3.6 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.7 /usr/local/bin/python3
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd

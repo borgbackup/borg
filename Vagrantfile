@@ -20,7 +20,7 @@ def packages_debianoid(user)
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
     apt install -y fakeroot build-essential git curl
-    apt install -y python3-dev python3-setuptools python-virtualenv python3-virtualenv
+    apt install -y python3-dev python3-setuptools virtualenv
     # for building python:
     apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
   EOF

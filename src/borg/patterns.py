@@ -143,7 +143,7 @@ class PatternMatcher:
         in self.fallback is returned (defaults to None).
 
         """
-        path = normalize_path(path)
+        path = normalize_path(path).lstrip(os.path.sep)
         # do a fast lookup for full path matches (note: we do not count such matches):
         non_existent = object()
         value = self._path_full_patterns.get(path, non_existent)

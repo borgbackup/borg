@@ -13,7 +13,7 @@ if is_win32:
     hiddenimports = []
 else:
     basepath = '/vagrant/borg/borg'
-    hiddenimports = ['borg.platform.posix']
+    hiddenimports = ['borg.platform.posix', 'pkg_resources.py2_warn', ]
 
 block_cipher = None
 

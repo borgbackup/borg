@@ -329,7 +329,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd12-64"
+    b.vm.box = "freebsd121-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

@@ -18,6 +18,7 @@ import unittest
 from ..xattr import get_all
 from ..platform import get_flags
 from ..helpers import umount
+from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .. import platform
 
 # Note: this is used by borg.selftest, do not use or import py.test functionality here.
@@ -253,6 +254,14 @@ class BaseTestCase(unittest.TestCase):
             # mount a read-only repo.
             kwargs['fork'] = True
         self.cmd('mount', location, mountpoint, *options, **kwargs)
+        if kwargs.get('exit_code', EXIT_SUCCESS) == EXIT_ERROR:
+            # If argument `exit_code = EXIT_ERROR`, then this call
+            # is testing the behavior of an unsuccessful mount and
+            # we must not continue, as there is no mount to work
+            # with. The test itself has already failed or succeeded
+            # with the call to `self.cmd`, above.
+            yield
+            return
         self.wait_for_mountstate(mountpoint, mounted=True)
         yield
         umount(mountpoint)

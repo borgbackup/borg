@@ -186,7 +186,7 @@ Install the dependencies with development headers::
     liblz4-dev libzstd-dev \
     build-essential \
     pkg-config python3-pkgconfig
-    sudo apt-get install libfuse-dev fuse    # optional, for FUSE support
+    sudo apt-get install libfuse-dev fuse python3-llfuse # optional, for FUSE support
 
 In case you get complaints about permission denied on ``/etc/fuse.conf``: on
 Ubuntu this means your user is not in the ``fuse`` group. Add yourself to that

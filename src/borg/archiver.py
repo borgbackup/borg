@@ -2066,17 +2066,27 @@ class Archiver:
         when invoking borg and these can be either relative or absolute paths.
 
         So, when you give `relative/` as root, the paths going into the matcher
-        will look like `relative/.../file.ext`. When you give `/absolute/` as root,
-        they will look like `/absolute/.../file.ext`. This is meant when we talk
-        about "full path" below.
+        will look like `relative/.../file.ext`. When you give `/absolute/` as
+        root, they will look like `/absolute/.../file.ext`.
+
+        File paths in Borg archives are always stored normalized and relative.
+        This means that e.g. ``borg create /path/to/repo ../some/path`` will
+        store all files as `some/path/.../file.ext` and ``borg create
+        /path/to/repo /home/user`` will store all files as
+        `home/user/.../file.ext`.
 
         File patterns support these styles: fnmatch, shell, regular expressions,
         path prefixes and path full-matches. By default, fnmatch is used for
-        ``--exclude`` patterns and shell-style is used for the experimental ``--pattern``
-        option.
+        ``--exclude`` patterns and shell-style is used for the experimental
+        ``--pattern`` option.
 
-        If followed by a colon (':') the first two characters of a pattern are used as a
-        style selector. Explicit style selection is necessary when a
+        Starting with Borg 1.2, for all but regular expression pattern matching
+        styles, all paths are treated as relative, meaning that a leading path
+        separator is removed after normalizing and before matching. This allows
+        you to use absolute or relative patterns arbitrarily.
+
+        If followed by a colon (':') the first two characters of a pattern are
+        used as a style selector. Explicit style selection is necessary when a
         non-default style is desired or when the desired pattern starts with
         two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
 
@@ -2093,14 +2103,15 @@ class Archiver:
             from the start of the full path to just before a path separator. Except
             for the root path, paths will never end in the path separator when
             matching is attempted.  Thus, if a given pattern ends in a path
-            separator, a '\\*' is appended before matching is attempted.
+            separator, a '\\*' is appended before matching is attempted. A leading
+            path separator is always removed.
 
         Shell-style patterns, selector `sh:`
             This is the default style for ``--pattern`` and ``--patterns-from``.
             Like fnmatch patterns these are similar to shell patterns. The difference
             is that the pattern may include `**/` for matching zero or more directory
             levels, `*` for matching zero or more arbitrary characters with the
-            exception of any path separator.
+            exception of any path separator. A leading path separator is always removed.
 
         Regular expressions, selector `re:`
             Regular expressions similar to those found in Perl are supported. Unlike
@@ -2114,13 +2125,14 @@ class Archiver:
 
         Path prefix, selector `pp:`
             This pattern style is useful to match whole sub-directories. The pattern
-            `pp:root/somedir` matches `root/somedir` and everything therein.
+            `pp:root/somedir` matches `root/somedir` and everything therein. A leading
+            path separator is always removed.
 
         Path full-match, selector `pf:`
             This pattern style is (only) useful to match full paths.
             This is kind of a pseudo pattern as it can not have any variable or
-            unspecified parts - the full path must be given.
-            `pf:root/file.ext` matches `root/file.txt` only.
+            unspecified parts - the full path must be given. `pf:root/file.ext` matches
+            `root/file.txt` only. A leading path separator is always removed.
 
             Implementation note: this is implemented via very time-efficient O(1)
             hashtable lookups (this means you can have huge amounts of such patterns
@@ -2164,7 +2176,7 @@ class Archiver:
             $ borg create -e '/home/*/junk' backup /
 
             # Exclude the contents of '/home/user/cache' but not the directory itself:
-            $ borg create -e /home/user/cache/ backup /
+            $ borg create -e home/user/cache/ backup /
 
             # The file '/home/user/cache/important' is *not* backed up:
             $ borg create -e /home/user/cache/ backup / /home/user/cache/important
@@ -2179,8 +2191,8 @@ class Archiver:
             /home/*/junk
             *.tmp
             fm:aa:something/*
-            re:^/home/[^/]\\.tmp/
-            sh:/home/*/.thumbnails
+            re:^home/[^/]\\.tmp/
+            sh:home/*/.thumbnails
             EOF
             $ borg create --exclude-from exclude.txt backup /
 

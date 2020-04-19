@@ -18,7 +18,6 @@ Borg documentation
     deployment
     faq
     support
-    resources
     changes
     internals
     development

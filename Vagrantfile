@@ -89,11 +89,11 @@ def packages_darwin
     sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.8.3/osxfuse-3.8.3.dmg >osxfuse.dmg
+    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.10.4/osxfuse-3.10.4.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.8.3.pkg" -target /
+    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.10.4.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
-    ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    which brew || ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew update > /dev/null
     brew install pkg-config || brew upgrade pkg-config
     brew install readline || brew upgrade readline
@@ -329,7 +329,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd12-64"
+    b.vm.box = "freebsd121-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -357,10 +357,10 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "darwin64" do |b|
-    b.vm.box = "jhcook/macos-sierra"
+    b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 1536 + $wmem
-      v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']
+      v.memory = 2048 + $wmem
+      v.customize ['modifyvm', :id, '--ostype', 'MacOS1012_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       # Adjust CPU settings according to
       # https://github.com/geerlingguy/macos-virtualbox-vm

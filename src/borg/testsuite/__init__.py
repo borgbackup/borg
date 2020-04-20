@@ -284,8 +284,13 @@ class BaseTestCase(unittest.TestCase):
     def read_only(self, path):
         """Some paths need to be made read-only for testing
 
-        Using chmod to remove write permissions is not enough due to
-        the tests running with root privileges. Instead, the folder is
+        If the tests are executed inside a fakeroot environment, the
+        changes from chmod won't affect the real permissions of that
+        folder. This issue is circumvented by temporarily disabling
+        fakeroot with `LD_PRELOAD=`.
+
+        Using chmod to remove write permissions is not enough if the
+        tests are running with root privileges. Instead, the folder is
         rendered immutable with chattr or chflags, respectively.
         """
         if sys.platform.startswith('linux'):
@@ -301,13 +306,13 @@ class BaseTestCase(unittest.TestCase):
             message = 'Testing read-only repos is not supported on platform %s' % sys.platform
             self.skipTest(message)
         try:
-            os.system('chmod -R ugo-w "%s"' % path)
+            os.system('LD_PRELOAD= chmod -R ugo-w "%s"' % path)
             os.system(cmd_immutable)
             yield
         finally:
             # Restore permissions to ensure clean-up doesn't fail
             os.system(cmd_mutable)
-            os.system('chmod -R ugo+w "%s"' % path)
+            os.system('LD_PRELOAD= chmod -R ugo+w "%s"' % path)
 
 
 class changedir:

@@ -1226,7 +1226,7 @@ class FilesystemObjectProcessors:
             item.update(self.metadata_collector.stat_attrs(st, path))  # can't use FD here?
             return status
 
-    def process_stdin(self, *, path, cache):
+    def process_pipe(self, *, path, cache, fd):
         uid, gid = 0, 0
         t = int(time.time()) * 1000000000
         item = Item(
@@ -1236,7 +1236,6 @@ class FilesystemObjectProcessors:
             gid=gid, group=gid2group(gid),
             mtime=t, atime=t, ctime=t,
         )
-        fd = sys.stdin.buffer  # binary
         self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
         item.get_size(memorize=True)
         self.stats.nfiles += 1

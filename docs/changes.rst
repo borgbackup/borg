@@ -278,6 +278,9 @@ Fixes:
 - extract: fix confusing output of borg extract --list --strip-components, #4934
 - recreate: support --timestamp option, #4745
 - fix ProgressIndicator msgids (JSON output), #4935
+- fuse: set f_namemax in statfs result, #2684
+- accept absolute paths on windows
+- pyinstaller: work around issue with setuptools > 44
 
 New features:
 
@@ -289,6 +292,10 @@ New features:
 - support platforms with no os.link, #4901 - if we don't have os.link,
   we just extract another copy instead of making a hardlink.
 - move sync_file_range to its own extension for better platform compatibility.
+- new --bypass-lock option to bypass locking, e.g. for read-only repos
+- accept absolute pathes by removing leading slashes in patterns of all
+  sorts but re: style, #4029
+- delete: new --keep-security-info option
 
 Other changes:
 
@@ -300,6 +307,7 @@ Other changes:
 - check: improve error output for matching index size, see #4829
 - ignore --stats when given with --dry-run, but continue, fixes #4373
 - replaced usage of os.statvfs with shutil.disk_usage (better cross-platform support).
+- fuse: remove unneeded version check and compat code, micro opts
 - docs:
 
   - improve description of path variables
@@ -321,6 +329,14 @@ Other changes:
   - explain difference between --exclude and --pattern, #4118
   - add FAQ for preventing SSH timeout in extract, #3866
   - improve password FAQ (decrease pw length, add -w 0 option to base64 to prevent line wrap), #4591
+  - add note about patterns and stored paths, #4160
+  - add upgrade of tools to pip installation how-to, #5090
+  - document one cause of orphaned chunks in check command, #2295
+  - clean up the whole check usage paragraph
+  - FAQ: linked recommended restrictions to ssh public keys on borg servers, #4946
+  - fixed "doc downplays severity of Nonce reuse issue", #4883
+  - borg repo restore instructions needed, #3428
+  - new FAQ: A repo is corrupt and must be replaced with an older repo.
 - native windows port:
 
   - update README_WINDOWS.rst
@@ -333,10 +349,16 @@ Other changes:
 - vagrant:
 
   - upgrade pyinstaller to v3.5 + patch
-  - macOS: test on py35 and py37, linux: test on py37
   - use py369 for binary build, add py380 for tests
   - fix issue in stretch VM hanging at grub installation
   - add a debian buster and a ubuntu focal VM
+  - update darwin box to 10.12
+  - upgrade FreeBSD box to 12.1
+  - fix debianoid virtualenv packages
+  - use pyenv in freebsd64 VM
+  - remove the flake8 test
+  - darwin: avoid error if pkg is already installed
+  - debianoid: don't interactively ask questions
 
 
 Version 1.2.0a7 (2019-09-07)

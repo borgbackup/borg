@@ -72,7 +72,8 @@ cdef class CompressorBase:
         using Auto compression it needs to determine the _actual_ target compression of a chunk
         in order to detect whether it should be recompressed.
 
-        For all Compressors that are not Auto this always returns *self*.
+        Any compressor may return a compressor other than *self*, like e.g. the CNONE compressor,
+        and should actually do so if *data* would become larger on compression.
         """
         return self
 
@@ -95,6 +96,50 @@ cdef class CompressorBase:
         # strip ID bytes
         return data[2:]
 
+cdef class DecidingCompressor(CompressorBase):
+    """
+    base class for (de)compression classes that (based on an internal _decide
+    method) decide whether and how to compress data.
+    """
+    name = 'decidebaseclass'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _decide(self, data):
+        """
+        Decides what to do with *data*. Returns (compressor, compressed_data).
+
+        *compressed_data* can be the result of *data* being processed by *compressor*,
+        if that is generated as a side-effect of the decision process, or None otherwise.
+
+        This private method allows for more efficient implementation of compress()
+        and decide_compress() making use of *compressed_data*, if already generated.
+        """
+        raise NotImplementedError
+
+    def decide(self, data):
+        return self._decide(data)[0]
+
+    def decide_compress(self, data):
+        """
+        Decides what to do with *data* and handle accordingly. Returns (compressor, compressed_data).
+
+        *compressed_data* is the result of *data* being processed by *compressor*.
+        """
+        compressor, compressed_data = self._decide(data)
+
+        if compressed_data is None:
+            compressed_data = compressor.compress(data)
+
+        if compressor is self:
+            # call super class to add ID bytes
+            return self, super().compress(compressed_data)
+
+        return compressor, compressed_data
+
+    def compress(self, data):
+        return self.decide_compress(data)[1]
 
 class CNONE(CompressorBase):
     """
@@ -113,7 +158,7 @@ class CNONE(CompressorBase):
         return data
 
 
-class LZ4(CompressorBase):
+class LZ4(DecidingCompressor):
     """
     raw LZ4 compression / decompression (liblz4).
 
@@ -128,7 +173,12 @@ class LZ4(CompressorBase):
     def __init__(self, **kwargs):
         pass
 
-    def compress(self, idata):
+    def _decide(self, idata):
+        """
+        Decides what to do with *data*. Returns (compressor, lz4_data).
+
+        *lz4_data* is the LZ4 result if *compressor* is LZ4 as well, otherwise it is None.
+        """
         if not isinstance(idata, bytes):
             idata = bytes(idata)  # code below does not work with memoryview
         cdef int isize = len(idata)
@@ -142,7 +192,11 @@ class LZ4(CompressorBase):
             osize = LZ4_compress_default(source, dest, isize, osize)
         if not osize:
             raise Exception('lz4 compress failed')
-        return super().compress(dest[:osize])
+        # only compress if the result actually is smaller
+        if osize < isize:
+            return self, dest[:osize]
+        else:
+            return NONE_COMPRESSOR, None
 
     def decompress(self, idata):
         if not isinstance(idata, bytes):
@@ -174,7 +228,7 @@ class LZ4(CompressorBase):
         return dest[:rsize]
 
 
-class LZMA(CompressorBase):
+class LZMA(DecidingCompressor):
     """
     lzma compression / decompression
     """
@@ -187,10 +241,18 @@ class LZMA(CompressorBase):
         if lzma is None:
             raise ValueError('No lzma support found.')
 
-    def compress(self, data):
+    def _decide(self, data):
+        """
+        Decides what to do with *data*. Returns (compressor, lzma_data).
+
+        *lzma_data* is the LZMA result if *compressor* is LZMA as well, otherwise it is None.
+        """
         # we do not need integrity checks in lzma, we do that already
-        data = lzma.compress(data, preset=self.level, check=lzma.CHECK_NONE)
-        return super().compress(data)
+        lzma_data = lzma.compress(data, preset=self.level, check=lzma.CHECK_NONE)
+        if len(lzma_data) < len(data):
+            return self, lzma_data
+        else:
+            return NONE_COMPRESSOR, None
 
     def decompress(self, data):
         data = super().decompress(data)
@@ -200,7 +262,7 @@ class LZMA(CompressorBase):
             raise DecompressionError(str(e)) from None
 
 
-class ZSTD(CompressorBase):
+class ZSTD(DecidingCompressor):
     """zstd compression / decompression (pypi: zstandard, gh: python-zstandard)"""
     # This is a NOT THREAD SAFE implementation.
     # Only ONE python context must to be created at a time.
@@ -212,7 +274,12 @@ class ZSTD(CompressorBase):
         super().__init__(**kwargs)
         self.level = level
 
-    def compress(self, idata):
+    def _decide(self, idata):
+        """
+        Decides what to do with *data*. Returns (compressor, zstd_data).
+
+        *zstd_data* is the ZSTD result if *compressor* is ZSTD as well, otherwise it is None.
+        """
         if not isinstance(idata, bytes):
             idata = bytes(idata)  # code below does not work with memoryview
         cdef int isize = len(idata)
@@ -227,7 +294,11 @@ class ZSTD(CompressorBase):
             osize = ZSTD_compress(dest, osize, source, isize, level)
         if ZSTD_isError(osize):
             raise Exception('zstd compress failed: %s' % ZSTD_getErrorName(osize))
-        return super().compress(dest[:osize])
+        # only compress if the result actually is smaller
+        if osize < isize:
+            return self, dest[:osize]
+        else:
+            return NONE_COMPRESSOR, None
 
     def decompress(self, idata):
         if not isinstance(idata, bytes):
@@ -306,44 +377,54 @@ class Auto(CompressorBase):
 
     def _decide(self, data):
         """
-        Decides what to do with *data*. Returns (compressor, lz4_data).
+        Decides what to do with *data*. Returns (compressor, compressed_data).
 
-        *lz4_data* is the LZ4 result if *compressor* is LZ4 as well, otherwise it is None.
+        *compressor* is the compressor that is decided to be best suited to compress
+        *data*, *compressed_data* is the result of *data* being compressed by a
+        compressor, which may or may not be *compressor*!
+
+        There are three possible outcomes of the decision process:
+        * *data* compresses well enough for trying the more expensive compressor
+          set on instantiation to make sense.
+          In this case, (expensive_compressor_class, lz4_compressed_data) is
+          returned.
+        * *data* compresses only slightly using the LZ4 compressor, thus trying
+          the more expensive compressor for potentially little gain does not
+          make sense.
+          In this case, (LZ4_COMPRESSOR, lz4_compressed_data) is returned.
+        * *data* does not compress at all using LZ4, in this case
+          (NONE_COMPRESSOR, none_compressed_data) is returned.
+
+        Note: While it makes no sense, the expensive compressor may well be set
+        to the LZ4 compressor.
         """
-        lz4_data = LZ4_COMPRESSOR.compress(data)
-        # lz4_data includes the compression type header, while data does not yet
-        ratio = len(lz4_data) / (len(data) + 2)
+        compressor, compressed_data = LZ4_COMPRESSOR.decide_compress(data)
+        # compressed_data includes the compression type header, while data does not yet
+        ratio = len(compressed_data) / (len(data) + 2)
         if ratio < 0.97:
-            return self.compressor, lz4_data
-        elif ratio < 1:
-            return LZ4_COMPRESSOR, lz4_data
+            return self.compressor, compressed_data
         else:
-            return NONE_COMPRESSOR, None
+            return compressor, compressed_data
 
     def decide(self, data):
         return self._decide(data)[0]
 
     def compress(self, data):
-        compressor, lz4_data = self._decide(data)
-        if compressor is LZ4_COMPRESSOR:
+        compressor, cheap_compressed_data = self._decide(data)
+        if compressor in (LZ4_COMPRESSOR, NONE_COMPRESSOR):
             # we know that trying to compress with expensive compressor is likely pointless,
-            # but lz4 managed to at least squeeze the data a bit.
-            return lz4_data
-        if compressor is NONE_COMPRESSOR:
-            # we know that trying to compress with expensive compressor is likely pointless
-            # and also lz4 did not manage to squeeze the data (not even a bit).
-            uncompressed_data = compressor.compress(data)
-            return uncompressed_data
+            # so we fallback to return the cheap compressed data.
+            return cheap_compressed_data
         # if we get here, the decider decided to try the expensive compressor.
-        # we also know that lz4_data is smaller than uncompressed data.
-        exp_compressed_data = compressor.compress(data)
-        ratio = len(exp_compressed_data) / len(lz4_data)
+        # we also know that the compressed data returned by the decider is lz4 compressed.
+        expensive_compressed_data = compressor.compress(data)
+        ratio = len(expensive_compressed_data) / len(cheap_compressed_data)
         if ratio < 0.99:
             # the expensive compressor managed to squeeze the data significantly better than lz4.
-            return exp_compressed_data
+            return expensive_compressed_data
         else:
             # otherwise let's just store the lz4 data, which decompresses extremely fast.
-            return lz4_data
+            return cheap_compressed_data
 
     def decompress(self, data):
         raise NotImplementedError

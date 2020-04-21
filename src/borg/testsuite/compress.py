@@ -43,11 +43,13 @@ def test_lz4():
     assert data == Compressor(**params).decompress(cdata)  # autodetect
 
 
-def test_lz4_buffer_allocation():
+def test_lz4_buffer_allocation(monkeypatch):
+    # disable fallback to no compression on incompressible data
+    monkeypatch.setattr(LZ4, 'decide', lambda always_compress: LZ4)
     # test with a rather huge data object to see if buffer allocation / resizing works
     data = os.urandom(5 * 2**20) * 10  # 50MiB badly compressible data
     assert len(data) == 50 * 2**20
-    c = get_compressor(name='lz4')
+    c = Compressor('lz4')
     cdata = c.compress(data)
     assert len(cdata) > len(data)
     assert data == c.decompress(cdata)

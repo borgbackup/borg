@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2020-04-12" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2020-04-21" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -37,17 +37,27 @@ currently active recursion root. You usually give the recursion root(s)
 when invoking borg and these can be either relative or absolute paths.
 .sp
 So, when you give \fIrelative/\fP as root, the paths going into the matcher
-will look like \fIrelative/.../file.ext\fP\&. When you give \fI/absolute/\fP as root,
-they will look like \fI/absolute/.../file.ext\fP\&. This is meant when we talk
-about "full path" below.
+will look like \fIrelative/.../file.ext\fP\&. When you give \fI/absolute/\fP as
+root, they will look like \fI/absolute/.../file.ext\fP\&.
+.sp
+File paths in Borg archives are always stored normalized and relative.
+This means that e.g. \fBborg create /path/to/repo ../some/path\fP will
+store all files as \fIsome/path/.../file.ext\fP and \fBborg create
+/path/to/repo /home/user\fP will store all files as
+\fIhome/user/.../file.ext\fP\&.
 .sp
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full\-matches. By default, fnmatch is used for
-\fB\-\-exclude\fP patterns and shell\-style is used for the experimental \fB\-\-pattern\fP
-option.
+\fB\-\-exclude\fP patterns and shell\-style is used for the experimental
+\fB\-\-pattern\fP option.
 .sp
-If followed by a colon (\(aq:\(aq) the first two characters of a pattern are used as a
-style selector. Explicit style selection is necessary when a
+Starting with Borg 1.2, for all but regular expression pattern matching
+styles, all paths are treated as relative, meaning that a leading path
+separator is removed after normalizing and before matching. This allows
+you to use absolute or relative patterns arbitrarily.
+.sp
+If followed by a colon (\(aq:\(aq) the first two characters of a pattern are
+used as a style selector. Explicit style selection is necessary when a
 non\-default style is desired or when the desired pattern starts with
 two alphanumeric characters followed by a colon (i.e. \fIaa:something/*\fP).
 .INDENT 0.0
@@ -65,14 +75,15 @@ to match a pattern, the full path must match, or it must match
 from the start of the full path to just before a path separator. Except
 for the root path, paths will never end in the path separator when
 matching is attempted.  Thus, if a given pattern ends in a path
-separator, a \(aq*\(aq is appended before matching is attempted.
+separator, a \(aq*\(aq is appended before matching is attempted. A leading
+path separator is always removed.
 .TP
 .B Shell\-style patterns, selector \fIsh:\fP
 This is the default style for \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP\&.
 Like fnmatch patterns these are similar to shell patterns. The difference
 is that the pattern may include \fI**/\fP for matching zero or more directory
 levels, \fI*\fP for matching zero or more arbitrary characters with the
-exception of any path separator.
+exception of any path separator. A leading path separator is always removed.
 .TP
 .B Regular expressions, selector \fIre:\fP
 Regular expressions similar to those found in Perl are supported. Unlike
@@ -86,13 +97,14 @@ the re module\fP\&.
 .TP
 .B Path prefix, selector \fIpp:\fP
 This pattern style is useful to match whole sub\-directories. The pattern
-\fIpp:root/somedir\fP matches \fIroot/somedir\fP and everything therein.
+\fIpp:root/somedir\fP matches \fIroot/somedir\fP and everything therein. A leading
+path separator is always removed.
 .TP
 .B Path full\-match, selector \fIpf:\fP
 This pattern style is (only) useful to match full paths.
 This is kind of a pseudo pattern as it can not have any variable or
-unspecified parts \- the full path must be given.
-\fIpf:root/file.ext\fP matches \fIroot/file.txt\fP only.
+unspecified parts \- the full path must be given. \fIpf:root/file.ext\fP matches
+\fIroot/file.txt\fP only. A leading path separator is always removed.
 .sp
 Implementation note: this is implemented via very time\-efficient O(1)
 hashtable lookups (this means you can have huge amounts of such patterns
@@ -144,7 +156,7 @@ $ borg create \-e \(aq*.o\(aq backup /
 $ borg create \-e \(aq/home/*/junk\(aq backup /
 
 # Exclude the contents of \(aq/home/user/cache\(aq but not the directory itself:
-$ borg create \-e /home/user/cache/ backup /
+$ borg create \-e home/user/cache/ backup /
 
 # The file \(aq/home/user/cache/important\(aq is *not* backed up:
 $ borg create \-e /home/user/cache/ backup / /home/user/cache/important
@@ -159,8 +171,8 @@ $ cat >exclude.txt <<EOF
 /home/*/junk
 *.tmp
 fm:aa:something/*
-re:^/home/[^/]\e.tmp/
-sh:/home/*/.thumbnails
+re:^home/[^/]\e.tmp/
+sh:home/*/.thumbnails
 EOF
 $ borg create \-\-exclude\-from exclude.txt backup /
 .ft P

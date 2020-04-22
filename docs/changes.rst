@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a8 (not released yet)
-----------------------------------
+Version 1.2.0a8 (2020-04-22)
+----------------------------
 
 Please note:
 
@@ -304,6 +304,7 @@ Other changes:
 - upgrade bundled lz4 to 1.9.2
 - upgrade xxhash to 0.7.3
 - require recent enough llfuse for birthtime support, #5064
+- only store compressed data if the result actually is smaller, #4516
 - check: improve error output for matching index size, see #4829
 - ignore --stats when given with --dry-run, but continue, fixes #4373
 - replaced usage of os.statvfs with shutil.disk_usage (better cross-platform support).
@@ -337,6 +338,7 @@ Other changes:
   - fixed "doc downplays severity of Nonce reuse issue", #4883
   - borg repo restore instructions needed, #3428
   - new FAQ: A repo is corrupt and must be replaced with an older repo.
+  - clarify borg init's encryption modes
 - native windows port:
 
   - update README_WINDOWS.rst

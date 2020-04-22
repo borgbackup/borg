@@ -220,7 +220,8 @@ optional arguments for ``borg serve`` are not necessary but a sane default.
 
 Now we need a way to access the unix socket on the client (holding the
 data to be backed up), as we created the unix socket on the backup server.
-We can use SSH reverse port forwarding for this::
+Opening a SSH connection from the backup server to the client with reverse port
+forwarding can do this for us:
 
    ssh -R /tmp/borg.reponame.sock:/tmp/borg.reponame.sock machine_to_backup
 

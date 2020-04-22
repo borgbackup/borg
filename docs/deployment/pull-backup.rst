@@ -211,7 +211,7 @@ create a connection to the client (holding the data to be backed up) and will
 
 In the following example *borg-server* connects to *borg-client* to pull a backup.
 
-On *borg-server*, we have to start the command ``borg serve`` and make it's
+On *borg-server*, we have to start the command ``borg serve`` and make its
 standard input and output available to a unix socket::
 
    borg-server:~$ socat UNIX-LISTEN:/tmp/borg.reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
@@ -255,8 +255,8 @@ the connection to the backup server. Borg uses additional
 arguments understood by SSH, but not by socat. We wrap the command with ``sh``
 to ignore those arguments. One of those arguments is the
 remote server SSH would normally connect to. As this argument is also ignored,
-we can replace the server name with a underscore. When using multiple backup
-server you should consider using the server name instead to be able to match
+we can replace the server name with an underscore. When using multiple backup
+servers, you should consider using the server name instead to be able to match
 running borg processes and backup servers::
 
    borg-client:~$ borg create ssh://_/path/to/repo::name_of_backup /path_to_backup

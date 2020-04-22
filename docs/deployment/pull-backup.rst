@@ -5,14 +5,15 @@
 Backing up in pull mode
 =======================
 
-Normally the borg client pushes the backup to a backup server using SSH as a
-transport. This means, the machine holding the data to be backed up, initiates
-the connection to the backup server. If you want to backup a remote server (in
-the borg perspective this would be the client) to your local hard drive in your
-PC (in the borg perspective this would be the backup server), the remote server
-needs a way to connect to your PC. Normally this is not possible.
+Typically the borg client connects to a backup server using SSH as a transport
+when initiating a backup. This is referred to as push mode.
 
-There are two ways to work around this issue:
+If you however require the backup server to initiate the connection or prefer
+it to initiate the backup run, one of the following workarounds is required to
+allow such a pull mode setup.
+
+A common usecase for pull mode is to backup a remote server to a local personal
+computer.
 
 SSHFS
 =====
@@ -191,52 +192,13 @@ restore all the advanced features that BorgBackup supports. See
 socat
 =====
 
-The program socat has to be available on the backup server and on the machine
+In this setup a SSH connection from the backup server to the client is
+established that uses SSHs reverse port forwarding feature to transparently
+tunnel data between UNIX domain sockets on the client and server and the socat
+tool to connect these with the borg client and server processes, respectively.
+
+The program socat has to be available on the backup server and on the client
 to be backed up.
-
-Short Version
--------------
-
-Execute the following command on the machine you want to store the backup::
-
-   socat UNIX-LISTEN:/tmp/borg_serve,fork EXEC:"borg serve --append-only --restrict-to-path /path_to_repository/"
-
-Connect to the remote machine you want to backup using the following ssh command::
-
-   ssh -R /tmp/borg_serve:/tmp/borg_socket machine_to_backup
-
-.. note::
-
-   As the default value of OpenSSH for ``StreamLocalBindUnlink`` is ``no``, the
-   socket file created by sshd is not removed. Trying to connect a second time,
-   will print a short warning, and the forwarding does **not** take place::
-
-      Warning: remote port forwarding failed for listen path /tmp/borg_socket
-
-   When you are done, you have to manually remove the socket file, otherwise
-   you may see a error like this when trying to execute borg commands::
-
-      Remote: YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/tmp/borg_socket", 13): Connection refused
-      Connection closed by remote host. Is borg working on the server?
-
-
-Use the next command to set the ``BORG_RSH`` environment variable on the remote machine::
-
-   export BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/tmp/borg_socket'"
-
-Now you can use any borg command on the remote machine, the connection will be
-forwarded to the machine you want to store the backup.
-
-For example creating a backup::
-
-   borg create ssh://_/path_to_repository::name_of_backup /path_to_backup
-
-Or restoring the backup::
-
-   borg extract ssh://_/tmp/path_to_repository::name_of_backup /path_to_backup
-
-Why and How does this work?
----------------------------
 
 When **pushing** a backup the borg client (holding the data to be backed up)
 connects to the backup server via ssh, starts ``borg serve`` on the backup
@@ -244,53 +206,67 @@ server and communicates via standard input and output (transported via SSH)
 with the process on the backup server.
 
 With the help of socat this process can be reversed. The backup server will
-create a connection to the backup client (holding the data to be backed up) and
+create a connection to the client (holding the data to be backed up) and will
 **pull** the data.
 
 On the backup server, we have to start the command ``borg serve`` and make it's
-standard input and output available to the backup client. We can use socat for
-this::
+standard input and output available to a unix socket::
 
-   socat UNIX-LISTEN:/tmp/borg_serve,fork EXEC:"borg serve --append-only --restrict-to-path /path_to_repository/"
+   socat UNIX-LISTEN:/tmp/borg.reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
 
 Socat will wait until a connection is opened. Then socat will execute the
 command given, redirecting Standard Input and Output to the unix socket. The
 optional arguments for ``borg serve`` are not necessary but a sane default.
 
-Now we need a way to access the unix socket on the backup client (holding the
+Now we need a way to access the unix socket on the client (holding the
 data to be backed up), as we created the unix socket on the backup server.
-We can use SSH forwarding for this::
+We can use SSH reverse port forwarding for this::
 
-   ssh -R /tmp/borg_serve:/tmp/borg_socket machine_to_backup
+   ssh -R /tmp/borg.reponame.sock:/tmp/borg.reponame.sock machine_to_backup
 
-So when a process opens the socket on the backup client, SSH will forward the
+.. note::
+
+   As the default value of OpenSSH for ``StreamLocalBindUnlink`` is ``no``, the
+   socket file created by sshd is not removed. Trying to connect a second time,
+   will print a short warning, and the forwarding does **not** take place::
+
+      Warning: remote port forwarding failed for listen path /tmp/borg.reponame.sock
+
+   When you are done, you have to manually remove the socket file, otherwise
+   you may see a error like this when trying to execute borg commands::
+
+      Remote: YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/tmp/borg.reponame.sock", 13): Connection refused
+      Connection closed by remote host. Is borg working on the server?
+
+
+When a process opens the socket on the client, SSH will forward the
 data to the socket on the backup server.
 
-The next step is to tell borg not to connect to the backup server via ssh, but
-instead use the unix socket to communicate with the ``borg serve`` command::
+The next step is to tell borg to use the unix socket to communicate with the
+``borg serve`` command instead of the normal ssh command::
 
-   export BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/tmp/borg_socket'"
+   export BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/tmp/borg.reponame.sock'"
 
 The default value for ``BORG_RSH`` is ``ssh``. Borg uses this command to create
 the connection to the backup server. In order to do so, borg uses additional
-arguments understood by SSH, but not by socat. In order to ignore those
-arguments, we wrap the command with ``sh``. One of those arguments is the
+arguments understood by SSH, but not by socat. We wrap the command with ``sh``
+to ignore those arguments. One of those arguments is the
 remote server SSH would normally connect to. As this argument is also ignored,
 we can replace the server name with a underscore::
 
-   borg create ssh://_/path_to_repository::name_of_backup /path_to_backup
+   borg create ssh://_/path/to/repo::name_of_backup /path_to_backup
 
 When creating a backup should be scheduled or otherwise automated, the
 interactive ssh session may seem inappropriate. An alternative way of creating
 a backup may be the following command::
 
    ssh \
-      -R /tmp/borg_serve:/tmp/borg_socket \
+      -R /tmp/borg.reponame.sock:/tmp/borg.reponame.sock \
       machine_to_backup \
       borg create \
-      --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/tmp/borg_socket'" \
-      ssh://_/path_to_repository::name_of_backup /path_to_backup \
-      ';' rm /tmp/borg_socket
+      --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/tmp/borg.reponame.sock'" \
+      ssh://_/path/to/repo::name_of_backup /path_to_backup \
+      ';' rm /tmp/borg.reponame.sock
 
 This command also automatically removes the socket file after the ``borg
 create`` command is done.

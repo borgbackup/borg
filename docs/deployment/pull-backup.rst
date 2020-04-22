@@ -211,10 +211,27 @@ create a connection to the client (holding the data to be backed up) and will
 
 In the following example *borg-server* connects to *borg-client* to pull a backup.
 
+To provide a secure setup sockets should be stored in ``/run/borg/``, only
+accessible to the users that run the backup process. So both systems,
+*borg-server* and *borg-client* the folder ``/run/borg`` has to be created::
+
+   sudo mkdir -m 0700 /run/borg
+
+On *borg-server* the socket file is opened by the user accessing
+``/path/to/repo``, so the user has to have read and write permissions on
+``/run/borg``::
+
+   borg-server:~$ sudo chown user_accessing_path_to_repo /run/borg
+
+On *borg-client* the socket file is created by ssh, so the user used to connect
+to *borg-client* has to have read and write permissions on ``/run/borg``::
+
+   borg-client:~$ sudo chown ssh_user_for_borg_client /run/borg
+
 On *borg-server*, we have to start the command ``borg serve`` and make its
 standard input and output available to a unix socket::
 
-   borg-server:~$ socat UNIX-LISTEN:/tmp/borg.reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
+   borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
 
 Socat will wait until a connection is opened. Then socat will execute the
 command given, redirecting Standard Input and Output to the unix socket. The
@@ -225,7 +242,7 @@ data to be backed up), as we created the unix socket on *borg-server*
 Opening a SSH connection from the *borg-server* to the *borg-client* with reverse port
 forwarding can do this for us::
 
-   borg-server:~$ ssh -R /tmp/borg.reponame.sock:/tmp/borg.reponame.sock borg-client
+   borg-server:~$ ssh -R /run/borg/reponame.sock:/run/borg/reponame.sock borg-client
 
 .. note::
 
@@ -233,12 +250,12 @@ forwarding can do this for us::
    socket file created by sshd is not removed. Trying to connect a second time,
    will print a short warning, and the forwarding does **not** take place::
 
-      Warning: remote port forwarding failed for listen path /tmp/borg.reponame.sock
+      Warning: remote port forwarding failed for listen path /run/borg/reponame.sock
 
    When you are done, you have to manually remove the socket file, otherwise
    you may see a error like this when trying to execute borg commands::
 
-      Remote: YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/tmp/borg.reponame.sock", 13): Connection refused
+      Remote: YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/run/borg/reponame.sock", 13): Connection refused
       Connection closed by remote host. Is borg working on the server?
 
 
@@ -248,7 +265,7 @@ data to the socket on *borg-server*.
 The next step is to tell borg on *borg-client* to use the unix socket to communicate with the
 ``borg serve`` command on *borg-server* instead of using the ssh command::
 
-   borg-client:~$ export BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/tmp/borg.reponame.sock'"
+   borg-client:~$ export BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'"
 
 The default value for ``BORG_RSH`` is ``ssh``. Borg uses this command to create
 the connection to the backup server. Borg uses additional
@@ -266,12 +283,12 @@ interactive ssh session may seem inappropriate. An alternative way of creating
 a backup may be the following command::
 
    borg-server:~$ ssh \
-      -R /tmp/borg.reponame.sock:/tmp/borg.reponame.sock \
+      -R /run/borg/reponame.sock:/run/borg/reponame.sock \
       borg-client \
       borg create \
-      --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/tmp/borg.reponame.sock'" \
+      --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
       ssh://_/path/to/repo::name_of_backup /path_to_backup \
-      ';' rm /tmp/borg.reponame.sock
+      ';' rm /run/borg/reponame.sock
 
 This command also automatically removes the socket file after the ``borg
 create`` command is done.

@@ -211,7 +211,7 @@ create a connection to the client (holding the data to be backed up) and will
 
 In the following example *borg-server* connects to *borg-client* to pull a backup.
 
-To provide a secure setup sockets should be stored in ``/run/borg/``, only
+To provide a secure setup sockets should be stored in ``/run/borg``, only
 accessible to the users that run the backup process. So both systems,
 *borg-server* and *borg-client* the folder ``/run/borg`` has to be created::
 

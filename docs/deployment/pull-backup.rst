@@ -193,7 +193,7 @@ socat
 =====
 
 In this setup a SSH connection from the backup server to the client is
-established that uses SSH reverse port forwarding feature to transparently
+established that uses SSH reverse port forwarding to transparently
 tunnel data between UNIX domain sockets on the client and server and the socat
 tool to connect these with the borg client and server processes, respectively.
 

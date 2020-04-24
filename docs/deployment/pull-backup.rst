@@ -12,7 +12,7 @@ If you however require the backup server to initiate the connection or prefer
 it to initiate the backup run, one of the following workarounds is required to
 allow such a pull mode setup.
 
-A common usecase for pull mode is to backup a remote server to a local personal
+A common use case for pull mode is to backup a remote server to a local personal
 computer.
 
 SSHFS
@@ -193,7 +193,7 @@ socat
 =====
 
 In this setup a SSH connection from the backup server to the client is
-established that uses SSHs reverse port forwarding feature to transparently
+established that uses SSH reverse port forwarding feature to transparently
 tunnel data between UNIX domain sockets on the client and server and the socat
 tool to connect these with the borg client and server processes, respectively.
 
@@ -253,7 +253,7 @@ forwarding can do this for us::
       Warning: remote port forwarding failed for listen path /run/borg/reponame.sock
 
    When you are done, you have to manually remove the socket file, otherwise
-   you may see a error like this when trying to execute borg commands::
+   you may see an error like this when trying to execute borg commands::
 
       Remote: YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/run/borg/reponame.sock", 13): Connection refused
       Connection closed by remote host. Is borg working on the server?

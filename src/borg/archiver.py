@@ -1659,7 +1659,7 @@ class Archiver:
         def repo_validate(section, name, value=None, check_value=True):
             if section not in ['repository', ]:
                 raise ValueError('Invalid section')
-            if name in ['segments_per_dir', 'max_segment_size', 'storage_quota', ]:
+            if name in ['segments_per_dir', 'max_segment_size', 'storage_quota', 'last_segment_checked', ]:
                 if check_value:
                     try:
                         int(value)
@@ -1715,6 +1715,11 @@ class Archiver:
                     value = default_values.get(key)
                     if value is None:
                         raise Error('The repository config is missing the %s key which has no default value' % key)
+                print('%s = %s' % (key, value))
+            for key in ['last_segment_checked', ]:
+                value = config.get('repository', key, fallback=None)
+                if value is None:
+                    continue
                 print('%s = %s' % (key, value))
 
         if not args.list:

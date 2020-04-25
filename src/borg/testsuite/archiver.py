@@ -2991,6 +2991,17 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.assert_in('append_only', output)
         self.assert_in('additional_free_space', output)
         self.assert_in('id', output)
+        self.assert_not_in('last_segment_checked', output)
+
+        output = self.cmd('config', self.repository_location, 'last_segment_checked', exit_code=1)
+        self.assert_in('No option ', output)
+        self.cmd('config', self.repository_location, 'last_segment_checked', '123')
+        output = self.cmd('config', self.repository_location, 'last_segment_checked')
+        assert output == '123' + '\n'
+        output = self.cmd('config', '--list', self.repository_location)
+        self.assert_in('last_segment_checked', output)
+        self.cmd('config', '--delete', self.repository_location, 'last_segment_checked')
+
         for cfg_key, cfg_value in [
             ('additional_free_space', '2G'),
             ('repository.append_only', '1'),
@@ -3002,6 +3013,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert output == cfg_value + '\n'
             self.cmd('config', '--delete', self.repository_location, cfg_key)
             self.cmd('config', self.repository_location, cfg_key, exit_code=1)
+
         self.cmd('config', '--list', '--delete', self.repository_location, exit_code=2)
         self.cmd('config', self.repository_location, exit_code=2)
         self.cmd('config', self.repository_location, 'invalid-option', exit_code=1)

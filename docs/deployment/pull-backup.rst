@@ -234,10 +234,13 @@ standard input and output available to a unix socket::
    borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
 
 .. note::
-   When used in production you may also use a systemd service together with a
-   socket_ configuration file to start the borg serve command.
+   When used in production you may also use systemd socket-based activation
+   instead of socat on the server side. You would wrap the ``borg serve`` command
+   in a `service unit`_ and configure a matching `socket unit`_
+   to start the service whenever a client connects to the socket.
 
-   .. _socket: https://www.freedesktop.org/software/systemd/man/systemd.socket.html
+   .. _service unit: https://www.freedesktop.org/software/systemd/man/systemd.service.html
+   .. _socket unit: https://www.freedesktop.org/software/systemd/man/systemd.socket.html
 
 Socat will wait until a connection is opened. Then socat will execute the
 command given, redirecting Standard Input and Output to the unix socket. The

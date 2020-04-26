@@ -1566,13 +1566,8 @@ class Archiver:
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        if args.recompress == 'never':
-            msg = ("recreate is an experimental feature.\n"
-                   "WARNING: Currently borg will not perform any recompression.\n"
-                   "Type 'YES' if you understand this and want to continue: ")
-        else:
-            msg = ("recreate is an experimental feature.\n"
-                   "Type 'YES' if you understand this and want to continue: ")
+        msg = ("recreate is an experimental feature.\n"
+               "Type 'YES' if you understand this and want to continue: ")
         if not yes(msg, false_msg="Aborting.", truish=('YES',),
                    env_var_override='BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING'):
             return EXIT_ERROR

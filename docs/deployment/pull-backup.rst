@@ -272,20 +272,20 @@ When a process opens the socket on *borg-client*, SSH will forward all
 data to the socket on *borg-server*.
 
 The next step is to tell borg on *borg-client* to use the unix socket to communicate with the
-``borg serve`` command on *borg-server* instead of using the ssh command::
+``borg serve`` command on *borg-server* via the socat socket instead of SSH::
 
    borg-client:~$ export BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'"
 
-The default value for ``BORG_RSH`` is ``ssh``. Borg uses this command to create
-the connection to the backup server. Borg uses additional
-arguments understood by SSH, but not by socat. We wrap the command with ``sh``
-to ignore those arguments. One of those arguments is the
-remote server SSH would normally connect to. As this argument is also ignored,
-we can replace the server name with an underscore. When using multiple backup
-servers, you should consider using the server name instead to be able to match
-running borg processes and backup servers::
+The default value for ``BORG_RSH`` is ``ssh``. By default Borg uses SSH to create
+the connection to the backup server. Therefore Borg parses the repo URL
+and adds the server name (and other arguments) to the SSH command. Those
+arguments can not be handled by socat. We wrap the command with ``sh`` to
+ignore all arguments intended for the SSH command.
 
-   borg-client:~$ borg create ssh://_/path/to/repo::name_of_backup /path_to_backup
+All Borg commands can now be executed on *borg-client*. For example to create a
+backup execute the ``borg create`` command::
+
+   borg-client:~$ borg create ssh://borg-server/path/to/repo::name_of_backup /path_to_backup
 
 When creating a backup should be scheduled or otherwise automated, the
 interactive ssh session may seem inappropriate. An alternative way of creating

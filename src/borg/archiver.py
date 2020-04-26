@@ -4105,15 +4105,15 @@ class Archiver:
         archive_group.add_argument('--recompress', metavar='MODE', dest='recompress', nargs='?',
                                    default='never', const='if-different', choices=('never', 'if-different', 'always'),
                                    help='recompress data chunks according to `MODE` and ``--compression``. '
-                                        '(default) MODE `never`: '
-                                        'do not recompress.'
-                                        'MODE `if-different`: '
-                                        'recompress if current compression is with a different compression algorithm '
-                                        '(the level is not considered). '
-                                        'MODE `always`: '
-                                        'recompress even if current compression is with the same compression algorithm '
-                                        '(use this to change the compression level). '
-                                        )
+                                        'Possible modes are '
+                                        '`if-different`: recompress if current compression is with a different '
+                                        'compression algorithm (the level is not considered); '
+                                        '`always`: recompress even if current compression is with the same'
+                                        'compression algorithm (use this to change the compression level); '
+                                        '`never`: do not recompress (use this option to explicitly prevent '
+                                        'recompression). '
+                                        'If no MODE is given, `if-different` will be used. '
+                                        'Not passing --recompress is equivalent "--recompress never".')
         archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '

@@ -4113,7 +4113,7 @@ class Archiver:
                                         '`never`: do not recompress (use this option to explicitly prevent '
                                         'recompression). '
                                         'If no MODE is given, `if-different` will be used. '
-                                        'Not passing --recompress is equivalent "--recompress never".')
+                                        'Not passing --recompress is equivalent to "--recompress never".')
         archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '

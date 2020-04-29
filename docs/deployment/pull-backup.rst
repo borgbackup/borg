@@ -217,16 +217,16 @@ accessible to the users that run the backup process. So both systems,
 
    sudo mkdir -m 0700 /run/borg
 
-On *borg-server* the socket file is opened by the user accessing
-``/path/to/repo``, so the user has to have read and write permissions on
-``/run/borg``::
+On *borg-server* the socket file is opened by the user running the ``borg
+serve`` process writing to the repository
+so the user has to have read and write permissions on ``/run/borg``::
 
-   borg-server:~$ sudo chown user_accessing_path_to_repo /run/borg
+   borg-server:~$ sudo chown borgs /run/borg
 
 On *borg-client* the socket file is created by ssh, so the user used to connect
 to *borg-client* has to have read and write permissions on ``/run/borg``::
 
-   borg-client:~$ sudo chown ssh_user_for_borg_client /run/borg
+   borg-client:~$ sudo chown borgc /run/borg
 
 On *borg-server*, we have to start the command ``borg serve`` and make its
 standard input and output available to a unix socket::
@@ -251,7 +251,7 @@ data to be backed up), as we created the unix socket on *borg-server*
 Opening a SSH connection from the *borg-server* to the *borg-client* with reverse port
 forwarding can do this for us::
 
-   borg-server:~$ ssh -R /run/borg/reponame.sock:/run/borg/reponame.sock borg-client
+   borg-server:~$ ssh -R /run/borg/reponame.sock:/run/borg/reponame.sock borgc@borg-client
 
 .. note::
 
@@ -293,7 +293,7 @@ a backup may be the following command::
 
    borg-server:~$ ssh \
       -R /run/borg/reponame.sock:/run/borg/reponame.sock \
-      borg-client \
+      borgc@borg-client \
       borg create \
       --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
       ssh://_/path/to/repo::name_of_backup /path_to_backup \

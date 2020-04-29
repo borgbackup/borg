@@ -834,13 +834,16 @@ class ItemFormatter(BaseFormatter):
         # note: does not support hardlink slaves, they will be csize 0
         return item.get_size(compressed=True)
 
-    def hash_item(self, hash_function, item):
-        if 'chunks' not in item:
-            return ""
+    def prepare_hash_function(self, hash_function):
         if hash_function in hashlib.algorithms_guaranteed:
             hash = hashlib.new(hash_function)
         elif hash_function == 'xxh64':
             hash = self.xxh64()
+        return hash
+    def hash_item(self, hash_function, item):
+        if 'chunks' not in item:
+            return ""
+        hash = self.prepare_hash_function(hash_function)
         for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
             hash.update(data)
         return hash.hexdigest()

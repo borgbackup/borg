@@ -688,8 +688,7 @@ class ItemFormatter(BaseFormatter):
         ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hash_algorithms)),
-        tuple(['chunk_ids_%s' % alg for alg in sorted(hash_algorithms)] + [
-            'chunker_params_%s' % alg for alg in sorted(hash_algorithms)]),
+        tuple(['chunker_params', *('chunk_ids_%s' % alg for alg in sorted(hash_algorithms))]),
         ('archiveid', 'archivename', 'extra'),
         ('health', )
     )
@@ -756,6 +755,7 @@ class ItemFormatter(BaseFormatter):
             'csize': self.calculate_csize,
             'dsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
             'dcsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.csize),
+            'chunker_params': self.hash_chunker_params,
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
             'isomtime': partial(self.format_iso_time, 'mtime'),
@@ -768,7 +768,6 @@ class ItemFormatter(BaseFormatter):
         for hash_function in self.hash_algorithms:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
             self.call_keys['chunk_ids_%s' % hash_function] = partial(self.hash_chunks, hash_function)
-            self.call_keys['chunker_params_%s' % hash_function] = partial(self.hash_chunker_params, hash_function)
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def format_item_json(self, item):
@@ -845,13 +844,9 @@ class ItemFormatter(BaseFormatter):
             hash = self.xxh64()
         return hash
 
-    def hash_chunker_params(self, hash_function, item):
-        hash = self.prepare_hash_function(hash_function)
-
+    def hash_chunker_params(self, item):
         chunker_params = self.archive.metadata.get('chunker_params')
-        for info in chunker_params:
-            hash.update(bytes(info))
-        return hash.hexdigest()
+        return '-'.join(map(repr, chunker_params))
 
     def hash_chunks(self, hash_function, item):
         if 'chunks' not in item:

@@ -859,8 +859,6 @@ class ItemFormatter(BaseFormatter):
         hash = self.prepare_hash_function(hash_function)
         for chunk in item.chunks:
             hash.update(chunk.id)
-            hash.update(bytes(chunk.size))
-            hash.update(bytes(chunk.csize))
         return hash.hexdigest()
 
     def hash_item(self, hash_function, item):

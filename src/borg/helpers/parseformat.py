@@ -764,7 +764,7 @@ class ItemFormatter(BaseFormatter):
             'atime': partial(self.format_time, 'atime'),
         }
         for hash_function in self.hash_algorithms:
-            self.add_key(hash_function, partial(self.hash_item, hash_function))
+            self.call_keys[hash_function] = partial(self.hash_item, hash_function)
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def format_item_json(self, item):

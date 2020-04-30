@@ -688,7 +688,8 @@ class ItemFormatter(BaseFormatter):
         ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hash_algorithms)),
-        tuple(('chunk_ids_%s' % alg for alg in sorted(hash_algorithms))),
+        tuple(['chunk_ids_%s' % alg for alg in sorted(hash_algorithms)] + [
+            'chunker_params_%s' % alg for alg in sorted(hash_algorithms)]),
         ('archiveid', 'archivename', 'extra'),
         ('health', )
     )
@@ -767,6 +768,7 @@ class ItemFormatter(BaseFormatter):
         for hash_function in self.hash_algorithms:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
             self.call_keys['chunk_ids_%s' % hash_function] = partial(self.hash_chunks, hash_function)
+            self.call_keys['chunker_params_%s' % hash_function] = partial(self.hash_chunker_params, hash_function)
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def format_item_json(self, item):
@@ -842,6 +844,14 @@ class ItemFormatter(BaseFormatter):
         elif hash_function == 'xxh64':
             hash = self.xxh64()
         return hash
+
+    def hash_chunker_params(self, hash_function, item):
+        hash = self.prepare_hash_function(hash_function)
+
+        chunker_params = self.archive.metadata.get('chunker_params')
+        for info in chunker_params:
+            hash.update(bytes(info))
+        return hash.hexdigest()
 
     def hash_chunks(self, hash_function, item):
         if 'chunks' not in item:

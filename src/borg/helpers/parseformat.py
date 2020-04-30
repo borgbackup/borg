@@ -770,10 +770,6 @@ class ItemFormatter(BaseFormatter):
     def format_item_json(self, item):
         return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder) + '\n'
 
-    def add_key(self, key, callable_with_item):
-        self.call_keys[key] = callable_with_item
-        self.used_call_keys = set(self.call_keys) & self.format_keys
-
     def get_item_data(self, item):
         item_data = {}
         item_data.update(self.item_data)

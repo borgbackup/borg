@@ -688,7 +688,7 @@ class ItemFormatter(BaseFormatter):
         ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hash_algorithms)),
-        tuple(['chunker_params', *('chunk_ids_%s' % alg for alg in sorted(hash_algorithms))]),
+        tuple(['chunker_params', 'chunk_ids_checksum']),
         ('archiveid', 'archivename', 'extra'),
         ('health', )
     )
@@ -756,6 +756,7 @@ class ItemFormatter(BaseFormatter):
             'dsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
             'dcsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.csize),
             'chunker_params': self.hash_chunker_params,
+            'chunk_ids_checksum': self.hash_chunks,
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
             'isomtime': partial(self.format_iso_time, 'mtime'),
@@ -767,7 +768,6 @@ class ItemFormatter(BaseFormatter):
         }
         for hash_function in self.hash_algorithms:
             self.add_key(hash_function, partial(self.hash_item, hash_function))
-            self.call_keys['chunk_ids_%s' % hash_function] = partial(self.hash_chunks, hash_function)
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def format_item_json(self, item):
@@ -848,10 +848,12 @@ class ItemFormatter(BaseFormatter):
         chunker_params = self.archive.metadata.get('chunker_params')
         return '-'.join(map(repr, chunker_params))
 
-    def hash_chunks(self, hash_function, item):
+    def hash_chunks(self, item):
         if 'chunks' not in item:
             return ""
-        hash = self.prepare_hash_function(hash_function)
+        hash_function = 'sha256'
+        assert hash_function in hashlib.algorithms_guaranteed, hashlib.algorithms_guaranteed
+        hash = hashlib.new(hash_function)
         for chunk in item.chunks:
             hash.update(chunk.id)
         return hash.hexdigest()

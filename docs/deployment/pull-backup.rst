@@ -285,7 +285,7 @@ ignore all arguments intended for the SSH command.
 All Borg commands can now be executed on *borg-client*. For example to create a
 backup execute the ``borg create`` command::
 
-   borg-client:~$ borg create ssh://borg-server/path/to/repo::name_of_backup /path_to_backup
+   borg-client:~$ borg create ssh://borg-server/path/to/repo::archive /path_to_backup
 
 When creating a backup should be scheduled or otherwise automated, the
 interactive ssh session may seem inappropriate. An alternative way of creating
@@ -296,7 +296,7 @@ a backup may be the following command::
       borgc@borg-client \
       borg create \
       --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
-      ssh://_/path/to/repo::name_of_backup /path_to_backup \
+      ssh://_/path/to/repo::archive /path_to_backup \
       ';' rm /run/borg/reponame.sock
 
 This command also automatically removes the socket file after the ``borg

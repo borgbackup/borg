@@ -233,6 +233,10 @@ standard input and output available to a unix socket::
 
    borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
 
+Socat will wait until a connection is opened. Then socat will execute the
+command given, redirecting Standard Input and Output to the unix socket. The
+optional arguments for ``borg serve`` are not necessary but a sane default.
+
 .. note::
    When used in production you may also use systemd socket-based activation
    instead of socat on the server side. You would wrap the ``borg serve`` command
@@ -241,10 +245,6 @@ standard input and output available to a unix socket::
 
    .. _service unit: https://www.freedesktop.org/software/systemd/man/systemd.service.html
    .. _socket unit: https://www.freedesktop.org/software/systemd/man/systemd.socket.html
-
-Socat will wait until a connection is opened. Then socat will execute the
-command given, redirecting Standard Input and Output to the unix socket. The
-optional arguments for ``borg serve`` are not necessary but a sane default.
 
 Now we need a way to access the unix socket on *borg-client* (holding the
 data to be backed up), as we created the unix socket on *borg-server*

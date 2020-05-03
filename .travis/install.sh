@@ -10,6 +10,8 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     mkdir $HOMEBREW_LOGS
     mkdir $HOMEBREW_TEMP
 
+    # Brew removed openssl@1.0 end of 2019 https://brew.sh/2019/11/27/homebrew-2.2.0/
+    # Use rbenv's formula fork https://github.com/rbenv/homebrew-tap/blob/master/Formula/openssl%401.0.rb
     brew install rbenv/tap/openssl@1.0
 
     if which pyenv > /dev/null; then

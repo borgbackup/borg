@@ -1386,13 +1386,9 @@ class RobustUnpacker:
 
 class ArchiveChecker:
 
-    def __init__(self):
-        self.error_found = False
-        self.possibly_superseded = set()
-
-    def check(self, repository, repair=False, archive=None, first=0, last=0, sort_by='', glob=None,
+    def __init__(self, repository, repair=False, archive=None, first=0, last=0, sort_by='', glob=None,
               verify_data=False, save_space=False):
-        """Perform a set of checks on 'repository'
+        """A checker of repostiory archives
 
         :param repair: enable repair mode, write updated or corrected data into repository
         :param archive: only check this archive
@@ -1401,32 +1397,45 @@ class ArchiveChecker:
         :param verify_data: integrity verification of data referenced by archives
         :param save_space: Repository.commit(save_space)
         """
-        logger.info('Starting archive consistency check...')
-        self.check_all = archive is None and not any((first, last, glob))
+        self.error_found = False
+        self.verify_data = verify_data
+        self.possibly_superseded = set()
         self.repair = repair
         self.repository = repository
+        self.archive = archive
+        self.first = first
+        self.last = last
+        self.glob = glob
+        self.check_all = archive is None and not any((first, last, glob))
+        self.sort_by = sort_by
+        self.save_space = save_space
         self.init_chunks()
+        self.key = self.identify_key(repository)
+        logger.info('Initialised archive consistency checker...')
+
+    def check(self):
+        """Perform a set of checks on 'repository'"""
+        logger.info('Starting archive consistency check...')
         if not self.chunks:
             logger.error('Repository contains no apparent data at all, cannot continue check/repair.')
             return False
-        self.key = self.identify_key(repository)
-        if verify_data:
-            self.verify_data()
+        if self.verify_data:
+            self.do_verify_data()
         if Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")
             self.error_found = True
             self.manifest = self.rebuild_manifest()
         else:
             try:
-                self.manifest, _ = Manifest.load(repository, (Manifest.Operation.CHECK,), key=self.key)
+                self.manifest, _ = Manifest.load(self.repository, (Manifest.Operation.CHECK,), key=self.key)
             except IntegrityErrorBase as exc:
                 logger.error('Repository manifest is corrupted: %s', exc)
                 self.error_found = True
                 del self.chunks[Manifest.MANIFEST_ID]
                 self.manifest = self.rebuild_manifest()
-        self.rebuild_refcounts(archive=archive, first=first, last=last, sort_by=sort_by, glob=glob)
+        self.rebuild_refcounts(archive=self.archive, first=self.first, last=self.last, sort_by=self.sort_by, glob=self.glob)
         self.orphan_chunks_check()
-        self.finish(save_space=save_space)
+        self.finish(save_space=self.save_space)
         if self.error_found:
             logger.error('Archive consistency check complete, problems found.')
         else:
@@ -1459,7 +1468,7 @@ class ArchiveChecker:
         cdata = repository.get(some_chunkid)
         return key_factory(repository, cdata)
 
-    def verify_data(self):
+    def do_verify_data(self):
         logger.info('Starting cryptographic data integrity verification...')
         chunks_count_index = len(self.chunks)
         chunks_count_segments = 0

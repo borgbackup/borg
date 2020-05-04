@@ -1049,7 +1049,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         input_data = 'some test content'
         name = 'a/b/c'
         self.cmd('create', '--stdin-name', name, '--content-from-command',
-                 self.repository_location + '::test', 'echo', input_data)
+                 self.repository_location + '::test', '--', 'echo', input_data)
         item = json.loads(self.cmd('list', '--json-lines', self.repository_location + '::test'))
         assert item['uid'] == 0
         assert item['gid'] == 0

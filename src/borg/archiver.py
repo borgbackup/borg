@@ -3173,8 +3173,8 @@ class Archiver:
         archive even if the command piping to borg exits with a failure. In this case,
         **one can end up with truncated output being backed up**. Using
         ``--content-from-command``, in contrast, borg is guaranteed to fail without
-        creating an archive should the command fail. A command is considered to have
-        failed when it returns an non-zero exit code.
+        creating an archive should the command fail. The command is considered failed
+        when it returned an non-zero exit code.
 
         By default, the content read from stdin is stored in a file called 'stdin'.
         Use ``--stdin-name`` to change the name.

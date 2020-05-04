@@ -331,9 +331,13 @@ class Archiver:
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         if not args.repo_only:
-            checker = ArchiveChecker(repository, repair=args.repair, archive=args.location.archive, first=args.first,
-                                     last=args.last, sort_by=args.sort_by or 'ts', glob=args.glob_archives,
-                                     verify_data=args.verify_data, save_space=args.save_space)
+            try:
+                checker = ArchiveChecker(repository, repair=args.repair, archive=args.location.archive, first=args.first,
+                                         last=args.last, sort_by=args.sort_by or 'ts', glob=args.glob_archives,
+                                         verify_data=args.verify_data, save_space=args.save_space)
+            except Exception as exc:
+                self.print_error(str(exc))
+                return EXIT_WARNING
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
                 return EXIT_WARNING

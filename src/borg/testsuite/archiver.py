@@ -1058,6 +1058,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         extracted_data = self.cmd('extract', '--stdout', self.repository_location + '::test')
         assert extracted_data == input_data + '\n'
 
+    def test_create_content_from_command_with_failed_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--content-from-command', self.repository_location + '::test',
+                          '--', 'false', '--arg-passed-to-false', exit_code=2)
+        assert output.endswith("Command 'false' exited with status 1\n")
+        archive_list = json.loads(self.cmd('list', '--json', self.repository_location))
+        assert archive_list['archives'] == []
+
     def test_create_content_from_command_missing_command(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         output = self.cmd('create', '--content-from-command', self.repository_location + '::test', exit_code=2)

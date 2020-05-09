@@ -287,7 +287,7 @@ backup execute the ``borg create`` command::
 
    borg-client:~$ borg create ssh://borg-server/path/to/repo::archive /path_to_backup
 
-When creating a backup should be scheduled or otherwise automated, the
+When automating backup creation, the
 interactive ssh session may seem inappropriate. An alternative way of creating
 a backup may be the following command::
 

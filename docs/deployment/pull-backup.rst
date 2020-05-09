@@ -296,7 +296,7 @@ a backup may be the following command::
       borgc@borg-client \
       borg create \
       --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
-      ssh://_/path/to/repo::archive /path_to_backup \
+      ssh://borg-server/path/to/repo::archive /path_to_backup \
       ';' rm /run/borg/reponame.sock
 
 This command also automatically removes the socket file after the ``borg

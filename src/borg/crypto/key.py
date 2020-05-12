@@ -170,6 +170,10 @@ class KeyBase:
     # was supplied, and if an empty passphrase works, then Borg won't ask for one.
     logically_encrypted = False
 
+    # skip the check for valid IDs.
+    # This is required after loading data from a repo with an alternative key.
+    skip_assert_id = False
+
     def __init__(self, repository):
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
@@ -191,6 +195,9 @@ class KeyBase:
         pass
 
     def assert_id(self, id, data):
+        if self.skip_assert_id:
+            return
+
         if id:
             id_computed = self.id_hash(data)
             if not compare_digest(id_computed, id):

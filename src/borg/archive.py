@@ -1859,6 +1859,7 @@ class ArchiveRecreater:
     def __init__(self, repository, manifest, key, cache, matcher,
                  exclude_caches=False, exclude_if_present=None, keep_exclude_tags=False,
                  chunker_params=None, compression=None, recompress=False, always_recompress=False,
+                 always_recreate=False,
                  dry_run=False, stats=False, progress=False, file_status_printer=None,
                  timestamp=None, checkpoint_interval=1800):
         self.repository = repository
@@ -1877,6 +1878,7 @@ class ArchiveRecreater:
         self.chunker_params = chunker_params or CHUNKER_PARAMS
         self.recompress = recompress
         self.always_recompress = always_recompress
+        self.always_recreate = always_recreate
         self.compression = compression or CompressionSpec('none')
         self.seen_chunks = set()
 
@@ -1893,6 +1895,7 @@ class ArchiveRecreater:
         target = self.create_target(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
+        print('RECHUNK',target.recreate_rechunkify )
         if self.matcher.empty() and not self.recompress and not target.recreate_rechunkify and comment is None:
             return False
         self.process_items(archive, target)
@@ -2062,7 +2065,11 @@ class ArchiveRecreater:
         if len(source_chunker_params) == 4 and isinstance(source_chunker_params[0], int):
             # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
             source_chunker_params = (CH_BUZHASH, ) + source_chunker_params
-        target.recreate_rechunkify = self.rechunkify and source_chunker_params != target.chunker_params
+
+        if self.always_recreate:
+            target.recreate_rechunkify = True
+        else:
+            target.recreate_rechunkify = self.rechunkify and source_chunker_params != target.chunker_params
         if target.recreate_rechunkify:
             logger.debug('Rechunking archive from %s to %s', source_chunker_params or '(unknown)', target.chunker_params)
         target.process_file_chunks = ChunksProcessor(

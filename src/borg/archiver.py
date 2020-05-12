@@ -36,7 +36,7 @@ try:
     from . import __version__
     from . import helpers
     from .algorithms.checksums import crc32
-    from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
+    from .archive import Archive, ArchiveChecker, ArchiveItem, ArchiveRecreater, Statistics, is_special
     from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
     from .archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
     from .archive import has_link
@@ -168,6 +168,10 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                         kwargs['key'].compressor = args.compression.compressor
                     if secure:
                         assert_secure(repository, kwargs['manifest'], self.lock_wait)
+                            
+                    if 'new_ids' in args and args.new_ids:
+                        kwargs['key'].skip_assert_id = True
+        
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
@@ -1099,6 +1103,113 @@ class Archiver:
 
         return self.exit_code
 
+    @with_repository(compatibility=(Manifest.Operation.READ,))
+    def do_dump(self, args, repository, manifest, key):
+        """dump repository contents to JSON/msgpack"""
+        from .helpers.msgpack import UnpackException
+
+        # set up the key without depending on a manifest obj
+        # ids = repository.list(limit=1, marker=None)
+        # cdata = repository.get(ids[0])
+        # key = key_factory(repository, cdata)
+        
+        if args.json:
+            def fixup_json(value):
+                if isinstance(value, dict):
+                    return { k.decode(): fixup_json(v) for k, v in value.items() }
+                
+                if isinstance(value, bytes):
+                    if len(value) < 65:
+                        return bin_to_hex(value)
+                    else:
+                        return f'{len(value)} bytes'
+
+                if isinstance(value, list):
+                    return [ fixup_json(v) for v in value ]
+
+                return value
+
+            def dump_item(id, data):
+                try:
+                    msg = msgpack.unpackb(data)
+                except UnpackException:
+                    msg = { b'data': data }
+
+                msg = fixup_json(msg)
+                msg['id'] = bin_to_hex(id)
+                json_print(msg)
+        else:
+            packer = msgpack.Packer()
+            def dump_item(id, data):
+                sys.stdout.buffer.write(packer.pack({
+                    b'id': id,
+                    b'data': data,
+                }))
+
+        marker = None
+        while True:
+            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)
+            if not result:
+                break
+            marker = result[-1]
+            for id in result:
+                cdata = repository.get(id)
+                give_id = id if id != Manifest.MANIFEST_ID else None
+                data = key.decrypt(give_id, cdata)
+                dump_item(id, data)
+
+        return self.exit_code
+
+    @with_repository(exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    def do_load(self, args, repository, manifest, key):
+        """load repository contents from stdin"""
+
+        # set up the key without depending on a manifest obj
+        # ids = repository.list(limit=1, marker=None)
+        # cdata = repository.get(ids[0])
+        # key = key_factory(repository, cdata)
+        
+        def add_archive(id, data):
+            try:
+                raw = msgpack.unpackb(data)
+            except msgpack.UnpackException:
+                return
+
+            if isinstance(raw, dict) and b'name' in data and b'version' in data:
+                archive = ArchiveItem(internal_dict=raw)
+                logger.info('Found archive %s', archive.name)
+                manifest.archives[archive.name] = (id, archive.time)
+
+        unpacker = msgpack.Unpacker(file_like=sys.stdin.buffer, object_hook=StableDict)
+        while True:
+            try:
+                item = unpacker.unpack()
+            except msgpack.OutOfData:
+                print('OUT OF DATA')
+                break
+            
+            if item[b'id'] == Manifest.MANIFEST_ID:
+                print('SKIP MANIFEST')
+                continue
+
+            id_ = bin_to_hex(key.id_hash(item[b'data']))
+            print(id_[:10], bin_to_hex(item[b'id'])[:10])
+            cdata = key.encrypt(item[b'data'])
+            repository.put(item[b'id'], cdata)
+
+            add_archive(item[b'id'], item[b'data'])
+
+        print('''You must now recompute the IDs by running
+        
+            borg recreate --new-ids
+        ''')
+
+        manifest.write()
+        repository.commit(compact=False)
+        # repository.check(repair=True)
+        # cache.commit()
+        return self.exit_code
+
     @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
@@ -1582,6 +1693,7 @@ class Archiver:
                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                      keep_exclude_tags=args.keep_exclude_tags, chunker_params=args.chunker_params,
                                      compression=args.compression, recompress=recompress, always_recompress=always_recompress,
+                                     always_recreate=args.new_ids,
                                      progress=args.progress, stats=args.stats,
                                      file_status_printer=self.print_file_status,
                                      checkpoint_interval=args.checkpoint_interval,
@@ -3481,6 +3593,38 @@ class Archiver:
                                help='paths of items inside the archives to compare; patterns are supported')
         define_exclusion_group(subparser)
 
+        # borg dump
+        dump_epilog = process_epilog("""
+            Dump contents as msgpack.
+            """)
+        subparser = subparsers.add_parser('dump', parents=[common_parser], add_help=False,
+                                          description=self.do_dump.__doc__,
+                                          epilog=dump_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump contents')
+        subparser.set_defaults(func=self.do_dump)
+        subparser.add_argument('location', metavar='REPO',
+                               type=location_validator(archive=False),
+                               help='repository location')
+        subparser.add_argument('--json', dest='json', action='store_true',
+                        help='Dump contents as json (just for debugging).')
+        define_exclusion_group(subparser)
+
+        # borg load
+        load_epilog = process_epilog("""
+            Load contents from stdin.
+            """)
+        subparser = subparsers.add_parser('load', parents=[common_parser], add_help=False,
+                                          description=self.do_load.__doc__,
+                                          epilog=load_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='load contents')
+        subparser.set_defaults(func=self.do_load)
+        subparser.add_argument('location', metavar='REPO',
+                               type=location_validator(archive=False),
+                               help='repository location')
+        define_exclusion_group(subparser)
+
         # borg export-tar
         export_tar_epilog = process_epilog("""
         This command creates a tarball from an archive.
@@ -4124,6 +4268,8 @@ class Archiver:
                                    help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
                                         'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
+        archive_group.add_argument('--new-ids', dest='new_ids',
+                                   action='store_true', help='recompute valid ids')
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),

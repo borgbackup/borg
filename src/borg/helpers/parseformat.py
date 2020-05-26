@@ -271,16 +271,13 @@ def parse_file_size(s):
 
 
 def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2, sign=False):
-    prefix = '+' if sign and num > 0 else ''
-
+    sign = '+' if sign else ''
+    fmt = '{0:{1}d}{3}{4}{5}' if isinstance(num, int) else '{0:{1}.{2}f}{3}{4}{5}'
     for unit in units[:-1]:
         if abs(round(num, precision)) < power:
-            if isinstance(num, int):
-                return "{}{}{}{}{}".format(prefix, num, sep, unit, suffix)
-            else:
-                return "{}{:3.{}f}{}{}{}".format(prefix, num, precision, sep, unit, suffix)
+            return fmt.format(num, sign, precision, sep, unit, suffix)
         num /= float(power)
-    return "{}{:.{}f}{}{}{}".format(prefix, num, precision, sep, units[-1], suffix)
+    return fmt.format(num, sign, precision, sep, units[-1], suffix)
 
 
 def sizeof_fmt_iec(num, suffix='B', sep='', precision=2, sign=False):

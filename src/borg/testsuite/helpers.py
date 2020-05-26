@@ -579,7 +579,7 @@ def test_file_size_precision():
 
 def test_file_size_sign():
     si_size_map = {
-        0: '0 B',
+        0: '+0 B',
         1: '+1 B',
         1234: '+1.23 kB',
         -1: '-1 B',

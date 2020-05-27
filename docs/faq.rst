@@ -345,12 +345,13 @@ resolution from that.
 Assuming that all your chunks have a size of :math:`2^{21}` bytes (approximately 2.1 MB)
 and we have a "perfect" hash algorithm, we can think that the probability of collision 
 would be of :math:`p^2/2^{n+1}` then, using SHA-256 (:math:`n=256`) and for example
-we have a 1,000 million chunks (:math:`p=10^9`) (a 1,000 million chunks would be about 2,100TB).
+we have 1e9 chunks (:math:`p=10^9`) (1e9 chunks would be about 2100TB).
 The probability would be around to **4.3e-60**.
 
-According to the `US Weather Service <https://www.weather.gov/safety/lightning-odds>`_ you
-have 1:1,222,000 odds of being struck in a given year (in USA obviously). This is **54** 
-orders of magnitude more probable than a SHA-256 collision.
+A mass-murderer space rock happens about once every 30 million years on average.
+This leads to a probability of such an event occurring in the next second to about :math:`10^{-15}`.
+That's **45** orders of magnitude more probable than the SHA-256 collision. Briefly stated,
+if you find SHA-256 collisions scary then your priorities are wrong.
 
 Still, the real question is if Borg tries to not make this happen?
 

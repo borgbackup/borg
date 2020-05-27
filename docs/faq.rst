@@ -351,7 +351,8 @@ The probability would be around to **4.3e-60**.
 A mass-murderer space rock happens about once every 30 million years on average.
 This leads to a probability of such an event occurring in the next second to about :math:`10^{-15}`.
 That's **45** orders of magnitude more probable than the SHA-256 collision. Briefly stated,
-if you find SHA-256 collisions scary then your priorities are wrong.
+if you find SHA-256 collisions scary then your priorities are wrong. This example was grabbed from
+`this SO answer <https://stackoverflow.com/a/4014407/13359375>`_, it's great honestly.
 
 Still, the real question is if Borg tries to not make this happen?
 

@@ -345,14 +345,19 @@ resolution from that.
 Assuming that all your chunks have a size of :math:`2^{21}` bytes (approximately 2.1 MB)
 and we have a "perfect" hash algorithm, we can think that the probability of collision 
 would be of :math:`p^2/2^{n+1}` then, using SHA-256 (:math:`n=256`) and for example
-we have a billion chunks (:math:`p=10^9`) (a billion chunks would be about 2.1ZB).
-The probability would be around to 4.3e-60.
+we have a 1,000 million chunks (:math:`p=10^9`) (a 1,000 million chunks would be about 2,100TB).
+The probability would be around to **4.3e-60**.
+
+According to the `US Weather Service <https://www.weather.gov/safety/lightning-odds>`_ you
+have 1:1,222,000 odds of being struck in a given year (in USA obviously). This is **54** 
+orders of magnitude more probable than a SHA-256 collision.
 
 Still, the real question is if Borg tries to not make this happen?
 
 Well... it used to not check anything but there was a feature added which saves the size
 of the chunks too, so the size of the chunks is compared to the size that you got with the
-hash, this doesn't save us from everything but reduces the chances of corrupting the file.
+hash and if the check says there is a mismatch it will raise an exception instead of corrupting
+the file. This doesn't save us from everything but reduces the chances of corruption.
 There are other ways of trying to escape this but it would affect performance so much that
 it wouldn't be worth it and it would contradict Borg's design, so if you don't want this to
 happen, simply don't use Borg.

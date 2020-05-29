@@ -712,10 +712,16 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             return filename
 
     def find_key(self):
+        keyfile = self._find_key_file_from_environment()
+        if keyfile is not None:
+            return self.sanity_check(keyfile, self.repository.id)
+        keyfile = self._find_key_in_keys_dir()
+        if keyfile is not None:
+            return keyfile
+        raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
+
+    def _find_key_in_keys_dir(self):
         id = self.repository.id
-        keyfile = os.environ.get('BORG_KEY_FILE')
-        if keyfile:
-            return self.sanity_check(os.path.abspath(keyfile), id)
         keys_dir = get_keys_dir()
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
@@ -723,12 +729,19 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
                 return self.sanity_check(filename, id)
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
-        raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
     def get_new_target(self, args):
+        keyfile = self._find_key_file_from_environment()
+        if keyfile is not None:
+            return keyfile
+        return self._get_new_target_in_keys_dir(args)
+
+    def _find_key_file_from_environment(self):
         keyfile = os.environ.get('BORG_KEY_FILE')
         if keyfile:
             return os.path.abspath(keyfile)
+
+    def _get_new_target_in_keys_dir(self, args):
         filename = args.location.to_key_filename()
         path = filename
         i = 1

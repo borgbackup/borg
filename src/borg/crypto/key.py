@@ -720,6 +720,15 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             return keyfile
         raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
 
+    def get_existing_or_new_target(self, args):
+        keyfile = self._find_key_file_from_environment()
+        if keyfile is not None:
+            return keyfile
+        keyfile = self._find_key_in_keys_dir()
+        if keyfile is not None:
+            return keyfile
+        return self._get_new_target_in_keys_dir(args)
+
     def _find_key_in_keys_dir(self):
         id = self.repository.id
         keys_dir = get_keys_dir()

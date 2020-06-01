@@ -9,10 +9,10 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
     export HOMEBREW_TEMP=~/brew-temp
     mkdir $HOMEBREW_LOGS
     mkdir $HOMEBREW_TEMP
-    # brew update
-    if [[ "${OPENSSL}" != "0.9.8" ]]; then
-        brew outdated openssl || brew upgrade openssl
-    fi
+
+    # Brew removed openssl@1.0 end of 2019 https://brew.sh/2019/11/27/homebrew-2.2.0/
+    # Use rbenv's formula fork https://github.com/rbenv/homebrew-tap/blob/master/Formula/openssl%401.0.rb
+    brew install rbenv/tap/openssl@1.0
 
     if which pyenv > /dev/null; then
         eval "$(pyenv init -)"
@@ -25,11 +25,11 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
 
     case "${TOXENV}" in
         py34)
-            pyenv install 3.4.5
+            PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@1.0 pyenv install 3.4.5
             pyenv global 3.4.5
             ;;
         py35)
-            pyenv install 3.5.2
+            PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@1.0 pyenv install 3.5.2
             pyenv global 3.5.2
             ;;
         py36)

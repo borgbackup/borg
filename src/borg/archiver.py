@@ -3029,7 +3029,7 @@ class Archiver:
 
         When giving '-' as path, borg will read data from standard input and create a
         file 'stdin' in the created archive from that data. In some cases it's more
-        appropriate to use --content-from-command, however. See section *Read from
+        appropriate to use --content-from-command, however. See section *Reading from
         stdin* below for details.
 
         The archive will consume almost no disk space for files or parts of files that
@@ -3204,7 +3204,7 @@ class Archiver:
         subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
                                help='use NAME in archive for stdin data (default: %(default)r)')
         subparser.add_argument('--content-from-command', action='store_true',
-                               help='interpret PATH as command and store its stdout. See also section Read from'
+                               help='interpret PATH as command and store its stdout. See also section Reading from'
                                     ' stdin below.')
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)

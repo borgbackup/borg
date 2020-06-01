@@ -1489,11 +1489,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(repository, key, manifest, 'test')
             for item in archive.iter_items():
-                if 'chunks' in item:
-                    first_chunk_id = item.chunks[0].id
-                    repository.delete(first_chunk_id)
-                    repository.commit(compact=False)
+                if item.path.endswith('testsuite/archiver.py'):
+                    repository.delete(item.chunks[-1].id)
                     break
+            else:
+                assert False  # missed the file
+            repository.commit(compact=False)
         output = self.cmd('delete', '--force', self.repository_location + '::test')
         self.assert_in('deleted archive was corrupted', output)
         self.cmd('check', '--repair', self.repository_location)

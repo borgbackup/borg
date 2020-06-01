@@ -262,6 +262,9 @@ class DownloadPipeline:
         Warning: if *preload* is True then all data chunks of every yielded item have to be retrieved,
         otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
         """
+        def _preload(chunks):
+            self.repository.preload([c.id for c in chunks])
+
         masters_preloaded = set()
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
@@ -270,9 +273,6 @@ class DownloadPipeline:
             for item in items:
                 if 'chunks' in item:
                     item.chunks = [ChunkListEntry(*e) for e in item.chunks]
-
-            def preload(chunks):
-                self.repository.preload([c.id for c in chunks])
 
             if filter:
                 items = [item for item in items if filter(item)]
@@ -286,7 +286,7 @@ class DownloadPipeline:
                     # due to a side effect of the filter() call, we now have hardlink_masters dict populated.
                     for item in items:
                         if 'chunks' in item:  # regular file, maybe a hardlink master
-                            preload(item.chunks)
+                            _preload(item.chunks)
                             # if this is a hardlink master, remember that we already preloaded it:
                             if 'source' not in item and hardlinkable(item.mode) and item.get('hardlink_master', True):
                                 masters_preloaded.add(item.path)
@@ -296,13 +296,13 @@ class DownloadPipeline:
                                 # we only need to preload *once* (for the 1st selected slave)
                                 chunks, _ = hardlink_masters[source]
                                 if chunks is not None:
-                                    preload(chunks)
+                                    _preload(chunks)
                                 masters_preloaded.add(source)
                 else:
                     # easy: we do not have a filter, thus all items are selected, thus we need to preload all chunks.
                     for item in items:
                         if 'chunks' in item:
-                            preload(item.chunks)
+                            _preload(item.chunks)
 
             for item in items:
                 yield item

@@ -243,17 +243,25 @@ Compatibility notes:
 
 Fixes:
 
-- update precedence of env vars to set config and cache paths, #4894
-- mount:
+- mount / borgfs (FUSE filesystem):
 
   - fix FUSE low linear read speed on large files, #5067
   - fix crash on old llfuse without birthtime attrs, #5064 - accidentally
     we required llfuse >= 1.3. Now also old llfuse works again.
+  - set f_namemax in statfs result, #2684
+- update precedence of env vars to set config and cache paths, #4894
+- correctly calculate compression ratio, taking header size into account, too
+
+New features:
+
+- --bypass-lock option to bypass locking with read-only repositories
 
 Other changes:
 
 - travis: adding comments and explanations to Travis config / install script,
   improve macOS builds.
+- tests: test_delete_force: avoid sporadic test setup issues, #5196
+- misc. vagrant fixes
 - docs:
 
   - PlaceholderError not printed as JSON, #4073
@@ -262,6 +270,11 @@ Other changes:
   - some markup / warning fixes
   - add "updating borgbackup.org/releases" to release checklist, #4999
   - add "rendering docs" to release checklist, #5000
+  - clarify borg init's encryption modes
+  - add note about patterns and stored paths, #4160
+  - add upgrade of tools to pip installation how-to
+  - document one cause of orphaned chunks in check command, #2295
+  - linked recommended restrictions to ssh public keys on borg servers in faq, #4946
 
 
 Version 1.1.11 (2020-03-08)

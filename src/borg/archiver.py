@@ -3030,7 +3030,7 @@ class Archiver:
         When giving '-' as path, borg will read data from standard input and create a
         file 'stdin' in the created archive from that data. In some cases it's more
         appropriate to use --content-from-command, however. See section *Read from
-        Stdin* below for details.
+        stdin* below for details.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
@@ -3151,7 +3151,7 @@ class Archiver:
         - 'x' = excluded, item was *not* backed up
         - '?' = missing status code (if you see this, please file a bug report!)
 
-        Reading from Stdin
+        Reading from stdin
         ++++++++++++++++++
 
         There are two methods to read from stdin. Either specify ``-`` as path and
@@ -3174,7 +3174,7 @@ class Archiver:
         **one can end up with truncated output being backed up**. Using
         ``--content-from-command``, in contrast, borg is guaranteed to fail without
         creating an archive should the command fail. The command is considered failed
-        when it returned an non-zero exit code.
+        when it returned a non-zero exit code.
 
         By default, the content read from stdin is stored in a file called 'stdin'.
         Use ``--stdin-name`` to change the name.
@@ -3205,7 +3205,7 @@ class Archiver:
                                help='use NAME in archive for stdin data (default: %(default)r)')
         subparser.add_argument('--content-from-command', action='store_true',
                                help='interpret PATH as command and store its stdout. See also section Read from'
-                                    ' Stdin below.')
+                                    ' stdin below.')
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)
         exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',

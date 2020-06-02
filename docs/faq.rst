@@ -345,8 +345,8 @@ resolution from that.
 Assuming that all your chunks have a size of :math:`2^{21}` bytes (approximately 2.1 MB)
 and we have a "perfect" hash algorithm, we can think that the probability of collision 
 would be of :math:`p^2/2^{n+1}` then, using SHA-256 (:math:`n=256`) and for example
-we have :math:`10^9` chunks (:math:`p=10^9`) (:math:`10^9` chunks would be about 2100TB).
-The probability would be around to `4.3e-60 <https://www.wolframalpha.com/input/?i=4.3e-60>`_.
+we have 1000 million chunks (:math:`p=10^9`) (1000 million chunks would be about 2100TB).
+The probability would be around to 0.0000000000000000000000000000000000000000000000000000000000043.
 
 A mass-murderer space rock happens about once every 30 million years on average.
 This leads to a probability of such an event occurring in the next second to about :math:`10^{-15}`.

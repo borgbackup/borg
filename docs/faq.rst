@@ -330,6 +330,40 @@ needs to be ascertained and fixed.
 issues. We recommend to first run without ``--repair`` to assess the situation.
 If the found issues and proposed repairs seem right, re-run "check" with ``--repair`` enabled.
 
+How probable is it to get a hash collision problem?
+---------------------------------------------------
+
+If you noticed, there are some issues (:issue:`170` (**warning: hell**) and :issue:`4884`)
+about the probability of a chunk having the same hash as another chunk, making the file
+corrupted because it grabbed the wrong chunk. This is called the `Birthday Problem
+<https://en.wikipedia.org/wiki/Birthday_problem>`_.
+
+There is a lot of probability in here so, I can give you my interpretation of
+such math but it's honestly better that you read it yourself and grab your own
+resolution from that.
+
+Assuming that all your chunks have a size of :math:`2^{21}` bytes (approximately 2.1 MB)
+and we have a "perfect" hash algorithm, we can think that the probability of collision 
+would be of :math:`p^2/2^{n+1}` then, using SHA-256 (:math:`n=256`) and for example
+we have 1000 million chunks (:math:`p=10^9`) (1000 million chunks would be about 2100TB).
+The probability would be around to 0.0000000000000000000000000000000000000000000000000000000000043.
+
+A mass-murderer space rock happens about once every 30 million years on average.
+This leads to a probability of such an event occurring in the next second to about :math:`10^{-15}`.
+That's **45** orders of magnitude more probable than the SHA-256 collision. Briefly stated,
+if you find SHA-256 collisions scary then your priorities are wrong. This example was grabbed from
+`this SO answer <https://stackoverflow.com/a/4014407/13359375>`_, it's great honestly.
+
+Still, the real question is if Borg tries to not make this happen?
+
+Well... it used to not check anything but there was a feature added which saves the size
+of the chunks too, so the size of the chunks is compared to the size that you got with the
+hash and if the check says there is a mismatch it will raise an exception instead of corrupting
+the file. This doesn't save us from everything but reduces the chances of corruption.
+There are other ways of trying to escape this but it would affect performance so much that
+it wouldn't be worth it and it would contradict Borg's design, so if you don't want this to
+happen, simply don't use Borg.
+
 Why is the time elapsed in the archive stats different from wall clock time?
 ----------------------------------------------------------------------------
 

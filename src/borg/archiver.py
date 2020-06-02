@@ -507,39 +507,60 @@ class Archiver:
                 except OSError:
                     pass
             logger.debug('Processing files ...')
-            for path in args.paths:
-                if path == '-':  # stdin
-                    path = args.stdin_name
-                    if not dry_run:
-                        try:
-                            status = fso.process_stdin(path=path, cache=cache)
-                        except BackupOSError as e:
-                            status = 'E'
-                            self.print_warning('%s: %s', path, e)
-                    else:
-                        status = '-'
-                    self.print_file_status(status, path)
-                    continue
-                path = os.path.normpath(path)
-                parent_dir = os.path.dirname(path) or '.'
-                name = os.path.basename(path)
-                # note: for path == '/':  name == '' and parent_dir == '/'.
-                # the empty name will trigger a fall-back to path-based processing in os_stat and os_open.
-                with OsOpen(path=parent_dir, flags=flags_root, noatime=True, op='open_root') as parent_fd:
+            if args.content_from_command:
+                path = args.stdin_name
+                if not dry_run:
                     try:
-                        st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
-                    except OSError as e:
-                        self.print_warning('%s: %s', path, e)
+                        try:
+                            proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE)
+                        except (FileNotFoundError, PermissionError) as e:
+                            self.print_error('Failed to execute command: %s', e)
+                            return self.exit_code
+                        status = fso.process_pipe(path=path, cache=cache, fd=proc.stdout)
+                        rc = proc.wait()
+                        if rc != 0:
+                            self.print_error('Command %r exited with status %d', args.paths[0], rc)
+                            return self.exit_code
+                    except BackupOSError as e:
+                        self.print_error('%s: %s', path, e)
+                        return self.exit_code
+                else:
+                    status = '-'
+                self.print_file_status(status, path)
+            else:
+                for path in args.paths:
+                    if path == '-':  # stdin
+                        path = args.stdin_name
+                        if not dry_run:
+                            try:
+                                status = fso.process_pipe(path=path, cache=cache, fd=sys.stdin.buffer)
+                            except BackupOSError as e:
+                                status = 'E'
+                                self.print_warning('%s: %s', path, e)
+                        else:
+                            status = '-'
+                        self.print_file_status(status, path)
                         continue
-                    if args.one_file_system:
-                        restrict_dev = st.st_dev
-                    else:
-                        restrict_dev = None
-                    self._process(path=path, parent_fd=parent_fd, name=name,
-                                  fso=fso, cache=cache, matcher=matcher,
-                                  exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
-                                  keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
-                                  restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
+                    path = os.path.normpath(path)
+                    parent_dir = os.path.dirname(path) or '.'
+                    name = os.path.basename(path)
+                    # note: for path == '/':  name == '' and parent_dir == '/'.
+                    # the empty name will trigger a fall-back to path-based processing in os_stat and os_open.
+                    with OsOpen(path=parent_dir, flags=flags_root, noatime=True, op='open_root') as parent_fd:
+                        try:
+                            st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
+                        except OSError as e:
+                            self.print_warning('%s: %s', path, e)
+                            continue
+                        if args.one_file_system:
+                            restrict_dev = st.st_dev
+                        else:
+                            restrict_dev = None
+                        self._process(path=path, parent_fd=parent_fd, name=name,
+                                      fso=fso, cache=cache, matcher=matcher,
+                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
+                                      keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
+                                      restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
                 if args.progress:
                     archive.stats.show_progress(final=True)
@@ -3007,7 +3028,9 @@ class Archiver:
         directory.
 
         When giving '-' as path, borg will read data from standard input and create a
-        file 'stdin' in the created archive from that data.
+        file 'stdin' in the created archive from that data. In some cases it's more
+        appropriate to use --content-from-command, however. See section *Reading from
+        stdin* below for details.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
@@ -3127,6 +3150,34 @@ class Archiver:
         - '-' = dry run, item was *not* backed up
         - 'x' = excluded, item was *not* backed up
         - '?' = missing status code (if you see this, please file a bug report!)
+
+        Reading from stdin
+        ++++++++++++++++++
+
+        There are two methods to read from stdin. Either specify ``-`` as path and
+        pipe directly to borg::
+
+            backup-vm --id myvm --stdout | borg create REPO::ARCHIVE -
+
+        Or use ``--content-from-command`` to have Borg manage the execution of the
+        command and piping. If you do so, the first PATH argument is interpreted
+        as command to execute and any further arguments are treated as arguments
+        to the command::
+
+            borg create --content-from-command REPO::ARCHIVE -- backup-vm --id myvm --stdout
+
+        ``--`` is used to ensure ``--id`` and ``--stdout`` are **not** considered
+        arguments to ``borg`` but rather ``backup-vm``.
+
+        The difference between the two approaches is that piping to borg creates an
+        archive even if the command piping to borg exits with a failure. In this case,
+        **one can end up with truncated output being backed up**. Using
+        ``--content-from-command``, in contrast, borg is guaranteed to fail without
+        creating an archive should the command fail. The command is considered failed
+        when it returned a non-zero exit code.
+
+        By default, the content read from stdin is stored in a file called 'stdin'.
+        Use ``--stdin-name`` to change the name.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,
@@ -3151,7 +3202,10 @@ class Archiver:
         subparser.add_argument('--no-cache-sync', dest='no_cache_sync', action='store_true',
                                help='experimental: do not synchronize the cache. Implies not using the files cache.')
         subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
-                               help='use NAME in archive for stdin data (default: "stdin")')
+                               help='use NAME in archive for stdin data (default: %(default)r)')
+        subparser.add_argument('--content-from-command', action='store_true',
+                               help='interpret PATH as command and store its stdout. See also section Reading from'
+                                    ' stdin below.')
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)
         exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',
@@ -4386,8 +4440,11 @@ class Archiver:
         parser.common_options.resolve(args)
         func = get_func(args)
         if func == self.do_create and not args.paths:
-            # need at least 1 path but args.paths may also be populated from patterns
-            parser.error('Need at least one PATH argument.')
+            if args.content_from_command:
+                parser.error('No command given.')
+            else:
+                # need at least 1 path but args.paths may also be populated from patterns
+                parser.error('Need at least one PATH argument.')
         if not getattr(args, 'lock', True):  # Option --bypass-lock sets args.lock = False
             bypass_allowed = {self.do_check, self.do_config, self.do_diff,
                               self.do_export_tar, self.do_extract, self.do_info,

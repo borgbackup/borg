@@ -1044,6 +1044,33 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         extracted_data = self.cmd('extract', '--stdout', self.repository_location + '::test', binary_output=True)
         assert extracted_data == input_data
 
+    def test_create_content_from_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        input_data = 'some test content'
+        name = 'a/b/c'
+        self.cmd('create', '--stdin-name', name, '--content-from-command',
+                 self.repository_location + '::test', '--', 'echo', input_data)
+        item = json.loads(self.cmd('list', '--json-lines', self.repository_location + '::test'))
+        assert item['uid'] == 0
+        assert item['gid'] == 0
+        assert item['size'] == len(input_data) + 1  # `echo` adds newline
+        assert item['path'] == name
+        extracted_data = self.cmd('extract', '--stdout', self.repository_location + '::test')
+        assert extracted_data == input_data + '\n'
+
+    def test_create_content_from_command_with_failed_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--content-from-command', self.repository_location + '::test',
+                          '--', 'false', '--arg-passed-to-false', exit_code=2)
+        assert output.endswith("Command 'false' exited with status 1\n")
+        archive_list = json.loads(self.cmd('list', '--json', self.repository_location))
+        assert archive_list['archives'] == []
+
+    def test_create_content_from_command_missing_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--content-from-command', self.repository_location + '::test', exit_code=2)
+        assert output.endswith('No command given.\n')
+
     def test_create_without_root(self):
         """test create without a root"""
         self.cmd('init', '--encryption=repokey', self.repository_location)

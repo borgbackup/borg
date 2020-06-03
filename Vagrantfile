@@ -65,26 +65,26 @@ end
 def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
-    # note: the base machine is old and as uptodate as it gets,
-    # thus we do not need to install updates for the OS.
-    #sudo softwareupdate --ignore iTunesX
-    #sudo softwareupdate --ignore iTunes
-    #sudo softwareupdate --ignore "Install macOS High Sierra"
-    #sudo softwareupdate --install --all
+    sudo softwareupdate --ignore iTunesX
+    sudo softwareupdate --ignore iTunes
+    sudo softwareupdate --ignore "Install macOS High Sierra"
+    sudo softwareupdate --install --all
     # get osxfuse 3.x release code from github:
     curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.10.4/osxfuse-3.10.4.dmg >osxfuse.dmg
     MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
     && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.10.4.pkg" -target /
     sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
-    # brew is already installed in the base box
-    #ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-    brew update
-    brew install openssl || brew upgrade openssl
+    which brew || ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    brew update > /dev/null
+    brew install pkg-config || brew upgrade pkg-config
+    brew install readline || brew upgrade readline
+    brew install openssl@1.1 || brew upgrade openssl@1.1
+    brew install zstd || brew upgrade zstd
     brew install lz4 || brew upgrade lz4
-    brew install xz  || brew upgrade xz  # required for python lzma module
+    brew install xz || brew upgrade xz  # required for python lzma module
     brew install fakeroot || brew upgrade fakeroot
     brew install git || brew upgrade git
-    brew install pkg-config || brew upgrade pkg-config
+    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -519,10 +519,10 @@ Vagrant.configure(2) do |config|
 
   # OS X
   config.vm.define "darwin64" do |b|
-    b.vm.box = "macos1010"
+    b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 1536 + $wmem
-      v.customize ['modifyvm', :id, '--ostype', 'MacOS1010_64']
+      v.memory = 2048 + $wmem
+      v.customize ['modifyvm', :id, '--ostype', 'MacOS1012_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       # Adjust CPU settings according to
       # https://github.com/geerlingguy/macos-virtualbox-vm

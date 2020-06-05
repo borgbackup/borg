@@ -7,7 +7,6 @@ from collections import OrderedDict
 from datetime import datetime
 from glob import glob
 
-from distutils.command.build import build
 from distutils.core import Command
 
 import textwrap

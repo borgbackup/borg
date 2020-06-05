@@ -94,8 +94,8 @@ are available on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
   Older glibc releases are untested and may not work.
-* **Mac OS X**: 10.10 (does not work with older OS X releases)
-* **FreeBSD**: 10.2 (unknown whether it works for older releases)
+* **Mac OS X**: 10.12 (unknown whether it works for older releases)
+* **FreeBSD**: 10.3 (unknown whether it works for older releases)
 
 ARM binaries are built by Johann Bauer, see: https://borg.bauerj.eu/
 

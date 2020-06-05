@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.12 (not released yet)
----------------------------------
+Version 1.1.12 (2020-06-06)
+---------------------------
 
 Compatibility notes:
 

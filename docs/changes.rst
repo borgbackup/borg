@@ -243,6 +243,7 @@ Compatibility notes:
 
 Fixes:
 
+- fix preload-related memory leak, #5202.
 - mount / borgfs (FUSE filesystem):
 
   - fix FUSE low linear read speed on large files, #5067
@@ -258,6 +259,7 @@ New features:
 
 Other changes:
 
+- upgrade bundled zstd to 1.4.5
 - travis: adding comments and explanations to Travis config / install script,
   improve macOS builds.
 - tests: test_delete_force: avoid sporadic test setup issues, #5196

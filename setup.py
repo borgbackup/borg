@@ -7,7 +7,6 @@ from collections import OrderedDict
 from datetime import datetime
 from glob import glob
 
-from distutils.command.build import build
 from distutils.core import Command
 
 import textwrap
@@ -870,6 +869,7 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],

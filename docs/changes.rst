@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.12 (not released yet)
----------------------------------
+Version 1.1.12 (2020-06-06)
+---------------------------
 
 Compatibility notes:
 
@@ -264,6 +264,8 @@ Other changes:
   improve macOS builds.
 - tests: test_delete_force: avoid sporadic test setup issues, #5196
 - misc. vagrant fixes
+- the binary for macOS is now built on macOS 10.12
+- the binaries for Linux are now built on Debian 8 "Jessie", #3761
 - docs:
 
   - PlaceholderError not printed as JSON, #4073

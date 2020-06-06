@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG 1 "2017-02-05" "" "borg backup tool"
+.TH BORG 1 "2020-06-06" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .
@@ -30,10 +30,26 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.SH SYNOPSIS
+.SH BORG
+.SS deduplicating and encrypting backup tool
+.INDENT 0.0
+.TP
+.B Author
+The Borg Collective
+.TP
+.B Date
+2020\-06\-06
+.TP
+.B Manual section
+1
+.TP
+.B Manual group
+borg backup tool
+.UNINDENT
+.SS SYNOPSIS
 .sp
 borg [common options] <command> [options] [arguments]
-.SH DESCRIPTION
+.SS DESCRIPTION
 .\" we don't include the README.rst here since we want to keep this terse.
 .
 .sp
@@ -50,7 +66,7 @@ Borg stores a set of files in an \fIarchive\fP\&. A \fIrepository\fP is a collec
 of \fIarchives\fP\&. The format of repositories is Borg\-specific. Borg does not
 distinguish archives from each other in any way other than their name,
 it does not matter when or where archives were created (e.g. different hosts).
-.SH EXAMPLES
+.SS EXAMPLES
 .SS A step\-by\-step example
 .INDENT 0.0
 .IP 1. 3
@@ -185,7 +201,7 @@ reports during command execution.  You can also add the \fB\-v\fP (or
 get other informational messages.
 .UNINDENT
 .UNINDENT
-.SH NOTES
+.SS NOTES
 .SS Positional Arguments and Options: Order matters
 .sp
 Borg only supports taking options (\fB\-s\fP and \fB\-\-progress\fP in the example)
@@ -465,9 +481,6 @@ in systemd.nspawn containers on some architectures (e.g. ARM).
 Using this does not affect data safety, but might result in a more bursty
 write to disk behaviour (not continuously streaming to disk).
 .UNINDENT
-.TP
-.B TMPDIR
-where temporary files are stored (might need a lot of temporary space for some operations), see \fI\%tempfile\fP for details
 .UNINDENT
 .TP
 .B Some automatic "answerers" (if set, they automatically answer confirmation questions):
@@ -497,27 +510,47 @@ allowed). So please test your scripts interactively before making them a non\-in
 .INDENT 7.0
 .TP
 .B BORG_BASE_DIR
-Default to \(aq$HOME\(aq, \(aq~$USER\(aq, \(aq~\(aq (in that order)\(aq.
-If we refer to ~ below, we in fact mean BORG_BASE_DIR.
+Defaults to \fB$HOME\fP or \fB~$USER\fP or \fB~\fP (in that order).
+If you want to move all borg\-specific folders to a custom path at once, all you need to do is
+to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt accordingly
+(assuming you didn\(aqt set them to a different custom value).
 .TP
 .B BORG_CACHE_DIR
-Default to \(aq~/.cache/borg\(aq. This directory contains the local cache and might need a lot
+Defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
+
+.nf
+\(gaXDG env var\(ga_
+.fi
+ \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
+This directory contains the local cache and might need a lot
 of space for dealing with big repositories. Make sure you\(aqre aware of the associated
 security aspects of the cache location: \fIcache_security\fP
 .TP
 .B BORG_CONFIG_DIR
-Default to \(aq~/.config/borg\(aq. This directory contains the whole config directories.
+Defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
+
+.nf
+\(gaXDG env var\(ga_
+.fi
+ \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
+This directory contains all borg configuration directories, see the FAQ
+for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
 .B BORG_SECURITY_DIR
-Default to \(aq~/.config/borg/security\(aq. This directory contains information borg uses to
-track its usage of NONCES ("numbers used once" \- usually in encryption context) and other
-security relevant data. Will move with BORG_CONFIG_DIR variable unless specified.
+Defaults to \fB$BORG_CONFIG_DIR/security\fP\&.
+This directory contains information borg uses to track its usage of NONCES ("numbers used
+once" \- usually in encryption context) and other security relevant data.
 .TP
 .B BORG_KEYS_DIR
-Default to \(aq~/.config/borg/keys\(aq. This directory contains keys for encrypted repositories.
+Defaults to \fB$BORG_CONFIG_DIR/keys\fP\&.
+This directory contains keys for encrypted repositories.
 .TP
 .B BORG_KEY_FILE
 When set, use the given filename as repository key file.
+.TP
+.B TMPDIR
+This is where temporary files are stored (might need a lot of temporary space for some
+operations), see \fI\%tempfile\fP for details.
 .UNINDENT
 .TP
 .B Building:
@@ -543,10 +576,10 @@ will be linked against the system libzstd instead of a bundled implementation. (
 Please note:
 .INDENT 0.0
 .IP \(bu 2
-be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data\(aqs security/safety
+Be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data\(aqs security/safety.
 .IP \(bu 2
-also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions
-(e.g. mode 600, root:root).
+Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
+mode 600, root:root).
 .UNINDENT
 .SS File systems
 .sp
@@ -681,7 +714,7 @@ $TMPDIR, $TEMP, or $TMP environment variable is properly set for the sshd
 process.
 For some OSes, this can be done just by setting the correct value in the
 .bashrc (or equivalent login config file for other shells), however in
-other cases it may be neccessary to first enable \fBPermitUserEnvironment yes\fP
+other cases it may be necessary to first enable \fBPermitUserEnvironment yes\fP
 in your \fBsshd_config\fP file, then add \fBenvironment="TMPDIR=/my/big/tmpdir"\fP
 at the start of the public key to be used in the \fBauthorized_hosts\fP file.
 .TP
@@ -847,7 +880,7 @@ This includes resource forks on Mac OS X.
 .IP [7] 5
 aka \fIBSD flags\fP\&. The Linux set of flags [1] is portable across platforms.
 The BSDs define additional flags.
-.SH SEE ALSO
+.SS SEE ALSO
 .sp
 \fIborg\-common(1)\fP for common command line options
 .sp

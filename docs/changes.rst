@@ -264,7 +264,8 @@ Other changes:
   improve macOS builds.
 - tests: test_delete_force: avoid sporadic test setup issues, #5196
 - misc. vagrant fixes
-- new vagrant box, the binary for macOS is built on 10.12 now
+- the binary for macOS is now built on macOS 10.12
+- the binaries for Linux are now built on Debian 8 "Jessie", #3761
 - docs:
 
   - PlaceholderError not printed as JSON, #4073

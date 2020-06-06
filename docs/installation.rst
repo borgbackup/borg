@@ -92,7 +92,7 @@ Standalone Binary
 |project_name| x86/x64 amd/intel compatible binaries (generated with `pyinstaller`_)
 are available on the releases_ page for the following platforms:
 
-* **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
+* **Linux**: glibc >= 2.19 (ok for most supported Linux releases).
   Older glibc releases are untested and may not work.
 * **Mac OS X**: 10.12 (unknown whether it works for older releases)
 * **FreeBSD**: 10.3 (unknown whether it works for older releases)

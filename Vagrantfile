@@ -7,13 +7,6 @@ $cpus = Integer(ENV.fetch('VMCPUS', '4'))  # create VMs with that many cpus
 $xdistn = Integer(ENV.fetch('XDISTN', '4'))  # dispatch tests to that many pytest workers
 $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
-def packages_prepare_wheezy
-  return <<-EOF
-      # debian 7 wheezy does not have lz4, but it is available from wheezy-backports:
-      echo "deb http://http.debian.net/debian wheezy-backports main" > /etc/apt/sources.list.d/wheezy-backports.list
-  EOF
-end
-
 def packages_debianoid(user)
   return <<-EOF
     export DEBIAN_FRONTEND=noninteractive
@@ -481,40 +474,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("jessie64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie64")
-  end
-
-  config.vm.define "wheezy32" do |b|
-    b.vm.box = "debian7-i386"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 768 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy32")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy32")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy32")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy32")
-  end
-
-  config.vm.define "wheezy64" do |b|
-    b.vm.box = "debian7-amd64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages prepare wheezy", :type => :shell, :inline => packages_prepare_wheezy
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("wheezy64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("wheezy64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("wheezy64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("wheezy64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("wheezy64")
   end
 
   # OS X

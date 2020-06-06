@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.12 (2020-06-06)
+Version 1.1.13 (2020-06-06)
 ---------------------------
 
 Compatibility notes:
@@ -240,6 +240,14 @@ Compatibility notes:
   If WSL still has a problem with sync_file_range, you need to set
   BORG_WORKAROUNDS=basesyncfile in the borg process environment to
   work around the WSL issue.
+
+Fixes:
+
+- rebuilt using a current Cython version, compatible with python 3.8, #5214
+
+
+Version 1.1.12 (2020-06-06)
+---------------------------
 
 Fixes:
 

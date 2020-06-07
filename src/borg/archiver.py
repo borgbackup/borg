@@ -2261,7 +2261,7 @@ class Archiver:
             This pattern style is (only) useful to match full paths.
             This is kind of a pseudo pattern as it can not have any variable or
             unspecified parts - the full path must be given.
-            `pf:root/file.ext` matches `root/file.txt` only.
+            `pf:root/file.ext` matches `root/file.ext` only.
 
             Implementation note: this is implemented via very time-efficient O(1)
             hashtable lookups (this means you can have huge amounts of such patterns

@@ -885,17 +885,17 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
         logging.getLogger().setLevel(logging.INFO)
         # note: test logger is on info log level, so --info gets added automagically
-        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--info']
         args.remote_path = 'borg-0.28.2'
-        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info']
+        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--info']
         args.debug_topics = ['something_client_side', 'repository_compaction']
-        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--umask=077', '--info',
+        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--info',
                                                                  '--debug-topic=borg.debug.repository_compaction']
         args = self._get_mock_args()
         args.storage_quota = 0
-        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info']
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--info']
         args.storage_quota = 314159265
-        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--umask=077', '--info',
+        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--info',
                                                                  '--storage-quota=314159265']
         args.rsh = 'ssh -i foo'
         self.repository._args = args

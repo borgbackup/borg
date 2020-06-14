@@ -2617,7 +2617,7 @@ class Archiver:
             add_common_option('--show-rc', dest='show_rc', action='store_true',
                               help='show/log the return code (rc)')
             add_common_option('--umask', metavar='M', dest='umask', type=lambda s: int(s, 8), default=UMASK_DEFAULT,
-                              help='set umask to M (local and remote, default: %(default)04o)')
+                              help='set umask to M (local only, default: %(default)04o)')
             add_common_option('--remote-path', metavar='PATH', dest='remote_path',
                               help='use PATH as borg executable on the remote (default: "borg")')
             add_common_option('--remote-ratelimit', metavar='RATE', dest='remote_ratelimit', type=int,
@@ -4413,12 +4413,12 @@ class Archiver:
                     'restrict_to_repositories',
                     'append_only',
                     'storage_quota',
+                    'umask',
                 }
                 whitelist = {
                     'debug_topics',
                     'lock_wait',
                     'log_level',
-                    'umask',
                 }
                 not_present = object()
                 for attr_name in whitelist:

@@ -1279,6 +1279,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                  '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test')
         self._assert_test_keep_tagged()
 
+    @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+    def test_recreate_hardlinked_tags(self):  # test for issue #4911
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.create_regular_file('file1', contents=CACHE_TAG_CONTENTS)  # "wrong" filename, but correct tag contents
+        os.mkdir(os.path.join(self.input_path, 'subdir'))  # to make sure the tag is encountered *after* file1
+        os.link(os.path.join(self.input_path, 'file1'),
+                os.path.join(self.input_path, 'subdir', CACHE_TAG_NAME))  # correct tag name, hardlink to file1
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # in the "test" archive, we now have, in this order:
+        # - a regular file item for "file1"
+        # - a hardlink item for "CACHEDIR.TAG" referring back to file1 for its contents
+        self.cmd('recreate', '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test')
+        # if issue #4911 is present, the recreate will crash with a KeyError for "input/file1"
+
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='Linux capabilities test, requires fakeroot >= 1.20.2')
     def test_extract_capabilities(self):
         fchown = os.fchown

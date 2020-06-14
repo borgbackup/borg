@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a8 (2020-04-22)
+Version 1.2.0a9 (2020-xx-xx)
 ----------------------------
 
 Please note:
@@ -240,8 +240,8 @@ Compatibility notes:
 - freeing repository space only happens when "borg compact" is invoked.
 - borg create --noatime is deprecated. Not storing atime is the default behaviour
   now (use --atime if you want to store the atime).
-- list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
-  "isomtime" was the default but produced a verbose human format,
+- list: corrected mix-up of "isomtime" and "mtime" formats.
+  Previously, "isomtime" was the default but produced a verbose human format,
   while "mtime" produced a ISO-8601-like format.
   The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
   and the default is now "mtime".
@@ -261,6 +261,28 @@ Compatibility notes:
        having duplicate FQDN *and* MAC address or all-zero MAC address)
   - 2) if you are aware that 1) is not the case for you, you must set
        BORG_HOST_ID env var to something unique.
+
+Fixes:
+
+- fix memory leak related to preloading, #5202
+- borg config --list does not show last_segment_checked, #5159
+
+New features:
+
+- --content-from-command: create archive using stdout of given command, #5174
+
+Other changes:
+
+- docs:
+
+  - explain hash collision, #4884
+  - clarify --recompress option, #5154
+- misc. testing fixes, #5196
+- parseformat: unnecessary calls removed, #5169
+
+
+Version 1.2.0a8 (2020-04-22)
+----------------------------
 
 Fixes:
 
@@ -618,6 +640,78 @@ Other changes:
 - testing:
 
   - vagrant: new VMs for linux/bsd/darwin, most with OpenSSL 1.1 and py36
+
+
+Version 1.1.13 (2020-06-06)
+---------------------------
+
+Compatibility notes:
+
+- When upgrading from borg 1.0.x to 1.1.x, please note:
+
+  - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
+  - borg upgrade: you do not need to and you also should not run it.
+  - borg might ask some security-related questions once after upgrading.
+    You can answer them either manually or via environment variable.
+    One known case is if you use unencrypted repositories, then it will ask
+    about a unknown unencrypted repository one time.
+  - your first backup with 1.1.x might be significantly slower (it might
+    completely read, chunk, hash a lot files) - this is due to the
+    --files-cache mode change (and happens every time you change mode).
+    You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
+    mode (but that is less safe for detecting changed files than the default).
+    See the --files-cache docs for details.
+- 1.1.11 removes WSL autodetection (Windows 10 Subsystem for Linux).
+  If WSL still has a problem with sync_file_range, you need to set
+  BORG_WORKAROUNDS=basesyncfile in the borg process environment to
+  work around the WSL issue.
+
+Fixes:
+
+- rebuilt using a current Cython version, compatible with python 3.8, #5214
+
+
+Version 1.1.12 (2020-06-06)
+---------------------------
+
+Fixes:
+
+- fix preload-related memory leak, #5202.
+- mount / borgfs (FUSE filesystem):
+
+  - fix FUSE low linear read speed on large files, #5067
+  - fix crash on old llfuse without birthtime attrs, #5064 - accidentally
+    we required llfuse >= 1.3. Now also old llfuse works again.
+  - set f_namemax in statfs result, #2684
+- update precedence of env vars to set config and cache paths, #4894
+- correctly calculate compression ratio, taking header size into account, too
+
+New features:
+
+- --bypass-lock option to bypass locking with read-only repositories
+
+Other changes:
+
+- upgrade bundled zstd to 1.4.5
+- travis: adding comments and explanations to Travis config / install script,
+  improve macOS builds.
+- tests: test_delete_force: avoid sporadic test setup issues, #5196
+- misc. vagrant fixes
+- the binary for macOS is now built on macOS 10.12
+- the binaries for Linux are now built on Debian 8 "Jessie", #3761
+- docs:
+
+  - PlaceholderError not printed as JSON, #4073
+  - "How important is Borg config?", #4941
+  - make Sphinx warnings break docs build, #4587
+  - some markup / warning fixes
+  - add "updating borgbackup.org/releases" to release checklist, #4999
+  - add "rendering docs" to release checklist, #5000
+  - clarify borg init's encryption modes
+  - add note about patterns and stored paths, #4160
+  - add upgrade of tools to pip installation how-to
+  - document one cause of orphaned chunks in check command, #2295
+  - linked recommended restrictions to ssh public keys on borg servers in faq, #4946
 
 
 Version 1.1.11 (2020-03-08)

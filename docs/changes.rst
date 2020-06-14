@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a8 (2020-04-22)
+Version 1.2.0a9 (2020-xx-xx)
 ----------------------------
 
 Please note:
@@ -240,8 +240,8 @@ Compatibility notes:
 - freeing repository space only happens when "borg compact" is invoked.
 - borg create --noatime is deprecated. Not storing atime is the default behaviour
   now (use --atime if you want to store the atime).
-- list: corrected mix-up of "isomtime" and "mtime" formats. Previously,
-  "isomtime" was the default but produced a verbose human format,
+- list: corrected mix-up of "isomtime" and "mtime" formats.
+  Previously, "isomtime" was the default but produced a verbose human format,
   while "mtime" produced a ISO-8601-like format.
   The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
   and the default is now "mtime".
@@ -261,6 +261,28 @@ Compatibility notes:
        having duplicate FQDN *and* MAC address or all-zero MAC address)
   - 2) if you are aware that 1) is not the case for you, you must set
        BORG_HOST_ID env var to something unique.
+
+Fixes:
+
+- fix memory leak related to preloading, #5202
+- borg config --list does not show last_segment_checked, #5159
+
+New features:
+
+- --content-from-command: create archive using stdout of given command, #5174
+
+Other changes:
+
+- docs:
+
+  - explain hash collision, #4884
+  - clarify --recompress option, #5154
+- misc. testing fixes, #5196
+- parseformat: unnecessary calls removed, #5169
+
+
+Version 1.2.0a8 (2020-04-22)
+----------------------------
 
 Fixes:
 

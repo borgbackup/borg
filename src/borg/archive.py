@@ -1038,6 +1038,11 @@ Utilization of max. archive size: {csize_max:.0%}
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
             item.update(self.stat_simple_attrs(st))
             is_special_file = is_special(st.st_mode)
+            if is_special_file:
+                # we process a special file like a regular file. reflect that in mode,
+                # so it can be extracted / accessed in FUSE mount like a regular file.
+                # this needs to be done early, so that part files also get the patched mode.
+                item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
             if not hardlinked or hardlink_master:
                 if not is_special_file:
                     path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
@@ -1076,10 +1081,6 @@ Utilization of max. archive size: {csize_max:.0%}
                 self.stats.nfiles += 1
             item.update(self.stat_ext_attrs(st, path))
             item.get_size(memorize=True)
-            if is_special_file:
-                # we processed a special file like a regular file. reflect that in mode,
-                # so it can be extracted / accessed in FUSE mount like a regular file:
-                item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
             return status
 
     @staticmethod

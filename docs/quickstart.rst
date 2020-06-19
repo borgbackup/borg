@@ -161,11 +161,6 @@ your setup.
 Do not forget to test your created backups to make sure everything you need is being
 backed up and that the ``prune`` command is keeping and deleting the correct backups.
 
-.. note::
-
-    Please see the :ref:`software` section for related tooling for automating
-    backups.
-
 ::
 
     #!/bin/sh

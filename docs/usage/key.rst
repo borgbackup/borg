@@ -26,6 +26,11 @@ Examples
     Remember your passphrase. Your data will be inaccessible without it.
     Key updated
 
+    # Import a previously-exported key into the specified
+    # key file (creating or overwriting the output key)
+    # (keyfile repositories only)
+    $ BORG_KEY_FILE=/path/to/output-key borg key import /path/to/repo /path/to/exported
+
 Fully automated using environment variables:
 
 ::

@@ -2821,6 +2821,26 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         assert key_contents2 == key_contents
 
+    def test_key_import_keyfile_with_borg_key_file(self):
+        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+
+        exported_key_file = os.path.join(self.output_path, 'exported')
+        self.cmd('key', 'export', self.repository_location, exported_key_file)
+
+        key_file = os.path.join(self.keys_path, os.listdir(self.keys_path)[0])
+        with open(key_file, 'r') as fd:
+            key_contents = fd.read()
+        os.unlink(key_file)
+
+        imported_key_file = os.path.join(self.output_path, 'imported')
+        with environment_variable(BORG_KEY_FILE=imported_key_file):
+            self.cmd('key', 'import', self.repository_location, exported_key_file)
+        assert not os.path.isfile(key_file), '"borg key import" should respect BORG_KEY_FILE'
+
+        with open(imported_key_file, 'r') as fd:
+            imported_key_contents = fd.read()
+        assert imported_key_contents == key_contents
+
     def test_key_export_repokey(self):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'repokey')

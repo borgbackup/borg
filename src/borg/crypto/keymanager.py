@@ -61,10 +61,7 @@ class KeyManager:
     def store_keyblob(self, args):
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:
             k = KeyfileKey(self.repository)
-            try:
-                target = k.find_key()
-            except KeyfileNotFoundError:
-                target = k.get_new_target(args)
+            target = k.get_existing_or_new_target(args)
 
             self.store_keyfile(target)
         elif self.keyblob_storage == KeyBlobStorage.REPO:

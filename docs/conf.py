@@ -111,7 +111,7 @@ def set_rst_settings(app):
 
 
 def setup(app):
-    app.add_stylesheet('css/borg.css')
+    app.add_css_file('css/borg.css')
     app.connect('builder-inited', set_rst_settings)
 
 # Theme options are theme-specific and customize the look and feel of a theme

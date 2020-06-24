@@ -93,6 +93,8 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     answer or ask you interactively, depending on whether retries are allowed (they by default are
     allowed). So please test your scripts interactively before making them a non-interactive script.
 
+.. _XDG env var: https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html
+
 Directories and files:
     BORG_BASE_DIR
         Defaults to ``$HOME`` or ``~$USER`` or ``~`` (in that order).

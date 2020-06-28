@@ -84,12 +84,19 @@ use this option also for speeding up operations.
 ``--umask``
 ~~~~~~~~~~~
 
-If you use ``--umask``, make sure that all repository-modifying borg commands
-(create, delete, prune) that access the repository in question use the same
-``--umask`` value.
+borg uses a safe default umask of 077 (that means the files borg creates have
+only permissions for owner, but no permissions for group and others) - so there
+should rarely be a need to change the default behaviour.
 
-If multiple machines access the same repository, this should hold true for all
-of them.
+This option only affects the process to which it is given. Thus, when you run
+borg in client/server mode and you want to change the behaviour on the server
+side, you need to use ``borg serve --umask=XXX ...`` as a ssh forced command
+in ``authorized_keys``. The ``--umask`` value given on the client side is
+**not** transferred to the server side.
+
+Also, if you choose to use the ``--umask`` option, always be consistent and use
+the same umask value so you do not create a mixup of permissions in a borg
+repository or with other files borg creates.
 
 ``--read-special``
 ~~~~~~~~~~~~~~~~~~

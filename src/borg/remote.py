@@ -647,7 +647,6 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         # give some args/options to 'borg serve' process as they were given to us
         opts = []
         if args is not None:
-            opts.append('--umask=%03o' % args.umask)
             root_logger = logging.getLogger()
             if root_logger.isEnabledFor(logging.DEBUG):
                 opts.append('--debug')

@@ -3833,8 +3833,8 @@ def test_get_args():
     # everything normal:
     # first param is argv as produced by ssh forced command,
     # second param is like from SSH_ORIGINAL_COMMAND env variable
-    args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
-                             'borg serve --info --umask=0027')
+    args = archiver.get_args(['borg', 'serve', '--umask=0027', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
+                             'borg serve --info')
     assert args.func == archiver.do_serve
     assert args.restrict_to_paths == ['/p1', '/p2']
     assert args.umask == 0o027

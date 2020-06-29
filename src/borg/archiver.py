@@ -45,7 +45,7 @@ try:
     from .compress import CompressionSpec
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
     from .crypto.keymanager import KeyManager
-    from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+    from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
@@ -4644,17 +4644,17 @@ def main():  # pragma: no cover
             msg = 'Keyboard interrupt'
             tb_log_level = logging.DEBUG
             tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
-            exit_code = EXIT_ERROR
+            exit_code = EXIT_SIGNAL_BASE + 2
         except SigTerm:
             msg = 'Received SIGTERM'
             msgid = 'Signal.SIGTERM'
             tb_log_level = logging.DEBUG
             tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
-            exit_code = EXIT_ERROR
+            exit_code = EXIT_SIGNAL_BASE + 15
         except SigHup:
             msg = 'Received SIGHUP.'
             msgid = 'Signal.SIGHUP'
-            exit_code = EXIT_ERROR
+            exit_code = EXIT_SIGNAL_BASE + 1
         if msg:
             logger.error(msg, msgid=msgid)
         if tb:
@@ -4668,6 +4668,8 @@ def main():  # pragma: no cover
                 rc_logger.warning(exit_msg % ('warning', exit_code))
             elif exit_code == EXIT_ERROR:
                 rc_logger.error(exit_msg % ('error', exit_code))
+            elif exit_code >= EXIT_SIGNAL_BASE:
+                rc_logger.error(exit_msg % ('signal', exit_code))
             else:
                 rc_logger.error(exit_msg % ('abnormal', exit_code or 666))
         sys.exit(exit_code)

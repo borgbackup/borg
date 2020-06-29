@@ -4092,9 +4092,10 @@ class Archiver:
 
         Important: Repository disk space is **not** freed until you run ``borg compact``.
 
-        ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
-        have the exact same semantics as in "borg create". If PATHs are specified the
-        resulting archive will only contain files from these PATHs.
+        ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``
+        and PATH have the exact same semantics as in "borg create", but they only check
+        for files in the archives and not in the local file system. If PATHs are specified,
+        the resulting archives will only contain files from these PATHs.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (``--exclude``, ``--exclude-from``, PATHs).

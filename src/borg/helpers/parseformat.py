@@ -276,10 +276,12 @@ def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2, sig
     prec = 0
     for unit in units[:-1]:
         if abs(round(num, precision)) < power:
-            return fmt.format(num, sign, prec, sep, unit, suffix)
+            break
         num /= float(power)
         prec = precision
-    return fmt.format(num, sign, prec, sep, units[-1], suffix)
+    else:
+        unit = units[-1]
+    return fmt.format(num, sign, prec, sep, unit, suffix)
 
 
 def sizeof_fmt_iec(num, suffix='B', sep='', precision=2, sign=False):

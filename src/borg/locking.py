@@ -150,9 +150,17 @@ class ExclusiveLock:
                     temp_path = None  # see finally:-block below
                     return self
         finally:
-            if temp_path is not None:  # Renaming failed for any reason, so temp_dir still exists and should be cleaned up anyway.
-                os.unlink(temp_unique_name)
-                os.rmdir(temp_path)
+            if temp_path is not None:
+                # Renaming failed for some reason, so temp_dir still exists and
+                # should be cleaned up anyway. Try to clean up, but don't crash.
+                try:
+                    os.unlink(temp_unique_name)
+                except:
+                    pass
+                try:
+                    os.rmdir(temp_path)
+                except:
+                    pass
 
     def release(self):
         if not self.is_locked():

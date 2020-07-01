@@ -145,7 +145,7 @@ class ExclusiveLock:
                         return self
                     self.kill_stale_lock()
                     if timer.timed_out_or_sleep():
-                        raise LockTimeout(self.path)
+                        raise LockTimeout(self.path) from None
                 else:
                     temp_path = None
                     return self

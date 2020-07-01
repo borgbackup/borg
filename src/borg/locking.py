@@ -186,7 +186,11 @@ class ExclusiveLock:
 
     def kill_stale_lock(self):
         try:
-            for name in os.listdir(self.path):
+            names = os.listdir(self.path)
+        except FileNotFoundError:  # another process did our job in the meantime.
+            pass
+        else:
+            for name in names:
                 try:
                     host_pid, thread_str = name.rsplit('-', 1)
                     host, pid_str = host_pid.rsplit('.', 1)
@@ -216,9 +220,6 @@ class ExclusiveLock:
                         logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
                         self.stale_warning_printed = True
                     return False
-
-        except FileNotFoundError:  # Another process did our job in the meantime.
-            pass
 
         try:
             os.rmdir(self.path)

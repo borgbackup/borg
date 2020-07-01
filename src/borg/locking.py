@@ -147,7 +147,7 @@ class ExclusiveLock:
                     if timer.timed_out_or_sleep():
                         raise LockTimeout(self.path) from None
                 else:
-                    temp_path = None
+                    temp_path = None  # see finally:-block below
                     return self
         finally:
             if temp_path is not None:  # Renaming failed for any reason, so temp_dir still exists and should be cleaned up anyway.

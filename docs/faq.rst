@@ -894,7 +894,7 @@ I am having troubles with some network/FUSE/special filesystem, why?
 --------------------------------------------------------------------
 
 Borg is doing nothing special in the filesystem, it only uses very
-common and compatible operations (even the locking is just "mkdir").
+common and compatible operations (even the locking is just "rename").
 
 So, if you are encountering issues like slowness, corruption or malfunction
 when using a specific filesystem, please try if you can reproduce the issues
@@ -1055,7 +1055,7 @@ Here's a (incomplete) list of some major changes:
   nor the pbkdf2 iteration count in "passphrase" mode)
 * simple sparse file support, great for virtual machine disk files
 * can read special files (e.g. block devices) or from stdin, write to stdout
-* mkdir-based locking is more compatible than attic's posix locking
+* rename-based locking is more compatible than attic's posix locking
 * uses fadvise to not spoil / blow up the fs cache
 * better error messages / exception handling
 * better logging, screen output, progress indication

@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+import tempfile
 import time
 
 from . import platform
@@ -124,22 +125,42 @@ class ExclusiveLock:
             timeout = self.timeout
         if sleep is None:
             sleep = self.sleep
-        timer = TimeoutTimer(timeout, sleep).start()
-        while True:
-            try:
-                os.mkdir(self.path)
-            except FileExistsError:  # already locked
-                if self.by_me():
+        parent_path, base_name = os.path.split(self.path)
+        unique_base_name = os.path.basename(self.unique_name)
+        temp_path = None
+        try:
+            temp_path = tempfile.mkdtemp(".tmp", base_name + '.', parent_path)
+            temp_unique_name = os.path.join(temp_path, unique_base_name)
+            with open(temp_unique_name, "wb"):
+                pass
+        except OSError as err:
+            raise LockFailed(self.path, str(err)) from None
+        else:
+            timer = TimeoutTimer(timeout, sleep).start()
+            while True:
+                try:
+                    os.rename(temp_path, self.path)
+                except OSError:  # already locked
+                    if self.by_me():
+                        return self
+                    self.kill_stale_lock()
+                    if timer.timed_out_or_sleep():
+                        raise LockTimeout(self.path) from None
+                else:
+                    temp_path = None  # see finally:-block below
                     return self
-                self.kill_stale_lock()
-                if timer.timed_out_or_sleep():
-                    raise LockTimeout(self.path)
-            except OSError as err:
-                raise LockFailed(self.path, str(err)) from None
-            else:
-                with open(self.unique_name, "wb"):
+        finally:
+            if temp_path is not None:
+                # Renaming failed for some reason, so temp_dir still exists and
+                # should be cleaned up anyway. Try to clean up, but don't crash.
+                try:
+                    os.unlink(temp_unique_name)
+                except:
                     pass
-                return self
+                try:
+                    os.rmdir(temp_path)
+                except:
+                    pass
 
     def release(self):
         if not self.is_locked():
@@ -147,7 +168,15 @@ class ExclusiveLock:
         if not self.by_me():
             raise NotMyLock(self.path)
         os.unlink(self.unique_name)
-        os.rmdir(self.path)
+        try:
+            os.rmdir(self.path)
+        except OSError as err:
+            if err.errno not in (errno.ENOTEMPTY, errno.ENOENT):
+                # EACCES or EIO or ... = we cannot operate anyway, so re-throw
+                raise err
+            # else:
+            # Directory is not empty or doesn't exist any more.
+            # this means we lost the race to somebody else -- which is ok.
 
     def is_locked(self):
         return os.path.exists(self.path)
@@ -156,42 +185,47 @@ class ExclusiveLock:
         return os.path.exists(self.unique_name)
 
     def kill_stale_lock(self):
-        for name in os.listdir(self.path):
-            try:
-                host_pid, thread_str = name.rsplit('-', 1)
-                host, pid_str = host_pid.rsplit('.', 1)
-                pid = int(pid_str)
-                thread = int(thread_str)
-            except ValueError:
-                # Malformed lock name? Or just some new format we don't understand?
-                logger.error("Found malformed lock %s in %s. Please check/fix manually.", name, self.path)
-                return False
+        try:
+            names = os.listdir(self.path)
+        except FileNotFoundError:  # another process did our job in the meantime.
+            pass
+        else:
+            for name in names:
+                try:
+                    host_pid, thread_str = name.rsplit('-', 1)
+                    host, pid_str = host_pid.rsplit('.', 1)
+                    pid = int(pid_str)
+                    thread = int(thread_str)
+                except ValueError:
+                    # Malformed lock name? Or just some new format we don't understand?
+                    logger.error("Found malformed lock %s in %s. Please check/fix manually.", name, self.path)
+                    return False
 
-            if platform.process_alive(host, pid, thread):
-                return False
+                if platform.process_alive(host, pid, thread):
+                    return False
 
-            if not self.kill_stale_locks:
-                if not self.stale_warning_printed:
-                    # Log this at warning level to hint the user at the ability
-                    logger.warning("Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name)
-                    self.stale_warning_printed = True
-                return False
+                if not self.kill_stale_locks:
+                    if not self.stale_warning_printed:
+                        # Log this at warning level to hint the user at the ability
+                        logger.warning("Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name)
+                        self.stale_warning_printed = True
+                    return False
 
-            try:
-                os.unlink(os.path.join(self.path, name))
-                logger.warning('Killed stale lock %s.', name)
-            except OSError as err:
-                if not self.stale_warning_printed:
-                    # This error will bubble up and likely result in locking failure
-                    logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
-                    self.stale_warning_printed = True
-                return False
+                try:
+                    os.unlink(os.path.join(self.path, name))
+                    logger.warning('Killed stale lock %s.', name)
+                except OSError as err:
+                    if not self.stale_warning_printed:
+                        # This error will bubble up and likely result in locking failure
+                        logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
+                        self.stale_warning_printed = True
+                    return False
 
         try:
             os.rmdir(self.path)
         except OSError as err:
-            if err.errno == errno.ENOTEMPTY:
-                # Directory is not empty = we lost the race to somebody else
+            if err.errno == errno.ENOTEMPTY or err.errno == errno.ENOENT:
+                # Directory is not empty or doesn't exist any more = we lost the race to somebody else--which is ok.
                 return False
             # EACCES or EIO or ... = we cannot operate anyway
             logger.error('Failed to remove lock dir: %s', str(err))

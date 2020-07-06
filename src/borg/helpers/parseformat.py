@@ -271,7 +271,7 @@ def parse_file_size(s):
 
 
 def sizeof_fmt(num, suffix='B', units=None, power=None, sep='', precision=2, sign=False):
-    sign = '+' if sign else ''
+    sign = '+' if sign and num > 0 else ''
     fmt = '{0:{1}.{2}f}{3}{4}{5}'
     prec = 0
     for unit in units[:-1]:

@@ -4415,27 +4415,27 @@ class Archiver:
                 # make sure we only process like normal if the client is executing
                 # the same command as specified in the forced command, otherwise
                 # just skip this block and return the forced command (== result).
-                # client is allowed to specify the whitelisted options,
+                # client is allowed to specify the allowlisted options,
                 # everything else comes from the forced "borg serve" command (or the defaults).
-                # stuff from blacklist must never be used from the client.
-                blacklist = {
+                # stuff from denylist must never be used from the client.
+                denylist = {
                     'restrict_to_paths',
                     'restrict_to_repositories',
                     'append_only',
                     'storage_quota',
                     'umask',
                 }
-                whitelist = {
+                allowlist = {
                     'debug_topics',
                     'lock_wait',
                     'log_level',
                 }
                 not_present = object()
-                for attr_name in whitelist:
-                    assert attr_name not in blacklist, 'whitelist has blacklisted attribute name %s' % attr_name
+                for attr_name in allowlist:
+                    assert attr_name not in denylist, 'allowlist has denylisted attribute name %s' % attr_name
                     value = getattr(client_result, attr_name, not_present)
                     if value is not not_present:
-                        # note: it is not possible to specify a whitelisted option via a forced command,
+                        # note: it is not possible to specify a allowlisted option via a forced command,
                         # it always gets overridden by the value specified (or defaulted to) by the client commmand.
                         setattr(result, attr_name, value)
 

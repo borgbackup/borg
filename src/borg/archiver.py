@@ -307,9 +307,8 @@ class Archiver:
         """Check repository consistency"""
         if args.repair:
             msg = ("This is a potentially dangerous function.\n"
-                   "check --repair might lead to data loss (in case of bugs or for kinds of\n"
-                   "corruption it is not capable of dealing with).\n"
-                   "BE VERY CAREFUL!\n"
+                   "check --repair might lead to data loss (for kinds of corruption it is not\n"
+                   "capable of dealing with). BE VERY CAREFUL!\n"
                    "\n"
                    "Type 'YES' if you understand this and want to continue: ")
             if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
@@ -1591,8 +1590,7 @@ class Archiver:
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
         msg = ("This is a potentially dangerous function.\n"
-               "recreate might lead to data loss (if used wrongly or in case of bugs).\n"
-               "BE VERY CAREFUL!\n"
+               "recreate might lead to data loss (if used wrongly). BE VERY CAREFUL!\n"
                "\n"
                "Type 'YES' if you understand this and want to continue: ")
         if not yes(msg, false_msg="Aborting.", truish=('YES',),
@@ -2868,8 +2866,7 @@ class Archiver:
         The check command verifies the consistency of a repository and the corresponding archives.
 
         check --repair is a potentially dangerous function and might lead to data loss
-        (in case of bugs or for kinds of corruption it is not capable of dealing with).
-        BE VERY CAREFUL!
+        (for kinds of corruption it is not capable of dealing with). BE VERY CAREFUL!
 
         First, the underlying repository data files are checked:
 
@@ -4099,8 +4096,7 @@ class Archiver:
         Recreate the contents of existing archives.
 
         recreate is a potentially dangerous function and might lead to data loss
-        (if used wrongly or in case of bugs).
-        BE VERY CAREFUL!
+        (if used wrongly). BE VERY CAREFUL!
 
         Important: Repository disk space is **not** freed until you run ``borg compact``.
 

@@ -1710,14 +1710,6 @@ class Archiver:
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        msg = ("This is a potentially dangerous function.\n"
-               "recreate might lead to data loss (if used wrongly). BE VERY CAREFUL!\n"
-               "\n"
-               "Type 'YES' if you understand this and want to continue: ")
-        if not yes(msg, false_msg="Aborting.", truish=('YES',),
-                   env_var_override='BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING'):
-            return EXIT_ERROR
-
         matcher = self.build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter

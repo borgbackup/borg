@@ -577,5 +577,3 @@ Prompts
         For "This is a potentially dangerous function..." (check --repair)
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
         For "You requested to completely DELETE the repository *including* all archives it contains:"
-    BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING
-        For "This is a potentially dangerous function..." (recreate)

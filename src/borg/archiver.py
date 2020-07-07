@@ -323,7 +323,7 @@ class Archiver:
     def do_check(self, args, repository):
         """Check repository consistency"""
         if args.repair:
-            msg = ("This is a potentially dangerous functionality.\n"
+            msg = ("This is a potentially dangerous function.\n"
                    "check --repair might lead to data loss (in case of bugs or for kinds of\n"
                    "corruption it is not capable of dealing with).\n"
                    "BE VERY CAREFUL!\n"
@@ -1711,7 +1711,7 @@ class Archiver:
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        msg = ("This is a potentially dangerous functionality.\n"
+        msg = ("This is a potentially dangerous function.\n"
                "recreate might lead to data loss (if used wrongly or in case of bugs).\n"
                "BE VERY CAREFUL!\n"
                "\n"
@@ -3053,7 +3053,7 @@ class Archiver:
         check_epilog = process_epilog("""
         The check command verifies the consistency of a repository and the corresponding archives.
 
-        check --repair is a potentially dangerous functionality and might lead to data loss
+        check --repair is a potentially dangerous function and might lead to data loss
         (in case of bugs or for kinds of corruption it is not capable of dealing with).
         BE VERY CAREFUL!
 
@@ -3959,7 +3959,7 @@ class Archiver:
         recreate_epilog = process_epilog("""
         Recreate the contents of existing archives.
 
-        recreate is a potentially dangerous functionality and might lead to data loss
+        recreate is a potentially dangerous function and might lead to data loss
         (if used wrongly or in case of bugs).
         BE VERY CAREFUL!
 

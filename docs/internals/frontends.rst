@@ -575,8 +575,8 @@ Prompts
     BORG_RELOCATED_REPO_ACCESS_IS_OK
         For "Warning: The repository at location ... was previously located at ..."
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
-        For "This is a potentially dangerous functionality..." (check --repair)
+        For "This is a potentially dangerous function..." (check --repair)
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
         For "You requested to completely DELETE the repository *including* all archives it contains:"
     BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING
-        For "This is a potentially dangerous functionality..." (recreate)
+        For "This is a potentially dangerous function..." (recreate)

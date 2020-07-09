@@ -238,30 +238,55 @@ class BaseTestCase(unittest.TestCase):
             self._assert_dirs_equal_cmp(sub_diff, ignore_flags=ignore_flags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)
 
     @contextmanager
-    def fuse_mount(self, location, mountpoint=None, *options, **kwargs):
+    def fuse_mount(self, location, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
+        # For a successful mount, `fork = True` is required for
+        # the borg mount daemon to work properly or the tests
+        # will just freeze. Therefore, if argument `fork` is not
+        # specified, the default value is `True`, regardless of
+        # `FORK_DEFAULT`. However, leaving the possibilty to run
+        # the command with `fork = False` is still necessary for
+        # testing for mount failures, for example attempting to
+        # mount a read-only repo.
+        #    `os_fork = True` is needed for testing (the absence of)
+        # a race condition of the Lock during lock migration when
+        # borg mount (local repo) is daemonizing (#4953). This is another
+        # example where we need `fork = False`, because the test case
+        # needs an OS fork, not a spawning of the fuse mount.
+        # `fork = False` is implied if `os_fork = True`.
         if mountpoint is None:
             mountpoint = tempfile.mkdtemp()
         else:
             os.mkdir(mountpoint)
-        if 'fork' not in kwargs:
-            # For a successful mount, `fork = True` is required for
-            # the borg mount daemon to work properly or the tests
-            # will just freeze. Therefore, if argument `fork` is not
-            # specified, the default value is `True`, regardless of
-            # `FORK_DEFAULT`. However, leaving the possibilty to run
-            # the command with `fork = False` is still necessary for
-            # testing for mount failures, for example attempting to
-            # mount a read-only repo.
-            kwargs['fork'] = True
-        self.cmd('mount', location, mountpoint, *options, **kwargs)
-        if kwargs.get('exit_code', EXIT_SUCCESS) == EXIT_ERROR:
-            # If argument `exit_code = EXIT_ERROR`, then this call
-            # is testing the behavior of an unsuccessful mount and
-            # we must not continue, as there is no mount to work
-            # with. The test itself has already failed or succeeded
-            # with the call to `self.cmd`, above.
-            yield
-            return
+        args = ['mount', location, mountpoint] + list(options)
+        if os_fork:
+            # Do not spawn, but actually (OS) fork.
+            if os.fork() == 0:
+                # The child process.
+                # Decouple from parent and fork again.
+                # Otherwise, it becomes a zombie and pretends to be alive.
+                os.setsid()
+                if os.fork() > 0:
+                    os._exit(0)
+                # The grandchild process.
+                try:
+                    self.cmd(*args, fork=False, **kwargs)  # borg mount not spawning.
+                finally:
+                    # This should never be reached, since it daemonizes,
+                    # and the grandchild process exits before cmd() returns.
+                    # However, just in case...
+                    print('Fatal: borg mount did not daemonize properly. Force exiting.',
+                          file=sys.stderr, flush=True)
+                    os._exit(0)
+        else:
+            self.cmd(*args, fork=fork, **kwargs)
+            if kwargs.get('exit_code', EXIT_SUCCESS) == EXIT_ERROR:
+                # If argument `exit_code = EXIT_ERROR`, then this call
+                # is testing the behavior of an unsuccessful mount and
+                # we must not continue, as there is no mount to work
+                # with. The test itself has already failed or succeeded
+                # with the call to `self.cmd`, above.
+                yield
+                return
         self.wait_for_mountstate(mountpoint, mounted=True)
         yield
         umount(mountpoint)

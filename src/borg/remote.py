@@ -107,7 +107,7 @@ class UnexpectedRPCDataFormatFromServer(Error):
 # For the client the return of the negotiate method is either 2 if the server is in the version range [0.29.0, 1.0.x]
 # inclusive, or it is a dict which includes the server version.
 #
-# All method calls on the remote repository object must be whitelisted in RepositoryServer.rpc_methods and have api
+# All method calls on the remote repository object must be allowlisted in RepositoryServer.rpc_methods and have api
 # stubs in RemoteRepository. The @api decorator on these stubs is used to set server version requirements.
 #
 # Method parameters are identified only by name and never by position. Unknown parameters are ignored by the server side.

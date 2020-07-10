@@ -306,8 +306,10 @@ class Archiver:
     def do_check(self, args, repository):
         """Check repository consistency"""
         if args.repair:
-            msg = ("'check --repair' is an experimental feature that might result in data loss." +
-                   "\n" +
+            msg = ("This is a potentially dangerous function.\n"
+                   "check --repair might lead to data loss (for kinds of corruption it is not\n"
+                   "capable of dealing with). BE VERY CAREFUL!\n"
+                   "\n"
                    "Type 'YES' if you understand this and want to continue: ")
             if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
                        truish=('YES', ), retry=False,
@@ -1587,12 +1589,6 @@ class Archiver:
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        msg = ("recreate is an experimental feature.\n"
-               "Type 'YES' if you understand this and want to continue: ")
-        if not yes(msg, false_msg="Aborting.", truish=('YES',),
-                   env_var_override='BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING'):
-            return EXIT_ERROR
-
         matcher = self.build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
@@ -2861,6 +2857,9 @@ class Archiver:
         check_epilog = process_epilog("""
         The check command verifies the consistency of a repository and the corresponding archives.
 
+        check --repair is a potentially dangerous function and might lead to data loss
+        (for kinds of corruption it is not capable of dealing with). BE VERY CAREFUL!
+
         First, the underlying repository data files are checked:
 
         - For all segments, the segment magic header is checked.
@@ -4088,7 +4087,8 @@ class Archiver:
         recreate_epilog = process_epilog("""
         Recreate the contents of existing archives.
 
-        This is an *experimental* feature. Do *not* use this on your only backup.
+        recreate is a potentially dangerous function and might lead to data loss
+        (if used wrongly). BE VERY CAREFUL!
 
         Important: Repository disk space is **not** freed until you run ``borg compact``.
 

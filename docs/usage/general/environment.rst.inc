@@ -83,11 +83,9 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     BORG_RELOCATED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: The repository at location ... was previously located at ..."
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-        For "Warning: 'check --repair' is an experimental feature that might result in data loss."
+        For "This is a potentially dangerous function..." (check --repair)
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
         For "You requested to completely DELETE the repository *including* all archives it contains:"
-    BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-        For "recreate is an experimental feature."
 
     Note: answers are case sensitive. setting an invalid answer value might either give the default
     answer or ask you interactively, depending on whether retries are allowed (they by default are

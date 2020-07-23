@@ -30,7 +30,8 @@ Can I backup from multiple servers into a single repository?
 Yes, this is *possible* from the technical standpoint, but it is
 *not recommended* from the security perspective. BorgBackup is
 built upon a defined :ref:`attack_model` that cannot provide its
-guarantees for multiple clients using the same repository.
+guarantees for multiple clients using the same repository. See
+:ref:`borg_security_critique` for a detailed explanation.
 
 Also, in order for the deduplication used by Borg to work, it
 needs to keep a local cache containing checksums of all file
@@ -343,7 +344,7 @@ such math but it's honestly better that you read it yourself and grab your own
 resolution from that.
 
 Assuming that all your chunks have a size of :math:`2^{21}` bytes (approximately 2.1 MB)
-and we have a "perfect" hash algorithm, we can think that the probability of collision 
+and we have a "perfect" hash algorithm, we can think that the probability of collision
 would be of :math:`p^2/2^{n+1}` then, using SHA-256 (:math:`n=256`) and for example
 we have 1000 million chunks (:math:`p=10^9`) (1000 million chunks would be about 2100TB).
 The probability would be around to 0.0000000000000000000000000000000000000000000000000000000000043.
@@ -419,6 +420,34 @@ to change them.
 
 Security
 ########
+
+.. _borg_security_critique:
+
+Isn't BorgBackup's AES-CTR crypto broken?
+-----------------------------------------
+
+If a nonce (counter) value is reused, AES-CTR mode crypto is broken.
+
+To exploit the AES counter management issue, an attacker would need to have
+access to the borg repository.
+
+By tampering with the repo, the attacker could bring the repo into a state so
+that it reports a lower "highest used counter value" than the one that actually
+was used. The client would usually notice that, because it rather trusts the
+clientside stored "highest used counter value" than trusting the server.
+
+But there are situations, where this is simply not possible:
+
+- If clients A and B used the repo, the client A can only know its own highest
+  CTR value, but not the one produced by B. That is only known to (B and) the
+  server (the repo) and thus the client A needs to trust the server about the
+  value produced by B in that situation. You can't do much about this except
+  not having multiple clients per repo.
+
+- Even if there is only one client, if client-side information is completely
+  lost (e.g. due to disk defect), the client also needs to trust the value from
+  server side. You can avoid this by not continuing to write to the repository
+  after you have lost clientside borg information.
 
 .. _home_config_borg:
 

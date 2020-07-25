@@ -3175,6 +3175,11 @@ class Archiver:
         creating an archive should the command fail. The command is considered failed
         when it returned a non-zero exit code.
 
+        Reading from stdin yields just a stream of data without file metadata
+        associated with it, and the files cache is not needed at all. So it is
+        safe to disable it via ``--files-cache disabled`` and speed up backup
+        creation a bit.
+
         By default, the content read from stdin is stored in a file called 'stdin'.
         Use ``--stdin-name`` to change the name.
         """)

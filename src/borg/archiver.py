@@ -3238,7 +3238,8 @@ class Archiver:
         directory.
 
         When giving '-' as path, borg will read data from standard input and create a
-        file 'stdin' in the created archive from that data.
+        file 'stdin' in the created archive from that data. See section *Reading from
+        stdin* below for details.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
@@ -3357,6 +3358,25 @@ class Archiver:
         - '-' = dry run, item was *not* backed up
         - 'x' = excluded, item was *not* backed up
         - '?' = missing status code (if you see this, please file a bug report!)
+
+        Reading from stdin
+        ++++++++++++++++++
+
+        To read from stdin, specify ``-`` as path and pipe directly to borg::
+
+            backup-vm --id myvm --stdout | borg create REPO::ARCHIVE -
+
+        Note that piping to borg creates an archive even if the command piping
+        to borg exits with a failure. In this case, **one can end up with
+        truncated output being backed up**.
+
+        Reading from stdin yields just a stream of data without file metadata
+        associated with it, and the files cache is not needed at all. So it is
+        safe to disable it via ``--no-files-cache`` and speed up backup
+        creation a bit.
+
+        By default, the content read from stdin is stored in a file called 'stdin'.
+        Use ``--stdin-name`` to change the name.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,

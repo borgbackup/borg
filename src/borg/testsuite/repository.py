@@ -792,6 +792,46 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             self.assert_equal(self.repository.get(H(0)), b'data2')
 
 
+class RepositoryHintsTestCase(RepositoryTestCaseBase):
+
+    def test_hints_persistence(self):
+        self.repository.put(H(0), b'data')
+        self.repository.delete(H(0))
+        self.repository.commit(compact=False)
+        shadow_index_expected = self.repository.shadow_index
+        compact_expected = self.repository.compact
+        segments_expected = self.repository.segments
+        # close and re-open the repository (create fresh Repository instance) to
+        # check whether hints were persisted to / reloaded from disk
+        self.reopen()
+        with self.repository:
+            # see also do_compact()
+            self.repository.put(H(42), b'foobar')  # this will call prepare_txn() and load the hints data
+            # check if hints persistence worked:
+            self.assert_equal(shadow_index_expected, self.repository.shadow_index)
+            self.assert_equal(compact_expected, self.repository.compact)
+            del self.repository.segments[2]  # ignore the segment created by put(H(42), ...)
+            self.assert_equal(segments_expected, self.repository.segments)
+
+    def test_hints_behaviour(self):
+        self.repository.put(H(0), b'data')
+        self.assert_equal(self.repository.shadow_index, {})
+        self.assert_true(len(self.repository.compact) == 0)
+        self.repository.delete(H(0))
+        self.repository.commit(compact=False)
+        # now there should be an entry for H(0) in shadow_index
+        self.assert_in(H(0), self.repository.shadow_index)
+        self.assert_equal(len(self.repository.shadow_index[H(0)]), 1)
+        self.assert_in(0, self.repository.compact)  # segment 0 can be compacted
+        self.repository.put(H(42), b'foobar')  # see also do_compact()
+        self.repository.commit(compact=True, threshold=0.0)  # compact completely!
+        # nothing to compact any more! no info left about stuff that does not exist any more:
+        self.assert_equal(self.repository.shadow_index[H(0)], [])
+        # segment 0 was compacted away, no info about it left:
+        self.assert_not_in(0, self.repository.compact)
+        self.assert_not_in(0, self.repository.segments)
+
+
 class RemoteRepositoryTestCase(RepositoryTestCase):
     repository = None  # type: RemoteRepository
 

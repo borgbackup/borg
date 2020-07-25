@@ -160,6 +160,7 @@ class Repository:
         # This is an index of shadowed log entries during this transaction. Consider the following sequence:
         # segment_n PUT A, segment_x DELETE A
         # After the "DELETE A" in segment_x the shadow index will contain "A -> [n]".
+        # .delete() is updating this index, it is persisted into "hints" file and is later used by .compact_segments().
         self.shadow_index = {}
         self._active_txn = False
         self.lock_wait = lock_wait
@@ -570,6 +571,7 @@ class Repository:
                 self.segments = hints[b'segments']
                 self.compact = FreeSpace()
                 self.storage_quota_use = 0
+                self.shadow_index = {}
                 for segment in sorted(hints[b'compact']):
                     logger.debug('Rebuilding sparse info for segment %d', segment)
                     self._rebuild_sparse(segment)
@@ -580,6 +582,7 @@ class Repository:
                 self.segments = hints[b'segments']
                 self.compact = FreeSpace(hints[b'compact'])
                 self.storage_quota_use = hints.get(b'storage_quota_use', 0)
+                self.shadow_index = hints.get(b'shadow_index', {})
             self.log_storage_quota()
             # Drop uncommitted segments in the shadow index
             for key, shadowed_segments in self.shadow_index.items():
@@ -600,6 +603,7 @@ class Repository:
             b'segments': self.segments,
             b'compact': self.compact,
             b'storage_quota_use': self.storage_quota_use,
+            b'shadow_index': self.shadow_index,
         }
         integrity = {
             # Integrity version started at 2, the current hints version.
@@ -975,7 +979,7 @@ class Repository:
         segments_transaction_id = self.io.get_segments_transaction_id()
         logger.debug('Segment transaction is    %s', segments_transaction_id)
         logger.debug('Determined transaction is %s', transaction_id)
-        self.prepare_txn(None)  # self.index, self.compact, self.segments all empty now!
+        self.prepare_txn(None)  # self.index, self.compact, self.segments, self.shadow_index all empty now!
         segment_count = sum(1 for _ in self.io.segment_iterator())
         logger.debug('Found %d segments', segment_count)
 

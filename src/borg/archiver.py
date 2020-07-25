@@ -3110,6 +3110,8 @@ class Archiver:
         and not include any other contents of the containing folder, this can be enabled
         through using the ``--keep-exclude-tags`` option.
 
+        .. _list_item_flags:
+
         Item flags
         ++++++++++
 
@@ -4118,7 +4120,7 @@ class Archiver:
         Depending on the PATHs and patterns given, recreate can be used to permanently
         delete files from archives.
         When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
-        interpreted.
+        interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
         The archive being recreated is only removed after the operation completes. The
         archive that is built during the operation exists at the same time at

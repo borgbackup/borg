@@ -13,6 +13,8 @@ Security
 Cryptography in Borg
 ====================
 
+.. _attack_model:
+
 Attack model
 ------------
 

@@ -171,7 +171,7 @@ class ExclusiveLock:
         try:
             os.rmdir(self.path)
         except OSError as err:
-            if err.errno not in (errno.ENOTEMPTY, errno.ENOENT):
+            if err.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
                 # EACCES or EIO or ... = we cannot operate anyway, so re-throw
                 raise err
             # else:
@@ -224,7 +224,7 @@ class ExclusiveLock:
         try:
             os.rmdir(self.path)
         except OSError as err:
-            if err.errno == errno.ENOTEMPTY or err.errno == errno.ENOENT:
+            if err.errno in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
                 # Directory is not empty or doesn't exist any more = we lost the race to somebody else--which is ok.
                 return False
             # EACCES or EIO or ... = we cannot operate anyway

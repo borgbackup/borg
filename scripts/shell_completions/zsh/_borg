@@ -1,6 +1,6 @@
 #compdef borg borgfs -P -value-,BORG_*,-default-
 
-# Zsh completion for Borg Backup 1.2.0a8 (2020-04-21).
+# Zsh completion for Borg Backup 1.1.13.
 #
 # Recommended _borg specific settings:
 #

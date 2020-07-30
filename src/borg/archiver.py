@@ -2672,6 +2672,7 @@ class Archiver:
         # It will replace the entire :ref:`foo` verbatim.
         rst_plain_text_references = {
             'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
+            'list_item_flags': '"Item flags"',
         }
 
         def process_epilog(epilog):
@@ -3319,6 +3320,8 @@ class Archiver:
         only include the objects specified by ``--exclude-if-present`` in your backup,
         and not include any other contents of the containing folder, this can be enabled
         through using the ``--keep-exclude-tags`` option.
+
+        .. _list_item_flags:
 
         Item flags
         ++++++++++
@@ -3969,7 +3972,7 @@ class Archiver:
         Depending on the PATHs and patterns given, recreate can be used to permanently
         delete files from archives.
         When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
-        interpreted.
+        interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
         The archive being recreated is only removed after the operation completes. The
         archive that is built during the operation exists at the same time at

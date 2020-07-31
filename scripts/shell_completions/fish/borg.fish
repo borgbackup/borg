@@ -329,18 +329,53 @@ complete -c borg -f      -l 'list'                  -d 'List the configuration o
 # borg help
 # no specific options
 
-# List archives
 
-function __fish_borg_is_repository
-    return (string match --quiet --regex '.*::' '"'(commandline --current-token)'"')
+# List repositories::archives
+
+function __fish_borg_is_argument_n --description 'Test if current argument is on Nth place' --argument n
+    set tokens (commandline --current-process --tokenize --cut-at-cursor)
+    set -l tokencount 0
+    for token in $tokens
+        switch $token
+            case '-*'
+                # ignore command line switches
+            case '*'
+                set tokencount (math $tokencount+1)
+        end
+    end
+    return (test $tokencount -eq $n)
 end
 
-function __fish_borg_list_archives
-    set -l repository_name (string replace --regex '::.*' '' (commandline --current-token))
-    borg list --format="$repository_name::{archive}{NEWLINE}" "$repository_name" ^/dev/null
+function __fish_borg_is_dir_a_repository
+    set -l config_content
+    if test -f $argv[1]/README
+    and test -f $argv[1]/config
+        read config_content < $argv[1]/config ^/dev/null
+    end
+    return (string match --quiet '[repository]' $config_content)
 end
 
-complete -c borg -f -n __fish_borg_is_repository -a '(__fish_borg_list_archives)'
+function __fish_borg_list_repos_or_archives
+    if string match --quiet --regex '.*::' '"'(commandline --current-token)'"'
+        # If the current token contains "::" then list the archives:
+        set -l repository_name (string replace --regex '::.*' '' (commandline --current-token))
+        borg list --format="$repository_name::{archive}{NEWLINE}" "$repository_name" ^/dev/null
+    else
+        # Otherwise list the repositories, directories and user@host entries:
+        set -l directories (commandline --cut-at-cursor --current-token)*/
+        for directoryname in $directories
+            if __fish_borg_is_dir_a_repository $directoryname
+                printf '%s::\t%s\n' (string trim --right --chars='/' $directoryname) "Repository"
+            else
+                printf '%s\n' $directoryname
+            end
+        end
+        __fish_complete_user_at_hosts | string replace --regex '$' ':'
+    end
+end
+
+complete -c borg -f -n "__fish_borg_is_argument_n 2" -a '(__fish_borg_list_repos_or_archives)'
+
 
 # Second archive listing for borg diff
 
@@ -349,9 +384,8 @@ function __fish_borg_is_diff_second_archive
 end
 
 function __fish_borg_list_diff_archives
-    set -l repository_name (string match --regex '[^ ]*::' (commandline))
-    set -l repository_name (string replace '::' '' $repository_name)
-    borg list --format="{archive}{NEWLINE}" "$repository_name" ^/dev/null
+    set -l repo_matches (string match --regex '([^ ]*)::' (commandline))
+    borg list --format="{archive}{NEWLINE}" "$repo_matches[2]" ^/dev/null
 end
 
 complete -c borg -f -n __fish_borg_is_diff_second_archive -a '(__fish_borg_list_diff_archives)'

@@ -734,6 +734,17 @@ connections and release the lock).
 The borg cache eats way too much disk space, what can I do?
 -----------------------------------------------------------
 
+This may especially happen if borg needs to rebuild the local "chunks" index -
+either because it was removed, or because it was not coherent with the
+repository state any more (e.g. because another borg instance changed the
+repository).
+
+To optimize this rebuild process, borg caches per-archive information in the
+``chunks.archive.d/`` directory. It won't help the first time it happens, but it
+will make the subsequent rebuilds faster (because it needs to transfer less data
+from the repository). While being faster, the cache needs quite some disk space,
+which might be unwanted.
+
 There is a temporary (but maybe long lived) hack to avoid using lots of disk
 space for chunks.archive.d (see :issue:`235` for details):
 

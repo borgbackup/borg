@@ -301,3 +301,66 @@ a backup may be the following command::
 
 This command also automatically removes the socket file after the ``borg
 create`` command is done.
+
+ssh-agent
+=========
+
+In this scenario *borg-server* initiate SSH connection to *borg-client* with forwarding of the authentication agent connection.
+Afterwards scenario is similar to the push mode: *borg-client* initiate another SSH connection
+back to *borg-server* using forwarded agent connection for authenticate itself,
+starts ``borg serve`` and communicate with them.
+
+Using of this method requires ssh access from *borgs* to *borgc@borg-client* and
+from *borgs* to *borgs@borg-server* itself. Where:
+
+* *borgs* is the user on the server side with read/write access to local borg repository.
+* *borgc* is the user on the client side with read access to files meant to be backed up.
+
+Apply of this method in case of automated backup operations
+-----------------------------------------------------------
+
+Do this once on *borg-server* for allowing *borgs* to connect itself on *borg-server*::
+
+  borgs@borg-server$ cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+  borgs@borg-server$ chmod go-w ~/.ssh/authorized_keys
+
+Execute pull operation (init repo in this example) on *borg-server*::
+
+  borgs@borg-server$ (
+    eval $(ssh-agent) > /dev/null
+    ssh-add -q
+    ssh -A borgc@borg-client "borg init -e none --rsh 'ssh -o StrictHostKeyChecking=no' borgs@borg-server:repo"
+    kill "${SSH_AGENT_PID}"
+  )
+
+Parentheses around commands are needed to exclude interferention with possibly already running ssh-agent.
+Parentheses not needed in case of using dedicated bash process.
+
+*eval $(ssh-agent) > /dev/null*
+
+  Run SSH agent in background and export related environment variables to current bash session.
+
+*ssh-add -q*
+
+  Load SSH private key(s) to SSH agent from default locations:
+  ~/.ssh/id_rsa, ~/.ssh/id_dsa, ~/.ssh/id_ecdsa and ~/.ssh/id_ed25519.
+  Look at ``man 1 ssh-add`` for more detailed explanation.
+
+  Care needs to be taken when loading keys to SSH agent. Users on the *borg-client* having read/write permissions to
+  agent's UNIX-domain socket (at least borgc and root in our case) can access the agent on *borg-server* through the
+  forwarded connection and use loaded keys for authenticate using the identities loaded into the agent
+  (look at ``man 1 ssh`` for more detailed explanation). Therefore there are some security considerations:
+
+  * *borgs*'s private key loaded to agent must not be used to access anywhere else.
+  * The keys meant to be loaded to agent must be specified explicitly, not from default locations.
+  * The *borgs*'s public key record at *borgs@borg-server:~/.ssh/authorized_keys* must be as restrictive as possible.
+
+*ssh -A borgc@borg-client "borg init -e none --rsh 'ssh -o StrictHostKeyChecking=no' borgs@borg-server:repo"*
+
+  Issue *borg init -e none borgs@borg-server:repo* command to be executed at *borg-client*.
+  *StrictHostKeyChecking=no* used for automatically adding host key of
+  *borg-server* to *borgc@borg-client:~/.ssh/known_hosts* without user intervention.
+
+*kill "${SSH_AGENT_PID}"*
+
+  Kill ssh-agent with loaded keys as it not needed anymore.

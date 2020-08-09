@@ -606,6 +606,43 @@ into the repository.
 Yes, as an attacker with access to the remote server could delete (or
 otherwise make unavailable) all your backups.
 
+Which encryption mode is the safest / should I choose?
+------------------------------------------------------
+
+This question is impossible to answer in a simple way, because there is a bunch
+of different aspects that need to be considered. Availability, confidentiality
+and integrity take influence on how complex or comfortable your backup process
+can be designed.
+
+1. Do you want full automation?
+
+If you choose password protection for encryption keys, you will have to store
+the plain password somewhere for fully automated backups. If you have several
+backup repositories, it is generally safer to have individual passwords.
+
+2. Do you trust the backup server?
+
+In repokey mode the key is stored in the repo and could be stolen by an
+attacker. In keyfile mode the key never leaves the backup client.
+
+3. Do you trust the backup client?
+
+In keyfile mode the key is stored on the client and could be stolen by other
+users. Password protection makes stealing the key useless.
+
+4. Can you afford to loose the backup repo?
+
+Can you restore a corrupted or lost repo? If not, there is no point in storing
+the keyfile on the client separate from the repo.
+
+5. Do you mind securing your keyfile?
+
+If you loose your keyfile, the backup repo is lost. You may not want to store
+copies of the key at other places and choose repokey mode.
+
+The safest choice may be password-protected keyfile mode running interactively
+and storing the keyfile on USB stick.
+
 How can I protect against a hacked backup client?
 -------------------------------------------------
 

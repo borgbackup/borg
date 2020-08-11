@@ -310,8 +310,7 @@ Afterwards scenario is similar to the push mode: *borg-client* initiate another 
 back to *borg-server* using forwarded agent connection for authenticate itself,
 starts ``borg serve`` and communicate with them.
 
-Using of this method requires ssh access from *borgs* to *borgc@borg-client* and
-from *borgs* to *borgs@borg-server* itself. Where:
+Using of this method requires ssh access of user *borgs* to *borgc@borg-client*. Where:
 
 * *borgs* is the user on the server side with read/write access to local borg repository.
 * *borgc* is the user on the client side with read access to files meant to be backed up.
@@ -319,48 +318,84 @@ from *borgs* to *borgs@borg-server* itself. Where:
 Apply of this method in case of automated backup operations
 -----------------------------------------------------------
 
-Do this once on *borg-server* for allowing *borgs* to connect itself on *borg-server*::
+Assume that borg-client host is untrusted.
+Therefore there is effort to prevent hostile user on borg-client side to do something harmful.
+In case of fully trusted borg-client the method may be simplified.
 
-  borgs@borg-server$ cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+Prepare server side
+~~~~~~~~~~~~~~~~~~~
+
+Do this once for each client on *borg-server* for allowing *borgs* to connect itself on *borg-server* using dedicated RSA key::
+
+  borgs@borg-server$ install -m 700 -d ~/.ssh/
+  borgs@borg-server$ ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_rsa
+  borgs@borg-server$ { echo -n 'command="borg serve --append-only --restrict-to-path ~/repo",restrict '; cat ~/.ssh/borg-client_rsa.pub; } >> ~/.ssh/authorized_keys
   borgs@borg-server$ chmod go-w ~/.ssh/authorized_keys
 
-Execute pull operation (init repo in this example) on *borg-server*::
+``install -m 700 -d ~/.ssh/``
+
+  Create directory ~/.ssh with correct permissions if not exists yet.
+
+``ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_rsa``
+
+  Create RSA key dedicated to communication with borg-client.
+
+``{ echo -n 'command="borg serve --append-only --restrict-to-path ~/repo",restrict '; cat ~/.ssh/borg-client_rsa.pub; } >> ~/.ssh/authorized_keys``
+
+  Add borg-client's public key record to ~/.ssh/authorized_keys with force command and restrictions.
+  Client restricted to use specified repository path and to use only append operations.
+  The commands like *prune* and *compact* have to be executed another way, for example directly on *borg-server* side.
+
+``chmod go-w ~/.ssh/authorized_keys``
+
+  Fix permissions of ~/.ssh/authorized_keys.
+
+
+Pull operation
+~~~~~~~~~~~~~~~~~~~~~~
+
+Execute borg command (init repo in this example) on *borg-server*::
 
   borgs@borg-server$ (
     eval $(ssh-agent) > /dev/null
-    ssh-add -q
-    ssh -A borgc@borg-client "borg init -e none --rsh 'ssh -o StrictHostKeyChecking=no' borgs@borg-server:repo"
+    ssh-add -q ~/.ssh/borg-client_rsa
+    echo 'complicated & long' | \
+      ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"
     kill "${SSH_AGENT_PID}"
   )
 
 Parentheses around commands are needed to exclude interferention with possibly already running ssh-agent.
 Parentheses not needed in case of using dedicated bash process.
 
-*eval $(ssh-agent) > /dev/null*
+``eval $(ssh-agent) > /dev/null``
 
   Run SSH agent in background and export related environment variables to current bash session.
 
-*ssh-add -q*
+``ssh-add -q ~/.ssh/borg-client_rsa``
 
-  Load SSH private key(s) to SSH agent from default locations:
-  ~/.ssh/id_rsa, ~/.ssh/id_dsa, ~/.ssh/id_ecdsa and ~/.ssh/id_ed25519.
+  Load SSH private key dedicated to communication with borg-client to SSH agent.
   Look at ``man 1 ssh-add`` for more detailed explanation.
 
-  Care needs to be taken when loading keys to SSH agent. Users on the *borg-client* having read/write permissions to
+  Care needs to be taken when loading key to SSH agent. Users on the *borg-client* having read/write permissions to
   agent's UNIX-domain socket (at least borgc and root in our case) can access the agent on *borg-server* through the
   forwarded connection and use loaded keys for authenticate using the identities loaded into the agent
   (look at ``man 1 ssh`` for more detailed explanation). Therefore there are some security considerations:
 
-  * *borgs*'s private key loaded to agent must not be used to access anywhere else.
+  * Private key loaded to agent must not be used to access anywhere else.
   * The keys meant to be loaded to agent must be specified explicitly, not from default locations.
-  * The *borgs*'s public key record at *borgs@borg-server:~/.ssh/authorized_keys* must be as restrictive as possible.
+  * The *borg-client*'s public key record at *borgs@borg-server:~/.ssh/authorized_keys* must be as restrictive as possible.
 
-*ssh -A borgc@borg-client "borg init -e none --rsh 'ssh -o StrictHostKeyChecking=no' borgs@borg-server:repo"*
+``echo 'complicated & long' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"``
 
-  Issue *borg init -e none borgs@borg-server:repo* command to be executed at *borg-client*.
-  *StrictHostKeyChecking=no* used for automatically adding host key of
-  *borg-server* to *borgc@borg-client:~/.ssh/known_hosts* without user intervention.
+  Issue *borg init* command to be executed at *borg-client*.
 
-*kill "${SSH_AGENT_PID}"*
+  *'complicated & long'* is the password used for encrypt the key of new repository. The password passed via stdin,
+  not as command line argument, therefore it can't be stolen via examination of process list.
+
+  *ssh://borgs@borg-server/~/repo* is reference to repository *repo* located at borgs's home directory.
+
+  *StrictHostKeyChecking=no* used for automatically adding host keys to *~/.ssh/known_hosts* without user intervention.
+
+``kill "${SSH_AGENT_PID}"``
 
   Kill ssh-agent with loaded keys as it not needed anymore.

@@ -51,15 +51,24 @@ exe = EXE(pyz,
           upx=True,
           console=True)
 
-if False:
-    # Enable this block to build a directory-based binary instead of
-    # a packed single file. This allows one to easily look at all included
-    # files (e.g. without having to strace or halt the built binary
-    # and introspect /tmp).
-    coll = COLLECT(exe,
-                   a.binaries,
-                   a.zipfiles,
-                   a.datas,
-                   strip=False,
-                   upx=True,
-                   name='borg-dir')
+# Build a directory-based binary in addition to a packed
+# single file. This allows one to easily look at all included
+# files (e.g. without having to strace or halt the built binary
+# and introspect /tmp). Also avoids unpacking all libs when
+# running the app, which is better for app signing on various OS.
+slim_exe = EXE(pyz,
+            a.scripts,
+            exclude_binaries=True,
+            name='borg.exe',
+            debug=False,
+            strip=False,
+            upx=False,
+            console=True)
+
+coll = COLLECT(slim_exe,
+                a.binaries,
+                a.zipfiles,
+                a.datas,
+                strip=False,
+                upx=False,
+                name='borg-dir')

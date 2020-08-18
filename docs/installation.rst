@@ -48,7 +48,7 @@ Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
 Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbackup``
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
-macOS        `Brew cask`_                                  ``brew cask install borgbackup``
+macOS        `Homebrew`_                                  ``brew install borgbackup``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  ``nix-env -i borgbackup``
@@ -72,7 +72,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
 .. _OpenIndiana hipster repository: http://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
 .. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
-.. _Brew cask: https://formulae.brew.sh/cask/borgbackup
+.. _Homebrew: https://formulae.brew.sh/formula/borgbackup
 .. _Raspbian testing: http://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
 .. _Ubuntu packages: http://packages.ubuntu.com/xenial/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
@@ -223,8 +223,8 @@ Alternatively, you can enumerate all build dependencies in the command line::
 Mac OS X
 ++++++++
 
-Assuming you have installed homebrew_, the following steps will install all the
-dependencies::
+When installing via Homebrew_, dependencies are installed automatically. To install
+dependencies manually::
 
     brew install python3 openssl
     brew install pkg-config
@@ -232,7 +232,7 @@ dependencies::
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of
 FUSE for OS X, which is available via `github
-<https://github.com/osxfuse/osxfuse/releases/latest>`__, or via homebrew::
+<https://github.com/osxfuse/osxfuse/releases/latest>`__, or via Homebrew::
 
     brew cask install osxfuse
 

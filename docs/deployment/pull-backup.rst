@@ -340,6 +340,10 @@ Do this once for each client on *borg-server* for allowing *borgs* to connect it
 
   Create RSA key dedicated to communication with borg-client.
 
+.. note::
+  Another more complex approach is using an unique RSA key for each pull operation.
+  This have to be more secure as it garanties that the key will not be used to access anywhere else.
+
 ``{ echo -n 'command="borg serve --append-only --restrict-to-path ~/repo",restrict '; cat ~/.ssh/borg-client_rsa.pub; } >> ~/.ssh/authorized_keys``
 
   Add borg-client's public key record to ~/.ssh/authorized_keys with force command and restrictions.
@@ -350,16 +354,15 @@ Do this once for each client on *borg-server* for allowing *borgs* to connect it
 
   Fix permissions of ~/.ssh/authorized_keys.
 
-
 Pull operation
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 Execute borg command (init repo in this example) on *borg-server*::
 
   borgs@borg-server$ (
     eval $(ssh-agent) > /dev/null
     ssh-add -q ~/.ssh/borg-client_rsa
-    echo 'complicated & long' | \
+    echo 'your secure borg key passphrase' | \
       ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"
     kill "${SSH_AGENT_PID}"
   )
@@ -376,6 +379,7 @@ Parentheses not needed in case of using dedicated bash process.
   Load SSH private key dedicated to communication with borg-client to SSH agent.
   Look at ``man 1 ssh-add`` for more detailed explanation.
 
+.. note::
   Care needs to be taken when loading key to SSH agent. Users on the *borg-client* having read/write permissions to
   agent's UNIX-domain socket (at least borgc and root in our case) can access the agent on *borg-server* through the
   forwarded connection and use loaded keys for authenticate using the identities loaded into the agent
@@ -385,12 +389,9 @@ Parentheses not needed in case of using dedicated bash process.
   * The keys meant to be loaded to agent must be specified explicitly, not from default locations.
   * The *borg-client*'s public key record at *borgs@borg-server:~/.ssh/authorized_keys* must be as restrictive as possible.
 
-``echo 'complicated & long' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"``
+``echo 'your secure borg key passphrase' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"``
 
   Issue *borg init* command to be executed at *borg-client*.
-
-  *'complicated & long'* is the password used for encrypt the key of new repository. The password passed via stdin,
-  not as command line argument, therefore it can't be stolen via examination of process list.
 
   *ssh://borgs@borg-server/~/repo* is reference to repository *repo* located at borgs's home directory.
 

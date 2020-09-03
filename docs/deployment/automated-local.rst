@@ -29,7 +29,7 @@ Configuring the system
 First, create the ``/etc/backups`` directory (as root).
 All configuration goes into this directory.
 
-Then, create ``etc/backups/40-backup.rules`` with the following content (all on one line)::
+Then, create ``/etc/backups/40-backup.rules`` with the following content (all on one line)::
 
     ACTION=="add", SUBSYSTEM=="bdi", DEVPATH=="/devices/virtual/bdi/*",
     TAG+="systemd", ENV{SYSTEMD_WANTS}="automatic-backup.service"

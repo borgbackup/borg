@@ -1524,12 +1524,16 @@ class LoggedIO:
                     data = memoryview(mm)
                     d = data
                     chunk = None
+                    alignment_normal = True
                     try:
                         dst_fd.write(MAGIC)
                         while len(d) >= self.header_fmt.size:
-                            chunk, size = self.recover_segment_chunk(d)
+                            chunk, size = self.recover_segment_chunk(d, try_next_chunk=alignment_normal)
                             d = d[size:]
-                            if chunk is not None:
+                            if chunk is None:
+                                alignment_normal = False
+                            else:
+                                alignment_normal = True
                                 dst_fd.write(chunk)
                     finally:
                         del chunk

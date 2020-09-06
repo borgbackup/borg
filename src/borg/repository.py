@@ -1486,23 +1486,21 @@ class LoggedIO:
         logger.info('attempting to recover ' + filename)
         if segment in self.fds:
             del self.fds[segment]
-        backup_filename = filename + '.beforerecover'
-        os.rename(filename, backup_filename)
-        if os.path.getsize(backup_filename) < MAGIC_LEN + self.header_fmt.size:
+        if os.path.getsize(filename) < MAGIC_LEN + self.header_fmt.size:
             # this is either a zero-byte file (which would crash mmap() below) or otherwise
             # just too small to be a valid non-empty segment file, so do a shortcut here:
-            with open(filename, 'wb') as fd:
+            with SaveFile(filename, binary=True) as fd:
                 fd.write(MAGIC)
             return
-        with open(backup_filename, 'rb') as backup_fd:
+        with open(filename, 'rb') as src_fd:
             # note: file must not be 0 size or mmap() will crash.
-            with mmap.mmap(backup_fd.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+            with mmap.mmap(src_fd.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                 # memoryview context manager is problematic, see https://bugs.python.org/issue35686
                 data = memoryview(mm)
                 d = data
                 try:
-                    with open(filename, 'wb') as fd:
-                        fd.write(MAGIC)
+                    with SaveFile(filename, binary=True) as dst_fd:
+                        dst_fd.write(MAGIC)
                         while len(d) >= self.header_fmt.size:
                             crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
                             if size < self.header_fmt.size or size > len(d):
@@ -1511,7 +1509,7 @@ class LoggedIO:
                             if crc32(d[4:size]) & 0xffffffff != crc:
                                 d = d[1:]
                                 continue
-                            fd.write(d[:size])
+                            dst_fd.write(d[:size])
                             d = d[size:]
                 finally:
                     del d

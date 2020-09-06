@@ -1482,6 +1482,17 @@ class LoggedIO:
             fd.seek(offset)
             header = fd.read(self.header_fmt.size)
 
+    def recover_segment_chunk(self, d):
+        """
+        Returns a tuple of chunk data (or None) and length of bytes to skip forward
+        """
+        crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
+        if size < self.header_fmt.size or size > len(d):
+            return None, 1
+        if crc32(d[4:size]) & 0xffffffff != crc:
+            return None, 1
+        return d[:size], size
+
     def recover_segment(self, segment, filename):
         logger.info('attempting to recover ' + filename)
         if segment in self.fds:
@@ -1499,19 +1510,16 @@ class LoggedIO:
                     # memoryview context manager is problematic, see https://bugs.python.org/issue35686
                     data = memoryview(mm)
                     d = data
+                    chunk = None
                     try:
                         dst_fd.write(MAGIC)
                         while len(d) >= self.header_fmt.size:
-                            crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
-                            if size < self.header_fmt.size or size > len(d):
-                                d = d[1:]
-                                continue
-                            if crc32(d[4:size]) & 0xffffffff != crc:
-                                d = d[1:]
-                                continue
-                            dst_fd.write(d[:size])
+                            chunk, size = self.recover_segment_chunk(d)
                             d = d[size:]
+                            if chunk is not None:
+                                dst_fd.write(chunk)
                     finally:
+                        del chunk
                         del d
                         data.release()
 

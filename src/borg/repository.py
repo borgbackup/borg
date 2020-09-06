@@ -1482,14 +1482,23 @@ class LoggedIO:
             fd.seek(offset)
             header = fd.read(self.header_fmt.size)
 
-    def recover_segment_chunk(self, d):
+    def recover_segment_chunk(self, d, try_next_chunk=True):
         """
         Returns a tuple of chunk data (or None) and length of bytes to skip forward
+
+        If try_next_chunk is True, then when the CRC mismatches, it will seek past the purported size and check the CRC of the next chunk. If that is correct, or exactly EOF, it will be returned with a length of both the corrupt chunk and the next one being returned.
         """
         crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
         if size < self.header_fmt.size or size > len(d):
             return None, 1
         if crc32(d[4:size]) & 0xffffffff != crc:
+            if try_next_chunk and len(d) >= size + self.header_fmt.size:
+                next_chunk, next_chunk_size = self.recover_segment_chunk(d[size:], try_next_chunk=False)
+                if next_chunk is not None:
+                    # If the next chunk is valid, we assume the size of this chunk was correct, and just skip over it without retrying for every byte of the data the CRC fails to match
+                    return next_chunk, next_chunk_size + size
+            elif len(d) == size:
+                return None, size
             return None, 1
         return d[:size], size
 

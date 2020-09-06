@@ -1492,14 +1492,14 @@ class LoggedIO:
             with SaveFile(filename, binary=True) as fd:
                 fd.write(MAGIC)
             return
-        with open(filename, 'rb') as src_fd:
-            # note: file must not be 0 size or mmap() will crash.
-            with mmap.mmap(src_fd.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-                # memoryview context manager is problematic, see https://bugs.python.org/issue35686
-                data = memoryview(mm)
-                d = data
-                try:
-                    with SaveFile(filename, binary=True) as dst_fd:
+        with SaveFile(filename, binary=True) as dst_fd:
+            with open(filename, 'rb') as src_fd:
+                # note: file must not be 0 size or mmap() will crash.
+                with mmap.mmap(src_fd.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                    # memoryview context manager is problematic, see https://bugs.python.org/issue35686
+                    data = memoryview(mm)
+                    d = data
+                    try:
                         dst_fd.write(MAGIC)
                         while len(d) >= self.header_fmt.size:
                             crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
@@ -1511,9 +1511,9 @@ class LoggedIO:
                                 continue
                             dst_fd.write(d[:size])
                             d = d[size:]
-                finally:
-                    del d
-                    data.release()
+                    finally:
+                        del d
+                        data.release()
 
     def read(self, segment, offset, id, read_data=True):
         """

@@ -37,6 +37,7 @@ assert len(ATTIC_MAGIC) == MAGIC_LEN
 TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
+all_tags = {TAG_PUT, TAG_DELETE, TAG_COMMIT}
 
 FreeSpace = partial(defaultdict, int)
 
@@ -1482,18 +1483,21 @@ class LoggedIO:
             fd.seek(offset)
             header = fd.read(self.header_fmt.size)
 
-    def recover_segment_chunk(self, d, try_next_chunk=True):
+    def recover_segment_chunk(self, d, try_next_chunk=True, pedantic=False):
         """
         Returns a tuple of chunk data (or None) and length of bytes to skip forward
 
         If try_next_chunk is True, then when the CRC mismatches, it will seek past the purported size and check the CRC of the next chunk. If that is correct, or exactly EOF, it will be returned with a length of both the corrupt chunk and the next one being returned.
+        If pedantic is True (always for the next-chunk check), chunk will only be accepted if the tag is valid.
         """
         crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
+        if pedantic and tag not in all_tags:
+            return None, 1
         if size < self.header_fmt.size or size > len(d):
             return None, 1
         if crc32(d[4:size]) & 0xffffffff != crc:
             if try_next_chunk and len(d) >= size + self.header_fmt.size:
-                next_chunk, next_chunk_size = self.recover_segment_chunk(d[size:], try_next_chunk=False)
+                next_chunk, next_chunk_size = self.recover_segment_chunk(d[size:], try_next_chunk=False, pedantic=True)
                 if next_chunk is not None:
                     # If the next chunk is valid, we assume the size of this chunk was correct, and just skip over it without retrying for every byte of the data the CRC fails to match
                     return next_chunk, next_chunk_size + size

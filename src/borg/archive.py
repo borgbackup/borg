@@ -576,7 +576,15 @@ Utilization of max. archive size: {csize_max:.0%}
         metadata = ArchiveItem(metadata)
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         self.id = self.key.id_hash(data)
-        self.cache.add_chunk(self.id, data, self.stats)
+        try:
+            self.cache.add_chunk(self.id, data, self.stats)
+        except IntegrityError as err:
+            err_msg = str(err)
+            # hack to avoid changing the RPC protocol by introducing new (more specific) exception class
+            if 'More than allowed put data' in err_msg:
+                raise Error('%s - archive too big (issue #1473)!' % err_msg)
+            else:
+                raise
         while self.repository.async_response(wait=True) is not None:
             pass
         self.manifest.archives[name] = (self.id, metadata.time)

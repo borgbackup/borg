@@ -58,6 +58,10 @@ def prune_split(archives, rule, n, kept_because=None):
                 kept_because[a.id] = (rule, len(keep))
                 if len(keep) == n:
                     break
+    # Keep oldest archive if we didn't reach the target retention count
+    if len(keep) < n and a.id not in kept_because:
+        keep.append(a)
+        kept_because[a.id] = (rule+"[oldest]", len(keep))
     return keep
 
 

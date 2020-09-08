@@ -407,6 +407,38 @@ def test_prune_split(rule, num_to_keep, expected_ids):
         assert kept_because[item.id][0] == rule
 
 
+def test_prune_split_keep_oldest():
+    def subset(lst, ids):
+        return {i for i in lst if i.id in ids}
+
+    archives = [
+        # oldest backup, but not last in its year
+        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=timezone.utc), 1),
+        # an interim backup
+        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=timezone.utc), 2),
+        # year end backups
+        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=timezone.utc), 3),
+        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=timezone.utc), 4),
+    ]
+
+    # Keep oldest when retention target can't otherwise be met
+    kept_because = {}
+    keep = prune_split(archives, "yearly", 3, kept_because)
+
+    assert set(keep) == subset(archives, [1, 3, 4])
+    assert kept_because[1][0] == "yearly[oldest]"
+    assert kept_because[3][0] == "yearly"
+    assert kept_because[4][0] == "yearly"
+
+    # Otherwise, prune it
+    kept_because = {}
+    keep = prune_split(archives, "yearly", 2, kept_because)
+
+    assert set(keep) == subset(archives, [3, 4])
+    assert kept_because[3][0] == "yearly"
+    assert kept_because[4][0] == "yearly"
+
+
 class IntervalTestCase(BaseTestCase):
     def test_interval(self):
         self.assert_equal(interval('1H'), 1)

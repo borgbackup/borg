@@ -35,11 +35,10 @@ Fully automated using environment variables:
 
 ::
 
-    $ export BORG_PASSPHRASE='old'
+    $ BORG_PASSPHRASE='old'
     $ borg init -e=repokey repo
     # now "old" is the current passphrase.
-    $ export BORG_PASSPHRASE='old'
-    $ export BORG_NEW_PASSPHRASE='new' 
+    $ BORG_NEW_PASSPHRASE='new' 
     $ borg key change-passphrase repo
     # now "new" is the current passphrase.
 

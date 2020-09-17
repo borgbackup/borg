@@ -1,4 +1,5 @@
 import argparse
+import dateutil.tz
 import errno
 import io
 import json
@@ -2058,6 +2059,101 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('checkpoint', output)
         # the latest archive must be still there
         self.assert_in('test5', output)
+
+    # Given a date and time in local tz, create a UTC timestamp string suitable
+    # for create --timestamp command line option
+    def _to_utc_timestamp(self, year, month, day, hour, minute, second):
+        dtime = datetime(year, month, day, hour, minute, second, 0, dateutil.tz.gettz())
+        return dtime.astimezone(dateutil.tz.UTC).strftime("%Y-%m-%dT%H:%M:%S")
+
+    def _create_archive_ts(self, name, y, m, d, H=0, M=0, S=0):
+        loc = self.repository_location + '::' + name
+        self.cmd('create', '--timestamp', self._to_utc_timestamp(y, m, d, H, M, S), loc, src_dir)
+
+    # This test must match docs/misc/prune-example.txt
+    def test_prune_repository_example(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        # Archives that will be kept, per the example
+        # Oldest archive
+        self._create_archive_ts('test01', 2015, 1, 1)
+        # 6 monthly archives
+        self._create_archive_ts('test02', 2015, 6, 30)
+        self._create_archive_ts('test03', 2015, 7, 31)
+        self._create_archive_ts('test04', 2015, 8, 31)
+        self._create_archive_ts('test05', 2015, 9, 30)
+        self._create_archive_ts('test06', 2015, 10, 31)
+        self._create_archive_ts('test07', 2015, 11, 30)
+        # 14 daily archives
+        self._create_archive_ts('test08', 2015, 12, 17)
+        self._create_archive_ts('test09', 2015, 12, 18)
+        self._create_archive_ts('test10', 2015, 12, 20)
+        self._create_archive_ts('test11', 2015, 12, 21)
+        self._create_archive_ts('test12', 2015, 12, 22)
+        self._create_archive_ts('test13', 2015, 12, 23)
+        self._create_archive_ts('test14', 2015, 12, 24)
+        self._create_archive_ts('test15', 2015, 12, 25)
+        self._create_archive_ts('test16', 2015, 12, 26)
+        self._create_archive_ts('test17', 2015, 12, 27)
+        self._create_archive_ts('test18', 2015, 12, 28)
+        self._create_archive_ts('test19', 2015, 12, 29)
+        self._create_archive_ts('test20', 2015, 12, 30)
+        self._create_archive_ts('test21', 2015, 12, 31)
+        # Additional archives that would be pruned
+        # The second backup of the year
+        self._create_archive_ts('test22', 2015, 1, 2)
+        # The next older monthly backup
+        self._create_archive_ts('test23', 2015, 5, 31)
+        # The next older daily backup
+        self._create_archive_ts('test24', 2015, 12, 16)
+        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=14', '--keep-monthly=6', '--keep-yearly=1')
+        # Prune second backup of the year
+        assert re.search(r'Would prune:\s+test22', output)
+        # Prune next older monthly and daily backups
+        assert re.search(r'Would prune:\s+test23', output)
+        assert re.search(r'Would prune:\s+test24', output)
+        # Must keep the other 21 backups
+        # Yearly is kept as oldest archive
+        assert re.search(r'Keeping archive \(rule: yearly\[oldest\] #1\):\s+test01', output)
+        for i in range(1, 7):
+            assert re.search(r'Keeping archive \(rule: monthly #' + str(i) + r'\):\s+test' + ("%02d" % (8-i)), output)
+        for i in range(1, 15):
+            assert re.search(r'Keeping archive \(rule: daily #' + str(i) + r'\):\s+test' + ("%02d" % (22-i)), output)
+        output = self.cmd('list', self.repository_location)
+        # Nothing pruned after dry run
+        for i in range(1, 25):
+            self.assert_in('test%02d' % i, output)
+        self.cmd('prune', self.repository_location, '--keep-daily=14', '--keep-monthly=6', '--keep-yearly=1')
+        output = self.cmd('list', self.repository_location)
+        # All matching backups plus oldest kept
+        for i in range(1, 22):
+            self.assert_in('test%02d' % i, output)
+        # Other backups have been pruned
+        for i in range(22, 25):
+            self.assert_not_in('test%02d' % i, output)
+
+    # With an initial and daily backup, prune daily until oldest is replaced by a monthly backup
+    def test_prune_retain_and_expire_oldest(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        # Initial backup
+        self._create_archive_ts('original_archive', 2020, 9, 1, 11, 15)
+        # Archive and prune daily for 30 days
+        for i in range(1, 31):
+            self._create_archive_ts('september%02d' % i, 2020, 9, i, 12)
+            self.cmd('prune', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        # Archive and prune 6 days into the next month
+        for i in range(1, 7):
+            self._create_archive_ts('october%02d' % i, 2020, 10, i, 12)
+            self.cmd('prune', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        # Oldest backup is still retained
+        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        assert re.search(r'Keeping archive \(rule: monthly\[oldest\] #1' + r'\):\s+original_archive', output)
+        # Archive one more day and prune.
+        self._create_archive_ts('october07', 2020, 10, 7, 12)
+        self.cmd('prune', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        # Last day of previous month is retained as monthly, and oldest is expired.
+        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        assert re.search(r'Keeping archive \(rule: monthly #1\):\s+september30', output)
+        self.assert_not_in('original_archive', output)
 
     def test_prune_repository_save_space(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

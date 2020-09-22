@@ -1487,7 +1487,9 @@ class LoggedIO:
         """
         Returns a tuple of chunk data (or None) and length of bytes to skip forward
 
-        If try_next_chunk is True, then when the CRC mismatches, it will seek past the purported size and check the CRC of the next chunk. If that is correct, or exactly EOF, it will be returned with a length of both the corrupt chunk and the next one being returned.
+        If try_next_chunk is True, then when the CRC mismatches, it will seek past the purported size and check
+        the CRC of the next chunk. If that is correct, or exactly EOF, it will be returned with a length of both
+        the corrupt chunk and the next one being returned.
         If pedantic is True (always for the next-chunk check), chunk will only be accepted if the tag is valid.
         """
         crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])

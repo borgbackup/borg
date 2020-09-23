@@ -86,23 +86,15 @@ def packages_darwin
     # install all the (security and other) updates
     sudo softwareupdate --ignore iTunesX
     sudo softwareupdate --ignore iTunes
+    sudo softwareupdate --ignore Safari
     sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
-    # get osxfuse 3.x release code from github:
-    curl -s -L https://github.com/osxfuse/osxfuse/releases/download/osxfuse-3.10.4/osxfuse-3.10.4.dmg >osxfuse.dmg
-    MOUNTDIR=$(echo `hdiutil mount osxfuse.dmg | tail -1 | awk '{$1="" ; print $0}'` | xargs -0 echo) \
-    && sudo installer -pkg "${MOUNTDIR}/Extras/FUSE for macOS 3.10.4.pkg" -target /
-    sudo chown -R vagrant /usr/local  # brew must be able to create stuff here
-    which brew || ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config || brew upgrade pkg-config
-    brew install readline || brew upgrade readline
-    brew install openssl@1.1 || brew upgrade openssl@1.1
-    brew install zstd || brew upgrade zstd
-    brew install lz4 || brew upgrade lz4
-    brew install xz || brew upgrade xz  # required for python lzma module
-    brew install fakeroot || brew upgrade fakeroot
-    brew install git || brew upgrade git
+    brew install pkg-config readline openssl@1.1 zstd lz4 xz fakeroot git
+    brew tap homebrew/cask
+    brew cask install osxfuse
+    brew upgrade  # upgrade everything
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
   EOF
 end
@@ -210,6 +202,7 @@ def build_binary_with_pyinstaller(boxname)
     cd borg
     pyinstaller --clean --distpath=/vagrant/borg scripts/borg.exe.spec
     echo 'export PATH="/vagrant/borg:$PATH"' >> ~/.bash_profile
+    cd .. && tar -czvf borg.tgz borg-dir
   EOF
 end
 
@@ -251,7 +244,7 @@ end
 
 Vagrant.configure(2) do |config|
   # use rsync to copy content to the folder
-  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "-z"], :rsync__chown => false
+  config.vm.synced_folder ".", "/vagrant/borg/borg", :type => "rsync", :rsync__args => ["--verbose", "--archive", "--delete", "--exclude", ".python-version"], :rsync__chown => false
   # do not let the VM access . on the host machine via the default shared folder!
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
@@ -362,8 +355,9 @@ Vagrant.configure(2) do |config|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
       v.memory = 2048 + $wmem
-      v.customize ['modifyvm', :id, '--ostype', 'MacOS1012_64']
+      v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
+      v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']
       # Adjust CPU settings according to
       # https://github.com/geerlingguy/macos-virtualbox-vm
       v.customize ['modifyvm', :id, '--cpuidset',

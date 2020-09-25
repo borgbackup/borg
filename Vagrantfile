@@ -103,11 +103,11 @@ def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
     #pkg update
-    # already installed:
-    #pkg install python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
-    ln -sf /usr/bin/python3.5 /usr/bin/pyton3
-    ln -sf /usr/bin/virtualenv-3.5 /usr/bin/virtualenv
-    ln -sf /usr/bin/pip-3.5 /usr/bin/pip
+    pkg install python-37 clang-40 lz4 zstd git
+    ln -sf /usr/bin/python3.7 /usr/bin/python3
+    python3 -m ensurepip
+    ln -sf /usr/bin/pip3.7 /usr/bin/pip3
+    pip3 install virtualenv
   EOF
 end
 
@@ -133,7 +133,6 @@ def install_pythons(boxname)
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv install 3.7.0  # tests, version supporting openssl 1.1
     pyenv install 3.6.9  # binary build, tests, version supporting openssl 1.1
-    pyenv install 3.5.3  # tests, 3.5.3 is first to support openssl 1.1
     pyenv rehash
   EOF
 end
@@ -213,16 +212,16 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.5.3 3.6.9 3.7.0 3.8.0
-      pyenv local 3.5.3 3.6.9 3.7.0 3.8.0
+      pyenv global 3.6.9 3.7.0 3.8.0
+      pyenv local 3.6.9 3.7.0 3.8.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then
       echo "Running tox WITH fakeroot -u"
-      fakeroot -u tox --skip-missing-interpreters -e py35,py36,py37,py38
+      fakeroot -u tox --skip-missing-interpreters -e py36,py37,py38
     else
       echo "Running tox WITHOUT fakeroot -u"
-      tox --skip-missing-interpreters -e py35,py36,py37,py38
+      tox --skip-missing-interpreters -e py36,py37,py38
     fi
   EOF
 end
@@ -391,6 +390,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64")
   end
 
-  # TODO: create more VMs with python 3.5+ and openssl 1.1.
+  # TODO: create more VMs with python 3.6+ and openssl 1.1.
   # See branch 1.1-maint for a better equipped Vagrantfile (but still on py34 and openssl 1.0).
 end

@@ -182,7 +182,7 @@ Some more advanced examples::
   # verify a changed tox.ini (run this after any change to tox.ini):
   fakeroot -u tox --recreate
 
-  fakeroot -u tox -e py35  # run all tests, but only on python 3.5
+  fakeroot -u tox -e py37  # run all tests, but only on python 3.7
 
   fakeroot -u tox borg.testsuite.locking  # only run 1 test module
 
@@ -320,10 +320,7 @@ Checklist:
 - Check version number of upcoming release in ``CHANGES.rst``.
 - Render ``CHANGES.rst`` via ``make html`` and check for markup errors.
 - Verify that ``MANIFEST.in`` and ``setup.py`` are complete.
-- ``python setup.py build_usage ; python setup.py build_man`` and
-  commit (be sure to build with Python 3.5 as Python 3.6 added `more
-  guaranteed hashing algorithms
-  <https://github.com/borgbackup/borg/issues/2123>`_).
+- ``python setup.py build_usage ; python setup.py build_man`` and commit.
 - Tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z

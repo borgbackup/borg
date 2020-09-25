@@ -21,7 +21,7 @@ def packages_debianoid(user)
     apt-get install -y fakeroot build-essential git
     apt-get install -y python3-dev python3-setuptools
     # for building python:
-    apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
+    apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
     # this way it works on older dists (like ubuntu 12.04) also:
     # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
     # newer versions are not compatible with py 3.2 any more.
@@ -49,7 +49,7 @@ def packages_redhatted
     # needed to compile msgpack-python (otherwise it will use slow fallback code):
     yum install -y gcc-c++
     # for building python:
-    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel
+    yum install -y zlib-devel bzip2-devel ncurses-devel readline-devel xz xz-devel sqlite-devel libffi-devel
     #yum install -y python-pip
     #pip install virtualenv
   EOF
@@ -83,7 +83,7 @@ def packages_freebsd
     pkg install -y openssl liblz4 fusefs-libs pkgconf
     pkg install -y git bash
     # for building python:
-    pkg install -y sqlite3
+    pkg install -y sqlite3 libffi
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd
@@ -230,7 +230,7 @@ def install_pythons(boxname)
     pyenv install 3.6.2  # tests
     pyenv install 3.7.0  # tests
     pyenv install 3.8.0  # tests
-    pyenv install 3.5.9  # binary build, use latest 3.5.x release
+    pyenv install 3.5.10  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -248,8 +248,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.5 release
-    pyenv global 3.5.9
-    pyenv virtualenv 3.5.9 borg-env
+    pyenv global 3.5.10
+    pyenv virtualenv 3.5.10 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end

@@ -333,15 +333,15 @@ dedicated ssh key:
 ::
 
   borgs@borg-server$ install -m 700 -d ~/.ssh/
-  borgs@borg-server$ ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_rsa
-  borgs@borg-server$ { echo -n 'command="borg serve --append-only --restrict-to-path ~/repo",restrict '; cat ~/.ssh/borg-client_rsa.pub; } >> ~/.ssh/authorized_keys
-  borgs@borg-server$ chmod go-w ~/.ssh/authorized_keys
+  borgs@borg-server$ ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_key
+  borgs@borg-server$ { echo -n 'command="borg serve --append-only --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
+  borgs@borg-server$ chmod 600 ~/.ssh/authorized_keys
 
 ``install -m 700 -d ~/.ssh/``
 
   Create directory ~/.ssh with correct permissions if it does not exist yet.
 
-``ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_rsa``
+``ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_key``
 
   Create an ssh key dedicated to communication with borg-client.
 
@@ -349,14 +349,14 @@ dedicated ssh key:
   Another more complex approach is using a unique ssh key for each pull operation.
   This is more secure as it guarantees that the key will not be used for other purposes.
 
-``{ echo -n 'command="borg serve --append-only --restrict-to-path ~/repo",restrict '; cat ~/.ssh/borg-client_rsa.pub; } >> ~/.ssh/authorized_keys``
+``{ echo -n 'command="borg serve --append-only --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
 
   Add borg-client's ssh public key to ~/.ssh/authorized_keys with forced command and restricted mode.
   The borg client is restricted to use a repo path below the specified path and to append-only operation.
   Commands like *delete*, *prune* and *compact* have to be executed another way, for example directly on *borg-server*
   side or from a privileged, less restricted client (using another authorized_keys entry).
 
-``chmod go-w ~/.ssh/authorized_keys``
+``chmod 600 ~/.ssh/authorized_keys``
 
   Fix permissions of ~/.ssh/authorized_keys.
 
@@ -367,7 +367,7 @@ Initiating borg command execution from *borg-server* (e.g. init)::
 
   borgs@borg-server$ (
     eval $(ssh-agent) > /dev/null
-    ssh-add -q ~/.ssh/borg-client_rsa
+    ssh-add -q ~/.ssh/borg-client_key
     echo 'your secure borg key passphrase' | \
       ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"
     kill "${SSH_AGENT_PID}"
@@ -380,7 +380,7 @@ Parentheses are not needed when using a dedicated bash process.
 
   Run the SSH agent in the background and export related environment variables to the current bash session.
 
-``ssh-add -q ~/.ssh/borg-client_rsa``
+``ssh-add -q ~/.ssh/borg-client_key``
 
   Load the SSH private key dedicated to communication with the borg-client into the SSH agent.
   Look at ``man 1 ssh-add`` for a more detailed explanation.

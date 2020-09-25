@@ -26,10 +26,10 @@ then
 
     # Configure pyenv with Python version according to TOXENV
     eval "$(pyenv init -)"
-    if [ "${TOXENV}" = "py35" ]
+    if [ "${TOXENV}" = "py36" ]
     then
-        pyenv install 3.5.3  # Minimum version for OpenSSL 1.1.x
-        pyenv global 3.5.3
+        pyenv install 3.6.0
+        pyenv global 3.6.0
     elif [ "${TOXENV}" = "py37" ]
     then
         pyenv install 3.7.0

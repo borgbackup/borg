@@ -141,7 +141,7 @@ Dependencies
 To install Borg from a source package (including pip), you have to install the
 following dependencies first:
 
-* `Python 3`_ >= 3.5.0, plus development headers. Even though Python 3 is not
+* `Python 3`_ >= 3.6.0, plus development headers. Even though Python 3 is not
   the default Python version on most systems, it is usually available as an
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
@@ -282,7 +282,7 @@ Use the Cygwin installer to install the dependencies::
 
 You can then install ``pip`` and ``virtualenv``::
 
-    easy_install-3.5 pip
+    easy_install-3.6 pip
     pip install virtualenv
 
 

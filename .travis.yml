@@ -7,10 +7,6 @@ cache:
 matrix:
     fast_finish: true
     include:
-        - python: "3.5"
-          os: linux
-          dist: trusty
-          env: TOXENV=py35
         - python: "3.6"
           os: linux
           dist: trusty
@@ -31,14 +27,14 @@ matrix:
           os: linux
           dist: xenial
           env: TOXENV=py38
-        - python: "3.5"
+        - python: "3.6"
           os: linux
           dist: xenial
           env: TOXENV=flake8
         - language: generic
           os: osx
           osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions
-          env: TOXENV=py35
+          env: TOXENV=py36
         - language: generic
           os: osx
           osx_image: xcode11.3

@@ -352,7 +352,7 @@ dedicated ssh key:
 ``{ echo -n 'command="borg serve --append-only --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
 
   Add borg-client's ssh public key to ~/.ssh/authorized_keys with forced command and restricted mode.
-  The borg client is restricted to use a repo path below the specified path and to append-only operation.
+  The borg client is restricted to use one repo at the specified path and to append-only operation.
   Commands like *delete*, *prune* and *compact* have to be executed another way, for example directly on *borg-server*
   side or from a privileged, less restricted client (using another authorized_keys entry).
 

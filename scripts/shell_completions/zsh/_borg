@@ -5,7 +5,7 @@
 # Recommended _borg specific settings:
 #
 #   zstyle -e ':completion:*:*:borg-*:argument-rest:*' tag-order \
-#     '[[ $words[CURRENT] == -* ]] && reply=( "!archives archive-files" "-" )'
+#     '[[ $words[CURRENT] == -* ]] && reply=( "! archives archive-files" "-" )'
 #   zstyle ':completion:*:*:(borg|-value-,BORG_)*' sort false
 #   zstyle ':completion:*:*:borg-config:argument-2:keys' list-grouped false
 #   zstyle ':completion:*:*:borg-*:*' gain-privileges true
@@ -24,7 +24,7 @@
 #   Style selector used to select a path (when Borg would use either `pp` or `pf`).
 #   Default: `fm`.
 # repository-suffix
-#   This boolean style controls whether to add the `::` suffix to a repository.
+#   This boolean style controls whether to add the `::` auto-removable suffix to a repository.
 #   Default: `true`.
 
 (( $+functions[_borg_commands] )) ||
@@ -169,7 +169,7 @@ _borg-debug() {
 
   case $state in
   (command)
-    debug_commands=(
+    local -a debug_commands=(
       'info:show system infos for debugging / bug reports'
       'dump-archive-items:dump archive items (metadata)'
       'dump-archive:dump decoded archive metadata'
@@ -455,7 +455,7 @@ _borg-list() {
   __borg_setup_common_archive_filters_options
 
   _arguments -s -w -S : \
-     '--consider-checkpoints[show checkpoint archives in the repository contents list (default: hidden)]' \
+    '--consider-checkpoints[show checkpoint archives in the repository contents list (default: hidden)]' \
     '--short[only print file/directory names, nothing else]' \
     {--format,--list-format}'=[specify format for file listing]:FORMAT: _borg_format_keys $line[1]' \
     '--json[Only valid for listing repository contents. Format output as JSON.]' \
@@ -693,7 +693,7 @@ __borg_setup_common_create_options() {
     '--comment=[add a comment text to the archive]:COMMENT:_borg_placeholders'
     '--timestamp=[manually specify the archive creation date/time]:TIMESTAMP:_borg_timestamp'
     '(-c --checkpoint-interval)'{-c,--checkpoint-interval}'=[write checkpoint every SECONDS seconds (default: 1800)]: : _borg_guard_unsigned_number "SECONDS"'
-    '--chunker-params[specify the chunker parameters]: :_borg_chunker_params_examples'
+    '--chunker-params=[specify the chunker parameters]: :_borg_chunker_params_examples'
     '(-C --compression)'{-C,--compression}'=[select compression algorithm]: :_borg_compression'
   )
 }
@@ -799,7 +799,7 @@ _borg_cached_repositories() {
   }'
   local cachedir=${BORG_CACHE_DIR:-${XDG_CACHE_HOME:-${BORG_BASE_DIR:-$HOME}/.cache}/borg}
   cached_repos=( ${(f)"$(_call_program -p cached-repositories sed -n -E ${(q)sed_script} \
-    "${(q)cachedir}/*/config(N.om)" 2>/dev/null)"} )
+    "${(q)cachedir}/*/config(#qN.om)" 2>/dev/null)"} )
 
   if [[ $compstate[quote] != (\'|\") ]]; then
     # hide ~BORG_REPO and other scalars
@@ -877,7 +877,7 @@ _borg_repository_or_archive() {
   else
     local -a suf
     if ! compset -S '::*'; then
-      if (( $+opts[-a] )) || zstyle -T ":completion:${curcontext}:" repository-suffix; then
+      if (( $+opts[-a] )) || zstyle -T ":completion:${curcontext}:repositories" repository-suffix; then
         suf=( -S '::' )
       fi
       local oqrepo="$PREFIX$SUFFIX"
@@ -984,12 +984,12 @@ _borg_archive() {
         fi
       fi
 
-      if zstyle -t ":completion:${curcontext}:" verbose; then
+      if zstyle -t ":completion:${curcontext}:archives" verbose; then
         if (( __borg_archives_need_update || ! $+__borg_archive_names || ! $+__borg_archive_descriptions )); then
           __borg_archives_need_update=0
           typeset -gHa __borg_archive_names=() __borg_archive_descriptions=()
           local fmt descfmt name desc
-          zstyle -s ":completion:${curcontext}:" archive-description-format descfmt ||
+          zstyle -s ":completion:${curcontext}:archives" archive-description-format descfmt ||
             descfmt='{archive:<36} {time} [{id}]'
           fmt="{barchive}{NUL}$descfmt{NUL}"
           _call_program -p archive-descriptions \
@@ -1211,11 +1211,12 @@ _borg_style_selector_or_archive_files() {
 __borg_style_selectors() {
   local default_style_selector=$1 path_style_selector
   shift
-  zstyle -s ":completion:${curcontext%:*}:archive-files" path-style-selector path_style_selector ||
+  zstyle -s ":completion:${curcontext}:archive-files" path-style-selector path_style_selector ||
     path_style_selector='fm'
-  local -a disp style_selectors
+  local -a disp
+  local -A style_selectors
   __borg_setup_style_selectors
-  if zstyle -T ":completion:${curcontext}:" verbose; then
+  if zstyle -T ":completion:${curcontext}:style-selectors" verbose; then
     local -a style_selector_descriptions extra
     local k v sep
     for k v in ${(kv)style_selectors}; do
@@ -1226,7 +1227,7 @@ __borg_style_selectors() {
       (( $#extra )) && v+=" (${(j:, :)extra})"
       style_selector_descriptions+=( "${${k//\\/\\\\}//:/\\:}:$v" )
     done
-    zstyle -s ":completion:${curcontext}:" list-separator sep || sep=--
+    zstyle -s ":completion:${curcontext}:style-selectors" list-separator sep || sep=--
     zformat -a style_selector_descriptions " $sep " $style_selector_descriptions
     disp=( -ld style_selector_descriptions )
   fi
@@ -1246,7 +1247,8 @@ __borg_archive_files() {
     return 1
   fi
 
-  local -a qargs tmp disp pref style_selectors match mbegin mend archive_files descs
+  local -a qargs tmp disp pref match mbegin mend archive_files descs
+  local -A style_selectors
   local k cword fmt descfmt style_selector path_style_selector name descr
 
   # take into account exclude options on the command line
@@ -1270,8 +1272,8 @@ __borg_archive_files() {
 
   [[ -z $cword ]] && return 1
 
-  if zstyle -t ":completion:${curcontext}:" verbose; then
-    zstyle -s ":completion:${curcontext}:" file-description-format descfmt ||
+  if zstyle -t ":completion:${curcontext}:archive-files" verbose; then
+    zstyle -s ":completion:${curcontext}:archive-files" file-description-format descfmt ||
       descfmt='{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}'
     fmt="{bpath}{NUL}$descfmt{NUL}"
   else
@@ -1292,7 +1294,8 @@ __borg_archive_files() {
       [[ -n $style_selector ]] && compset -P "$style_selector:" && pref=( -P "$style_selector:" )
       cword="$PREFIX$SUFFIX"
       [[ $compstate[quote] != (\'|\") ]] && cword=${(Q)cword}
-      zstyle -s ":completion:${curcontext}:" path-style-selector path_style_selector || path_style_selector='fm'
+      zstyle -s ":completion:${curcontext}:archive-files" path-style-selector path_style_selector ||
+        path_style_selector='fm'
       cword="$path_style_selector:$cword"
     else
       [[ -z $style_selector ]] && cword="$default_style_selector:$cword"
@@ -1300,7 +1303,7 @@ __borg_archive_files() {
     qargs+=( ${(q)cword} )
   fi
 
-  if zstyle -t ":completion:${curcontext}:" verbose; then
+  if zstyle -t ":completion:${curcontext}:archive-files" verbose; then
     _call_program -p archive-file-descriptions ${(q)__borg_command:-borg} list $qargs 2>/dev/null |
     while IFS= read -r -d $'\0' name && IFS= read -r -d $'\0' descr; do
       archive_files+=( $name )
@@ -1341,7 +1344,8 @@ __borg_pattern_files() {
   local paths_varname=$1
   shift
 
-  local -a args style_selectors
+  local -a args
+  local -A style_selectors
   __borg_setup_style_selectors
   local pr_pat='[RP\+\-\!]' ss_pat="(${(j:|:)${(@kb)style_selectors}}):"
   local prs_pat="$pr_pat #"
@@ -1533,7 +1537,7 @@ _borg_statuschars() {
     'i[backup data was read from standard input (stdin)]' \
     '-[dry run, item was not backed up]' \
     'x[excluded, item was not backed up]' \
-    '?[missing status code]' \
+    '?[missing status code]'
 }
 
 (( $+functions[_borg_quota_suffixes] )) ||

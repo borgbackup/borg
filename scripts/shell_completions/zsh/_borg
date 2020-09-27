@@ -1,6 +1,6 @@
 #compdef borg borgfs -P -value-,BORG_*,-default-
 
-# Zsh completion for Borg Backup 1.1.13.
+# Zsh completion for Borg Backup 1.1.14 (2020-09-27).
 #
 # Recommended _borg specific settings:
 #
@@ -742,7 +742,7 @@ _borg_parameters() {
     _description values expl 'value'
     compadd "$expl[@]" yes no && ret=0
     ;;
-  ((CHECK|DELETE|RECREATE)_I_KNOW_WHAT_I_AM_DOING)
+  ((CHECK|DELETE)_I_KNOW_WHAT_I_AM_DOING)
     _description values expl 'value'
     compadd "$expl[@]" YES NO && ret=0
     ;;
@@ -1095,8 +1095,8 @@ _borg_format_keys() {
   local -a keys=( NEWLINE NL NUL SPACE TAB CR LF )
   local -a repository_keys=( archive name barchive comment bcomment id start time end hostname username )
   local -a archive_keys=( type mode uid gid user group path bpath source linktarget flags size csize dsize dcsize
-    num_chunks unique_chunks mtime ctime atime isomtime isoctime isoatime md5 sha1 sha224 sha256 sha384 sha512
-    archiveid archivename extra health )
+    num_chunks unique_chunks mtime ctime atime isomtime isoctime isoatime blake2b blake2s md5 sha1 sha224 sha256 sha384
+    sha3_224 sha3_256 sha3_384 sha3_512 sha512 shake_128 shake_256 archiveid archivename extra health )
 
   local akeys rkeys
   akeys='archive-keys:archive keys:compadd -a archive_keys'

@@ -1,6 +1,6 @@
 #compdef borg borgfs -P -value-,BORG_*,-default-
 
-# Zsh completion for Borg Backup 1.2.0a8 (2020-04-21).
+# Zsh completion for Borg Backup 1.2.0a9 (2020-09-27).
 #
 # Recommended _borg specific settings:
 #
@@ -127,17 +127,25 @@ _borg-config() {
 
 (( $+functions[_borg-create] )) ||
 _borg-create() {
-  local -a common_options common_create_options
+  local -a common_options common_create_options state line
+  local curcontext="$curcontext" state_descr
+  declare -A opt_args
+  local -i ret=1
   __borg_setup_common_options
   __borg_setup_common_create_options
 
-  _arguments -s -w -S : \
+  local lastspec='*:PATH:_files'
+  (( $words[(I)--content-from-command] )) &&
+    lastspec='*:::PATH:->command'
+
+  _arguments -C -s -w -S : \
     '*'{-e,--exclude}'=[exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files -f -e "$line[1]" fm "${(@)line[2,-1]}"' \
     '*--pattern=[experimental: include/exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files -p -f -e "$line[1]" sh "${(@)line[2,-1]}"' \
     $common_create_options \
     '(-s --stats)--json[Output stats as JSON. Implies --stats.]' \
     '--no-cache-sync[experimental: do not synchronize the cache. Implies not using the files cache.]' \
     '--stdin-name=[use NAME in archive for stdin data (default: "stdin")]:NAME' \
+    '--content-from-command[interpret PATH as command and store its stdout]' \
     '--exclude-nodump[exclude files flagged NODUMP]' \
     '(-x --one-file-system)'{-x,--one-file-system}'[stay in the same file system]' \
     '--numeric-owner[only store numeric user and group identifiers]' \
@@ -151,7 +159,19 @@ _borg-create() {
     '--read-special[open and read block and char device files as well as FIFOs as if they were regular files]' \
     $common_options \
     ':ARCHIVE: _borg_repository_or_archive -a -p' \
-    '*:PATH:_files'
+    $lastspec && ret=0
+
+  case $state in
+  (command)
+    if (( CURRENT <= 1 )); then
+      _command_names -e && ret=0
+    else
+      _normal && ret=0
+    fi
+    ;;
+  esac
+
+  return ret
 }
 
 (( $+functions[_borg-debug] )) ||
@@ -273,7 +293,7 @@ _borg-delete() {
   _arguments -s -w -S : \
     $common_dry_run_stats_options \
     '--cache-only[delete only the local cache for the given repository]' \
-    '*--force[force deletion of corrupted archives, use --force --force in case --force does not work.]' \
+    '*--force[force deletion of corrupted archives, use "--force --force" in case "--force" does not work]' \
     '--keep-security-info[keep the local security info when deleting a repository]' \
     '--save-space[work slower, but using less space]' \
     $common_archive_filters_options \
@@ -499,7 +519,7 @@ _borg-prune() {
 
   _arguments -s -w -S : \
     $common_dry_run_stats_options \
-    '--force[force pruning of corrupted archives]' \
+    '*--force[force pruning of corrupted archives, use "--force --force" in case "--force" does not work]' \
     '--list[output verbose list of archives it keeps/prunes]' \
     '--keep-within[keep all archives within this time interval]: : _borg_guard_unsigned_number "INTERVAL"' \
     '(--keep-last --keep-secondly)'{--keep-last,--keep-secondly}'[number of secondly archives to keep]: : _borg_guard_unsigned_number "N"' \
@@ -521,10 +541,18 @@ _borg-recreate() {
   __borg_setup_common_options
   __borg_setup_common_create_options
 
+  local -a mods=(
+    'if-different:recompress if current compression is with a different compression algorithm (the level is not considered)'
+    'always:recompress even if current compression is with the same compression algorithm (use this to change the compression level)'
+    'never:do not recompress (use this option to explicitly prevent recompression)'
+  )
+  mods=( ${(q)mods//\\/\\\\} )
+  mods=( ${mods//:/\\:} )
+
   _arguments -s -w -S : \
     $common_create_options \
-    '--target[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive "${line[1]%%\:\:*}"' \
-    '--recompress[recompress data chunks according to --compression]:params:((if-different always never\:\(default\)))' \
+    '--target=[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive "${line[1]%%\:\:*}"' \
+    '--recompress=[recompress data chunks according to "MODE" and "--compression"]:MODE:'"(($mods))" \
     $common_options \
     ':REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
@@ -619,7 +647,7 @@ __borg_setup_common_options() {
     '--bypass-lock[bypass locking mechanism]'
     '(- :)--show-version[show/log the borg version]'
     '--show-rc[show/log the return code (rc)]'
-    '--umask=[set umask to M (local and remote, default: 0077)]:M'
+    '--umask=[set umask to M (local only, default: 0077)]:M'
     '--remote-path=[set remote path to executable (default: "borg")]: :_cmdstring'
     '--remote-ratelimit=[set remote network upload rate limit in kiByte/s (default: 0=unlimited)]: : _borg_guard_unsigned_number "RATE"'
     '--consider-part-files[treat part files like normal files (e.g. to list/extract them)]'
@@ -755,6 +783,9 @@ _borg_parameters() {
     ;;
   (WORKAROUNDS)
     _wanted workarounds expl 'workaround' _sequence compadd - basesyncfile && ret=0
+    ;;
+  (KEYS_DIR)
+    _directories && ret=0
     ;;
   (*)
     _default && ret=0
@@ -1102,8 +1133,8 @@ _borg_format_keys() {
   local -a keys=( NEWLINE NL NUL SPACE TAB CR LF )
   local -a repository_keys=( archive name barchive comment bcomment id start time end hostname username )
   local -a archive_keys=( type mode uid gid user group path bpath source linktarget flags size csize dsize dcsize
-    num_chunks unique_chunks mtime ctime atime isomtime isoctime isoatime md5 sha1 sha224 sha256 sha384 sha512
-    xxh64 archiveid archivename extra health )
+    num_chunks unique_chunks mtime ctime atime isomtime isoctime isoatime blake2b blake2s md5 sha1 sha224 sha256 sha384
+    sha3_224 sha3_256 sha3_384 sha3_512 sha512 shake_128 shake_256 archiveid archivename extra health )
 
   local akeys rkeys
   akeys='archive-keys:archive keys:compadd -a archive_keys'

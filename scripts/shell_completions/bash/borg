@@ -63,7 +63,7 @@ _borg()
             return 0
             ;;
         '--recompress')
-            local recompress_when="if-different always"
+            local recompress_when="if-different always never"
             COMPREPLY=( $(compgen -W "${recompress_when}" -- ${cur}) )
             return 0
             ;;
@@ -75,7 +75,7 @@ _borg()
                 local opts="-e --encryption --append-only --storage-quota --make-parent-dirs ${common_opts}"
                 ;;
             *' create '*)
-                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --noflags --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name --content-from-command -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --noflags --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
                 ;;
             *' extract '*)
                 local opts="--list -n --dry-run --numeric-owner --nobsdflags --noflags --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"

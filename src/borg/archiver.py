@@ -4063,7 +4063,8 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository')
         subparser.add_argument('--force', dest='forced', action='store_true',
-                               help='force pruning of corrupted archives')
+                               help='force pruning of corrupted archives, '
+                                    'use ``--force --force`` in case ``--force`` does not work.')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
         subparser.add_argument('--list', dest='output_list', action='store_true',

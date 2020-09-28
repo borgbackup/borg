@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.13 (2020-06-06)
----------------------------
+Version 1.1.14 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -240,6 +240,55 @@ Compatibility notes:
   If WSL still has a problem with sync_file_range, you need to set
   BORG_WORKAROUNDS=basesyncfile in the borg process environment to
   work around the WSL issue.
+- 1.1.14 changes return codes due to a bug fix:
+  In case you have scripts expecting rc == 2 for a signal exit, you need to
+  update them to check for >= 128 (as documented since long).
+
+Fixes:
+
+- check --repair: fix potential data loss when interrupting it, #5325
+- exit with 128 + signal number (as documented) when borg is killed by a signal, #5161
+- fix hardlinked CACHEDIR.TAG processing, #4911
+- create --read-special: .part files also should be regular files, #5217
+
+Other changes:
+
+- prettier error message when archive gets too big, #5307
+- check/recreate are not "experimental" any more (but still potentially dangerous):
+
+  - recreate: remove extra confirmation
+  - rephrase some warnings, update docs, #5164
+- shell completions:
+
+  - misc. updates / fixes
+  - complete $BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING
+  - rewrite zsh completion:
+
+    - completion for almost all optional and positional arguments
+    - completion for Borg environment variables (parameters)
+- use "allow/deny list" instead of "white/black list" wording
+- declare "allow_cache_wipe" marker in setup.cfg to avoid pytest warning
+- vagrant:
+
+  - misc. fixes / updates
+  - use python 3.5.10 for binary build
+  - build directory-based binaries additionally to the single file binaries
+  - add libffi-dev, required to build python
+  - use cryptography<3.0, more recent versions break the jessie box
+- docs:
+
+  - mention double --force in prune docs
+  - update Homebrew install instructions, #5185
+  - better description of how cache and rebuilds of it work
+  - point to borg create --list item flags in recreate usage, #5165
+  - add security faq explaining AES-CTR crypto issues, #5254
+  - add a note to create from stdin regarding files cache, #5180
+  - fix borg.1 manpage generation regression, #5211
+  - clarify how exclude options work in recreate, #5193
+
+
+Version 1.1.13 (2020-06-06)
+---------------------------
 
 Fixes:
 

@@ -146,7 +146,8 @@ def packages_openindiana
     # needs separate provisioning step + reboot:
     #pkg update
     # already installed:
-    #pkg install python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
+    #pkg install python-37 python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
+    pkg install gcc-7
     ln -sf /usr/bin/python3.5 /usr/bin/pyton3
     ln -sf /usr/bin/virtualenv-3.5 /usr/bin/virtualenv
     ln -sf /usr/bin/pip-3.5 /usr/bin/pip

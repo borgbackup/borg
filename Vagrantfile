@@ -103,7 +103,9 @@ def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
     #pkg update
-    pkg install python-37 clang-40 lz4 zstd git
+    # already installed:
+    #pkg install python-37 python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
+    pkg install gcc-7
     ln -sf /usr/bin/python3.7 /usr/bin/python3
     python3 -m ensurepip
     ln -sf /usr/bin/pip3.7 /usr/bin/pip3

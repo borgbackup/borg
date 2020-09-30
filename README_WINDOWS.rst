@@ -1,4 +1,4 @@
-Borg Native on Windows
+fantastic project
 ======================
 
 Running borg natively on windows is in a early alpha stage. Expect many things to fail.

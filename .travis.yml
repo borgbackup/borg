@@ -42,7 +42,7 @@ matrix:
         - python: "3.9-dev"
           os: linux
           dist: xenial
-          env: TOXENV=py39
+          env: TOXENV=py39 SKIPFUSE=true
         - python: "3.6"
           os: linux
           dist: xenial

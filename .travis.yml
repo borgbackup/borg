@@ -27,6 +27,10 @@ matrix:
           os: linux
           dist: xenial
           env: TOXENV=py38
+        - python: "3.9-dev"
+          os: linux
+          dist: xenial
+          env: TOXENV=py39
         - python: "3.6"
           os: linux
           dist: xenial

@@ -33,6 +33,10 @@ then
     then
         pyenv install 3.7.0
         pyenv global 3.7.0
+    elif [ "${TOXENV}" = "py39" ]
+    then
+        pyenv install 3.9
+        pyenv global 3.9
     else
         printf '%s\n' "Unexpected value for TOXENV environment variable"
         exit 1

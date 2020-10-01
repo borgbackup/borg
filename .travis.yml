@@ -31,6 +31,22 @@ matrix:
           os: linux
           dist: xenial
           env: TOXENV=py38
+        - python: "3.7-dev"
+          os: linux
+          dist: xenial
+          env: TOXENV=py37
+        - python: "3.8-dev"
+          os: linux
+          dist: xenial
+          env: TOXENV=py38
+        - python: "3.9-dev"
+          os: linux
+          dist: xenial
+          env: TOXENV=py39
+        - python: "3.6"
+          os: linux
+          dist: xenial
+          env: TOXENV=flake8
         - language: generic
           os: osx
           osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions

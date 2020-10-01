@@ -72,7 +72,7 @@ def selftest(logger):
                      successful_tests, SELFTEST_COUNT)
     if not result.wasSuccessful() or count_mismatch:
         logger.error("self test failed\n"
-                     "This is a bug either in Borg or in the package / distribution you use.")
+                     "Could be a bug either in Borg, the package / distribution you use, your OS or your hardware.")
         sys.exit(2)
         assert False, "sanity assertion failed: ran beyond sys.exit()"
     selftest_elapsed = time.perf_counter() - selftest_started

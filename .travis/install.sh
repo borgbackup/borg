@@ -65,14 +65,16 @@ python -m pip install virtualenv
 python -m virtualenv ~/.venv
 source ~/.venv/bin/activate
 
+# Install requirements
+pip install -r requirements.d/development.txt
+pip install codecov
+python setup.py --version
+
 # Recent versions of OS X don't allow kernel extensions which makes the osxfuse tests fail; those versions are marked with SKIPFUSE=true in .travis.yml
 if [ "${SKIPFUSE}" = "true" ]
 then
     truncate -s 0 requirements.d/fuse.txt
+    pip install -e .
+else
+    pip install -e .[fuse]
 fi
-
-# Install requirements
-pip install -r requirements.d/development.lock.txt
-pip install codecov
-python setup.py --version
-pip install -e .[fuse]

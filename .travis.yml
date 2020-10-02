@@ -7,58 +7,43 @@ cache:
 matrix:
     fast_finish: true
     include:
-        - name: "Python 3.6 Trusty"
-          python: "3.6"
+        - python: "3.6"
           os: linux
           dist: trusty
           env: TOXENV=py36
-        - name: "Python 3.7 Xenial"
-          python: "3.7"
+        - python: "3.7"
           os: linux
           dist: xenial
           env: TOXENV=py37
-        - name: "Python 3.7-dev Xenial"
-          python: "3.7-dev"
+        - python: "3.7-dev"
           os: linux
           dist: xenial
           env: TOXENV=py37
-        - name: "Python 3.8 Xenial"
-          python: "3.8"
+        - python: "3.8"
           os: linux
           dist: xenial
           env: TOXENV=py38
-        - name: "Python 3.8-dev Xenial"
-          python: "3.8-dev"
+        - python: "3.8-dev"
           os: linux
           dist: xenial
           env: TOXENV=py38
-        - name: "Python 3.9-dev Xenial"
-          python: "3.9-dev"
+        - python: "3.9-dev"
           os: linux
           dist: xenial
           env: TOXENV=py39 SKIPFUSE=true
-        - name: "Python 3.9-dev Focal Fossa"
-          python: "3.9-dev"
+        - python: "3.9-dev"
           os: linux
           dist: focal
           env: TOXENV=py39 SKIPFUSE=true
-        - name: "Python 3.6 Xenial"
-          python: "3.6"
+        - python: "3.6"
           os: linux
           dist: xenial
           env: TOXENV=flake8
-        - name: "Python 3.6 MacOs"
-          language: generic
+        - language: generic
           os: osx
           osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions
           env: TOXENV=py36
-        - name: "Python 3.7 MacOs"
-          language: generic
-          os: osx
-          osx_image: xcode11.3
-          env: TOXENV=py37 SKIPFUSE=true
-        - name: "Python 3.8.3 MacOS"
-          language: generic
+        - language: generic
           os: osx
           osx_image: xcode12u
           env: TOXENV=py38 SKIPFUSE=true

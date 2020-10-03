@@ -12,7 +12,7 @@ then
     # Update brew itself
     export HOMEBREW_NO_AUTO_UPDATE=1  # Auto-updating everything would take too much time
     brew cleanup  # Preempt possible scheduled clean-up so it doesn't clutter the log later
-
+    brew update > /dev/null
     # Install and/or upgrade dependencies
     #brew install zstd || brew upgrade zstd  # Installation takes very long due to CMake dependency and isn't necessary for the tests as borg comes bundled with zstd anyway
     brew install lz4 || brew upgrade lz4

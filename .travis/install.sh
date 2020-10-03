@@ -11,7 +11,7 @@ then
 
     # Update brew itself
     export HOMEBREW_NO_AUTO_UPDATE=1  # Auto-updating everything would take too much time
-    brew update
+    brew update > /dev/null
     brew cleanup  # Preempt possible scheduled clean-up so it doesn't clutter the log later
 
     # Install and/or upgrade dependencies
@@ -30,18 +30,10 @@ then
     then
         pyenv install 3.6.0
         pyenv global 3.6.0
-    elif [ "${TOXENV}" = "py37" ]
-    then
-        pyenv install 3.7.0
-        pyenv global 3.7.0
     elif [ "${TOXENV}" = "py38" ]
     then
         pyenv install 3.8.0
         pyenv global 3.8.0
-    elif [ "${TOXENV}" = "py39" ]
-    then
-        pyenv install 3.9
-        pyenv global 3.9
     else
         printf '%s\n' "Unexpected value for TOXENV environment variable"
         exit 1

@@ -11,7 +11,6 @@ then
 
     # Update brew itself
     export HOMEBREW_NO_AUTO_UPDATE=1  # Auto-updating everything would take too much time
-    brew update > /dev/null
     brew cleanup  # Preempt possible scheduled clean-up so it doesn't clutter the log later
 
     # Install and/or upgrade dependencies

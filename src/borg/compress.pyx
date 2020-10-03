@@ -44,6 +44,20 @@ cdef extern from "algorithms/zstd-libselect.h":
     const char* ZSTD_getErrorName(size_t code) nogil
 
 
+cdef enum snappy_status:
+    SNAPPY_OK = 0
+    SNAPPY_INVALID_INPUT = 1
+    SNAPPY_BUFFER_TOO_SMALL = 2
+
+
+cdef extern from "algorithms/snappy-libselect.h":
+    snappy_status snappy_compress(const char* input, size_t input_length, char* compressed, size_t* compressed_length) nogil
+    snappy_status snappy_uncompress(const char* compressed, size_t compressed_length, char* uncompressed, size_t* uncompressed_length) nogil
+    size_t snappy_max_compressed_length(size_t source_length) nogil
+    snappy_status snappy_uncompressed_length(const char* compressed, size_t compressed_length, size_t* result) nogil
+    snappy_status snappy_validate_compressed_buffer(const char* compressed, size_t compressed_length) nogil
+
+
 buffer = Buffer(bytearray, size=0)
 
 
@@ -171,7 +185,7 @@ class LZ4(DecidingCompressor):
     name = 'lz4'
 
     def __init__(self, **kwargs):
-        pass
+        super().__init__(**kwargs)
 
     def _decide(self, idata):
         """
@@ -328,6 +342,74 @@ class ZSTD(DecidingCompressor):
         return dest[:osize]
 
 
+class Snappy(CompressorBase):
+    """
+    snappy compression / decompression
+    """
+    ID = b'\x04\x00'
+    name = 'snappy'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _decide(self, idata):
+        """
+        Decides what to do with *data*. Returns (compressor, snappy_data).
+
+        *snappy_data* is the Snappy result if *compressor* is Snappy as well, otherwise it is None.
+        """
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
+        cdef int isize = len(idata)
+        cdef size_t osize
+        cdef char *source = idata
+        cdef char *dest
+        cdef int level = self.level
+        cdef snappy_status status
+        osize = snappy_max_compressed_length(isize)
+        try:
+            buf = buffer.get(osize)
+        except MemoryError:
+            raise DecompressionError('MemoryError')
+        dest = <char *> buf
+        with nogil:
+            status = snappy_compress(source, isize, dest, &osize)
+        if status != SNAPPY_OK:
+            raise Exception('snappy compress failed')
+        # only compress if the result actually is smaller
+        if osize < isize:
+            return self, dest[:osize]
+        else:
+            return NONE_COMPRESSOR, None
+
+    def decompress(self, idata):
+        if not isinstance(idata, bytes):
+            idata = bytes(idata)  # code below does not work with memoryview
+        idata = super().decompress(idata)
+        cdef int isize = len(idata)
+        cdef size_t osize
+        cdef size_t rsize
+        cdef char *source = idata
+        cdef char *dest
+        cdef snappy_status status
+        status = snappy_uncompressed_length(source, isize, &osize)
+        if status != SNAPPY_OK:
+            raise DecompressionError('snappy get size failed: invalid data')
+        try:
+            buf = buffer.get(osize)
+        except MemoryError:
+            raise DecompressionError('MemoryError')
+        dest = <char *> buf
+        rsize = osize
+        with nogil:
+            status = snappy_uncompress(source, isize, dest, &rsize)
+        if status != SNAPPY_OK:
+            raise DecompressionError('snappy decompress failed')
+        if rsize != osize:
+            raise DecompressionError('snappy decompress failed: size mismatch')
+        return dest[:osize]
+
+
 class ZLIB(CompressorBase):
     """
     zlib compression / decompression (python stdlib)
@@ -411,7 +493,7 @@ class Auto(CompressorBase):
 
     def compress(self, data):
         compressor, cheap_compressed_data = self._decide(data)
-        if compressor in (LZ4_COMPRESSOR, NONE_COMPRESSOR):
+        if compressor in (SNAPPY_COMPRESSOR, LZ4_COMPRESSOR, NONE_COMPRESSOR):
             # we know that trying to compress with expensive compressor is likely pointless,
             # so we fallback to return the cheap compressed data.
             return cheap_compressed_data
@@ -441,9 +523,10 @@ COMPRESSOR_TABLE = {
     LZMA.name: LZMA,
     Auto.name: Auto,
     ZSTD.name: ZSTD,
+    Snappy.name: Snappy,
 }
 # List of possible compression types. Does not include Auto, since it is a meta-Compressor.
-COMPRESSOR_LIST = [LZ4, ZSTD, CNONE, ZLIB, LZMA, ]  # check fast stuff first
+COMPRESSOR_LIST = [Snappy, LZ4, ZSTD, CNONE, ZLIB, LZMA, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]
@@ -452,6 +535,7 @@ def get_compressor(name, **kwargs):
 # compressor instances to be used by all other compressors
 NONE_COMPRESSOR = get_compressor('none')
 LZ4_COMPRESSOR = get_compressor('lz4')
+SNAPPY_COMPRESSOR = get_compressor('snappy')
 
 class Compressor:
     """
@@ -487,7 +571,7 @@ class CompressionSpec:
             raise ValueError
         # --compression algo[,level]
         self.name = values[0]
-        if self.name in ('none', 'lz4', ):
+        if self.name in ('none', 'snappy', 'lz4', ):
             return
         elif self.name in ('zlib', 'lzma', ):
             if count < 2:
@@ -520,7 +604,7 @@ class CompressionSpec:
 
     @property
     def compressor(self):
-        if self.name in ('none', 'lz4', ):
+        if self.name in ('none', 'snappy', 'lz4', ):
             return get_compressor(self.name)
         elif self.name in ('zlib', 'lzma', 'zstd', ):
             return get_compressor(self.name, level=self.level)

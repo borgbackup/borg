@@ -59,6 +59,10 @@ system_prefix_liblz4 = os.environ.get('BORG_LIBLZ4_PREFIX')
 prefer_system_libzstd = not bool(os.environ.get('BORG_USE_BUNDLED_ZSTD'))
 system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
 
+# needed: snappy (>= 1.1.0)
+prefer_system_snappy = not bool(os.environ.get('BORG_USE_BUNDLED_SNAPPY'))
+system_prefix_snappy = os.environ.get('BORG_SNAPPY_PREFIX')
+
 prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
 system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
 
@@ -185,6 +189,7 @@ if not on_rtd:
         setup_compress.lz4_ext_kwargs(pc, prefer_system_liblz4, system_prefix_liblz4),
         setup_compress.zstd_ext_kwargs(pc, prefer_system_libzstd, system_prefix_libzstd,
                                        multithreaded=False, legacy=False),
+        setup_compress.snappy_ext_kwargs(pc, prefer_system_snappy, system_prefix_snappy),
     )
 
     checksums_ext_kwargs = members_appended(

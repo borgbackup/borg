@@ -132,3 +132,37 @@ def lz4_ext_kwargs(pc, prefer_system, system_prefix):
     include_dirs = multi_join(lz4_includes, lz4_bundled_path)
     define_macros = [('BORG_USE_BUNDLED_LZ4', 'YES')]
     return dict(sources=sources, include_dirs=include_dirs, define_macros=define_macros)
+
+
+# snappy files, structure as seen in snappy project repository:
+
+# path relative (to this file) to the bundled library source code files
+snappy_bundled_path = 'src/borg/algorithms/snappy'
+
+snappy_sources = [
+    'lib/snappy.cc',
+    'lib/snappy-c.cc',
+]
+
+snappy_includes = [
+    'lib',
+]
+
+def snappy_ext_kwargs(pc, prefer_system, system_prefix):
+    if prefer_system:
+        if system_prefix:
+            print('Detected and preferring snappy [via BORG_SNAPPY_PREFIX]')
+            return dict(include_dirs=[os.path.join(system_prefix, 'include')],
+                        library_dirs=[os.path.join(system_prefix, 'lib')],
+                        libraries=['snappy'])
+        
+        if pc and pc.installed('snappy', '>= 1.1.0'):
+            print('Detected and preferring snappy [via pkg-config]')
+            return pc.parse('snappy')
+
+    print('Using bundled snappy')
+    sources = multi_join(snappy_sources, snappy_bundled_path)
+    include_dirs = multi_join(snappy_includes, snappy_bundled_path)
+    define_macros = [('BORG_USE_BUNDLED_SNAPPY', 'YES')]
+    return dict(sources=sources, include_dirs=include_dirs, define_macros=define_macros)
+

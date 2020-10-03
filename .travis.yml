@@ -45,8 +45,8 @@ matrix:
           env: TOXENV=py36
         - language: generic
           os: osx
-          osx_image: xcode12u
-          env: TOXENV=py38 SKIPFUSE=true
+          osx_image: xcode11.3
+          env: TOXENV=py37 SKIPFUSE=true
     allow_failures:
         - os: osx  # OS X builds often take too long and time out, even though tests don't actually fail
 

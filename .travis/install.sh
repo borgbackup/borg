@@ -12,7 +12,7 @@ then
     # Update brew itself
     export HOMEBREW_NO_AUTO_UPDATE=1  # Auto-updating everything would take too much time
     brew cleanup  # Preempt possible scheduled clean-up so it doesn't clutter the log later
-
+    brew update
     # Install and/or upgrade dependencies
     #brew install zstd || brew upgrade zstd  # Installation takes very long due to CMake dependency and isn't necessary for the tests as borg comes bundled with zstd anyway
     brew install lz4 || brew upgrade lz4
@@ -29,10 +29,10 @@ then
     then
         pyenv install 3.6.0
         pyenv global 3.6.0
-    elif [ "${TOXENV}" = "py38" ]
+    elif [ "${TOXENV}" = "py37" ]
     then
-        pyenv install 3.8.0
-        pyenv global 3.8.0
+        pyenv install 3.7.0
+        pyenv global 3.7.0
     else
         printf '%s\n' "Unexpected value for TOXENV environment variable"
         exit 1

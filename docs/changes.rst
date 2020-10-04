@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a9 (2020-xx-xx)
+Version 1.2.0a9 (2020-10-05)
 ----------------------------
 
 Please note:
@@ -233,10 +233,9 @@ See there for feedback: https://github.com/borgbackup/borg/issues/4360
 
 Compatibility notes:
 
-- dropped support / testing for Python 3.4, minimum requirement is 3.5.
-  In case your OS does not provide Python >= 3.5, consider using our binary,
+- dropped support / testing for Python 3.4 and 3.5, minimum requirement is 3.6.
+  In case your OS does not provide Python >= 3.6, consider using our binary,
   which does not need an external Python interpreter.
-  Maybe this requirement will be raised to Python 3.6 later.
 - freeing repository space only happens when "borg compact" is invoked.
 - borg create --noatime is deprecated. Not storing atime is the default behaviour
   now (use --atime if you want to store the atime).
@@ -261,24 +260,64 @@ Compatibility notes:
        having duplicate FQDN *and* MAC address or all-zero MAC address)
   - 2) if you are aware that 1) is not the case for you, you must set
        BORG_HOST_ID env var to something unique.
+- exit with 128 + signal number, #5161.
+  if you have scripts expecting rc == 2 for a signal exit, you need to update
+  them to check for >= 128.
 
 Fixes:
 
 - fix memory leak related to preloading, #5202
+- check --repair: fix potential data loss, #5325
+- persist shadow_index in between borg runs, #4830
+- fix hardlinked CACHEDIR.TAG processing, #4911
+- --read-special: .part files also should be regular files, #5217
+- allow server side enforcing of umask, --umask is for the local borg
+  process only (see docs), #4947
+- exit with 128 + signal number, #5161
 - borg config --list does not show last_segment_checked, #5159
+- locking:
+
+  - fix ExclusiveLock race condition bug, #4923
+  - fix race condition in lock migration, #4953
+  - fix locking on openindiana, #5271
 
 New features:
 
 - --content-from-command: create archive using stdout of given command, #5174
+- allow key-import + BORG_KEY_FILE to create key files
+- build directory-based binary for macOS to avoid Gatekeeper delays
 
 Other changes:
 
+- upgrade bundled zstd to 1.4.5
+- upgrade bundled xxhash to 0.8.0, #5362
+- if self test fails, also point to OS and hardware, #5334
+- misc. shell completions fixes/updates, rewrite zsh completion
+- prettier error message when archive gets too big, #5307
+- stop relying on `false` exiting with status code 1
+- rephrase some warnings, #5164
+- parseformat: unnecessary calls removed, #5169
+- testing:
+
+  - enable Python3.9 env for test suite and VMs, #5373
+  - drop python 3.5, #5344
+  - misc. vagrant fixes/updates
+  - misc. testing fixes, #5196
 - docs:
 
+  - add ssh-agent pull backup method to doc, #5288
+  - mention double --force in prune docs
+  - update Homebrew install instructions, #5185
+  - better description of how cache and rebuilds of it work
+    and how the workaround applies to that
+  - point to borg create --list item flags in recreate usage, #5165
+  - add a note to create from stdin regarding files cache, #5180
+  - add security faq explaining AES-CTR crypto issues, #5254
+  - clarify --exclude-if-present in recreate, #5193
+  - add socat pull mode, #5150, #900
+  - move content of resources doc page to community project, #2088
   - explain hash collision, #4884
   - clarify --recompress option, #5154
-- misc. testing fixes, #5196
-- parseformat: unnecessary calls removed, #5169
 
 
 Version 1.2.0a8 (2020-04-22)
@@ -328,7 +367,7 @@ Other changes:
 - require recent enough llfuse for birthtime support, #5064
 - only store compressed data if the result actually is smaller, #4516
 - check: improve error output for matching index size, see #4829
-- ignore --stats when given with --dry-run, but continue, fixes #4373
+- ignore --stats when given with --dry-run, but continue, #4373
 - replaced usage of os.statvfs with shutil.disk_usage (better cross-platform support).
 - fuse: remove unneeded version check and compat code, micro opts
 - docs:

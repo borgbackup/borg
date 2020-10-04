@@ -7,12 +7,11 @@ is_win32 = sys.platform.startswith('win32')
 
 # Note: SPEC contains the spec file argument given to pyinstaller
 here = os.path.dirname(os.path.abspath(SPEC))
+basepath = os.path.abspath(os.path.join(here, '..'))
 
 if is_win32:
-    basepath = os.path.abspath(os.path.join(here, '..'))
     hiddenimports = []
 else:
-    basepath = '/vagrant/borg/borg'
     hiddenimports = ['borg.platform.posix', 'pkg_resources.py2_warn', ]
 
 block_cipher = None

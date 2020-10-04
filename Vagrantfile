@@ -203,7 +203,7 @@ end
 def install_cygwin_venv
   return <<-EOF
       python3 -m ensurepip -U --default-pip
-      pip install virtualenv
+      pip install 'virtualenv!=20.0.32'  # 20.0.32 is broken on py34
   EOF
 end
 

@@ -1,7 +1,8 @@
 setuptools
 setuptools_scm
 pip
-virtualenv
+# 20.0.32 is broken on py34
+virtualenv!=20.0.32
 # newer cryptography does not build in the jessie vagrant boxes
 cryptography<3.0
 tox

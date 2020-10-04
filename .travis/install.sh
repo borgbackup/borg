@@ -56,7 +56,7 @@ else
 fi
 
 # Setup and activate virtual environment
-python -m pip install virtualenv
+python -m pip install 'virtualenv!=20.0.32'
 python -m virtualenv ~/.venv
 source ~/.venv/bin/activate
 

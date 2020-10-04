@@ -10,10 +10,10 @@ try:
 except ImportError:
     multiprocessing = None
 
-from distutils.command.clean import clean
 from setuptools.command.build_ext import build_ext
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
+from distutils.command.clean import clean
 
 try:
     from Cython.Build import cythonize

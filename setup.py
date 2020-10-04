@@ -52,7 +52,10 @@ extras_require = {
     # llfuse 1.2 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.3 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
-    'fuse': ['llfuse<2.0', ],
+    'fuse': [
+        'llfuse >=1.3.4, <1.3.7; python_version <"3.9"',  # broken on py39
+        'llfuse >=1.3.7, <2.0; python_version >="3.9"',  # broken on freebsd
+    ],
 }
 
 if sys.platform.startswith('freebsd'):

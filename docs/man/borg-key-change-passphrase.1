@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-CHANGE-PASSPHRASE 1 "2020-04-21" "" "borg backup tool"
+.TH BORG-KEY-CHANGE-PASSPHRASE 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borg-key-change-passphrase \- Change repository key file passphrase
 .
@@ -73,6 +73,11 @@ Enter new passphrase:
 Enter same passphrase again:
 Remember your passphrase. Your data will be inaccessible without it.
 Key updated
+
+# Import a previously\-exported key into the specified
+# key file (creating or overwriting the output key)
+# (keyfile repositories only)
+$ BORG_KEY_FILE=/path/to/output\-key borg key import /path/to/repo /path/to/exported
 .ft P
 .fi
 .UNINDENT

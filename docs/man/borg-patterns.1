@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2020-04-21" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -104,7 +104,7 @@ path separator is always removed.
 This pattern style is (only) useful to match full paths.
 This is kind of a pseudo pattern as it can not have any variable or
 unspecified parts \- the full path must be given. \fIpf:root/file.ext\fP matches
-\fIroot/file.txt\fP only. A leading path separator is always removed.
+\fIroot/file.ext\fP only. A leading path separator is always removed.
 .sp
 Implementation note: this is implemented via very time\-efficient O(1)
 hashtable lookups (this means you can have huge amounts of such patterns

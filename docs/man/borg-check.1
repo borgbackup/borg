@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CHECK 1 "2020-04-21" "" "borg backup tool"
+.TH BORG-CHECK 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .
@@ -36,6 +36,9 @@ borg [common options] check [options] [REPOSITORY_OR_ARCHIVE]
 .SH DESCRIPTION
 .sp
 The check command verifies the consistency of a repository and the corresponding archives.
+.sp
+check \-\-repair is a potentially dangerous function and might lead to data loss
+(for kinds of corruption it is not capable of dealing with). BE VERY CAREFUL!
 .sp
 First, the underlying repository data files are checked:
 .INDENT 0.0
@@ -140,10 +143,10 @@ do only a partial repo check for max. SECONDS seconds (Default: unlimited)
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
+.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
+.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .BI \-\-sort\-by \ KEYS

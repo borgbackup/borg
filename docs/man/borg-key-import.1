@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-IMPORT 1 "2020-04-21" "" "borg backup tool"
+.TH BORG-KEY-IMPORT 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borg-key-import \- Import the repository key from backup
 .
@@ -40,6 +40,15 @@ This command restores a key previously backed up with the export command.
 If the \fB\-\-paper\fP option is given, the import will be an interactive
 process in which each line is checked for plausibility before
 proceeding to the next line. For this format PATH must not be given.
+.sp
+For repositories using keyfile encryption, the key file which \fBborg key
+import\fP writes to depends on several factors. If the \fBBORG_KEY_FILE\fP
+environment variable is set and non\-empty, \fBborg key import\fP creates
+or overwrites that file named by \fB$BORG_KEY_FILE\fP\&. Otherwise, \fBborg
+key import\fP searches in the \fB$BORG_KEYS_DIR\fP directory for a key file
+associated with the repository. If a key file is found in
+\fB$BORG_KEYS_DIR\fP, \fBborg key import\fP overwrites it; otherwise, \fBborg
+key import\fP creates a new key file in \fB$BORG_KEYS_DIR\fP\&.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

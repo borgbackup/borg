@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2020-04-21" "" "borg backup tool"
+.TH BORG-CREATE 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -41,7 +41,9 @@ that means if relative paths are desired, the command has to be run from the cor
 directory.
 .sp
 When giving \(aq\-\(aq as path, borg will read data from standard input and create a
-file \(aqstdin\(aq in the created archive from that data.
+file \(aqstdin\(aq in the created archive from that data. In some cases it\(aqs more
+appropriate to use \-\-content\-from\-command, however. See section \fIReading from
+stdin\fP below for details.
 .sp
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -150,12 +152,15 @@ output stats as JSON. Implies \fB\-\-stats\fP\&.
 experimental: do not synchronize the cache. Implies not using the files cache.
 .TP
 .BI \-\-stdin\-name \ NAME
-use NAME in archive for stdin data (default: "stdin")
+use NAME in archive for stdin data (default: \(aqstdin\(aq)
+.TP
+.B \-\-content\-from\-command
+interpret PATH as command and store its stdout. See also section Reading from stdin below.
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
 .TP
-.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+.BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN
 exclude paths matching PATTERN
 .TP
 .BI \-\-exclude\-from \ EXCLUDEFILE
@@ -221,13 +226,13 @@ add a comment text to the archive
 .BI \-\-timestamp \ TIMESTAMP
 manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). Alternatively, give a reference file/directory.
 .TP
-.BI \-c \ SECONDS\fP,\fB \ \-\-checkpoint\-interval \ SECONDS
+.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
 write checkpoint every SECONDS seconds (Default: 1800)
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
 .TP
-.BI \-C \ COMPRESSION\fP,\fB \ \-\-compression \ COMPRESSION
+.BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the "borg help compression" command for details.
 .UNINDENT
 .SH EXAMPLES
@@ -378,6 +383,53 @@ Other flags used include:
 .IP \(bu 2
 \(aq?\(aq = missing status code (if you see this, please file a bug report!)
 .UNINDENT
+.SS Reading from stdin
+.sp
+There are two methods to read from stdin. Either specify \fB\-\fP as path and
+pipe directly to borg:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+backup\-vm \-\-id myvm \-\-stdout | borg create REPO::ARCHIVE \-
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Or use \fB\-\-content\-from\-command\fP to have Borg manage the execution of the
+command and piping. If you do so, the first PATH argument is interpreted
+as command to execute and any further arguments are treated as arguments
+to the command:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg create \-\-content\-from\-command REPO::ARCHIVE \-\- backup\-vm \-\-id myvm \-\-stdout
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fB\-\-\fP is used to ensure \fB\-\-id\fP and \fB\-\-stdout\fP are \fBnot\fP considered
+arguments to \fBborg\fP but rather \fBbackup\-vm\fP\&.
+.sp
+The difference between the two approaches is that piping to borg creates an
+archive even if the command piping to borg exits with a failure. In this case,
+\fBone can end up with truncated output being backed up\fP\&. Using
+\fB\-\-content\-from\-command\fP, in contrast, borg is guaranteed to fail without
+creating an archive should the command fail. The command is considered failed
+when it returned a non\-zero exit code.
+.sp
+Reading from stdin yields just a stream of data without file metadata
+associated with it, and the files cache is not needed at all. So it is
+safe to disable it via \fB\-\-files\-cache disabled\fP and speed up backup
+creation a bit.
+.sp
+By default, the content read from stdin is stored in a file called \(aqstdin\(aq.
+Use \fB\-\-stdin\-name\fP to change the name.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP, \fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-check(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-compression(1)\fP

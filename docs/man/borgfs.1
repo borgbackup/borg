@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORGFS 1 "2020-04-21" "" "borg backup tool"
+.TH BORGFS 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .
@@ -108,10 +108,10 @@ Extra mount options
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
+.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
+.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .BI \-\-sort\-by \ KEYS
@@ -126,7 +126,7 @@ consider last N archives after other filters were applied
 .SS Exclusion options
 .INDENT 0.0
 .TP
-.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+.BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN
 exclude paths matching PATTERN
 .TP
 .BI \-\-exclude\-from \ EXCLUDEFILE

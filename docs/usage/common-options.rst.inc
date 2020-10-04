@@ -11,7 +11,7 @@
 --bypass-lock      Bypass locking mechanism
 --show-version     show/log the borg version
 --show-rc          show/log the return code (rc)
---umask M          set umask to M (local and remote, default: 0077)
+--umask M          set umask to M (local only, default: 0077)
 --remote-path PATH    use PATH as borg executable on the remote (default: "borg")
 --remote-ratelimit RATE    set remote network upload rate limit in kiByte/s (default: 0=unlimited)
 --consider-part-files    treat part files like normal files (e.g. to list/extract them)

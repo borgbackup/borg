@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PRUNE 1 "2020-04-21" "" "borg backup tool"
+.TH BORG-PRUNE 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .
@@ -98,7 +98,7 @@ repository to prune
 do not change repository
 .TP
 .B \-\-force
-force pruning of corrupted archives
+force pruning of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
 .TP
 .B \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
@@ -136,10 +136,10 @@ work slower, but using less space
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
+.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
+.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .UNINDENT
 .SH EXAMPLES

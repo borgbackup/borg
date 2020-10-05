@@ -87,6 +87,9 @@ Description
 
 The check command verifies the consistency of a repository and the corresponding archives.
 
+check --repair is a potentially dangerous function and might lead to data loss
+(for kinds of corruption it is not capable of dealing with). BE VERY CAREFUL!
+
 First, the underlying repository data files are checked:
 
 - For all segments, the segment magic header is checked.

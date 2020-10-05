@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2020-04-21" "" "borg backup tool"
+.TH BORG-LIST 1 "2020-10-04" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .
@@ -59,7 +59,7 @@ Show checkpoint archives in the repository contents list (default: hidden).
 .B \-\-short
 only print file/directory names, nothing else
 .TP
-.BI \-\-format \ FORMAT\fP,\fB \ \-\-list\-format \ FORMAT
+.BI \-\-format \ FORMAT\fR,\fB \ \-\-list\-format \ FORMAT
 specify format for file listing (default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")
 .TP
 .B \-\-json
@@ -71,10 +71,10 @@ Only valid for listing archive contents. Format output as JSON Lines. The form o
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fP,\fB \ \-\-prefix \ PREFIX
+.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
 only consider archive names starting with this prefix.
 .TP
-.BI \-a \ GLOB\fP,\fB \ \-\-glob\-archives \ GLOB
+.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
 only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .BI \-\-sort\-by \ KEYS
@@ -89,7 +89,7 @@ consider last N archives after other filters were applied
 .SS Exclusion options
 .INDENT 0.0
 .TP
-.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+.BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN
 exclude paths matching PATTERN
 .TP
 .BI \-\-exclude\-from \ EXCLUDEFILE
@@ -227,6 +227,10 @@ isoctime
 .IP \(bu 2
 isoatime
 .IP \(bu 2
+blake2b
+.IP \(bu 2
+blake2s
+.IP \(bu 2
 md5
 .IP \(bu 2
 sha1
@@ -237,7 +241,19 @@ sha256
 .IP \(bu 2
 sha384
 .IP \(bu 2
+sha3_224
+.IP \(bu 2
+sha3_256
+.IP \(bu 2
+sha3_384
+.IP \(bu 2
+sha3_512
+.IP \(bu 2
 sha512
+.IP \(bu 2
+shake_128
+.IP \(bu 2
+shake_256
 .IP \(bu 2
 xxh64: XXH64 checksum of this file (note: this is NOT a cryptographic hash!)
 .IP \(bu 2

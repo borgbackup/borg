@@ -10,10 +10,10 @@ try:
 except ImportError:
     multiprocessing = None
 
-from distutils.command.clean import clean
 from setuptools.command.build_ext import build_ext
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
+from distutils.command.clean import clean
 
 try:
     from Cython.Build import cythonize
@@ -83,8 +83,8 @@ install_requires = [
 # if you do not have llfuse, do not require it, most of borgbackup will work.
 extras_require = {
     'fuse': [
-        'llfuse >=1.3, <2.0',
-        'llfuse >=1.3.4, <2.0; python_version >="3.7"',
+        'llfuse >=1.3.4, <1.3.7; python_version <"3.9"',  # broken on py39
+        'llfuse >=1.3.7, <2.0; python_version >="3.9"',  # broken on freebsd
     ],
 }
 

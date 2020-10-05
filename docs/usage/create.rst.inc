@@ -33,7 +33,9 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the cache. Implies not using the files cache.                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: "stdin")                                                                                             |
+    |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: 'stdin')                                                                                             |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--content-from-command``                        | interpret PATH as command and store its stdout. See also section Reading from stdin below.                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                |
     |                                                                                                                                                                                                                                                               |
@@ -115,7 +117,8 @@ borg create
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
         --no-cache-sync    experimental: do not synchronize the cache. Implies not using the files cache.
-        --stdin-name NAME    use NAME in archive for stdin data (default: "stdin")
+        --stdin-name NAME    use NAME in archive for stdin data (default: 'stdin')
+        --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
 
 
     :ref:`common_options`
@@ -162,7 +165,9 @@ that means if relative paths are desired, the command has to be run from the cor
 directory.
 
 When giving '-' as path, borg will read data from standard input and create a
-file 'stdin' in the created archive from that data.
+file 'stdin' in the created archive from that data. In some cases it's more
+appropriate to use --content-from-command, however. See section *Reading from
+stdin* below for details.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -243,6 +248,8 @@ only include the objects specified by ``--exclude-if-present`` in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the ``--keep-exclude-tags`` option.
 
+.. _list_item_flags:
+
 Item flags
 ++++++++++
 
@@ -282,3 +289,36 @@ Other flags used include:
 - '-' = dry run, item was *not* backed up
 - 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
+
+Reading from stdin
+++++++++++++++++++
+
+There are two methods to read from stdin. Either specify ``-`` as path and
+pipe directly to borg::
+
+    backup-vm --id myvm --stdout | borg create REPO::ARCHIVE -
+
+Or use ``--content-from-command`` to have Borg manage the execution of the
+command and piping. If you do so, the first PATH argument is interpreted
+as command to execute and any further arguments are treated as arguments
+to the command::
+
+    borg create --content-from-command REPO::ARCHIVE -- backup-vm --id myvm --stdout
+
+``--`` is used to ensure ``--id`` and ``--stdout`` are **not** considered
+arguments to ``borg`` but rather ``backup-vm``.
+
+The difference between the two approaches is that piping to borg creates an
+archive even if the command piping to borg exits with a failure. In this case,
+**one can end up with truncated output being backed up**. Using
+``--content-from-command``, in contrast, borg is guaranteed to fail without
+creating an archive should the command fail. The command is considered failed
+when it returned a non-zero exit code.
+
+Reading from stdin yields just a stream of data without file metadata
+associated with it, and the files cache is not needed at all. So it is
+safe to disable it via ``--files-cache disabled`` and speed up backup
+creation a bit.
+
+By default, the content read from stdin is stored in a file called 'stdin'.
+Use ``--stdin-name`` to change the name.

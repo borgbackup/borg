@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG 1 "2020-06-06" "" "borg backup tool"
+.TH BORG 1 "2017-02-05" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .
@@ -30,26 +30,10 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.SH BORG
-.SS deduplicating and encrypting backup tool
-.INDENT 0.0
-.TP
-.B Author
-The Borg Collective
-.TP
-.B Date
-2020\-06\-06
-.TP
-.B Manual section
-1
-.TP
-.B Manual group
-borg backup tool
-.UNINDENT
-.SS SYNOPSIS
+.SH SYNOPSIS
 .sp
 borg [common options] <command> [options] [arguments]
-.SS DESCRIPTION
+.SH DESCRIPTION
 .\" we don't include the README.rst here since we want to keep this terse.
 .
 .sp
@@ -66,7 +50,7 @@ Borg stores a set of files in an \fIarchive\fP\&. A \fIrepository\fP is a collec
 of \fIarchives\fP\&. The format of repositories is Borg\-specific. Borg does not
 distinguish archives from each other in any way other than their name,
 it does not matter when or where archives were created (e.g. different hosts).
-.SS EXAMPLES
+.SH EXAMPLES
 .SS A step\-by\-step example
 .INDENT 0.0
 .IP 1. 3
@@ -201,7 +185,7 @@ reports during command execution.  You can also add the \fB\-v\fP (or
 get other informational messages.
 .UNINDENT
 .UNINDENT
-.SS NOTES
+.SH NOTES
 .SS Positional Arguments and Options: Order matters
 .sp
 Borg only supports taking options (\fB\-s\fP and \fB\-\-progress\fP in the example)
@@ -493,18 +477,17 @@ For "Warning: Attempting to access a previously unknown unencrypted repository"
 For "Warning: The repository at location ... was previously located at ..."
 .TP
 .B BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-For "Warning: \(aqcheck \-\-repair\(aq is an experimental feature that might result in data loss."
+For "This is a potentially dangerous function..." (check \-\-repair)
 .TP
 .B BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
 For "You requested to completely DELETE the repository \fIincluding\fP all archives it contains:"
-.TP
-.B BORG_RECREATE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-For "recreate is an experimental feature."
 .UNINDENT
 .sp
 Note: answers are case sensitive. setting an invalid answer value might either give the default
 answer or ask you interactively, depending on whether retries are allowed (they by default are
 allowed). So please test your scripts interactively before making them a non\-interactive script.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B Directories and files:
 .INDENT 7.0
@@ -517,22 +500,14 @@ to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt
 .TP
 .B BORG_CACHE_DIR
 Defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-
-.nf
-\(gaXDG env var\(ga_
-.fi
- \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
+\fI\%XDG env var\fP \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
 This directory contains the local cache and might need a lot
 of space for dealing with big repositories. Make sure you\(aqre aware of the associated
 security aspects of the cache location: \fIcache_security\fP
 .TP
 .B BORG_CONFIG_DIR
 Defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-
-.nf
-\(gaXDG env var\(ga_
-.fi
- \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
+\fI\%XDG env var\fP \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
 This directory contains all borg configuration directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
@@ -713,7 +688,7 @@ default temporary directory at /tmp. This can be remediated by ensuring the
 $TMPDIR, $TEMP, or $TMP environment variable is properly set for the sshd
 process.
 For some OSes, this can be done just by setting the correct value in the
-.bashrc (or equivalent login config file for other shells), however in
+\&.bashrc (or equivalent login config file for other shells), however in
 other cases it may be necessary to first enable \fBPermitUserEnvironment yes\fP
 in your \fBsshd_config\fP file, then add \fBenvironment="TMPDIR=/my/big/tmpdir"\fP
 at the start of the public key to be used in the \fBauthorized_hosts\fP file.
@@ -880,7 +855,7 @@ This includes resource forks on Mac OS X.
 .IP [7] 5
 aka \fIBSD flags\fP\&. The Linux set of flags [1] is portable across platforms.
 The BSDs define additional flags.
-.SS SEE ALSO
+.SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP for common command line options
 .sp

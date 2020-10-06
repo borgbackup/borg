@@ -10,10 +10,6 @@ matrix:
         - python: "3.4"
           os: linux
           dist: trusty
-          env: TOXENV=flake8
-        - python: "3.4"
-          os: linux
-          dist: trusty
           env: TOXENV=py34
         - python: "3.5.2"  # Use version 3.5.2 because it has lzma support while 3.5(.0) does not
           os: linux
@@ -31,6 +27,18 @@ matrix:
           os: linux
           dist: xenial
           env: TOXENV=py38
+        - python: "3.9-dev"
+          os: linux
+          dist: xenial
+          env: TOXENV=py39
+        - python: "3.9-dev"
+          os: linux
+          dist: focal
+          env: TOXENV=py39
+        - python: "3.6"
+          os: linux
+          dist: xenial
+          env: TOXENV=flake8
         - language: generic
           os: osx
           osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions

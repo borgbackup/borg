@@ -11,9 +11,8 @@ then
 
     # Update brew itself
     export HOMEBREW_NO_AUTO_UPDATE=1  # Auto-updating everything would take too much time
-    brew update
+    brew update > /dev/null
     brew cleanup  # Preempt possible scheduled clean-up so it doesn't clutter the log later
-
     # Install and/or upgrade dependencies
     brew install lz4 || brew upgrade lz4
     brew install xz || brew upgrade xz  # Required for Python lzma module
@@ -61,14 +60,16 @@ python -m pip install virtualenv
 python -m virtualenv ~/.venv
 source ~/.venv/bin/activate
 
+# Install requirements
+pip install -r requirements.d/development.txt
+pip install codecov
+python setup.py --version
+
 # Recent versions of OS X don't allow kernel extensions which makes the osxfuse tests fail; those versions are marked with SKIPFUSE=true in .travis.yml
 if [ "${SKIPFUSE}" = "true" ]
 then
     truncate -s 0 requirements.d/fuse.txt
+    pip install -e .
+else
+    pip install -e .[fuse]
 fi
-
-# Install requirements
-pip install -r requirements.d/development.lock.txt
-pip install codecov
-python setup.py --version
-pip install -e .[fuse]

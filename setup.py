@@ -52,16 +52,11 @@ extras_require = {
     # llfuse 1.2 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 1.3 (tested shortly, looks ok), needs FUSE version >= 2.8.0
     # llfuse 2.0 will break API
-    'fuse': ['llfuse<2.0', ],
+    'fuse': [
+        'llfuse >=1.3.4, <1.3.7; python_version <"3.9"',  # broken on py39
+        'llfuse >=1.3.7, <2.0; python_version >="3.9"',  # broken on freebsd
+    ],
 }
-
-if sys.platform.startswith('freebsd'):
-    # llfuse was frequently broken / did not build on freebsd
-    # llfuse 0.41.1, 1.1 are ok
-    extras_require['fuse'] = ['llfuse <2.0, !=0.42.*, !=0.43, !=1.0', ]
-
-if my_python >= (3, 7):
-    extras_require['fuse'][0] += ', >=1.3.4'
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
@@ -89,7 +84,6 @@ cython_c_sources = [
     hashindex_source,
     item_source,
     checksums_source,
-
     platform_posix_source,
     platform_linux_source,
     platform_syncfilerange_source,
@@ -870,6 +864,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],

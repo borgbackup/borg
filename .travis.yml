@@ -50,7 +50,7 @@ matrix:
         - language: generic
           os: osx
           osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions
-          env: TOXENV=py36
+          env: TOXENV=py35
         - language: generic
           os: osx
           osx_image: xcode11.3

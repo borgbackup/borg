@@ -24,7 +24,11 @@ then
 
     # Configure pyenv with Python version according to TOXENV
     eval "$(pyenv init -)"
-    if [ "${TOXENV}" = "py36" ]
+    if [ "${TOXENV}" = "py35" ]
+    then
+        pyenv install 3.5.0
+        pyenv global 3.5.0
+    elif [ "${TOXENV}" = "py36" ]
     then
         pyenv install 3.6.0
         pyenv global 3.6.0

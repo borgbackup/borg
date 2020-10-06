@@ -26,8 +26,8 @@ then
     eval "$(pyenv init -)"
     if [ "${TOXENV}" = "py35" ]
     then
-        pyenv install 3.5.0
-        pyenv global 3.5.0
+        pyenv install 3.5.3
+        pyenv global 3.5.3
     elif [ "${TOXENV}" = "py36" ]
     then
         pyenv install 3.6.0

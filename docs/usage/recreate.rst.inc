@@ -117,11 +117,13 @@ Description
 
 Recreate the contents of existing archives.
 
-This is an *experimental* feature. Do *not* use this on your only backup.
+recreate is a potentially dangerous function and might lead to data loss
+(if used wrongly). BE VERY CAREFUL!
 
-``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``, and PATH
-have the exact same semantics as in "borg create". If PATHs are specified the
-resulting archive will only contain files from these PATHs.
+``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``
+and PATH have the exact same semantics as in "borg create", but they only check
+for files in the archives and not in the local file system. If PATHs are specified,
+the resulting archives will only contain files from these PATHs.
 
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will *not* match (``--exclude``, ``--exclude-from``, PATHs).
@@ -139,7 +141,7 @@ Borg 1.x archives.
 Depending on the PATHs and patterns given, recreate can be used to permanently
 delete files from archives.
 When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
-interpreted.
+interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at

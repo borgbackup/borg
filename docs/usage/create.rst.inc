@@ -162,7 +162,8 @@ that means if relative paths are desired, the command has to be run from the cor
 directory.
 
 When giving '-' as path, borg will read data from standard input and create a
-file 'stdin' in the created archive from that data.
+file 'stdin' in the created archive from that data. See section *Reading from
+stdin* below for details.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -204,6 +205,7 @@ ctime vs. mtime: safety vs. speed
   as it can not be set from userspace. But, a metadata-only change will already
   update the ctime, so there might be some unnecessary chunking/hashing even
   without content changes. Some filesystems do not support ctime (change time).
+  E.g. doing a chown or chmod to a file will change its ctime.
 - mtime usually works and only updates if file contents were changed. But mtime
   can be arbitrarily set from userspace, e.g. to set mtime back to the same value
   it had before a content change happened. This can be used maliciously as well as
@@ -243,6 +245,8 @@ only include the objects specified by ``--exclude-if-present`` in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the ``--keep-exclude-tags`` option.
 
+.. _list_item_flags:
+
 Item flags
 ++++++++++
 
@@ -281,3 +285,22 @@ Other flags used include:
 - '-' = dry run, item was *not* backed up
 - 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
+
+Reading from stdin
+++++++++++++++++++
+
+To read from stdin, specify ``-`` as path and pipe directly to borg::
+
+    backup-vm --id myvm --stdout | borg create REPO::ARCHIVE -
+
+Note that piping to borg creates an archive even if the command piping
+to borg exits with a failure. In this case, **one can end up with
+truncated output being backed up**.
+
+Reading from stdin yields just a stream of data without file metadata
+associated with it, and the files cache is not needed at all. So it is
+safe to disable it via ``--no-files-cache`` and speed up backup
+creation a bit.
+
+By default, the content read from stdin is stored in a file called 'stdin'.
+Use ``--stdin-name`` to change the name.

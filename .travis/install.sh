@@ -26,12 +26,8 @@ then
     eval "$(pyenv init -)"
     if [ "${TOXENV}" = "py35" ]
     then
-        pyenv install 3.5.3
+        pyenv install 3.5.3 #v3.5.0 just won't compile with openssl 1.1.
         pyenv global 3.5.3
-    elif [ "${TOXENV}" = "py36" ]
-    then
-        pyenv install 3.6.0
-        pyenv global 3.6.0
     elif [ "${TOXENV}" = "py37" ]
     then
         pyenv install 3.7.0

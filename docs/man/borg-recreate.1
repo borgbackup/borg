@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2020-06-06" "" "borg backup tool"
+.TH BORG-RECREATE 1 "2020-10-06" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .
@@ -37,11 +37,13 @@ borg [common options] recreate [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
 .sp
 Recreate the contents of existing archives.
 .sp
-This is an \fIexperimental\fP feature. Do \fInot\fP use this on your only backup.
+recreate is a potentially dangerous function and might lead to data loss
+(if used wrongly). BE VERY CAREFUL!
 .sp
-\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP, and PATH
-have the exact same semantics as in "borg create". If PATHs are specified the
-resulting archive will only contain files from these PATHs.
+\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP
+and PATH have the exact same semantics as in "borg create", but they only check
+for files in the archives and not in the local file system. If PATHs are specified,
+the resulting archives will only contain files from these PATHs.
 .sp
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will \fInot\fP match (\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, PATHs).
@@ -59,7 +61,7 @@ Borg 1.x archives.
 Depending on the PATHs and patterns given, recreate can be used to permanently
 delete files from archives.
 When in doubt, use \fB\-\-dry\-run \-\-verbose \-\-list\fP to see how patterns/PATHS are
-interpreted.
+interpreted. See \fIlist_item_flags\fP in \fBborg create\fP for details.
 .sp
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at
@@ -112,7 +114,7 @@ print statistics at end
 .SS Exclusion options
 .INDENT 0.0
 .TP
-.BI \-e \ PATTERN\fP,\fB \ \-\-exclude \ PATTERN
+.BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN
 exclude paths matching PATTERN
 .TP
 .BI \-\-exclude\-from \ EXCLUDEFILE
@@ -139,7 +141,7 @@ if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit 
 .BI \-\-target \ TARGET
 create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
 .TP
-.BI \-c \ SECONDS\fP,\fB \ \-\-checkpoint\-interval \ SECONDS
+.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
 write checkpoint every SECONDS seconds (Default: 1800)
 .TP
 .BI \-\-comment \ COMMENT
@@ -148,7 +150,7 @@ add a comment text to the archive
 .BI \-\-timestamp \ TIMESTAMP
 manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). alternatively, give a reference file/directory.
 .TP
-.BI \-C \ COMPRESSION\fP,\fB \ \-\-compression \ COMPRESSION
+.BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the "borg help compression" command for details.
 .TP
 .BI \-\-recompress \ MODE

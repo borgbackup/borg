@@ -23,7 +23,7 @@ prefer_system_libb2 = True
 
 # prefer_system_msgpack is another option, but you need to set it in src/borg/helpers.py.
 
-min_python = (3, 4)
+min_python = (3, 5)
 my_python = sys.version_info
 
 if my_python < min_python:
@@ -857,7 +857,6 @@ setup(
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',

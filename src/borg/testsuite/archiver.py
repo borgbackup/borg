@@ -61,8 +61,6 @@ from .platform import fakeroot_detected
 from .upgrader import make_attic_repo
 from . import key
 
-# 3.4.3 == first version with argparse bugfix for nargs='*' and 0 arguments given
-argparse_nargs0_fixed = sys.version_info >= (3, 4, 3)
 
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -1053,10 +1051,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
-        if argparse_nargs0_fixed:
-            output = self.cmd('create', '-v', '--list', '--pattern=R input', self.repository_location + '::test')
-            self.assert_in("A input/file1", output)
-            self.assert_in("A input/file2", output)
+        output = self.cmd('create', '-v', '--list', '--pattern=R input', self.repository_location + '::test')
+        self.assert_in("A input/file1", output)
+        self.assert_in("A input/file2", output)
 
     def test_create_pattern(self):
         """test file patterns during create"""

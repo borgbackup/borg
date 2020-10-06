@@ -140,7 +140,7 @@ Dependencies
 To install |project_name| from a source package (including pip), you have to install the
 following dependencies first:
 
-* `Python 3`_ >= 3.4.0, plus development headers. Even though Python 3 is not
+* `Python 3`_ >= 3.5.0, plus development headers. Even though Python 3 is not
   the default Python version on most systems, it is usually available as an
   optional install.
 * OpenSSL_ >= 1.0.0, plus development headers.
@@ -237,7 +237,7 @@ and commands to make FUSE work for using the mount command.
 
      pkg install -y python3 openssl fusefs-libs pkgconf
      pkg install -y git
-     python3.4 -m ensurepip # to install pip for Python3
+     python3 -m ensurepip  # to install pip for Python3
      To use the mount command:
      echo 'fuse_load="YES"' >> /boot/loader.conf
      echo 'vfs.usermount=1' >> /etc/sysctl.conf
@@ -269,7 +269,7 @@ Use the Cygwin installer to install the dependencies::
 
 You can then install ``pip`` and ``virtualenv``::
 
-    easy_install-3.4 pip
+    easy_install-3.7 pip
     pip install virtualenv
 
 

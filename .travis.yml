@@ -7,10 +7,6 @@ cache:
 matrix:
     fast_finish: true
     include:
-        - python: "3.4"
-          os: linux
-          dist: trusty
-          env: TOXENV=py34
         - python: "3.5.2"  # Use version 3.5.2 because it has lzma support while 3.5(.0) does not
           os: linux
           dist: trusty

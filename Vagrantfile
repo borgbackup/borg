@@ -229,10 +229,9 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.5.3  # tests, 3.5.3 is first to support openssl 1.1
     pyenv install 3.6.2  # tests
-    pyenv install 3.7.0  # tests
+    pyenv install 3.7.9  # binary build, use latest 3.7.x release
     pyenv install 3.8.0  # tests
     pyenv install 3.9.0  # tests
-    pyenv install 3.5.10  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -249,9 +248,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.5 release
-    pyenv global 3.5.10
-    pyenv virtualenv 3.5.10 borg-env
+    # use the latest 3.7 release
+    pyenv global 3.7.9
+    pyenv virtualenv 3.7.9 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -288,7 +287,7 @@ def install_pyinstaller()
     . borg-env/bin/activate
     git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    git checkout v3.2.1
+    git checkout v4.0-maint
     python setup.py install
   EOF
 end
@@ -312,8 +311,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.5.3 3.6.2 3.7.0 3.8.0 3.9.0
-      pyenv local 3.5.3 3.6.2 3.7.0 3.8.0 3.9.0
+      pyenv global 3.5.3 3.6.2 3.7.9 3.8.0 3.9.0
+      pyenv local 3.5.3 3.6.2 3.7.9 3.8.0 3.9.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then

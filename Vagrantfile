@@ -22,17 +22,7 @@ def packages_debianoid(user)
     apt-get install -y python3-dev python3-setuptools
     # for building python:
     apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
-    # this way it works on older dists (like ubuntu 12.04) also:
-    # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
-    # newer versions are not compatible with py 3.2 any more.
-    if which easy_install3 2> /dev/null; then
-        # works up to xenial / stretch
-        easy_install3 -i https://pypi.python.org/simple/ 'pip<8.0'
-        pip3 install 'virtualenv<14.0'
-    else
-        # works on recent debian / ubuntu
-        apt-get install -y python3-pip virtualenv python3-virtualenv
-    fi
+    apt-get install -y python3-pip virtualenv python3-virtualenv
   EOF
 end
 

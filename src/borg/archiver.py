@@ -3220,7 +3220,7 @@ class Archiver:
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
-                              help='stay in the same file system and do not store mount points of other file systems')
+                              help='stay in the same file system and do not store mount points of other file systems. Be aware that this treats every btrfs subvolume as a separate file system and will not back them up! Make doubly sure to check your backup does what you want when using btrfs.')
         fs_group.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                               help='only store numeric user and group identifiers')
         # --noatime is the default now and the flag is deprecated. args.noatime is not used any more.

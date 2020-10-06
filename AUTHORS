@@ -1,8 +1,12 @@
+E-mail addresses listed here are not intended for support, please see
+the `support section`_ instead.
+
+.. support section: https://borgbackup.readthedocs.io/en/stable/support.html
+
 Borg authors ("The Borg Collective")
 ------------------------------------
 
 - Thomas Waldmann <tw@waldmann-edv.de>
-- Antoine Beaupré <anarcat@debian.org>
 - Radek Podgorny <radek@podgorny.cz>
 - Yuri D'Elia
 - Michael Hanselmann <public@hansmi.ch>
@@ -12,6 +16,11 @@ Borg authors ("The Borg Collective")
 - Daniel Reichelt <hacking@nachtgeist.net>
 - Lauri Niskanen <ape@ape3000.com>
 - Abdel-Rahman A. (Abogical)
+
+Retired
+```````
+
+- Antoine Beaupré <anarcat@debian.org>
 
 Borg is a fork of Attic.
 

@@ -92,7 +92,6 @@ cython_c_sources = [
     hashindex_source,
     item_source,
     checksums_source,
-
     platform_posix_source,
     platform_linux_source,
     platform_syncfilerange_source,

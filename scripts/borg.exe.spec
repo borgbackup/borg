@@ -3,7 +3,9 @@
 
 import os, sys
 
-basepath = '/vagrant/borg/borg'
+# Note: SPEC contains the spec file argument given to pyinstaller
+here = os.path.dirname(os.path.abspath(SPEC))
+basepath = os.path.abspath(os.path.join(here, '..'))
 
 block_cipher = None
 

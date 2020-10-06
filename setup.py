@@ -3,13 +3,10 @@ import os
 import io
 import re
 import sys
+import textwrap
 from collections import OrderedDict
 from datetime import datetime
 from glob import glob
-
-from distutils.core import Command
-
-import textwrap
 
 import setup_lz4
 import setup_zstd
@@ -60,6 +57,7 @@ extras_require = {
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
+from distutils.core import Command
 from distutils.command.clean import clean
 
 compress_source = 'src/borg/compress.pyx'

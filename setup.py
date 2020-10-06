@@ -58,11 +58,6 @@ extras_require = {
     ],
 }
 
-if sys.platform.startswith('freebsd'):
-    # llfuse was frequently broken / did not build on freebsd
-    # llfuse 0.41.1, 1.1 are ok
-    extras_require['fuse'] = ['llfuse <2.0, !=0.42.*, !=0.43, !=1.0', ]
-
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
 from distutils.command.clean import clean

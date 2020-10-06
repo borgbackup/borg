@@ -63,9 +63,6 @@ if sys.platform.startswith('freebsd'):
     # llfuse 0.41.1, 1.1 are ok
     extras_require['fuse'] = ['llfuse <2.0, !=0.42.*, !=0.43, !=1.0', ]
 
-# if my_python >= (3, 7):
-#     extras_require['fuse'][0] += ', >=1.3.4'
-
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
 from distutils.command.clean import clean

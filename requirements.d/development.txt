@@ -2,12 +2,10 @@ setuptools
 setuptools_scm
 pip
 virtualenv
-# newer cryptography does not build in the jessie vagrant boxes
-cryptography<3.0
 tox
 pytest
 pytest-xdist
 pytest-cov
 pytest-benchmark
-Cython!=0.27
+Cython
 twine

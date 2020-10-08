@@ -2408,7 +2408,7 @@ def prepare_subprocess_env(system, env=None):
         # (non-matching) libraries from there.
         # thus we install the original LDLP, before pyinstaller has modified it:
         lp_key = 'LD_LIBRARY_PATH'
-        lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 / v3.2.1 has this
+        lp_orig = env.get(lp_key + '_ORIG')
         if lp_orig is not None:
             env[lp_key] = lp_orig
         else:

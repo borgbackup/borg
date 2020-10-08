@@ -48,7 +48,7 @@ Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
 Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbackup``
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
-macOS        `Homebrew`_                                  ``brew install borgbackup``
+macOS        `Homebrew`_                                   ``brew install borgbackup``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  ``nix-env -i borgbackup``

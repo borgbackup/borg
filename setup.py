@@ -40,15 +40,6 @@ install_requires = []
 # llfuse package. "borg mount" needs llfuse to work.
 # if you do not have llfuse, do not require it, most of borgbackup will work.
 extras_require = {
-    # llfuse 0.40 (tested, proven, ok), needs FUSE version >= 2.8.0
-    # llfuse 0.41 (tested shortly, looks ok), needs FUSE version >= 2.8.0
-    # llfuse 0.41.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
-    # llfuse 0.42 (tested shortly, looks ok), needs FUSE version >= 2.8.0
-    # llfuse 1.0 (tested shortly, looks ok), needs FUSE version >= 2.8.0
-    # llfuse 1.1.1 (tested shortly, looks ok), needs FUSE version >= 2.8.0
-    # llfuse 1.2 (tested shortly, looks ok), needs FUSE version >= 2.8.0
-    # llfuse 1.3 (tested shortly, looks ok), needs FUSE version >= 2.8.0
-    # llfuse 2.0 will break API
     'fuse': [
         'llfuse >=1.3.4, <1.3.7; python_version <"3.9"',  # broken on py39
         'llfuse >=1.3.7, <2.0; python_version >="3.9"',  # broken on freebsd

@@ -1,5 +1,5 @@
 # coding: utf-8
-#cython: embedsignature=True, c_string_encoding=ascii
+#cython: embedsignature=True, c_string_encoding=ascii, language_level=2
 
 from cpython cimport *
 from cpython.version cimport PY_MAJOR_VERSION

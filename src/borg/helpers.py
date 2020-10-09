@@ -28,6 +28,7 @@ from datetime import datetime, timezone, timedelta
 from functools import partial, lru_cache
 from itertools import islice
 from operator import attrgetter
+from os import scandir
 from string import Formatter
 from shutil import get_terminal_size
 
@@ -2134,68 +2135,6 @@ def consume(iterator, n=None):
         # advance to the empty slice starting at position n
         next(islice(iterator, n, n), None)
 
-# GenericDirEntry, scandir_generic (c) 2012 Ben Hoyt
-# from the python-scandir package (3-clause BSD license, just like us, so no troubles here)
-# note: simplified version
-
-
-class GenericDirEntry:
-    __slots__ = ('name', '_scandir_path', '_path')
-
-    def __init__(self, scandir_path, name):
-        self._scandir_path = scandir_path
-        self.name = name
-        self._path = None
-
-    @property
-    def path(self):
-        if self._path is None:
-            self._path = os.path.join(self._scandir_path, self.name)
-        return self._path
-
-    def stat(self, follow_symlinks=True):
-        assert not follow_symlinks
-        return os.stat(self.path, follow_symlinks=follow_symlinks)
-
-    def _check_type(self, type):
-        st = self.stat(False)
-        return stat.S_IFMT(st.st_mode) == type
-
-    def is_dir(self, follow_symlinks=True):
-        assert not follow_symlinks
-        return self._check_type(stat.S_IFDIR)
-
-    def is_file(self, follow_symlinks=True):
-        assert not follow_symlinks
-        return self._check_type(stat.S_IFREG)
-
-    def is_symlink(self):
-        return self._check_type(stat.S_IFLNK)
-
-    def inode(self):
-        st = self.stat(False)
-        return st.st_ino
-
-    def __repr__(self):
-        return '<{0}: {1!r}>'.format(self.__class__.__name__, self.path)
-
-
-def scandir_generic(path='.'):
-    """Like os.listdir(), but yield DirEntry objects instead of returning a list of names."""
-    for name in os.listdir(path):
-        yield GenericDirEntry(path, name)
-
-
-try:
-    from os import scandir
-except ImportError:
-    try:
-        # Try python-scandir on Python 3.4
-        from scandir import scandir
-    except ImportError:
-        # If python-scandir is not installed, then use a version that is just as slow as listdir.
-        scandir = scandir_generic
-
 
 def scandir_keyfunc(dirent):
     try:
@@ -2469,7 +2408,7 @@ def prepare_subprocess_env(system, env=None):
         # (non-matching) libraries from there.
         # thus we install the original LDLP, before pyinstaller has modified it:
         lp_key = 'LD_LIBRARY_PATH'
-        lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 / v3.2.1 has this
+        lp_orig = env.get(lp_key + '_ORIG')
         if lp_orig is not None:
             env[lp_key] = lp_orig
         else:

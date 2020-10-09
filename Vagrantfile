@@ -18,21 +18,11 @@ def packages_debianoid(user)
     usermod -a -G fuse #{user}
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
-    apt-get install -y fakeroot build-essential git
+    apt-get install -y fakeroot build-essential git curl
     apt-get install -y python3-dev python3-setuptools
     # for building python:
     apt-get install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
-    # this way it works on older dists (like ubuntu 12.04) also:
-    # for python 3.2 on ubuntu 12.04 we need pip<8 and virtualenv<14 as
-    # newer versions are not compatible with py 3.2 any more.
-    if which easy_install3 2> /dev/null; then
-        # works up to xenial / stretch
-        easy_install3 -i https://pypi.python.org/simple/ 'pip<8.0'
-        pip3 install 'virtualenv<14.0'
-    else
-        # works on recent debian / ubuntu
-        apt-get install -y python3-pip virtualenv python3-virtualenv
-    fi
+    apt-get install -y python3-pip virtualenv python3-virtualenv
   EOF
 end
 
@@ -229,10 +219,9 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.5.3  # tests, 3.5.3 is first to support openssl 1.1
     pyenv install 3.6.2  # tests
-    pyenv install 3.7.0  # tests
+    pyenv install 3.7.9  # binary build, use latest 3.7.x release
     pyenv install 3.8.0  # tests
     pyenv install 3.9.0  # tests
-    pyenv install 3.5.10  # binary build, use latest 3.5.x release
     pyenv rehash
   EOF
 end
@@ -249,9 +238,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.5 release
-    pyenv global 3.5.10
-    pyenv virtualenv 3.5.10 borg-env
+    # use the latest 3.7 release
+    pyenv global 3.7.9
+    pyenv virtualenv 3.7.9 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -288,7 +277,7 @@ def install_pyinstaller()
     . borg-env/bin/activate
     git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    git checkout v3.2.1
+    git checkout v4.0-maint
     python setup.py install
   EOF
 end
@@ -312,8 +301,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.5.3 3.6.2 3.7.0 3.8.0 3.9.0
-      pyenv local 3.5.3 3.6.2 3.7.0 3.8.0 3.9.0
+      pyenv global 3.5.3 3.6.2 3.7.9 3.8.0 3.9.0
+      pyenv local 3.5.3 3.6.2 3.7.9 3.8.0 3.9.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then
@@ -403,18 +392,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
   end
 
-  config.vm.define "trusty64" do |b|
-    b.vm.box = "ubuntu/trusty64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("trusty64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trusty64")
-  end
-
   config.vm.define "buster64" do |b|
     b.vm.box = "debian/buster64"
     b.vm.provider :virtualbox do |v|
@@ -434,41 +411,13 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("stretch64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("stretch64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("stretch64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("stretch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("stretch64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
-  end
-
-  config.vm.define "jessie32" do |b|
-    b.vm.box = "debian8-i386"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 768 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("jessie32")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("jessie32")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("jessie32")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("jessie32")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie32")
-  end
-
-  config.vm.define "jessie64" do |b|
-    b.vm.box = "debian8-amd64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("jessie64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("jessie64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("jessie64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("jessie64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jessie64")
   end
 
   # OS X

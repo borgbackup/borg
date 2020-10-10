@@ -9,44 +9,40 @@ matrix:
     include:
         - python: "3.6"
           os: linux
-          dist: trusty
-          env: TOXENV=py36
+          dist: bionic
+          env: TOXENV=py36-fuse2
         - python: "3.7"
           os: linux
-          dist: xenial
-          env: TOXENV=py37
-        - python: "3.7-dev"
-          os: linux
-          dist: xenial
-          env: TOXENV=py37
+          dist: bionic
+          env: TOXENV=py37-fuse2
         - python: "3.8"
           os: linux
-          dist: xenial
-          env: TOXENV=py38
+          dist: focal
+          env: TOXENV=py38-fuse2
         - python: "3.8-dev"
           os: linux
-          dist: xenial
-          env: TOXENV=py38
-        - python: "3.9-dev"
-          os: linux
-          dist: xenial
-          env: TOXENV=py39
+          dist: focal
+          env: TOXENV=py38-fuse3
         - python: "3.9-dev"
           os: linux
           dist: focal
-          env: TOXENV=py39
-        - python: "3.6"
+          env: TOXENV=py39-fuse2
+        - python: "3.9-dev"
           os: linux
-          dist: xenial
+          dist: focal
+          env: TOXENV=py39-fuse3
+        - python: "3.8"
+          os: linux
+          dist: focal
           env: TOXENV=flake8
         - language: generic
           os: osx
           osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions
-          env: TOXENV=py36
+          env: TOXENV=py36-fuse2
         - language: generic
           os: osx
           osx_image: xcode11.3
-          env: TOXENV=py37 SKIPFUSE=true
+          env: TOXENV=py37  # No FUSE testing, because recent versions of macOS don't allow kernel extensions of osxfuse.
     allow_failures:
         - os: osx  # OS X builds often take too long and time out, even though tests don't actually fail
 

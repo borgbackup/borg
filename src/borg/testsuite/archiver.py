@@ -26,11 +26,6 @@ from unittest.mock import patch
 
 import pytest
 
-try:
-    import llfuse
-except ImportError:
-    pass
-
 import borg
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
@@ -55,7 +50,7 @@ from ..locking import LockFailed
 from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
-from . import has_lchflags, has_llfuse
+from . import has_lchflags, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
@@ -798,7 +793,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
 
     @requires_hardlinks
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_mount_hardlinks(self):
         self._extract_hardlinks_setup()
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
@@ -1661,7 +1656,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # verify that command works with read-only repo when using --bypass-lock
             self.cmd('list', self.repository_location, '--bypass-lock')
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_readonly_mount(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_src_archive('test')
@@ -1754,7 +1749,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # delete of the whole repository ignores features
         self.cmd('delete', self.repository_location)
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_unknown_feature_on_mount(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
@@ -2322,7 +2317,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'positional arguments' not in self.cmd('help', 'init', '--epilog-only')
         assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse(self):
         def has_noatime(some_file):
             atime_before = os.stat(some_file).st_atime_ns
@@ -2423,7 +2418,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 else:
                     raise
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_versions_view(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('test', contents=b'first')
@@ -2455,7 +2450,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert os.stat(hl2).st_ino == os.stat(hl3).st_ino
                 assert open(hl3, 'rb').read() == b'123456'
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_src_archive('archive')
@@ -2480,7 +2475,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.fuse_mount(self.repository_location + '::archive', mountpoint, '-o', 'allow_damaged_files'):
             open(os.path.join(mountpoint, path)).close()
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_mount_options(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_src_archive('arch11')
@@ -2502,7 +2497,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.fuse_mount(self.repository_location, mountpoint, '--prefix=nope'):
             assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
-    @unittest.skipUnless(has_llfuse, 'llfuse not installed')
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_migrate_lock_alive(self):
         """Both old_id and new_id must not be stale during lock migration / daemonization."""
         from functools import wraps

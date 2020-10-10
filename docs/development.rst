@@ -288,7 +288,7 @@ Usage::
 Creating standalone binaries
 ----------------------------
 
-Make sure you have everything built and installed (including llfuse and fuse).
+Make sure you have everything built and installed (including fuse stuff).
 When using the Vagrant VMs, pyinstaller will already be installed.
 
 With virtual env activated::

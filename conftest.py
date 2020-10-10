@@ -21,7 +21,7 @@ from borg.logger import setup_logging
 # Ensure that the loggers exist for all tests
 setup_logging()
 
-from borg.testsuite import has_lchflags, has_llfuse
+from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported
 from borg.testsuite.platform import fakeroot_detected, are_acls_working
 from borg import xattr
@@ -33,7 +33,8 @@ def clean_env(tmpdir_factory, monkeypatch):
     monkeypatch.setenv('XDG_CONFIG_HOME', str(tmpdir_factory.mktemp('xdg-config-home')))
     monkeypatch.setenv('XDG_CACHE_HOME', str(tmpdir_factory.mktemp('xdg-cache-home')))
     # also avoid to use anything from the outside environment:
-    keys = [key for key in os.environ if key.startswith('BORG_')]
+    keys = [key for key in os.environ
+            if key.startswith('BORG_') and key not in ('BORG_FUSE_IMPL', )]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
 
@@ -41,7 +42,8 @@ def clean_env(tmpdir_factory, monkeypatch):
 def pytest_report_header(config, startdir):
     tests = {
         "BSD flags": has_lchflags,
-        "fuse": has_llfuse,
+        "fuse2": has_llfuse,
+        "fuse3": has_pyfuse3,
         "root": not fakeroot_detected(),
         "symlinks": are_symlinks_supported(),
         "hardlinks": are_hardlinks_supported(),

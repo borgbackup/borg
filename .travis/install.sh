@@ -48,7 +48,8 @@ then
     #sudo apt-get install -y liblz4-dev  # Too old on trusty and xenial, but might be useful in future versions
     #sudo apt-get install -y libzstd-dev  # Too old on trusty and xenial, but might be useful in future versions
     sudo apt-get install -y libacl1-dev
-    sudo apt-get install -y libfuse-dev fuse  # Required for Python llfuse module
+    sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
+    sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
 
 else
 
@@ -66,13 +67,4 @@ source ~/.venv/bin/activate
 pip install -r requirements.d/development.txt
 pip install codecov
 python setup.py --version
-
-# Recent versions of OS X don't allow kernel extensions which makes the osxfuse tests fail; those versions are marked with SKIPFUSE=true in .travis.yml
-if [ "${SKIPFUSE}" = "true" ]
-then
-    truncate -s 0 requirements.d/fuse.txt
-    pip install -e .
-else
-    pip install -e .[fuse]
-fi
 

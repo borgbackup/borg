@@ -83,8 +83,10 @@ install_requires = [
 # if you do not have llfuse, do not require it, most of borgbackup will work.
 extras_require = {
     'fuse': [
-        'llfuse >=1.3.4, <1.3.7; python_version <"3.9"',  # broken on py39
-        'llfuse >=1.3.7, <2.0; python_version >="3.9"',  # broken on freebsd
+        # 1.3.8 is the fixed version that works on py39 AND freebsd.
+        # if you cythonize yourself and make sure llfuse works for your
+        # OS and python version, you can use other versions than 1.3.8, too.
+        'llfuse >=1.3.4',  # should nowadays pull 1.3.8 or better
     ],
 }
 

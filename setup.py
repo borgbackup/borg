@@ -11,6 +11,7 @@ from glob import glob
 import setup_lz4
 import setup_zstd
 import setup_b2
+import setup_xxhash
 
 # True: use the shared liblz4 (>= 1.7.0 / r129) from the system, False: use the bundled lz4 code
 prefer_system_liblz4 = True
@@ -20,6 +21,9 @@ prefer_system_libzstd = True
 
 # True: use the shared libb2 from the system, False: use the bundled blake2 code
 prefer_system_libb2 = True
+
+# True: use the shared libxxhash (>= 0.6.5 [>= 0.7.2 on ARM]) from the system, False: use the bundled xxhash code
+prefer_system_libxxhash = True
 
 # prefer_system_msgpack is another option, but you need to set it in src/borg/helpers.py.
 
@@ -209,6 +213,18 @@ if prefer_system_libzstd and libzstd_prefix:
     libzstd_system = True
 else:
     libzstd_system = False
+
+possible_libxxhash_prefixes = ['/usr', '/usr/local', '/usr/local/opt/libxxhash', '/usr/local/libxxhash',
+                           '/usr/local/borg', '/opt/local', '/opt/pkg', ]
+if os.environ.get('BORG_LIBXXHASH_PREFIX'):
+    possible_libxxhash_prefixes.insert(0, os.environ.get('BORG_LIBXXHASH_PREFIX'))
+libxxhash_prefix = setup_xxhash.xxhash_system_prefix(possible_libxxhash_prefixes)
+if prefer_system_libxxhash and libxxhash_prefix:
+    print('Detected and preferring libxxhash over bundled XXHASH')
+    define_macros.append(('BORG_USE_LIBXXHASH', 'YES'))
+    libxxhash_system = True
+else:
+    libxxhash_system = False
 
 
 with open('README.rst', 'r') as fd:
@@ -787,6 +803,10 @@ if not on_rtd:
                              include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros)
     crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
                                                system_prefix=libb2_prefix, system=libb2_system,
+                                               **crypto_ext_kwargs)
+
+    crypto_ext_kwargs = setup_xxhash.xxhash_ext_kwargs(bundled_path='src/borg/algorithms/xxh64',
+                                               system_prefix=libxxhash_prefix, system=libxxhash_system,
                                                **crypto_ext_kwargs)
 
     msgpack_endian = '__BIG_ENDIAN__' if (sys.byteorder == 'big') else '__LITTLE_ENDIAN__'

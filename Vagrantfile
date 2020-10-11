@@ -135,7 +135,7 @@ def install_pythons(boxname)
     pyenv install 3.9.0  # tests, version supporting openssl 1.1
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv install 3.7.9  # binary build, tests, version supporting openssl 1.1
-    pyenv install 3.6.1  # tests, version supporting openssl 1.1. coverage-py is broken on 3.6.0.
+    pyenv install 3.6.2  # tests, version supporting openssl 1.1. broken for older 3.6.x.
     pyenv rehash
   EOF
 end
@@ -215,8 +215,8 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.6.1 3.7.9 3.8.0 3.9.0
-      pyenv local 3.6.1 3.7.9 3.8.0 3.9.0
+      pyenv global 3.6.2 3.7.9 3.8.0 3.9.0
+      pyenv local 3.6.2 3.7.9 3.8.0 3.9.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then

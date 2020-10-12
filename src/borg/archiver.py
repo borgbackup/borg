@@ -3111,6 +3111,18 @@ class Archiver:
         and not include any other contents of the containing folder, this can be enabled
         through using the ``--keep-exclude-tags`` option.
 
+        The ``-x`` or ``--one-file-system`` option excludes directories, that are mountpoints (and everything in them).
+        It detects mountpoints by comparing the device number from the output of ``stat()`` of the directory and its
+        parent directory. Specifically, it excludes directories for which ``stat()`` reports a device number different
+        from the device number of their parent. Be aware that in Linux (and possibly elsewhere) there are directories
+        with device number different from their parent, which the kernel does not consider a mountpoint and also the
+        other way around. Examples are bind mounts (possibly same device number, but always a mountpoint) and ALL
+        subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint). Therefore when
+        using ``--one-file-system``, one should make doubly sure that the backup works as intended especially when using
+        btrfs. This is even more important, if the btrfs layout was created by someone else, e.g. a distribution
+        installer.
+
+
         .. _list_item_flags:
 
         Item flags
@@ -3220,7 +3232,7 @@ class Archiver:
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
-                              help='stay in the same file system and do not store mount points of other file systems')
+                              help='stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.')
         fs_group.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
                               help='only store numeric user and group identifiers')
         # --noatime is the default now and the flag is deprecated. args.noatime is not used any more.

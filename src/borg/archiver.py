@@ -3112,13 +3112,15 @@ class Archiver:
         through using the ``--keep-exclude-tags`` option.
 
         The ``-x`` or ``--one-file-system`` option excludes directories, that are mountpoints (and everything in them).
-        It detects mountpoints by comparing the device number from the output of ``stat`` of the directory and its
-        parent. Be aware that in Linux there are directories with device number different from their parent, which the
-        kernel does not consider a mountpoint and also the other way around. Examples are bind mounts (possibly same
-        device number, but always a mountpoint) and ALL subvolumes of a btrfs (different device number from parent but
-        not necessarily a mountpoint). Therefore in Linux one should make doubly sure that the backup works as intended
-        especially when using btrfs. This is even more important, if the btrfs layout was created by someone else, e.g.
-        the distribution installer.
+        It detects mountpoints by comparing the device number from the output of ``stat()`` of the directory and its
+        parent directory. Specifically, it excludes directories for which ``stat()`` reports a device number different
+        from the device number of their parent. Be aware that in Linux (and possibly elsewhere) there are directories
+        with device number different from their parent, which the kernel does not consider a mountpoint and also the
+        other way around. Examples are bind mounts (possibly same device number, but always a mountpoint) and ALL
+        subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint). Therefore when
+        using ``--one-file-system``, one should make doubly sure that the backup works as intended especially when using
+        btrfs. This is even more important, if the btrfs layout was created by someone else, e.g. a distribution
+        installer.
 
 
         .. _list_item_flags:

@@ -3213,10 +3213,11 @@ class Archiver:
                                           help='create backup')
         subparser.set_defaults(func=self.do_create)
 
-        dryrun_group = subparser.add_mutually_exclusive_group()
-        dryrun_group.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+        # note: --dry-run and --stats are mutually exclusive, but we do not want to abort when
+        #  parsing, but rather proceed with the dry-run, but without stats (see run() method).
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not create a backup archive')
-        dryrun_group.add_argument('-s', '--stats', dest='stats', action='store_true',
+        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the created archive')
 
         subparser.add_argument('--list', dest='output_list', action='store_true',

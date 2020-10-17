@@ -933,7 +933,7 @@ class Archiver:
 
         # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
         # where it never seeks on the passed fileobj.
-        tar = tarfile.open(fileobj=tarstream, mode='w|')
+        tar = tarfile.open(fileobj=tarstream, mode='w|', format=tarfile.GNU_FORMAT)
 
         self._export_tar(args, archive, tar)
 

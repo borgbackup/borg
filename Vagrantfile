@@ -200,7 +200,7 @@ def build_binary_with_pyinstaller(boxname)
   EOF
 end
 
-def run_tests(boxname)
+def run_tests(boxname, skip_env)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg/borg
@@ -211,6 +211,8 @@ def run_tests(boxname)
       pyenv local 3.6.2 3.7.9 3.8.0 3.9.0
     fi
     # otherwise: just use the system python
+    # some OSes can only run specific test envs, e.g. because they miss FUSE support:
+    export TOX_SKIP_ENV='#{skip_env}'
     if which fakeroot 2> /dev/null; then
       echo "Running tox WITH fakeroot -u"
       fakeroot -u tox --skip-missing-interpreters
@@ -256,7 +258,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("focal64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64", "^$")
   end
 
   config.vm.define "bionic64" do |b|
@@ -268,7 +270,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("bionic64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64", ".*fuse3.*")
   end
 
   config.vm.define "buster64" do |b|
@@ -284,7 +286,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("buster64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64", "^$")
   end
 
   config.vm.define "stretch64" do |b|
@@ -300,7 +302,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("stretch64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64", ".*fuse3.*")
   end
 
   config.vm.define "arch64" do |b|
@@ -312,7 +314,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages arch", :type => :shell, :privileged => true, :inline => packages_arch
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("arch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64", "^$")
   end
 
   config.vm.define "freebsd64" do |b|
@@ -329,7 +331,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64", ".*fuse3.*")
   end
 
   config.vm.define "openbsd64" do |b|
@@ -342,7 +344,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64", ".*fuse.*")
   end
 
   config.vm.define "darwin64" do |b|
@@ -368,7 +370,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64", ".*fuse3.*")
   end
 
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
@@ -382,7 +384,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
   end
 
   # TODO: create more VMs with python 3.6+ and openssl 1.1.

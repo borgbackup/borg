@@ -226,6 +226,11 @@ def cache_dir(repository, path=None):
     return path or os.path.join(get_cache_dir(), repository.id_str)
 
 
+def files_cache_name():
+    suffix = os.environ.get('BORG_FILES_CACHE_SUFFIX', '')
+    return 'files.' + suffix if suffix else 'files'
+
+
 class CacheConfig:
     def __init__(self, repository, path=None, lock_wait=None):
         self.repository = repository
@@ -497,7 +502,7 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.create()
         ChunkIndex().write(os.path.join(self.path, 'chunks'))
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
-        with SaveFile(os.path.join(self.path, 'files'), binary=True):
+        with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
             pass  # empty file
 
     def _do_open(self):
@@ -527,8 +532,8 @@ class LocalCache(CacheStatsMixin):
         logger.debug('Reading files cache ...')
         msg = None
         try:
-            with IntegrityCheckedFile(path=os.path.join(self.path, 'files'), write=False,
-                                      integrity_data=self.cache_config.integrity.get('files')) as fd:
+            with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=False,
+                                      integrity_data=self.cache_config.integrity.get(files_cache_name())) as fd:
                 u = msgpack.Unpacker(use_list=True)
                 while True:
                     data = fd.read(64 * 1024)
@@ -562,7 +567,7 @@ class LocalCache(CacheStatsMixin):
         pi.output('Initializing cache transaction: Reading chunks')
         shutil.copy(os.path.join(self.path, 'chunks'), txn_dir)
         pi.output('Initializing cache transaction: Reading files')
-        shutil.copy(os.path.join(self.path, 'files'), txn_dir)
+        shutil.copy(os.path.join(self.path, files_cache_name()), txn_dir)
         os.rename(os.path.join(self.path, 'txn.tmp'),
                   os.path.join(self.path, 'txn.active'))
         self.txn_active = True
@@ -581,7 +586,7 @@ class LocalCache(CacheStatsMixin):
                 self._newest_cmtime = 2 ** 63 - 1  # nanoseconds, good until y2262
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             pi.output('Saving files cache')
-            with IntegrityCheckedFile(path=os.path.join(self.path, 'files'), write=True) as fd:
+            with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=True) as fd:
                 for path_hash, item in self.files.items():
                     # Only keep files seen in this backup that are older than newest cmtime seen in this backup -
                     # this is to avoid issues with filesystem snapshots and cmtime granularity.
@@ -590,7 +595,7 @@ class LocalCache(CacheStatsMixin):
                     if entry.age == 0 and bigint_to_int(entry.cmtime) < self._newest_cmtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
-            self.cache_config.integrity['files'] = fd.integrity_data
+            self.cache_config.integrity[files_cache_name()] = fd.integrity_data
         pi.output('Saving chunks cache')
         with IntegrityCheckedFile(path=os.path.join(self.path, 'chunks'), write=True) as fd:
             self.chunks.write(fd)
@@ -614,7 +619,7 @@ class LocalCache(CacheStatsMixin):
         if os.path.exists(txn_dir):
             shutil.copy(os.path.join(txn_dir, 'config'), self.path)
             shutil.copy(os.path.join(txn_dir, 'chunks'), self.path)
-            shutil.copy(os.path.join(txn_dir, 'files'), self.path)
+            shutil.copy(os.path.join(txn_dir, files_cache_name()), self.path)
             os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
             if os.path.exists(os.path.join(self.path, 'txn.tmp')):
                 shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
@@ -881,7 +886,7 @@ class LocalCache(CacheStatsMixin):
             shutil.rmtree(os.path.join(self.path, 'chunks.archive.d'))
             os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         self.chunks = ChunkIndex()
-        with SaveFile(os.path.join(self.path, 'files'), binary=True):
+        with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
             pass  # empty file
         self.cache_config.manifest_id = ''
         self.cache_config._config.set('cache', 'manifest', '')

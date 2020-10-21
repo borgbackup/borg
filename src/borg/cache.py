@@ -567,7 +567,11 @@ class LocalCache(CacheStatsMixin):
         pi.output('Initializing cache transaction: Reading chunks')
         shutil.copy(os.path.join(self.path, 'chunks'), txn_dir)
         pi.output('Initializing cache transaction: Reading files')
-        shutil.copy(os.path.join(self.path, files_cache_name()), txn_dir)
+        try:
+            shutil.copy(os.path.join(self.path, files_cache_name()), txn_dir)
+        except FileNotFoundError:
+            with SaveFile(os.path.join(txn_dir, files_cache_name()), binary=True):
+                pass  # empty file
         os.rename(os.path.join(self.path, 'txn.tmp'),
                   os.path.join(self.path, 'txn.active'))
         self.txn_active = True

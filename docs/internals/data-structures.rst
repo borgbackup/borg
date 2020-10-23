@@ -608,8 +608,8 @@ default is not to have a differently sized header chunk).
 "buzhash" chunker
 +++++++++++++++++
 
-The buzhash chunker triggers (chunks) when the last HASH_MASK_BITS bits of
-the hash are zero, producing chunks of 2^HASH_MASK_BITS Bytes on average.
+The buzhash chunker triggers (chunks) when the last HASH_MASK_BITS bits of the
+hash are zero, producing chunks with a target size of 2^HASH_MASK_BITS Bytes.
 
 Buzhash is **only** used for cutting the chunks at places defined by the
 content, the buzhash value is **not** used as the deduplication criteria (we
@@ -621,7 +621,7 @@ can be used to tune the chunker parameters, the default is:
 
 - CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
 - CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
-- HASH_MASK_BITS = 21 (statistical medium chunk size ~= 2^21 B = 2 MiB)
+- HASH_MASK_BITS = 21 (target chunk size ~= 2^21 B = 2 MiB)
 - HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
 
 The buzhash table is altered by XORing it with a seed randomly generated once

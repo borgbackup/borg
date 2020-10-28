@@ -19,6 +19,12 @@ Examples
     -rwxr-xr-x root   root       2140 Fri, 2015-03-27 20:24:22 bin/bzdiff
     ...
 
+    $ borg list /path/to/repo::root-2016-02-15 --pattern "- bin/bz*"
+    drwxr-xr-x root   root          0 Mon, 2016-02-15 17:44:27 .
+    drwxrwxr-x root   root          0 Mon, 2016-02-15 19:04:49 bin
+    -rwxr-xr-x root   root    1029624 Thu, 2014-11-13 00:08:51 bin/bash
+    ...
+
     $ borg list /path/to/repo::archiveA --format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 .
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code

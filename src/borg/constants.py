@@ -20,6 +20,10 @@ REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time'
 # default umask, overridden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
 
+# default file mode to store stdin data, defaults to read/write for owner and group
+# forcing to 0o100XXX later
+STDIN_MODE_DEFAULT = 0o660
+
 CACHE_TAG_NAME = 'CACHEDIR.TAG'
 CACHE_TAG_CONTENTS = b'Signature: 8a477f597d28d172789f06886806bc55'
 

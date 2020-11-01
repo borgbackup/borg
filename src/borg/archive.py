@@ -1234,14 +1234,19 @@ class FilesystemObjectProcessors:
             item.update(self.metadata_collector.stat_attrs(st, path))  # can't use FD here?
             return status
 
-    def process_pipe(self, *, path, cache, fd):
-        uid, gid = 0, 0
+    def process_pipe(self, *, path, cache, fd, mode, user, group):
+        uid = user2uid(user)
+        if uid is None:
+            raise Error("no such user: %s" % user)
+        gid = group2gid(group)
+        if gid is None:
+            raise Error("no such group: %s" % group)
         t = int(time.time()) * 1000000000
         item = Item(
             path=path,
-            mode=0o100660,  # regular file, ug=rw
-            uid=uid, user=uid2user(uid),
-            gid=gid, group=gid2group(gid),
+            mode=mode & 0o107777 | 0o100000,  # forcing regular file mode
+            uid=uid, user=user,
+            gid=gid, group=group,
             mtime=t, atime=t, ctime=t,
         )
         self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))

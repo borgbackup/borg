@@ -78,6 +78,7 @@ try:
     from .patterns import PatternMatcher
     from .item import Item
     from .platform import get_flags, get_process_id, SyncFile
+    from .platform import uid2user, gid2group
     from .remote import RepositoryServer, RemoteRepository, cache_if_remote
     from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
     from .selftest import selftest
@@ -511,6 +512,9 @@ class Archiver:
             logger.debug('Processing files ...')
             if args.content_from_command:
                 path = args.stdin_name
+                mode = args.stdin_mode
+                user = args.stdin_user
+                group = args.stdin_group
                 if not dry_run:
                     try:
                         try:
@@ -518,7 +522,7 @@ class Archiver:
                         except (FileNotFoundError, PermissionError) as e:
                             self.print_error('Failed to execute command: %s', e)
                             return self.exit_code
-                        status = fso.process_pipe(path=path, cache=cache, fd=proc.stdout)
+                        status = fso.process_pipe(path=path, cache=cache, fd=proc.stdout, mode=mode, user=user, group=group)
                         rc = proc.wait()
                         if rc != 0:
                             self.print_error('Command %r exited with status %d', args.paths[0], rc)
@@ -533,9 +537,12 @@ class Archiver:
                 for path in args.paths:
                     if path == '-':  # stdin
                         path = args.stdin_name
+                        mode = args.stdin_mode
+                        user = args.stdin_user
+                        group = args.stdin_group
                         if not dry_run:
                             try:
-                                status = fso.process_pipe(path=path, cache=cache, fd=sys.stdin.buffer)
+                                status = fso.process_pipe(path=path, cache=cache, fd=sys.stdin.buffer, mode=mode, user=user, group=group)
                             except BackupOSError as e:
                                 status = 'E'
                                 self.print_warning('%s: %s', path, e)
@@ -3222,6 +3229,12 @@ class Archiver:
                                help='experimental: do not synchronize the cache. Implies not using the files cache.')
         subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
                                help='use NAME in archive for stdin data (default: %(default)r)')
+        subparser.add_argument('--stdin-user', metavar='USER', dest='stdin_user', default=uid2user(0),
+                               help='set user USER in archive for stdin data (default: %(default)r)')
+        subparser.add_argument('--stdin-group', metavar='GROUP', dest='stdin_group', default=gid2group(0),
+                               help='set group GROUP in archive for stdin data (default: %(default)r)')
+        subparser.add_argument('--stdin-mode', metavar='M', dest='stdin_mode', type=lambda s: int(s, 8), default=STDIN_MODE_DEFAULT,
+                              help='set mode to M in archive for stdin data (default: %(default)04o)')
         subparser.add_argument('--content-from-command', action='store_true',
                                help='interpret PATH as command and store its stdout. See also section Reading from'
                                     ' stdin below.')

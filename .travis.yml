@@ -23,7 +23,7 @@ matrix:
           os: linux
           dist: focal
           env: TOXENV=py38
-        - python: "3.9-dev"
+        - python: "3.9"
           os: linux
           dist: focal
           env: TOXENV=py39
@@ -31,16 +31,6 @@ matrix:
           os: linux
           dist: focal
           env: TOXENV=flake8
-        - language: generic
-          os: osx
-          osx_image: xcode8.3  # This is the latest working xcode image with osxfuse compatibility; later images come with an OS X version which doesn't allow kernel extensions
-          env: TOXENV=py35
-        - language: generic
-          os: osx
-          osx_image: xcode11.3
-          env: TOXENV=py37 SKIPFUSE=true
-    allow_failures:
-         - os: osx  # OS X builds often take too long and time out, even though tests don't actually fail
 
 before_install: # Abort installation and don't run tests for pull requests if commit only changed the docs
 - |

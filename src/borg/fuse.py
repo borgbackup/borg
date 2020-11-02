@@ -1,4 +1,5 @@
 import errno
+import functools
 import io
 import os
 import stat
@@ -9,7 +10,23 @@ import time
 from collections import defaultdict
 from signal import SIGINT
 
-import llfuse
+from .fuse_impl import llfuse, has_pyfuse3
+
+
+if has_pyfuse3:
+    import trio
+
+    def async_wrapper(fn):
+        @functools.wraps(fn)
+        async def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs)
+        return wrapper
+else:
+    trio = None
+
+    def async_wrapper(fn):
+        return fn
+
 
 from .logger import create_logger
 logger = create_logger()
@@ -26,7 +43,15 @@ from .remote import RemoteRepository
 
 
 def fuse_main():
-    return llfuse.main(workers=1)
+    if has_pyfuse3:
+        try:
+            trio.run(llfuse.main)
+        except:
+            return 1  # TODO return signal number if it was killed by signal
+        else:
+            return None
+    else:
+        return llfuse.main(workers=1)
 
 
 # size of some LRUCaches (1 element per simultaneously open file)
@@ -533,6 +558,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         finally:
             llfuse.close(umount)
 
+    @async_wrapper
     def statfs(self, ctx=None):
         stat_ = llfuse.StatvfsData()
         stat_.f_bsize = 512
@@ -546,7 +572,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         stat_.f_namemax = 255  # == NAME_MAX (depends on archive source OS / FS)
         return stat_
 
-    def getattr(self, inode, ctx=None):
+    def _getattr(self, inode, ctx=None):
         item = self.get_item(inode)
         entry = llfuse.EntryAttributes()
         entry.st_ino = inode
@@ -568,10 +594,16 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
         return entry
 
+    @async_wrapper
+    def getattr(self, inode, ctx=None):
+        return self._getattr(inode, ctx=ctx)
+
+    @async_wrapper
     def listxattr(self, inode, ctx=None):
         item = self.get_item(inode)
         return item.get('xattrs', {}).keys()
 
+    @async_wrapper
     def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
         try:
@@ -579,6 +611,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         except KeyError:
             raise llfuse.FUSEError(llfuse.ENOATTR) from None
 
+    @async_wrapper
     def lookup(self, parent_inode, name, ctx=None):
         self.check_pending_archive(parent_inode)
         if name == b'.':
@@ -589,8 +622,9 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             inode = self.contents[parent_inode].get(name)
             if not inode:
                 raise llfuse.FUSEError(errno.ENOENT)
-        return self.getattr(inode)
+        return self._getattr(inode)
 
+    @async_wrapper
     def open(self, inode, flags, ctx=None):
         if not self.allow_damaged_files:
             item = self.get_item(inode)
@@ -601,12 +635,14 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                 logger.warning('File has damaged (all-zero) chunks. Try running borg check --repair. '
                                'Mount with allow_damaged_files to read damaged files.')
                 raise llfuse.FUSEError(errno.EIO)
-        return inode
+        return llfuse.FileInfo(fh=inode) if has_pyfuse3 else inode
 
+    @async_wrapper
     def opendir(self, inode, ctx=None):
         self.check_pending_archive(inode)
         return inode
 
+    @async_wrapper
     def read(self, fh, offset, size):
         parts = []
         item = self.get_item(fh)
@@ -650,12 +686,25 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                 break
         return b''.join(parts)
 
-    def readdir(self, fh, off):
-        entries = [(b'.', fh), (b'..', self.parent[fh])]
-        entries.extend(self.contents[fh].items())
-        for i, (name, inode) in enumerate(entries[off:], off):
-            yield name, self.getattr(inode), i + 1
+    # note: we can't have a generator (with yield) and not a generator (async) in the same method
+    if has_pyfuse3:
+        async def readdir(self, fh, off, token):
+            entries = [(b'.', fh), (b'..', self.parent[fh])]
+            entries.extend(self.contents[fh].items())
+            for i, (name, inode) in enumerate(entries[off:], off):
+                attrs = self._getattr(inode)
+                if not llfuse.readdir_reply(token, name, attrs, i + 1):
+                    break
 
+    else:
+        def readdir(self, fh, off):
+            entries = [(b'.', fh), (b'..', self.parent[fh])]
+            entries.extend(self.contents[fh].items())
+            for i, (name, inode) in enumerate(entries[off:], off):
+                attrs = self._getattr(inode)
+                yield name, attrs, i + 1
+
+    @async_wrapper
     def readlink(self, inode, ctx=None):
         item = self.get_item(inode)
         return os.fsencode(item.source)

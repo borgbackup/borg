@@ -78,14 +78,17 @@ install_requires = [
 ]
 
 # note for package maintainers: if you package borgbackup for distribution,
-# please add llfuse as a *requirement* on all platforms that have a working
-# llfuse package. "borg mount" needs llfuse to work.
-# if you do not have llfuse, do not require it, most of borgbackup will work.
+# please (if available) add pyfuse3 (preferably) or llfuse (not maintained any more)
+# as a *requirement*. "borg mount" needs one of them to work.
+# if neither is available, do not require it, most of borgbackup will work.
 extras_require = {
-    'fuse': [
-        'llfuse >=1.3.4, <1.3.7; python_version <"3.9"',  # broken on py39
-        'llfuse >=1.3.7, <2.0; python_version >="3.9"',  # broken on freebsd
+    'llfuse': [
+        'llfuse >= 1.3.8',
     ],
+    'pyfuse3': [
+        'pyfuse3 >= 3.1.1',
+    ],
+    'nofuse': [],
 }
 
 compress_source = 'src/borg/compress.pyx'

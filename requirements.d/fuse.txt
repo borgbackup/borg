@@ -1,4 +1,0 @@
-# low-level FUSE support library for "borg mount"
-# please see the comments in setup.py about llfuse.
-llfuse >=1.3.4, <1.3.7; python_version <"3.9"  # broken on py39
-llfuse >=1.3.7, <2.0; python_version >="3.9"  # broken on freebsd

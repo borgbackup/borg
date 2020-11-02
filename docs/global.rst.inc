@@ -22,6 +22,7 @@
 .. _msgpack: https://msgpack.org/
 .. _`msgpack-python`: https://pypi.python.org/pypi/msgpack-python/
 .. _llfuse: https://pypi.python.org/pypi/llfuse/
+.. _pyfuse3: https://pypi.python.org/pypi/pyfuse3/
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
 .. _Cython: http://cython.org/
 .. _virtualenv: https://pypi.python.org/pypi/virtualenv/

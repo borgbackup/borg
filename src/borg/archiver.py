@@ -1265,10 +1265,9 @@ class Archiver:
         """Mount archive or an entire repository as a FUSE filesystem"""
         # Perform these checks before opening the repository and asking for a passphrase.
 
-        try:
-            import borg.fuse
-        except ImportError as e:
-            self.print_error('borg mount not available: loading FUSE support failed [ImportError: %s]' % str(e))
+        from .fuse_impl import llfuse, BORG_FUSE_IMPL
+        if llfuse is None:
+            self.print_error('borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s.' % BORG_FUSE_IMPL)
             return self.exit_code
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):

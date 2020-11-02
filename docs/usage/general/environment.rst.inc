@@ -64,6 +64,16 @@ General:
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.
         Please only use for good reasons as it makes issues harder to analyze.
+    BORG_FUSE_IMPL
+        Choose the lowlevel FUSE implementation borg shall use for ``borg mount``.
+        This is a comma-separated list of implementation names, they are tried in the
+        given order, e.g.:
+
+        - ``pyfuse3,llfuse``: default, first try to load pyfuse3, then try to load llfuse.
+        - ``llfuse,pyfuse3``: first try to load llfuse, then try to load pyfuse3.
+        - ``pyfuse3``: only try to load pyfuse3
+        - ``llfuse``: only try to load llfuse
+        - ``none``: do not try to load an implementation
     BORG_WORKAROUNDS
         A list of comma separated strings that trigger workarounds in borg,
         e.g. to work around bugs in other software.

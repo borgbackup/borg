@@ -23,12 +23,10 @@ from .. import platform
 
 # Note: this is used by borg.selftest, do not use or import py.test functionality here.
 
-try:
-    import llfuse
-    # Does this version of llfuse support ns precision?
-    have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns')
-except ImportError:
-    have_fuse_mtime_ns = False
+from ..fuse_impl import llfuse, has_pyfuse3, has_llfuse
+
+# Does this version of llfuse support ns precision?
+have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns') if llfuse else False
 
 try:
     from pytest import raises
@@ -41,12 +39,6 @@ try:
         platform.set_flags(file.name, stat.UF_NODUMP)
 except OSError:
     has_lchflags = False
-
-try:
-    import llfuse
-    has_llfuse = True or llfuse  # avoids "unused import"
-except ImportError:
-    has_llfuse = False
 
 # The mtime get/set precision varies on different OS and Python versions
 if posix and 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):

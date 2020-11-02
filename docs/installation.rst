@@ -159,8 +159,12 @@ following dependencies first:
   it will fall back to using the bundled code, see above).
   These must be present before invoking setup.py!
 * some other Python dependencies, pip will automatically install them for you.
-* optionally, the llfuse_ Python package is required if you wish to mount an
-  archive as a FUSE filesystem. See setup.py about the version requirements.
+* optionally, if you wish to mount an archive as a FUSE filesystem, you need
+  a FUSE implementation for Python:
+
+  - Either pyfuse3_ (preferably, newer and maintained) or llfuse_ (older,
+    unmaintained now). See also the BORG_FUSE_IMPL env variable.
+  - See setup.py about the version requirements.
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below or the Vagrantfile in the git repository,
@@ -186,7 +190,8 @@ Install the dependencies with development headers::
     liblz4-dev libzstd-dev \
     build-essential \
     pkg-config python3-pkgconfig
-    sudo apt-get install libfuse-dev fuse    # optional, for FUSE support
+    sudo apt-get install libfuse-dev fuse    # needed for llfuse
+    sudo apt-get install libfuse3-dev fuse3  # needed for pyfuse3
 
 In case you get complaints about permission denied on ``/etc/fuse.conf``: on
 Ubuntu this means your user is not in the ``fuse`` group. Add yourself to that
@@ -203,7 +208,8 @@ Install the dependencies with development headers::
     lz4-devel libzstd-devel \
     pkgconf python3-pkgconfig
     sudo dnf install gcc gcc-c++ redhat-rpm-config
-    sudo dnf install fuse-devel fuse         # optional, for FUSE support
+    sudo dnf install fuse-devel fuse         # needed for llfuse
+    sudo dnf install fuse3-devel fuse3       # needed for pyfuse3
 
 openSUSE Tumbleweed / Leap
 ++++++++++++++++++++++++++
@@ -218,7 +224,8 @@ Alternatively, you can enumerate all build dependencies in the command line::
     libacl-devel openssl-devel \
     python3-Cython python3-Sphinx python3-msgpack-python \
     python3-pytest python3-setuptools python3-setuptools_scm \
-    python3-sphinx_rtd_theme python3-llfuse gcc gcc-c++
+    python3-sphinx_rtd_theme gcc gcc-c++
+    sudo zypper install python3-llfuse  # llfuse
 
 Mac OS X
 ++++++++
@@ -234,7 +241,7 @@ For FUSE support to mount the backup archives, you need at least version 3.0 of
 FUSE for OS X, which is available via `github
 <https://github.com/osxfuse/osxfuse/releases/latest>`__, or via Homebrew::
 
-    brew cask install osxfuse
+    brew cask install osxfuse  # needed for llfuse
 
 
 FreeBSD
@@ -248,7 +255,7 @@ and commands to make FUSE work for using the mount command.
      pkg install -y python3 pkgconf
      pkg install openssl
      pkg install liblz4 zstd
-     pkg install fusefs-libs
+     pkg install fusefs-libs  # needed for llfuse
      pkg install -y git
      python3.5 -m ensurepip # to install pip for Python3
      To use the mount command:
@@ -308,15 +315,17 @@ This will use ``pip`` to install the latest release from PyPi::
 
     # might be required if your tools are outdated
     pip install -U pip setuptools wheel
+
     # install Borg + Python dependencies into virtualenv
     pip install borgbackup
     # or alternatively (if you want FUSE support):
-    pip install borgbackup[fuse]
+    pip install borgbackup[llfuse]  # to use llfuse
+    pip install borgbackup[pyfuse3]  # to use pyfuse3
 
 To upgrade Borg to a new version later, run the following after
 activating your virtual environment::
 
-    pip install -U borgbackup  # or ... borgbackup[fuse]
+    pip install -U borgbackup  # or ... borgbackup[llfuse/pyfuse3]
 
 .. _git-installation:
 
@@ -339,8 +348,12 @@ While we try not to break master, there are no guarantees on anything.
     cd borg
     pip install -r requirements.d/development.txt
     pip install -r requirements.d/docs.txt  # optional, to build the docs
-    pip install -r requirements.d/fuse.txt  # optional, for FUSE support
-    pip install -e .  # in-place editable mode
+
+    pip install -e .           # in-place editable mode
+    or
+    pip install -e .[pyfuse3]  # in-place editable mode, use pyfuse3
+    or
+    pip install -e .[llfuse]   # in-place editable mode, use llfuse
 
     # optional: run all the tests, on all supported Python versions
     # requires fakeroot, available through your package manager

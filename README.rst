@@ -177,9 +177,9 @@ see ``docs/support.rst`` in the source distribution).
         :alt: Documentation
         :target: https://borgbackup.readthedocs.org/en/stable/
 
-.. |build| image:: https://api.travis-ci.org/borgbackup/borg.svg
-        :alt: Build Status
-        :target: https://travis-ci.org/borgbackup/borg
+.. |build| image:: https://travis-ci.com/borgbackup/borg.svg?branch=master
+        :alt: Build Status (master)
+        :target: https://travis-ci.com/borgbackup/borg
 
 .. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
         :alt: Test Coverage

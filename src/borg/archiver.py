@@ -4496,6 +4496,8 @@ class Archiver:
                               self.do_list, self.do_mount, self.do_umount}
             if func not in bypass_allowed:
                 raise Error('Not allowed to bypass locking mechanism for chosen command')
+        if getattr(args, 'timestamp', None):
+            args.location = args.location.with_timestamp(args.timestamp)
         return args
 
     def prerun_checks(self, logger, is_serve):

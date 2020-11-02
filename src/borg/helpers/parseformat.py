@@ -203,7 +203,7 @@ def format_line(format, data):
         raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 
 
-def replace_placeholders(text):
+def replace_placeholders(text, overrides={}):
     """Replace placeholders in text with their values."""
     from ..platform import fqdn, hostname, getosusername
     current_time = datetime.now(timezone.utc)
@@ -220,6 +220,7 @@ def replace_placeholders(text):
         'borgmajor': '%d' % borg_version_tuple[:1],
         'borgminor': '%d.%d' % borg_version_tuple[:2],
         'borgpatch': '%d.%d.%d' % borg_version_tuple[:3],
+        **overrides,
     }
     return format_line(text, data)
 
@@ -387,13 +388,13 @@ class Location:
         )
         """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
-    def __init__(self, text=''):
-        if not self.parse(text):
+    def __init__(self, text='', overrides={}):
+        if not self.parse(text, overrides):
             raise ValueError('Invalid location format: "%s"' % self.orig)
 
-    def parse(self, text):
+    def parse(self, text, overrides={}):
         self.orig = text
-        text = replace_placeholders(text)
+        text = replace_placeholders(text, overrides)
         valid = self._parse(text)
         if valid:
             return True
@@ -496,6 +497,12 @@ class Location:
                                            self._host,  # needed for ipv6 addrs
                                            ':{}'.format(self.port) if self.port else '',
                                            path)
+
+    def with_timestamp(self, timestamp):
+        return Location(self.orig, overrides={
+            'now': DatetimeWrapper(timestamp.astimezone(None)),
+            'utcnow': DatetimeWrapper(timestamp),
+        })
 
 
 def location_validator(archive=None, proto=None):

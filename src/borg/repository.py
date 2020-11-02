@@ -301,7 +301,7 @@ class Repository:
             try:
                 os.link(config_path, old_config_path)
             except OSError as e:
-                if e.errno in (errno.EMLINK, errno.ENOSYS, errno.EPERM, errno.EACCES, errno.ENOTSUP):
+                if e.errno in (errno.EMLINK, errno.ENOSYS, errno.EPERM, errno.EACCES, errno.ENOTSUP, errno.EIO):
                     logger.warning(link_error_msg)
                 else:
                     raise

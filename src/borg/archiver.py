@@ -71,6 +71,7 @@ try:
     from .helpers import dash_open
     from .helpers import umount
     from .helpers import msgpack, msgpack_fallback
+    from .helpers import uid2user, gid2group
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
@@ -524,9 +525,12 @@ class Archiver:
             for path in args.paths:
                 if path == '-':  # stdin
                     path = args.stdin_name
+                    mode = args.stdin_mode
+                    user = args.stdin_user
+                    group = args.stdin_group
                     if not dry_run:
                         try:
-                            status = archive.process_stdin(path, cache)
+                            status = archive.process_stdin(path, cache, mode, user, group)
                         except BackupOSError as e:
                             status = 'E'
                             self.print_warning('%s: %s', path, e)
@@ -3408,6 +3412,12 @@ class Archiver:
                                help='do not load/update the file metadata cache used to detect unchanged files')
         subparser.add_argument('--stdin-name', metavar='NAME', dest='stdin_name', default='stdin',
                                help='use NAME in archive for stdin data (default: "stdin")')
+        subparser.add_argument('--stdin-user', metavar='USER', dest='stdin_user', default=uid2user(0),
+                                help='set user USER in archive for stdin data (default: %(default)r)')
+        subparser.add_argument('--stdin-group', metavar='GROUP', dest='stdin_group', default=gid2group(0),
+                                help='set group GROUP in archive for stdin data (default: %(default)r)')
+        subparser.add_argument('--stdin-mode', metavar='M', dest='stdin_mode', type=lambda s: int(s, 8), default=STDIN_MODE_DEFAULT,
+                                help='set mode to M in archive for stdin data (default: %(default)04o)')
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)
         exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',

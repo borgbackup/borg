@@ -1025,14 +1025,19 @@ Utilization of max. archive size: {csize_max:.0%}
                 for chunk in item.chunks:
                     cache.chunk_incref(chunk.id, dummy_stats, size=chunk.size)
 
-    def process_stdin(self, path, cache):
-        uid, gid = 0, 0
+    def process_stdin(self, path, cache, mode, user, group):
+        uid = user2uid(user)
+        if uid is None:
+            raise Error("no such user: %s" % user)
+        gid = group2gid(group)
+        if gid is None:
+            raise Error("no such group: %s" % group)
         t = int(time.time()) * 1000000000
         item = Item(
             path=path,
-            mode=0o100660,  # regular file, ug=rw
-            uid=uid, user=uid2user(uid),
-            gid=gid, group=gid2group(gid),
+            mode=mode & 0o107777 | 0o100000,  # forcing regular file mode
+            uid=uid, user=user,
+            gid=gid, group=group,
             mtime=t, atime=t, ctime=t,
         )
         fd = sys.stdin.buffer  # binary

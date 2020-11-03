@@ -60,13 +60,14 @@ jobs:
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
       PKG_CONFIG_PATH: /usr/local/opt/openssl@1.1/lib/pkgconfig
-      # TODO: fix why setuptools_scm can not determine version
-      SETUPTOOLS_SCM_PRETEND_VERSION: 1.2.0
 
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v2
+      with:
+        # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
+        fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:

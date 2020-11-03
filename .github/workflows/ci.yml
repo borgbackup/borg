@@ -1,25 +1,114 @@
+# badge: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=master
+
 name: CI
 
 on:
   push:
     branches: [ master ]
+    paths:
+    - '**.py'
+    - '**.pyx'
+    - '**.c'
+    - '**.h'
+    - '**.yml'
+    - '**.cfg'
+    - '**.ini'
+    - 'requirements.d/*'
+    - '!docs/**'
   pull_request:
     branches: [ master ]
+    paths:
+    - '**.py'
+    - '**.pyx'
+    - '**.c'
+    - '**.h'
+    - '**.yml'
+    - '**.cfg'
+    - '**.ini'
+    - 'requirements.d/*'
+    - '!docs/**'
 
 jobs:
-  build:
+  lint:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python 3.8
+    - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
-    - name: Install dependencies
-      run: |
-        pip install flake8
     - name: Lint with flake8
       run: |
+        pip install flake8
         flake8 src scripts conftest.py
+
+  pytest:
+
+    needs: lint
+    strategy:
+      matrix:
+        os: [ubuntu-20.04]
+        python-version: [3.6, 3.7, 3.8, 3.9]
+        include:
+            - os: macos-latest
+              # note: it seems that 3.7 and 3.8 are currently broken,
+              # neverending RuntimeError crashes...
+              python-version: 3.7
+
+    env:
+      # Configure pkg-config to use OpenSSL from Homebrew
+      PKG_CONFIG_PATH: /usr/local/opt/openssl@1.1/lib/pkgconfig
+      # TODO: fix why setuptools_scm can not determine version
+      SETUPTOOLS_SCM_PRETEND_VERSION: 1.2.0
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Cache pip
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
+        restore-keys: |
+            ${{ runner.os }}-pip-
+            ${{ runner.os }}-
+
+    - name: Install Linux packages
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config build-essential
+        sudo apt-get install -y libxxhash-dev || true
+        sudo apt-get install -y libb2-dev || true
+        sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
+        sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
+
+    - name: Install macOS packages
+      if: ${{ runner.os == 'macOS' }}
+      run: |
+        brew install pkg-config || brew upgrade pkg-config
+        brew install zstd || brew upgrade zstd
+        brew install lz4 || brew upgrade lz4
+        brew install openssl@1.1 || brew upgrade openssl@1.1
+        #brew install Caskroom/cask/osxfuse || brew upgrade Caskroom/cask/osxfuse  # Required for Python llfuse module
+
+    - name: Install Python requirements
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.d/development.txt
+    - name: Install borgbackup
+      run: |
+        # pip install -e .
+        python setup.py -v develop
+    - name: run pytest via tox
+      run: |
+        # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
+        #sudo -E bash -c "tox -e py"
+        tox -e py

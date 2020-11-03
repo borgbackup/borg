@@ -3078,6 +3078,7 @@ class Archiver:
           as it can not be set from userspace. But, a metadata-only change will already
           update the ctime, so there might be some unnecessary chunking/hashing even
           without content changes. Some filesystems do not support ctime (change time).
+          E.g. doing a chown or chmod to a file will change its ctime.
         - mtime usually works and only updates if file contents were changed. But mtime
           can be arbitrarily set from userspace, e.g. to set mtime back to the same value
           it had before a content change happened. This can be used maliciously as well as

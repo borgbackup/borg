@@ -3686,10 +3686,12 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cache_path = json.loads(self.cmd('info', self.repository_location, '--json'))['cache']['path']
 
-    def corrupt(self, file):
+    def corrupt(self, file, amount=1):
         with open(file, 'r+b') as fd:
-            fd.seek(-1, io.SEEK_END)
-            fd.write(b'1')
+            fd.seek(-amount, io.SEEK_END)
+            corrupted = bytes(255-c for c in fd.read(amount))
+            fd.seek(-amount, io.SEEK_END)
+            fd.write(corrupted)
 
     def test_cache_chunks(self):
         self.corrupt(os.path.join(self.cache_path, 'chunks'))

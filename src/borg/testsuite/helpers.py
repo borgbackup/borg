@@ -189,6 +189,10 @@ class TestLocationWithoutEnv:
         assert repr(Location('ssh://host/path::2016-12-31@23:59:59')) == \
             "Location(proto='ssh', user=None, host='host', port=None, path='/path', archive='2016-12-31@23:59:59')"
 
+    def test_with_timestamp(self):
+        assert repr(Location('path::archive-{utcnow}').with_timestamp(datetime(2002, 9, 19))) == \
+            "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive-2002-09-19T00:00:00')"
+
     def test_underspecified(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         with pytest.raises(ValueError):
@@ -933,6 +937,10 @@ def test_replace_placeholders():
     now = datetime.now()
     assert " " not in replace_placeholders('{now}')
     assert int(replace_placeholders('{now:%Y}')) == now.year
+
+
+def test_override_placeholders():
+    assert replace_placeholders('{uuid4}', overrides={'uuid4': "overridden"}) == "overridden"
 
 
 def working_swidth():

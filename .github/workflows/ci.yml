@@ -4,7 +4,7 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ 1.1-maint ]
     paths:
     - '**.py'
     - '**.pyx'
@@ -16,7 +16,7 @@ on:
     - 'requirements.d/*'
     - '!docs/**'
   pull_request:
-    branches: [ master ]
+    branches: [ 1.1-maint ]
     paths:
     - '**.py'
     - '**.pyx'
@@ -51,22 +51,25 @@ jobs:
       matrix:
         include:
             - os: ubuntu-20.04
+              python-version: 3.5
+              toxenv: py35
+            - os: ubuntu-20.04
               python-version: 3.6
-              toxenv: py36-fuse2
+              toxenv: py36
             - os: ubuntu-20.04
               python-version: 3.7
-              toxenv: py37-fuse2
+              toxenv: py37
             - os: ubuntu-20.04
               python-version: 3.8
-              toxenv: py38-fuse3
+              toxenv: py38
             - os: ubuntu-20.04
               python-version: 3.9
-              toxenv: py39-fuse3
+              toxenv: py39
             - os: macos-latest
               # note: it seems that 3.8 and 3.9 are currently broken,
               # neverending RuntimeError crashes...
               python-version: 3.7
-              toxenv: py37-fuse2
+              toxenv: py37
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
@@ -101,7 +104,6 @@ jobs:
         sudo apt-get install -y libxxhash-dev || true
         sudo apt-get install -y libb2-dev || true
         sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
-        sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
 
     - name: Install macOS packages
       if: ${{ runner.os == 'macOS' }}

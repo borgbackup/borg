@@ -49,24 +49,37 @@ jobs:
     needs: lint
     strategy:
       matrix:
-        os: [ubuntu-20.04]
-        python-version: [3.6, 3.7, 3.8, 3.9]
         include:
+            - os: ubuntu-20.04
+              python-version: 3.6
+              toxenv: py36-fuse2
+            - os: ubuntu-20.04
+              python-version: 3.7
+              toxenv: py37-fuse2
+            - os: ubuntu-20.04
+              python-version: 3.8
+              toxenv: py38-fuse3
+            - os: ubuntu-20.04
+              python-version: 3.9
+              toxenv: py39-fuse3
             - os: macos-latest
-              # note: it seems that 3.7 and 3.8 are currently broken,
+              # note: it seems that 3.8 and 3.9 are currently broken,
               # neverending RuntimeError crashes...
               python-version: 3.7
+              toxenv: py37-fuse2
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
       PKG_CONFIG_PATH: /usr/local/opt/openssl@1.1/lib/pkgconfig
-      # TODO: fix why setuptools_scm can not determine version
-      SETUPTOOLS_SCM_PRETEND_VERSION: 1.2.0
+      TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v2
+      with:
+        # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
+        fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -97,7 +110,7 @@ jobs:
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
         brew install openssl@1.1 || brew upgrade openssl@1.1
-        #brew install Caskroom/cask/osxfuse || brew upgrade Caskroom/cask/osxfuse  # Required for Python llfuse module
+        brew install Caskroom/cask/osxfuse || brew upgrade Caskroom/cask/osxfuse  # Required for Python llfuse module
 
     - name: Install Python requirements
       run: |
@@ -111,4 +124,4 @@ jobs:
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
-        tox -e py
+        tox --skip-missing-interpreters

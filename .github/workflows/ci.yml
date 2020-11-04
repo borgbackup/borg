@@ -62,7 +62,7 @@ jobs:
             - os: ubuntu-20.04
               python-version: 3.9
               toxenv: py39-fuse3
-            - os: macos-latest
+            - os: macos-11.0
               # note: it seems that 3.8 and 3.9 are currently broken,
               # neverending RuntimeError crashes...
               python-version: 3.7

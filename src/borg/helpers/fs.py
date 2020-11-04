@@ -38,13 +38,13 @@ def ensure_dir(path, name=None, mode=None, reraise=False):
     except FileExistsError:
         return False
     except FileNotFoundError as e:
-        print("Error : Could not create directory '%s'\n%s" % (name, e))
+        logger.error("Could not create directory '%s'\n%s" % (name, e))
         if reraise:
-            raise Error(e)
+            raise Error(e.args[1])
     except OSError as e:
-        print("Error : Could not create directory '%s'\n%s" % (name, e))
+        logger.error("Error : Could not create directory '%s'\n%s" % (name, e))
         if reraise:
-            raise Error(e)
+            raise Error(e.args[1])
     return True
 
 

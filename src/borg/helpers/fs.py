@@ -7,6 +7,8 @@ import subprocess
 import sys
 import textwrap
 
+from .errors import Error
+
 from .process import prepare_subprocess_env
 from ..platformflags import is_win32
 
@@ -17,6 +19,33 @@ logger = create_logger()
 
 
 py_37_plus = sys.version_info >= (3, 7)
+
+
+def ensure_dir(path, name=None, mode=None, reraise=False):
+    """
+    Ensures that the dir exists with the right permissions.
+    1) Make sure the directory exists in a race-free condition
+    2) If mode is not None and the directory has been created, give the right
+    permissions
+    3) If reraise is True, catch fatal exceptions, reraise them with a pretty
+    message and the full exception output.
+    Returns True if the file has been created and has the right permissions,
+    False otherwise
+    """
+    mode = 0o777 if mode is None else mode
+    try:
+        os.makedirs(path, exist_ok=False)
+    except FileExistsError:
+        return False
+    except FileNotFoundError as e:
+        print("Error : Could not create directory '%s'\n%s" % (name, e))
+        if reraise:
+            raise Error(e)
+    except OSError as e:
+        print("Error : Could not create directory '%s'\n%s" % (name, e))
+        if reraise:
+            raise Error(e)
+    return True
 
 
 def get_base_dir():
@@ -41,9 +70,8 @@ def get_keys_dir():
     """Determine where to repository keys and cache"""
 
     keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(get_config_dir(), 'keys'))
-    if not os.path.exists(keys_dir):
-        os.makedirs(keys_dir)
-        os.chmod(keys_dir, stat.S_IRWXU)
+    if ensure_dir(keys_dir, "key directory", stat.S_IRWXU, reraise=True):
+        logger.debug("Created keys directory : %s" % keys_dir)
     return keys_dir
 
 
@@ -52,9 +80,9 @@ def get_security_dir(repository_id=None):
     security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(get_config_dir(), 'security'))
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
-    if not os.path.exists(security_dir):
-        os.makedirs(security_dir)
-        os.chmod(security_dir, stat.S_IRWXU)
+    if ensure_dir(security_dir, "security directory", stat.S_IRWXU,
+                  reraise=True):
+        logger.debug("Created security directory : %s" % security_dir)
     return security_dir
 
 
@@ -68,16 +96,15 @@ def get_cache_dir():
     # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(cache_home, 'borg'))
     # Create path if it doesn't exist yet
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
-        os.chmod(cache_dir, stat.S_IRWXU)
-        with open(os.path.join(cache_dir, CACHE_TAG_NAME), 'wb') as fd:
-            fd.write(CACHE_TAG_CONTENTS)
-            fd.write(textwrap.dedent("""
-                # This file is a cache directory tag created by Borg.
-                # For information about cache directory tags, see:
-                #       http://www.bford.info/cachedir/spec.html
-                """).encode('ascii'))
+    if ensure_dir(cache_dir, "cache directory", stat.S_IRWXU, reraise=True):
+        logger.debug("Created cache directory : %s" % cache_dir)
+    with open(os.path.join(cache_dir, CACHE_TAG_NAME), 'wb') as fd:
+        fd.write(CACHE_TAG_CONTENTS)
+        fd.write(textwrap.dedent("""
+        # This file is a cache directory tag created by Borg.
+        # For information about cache directory tags, see:
+        #       http://www.bford.info/cachedir/spec.html
+        """).encode('ascii'))
     return cache_dir
 
 
@@ -91,9 +118,8 @@ def get_config_dir():
     # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
     config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(config_home, 'borg'))
     # Create path if it doesn't exist yet
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-        os.chmod(config_dir, stat.S_IRWXU)
+    if ensure_dir(config_dir, "config directory", stat.S_IRWXU, reraise=True):
+        logger.debug("Created config directory : %s" % config_dir)
     return config_dir
 
 

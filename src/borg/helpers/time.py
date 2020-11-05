@@ -24,7 +24,7 @@ def timestamp(s):
     try:
         # is it pointing to a file / directory?
         ts = safe_s(os.stat(s).st_mtime)
-        return datetime.utcfromtimestamp(ts)
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
         # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
         for format in ('%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S+00:00',
@@ -33,7 +33,7 @@ def timestamp(s):
                        '%Y-%m-%d', '%Y-%j',
                        ):
             try:
-                return datetime.strptime(s, format)
+                return datetime.strptime(s, format).replace(tzinfo=timezone.utc)
             except ValueError:
                 continue
         raise ValueError

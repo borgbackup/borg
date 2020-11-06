@@ -120,11 +120,7 @@ Ansible
 -------
 
 Ansible takes care of all the system-specific commands to add the user, create the
-folder. Even when the configuration is changed the repository server configuration is
-satisfied and reproducible.
-
-Automate setting up an repository server with the user, group, folders and
-permissions a Ansible playbook could be used.
+folder, install and configure software.
 
 ::
 

@@ -190,7 +190,7 @@ class TestLocationWithoutEnv:
             "Location(proto='ssh', user=None, host='host', port=None, path='/path', archive='2016-12-31@23:59:59')"
 
     def test_with_timestamp(self):
-        assert repr(Location('path::archive-{utcnow}').with_timestamp(datetime(2002, 9, 19))) == \
+        assert repr(Location('path::archive-{utcnow}').with_timestamp(datetime(2002, 9, 19, tzinfo=timezone.utc))) == \
             "Location(proto='file', user=None, host=None, port=None, path='path', archive='archive-2002-09-19T00:00:00')"
 
     def test_underspecified(self, monkeypatch):

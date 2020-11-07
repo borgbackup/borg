@@ -75,9 +75,8 @@ Using root likely will be required if you want to backup files of other users
 or the operating system. If you only back up your own files, you neither need
 nor want to use root.
 
-Avoid to create a mixup of users and permissions in your repository (or cache).
-
-This can easily happen if you run borg using different user accounts (e.g. your
+Mixup of users and permissions in your repository (or cache) is unwanted.
+It will easily happen if you run borg using different user accounts (e.g. your
 non-privileged user and root) while accessing the same repo.
 
 Of course, a non-root user will have no permission to work with the files

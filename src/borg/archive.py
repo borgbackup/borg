@@ -1203,12 +1203,12 @@ class FilesystemObjectProcessors:
     def process_dir(self, *, path, parent_fd, name, st):
         with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
-                        noatime=True, op='dir_open') as child_fd:
-                # child_fd is None for directories on windows, in that case a race condition check is not possible.
-                if child_fd is not None:
+                        noatime=True, op='dir_open') as fd:
+                # fd is None for directories on windows, in that case a race condition check is not possible.
+                if fd is not None:
                     with backup_io('fstat'):
-                        st = stat_update_check(st, os.fstat(child_fd))
-                item.update(self.metadata_collector.stat_attrs(st, path, fd=child_fd))
+                        st = stat_update_check(st, os.fstat(fd))
+                item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
                 return status
 
     def process_fifo(self, *, path, parent_fd, name, st):

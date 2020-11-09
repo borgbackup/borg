@@ -729,14 +729,18 @@ class Archiver:
                         self.print_file_status('x', path)
                         return
 
-            if stat.S_ISDIR(st.st_mode):
+            if not stat.S_ISDIR(st.st_mode):
+                # directories cannot go in this branch because they can be excluded based on tag
+                # files they might contain
+                status = self._process_any(path=path, parent_fd=parent_fd, name=name, st=st, fso=fso, cache=cache,
+                                           read_special=read_special, dry_run=dry_run)
+            else:
                 with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
                             noatime=True, op='dir_open') as child_fd:
                     # child_fd is None for directories on windows, in that case a race condition check is not possible.
                     if child_fd is not None:
                         with backup_io('fstat'):
                             st = stat_update_check(st, os.fstat(child_fd))
-
                     if recurse:
                         tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present)
                         if tag_names:
@@ -770,12 +774,6 @@ class Archiver:
                                     exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
                                     keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes, restrict_dev=restrict_dev,
                                     read_special=read_special, dry_run=dry_run)
-            else:
-                # everything non-directory goes is this branch
-                # note that directories have to be handled specifically just because they can be
-                # excluded based on tag files they might contain
-                status = self._process_any(path=path, parent_fd=parent_fd, name=name, st=st, fso=fso, cache=cache,
-                                           read_special=read_special, dry_run=dry_run)
 
         except (BackupOSError, BackupError) as e:
             self.print_warning('%s: %s', path, e)

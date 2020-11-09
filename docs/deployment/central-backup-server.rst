@@ -120,13 +120,7 @@ Ansible
 -------
 
 Ansible takes care of all the system-specific commands to add the user, create the
-folder. Even when the configuration is changed the repository server configuration is
-satisfied and reproducible.
-
-Automate setting up an repository server with the user, group, folders and
-permissions a Ansible playbook could be used. Keep in mind the playbook
-uses the Arch Linux `pacman <https://www.archlinux.org/pacman/pacman.8.html>`_
-package manager to install and keep borg up-to-date.
+folder, install and configure software.
 
 ::
 
@@ -144,7 +138,7 @@ package manager to install and keep borg up-to-date.
         - host: app01.clnt.local
           key: "{{ lookup('file', '/path/to/keys/app01.clnt.local.pub') }}"
     tasks:
-    - pacman: name=borg state=latest update_cache=yes
+    - package: name=borg state=present
     - group: name="{{ group }}" state=present
     - user: name="{{ user }}" shell=/bin/bash home="{{ home }}" createhome=yes group="{{ group }}" groups= state=present
     - file: path="{{ home }}" owner="{{ user }}" group="{{ group }}" mode=0700 state=directory

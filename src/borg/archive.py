@@ -1200,6 +1200,11 @@ class FilesystemObjectProcessors:
         if hardlink_master:
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
 
+    def process_dir_with_fd(self, *, path, fd, st):
+        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+            item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
+            return status
+
     def process_dir(self, *, path, parent_fd, name, st):
         with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,

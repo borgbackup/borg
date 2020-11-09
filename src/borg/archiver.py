@@ -759,7 +759,7 @@ class Archiver:
                                 self.print_file_status('x', path)
                             return
                     if not recurse_excluded_dir and not dry_run:
-                        status = fso.process_dir_with_fd(path=path, fd=fd, st=st)
+                        status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
                     if recurse:
                         with backup_io('scandir'):
                             entries = helpers.scandir_inorder(path=path, fd=child_fd)

@@ -720,7 +720,7 @@ class Archiver:
             # if restrict_dev is given, we do not want to recurse into a new filesystem,
             # but we WILL save the mountpoint directory (or more precise: the root
             # directory of the mounted filesystem that shadows the mountpoint dir).
-            right_dev = restrict_dev is None or st.st_dev == restrict_dev
+            recurse = restrict_dev is None or st.st_dev == restrict_dev
 
             if self.exclude_nodump:
                 # Ignore if nodump flag is set
@@ -737,31 +737,30 @@ class Archiver:
                         with backup_io('fstat'):
                             st = stat_update_check(st, os.fstat(child_fd))
 
-                    if right_dev:
+                    if recurse:
                         tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present)
                         if tag_names:
                             # if we are already recursing in an excluded dir, we do not need to do anything else than
                             # returning (we do not need to archive or recurse into tagged directories), see #3991:
-                            if recurse_excluded_dir:
-                                return
-                            if keep_exclude_tags:
-                                status = self._process_any(path=path, parent_fd=parent_fd, name=name, st=st, fso=fso,
-                                                      cache=cache, read_special=read_special, dry_run=dry_run)
-                                for tag_name in tag_names:
-                                    tag_path = os.path.join(path, tag_name)
-                                    self._rec_walk(
-                                            path=tag_path, parent_fd=child_fd, name=tag_name, fso=fso, cache=cache,
-                                            matcher=matcher, exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
-                                            keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes,
-                                            restrict_dev=restrict_dev, read_special=read_special, dry_run=dry_run)
-                            self.print_file_status('x', path)
+                            if not recurse_excluded_dir:
+                                if keep_exclude_tags:
+                                    status = self._process_any(path=path, parent_fd=parent_fd, name=name, st=st, fso=fso,
+                                                          cache=cache, read_special=read_special, dry_run=dry_run)
+                                    for tag_name in tag_names:
+                                        tag_path = os.path.join(path, tag_name)
+                                        self._rec_walk(
+                                                path=tag_path, parent_fd=child_fd, name=tag_name, fso=fso, cache=cache,
+                                                matcher=matcher, exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
+                                                keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes,
+                                                restrict_dev=restrict_dev, read_special=read_special, dry_run=dry_run)
+                                self.print_file_status('x', path)
                             return
 
                     if not recurse_excluded_dir:
                         status = self._process_any(path=path, parent_fd=parent_fd, name=name, st=st, fso=fso,
                                                    cache=cache, read_special=read_special, dry_run=dry_run)
 
-                    if right_dev:
+                    if recurse:
                         with backup_io('scandir'):
                             entries = helpers.scandir_inorder(path=path, fd=child_fd)
                         for dirent in entries:
@@ -771,7 +770,7 @@ class Archiver:
                                     exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
                                     keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes, restrict_dev=restrict_dev,
                                     read_special=read_special, dry_run=dry_run)
-            elif right_dev:
+            else:
                 # everything non-directory goes is this branch
                 # note that directories have to be handled specifically just because they can be
                 # excluded based on tag files they might contain

@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.14 (2020-10-07)
----------------------------
+Version 1.1.15 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -243,6 +243,52 @@ Compatibility notes:
 - 1.1.14 changes return codes due to a bug fix:
   In case you have scripts expecting rc == 2 for a signal exit, you need to
   update them to check for >= 128 (as documented since long).
+- 1.1.15 drops python 3.4 support, minimum requirement is 3.5 now.
+
+Fixes:
+
+- use --timestamp for {utcnow} and {now} if given, #5189
+- export-tar: set tar format to GNU_FORMAT explicitly, #5274
+- create: fix --dry-run and --stats coexistence, #5415
+
+New features:
+
+- create: implement --stdin-mode, --stdin-user and --stdin-group, #5333
+
+Other changes:
+
+- drop python 3.4 support, minimum requirement is 3.5 now.
+- enable using libxxhash instead of bundled xxh64 code
+- update llfuse requirements (1.3.8)
+- set cython language_level in some files to fix warnings
+- tests / CI
+
+  - fix spurious failure in test_cache_files, #5438
+  - added a github ci workflow
+  - reduce testing on travis, no macOS, no py3x-dev, #5467
+  - travis: use newer dists, native py on dist
+- vagrant:
+
+  - remove jessie and trusty boxes, #5348 #5383
+  - pyinstaller 4.0, build on py379
+  - binary build on stretch64, #5348
+  - remove easy_install based pip installation
+- docs:
+
+  - clarify '--one-file-system' for btrfs, #5391
+  - add example for excluding content using the --pattern cmd line arg
+  - made ansible playbook more generic, use package instead of pacman. also
+    change state from "latest" to "present".
+- modernize 1.1 code:
+
+  - drop code/workarounds only needed to support Python 3.4
+  - remove workaround for pre-release py37 argparse bug
+  - removed some outdated comments/docstrings
+  - requirements: remove some restrictions, lock on current versions
+
+
+Version 1.1.14 (2020-10-07)
+---------------------------
 
 Fixes:
 

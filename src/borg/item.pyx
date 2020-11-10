@@ -40,19 +40,21 @@ class PropDict:
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     def __init__(self, data_dict=None, internal_dict=None, **kw):
+        self._dict = {}
+        if internal_dict is None:
+            pass  # nothing to do
+        elif isinstance(internal_dict, dict):
+            self.update_internal(internal_dict)
+        else:
+            raise TypeError("internal_dict must be a dict")
         if data_dict is None:
             data = kw
-        elif not isinstance(data_dict, dict):
-            raise TypeError("data_dict must be a dict")
-        else:
+        elif isinstance(data_dict, dict):
             data = data_dict
-        if internal_dict is None:
-            internal_dict = {}
-        elif not isinstance(internal_dict, dict):
-            raise TypeError("internal_dict must be a dict")
-        self._dict = {}
-        self.update_internal(internal_dict)
-        self.update(data)
+        else:
+            raise TypeError("data_dict must be a dict")
+        if data:
+            self.update(data)
 
     def update(self, d):
         for k, v in d.items():

@@ -21,30 +21,34 @@ logger = create_logger()
 py_37_plus = sys.version_info >= (3, 7)
 
 
-def ensure_dir(path, name=None, mode=None, reraise=False):
+def ensure_dir(path, name=None, mode=0o777, pretty_deadly=True):
     """
     Ensures that the dir exists with the right permissions.
-    1) Make sure the directory exists in a race-free condition
+    1) Make sure the directory exists in a race-free operation
     2) If mode is not None and the directory has been created, give the right
     permissions
-    3) If reraise is True, catch fatal exceptions, reraise them with a pretty
-    message and the full exception output.
+    3) If pretty_deadly is True, catch fatal exceptions, reraise them with a pretty
+    message.
     Returns True if the file has been created and has the right permissions,
-    False otherwise
+    False otherwise. If a deadly exception happened it is reraised.
     """
-    mode = 0o777 if mode is None else mode
     try:
-        os.makedirs(path, exist_ok=False)
+        os.makedirs(path, mode=mode, exist_ok=True)
     except FileExistsError:
-        return False
+        if pretty_deadly:
+            raise Error(e.args[1])
+        else:
+            raise
     except FileNotFoundError as e:
-        logger.error("Could not create directory '%s'\n%s" % (name, e))
-        if reraise:
+        if pretty_deadly:
             raise Error(e.args[1])
+        else:
+            raise
     except OSError as e:
-        logger.error("Error : Could not create directory '%s'\n%s" % (name, e))
-        if reraise:
+        if pretty_deadly:
             raise Error(e.args[1])
+        else:
+            raise
     return True
 
 
@@ -70,7 +74,7 @@ def get_keys_dir():
     """Determine where to repository keys and cache"""
 
     keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(get_config_dir(), 'keys'))
-    if ensure_dir(keys_dir, "key directory", stat.S_IRWXU, reraise=True):
+    if ensure_dir(keys_dir, "key directory", stat.S_IRWXU):
         logger.debug("Created keys directory : %s" % keys_dir)
     return keys_dir
 
@@ -80,8 +84,7 @@ def get_security_dir(repository_id=None):
     security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(get_config_dir(), 'security'))
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
-    if ensure_dir(security_dir, "security directory", stat.S_IRWXU,
-                  reraise=True):
+    if ensure_dir(security_dir, "security directory", stat.S_IRWXU):
         logger.debug("Created security directory : %s" % security_dir)
     return security_dir
 
@@ -96,7 +99,7 @@ def get_cache_dir():
     # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(cache_home, 'borg'))
     # Create path if it doesn't exist yet
-    if ensure_dir(cache_dir, "cache directory", stat.S_IRWXU, reraise=True):
+    if ensure_dir(cache_dir, "cache directory", stat.S_IRWXU):
         logger.debug("Created cache directory : %s" % cache_dir)
     with open(os.path.join(cache_dir, CACHE_TAG_NAME), 'wb') as fd:
         fd.write(CACHE_TAG_CONTENTS)
@@ -118,7 +121,7 @@ def get_config_dir():
     # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
     config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(config_home, 'borg'))
     # Create path if it doesn't exist yet
-    if ensure_dir(config_dir, "config directory", stat.S_IRWXU, reraise=True):
+    if ensure_dir(config_dir, "config directory", stat.S_IRWXU):
         logger.debug("Created config directory : %s" % config_dir)
     return config_dir
 

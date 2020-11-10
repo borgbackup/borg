@@ -43,11 +43,15 @@ class PropDict:
         if data_dict is None:
             data = kw
         elif not isinstance(data_dict, dict):
-            raise TypeError("data_dict must be dict")
+            raise TypeError("data_dict must be a dict")
         else:
             data = data_dict
+        if internal_dict is None:
+            internal_dict = {}
+        elif not isinstance(internal_dict, dict):
+            raise TypeError("internal_dict must be a dict")
         self._dict = {}
-        self.update_internal(internal_dict or {})
+        self.update_internal(internal_dict)
         self.update(data)
 
     def update(self, d):

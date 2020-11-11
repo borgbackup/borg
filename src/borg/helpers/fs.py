@@ -34,16 +34,6 @@ def ensure_dir(path, name=None, mode=0o777, pretty_deadly=True):
     """
     try:
         os.makedirs(path, mode=mode, exist_ok=True)
-    except FileExistsError:
-        if pretty_deadly:
-            raise Error(e.args[1])
-        else:
-            raise
-    except FileNotFoundError as e:
-        if pretty_deadly:
-            raise Error(e.args[1])
-        else:
-            raise
     except OSError as e:
         if pretty_deadly:
             raise Error(e.args[1])

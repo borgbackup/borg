@@ -27,10 +27,10 @@ def ensure_dir(path, name=None, mode=0o777, pretty_deadly=True):
     1) Make sure the directory exists in a race-free operation
     2) If mode is not None and the directory has been created, give the right
     permissions
-    3) If pretty_deadly is True, catch fatal exceptions, reraise them with a pretty
+    3) If pretty_deadly is True, catch exceptions, reraise them with a pretty
     message.
     Returns True if the file has been created and has the right permissions,
-    False otherwise. If a deadly exception happened it is reraised.
+    An exception otherwise. If a deadly exception happened it is reraised.
     """
     try:
         os.makedirs(path, mode=mode, exist_ok=True)

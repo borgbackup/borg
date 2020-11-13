@@ -1,5 +1,6 @@
 .. include:: ../global.rst.inc
 .. highlight:: none
+.. _pull_backup:
 
 =======================
 Backing up in pull mode

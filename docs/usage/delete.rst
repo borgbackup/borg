@@ -12,7 +12,6 @@ Examples
     # delete all archives whose names begin with the machine's hostname followed by "-"
     $ borg delete --prefix '{hostname}-' /path/to/repo
 
-
     # delete all archives whose names contain "-2012-"
     $ borg delete --glob-archives '*-2012-*' /path/to/repo
 

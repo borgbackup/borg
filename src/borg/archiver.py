@@ -1181,10 +1181,9 @@ class Archiver:
                 else:
                     deleted = True
                     msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
-                    if self.output_list:
-                        logging.getLogger('borg.output.list').info(msg.format(format_archive(current_archive), i, len(archive_names)))
-                    else:
-                        logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
+                    _logger = logging.getLogger('borg.output.list') if self.output_list else logger
+                    _logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
+
             if dry_run:
                 logger.info('Finished dry-run.')
             elif deleted:
@@ -1206,10 +1205,9 @@ class Archiver:
                 except KeyError:
                     logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
-                    if self.output_list:
-                        logging.getLogger('borg.output.list').info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
-                    else:
-                        logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+                    _logger = logging.getLogger('borg.output.list') if self.output_list else logger
+                    _logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+
                     if not dry_run:
                         archive = Archive(repository, key, manifest, archive_name, cache=cache,
                                           consider_part_files=args.consider_part_files)
@@ -3497,8 +3495,8 @@ class Archiver:
         with the ``--cache-only`` option, or keep the security info with the
         ``--keep-security-info`` option.
 
-        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
-        interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
+        When in doubt, use ``--dry-run --list`` to see how patterns/PATHS are
+        interpreted.
 
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
@@ -3524,7 +3522,7 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository')
         subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of items (files, dirs, ...)')
+                               help='output verbose list of archives or repositories')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',

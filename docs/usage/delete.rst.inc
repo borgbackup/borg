@@ -68,6 +68,7 @@ borg delete
 
     optional arguments
         -n, --dry-run    do not change repository
+        --list          list the archives/files which would be deleted
         -s, --stats     print statistics for the deleted archive
         --cache-only    delete only the local cache for the given repository
         --force         force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
@@ -113,3 +114,4 @@ two options are mutually exclusive.
 To avoid accidentally deleting archives, especially when using glob patterns,
 it might be helpful to use the ``--dry-run`` to test out the command without
 actually making any changes to the repository.
+

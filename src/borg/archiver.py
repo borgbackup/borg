@@ -1144,6 +1144,7 @@ class Archiver:
         """Delete an existing repository or archives"""
         archive_filter_specified = any((args.first, args.last, args.prefix is not None, args.glob_archives))
         explicit_archives_specified = args.location.archive or args.archives
+        self.output_list = args.output_list
         if archive_filter_specified and explicit_archives_specified:
             self.print_error('Mixing archive filters and explicitly named archives is not supported.')
             return self.exit_code
@@ -1180,7 +1181,10 @@ class Archiver:
                 else:
                     deleted = True
                     msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
-                    logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
+                    if self.output_list:
+                        logging.getLogger('borg.output.list').info(msg.format(format_archive(current_archive), i, len(archive_names)))
+                    else:
+                        logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
             if dry_run:
                 logger.info('Finished dry-run.')
             elif deleted:
@@ -1202,7 +1206,10 @@ class Archiver:
                 except KeyError:
                     logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
-                    logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+                    if self.output_list:
+                        logging.getLogger('borg.output.list').info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+                    else:
+                        logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
                     if not dry_run:
                         archive = Archive(repository, key, manifest, archive_name, cache=cache,
                                           consider_part_files=args.consider_part_files)
@@ -1252,8 +1259,12 @@ class Archiver:
                 if not keep_security_info:
                     SecurityManager.destroy(repository)
             else:
-                logger.info("Would delete repository.")
-                logger.info("Would %s security info." % ("keep" if keep_security_info else "delete"))
+                if self.output_list:
+                    logging.getLogger('borg.output.list').info("Would delete repository.")
+                    logging.getLogger('borg.output.list').info("Would %s security info." % ("keep" if keep_security_info else "delete"))
+                else:
+                    logger.info("Would delete repository.")
+                    logger.info("Would %s security info." % ("keep" if keep_security_info else "delete"))
         if not dry_run:
             Cache.destroy(repository)
             logger.info("Cache deleted.")
@@ -3486,6 +3497,9 @@ class Archiver:
         with the ``--cache-only`` option, or keep the security info with the
         ``--keep-security-info`` option.
 
+        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
+        interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
+
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
         that is how much your repository will shrink.
@@ -3509,6 +3523,8 @@ class Archiver:
         subparser.set_defaults(func=self.do_delete)
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository')
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',

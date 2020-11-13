@@ -214,6 +214,13 @@ from ``.coafile`` there:
 Some bears have additional requirements and they usually tell you about
 them in case they are missing.
 
+
+Adding a compression algorithm
+------------------------------
+
+If you want to add a new compression algorithm, please refer to :issue:`1633`
+and leave a post there in order to discuss about the proposal.
+
 Documentation
 -------------
 

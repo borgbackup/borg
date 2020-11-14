@@ -113,4 +113,3 @@ two options are mutually exclusive.
 To avoid accidentally deleting archives, especially when using glob patterns,
 it might be helpful to use the ``--dry-run`` to test out the command without
 actually making any changes to the repository.
-

@@ -3522,7 +3522,7 @@ class Archiver:
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository')
         subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of archives or repositories')
+                               help='output verbose list of archives or print repository')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',

@@ -227,6 +227,16 @@ FUSE for OS X, which is available via `Github
 
     brew cask install osxfuse
 
+For OS X Catalina and later, be aware that you must authorize full disk access.
+It is no longer sufficient to run borg backups as root. If you have not yet
+granted full disk access, and you run Borg backup from cron, you will see
+messages such as::
+
+    /Users/you/Pictures/Photos Library.photoslibrary: scandir: [Errno 1] Operation not permitted:
+
+To fix this problem, you should grant full disk acccess to cron, and to your
+Terminal application. More information `can be found here
+<https://osxdaily.com/2020/04/27/fix-cron-permissions-macos-full-disk-access/>`__.
 
 FreeBSD
 ++++++++

@@ -252,7 +252,7 @@ messages such as::
 
 To fix this problem, you should grant full disk acccess to cron, and to your
 Terminal application. More information `can be found here
-<https://osxdaily.com/2020/04/27/fix-cron-permissions-macos-full-disk-access/>`.
+<https://osxdaily.com/2020/04/27/fix-cron-permissions-macos-full-disk-access/>`__.
 
 FreeBSD
 ++++++++

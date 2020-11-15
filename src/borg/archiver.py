@@ -565,11 +565,11 @@ class Archiver:
                             restrict_dev = st.st_dev
                         else:
                             restrict_dev = None
-                        self._process(path=path, parent_fd=parent_fd, name=name,
-                                      fso=fso, cache=cache, matcher=matcher,
-                                      exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
-                                      keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
-                                      restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
+                        self._rec_walk(path=path, parent_fd=parent_fd, name=name,
+                                       fso=fso, cache=cache, matcher=matcher,
+                                       exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
+                                       keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
+                                       restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
             if not dry_run:
                 if args.progress:
                     archive.stats.show_progress(final=True)
@@ -626,10 +626,66 @@ class Archiver:
             create_inner(None, None, None)
         return self.exit_code
 
-    def _process(self, *, path, parent_fd=None, name=None,
-                 fso, cache, matcher,
-                 exclude_caches, exclude_if_present, keep_exclude_tags, skip_inodes,
-                 restrict_dev, read_special=False, dry_run=False):
+    def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run):
+        """
+        Call the right method on the given FilesystemObjectProcessor.
+        """
+
+        if dry_run:
+            return '-'
+        elif stat.S_ISREG(st.st_mode):
+            return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache)
+        elif stat.S_ISDIR(st.st_mode):
+            return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st)
+        elif stat.S_ISLNK(st.st_mode):
+            if not read_special:
+                return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
+            else:
+                try:
+                    st_target = os.stat(name, dir_fd=parent_fd, follow_symlinks=True)
+                except OSError:
+                    special = False
+                else:
+                    special = is_special(st_target.st_mode)
+                if special:
+                    return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target,
+                                              cache=cache, flags=flags_special_follow)
+                else:
+                    return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
+        elif stat.S_ISFIFO(st.st_mode):
+            if not read_special:
+                return fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st)
+            else:
+                return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                        cache=cache, flags=flags_special)
+        elif stat.S_ISCHR(st.st_mode):
+            if not read_special:
+                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='c')
+            else:
+                return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                        cache=cache, flags=flags_special)
+        elif stat.S_ISBLK(st.st_mode):
+            if not read_special:
+                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='b')
+            else:
+                return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                        cache=cache, flags=flags_special)
+        elif stat.S_ISSOCK(st.st_mode):
+            # Ignore unix sockets
+            return
+        elif stat.S_ISDOOR(st.st_mode):
+            # Ignore Solaris doors
+            return
+        elif stat.S_ISPORT(st.st_mode):
+            # Ignore Solaris event ports
+            return
+        else:
+            self.print_warning('Unknown file type: %s', path)
+            return
+
+    def _rec_walk(self, *, path, parent_fd, name, fso, cache, matcher,
+                  exclude_caches, exclude_if_present, keep_exclude_tags,
+                  skip_inodes, restrict_dev, read_special, dry_run):
         """
         Process *path* (or, preferably, parent_fd/name) recursively according to the various parameters.
 
@@ -639,6 +695,7 @@ class Archiver:
             # the user says "get out of here!" and we have already completed the desired action.
             return
 
+        status = None
         try:
             recurse_excluded_dir = False
             if matcher.match(path):
@@ -652,10 +709,10 @@ class Archiver:
                 # could trigger an error, e.g. if access is forbidden, see #3209.
                 if not matcher.recurse_dir:
                     return
+                recurse_excluded_dir = True
                 with backup_io('stat'):
                     st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
-                recurse_excluded_dir = stat.S_ISDIR(st.st_mode)
-                if not recurse_excluded_dir:
+                if not stat.S_ISDIR(st.st_mode):
                     return
 
             if (st.st_ino, st.st_dev) in skip_inodes:
@@ -664,17 +721,20 @@ class Archiver:
             # but we WILL save the mountpoint directory (or more precise: the root
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
-            status = None
+
             if self.exclude_nodump:
                 # Ignore if nodump flag is set
                 with backup_io('flags'):
                     if get_flags(path=path, st=st) & stat.UF_NODUMP:
                         self.print_file_status('x', path)
                         return
-            if stat.S_ISREG(st.st_mode):
-                if not dry_run:
-                    status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache)
-            elif stat.S_ISDIR(st.st_mode):
+
+            if not stat.S_ISDIR(st.st_mode):
+                # directories cannot go in this branch because they can be excluded based on tag
+                # files they might contain
+                status = self._process_any(path=path, parent_fd=parent_fd, name=name, st=st, fso=fso, cache=cache,
+                                           read_special=read_special, dry_run=dry_run)
+            else:
                 with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
                             noatime=True, op='dir_open') as child_fd:
                     # child_fd is None for directories on windows, in that case a race condition check is not possible.
@@ -688,90 +748,36 @@ class Archiver:
                             # returning (we do not need to archive or recurse into tagged directories), see #3991:
                             if not recurse_excluded_dir:
                                 if keep_exclude_tags and not dry_run:
-                                    fso.process_dir(path=path, fd=child_fd, st=st)
+                                    fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
                                     for tag_name in tag_names:
                                         tag_path = os.path.join(path, tag_name)
-                                        self._process(path=tag_path, parent_fd=child_fd, name=tag_name,
-                                                      fso=fso, cache=cache, matcher=matcher,
-                                                      exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
-                                                      keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes,
-                                                      restrict_dev=restrict_dev, read_special=read_special, dry_run=dry_run)
+                                        self._rec_walk(
+                                                path=tag_path, parent_fd=child_fd, name=tag_name, fso=fso, cache=cache,
+                                                matcher=matcher, exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
+                                                keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes,
+                                                restrict_dev=restrict_dev, read_special=read_special, dry_run=dry_run)
                                 self.print_file_status('x', path)
                             return
-                    if not dry_run:
-                        if not recurse_excluded_dir:
-                            status = fso.process_dir(path=path, fd=child_fd, st=st)
+                    if not recurse_excluded_dir and not dry_run:
+                        status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
                     if recurse:
                         with backup_io('scandir'):
                             entries = helpers.scandir_inorder(path=path, fd=child_fd)
                         for dirent in entries:
                             normpath = os.path.normpath(os.path.join(path, dirent.name))
-                            self._process(path=normpath, parent_fd=child_fd, name=dirent.name,
-                                          fso=fso, cache=cache, matcher=matcher,
-                                          exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
-                                          keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes,
-                                          restrict_dev=restrict_dev, read_special=read_special, dry_run=dry_run)
-            elif stat.S_ISLNK(st.st_mode):
-                if not dry_run:
-                    if not read_special:
-                        status = fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
-                    else:
-                        try:
-                            st_target = os.stat(name, dir_fd=parent_fd, follow_symlinks=True)
-                        except OSError:
-                            special = False
-                        else:
-                            special = is_special(st_target.st_mode)
-                        if special:
-                            status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target,
-                                                      cache=cache, flags=flags_special_follow)
-                        else:
-                            status = fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
-            elif stat.S_ISFIFO(st.st_mode):
-                if not dry_run:
-                    if not read_special:
-                        status = fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st)
-                    else:
-                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                                  cache=cache, flags=flags_special)
-            elif stat.S_ISCHR(st.st_mode):
-                if not dry_run:
-                    if not read_special:
-                        status = fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='c')
-                    else:
-                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                                  cache=cache, flags=flags_special)
-            elif stat.S_ISBLK(st.st_mode):
-                if not dry_run:
-                    if not read_special:
-                        status = fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='b')
-                    else:
-                        status = fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                                  cache=cache, flags=flags_special)
-            elif stat.S_ISSOCK(st.st_mode):
-                # Ignore unix sockets
-                return
-            elif stat.S_ISDOOR(st.st_mode):
-                # Ignore Solaris doors
-                return
-            elif stat.S_ISPORT(st.st_mode):
-                # Ignore Solaris event ports
-                return
-            else:
-                self.print_warning('Unknown file type: %s', path)
-                return
+                            self._rec_walk(
+                                    path=normpath, parent_fd=child_fd, name=dirent.name, fso=fso, cache=cache, matcher=matcher,
+                                    exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
+                                    keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes, restrict_dev=restrict_dev,
+                                    read_special=read_special, dry_run=dry_run)
+
         except (BackupOSError, BackupError) as e:
             self.print_warning('%s: %s', path, e)
             status = 'E'
         if status == 'C':
             self.print_warning('%s: file changed while we backed it up', path)
-        # Status output
         if status is None:
-            if not dry_run:
-                status = '?'  # need to add a status code somewhere
-            else:
-                status = '-'  # dry run, item was not backed up
-
+            status = '?'  # need to add a status code somewhere
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
 
@@ -4592,7 +4598,7 @@ def sig_info_handler(sig_no, stack):  # pragma: no cover
     with signal_handler(sig_no, signal.SIG_IGN):
         for frame in inspect.getouterframes(stack):
             func, loc = frame[3], frame[0].f_locals
-            if func in ('process_file', '_process', ):  # create op
+            if func in ('process_file', '_rec_walk', ):  # create op
                 path = loc['path']
                 try:
                     pos = loc['fd'].tell()

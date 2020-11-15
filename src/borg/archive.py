@@ -38,7 +38,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
-from .helpers import os_open, flags_normal
+from .helpers import os_open, flags_normal, flags_dir
 from .helpers import msgpack
 from .helpers import sig_int
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
@@ -1200,10 +1200,21 @@ class FilesystemObjectProcessors:
         if hardlink_master:
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
 
-    def process_dir(self, *, path, fd, st):
+    def process_dir_with_fd(self, *, path, fd, st):
         with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
             item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
             return status
+
+    def process_dir(self, *, path, parent_fd, name, st):
+        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
+                        noatime=True, op='dir_open') as fd:
+                # fd is None for directories on windows, in that case a race condition check is not possible.
+                if fd is not None:
+                    with backup_io('fstat'):
+                        st = stat_update_check(st, os.fstat(fd))
+                item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
+                return status
 
     def process_fifo(self, *, path, parent_fd, name, st):
         with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo

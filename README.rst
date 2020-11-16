@@ -59,6 +59,10 @@ Main features
     All data can be protected using 256-bit AES encryption, data integrity and
     authenticity is verified using HMAC-SHA256. Data is encrypted clientside.
 
+**Obfuscation**
+    Optionally, borg can actively obfuscate e.g. the size of files / chunks to
+    make fingerprinting attacks more difficult.
+
 **Compression**
     All data can be optionally compressed:
 

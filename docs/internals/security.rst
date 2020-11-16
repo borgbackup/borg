@@ -426,6 +426,27 @@ he assumes that the victim also possesses (and backups into the repository)
 could try a brute force fingerprinting attack based on the chunk sizes in the
 repository to prove his assumption.
 
+To make this more difficult, borg has an ``obfuscate`` pseudo compressor, that
+will take the output of the normal compression step and tries to obfuscate
+the size of that output. Of course, it can only **add** to the size, not reduce
+it. Thus, the optional usage of this mechanism comes at a cost: it will make
+your repository larger (ranging from a few percent larger [cheap] to ridiculously
+larger [expensive], depending on the algorithm/params you wisely choose).
+
+The output of the compressed-size obfuscation step will then be encrypted and
+authenticated, as usual. Of course, using that obfuscation would not make any
+sense without encryption. Thus, the additional data added by the obfuscator
+are just 0x00 bytes, which is good enough because after encryption it will
+look like random anyway.
+
+To summarize, this is making size-based fingerprinting difficult:
+
+- user-selectable chunker algorithm (and parametrization)
+- for the buzhash chunker: secret, random per-repo chunker seed
+- user-selectable compression algorithm (and level)
+- optional ``obfuscate`` pseudo compressor with different choices
+  of algorithm and parameters
+
 Stored chunk proximity
 ----------------------
 

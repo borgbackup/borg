@@ -15,6 +15,8 @@ which compressor has been used to compress the data and dispatch to the correct
 decompressor.
 """
 
+import random
+from struct import Struct
 import zlib
 
 try:
@@ -23,9 +25,10 @@ except ImportError:
     lzma = None
 
 
+from .constants import MAX_DATA_SIZE
 from .helpers import Buffer, DecompressionError
 
-API_VERSION = '1.2_01'
+API_VERSION = '1.2_02'
 
 cdef extern from "algorithms/lz4-libselect.h":
     int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -433,6 +436,69 @@ class Auto(CompressorBase):
         raise NotImplementedError
 
 
+class ObfuscateSize(CompressorBase):
+    """
+    Meta-Compressor that obfuscates the compressed data size.
+    """
+    ID = b'\x04\x00'
+    name = 'obfuscate'
+
+    header_fmt = Struct('>I')
+    header_len = len(header_fmt.pack(0))
+
+    def __init__(self, level=None, compressor=None):
+        super().__init__()
+        self.compressor = compressor
+        if level is None:
+            pass  # decompression
+        elif 1 <= level <= 6:
+            self._obfuscate = self._relative_random_reciprocal_obfuscate
+            self.factor = 0.001 * 10 ** level
+            self.min_r = 0.0001
+        elif 110 <= level <= 123:
+            self._obfuscate = self._random_padding_obfuscate
+            self.max_padding_size = 2 ** (level - 100)  # 1kiB .. 8MiB
+
+    def _obfuscate(self, compr_size):
+        # implementations need to return the size of obfuscation data,
+        # that the caller shall add.
+        raise NotImplemented
+
+    def _relative_random_reciprocal_obfuscate(self, compr_size):
+        # effect for SPEC 1:
+        # f = 0.01 .. 0.1 for r in 1.0 .. 0.1 == in 90% of cases
+        # f = 0.1 .. 1.0 for r in 0.1 .. 0.01 == in 9% of cases
+        # f = 1.0 .. 10.0 for r in 0.01 .. 0.001 = in 0.9% of cases
+        # f = 10.0 .. 100.0 for r in 0.001 .. 0.0001 == in 0.09% of cases
+        r = max(self.min_r, random.random())  # 0..1, but dont get too close to 0
+        f = self.factor / r
+        return int(compr_size * f)
+
+    def _random_padding_obfuscate(self, compr_size):
+        return int(self.max_padding_size * random.random())
+
+    def compress(self, data):
+        compressed_data = self.compressor.compress(data)  # compress data
+        compr_size = len(compressed_data)
+        header = self.header_fmt.pack(compr_size)
+        addtl_size = self._obfuscate(compr_size)
+        addtl_size = max(0, addtl_size)  # we can only make it longer, not shorter!
+        addtl_size = min(MAX_DATA_SIZE - 1024 - compr_size, addtl_size)  # stay away from MAX_DATA_SIZE
+        trailer = bytes(addtl_size)
+        obfuscated_data = b''.join([header, compressed_data, trailer])
+        return super().compress(obfuscated_data)  # add ID header
+
+    def decompress(self, data):
+        if not isinstance(data, memoryview):
+            data = memoryview(data)
+        obfuscated_data = super().decompress(data)  # remove obfuscator ID header
+        compr_size = self.header_fmt.unpack(obfuscated_data[0:self.header_len])[0]
+        compressed_data = obfuscated_data[self.header_len:self.header_len+compr_size]
+        if self.compressor is None:
+            self.compressor = Compressor.detect(compressed_data)()
+        return self.compressor.decompress(compressed_data)  # decompress data
+
+
 # Maps valid compressor names to their class
 COMPRESSOR_TABLE = {
     CNONE.name: CNONE,
@@ -441,9 +507,10 @@ COMPRESSOR_TABLE = {
     LZMA.name: LZMA,
     Auto.name: Auto,
     ZSTD.name: ZSTD,
+    ObfuscateSize.name: ObfuscateSize,
 }
 # List of possible compression types. Does not include Auto, since it is a meta-Compressor.
-COMPRESSOR_LIST = [LZ4, ZSTD, CNONE, ZLIB, LZMA, ]  # check fast stuff first
+COMPRESSOR_LIST = [LZ4, ZSTD, CNONE, ZLIB, LZMA, ObfuscateSize, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]
@@ -515,6 +582,16 @@ class CompressionSpec:
             else:
                 raise ValueError
             self.inner = CompressionSpec(compression)
+        elif self.name == 'obfuscate':
+            if 3 <= count <= 5:
+                level = int(values[1])
+                if not ((1 <= level <= 6) or (110 <= level <= 123)):
+                    raise ValueError
+                self.level = level
+                compression = ','.join(values[2:])
+            else:
+                raise ValueError
+            self.inner = CompressionSpec(compression)
         else:
             raise ValueError
 
@@ -526,3 +603,5 @@ class CompressionSpec:
             return get_compressor(self.name, level=self.level)
         elif self.name == 'auto':
             return get_compressor(self.name, compressor=self.inner.compressor)
+        elif self.name == 'obfuscate':
+            return get_compressor(self.name, level=self.level, compressor=self.inner.compressor)

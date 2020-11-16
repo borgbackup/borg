@@ -140,6 +140,61 @@ def test_auto():
     assert Compressor.detect(compressed) == CNONE
 
 
+def test_obfuscate():
+    compressor = CompressionSpec('obfuscate,1,none').compressor
+    data = bytes(10000)
+    compressed = compressor.compress(data)
+    # 2 id bytes compression, 2 id bytes obfuscator. 4 length bytes
+    assert len(data) + 8 <= len(compressed) <= len(data) * 101 + 8
+    # compressing 100 times the same data should give at least 50 different result sizes
+    assert len(set(len(compressor.compress(data)) for i in range(100))) > 50
+
+    cs = CompressionSpec('obfuscate,2,lz4')
+    assert isinstance(cs.inner.compressor, LZ4)
+    compressor = cs.compressor
+    data = bytes(10000)
+    compressed = compressor.compress(data)
+    # 2 id bytes compression, 2 id bytes obfuscator. 4 length bytes
+    min_compress, max_compress = 0.2, 0.001  # estimate compression factor outer boundaries
+    assert max_compress * len(data) + 8 <= len(compressed) <= min_compress * len(data) * 1001 + 8
+    # compressing 100 times the same data should give multiple different result sizes
+    assert len(set(len(compressor.compress(data)) for i in range(100))) > 10
+
+    cs = CompressionSpec('obfuscate,6,zstd,3')
+    assert isinstance(cs.inner.compressor, ZSTD)
+    compressor = cs.compressor
+    data = bytes(10000)
+    compressed = compressor.compress(data)
+    # 2 id bytes compression, 2 id bytes obfuscator. 4 length bytes
+    min_compress, max_compress = 0.2, 0.001  # estimate compression factor outer boundaries
+    assert max_compress * len(data) + 8 <= len(compressed) <= min_compress * len(data) * 10000001 + 8
+    # compressing 100 times the same data should give multiple different result sizes
+    assert len(set(len(compressor.compress(data)) for i in range(100))) > 90
+
+    cs = CompressionSpec('obfuscate,2,auto,zstd,10')
+    assert isinstance(cs.inner.compressor, Auto)
+    compressor = cs.compressor
+    data = bytes(10000)
+    compressed = compressor.compress(data)
+    # 2 id bytes compression, 2 id bytes obfuscator. 4 length bytes
+    min_compress, max_compress = 0.2, 0.001  # estimate compression factor outer boundaries
+    assert max_compress * len(data) + 8 <= len(compressed) <= min_compress * len(data) * 1001 + 8
+    # compressing 100 times the same data should give multiple different result sizes
+    assert len(set(len(compressor.compress(data)) for i in range(100))) > 10
+
+    cs = CompressionSpec('obfuscate,110,none')
+    assert isinstance(cs.inner.compressor, CNONE)
+    compressor = cs.compressor
+    data = bytes(1000)
+    compressed = compressor.compress(data)
+    # N blocks + 2 id bytes obfuscator. 4 length bytes
+    assert 1000 + 6 <= len(compressed) <= 1000 + 6 + 1024
+    data = bytes(1100)
+    compressed = compressor.compress(data)
+    # N blocks + 2 id bytes obfuscator. 4 length bytes
+    assert 1100 + 6 <= len(compressed) <= 1100 + 6 + 1024
+
+
 def test_compression_specs():
     with pytest.raises(ValueError):
         CompressionSpec('')

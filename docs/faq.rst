@@ -210,6 +210,12 @@ This is not a problem anymore.
 
 For more details, see :ref:`checkpoints_parts`.
 
+My machine goes to sleep causing `Broken pipe`
+----------------------------------------------
+
+When backing up your data over the network, your machine should not go to sleep.
+On macOS you can use `caffeinate` to avoid that.
+
 How can I switch append-only mode on and off?
 -----------------------------------------------------------------------------------------------------------------------------------
 

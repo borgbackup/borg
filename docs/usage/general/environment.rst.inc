@@ -56,6 +56,10 @@ General:
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         Using ``--remote-path PATH`` commandline option overrides the environment variable.
+    BORG_FILES_CACHE_SUFFIX
+        When set to a value at least one character long, instructs borg to use a specifically named
+        (based on the suffix) alternative files cache. This can be used to avoid loading and saving
+        cache entries for backup sources other than the current sources.
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.

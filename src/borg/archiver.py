@@ -2272,18 +2272,34 @@ class Archiver:
 
                 # "sh:" pattern style is the default, so the following line is not needed:
                 P sh
-                R /
-                # can be rebuild
-                - /home/*/.cache
-                # they're downloads for a reason
-                - /home/*/Downloads
-                # susan is a nice person
-                # include susans home
-                + /home/susan
-                # don't backup the other home directories
-                - /home/*
-                # don't even look in /proc
-                ! /proc\n\n''')
+                # borg will consider only the files within a recursion root
+                # defined in this way: "R path/to/recursion_root"
+                R /home
+
+                # this won't be included because nowhere in the file
+                # there isn't a line like "R /" or "R /proc"
+                + /proc
+
+                # dir won't be included because of '!'
+                + /home/*/Downloads/dir
+                ! /home/*/Downloads
+
+                # from now on "pp:" pattern style will be applied
+                P pp
+
+                # This is correct
+                # the position of this line in the file is irrelevant
+                R /home/*/Pictures
+
+                # it is possible to use a pattern type prefix
+                #  directly in a pattern line
+                + fn:/home/*/file1
+
+                # this will be included
+                + ./home/*/Documents/dir
+                - ./home/*/Documents/
+                # this won't
+                + ./home/*/Documents/dir2\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
         and ``--remote-path`` values support these placeholders:

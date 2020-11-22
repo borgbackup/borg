@@ -7,6 +7,8 @@ import subprocess
 import sys
 import textwrap
 
+from .errors import Error
+
 from .process import prepare_subprocess_env
 from ..platformflags import is_win32
 
@@ -17,6 +19,26 @@ logger = create_logger()
 
 
 py_37_plus = sys.version_info >= (3, 7)
+
+
+def ensure_dir(path, mode=stat.S_IRWXU, pretty_deadly=True):
+    """
+    Ensures that the dir exists with the right permissions.
+    1) Make sure the directory exists in a race-free operation
+    2) If mode is not None and the directory has been created, give the right
+    permissions to the leaf directory
+    3) If pretty_deadly is True, catch exceptions, reraise them with a pretty
+    message.
+    Returns if the directory has been created and has the right permissions,
+    An exception otherwise. If a deadly exception happened it is reraised.
+    """
+    try:
+        os.makedirs(path, mode=mode, exist_ok=True)
+    except OSError as e:
+        if pretty_deadly:
+            raise Error(e.args[1])
+        else:
+            raise
 
 
 def get_base_dir():
@@ -41,9 +63,7 @@ def get_keys_dir():
     """Determine where to repository keys and cache"""
 
     keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(get_config_dir(), 'keys'))
-    if not os.path.exists(keys_dir):
-        os.makedirs(keys_dir)
-        os.chmod(keys_dir, stat.S_IRWXU)
+    ensure_dir(keys_dir)
     return keys_dir
 
 
@@ -52,9 +72,7 @@ def get_security_dir(repository_id=None):
     security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(get_config_dir(), 'security'))
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
-    if not os.path.exists(security_dir):
-        os.makedirs(security_dir)
-        os.chmod(security_dir, stat.S_IRWXU)
+    ensure_dir(security_dir)
     return security_dir
 
 
@@ -68,16 +86,14 @@ def get_cache_dir():
     # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(cache_home, 'borg'))
     # Create path if it doesn't exist yet
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
-        os.chmod(cache_dir, stat.S_IRWXU)
-        with open(os.path.join(cache_dir, CACHE_TAG_NAME), 'wb') as fd:
-            fd.write(CACHE_TAG_CONTENTS)
-            fd.write(textwrap.dedent("""
-                # This file is a cache directory tag created by Borg.
-                # For information about cache directory tags, see:
-                #       http://www.bford.info/cachedir/spec.html
-                """).encode('ascii'))
+    ensure_dir(cache_dir)
+    with open(os.path.join(cache_dir, CACHE_TAG_NAME), 'wb') as fd:
+        fd.write(CACHE_TAG_CONTENTS)
+        fd.write(textwrap.dedent("""
+        # This file is a cache directory tag created by Borg.
+        # For information about cache directory tags, see:
+        #       http://www.bford.info/cachedir/spec.html
+        """).encode('ascii'))
     return cache_dir
 
 
@@ -91,9 +107,7 @@ def get_config_dir():
     # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
     config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(config_home, 'borg'))
     # Create path if it doesn't exist yet
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-        os.chmod(config_dir, stat.S_IRWXU)
+    ensure_dir(config_dir)
     return config_dir
 
 

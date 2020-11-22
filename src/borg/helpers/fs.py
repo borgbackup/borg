@@ -39,7 +39,6 @@ def ensure_dir(path, mode=stat.S_IRWXU, pretty_deadly=True):
             raise Error(e.args[1])
         else:
             raise
-    return
 
 
 def get_base_dir():

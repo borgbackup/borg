@@ -2644,11 +2644,13 @@ class Archiver:
                        type=parse_exclude_pattern, action='append',
                        help='exclude paths matching PATTERN')
             add_option('--exclude-from', metavar='EXCLUDEFILE', action=ArgparseExcludeFileAction,
-                       help='read exclude patterns from EXCLUDEFILE, one per line')
+                       help='read exclude patterns from EXCLUDEFILE, one per'
+                       'line. These entries are processed by borg and not the shell')
             add_option('--pattern', metavar='PATTERN', action=ArgparsePatternAction,
                        help='experimental: include/exclude paths matching PATTERN')
             add_option('--patterns-from', metavar='PATTERNFILE', action=ArgparsePatternFileAction,
-                       help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
+                       help='experimental: read include/exclude patterns from PATTERNFILE, one per line'
+                       'These entries are processed by borg and not the shell')
 
             if tag_files:
                 add_option('--exclude-caches', dest='exclude_caches', action='store_true',

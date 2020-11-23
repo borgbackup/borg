@@ -1172,6 +1172,7 @@ class Archiver:
 
         if args.forced == 2:
             deleted = False
+            _logger = logging.getLogger('borg.output.list') if self.output_list else logger
             for i, archive_name in enumerate(archive_names, 1):
                 try:
                     current_archive = manifest.archives.pop(archive_name)
@@ -1181,7 +1182,6 @@ class Archiver:
                 else:
                     deleted = True
                     msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
-                    _logger = logging.getLogger('borg.output.list') if self.output_list else logger
                     _logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
 
             if dry_run:

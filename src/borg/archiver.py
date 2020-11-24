@@ -1199,13 +1199,13 @@ class Archiver:
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             msg_delete = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
             msg_not_found = 'Archive {} not found ({}/{}).'
+            _logger = logging.getLogger('borg.output.list') if self.output_list else logger
             for i, archive_name in enumerate(archive_names, 1):
                 try:
                     archive_info = manifest.archives[archive_name]
                 except KeyError:
                     logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
-                    _logger = logging.getLogger('borg.output.list') if self.output_list else logger
                     _logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
 
                     if not dry_run:
@@ -1243,8 +1243,11 @@ class Archiver:
             else:
                 msg.append("You requested to completely DELETE the repository *including* all archives it "
                            "contains:")
-                for archive_info in manifest.archives.list(sort_by=['ts']):
-                    msg.append(format_archive(archive_info))
+                if self.output_list:
+                    for archive_info in manifest.archives.list(sort_by=['ts']):
+                        msg.append(format_archive(archive_info))
+                else:
+                    msg.append("%d archives would be deleted" % len(manifest.archives))
             msg.append("Type 'YES' if you understand this and want to continue: ")
             msg = '\n'.join(msg)
             if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
@@ -1257,12 +1260,8 @@ class Archiver:
                 if not keep_security_info:
                     SecurityManager.destroy(repository)
             else:
-                if self.output_list:
-                    logging.getLogger('borg.output.list').info("Would delete repository.")
-                    logging.getLogger('borg.output.list').info("Would %s security info." % ("keep" if keep_security_info else "delete"))
-                else:
-                    logger.info("Would delete repository.")
-                    logger.info("Would %s security info." % ("keep" if keep_security_info else "delete"))
+                logger.info("would delete repository.")
+                logger.info("would %s security info." % ("keep" if keep_security_info else "delete"))
         if not dry_run:
             Cache.destroy(repository)
             logger.info("Cache deleted.")
@@ -3495,8 +3494,7 @@ class Archiver:
         with the ``--cache-only`` option, or keep the security info with the
         ``--keep-security-info`` option.
 
-        When in doubt, use ``--dry-run --list`` to see how patterns/PATHS are
-        interpreted.
+        When in doubt, use ``--dry-run --list`` to see what would be deleted.
 
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as

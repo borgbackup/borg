@@ -183,12 +183,12 @@ This is not a problem anymore.
 
 For more details, see :ref:`checkpoints_parts`.
 
-Do we have to run borg config "backup" append_only 0 and borg config "backup" append_only 1 on the sever to switch append only mode
+How can I switch append-only mode on and off?
 -----------------------------------------------------------------------------------------------------------------------------------
 
 You could do that, but using different ssh keys and different entries in
-authorized_keys is much easier and also maybe has less potential of thing going
-wrong somehow.
+``authorized_keys`` is much easier and also maybe has less potential of thing
+going wrong somehow.
 
 
 My machine goes to sleep causing `Broken pipe`

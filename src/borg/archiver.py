@@ -2644,13 +2644,11 @@ class Archiver:
                        type=parse_exclude_pattern, action='append',
                        help='exclude paths matching PATTERN')
             add_option('--exclude-from', metavar='EXCLUDEFILE', action=ArgparseExcludeFileAction,
-                       help='read exclude patterns from EXCLUDEFILE, one per'
-                       'line. These entries are processed by borg and not the shell')
+                       help='read exclude patterns from EXCLUDEFILE, one per line.')
             add_option('--pattern', metavar='PATTERN', action=ArgparsePatternAction,
                        help='experimental: include/exclude paths matching PATTERN')
             add_option('--patterns-from', metavar='PATTERNFILE', action=ArgparsePatternFileAction,
-                       help='experimental: read include/exclude patterns from PATTERNFILE, one per line'
-                       'These entries are processed by borg and not the shell')
+                       help='experimental: read include/exclude patterns from PATTERNFILE, one per line')
 
             if tag_files:
                 add_option('--exclude-caches', dest='exclude_caches', action='store_true',
@@ -3108,6 +3106,18 @@ class Archiver:
         exclusive because the data is not actually compressed and deduplicated during a dry run.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+        To give an example for --exclude-from:
+        ```shell
+        $ cat exclude-file.txt
+        # Comment line
+        /home/*/junk
+        *.tmp
+        One file with spaces
+        ```
+        Then the command borg ``create --exclude-from exclude-file.txt`` will
+        delete all files excluding /home/*/junk, *.tmp and the file named
+        ``One file with spaces``
+
         See the output of the "borg help placeholders" command for more help on placeholders.
 
         .. man NOTES
@@ -3505,6 +3515,18 @@ class Archiver:
         (for more info on these patterns, see ``borg help patterns``). Note that these
         two options are mutually exclusive.
 
+        To give an example for --exclude-from:
+        ```shell
+        $ cat exclude-file.txt
+        # Comment line
+        /home/*/junk
+        *.tmp
+        One file with spaces
+        ```
+        Then the command borg ``create --exclude-from exclude-file.txt`` will
+        delete all files excluding /home/*/junk, *.tmp and the file named
+        ``One file with spaces``
+
         To avoid accidentally deleting archives, especially when using glob patterns,
         it might be helpful to use the ``--dry-run`` to test out the command without
         actually making any changes to the repository.
@@ -3553,6 +3575,18 @@ class Archiver:
             Note that the chunker params changed from Borg 0.xx to 1.0.
 
             See the output of the "borg help patterns" command for more help on exclude patterns.
+
+            To give an example for --exclude-from:
+            ```shell
+            $ cat exclude-file.txt
+            # Comment line
+            /home/*/junk
+            *.tmp
+            One file with spaces
+            ```
+            Then the command borg ``create --exclude-from exclude-file.txt`` will
+            delete all files excluding /home/*/junk, *.tmp and the file named
+            ``One file with spaces``
             """)
         subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
                                           description=self.do_diff.__doc__,
@@ -3608,6 +3642,17 @@ class Archiver:
         The file selection can further be restricted by using the ``--exclude`` option.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+        To give an example for --exclude-from:
+        ```shell
+        $ cat exclude-file.txt
+        # Comment line
+        /home/*/junk
+        *.tmp
+        One file with spaces
+        ```
+        Then the command borg ``create --exclude-from exclude-file.txt`` will
+        delete all files excluding /home/*/junk, *.tmp and the file named
+        ``One file with spaces``
 
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
@@ -3639,6 +3684,17 @@ class Archiver:
         be restricted by using the ``--exclude`` option.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+        To give an example for --exclude-from:
+        ```shell
+        $ cat exclude-file.txt
+        # Comment line
+        /home/*/junk
+        *.tmp
+        One file with spaces
+        ```
+        Then the command borg ``create --exclude-from exclude-file.txt`` will
+        delete all files excluding /home/*/junk, *.tmp and the file named
+        ``One file with spaces``
 
         By using ``--dry-run``, you can do all extraction steps except actually writing the
         output data: reading metadata and data chunks from the repo, checking the hash/hmac,
@@ -3983,6 +4039,17 @@ class Archiver:
         This command lists the contents of a repository or an archive.
 
         See the "borg help patterns" command for more help on exclude patterns.
+        To give an example for --exclude-from:
+        ```shell
+        $ cat exclude-file.txt
+        # Comment line
+        /home/*/junk
+        *.tmp
+        One file with spaces
+        ```
+        Then the command borg ``create --exclude-from exclude-file.txt`` will
+        delete all files excluding /home/*/junk, *.tmp and the file named
+        ``One file with spaces``
 
         .. man NOTES
 

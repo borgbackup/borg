@@ -1172,7 +1172,7 @@ class Archiver:
 
         if args.forced == 2:
             deleted = False
-            _logger = logging.getLogger('borg.output.list') if self.output_list else logger
+            logger_list = logging.getLogger('borg.output.list')
             for i, archive_name in enumerate(archive_names, 1):
                 try:
                     current_archive = manifest.archives.pop(archive_name)
@@ -1182,7 +1182,11 @@ class Archiver:
                 else:
                     deleted = True
                     msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
-                    _logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
+                    if output_list:
+                        logger_list.info(msg.format(format_archive(current_archive),
+                                                    i, len(archive_names)))
+                    logger.info(msg.format(format_archive(current_archive),
+                                                    i, len(archive_names)))
 
             if dry_run:
                 logger.info('Finished dry-run.')
@@ -1199,14 +1203,16 @@ class Archiver:
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             msg_delete = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
             msg_not_found = 'Archive {} not found ({}/{}).'
-            _logger = logging.getLogger('borg.output.list') if self.output_list else logger
+            logger_list = logging.getLogger('borg.output.list')
             for i, archive_name in enumerate(archive_names, 1):
                 try:
                     archive_info = manifest.archives[archive_name]
                 except KeyError:
                     logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
-                    _logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+                    logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+                if self.output_list:
+                    logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
 
                     if not dry_run:
                         archive = Archive(repository, key, manifest, archive_name, cache=cache,
@@ -1241,13 +1247,13 @@ class Archiver:
                 msg.append("This repository seems to have no manifest, so we can't tell anything about its "
                            "contents.")
             else:
-                msg.append("You requested to completely DELETE the repository *including* all archives it "
-                           "contains:")
                 if self.output_list:
+                    msg.append("You requested to completely DELETE the repository *including* all archives it "
+                           "contains:")
                     for archive_info in manifest.archives.list(sort_by=['ts']):
                         msg.append(format_archive(archive_info))
                 else:
-                    msg.append("%d archives would be deleted" % len(manifest.archives))
+                    msg.append("%d archives are going to be deleted." % len(manifest.archives))
             msg.append("Type 'YES' if you understand this and want to continue: ")
             msg = '\n'.join(msg)
             if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
@@ -1260,8 +1266,8 @@ class Archiver:
                 if not keep_security_info:
                     SecurityManager.destroy(repository)
             else:
-                logger.info("would delete repository.")
-                logger.info("would %s security info." % ("keep" if keep_security_info else "delete"))
+                logger.info("Would delete repository.")
+                logger.info("Would %s security info." % ("keep" if keep_security_info else "delete"))
         if not dry_run:
             Cache.destroy(repository)
             logger.info("Cache deleted.")

@@ -2227,9 +2227,9 @@ class Archiver:
             fm:aa:something/*
             re:^home/[^/]\\.tmp/
             sh:home/*/.thumbnails
-            EOF
             # Example with spaces, no need to escape as it is processed by borg
             some file with spaces.txt
+            EOF
             $ borg create --exclude-from exclude.txt backup /
 
         .. container:: experimental
@@ -3619,6 +3619,8 @@ class Archiver:
         can be selected by passing a list of ``PATHs`` as arguments.
         The file selection can further be restricted by using the ``--exclude`` option.
 
+        See the output of the "borg help patterns" command for more help on exclude patterns.
+
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
         """)
@@ -3649,6 +3651,7 @@ class Archiver:
         be restricted by using the ``--exclude`` option.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+
         By using ``--dry-run``, you can do all extraction steps except actually writing the
         output data: reading metadata and data chunks from the repo, checking the hash/hmac,
         decrypting, decompressing.
@@ -3990,6 +3993,8 @@ class Archiver:
         # borg list
         list_epilog = process_epilog("""
         This command lists the contents of a repository or an archive.
+
+        See the "borg help patterns" command for more help on exclude patterns.
 
         .. man NOTES
 

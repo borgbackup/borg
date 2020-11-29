@@ -2227,6 +2227,8 @@ class Archiver:
             fm:aa:something/*
             re:^home/[^/]\\.tmp/
             sh:home/*/.thumbnails
+            # Example with spaces, no need to escape as it is processed by borg
+            some file with spaces.txt
             EOF
             $ borg create --exclude-from exclude.txt backup /
 
@@ -3106,6 +3108,7 @@ class Archiver:
         exclusive because the data is not actually compressed and deduplicated during a dry run.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
+
         See the output of the "borg help placeholders" command for more help on placeholders.
 
         .. man NOTES

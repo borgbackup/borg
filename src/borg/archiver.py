@@ -2369,7 +2369,7 @@ class Archiver:
             fm:aa:something/*
             re:^home/[^/]\\.tmp/
             sh:home/*/.thumbnails
-             # Example with spaces, no need to escape as it is processed by borg
+            # Example with spaces, no need to escape as it is processed by borg
             some file with spaces.txt
             EOF
             $ borg create --exclude-from exclude.txt backup /

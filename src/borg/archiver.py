@@ -2646,7 +2646,7 @@ class Archiver:
                        type=parse_exclude_pattern, action='append',
                        help='exclude paths matching PATTERN')
             add_option('--exclude-from', metavar='EXCLUDEFILE', action=ArgparseExcludeFileAction,
-                       help='read exclude patterns from EXCLUDEFILE, one per line.')
+                       help='read exclude patterns from EXCLUDEFILE, one per line')
             add_option('--pattern', metavar='PATTERN', action=ArgparsePatternAction,
                        help='experimental: include/exclude paths matching PATTERN')
             add_option('--patterns-from', metavar='PATTERNFILE', action=ArgparsePatternFileAction,
@@ -3108,17 +3108,6 @@ class Archiver:
         exclusive because the data is not actually compressed and deduplicated during a dry run.
 
         See the output of the "borg help patterns" command for more help on exclude patterns.
-        To give an example for --exclude-from:
-        ```shell
-        $ cat exclude-file.txt
-        # Comment line
-        /home/*/junk
-        *.tmp
-        One file with spaces
-        ```
-        Then the command borg ``create --exclude-from exclude-file.txt`` will
-        delete all files excluding /home/*/junk, *.tmp and the file named
-        ``One file with spaces``
 
         See the output of the "borg help placeholders" command for more help on placeholders.
 

@@ -2161,12 +2161,14 @@ class Archiver:
             This pattern style is useful to match whole sub-directories. The pattern
             `pp:root/somedir` matches `root/somedir` and everything therein. A leading
             path separator is always removed.
+            Another example : `pp:foo` will match `foobar`
 
         Path full-match, selector `pf:`
             This pattern style is (only) useful to match full paths.
             This is kind of a pseudo pattern as it can not have any variable or
             unspecified parts - the full path must be given. `pf:root/file.ext` matches
             `root/file.ext` only. A leading path separator is always removed.
+            Here `pf:foo` will not match `foobar`
 
             Implementation note: this is implemented via very time-efficient O(1)
             hashtable lookups (this means you can have huge amounts of such patterns

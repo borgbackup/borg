@@ -131,13 +131,13 @@ you run the tests.
 Continuous Integration
 ----------------------
 
-All pull requests go through GitHub-Actions_, which runs the tests on Linux
+All pull requests go through `GitHub Actions`_, which runs the tests on Linux
 and Mac OS X as well as the flake8 style checker. Windows builds run on AppVeyor_,
 while additional Unix-like platforms are tested on Golem_.
 
 .. _AppVeyor: https://ci.appveyor.com/project/borgbackup/borg/
 .. _Golem: https://golem.enkore.de/view/Borg/
-.. _GitHub-Actions: https://github.com/borgbackup/borg/actions
+.. _GitHub Actions: https://github.com/borgbackup/borg/actions
 
 Output and Logging
 ------------------

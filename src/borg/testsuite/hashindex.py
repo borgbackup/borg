@@ -510,3 +510,45 @@ class AllIndexTestCase(BaseTestCase):
     def test_max_load_factor(self):
         assert NSIndex.MAX_LOAD_FACTOR < 1.0
         assert ChunkIndex.MAX_LOAD_FACTOR < 1.0
+
+
+class IndexCorruptionTestCase(BaseTestCase):
+    def test_bug_4829(self):
+
+        from struct import pack
+
+        def HH(x, y):
+            # make some 32byte long thing that depends on x and y.
+            # same x will mean a collision in the hashtable as bucket index is computed from
+            # first 4 bytes. giving a specific x targets bucket index x.
+            # y is to create different keys and does not go into the bucket index calculation.
+            # so, same x + different y --> collision
+            return pack('<IIQQQ', x, y, 0, 0, 0)  # 2 * 4 + 3 * 8 == 32
+
+        idx = NSIndex()
+
+        # create lots of colliding entries
+        for y in range(700):  # stay below max load to not trigger resize
+            idx[HH(0, y)] = (0, y)
+
+        assert idx.size() == 1031 * 40 + 18  # 1031 buckets + header
+
+        # delete lots of the collisions, creating lots of tombstones
+        for y in range(400):  # stay above min load to not trigger resize
+            del idx[HH(0, y)]
+
+        # create lots of colliding entries, within the not yet used part of the hashtable
+        for y in range(330):  # stay below max load to not trigger resize
+            # at y == 259 a resize will happen due to going beyond max EFFECTIVE load
+            # if the bug is present, that element will be inserted at the wrong place.
+            # and because it will be at the wrong place, it can not be found again.
+            idx[HH(600, y)] = 600, y
+
+        # now check if hashtable contents is as expected:
+
+        assert [idx.get(HH(0, y)) for y in range(400, 700)] == [(0, y) for y in range(400, 700)]
+
+        assert [HH(0, y) in idx for y in range(400)] == [False for y in range(400)]  # deleted entries
+
+        # this will fail at HH(600, 259) if the bug is present.
+        assert [idx.get(HH(600, y)) for y in range(330)] == [(600, y) for y in range(330)]

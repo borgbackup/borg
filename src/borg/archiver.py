@@ -1181,14 +1181,10 @@ class Archiver:
                     logger.warning('Archive {} not found ({}/{}).'.format(archive_name, i, len(archive_names)))
                 else:
                     deleted = True
-                    msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
-                    if output_list:
+                    if self.output_list:
+                        msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
                         logger_list.info(msg.format(format_archive(current_archive),
                                                     i, len(archive_names)))
-                    else:
-                        logger.info(msg.format(format_archive(current_archive),
-                                               i, len(archive_names)))
-
             if dry_run:
                 logger.info('Finished dry-run.')
             elif deleted:
@@ -1211,7 +1207,8 @@ class Archiver:
                 except KeyError:
                     logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
-                    logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+                    if self.output_list:
+                        logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
 
                     if not dry_run:
                         archive = Archive(repository, key, manifest, archive_name, cache=cache,
@@ -1252,9 +1249,8 @@ class Archiver:
                     for archive_info in manifest.archives.list(sort_by=['ts']):
                         msg.append(format_archive(archive_info))
                 else:
-                    msg.append("You requested to completely DELETE the"
-                               "repository *including* %d archives it"
-                               "contains." % len(manifest.archives))
+                    msg.append("You requested to completely DELETE the repository *including* %d archives it contains."
+                               % len(manifest.archives))
             msg.append("Type 'YES' if you understand this and want to continue: ")
             msg = '\n'.join(msg)
             if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),

@@ -131,13 +131,13 @@ you run the tests.
 Continuous Integration
 ----------------------
 
-All pull requests go through Travis-CI_, which runs the tests on Linux
+All pull requests go through `GitHub Actions`_, which runs the tests on Linux
 and Mac OS X as well as the flake8 style checker. Windows builds run on AppVeyor_,
 while additional Unix-like platforms are tested on Golem_.
 
 .. _AppVeyor: https://ci.appveyor.com/project/borgbackup/borg/
 .. _Golem: https://golem.enkore.de/view/Borg/
-.. _Travis-CI: https://travis-ci.com/borgbackup/borg
+.. _GitHub Actions: https://github.com/borgbackup/borg/actions
 
 Output and Logging
 ------------------
@@ -322,7 +322,7 @@ Checklist:
   next milestone.
 - Check if there are any pending fixes for security issues.
 - Find and fix any low hanging fruit left on the issue tracker.
-- Check that Travis CI is happy.
+- Check that GitHub Actions CI is happy.
 - Update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``.
 - Check version number of upcoming release in ``CHANGES.rst``.
 - Render ``CHANGES.rst`` via ``make html`` and check for markup errors.

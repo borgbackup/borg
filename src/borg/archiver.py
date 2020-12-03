@@ -51,7 +51,7 @@ try:
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict
+    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from .helpers import timestamp
     from .helpers import get_cache_dir, os_stat
@@ -533,6 +533,36 @@ class Archiver:
                 else:
                     status = '-'
                 self.print_file_status(status, path)
+            elif args.paths_from_command or args.paths_from_stdin:
+                paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else '\n'
+                if args.paths_from_command:
+                    try:
+                        proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE)
+                    except (FileNotFoundError, PermissionError) as e:
+                        self.print_error('Failed to execute command: %s', e)
+                        return self.exit_code
+                    pipe = proc.stdout
+                else:  # args.paths_from_stdin == True
+                    pipe = sys.stdin
+                for path in iter_separated(pipe, paths_sep):
+                    try:
+                        with backup_io('stat'):
+                            st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
+                        status = self._process_any(path=path, parent_fd=None, name=None, st=st, fso=fso,
+                                                   cache=cache, read_special=args.read_special, dry_run=dry_run)
+                    except (BackupOSError, BackupError) as e:
+                        self.print_warning('%s: %s', path, e)
+                        status = 'E'
+                    if status == 'C':
+                        self.print_warning('%s: file changed while we backed it up', path)
+                    if status is None:
+                        status = '?'
+                    self.print_file_status(status, path)
+                if args.paths_from_command:
+                    rc = proc.wait()
+                    if rc != 0:
+                        self.print_error('Command %r exited with status %d', args.paths[0], rc)
+                        return self.exit_code
             else:
                 for path in args.paths:
                     if path == '-':  # stdin
@@ -3277,6 +3307,14 @@ class Archiver:
         subparser.add_argument('--content-from-command', action='store_true',
                                help='interpret PATH as command and store its stdout. See also section Reading from'
                                     ' stdin below.')
+        subparser.add_argument('--paths-from-stdin', action='store_true',
+                               help='read DELIM-separated list of paths to backup from stdin. Will not '
+                                    'recurse in directories')
+        subparser.add_argument('--paths-from-command', action='store_true',
+                               help='interpret PATH as command and treat its output as ``--paths-from-stdin``'
+                                    'recurse in directories')
+        subparser.add_argument('--paths-delimiter', metavar='DELIM',
+                               help='set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \\n) ')
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)
         exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',
@@ -4522,10 +4560,12 @@ class Archiver:
         args = parser.parse_args(args or ['-h'])
         parser.common_options.resolve(args)
         func = get_func(args)
+        if func == self.do_create and args.paths and args.paths_from_stdin:
+            parser.error('Must not pass PATH with ``--paths-from-stdin``.')
         if func == self.do_create and not args.paths:
-            if args.content_from_command:
+            if args.content_from_command or args.paths_from_command:
                 parser.error('No command given.')
-            else:
+            elif not args.paths_from_stdin:
                 # need at least 1 path but args.paths may also be populated from patterns
                 parser.error('Need at least one PATH argument.')
         if not getattr(args, 'lock', True):  # Option --bypass-lock sets args.lock = False

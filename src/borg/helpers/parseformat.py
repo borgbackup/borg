@@ -48,6 +48,11 @@ def remove_surrogates(s, errors='replace'):
     return s.encode('utf-8', errors).decode('utf-8')
 
 
+def eval_escapes(s):
+    """Evaluate literal escape sequences in a string (eg `\\n` -> `\n`)."""
+    return s.encode('ascii', 'backslashreplace').decode('unicode-escape')
+
+
 def decode_dict(d, keys, encoding='utf-8', errors='surrogateescape'):
     for key in keys:
         if isinstance(d.get(key), bytes):

@@ -70,7 +70,7 @@ support storage quotas.
 
 Refer to :ref:`internals_storage_quota` for more details on storage quotas.
 
-**Append-only repositories**
+**Specificities: Append-only repositories**
 
 Running ``borg init`` via a ``borg serve --append-only`` server will **not**
 create a repository that is configured to be append-only by its repository

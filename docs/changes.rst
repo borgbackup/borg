@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0a9 (2020-10-05)
-----------------------------
+Version 1.2.0b1 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -263,6 +263,62 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+
+Fixes:
+
+- BORG_CACHE_DIR crashing borg if empty, atomic handling of
+  recursive directory creation, #5216
+- fix --dry-run and --stats coexistence, #5415
+- allow EIO with warning when trying to hardlink, #4336
+- export-tar: set tar format to GNU_FORMAT explicitly, #5274
+- use --timestamp for {utcnow} and {now} if given, #5189
+- make timestamp helper timezone-aware
+
+New features:
+
+- 'obfuscate' pseudo compressor obfuscates compressed chunk size in repo
+- add pyfuse3 (successor of llfuse) as an alternative lowlevel fuse
+  implementation to llfuse (deprecated), #5407.
+  FUSE implementation can be switched via env var BORG_FUSE_IMPL.
+- allow appending to the files cache filename with BORG_FILES_CACHE_SUFFIX
+- create: implement --stdin-mode, --stdin-user and --stdin-group, #5333
+
+Other changes:
+
+- split recursive directory walking/processing into directory walking and
+  item processing.
+- fix warning by importing setuptools before distutils.
+- testing:
+
+  - add a test for the hashindex corruption bug, #5531 #4829
+  - move away from travis-ci, use github actions, #5528 #5467
+  - test both on fuse2 and fuse3
+  - upload coverage reports to codecov
+  - fix spurious failure in test_cache_files, #5438
+  - add tests for Location.with_timestamp
+- vagrant:
+
+  - use python 3.7.latest and pyinstaller 4.0 for binary creation
+  - pyinstaller: compute basepath from spec file location
+- docs:
+
+  - "filename with spaces" example added to exclude file, #5236
+  - add a hint about sleeping computer, #5301
+  - how to adjust macOS >= Catalina security settings, #5303
+  - process/policy for adding new compression algorithms
+  - updated docs about hacked backup client, #5480
+  - improve ansible deployment docs, make it more generic
+  - how to approach borg speed issues, give speed example, #5371
+  - fix mathematical inaccuracy about chunk size, #5336
+  - add example for excluding content using --pattern cli option
+  - clarify borg create's '--one-file-system' option, #4009
+  - fix reST markup issues, labels
+  - add infos about contributor retirement status
+
+
+Version 1.2.0a9 (2020-10-05)
+----------------------------
 
 Fixes:
 

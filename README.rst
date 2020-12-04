@@ -177,13 +177,13 @@ see ``docs/support.rst`` in the source distribution).
         :alt: Documentation
         :target: https://borgbackup.readthedocs.org/en/stable/
 
-.. |build| image:: https://api.travis-ci.org/borgbackup/borg.svg
-        :alt: Build Status
-        :target: https://travis-ci.org/borgbackup/borg
+.. |build| image:: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=1.1-maint
+        :alt: Build Status (1.1-maint)
+        :target: https://github.com/borgbackup/borg/actions
 
-.. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
-        :alt: Test Coverage
-        :target: https://codecov.io/github/borgbackup/borg?branch=master
+.. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=1.1-maint
+        :alt: Test Coverage (1.1-maint)
+        :target: https://codecov.io/github/borgbackup/borg?branch=1.1-maint
 
 .. |screencast_basic| image:: https://asciinema.org/a/133292.png
         :alt: BorgBackup Basic Usage

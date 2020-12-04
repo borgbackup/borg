@@ -258,7 +258,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("focal64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64", "^$")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64", ".*none.*")
   end
 
   config.vm.define "bionic64" do |b|
@@ -286,7 +286,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("buster64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64", "^$")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64", ".*none.*")
   end
 
   config.vm.define "stretch64" do |b|
@@ -314,7 +314,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages arch", :type => :shell, :privileged => true, :inline => packages_arch
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("arch64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64", "^$")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64", ".*none.*")
   end
 
   config.vm.define "freebsd64" do |b|

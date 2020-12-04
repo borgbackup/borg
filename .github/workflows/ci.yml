@@ -110,7 +110,7 @@ jobs:
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
         brew install openssl@1.1 || brew upgrade openssl@1.1
-        brew install Caskroom/cask/osxfuse || brew upgrade Caskroom/cask/osxfuse  # Required for Python llfuse module
+        brew install homebrew/cask/osxfuse || brew upgrade homebrew/cask/osxfuse  # Required for Python llfuse module
 
     - name: Install Python requirements
       run: |
@@ -125,3 +125,11 @@ jobs:
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      env: 
+        OS: ${{ runner.os }}
+        python: ${{ matrix.python-version }}
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        env_vars: OS, python

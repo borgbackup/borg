@@ -215,10 +215,15 @@ class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
         return len(s)
 
 
-def iter_separated(fd, sep='\n', read_size=1024):
+def iter_separated(fd, sep=None, read_size=1024):
     """Iter over chunks of open file ``fd`` delimited by ``sep``. Doesn't trim."""
-    part = ''
     buf = fd.read(read_size)
+    if type(buf) is str:
+        part = ''
+        sep = sep or '\n'
+    else:
+        part = b''
+        sep = sep or b'\n'
     while len(buf) > 0:
         part2, *items = buf.split(sep)
         *full, part = (part + part2, *items)

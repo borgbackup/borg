@@ -546,7 +546,7 @@ class Archiver:
                     pipe_bin = proc.stdout
                 else:  # args.paths_from_stdin == True
                     pipe_bin = sys.stdin.buffer
-                pipe = TextIOWrapper(pipe_bin, encoding='utf-8', errors='surrogateescape')
+                pipe = TextIOWrapper(pipe_bin, errors='surrogateescape')
                 for path in iter_separated(pipe, paths_sep):
                     try:
                         with backup_io('stat'):

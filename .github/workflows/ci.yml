@@ -32,6 +32,7 @@ jobs:
   lint:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
     - uses: actions/checkout@v2
@@ -74,6 +75,7 @@ jobs:
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
 
     steps:
     - uses: actions/checkout@v2
@@ -127,7 +129,7 @@ jobs:
         tox --skip-missing-interpreters
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
-      env: 
+      env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}
       with:

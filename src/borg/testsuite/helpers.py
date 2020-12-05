@@ -1029,17 +1029,21 @@ def test_dash_open():
 
 def test_iter_separated():
     # newline and utf-8
-    fd = StringIO('foo\nbar/baz\n나윤a선나윤선나윤선나윤선나윤선\n')
-    assert list(iter_separated(fd)) == ['foo', 'bar/baz', '나윤a선나윤선나윤선나윤선나윤선']
-    # null
-    fd = StringIO('foo/bar\0baz\0spam')
-    assert list(iter_separated(fd, sep='\0')) == ['foo/bar', 'baz', 'spam']
+    sep, items = '\n', ['foo', 'bar/baz', '나윤a선나윤선나윤선나윤선나윤선']
+    fd = StringIO(sep.join(items))
+    assert list(iter_separated(fd)) == items
+    # null and bogus ending
+    sep, items = '\0', ['foo/bar', 'baz', 'spam']
+    fd = StringIO(sep.join(items) + '\0')
+    assert list(iter_separated(fd, sep=sep)) == ['foo/bar', 'baz', 'spam']
     # multichar
-    fd = StringIO('foo/barSEPbazSEPspam')
-    assert list(iter_separated(fd, sep='SEP')) == ['foo/bar', 'baz', 'spam']
+    sep, items = 'SEP', ['foo/bar', 'baz', 'spam']
+    fd = StringIO(sep.join(items))
+    assert list(iter_separated(fd, sep=sep)) == items
     # bytes
-    fd = BytesIO(b'foo\nblop\t\n')
-    assert list(iter_separated(fd, sep=b'\n')) == [b'foo', b'blop\t']
+    sep, items = b'\n', [b'foo', b'blop\t', b'gr\xe4ezi']
+    fd = BytesIO(sep.join(items))
+    assert list(iter_separated(fd)) == items
 
 
 def test_eval_escapes():

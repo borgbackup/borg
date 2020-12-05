@@ -27,6 +27,7 @@ try:
     from binascii import unhexlify
     from contextlib import contextmanager
     from datetime import datetime, timedelta
+    from io import TextIOWrapper
 
     from .logger import create_logger, setup_logging
 
@@ -73,6 +74,7 @@ try:
     from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
     from .helpers import msgpack
     from .helpers import sig_int
+    from .helpers import iter_separated
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
@@ -541,9 +543,10 @@ class Archiver:
                     except (FileNotFoundError, PermissionError) as e:
                         self.print_error('Failed to execute command: %s', e)
                         return self.exit_code
-                    pipe = proc.stdout
+                    pipe_bin = proc.stdout
                 else:  # args.paths_from_stdin == True
-                    pipe = sys.stdin
+                    pipe_bin = sys.stdin.buffer
+                pipe = TextIOWrapper(pipe_bin, encoding='utf-8', errors='surrogateescape')
                 for path in iter_separated(pipe, paths_sep):
                     try:
                         with backup_io('stat'):

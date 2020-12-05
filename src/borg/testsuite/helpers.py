@@ -4,6 +4,7 @@ import shutil
 import sys
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
+from io import StringIO
 from time import sleep
 
 import pytest
@@ -27,6 +28,8 @@ from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
 from ..helpers import popen_with_error_handling
 from ..helpers import dash_open
+from ..helpers import iter_separated
+from ..helpers import eval_escapes
 
 from . import BaseTestCase, FakeInputs
 
@@ -1022,3 +1025,23 @@ def test_dash_open():
     assert dash_open('-', 'w') is sys.stdout
     assert dash_open('-', 'rb') is sys.stdin.buffer
     assert dash_open('-', 'wb') is sys.stdout.buffer
+
+
+def test_iter_separated():
+    # newline and utf-8
+    fd = StringIO('foo\nbar/baz\n나윤a선나윤선나윤선나윤선나윤선\n')
+    assert list(iter_separated(fd)) == ['foo', 'bar/baz', '나윤a선나윤선나윤선나윤선나윤선']
+
+    # null
+    fd = StringIO('foo/bar\0baz\0spam')
+    assert list(iter_separated(fd, sep='\0')) == ['foo/bar', 'baz', 'spam']
+
+    # multichar
+    fd = StringIO('foo/barSEPbazSEPspam')
+    assert list(iter_separated(fd, sep='SEP')) == ['foo/bar', 'baz', 'spam']
+
+
+def test_eval_escapes():
+    assert eval_escapes('\\n\\0\\x23') == '\n\0#'
+    assert eval_escapes('ä捃\\n') == 'ä捃\n'
+    assert eval_escapes('aoeu\u1234') == 'aoeu\u1234'

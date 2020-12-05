@@ -1065,6 +1065,47 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '--content-from-command', self.repository_location + '::test', exit_code=2)
         assert output.endswith('No command given.\n')
 
+    def test_create_paths_from_stdin(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file("file1", size=1024 * 80)
+        self.create_regular_file("dir1/file2", size=1024 * 80)
+        self.create_regular_file("dir1/file3", size=1024 * 80)
+        self.create_regular_file("file4", size=1024 * 80)
+
+        input_data = b'input/file1\0input/dir1\0input/file4'
+        self.cmd('create', '--paths-from-stdin', '--paths-delimiter', '\\0',
+                 self.repository_location + '::test', input=input_data)
+        archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
+        assert paths == ['input/file1', 'input/dir1', 'input/file4']
+
+    def test_create_paths_from_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file("file1", size=1024 * 80)
+        self.create_regular_file("file2", size=1024 * 80)
+        self.create_regular_file("file3", size=1024 * 80)
+        self.create_regular_file("file4", size=1024 * 80)
+
+        input_data = 'input/file1\ninput/file2\ninput/file3'
+        self.cmd('create', '--paths-from-command',
+                 self.repository_location + '::test', '--', 'echo', input_data)
+        archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
+        assert paths == ['input/file1', 'input/file2', 'input/file3']
+
+    def test_create_paths_from_command_with_failed_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--paths-from-command', self.repository_location + '::test',
+                          '--', 'sh', '-c', 'exit 73;', exit_code=2)
+        assert output.endswith("Command 'sh' exited with status 73\n")
+        archive_list = json.loads(self.cmd('list', '--json', self.repository_location))
+        assert archive_list['archives'] == []
+
+    def test_create_paths_from_command_missing_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        output = self.cmd('create', '--paths-from-command', self.repository_location + '::test', exit_code=2)
+        assert output.endswith('No command given.\n')
+
     def test_create_without_root(self):
         """test create without a root"""
         self.cmd('init', '--encryption=repokey', self.repository_location)

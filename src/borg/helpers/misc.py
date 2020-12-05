@@ -223,6 +223,7 @@ def iter_separated(fd, sep='\n', read_size=1024):
         part2, *items = buf.split(sep)
         *full, part = (part + part2, *items)
         yield from full
+        buf = fd.read(read_size)
     # won't yield an empty part if stream ended with `sep`
     # or if there was no data before EOF
     if len(part) > 0:

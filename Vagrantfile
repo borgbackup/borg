@@ -34,7 +34,8 @@ def packages_arch
     locale-gen
     localectl set-locale LANG=en_US.UTF-8
     chown vagrant.vagrant /vagrant
-    pacman -Syu --noconfirm python-virtualenv python-pip
+    pacman -Syu --noconfirm python-virtualenv python-pip fuse2 fuse3
+    modprobe fuse
   EOF
 end
 

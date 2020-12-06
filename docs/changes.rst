@@ -277,6 +277,11 @@ Fixes:
 
 New features:
 
+- create: implement --paths-from-stdin and --paths-from-command, see #5492
+  These switches read paths to archive from stdin. Delimiter can specified
+  by --paths-delimiter=DELIM. Paths read will be added honoring every
+  option but exclusion options and --one-file-system. Directories aren't
+  recursed into.
 - 'obfuscate' pseudo compressor obfuscates compressed chunk size in repo
 - add pyfuse3 (successor of llfuse) as an alternative lowlevel fuse
   implementation to llfuse (deprecated), #5407.
@@ -297,10 +302,12 @@ Other changes:
   - upload coverage reports to codecov
   - fix spurious failure in test_cache_files, #5438
   - add tests for Location.with_timestamp
+  - tox: add a non-fuse env to the envlist
 - vagrant:
 
   - use python 3.7.latest and pyinstaller 4.0 for binary creation
   - pyinstaller: compute basepath from spec file location
+  - vagrant: updates/fixes for archlinux box, #5543
 - docs:
 
   - "filename with spaces" example added to exclude file, #5236
@@ -313,6 +320,7 @@ Other changes:
   - fix mathematical inaccuracy about chunk size, #5336
   - add example for excluding content using --pattern cli option
   - clarify borg create's '--one-file-system' option, #4009
+  - improve docs/FAQ about append-only remote repos, #5497
   - fix reST markup issues, labels
   - add infos about contributor retirement status
 

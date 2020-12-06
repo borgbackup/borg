@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG 1 "2020-10-04" "" "borg backup tool"
+.TH BORG 1 "2020-12-06" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .
@@ -441,6 +441,11 @@ the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
 When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
 Using \fB\-\-remote\-path PATH\fP commandline option overrides the environment variable.
 .TP
+.B BORG_FILES_CACHE_SUFFIX
+When set to a value at least one character long, instructs borg to use a specifically named
+(based on the suffix) alternative files cache. This can be used to avoid loading and saving
+cache entries for backup sources other than the current sources.
+.TP
 .B BORG_FILES_CACHE_TTL
 When set to a numeric value, this determines the maximum "time to live" for the files cache
 entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
@@ -450,6 +455,23 @@ The FAQ explains this more detailed in: \fIalways_chunking\fP
 When set to no (default: yes), system information (like OS, Python version, ...) in
 exceptions is not shown.
 Please only use for good reasons as it makes issues harder to analyze.
+.TP
+.B BORG_FUSE_IMPL
+Choose the lowlevel FUSE implementation borg shall use for \fBborg mount\fP\&.
+This is a comma\-separated list of implementation names, they are tried in the
+given order, e.g.:
+.INDENT 7.0
+.IP \(bu 2
+\fBpyfuse3,llfuse\fP: default, first try to load pyfuse3, then try to load llfuse.
+.IP \(bu 2
+\fBllfuse,pyfuse3\fP: first try to load llfuse, then try to load pyfuse3.
+.IP \(bu 2
+\fBpyfuse3\fP: only try to load pyfuse3
+.IP \(bu 2
+\fBllfuse\fP: only try to load llfuse
+.IP \(bu 2
+\fBnone\fP: do not try to load an implementation
+.UNINDENT
 .TP
 .B BORG_WORKAROUNDS
 A list of comma separated strings that trigger workarounds in borg,

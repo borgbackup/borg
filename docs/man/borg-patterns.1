@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2020-10-04" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2020-12-06" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -173,6 +173,8 @@ $ cat >exclude.txt <<EOF
 fm:aa:something/*
 re:^home/[^/]\e.tmp/
 sh:home/*/.thumbnails
+# Example with spaces, no need to escape as it is processed by borg
+some file with spaces.txt
 EOF
 $ borg create \-\-exclude\-from exclude.txt backup /
 .ft P

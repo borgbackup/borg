@@ -138,6 +138,8 @@ Examples::
     fm:aa:something/*
     re:^home/[^/]\.tmp/
     sh:home/*/.thumbnails
+    # Example with spaces, no need to escape as it is processed by borg
+    some file with spaces.txt
     EOF
     $ borg create --exclude-from exclude.txt backup /
 
@@ -313,6 +315,32 @@ auto,C[,L]
     For compressible data, it uses the given C[,L] compression - with C[,L]
     being any valid compression specifier.
 
+obfuscate,SPEC,C[,L]
+    Use compressed-size obfuscation to make fingerprinting attacks based on
+    the observable stored chunk size more difficult.
+    Note:
+    - you must combine this with encryption or it won't make any sense.
+    - your repo size will be bigger, of course.
+
+    The SPEC value will determine how the size obfuscation will work:
+
+    Relative random reciprocal size variation:
+    Size will increase by a factor, relative to the compressed data size.
+    Smaller factors are often used, larger factors rarely.
+    1: factor 0.01 .. 100.0
+    2: factor 0.1 .. 1000.0
+    3: factor 1.0 .. 10000.0
+    4: factor 10.0 .. 100000.0
+    5: factor 100.0 .. 1000000.0
+    6: factor 1000.0 .. 10000000.0
+
+    Add a randomly sized padding up to the given size:
+    110: 1kiB
+    ...
+    120: 1MiB
+    ...
+    123: 8MiB (max.)
+
 Examples::
 
     borg create --compression lz4 REPO::ARCHIVE data
@@ -322,4 +350,7 @@ Examples::
     borg create --compression zlib,1 REPO::ARCHIVE data
     borg create --compression auto,lzma,6 REPO::ARCHIVE data
     borg create --compression auto,lzma ...
+    borg create --compression obfuscate,3,none ...
+    borg create --compression obfuscate,3,auto,zstd,10 ...
+    borg create --compression obfuscate,2,zstd,6 ...
 

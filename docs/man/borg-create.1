@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2020-10-04" "" "borg backup tool"
+.TH BORG-CREATE 1 "2020-12-06" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -94,6 +94,7 @@ ctime is a rather safe way to detect changes to a file (metadata and contents)
 as it can not be set from userspace. But, a metadata\-only change will already
 update the ctime, so there might be some unnecessary chunking/hashing even
 without content changes. Some filesystems do not support ctime (change time).
+E.g. doing a chown or chmod to a file will change its ctime.
 .IP \(bu 2
 mtime usually works and only updates if file contents were changed. But mtime
 can be arbitrarily set from userspace, e.g. to set mtime back to the same value
@@ -117,6 +118,7 @@ the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP optio
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 .sp
 See the output of the "borg help patterns" command for more help on exclude patterns.
+.sp
 See the output of the "borg help placeholders" command for more help on placeholders.
 .SH OPTIONS
 .sp
@@ -154,8 +156,26 @@ experimental: do not synchronize the cache. Implies not using the files cache.
 .BI \-\-stdin\-name \ NAME
 use NAME in archive for stdin data (default: \(aqstdin\(aq)
 .TP
+.BI \-\-stdin\-user \ USER
+set user USER in archive for stdin data (default: \(aqroot\(aq)
+.TP
+.BI \-\-stdin\-group \ GROUP
+set group GROUP in archive for stdin data (default: \(aqroot\(aq)
+.TP
+.BI \-\-stdin\-mode \ M
+set mode to M in archive for stdin data (default: 0660)
+.TP
 .B \-\-content\-from\-command
 interpret PATH as command and store its stdout. See also section Reading from stdin below.
+.TP
+.B \-\-paths\-from\-stdin
+read DELIM\-separated list of paths to backup from stdin. Will not recurse into directories.
+.TP
+.B \-\-paths\-from\-command
+interpret PATH as command and treat its output as \fB\-\-paths\-from\-stdin\fP
+.TP
+.BI \-\-paths\-delimiter \ DELIM
+set path delimiter for \fB\-\-paths\-from\-stdin\fP and \fB\-\-paths\-from\-command\fP (default: n)
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -188,7 +208,7 @@ exclude files flagged NODUMP
 .INDENT 0.0
 .TP
 .B \-x\fP,\fB  \-\-one\-file\-system
-stay in the same file system and do not store mount points of other file systems
+stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
 .TP
 .B \-\-numeric\-owner
 only store numeric user and group identifiers
@@ -327,6 +347,17 @@ all of its contents will be omitted from the backup.  If, however, you wish to
 only include the objects specified by \fB\-\-exclude\-if\-present\fP in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the \fB\-\-keep\-exclude\-tags\fP option.
+.sp
+The \fB\-x\fP or \fB\-\-one\-file\-system\fP option excludes directories, that are mountpoints (and everything in them).
+It detects mountpoints by comparing the device number from the output of \fBstat()\fP of the directory and its
+parent directory. Specifically, it excludes directories for which \fBstat()\fP reports a device number different
+from the device number of their parent. Be aware that in Linux (and possibly elsewhere) there are directories
+with device number different from their parent, which the kernel does not consider a mountpoint and also the
+other way around. Examples are bind mounts (possibly same device number, but always a mountpoint) and ALL
+subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint). Therefore when
+using \fB\-\-one\-file\-system\fP, one should make doubly sure that the backup works as intended especially when using
+btrfs. This is even more important, if the btrfs layout was created by someone else, e.g. a distribution
+installer.
 .SS Item flags
 .sp
 \fB\-\-list\fP outputs a list of all files, directories and other

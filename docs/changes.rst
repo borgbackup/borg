@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0b1 (not released yet)
-----------------------------------
+Version 1.2.0b1 (2020-12-06)
+----------------------------
 
 Please note:
 
@@ -277,11 +277,11 @@ Fixes:
 
 New features:
 
-- create: implement --paths-from-stdin and --paths-from-command, see #5492
+- create: implement --paths-from-stdin and --paths-from-command, see #5492.
   These switches read paths to archive from stdin. Delimiter can specified
   by --paths-delimiter=DELIM. Paths read will be added honoring every
-  option but exclusion options and --one-file-system. Directories aren't
-  recursed into.
+  option but exclusion options and --one-file-system. borg won't recurse
+  into directories.
 - 'obfuscate' pseudo compressor obfuscates compressed chunk size in repo
 - add pyfuse3 (successor of llfuse) as an alternative lowlevel fuse
   implementation to llfuse (deprecated), #5407.
@@ -294,6 +294,7 @@ Other changes:
 - split recursive directory walking/processing into directory walking and
   item processing.
 - fix warning by importing setuptools before distutils.
+- debug info: include infos about FUSE implementation, #5546
 - testing:
 
   - add a test for the hashindex corruption bug, #5531 #4829

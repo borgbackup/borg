@@ -1049,4 +1049,3 @@ def test_iter_separated():
 def test_eval_escapes():
     assert eval_escapes('\\n\\0\\x23') == '\n\0#'
     assert eval_escapes('äç\\n') == 'äç\n'
-    assert eval_escapes('aoeu\u1234') == 'aoeu\u1234'

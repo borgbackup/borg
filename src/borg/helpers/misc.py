@@ -86,13 +86,17 @@ def sysinfo():
         msgpack_version = '.'.join(str(v) for v in msgpack.version)
     except:
         msgpack_version = 'unknown'
+    from ..fuse_impl import llfuse, BORG_FUSE_IMPL
+    llfuse_name = llfuse.__name__ if llfuse else 'None'
+    llfuse_version = (' %s' % llfuse.__version__) if llfuse else ''
+    llfuse_info = '%s%s [%s]' % (llfuse_name, llfuse_version, BORG_FUSE_IMPL)
     info = []
     if uname is not None:
         info.append('Platform: %s' % (' '.join(uname), ))
     if linux_distribution is not None:
         info.append('Linux: %s %s %s' % linux_distribution)
-    info.append('Borg: %s  Python: %s %s msgpack: %s' % (
-                borg_version, python_implementation, python_version, msgpack_version))
+    info.append('Borg: %s  Python: %s %s msgpack: %s fuse: %s' % (
+                borg_version, python_implementation, python_version, msgpack_version, llfuse_info))
     info.append('PID: %d  CWD: %s' % (os.getpid(), os.getcwd()))
     info.append('sys.argv: %r' % sys.argv)
     info.append('SSH_ORIGINAL_COMMAND: %r' % os.environ.get('SSH_ORIGINAL_COMMAND'))

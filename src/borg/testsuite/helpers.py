@@ -1029,7 +1029,7 @@ def test_dash_open():
 
 def test_iter_separated():
     # newline and utf-8
-    sep, items = '\n', ['foo', 'bar/baz', '나윤a선나윤선나윤선나윤선나윤선']
+    sep, items = '\n', ['foo', 'bar/baz', 'αáčő']
     fd = StringIO(sep.join(items))
     assert list(iter_separated(fd)) == items
     # null and bogus ending
@@ -1048,5 +1048,5 @@ def test_iter_separated():
 
 def test_eval_escapes():
     assert eval_escapes('\\n\\0\\x23') == '\n\0#'
-    assert eval_escapes('ä捃\\n') == 'ä捃\n'
+    assert eval_escapes('äç\\n') == 'äç\n'
     assert eval_escapes('aoeu\u1234') == 'aoeu\u1234'

@@ -213,3 +213,20 @@ class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
                 except OSError:
                     pass
         return len(s)
+
+
+def iter_separated(fd, sep=None, read_size=4096):
+    """Iter over chunks of open file ``fd`` delimited by ``sep``. Doesn't trim."""
+    buf = fd.read(read_size)
+    is_str = isinstance(buf, str)
+    part = '' if is_str else b''
+    sep = sep or ('\n' if is_str else b'\n')
+    while len(buf) > 0:
+        part2, *items = buf.split(sep)
+        *full, part = (part + part2, *items)
+        yield from full
+        buf = fd.read(read_size)
+    # won't yield an empty part if stream ended with `sep`
+    # or if there was no data before EOF
+    if len(part) > 0:
+        yield part

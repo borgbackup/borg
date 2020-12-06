@@ -4,6 +4,7 @@ import shutil
 import sys
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
+from io import StringIO, BytesIO
 from time import sleep
 
 import pytest
@@ -27,6 +28,8 @@ from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
 from ..helpers import popen_with_error_handling
 from ..helpers import dash_open
+from ..helpers import iter_separated
+from ..helpers import eval_escapes
 
 from . import BaseTestCase, FakeInputs
 
@@ -1022,3 +1025,27 @@ def test_dash_open():
     assert dash_open('-', 'w') is sys.stdout
     assert dash_open('-', 'rb') is sys.stdin.buffer
     assert dash_open('-', 'wb') is sys.stdout.buffer
+
+
+def test_iter_separated():
+    # newline and utf-8
+    sep, items = '\n', ['foo', 'bar/baz', 'αáčő']
+    fd = StringIO(sep.join(items))
+    assert list(iter_separated(fd)) == items
+    # null and bogus ending
+    sep, items = '\0', ['foo/bar', 'baz', 'spam']
+    fd = StringIO(sep.join(items) + '\0')
+    assert list(iter_separated(fd, sep=sep)) == ['foo/bar', 'baz', 'spam']
+    # multichar
+    sep, items = 'SEP', ['foo/bar', 'baz', 'spam']
+    fd = StringIO(sep.join(items))
+    assert list(iter_separated(fd, sep=sep)) == items
+    # bytes
+    sep, items = b'\n', [b'foo', b'blop\t', b'gr\xe4ezi']
+    fd = BytesIO(sep.join(items))
+    assert list(iter_separated(fd)) == items
+
+
+def test_eval_escapes():
+    assert eval_escapes('\\n\\0\\x23') == '\n\0#'
+    assert eval_escapes('äç\\n') == 'äç\n'

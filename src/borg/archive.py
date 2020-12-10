@@ -1172,7 +1172,7 @@ class FilesystemObjectProcessors:
 
     def __init__(self, *, metadata_collector, cache, key,
                  add_item, process_file_chunks,
-                 chunker_params, show_progress):
+                 chunker_params, show_progress, sparse):
         self.metadata_collector = metadata_collector
         self.cache = cache
         self.key = key
@@ -1183,7 +1183,7 @@ class FilesystemObjectProcessors:
         self.hard_links = {}
         self.stats = Statistics()  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
-        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed)
+        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
 
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True):

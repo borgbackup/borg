@@ -596,14 +596,20 @@ The fixed chunker triggers (chunks) at even-spaced offsets, e.g. every 4MiB,
 producing chunks of same block size (the last chunk is not required to be
 full-size).
 
-Optionally, it can cut the first "header" chunk with a different size (the
-default is not to have a differently sized header chunk).
+Optionally, it supports processing a differently sized "header" first, before
+it starts to cut chunks of the desired block size.
+The default is not to have a differently sized header.
 
 ``borg create --chunker-params fixed,BLOCK_SIZE[,HEADER_SIZE]``
 
 - BLOCK_SIZE: no default value, multiple of the system page size (usually 4096
   bytes) recommended. E.g.: 4194304 would cut 4MiB sized chunks.
-- HEADER_SIZE: optional, defaults to 0 (no header chunk).
+- HEADER_SIZE: optional, defaults to 0 (no header).
+
+The fixed chunker also supports processing sparse files (reading only the ranges
+with data and seeking over the empty hole ranges).
+
+``borg create --sparse --chunker-params fixed,BLOCK_SIZE[,HEADER_SIZE]``
 
 "buzhash" chunker
 +++++++++++++++++

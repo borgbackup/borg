@@ -1183,6 +1183,7 @@ class Archiver:
         """Delete an existing repository or archives"""
         archive_filter_specified = any((args.first, args.last, args.prefix is not None, args.glob_archives))
         explicit_archives_specified = args.location.archive or args.archives
+        self.output_list = args.output_list
         if archive_filter_specified and explicit_archives_specified:
             self.print_error('Mixing archive filters and explicitly named archives is not supported.')
             return self.exit_code
@@ -1210,6 +1211,7 @@ class Archiver:
 
         if args.forced == 2:
             deleted = False
+            logger_list = logging.getLogger('borg.output.list')
             for i, archive_name in enumerate(archive_names, 1):
                 try:
                     current_archive = manifest.archives.pop(archive_name)
@@ -1218,8 +1220,10 @@ class Archiver:
                     logger.warning('Archive {} not found ({}/{}).'.format(archive_name, i, len(archive_names)))
                 else:
                     deleted = True
-                    msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
-                    logger.info(msg.format(format_archive(current_archive), i, len(archive_names)))
+                    if self.output_list:
+                        msg = 'Would delete: {} ({}/{})' if dry_run else 'Deleted archive: {} ({}/{})'
+                        logger_list.info(msg.format(format_archive(current_archive),
+                                                    i, len(archive_names)))
             if dry_run:
                 logger.info('Finished dry-run.')
             elif deleted:
@@ -1235,13 +1239,16 @@ class Archiver:
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             msg_delete = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
             msg_not_found = 'Archive {} not found ({}/{}).'
+            logger_list = logging.getLogger('borg.output.list')
             for i, archive_name in enumerate(archive_names, 1):
                 try:
                     archive_info = manifest.archives[archive_name]
                 except KeyError:
                     logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
-                    logger.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+                    if self.output_list:
+                        logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
+
                     if not dry_run:
                         archive = Archive(repository, key, manifest, archive_name, cache=cache,
                                           consider_part_files=args.consider_part_files)
@@ -1275,10 +1282,14 @@ class Archiver:
                 msg.append("This repository seems to have no manifest, so we can't tell anything about its "
                            "contents.")
             else:
-                msg.append("You requested to completely DELETE the repository *including* all archives it "
-                           "contains:")
-                for archive_info in manifest.archives.list(sort_by=['ts']):
-                    msg.append(format_archive(archive_info))
+                if self.output_list:
+                    msg.append("You requested to completely DELETE the repository *including* all archives it "
+                               "contains:")
+                    for archive_info in manifest.archives.list(sort_by=['ts']):
+                        msg.append(format_archive(archive_info))
+                else:
+                    msg.append("You requested to completely DELETE the repository *including* %d archives it contains."
+                               % len(manifest.archives))
             msg.append("Type 'YES' if you understand this and want to continue: ")
             msg = '\n'.join(msg)
             if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
@@ -3564,6 +3575,8 @@ class Archiver:
         with the ``--cache-only`` option, or keep the security info with the
         ``--keep-security-info`` option.
 
+        When in doubt, use ``--dry-run --list`` to see what would be deleted.
+
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
         that is how much your repository will shrink.
@@ -3587,6 +3600,8 @@ class Archiver:
         subparser.set_defaults(func=self.do_delete)
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository')
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of archives')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',

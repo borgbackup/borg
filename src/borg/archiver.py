@@ -1245,7 +1245,7 @@ class Archiver:
             else:
                 if self.output_list:
                     msg.append("You requested to completely DELETE the repository *including* all archives it "
-                           "contains:")
+                               "contains:")
                     for archive_info in manifest.archives.list(sort_by=['ts']):
                         msg.append(format_archive(archive_info))
                 else:

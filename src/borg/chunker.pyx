@@ -4,6 +4,9 @@ API_VERSION = '1.2_01'
 
 import errno
 import os
+from collections import namedtuple
+
+from .constants import CH_DATA, CH_HOLE
 
 from libc.stdlib cimport free
 
@@ -24,6 +27,25 @@ cdef extern from "_chunker.c":
 # this does not imply that it will actually work on the filesystem,
 # because the FS also needs to support this.
 has_seek_hole = hasattr(os, 'SEEK_DATA') and hasattr(os, 'SEEK_HOLE')
+
+
+_Chunk = namedtuple('_Chunk', 'meta data')
+_Chunk.__doc__ = """\
+    Chunk namedtuple
+
+    meta is always a dictionary, data depends on allocation.
+
+    on disk data:
+        meta = {'allocation' = CH_DATA, 'size' = size_of_data }
+        data = read_data [bytes or memoryview]
+
+    hole in a sparse file:
+        meta = {'allocation' = CH_HOLE, 'size' = size_of_hole }
+        data = None
+"""
+
+def Chunk(data, **meta):
+    return _Chunk(meta, data)
 
 
 def dread(offset, size, fd=None, fh=-1):
@@ -178,15 +200,16 @@ class ChunkerFixed:
                 if is_data:
                     # read block from the range
                     data = dread(offset, wanted, fd, fh)
+                    got = len(data)
                 else:  # hole
                     # seek over block from the range
                     pos = dseek(wanted, os.SEEK_CUR, fd, fh)
-                    data = self.zeros[:pos - offset]  # for now, create zero-bytes here
-                got = len(data)
+                    data = None
+                    got = pos - offset
                 if got > 0:
                     offset += got
                     range_size -= got
-                    yield data  # later, use a better api that tags data vs. hole
+                    yield Chunk(data, size=got, allocation=CH_DATA if is_data else CH_HOLE)
                 if got < wanted:
                     # we did not get enough data, looks like EOF.
                     return
@@ -233,7 +256,8 @@ cdef class Chunker:
         return self
 
     def __next__(self):
-        return chunker_process(self.chunker)
+        data = chunker_process(self.chunker)
+        return Chunk(data, size=len(data), allocation=CH_DATA)  # no sparse support here
 
 
 def get_chunker(algo, *params, **kw):

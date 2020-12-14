@@ -75,6 +75,9 @@ CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)
 
+# normal on-disk data, allocated (but not written, all zeros), not allocated hole (all zeros)
+CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
+
 # operating mode of the files cache (for fast skipping of unchanged files)
 DEFAULT_FILES_CACHE_MODE_UI = 'ctime,size,inode'
 DEFAULT_FILES_CACHE_MODE = 'cis'  # == CacheMode(DEFAULT_FILES_CACHE_MODE_UI)

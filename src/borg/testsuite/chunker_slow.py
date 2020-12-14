@@ -1,6 +1,7 @@
 from io import BytesIO
 from binascii import unhexlify
 
+from .chunker import cf
 from ..chunker import Chunker
 from ..crypto.low_level import blake2b_256
 from ..constants import *  # NOQA
@@ -30,7 +31,7 @@ class ChunkerRegressionTestCase(BaseTestCase):
                         for seed in (1849058162, 1234567653):
                             fh = BytesIO(data)
                             chunker = Chunker(seed, minexp, maxexp, maskbits, winsize)
-                            chunks = [blake2b_256(b'', c) for c in chunker.chunkify(fh, -1)]
+                            chunks = [blake2b_256(b'', c) for c in cf(chunker.chunkify(fh, -1))]
                             runs.append(blake2b_256(b'', b''.join(chunks)))
 
         # The "correct" hash below matches the existing chunker behavior.

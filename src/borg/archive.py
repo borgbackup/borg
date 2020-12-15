@@ -1143,7 +1143,7 @@ class ChunksProcessor:
                 if allocation == CH_DATA:
                     data = chunk.data
                     chunk_id = self.key.id_hash(data)
-                elif allocation == CH_HOLE:
+                elif allocation in (CH_HOLE, CH_ALLOC):
                     size = chunk.meta['size']
                     data = self.zeros[:size]
                     try:
@@ -2002,7 +2002,8 @@ class ArchiveRecreater:
         target.process_file_chunks(item, self.cache, target.stats, self.progress, chunk_iterator, chunk_processor)
 
     def chunk_processor(self, target, chunk):
-        # as this is recreate (we do not read from the fs), we never have holes here
+        # as this is recreate (we do not read from the fs), we never have CH_HOLE here,
+        # but we need to add support for CH_ALLOC - TODO!
         assert chunk.meta['allocation'] == CH_DATA
         data = chunk.data
         chunk_id = self.key.id_hash(data)

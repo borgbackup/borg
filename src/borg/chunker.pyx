@@ -6,7 +6,7 @@ import errno
 import os
 from collections import namedtuple
 
-from .constants import CH_DATA, CH_HOLE
+from .constants import CH_DATA, CH_ALLOC, CH_HOLE
 
 from libc.stdlib cimport free
 
@@ -35,12 +35,16 @@ _Chunk.__doc__ = """\
 
     meta is always a dictionary, data depends on allocation.
 
-    on disk data:
-        meta = {'allocation' = CH_DATA, 'size' = size_of_data }
+    data chunk read from a DATA range of a file (not from a sparse hole):
+        meta = {'allocation' = CH_DATA, 'size' = size_of_chunk }
         data = read_data [bytes or memoryview]
 
-    hole in a sparse file:
-        meta = {'allocation' = CH_HOLE, 'size' = size_of_hole }
+    all-zero chunk read from a DATA range of a file (not from a sparse hole, but detected to be all-zero):
+        meta = {'allocation' = CH_ALLOC, 'size' = size_of_chunk }
+        data = None
+
+    all-zero chunk from a HOLE range of a file (from a sparse hole):
+        meta = {'allocation' = CH_HOLE, 'size' = size_of_chunk }
         data = None
 """
 
@@ -201,15 +205,21 @@ class ChunkerFixed:
                     # read block from the range
                     data = dread(offset, wanted, fd, fh)
                     got = len(data)
+                    if data == self.zeros[:got]:
+                        data = None
+                        is_zero = True
+                    else:
+                        is_zero = False
                 else:  # hole
                     # seek over block from the range
                     pos = dseek(wanted, os.SEEK_CUR, fd, fh)
-                    data = None
                     got = pos - offset
+                    data = None
+                    is_zero = True
                 if got > 0:
                     offset += got
                     range_size -= got
-                    yield Chunk(data, size=got, allocation=CH_DATA if is_data else CH_HOLE)
+                    yield Chunk(data, size=got, allocation=(CH_ALLOC if is_zero else CH_DATA) if is_data else CH_HOLE)
                 if got < wanted:
                     # we did not get enough data, looks like EOF.
                     return

@@ -1115,7 +1115,8 @@ class Archiver:
                 return None, stream
             return tarinfo, stream
 
-        for item in archive.iter_items(filter, preload=True, hardlink_masters=hardlink_masters):
+        for item in archive.iter_items(filter, partial_extract=partial_extract,
+                                       preload=True, hardlink_masters=hardlink_masters):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])

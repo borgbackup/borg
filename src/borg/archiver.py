@@ -1013,8 +1013,8 @@ class Archiver:
         hardlink_masters = {} if partial_extract else None
 
         def peek_and_store_hardlink_masters(item, matched):
-            if (partial_extract and not matched and hardlinkable(item.mode) and
-                    item.get('hardlink_master', True) and 'source' not in item):
+            if ((partial_extract and not matched and hardlinkable(item.mode)) and
+                    (item.get('hardlink_master', True) and 'source' not in item)):
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)

@@ -497,6 +497,7 @@ class Archive:
 
     def __str__(self):
         return '''\
+Repository: {location}
 Archive name: {0.name}
 Archive fingerprint: {0.fpr}
 Time (start): {start}
@@ -508,7 +509,9 @@ Utilization of max. archive size: {csize_max:.0%}
             self,
             start=OutputTimestamp(self.start.replace(tzinfo=timezone.utc)),
             end=OutputTimestamp(self.end.replace(tzinfo=timezone.utc)),
-            csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE)
+            csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
+            location=self.repository._location.canonical_path()
+)
 
     def __repr__(self):
         return 'Archive(%r)' % self.name

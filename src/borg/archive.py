@@ -523,6 +523,8 @@ Utilization of max. archive size: {csize_max:.0%}
         return filter(item) if filter else True
 
     def iter_items(self, filter=None, partial_extract=False, preload=False, hardlink_masters=None):
+        # note: when calling this with preload=True, later fetch_many() must be called with
+        # is_preloaded=True or the RemoteRepository code will leak memory!
         assert not (filter and partial_extract and preload) or hardlink_masters is not None
         for item in self.pipeline.unpack_many(self.metadata.items, partial_extract=partial_extract,
                                               preload=preload, hardlink_masters=hardlink_masters,

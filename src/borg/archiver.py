@@ -1031,7 +1031,8 @@ class Archiver:
             """
             Return a file-like object that reads from the chunks of *item*.
             """
-            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks])
+            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks],
+                                                         is_preloaded=True)
             if pi:
                 info = [remove_surrogates(item.path)]
                 return ChunkIteratorFileWrapper(chunk_iterator,

@@ -49,3 +49,58 @@ class Buffer:
         if size is not None:
             self.resize(size, init)
         return self.buffer
+
+
+class EfficientBytesQueue:
+    """
+    An efficient FIFO queue that splits received elements into chunks.
+    """
+
+    class SizeUnderflow(Error):
+        """Could not pop_front first {} elements, collection only has {} elements.."""
+
+    def __init__(self, split_size):
+        self.buffers = []
+        self.size = 0
+        self.split_size = split_size
+
+    def peek_front(self):
+        if not self.buffers:
+            return []
+        buffer = self.buffers[0]
+        return buffer
+
+    def pop_front(self, size):
+        if size > self.size:
+            raise EfficientBytesQueue.SizeUnderflow(size, self.size)
+        while size > 0:
+            buffer = self.buffers[0]
+            to_remove = min(size, len(buffer))
+            buffer = buffer[to_remove:]
+            if buffer:
+                self.buffers[0] = buffer
+            else:
+                self.buffers = self.buffers[1:]
+            size -= to_remove
+            self.size -= to_remove
+
+    def push_back(self, data):
+        if not self.buffers:
+            self.buffers = [b'']
+        while data:
+            buffer = self.buffers[-1]
+            if len(buffer) >= self.split_size:
+                buffer = b''
+                self.buffers = self.buffers + [buffer]
+
+            to_add = min(len(data), self.split_size - len(buffer))
+            buffer = buffer + data[:to_add]
+            data = data[to_add:]
+            self.buffers[-1] = buffer
+            self.size += to_add
+
+    def __len__(self):
+        return self.size
+
+    def __bool__(self):
+        return len(self) != 0

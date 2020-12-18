@@ -1013,8 +1013,8 @@ class Archiver:
         hardlink_masters = {} if partial_extract else None
 
         def peek_and_store_hardlink_masters(item, matched):
-            if (partial_extract and not matched and hardlinkable(item.mode) and
-                    item.get('hardlink_master', True) and 'source' not in item):
+            if ((partial_extract and not matched and hardlinkable(item.mode)) and
+                    (item.get('hardlink_master', True) and 'source' not in item)):
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
@@ -1031,7 +1031,8 @@ class Archiver:
             """
             Return a file-like object that reads from the chunks of *item*.
             """
-            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks])
+            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks],
+                                                         is_preloaded=True)
             if pi:
                 info = [remove_surrogates(item.path)]
                 return ChunkIteratorFileWrapper(chunk_iterator,
@@ -1115,7 +1116,8 @@ class Archiver:
                 return None, stream
             return tarinfo, stream
 
-        for item in archive.iter_items(filter, preload=True, hardlink_masters=hardlink_masters):
+        for item in archive.iter_items(filter, partial_extract=partial_extract,
+                                       preload=True, hardlink_masters=hardlink_masters):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])

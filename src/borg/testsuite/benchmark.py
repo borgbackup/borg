@@ -13,7 +13,7 @@ import pytest
 from .archiver import changedir, cmd
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def repo_url(request, tmpdir, monkeypatch):
     monkeypatch.setenv('BORG_PASSPHRASE', '123456')
     monkeypatch.setenv('BORG_CHECK_I_KNOW_WHAT_I_AM_DOING', 'YES')
@@ -31,7 +31,7 @@ def repo(request, cmd, repo_url):
     return repo_url
 
 
-@pytest.yield_fixture(scope='session', params=["zeros", "random"])
+@pytest.fixture(scope='session', params=["zeros", "random"])
 def testdata(request, tmpdir_factory):
     count, size = 10, 1000*1000
     p = tmpdir_factory.mktemp('data')

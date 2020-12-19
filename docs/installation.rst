@@ -63,18 +63,18 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _[community]: https://www.archlinux.org/packages/?name=borg
 .. _Debian packages: https://packages.debian.org/search?keywords=borgbackup&searchon=names&exact=1&suite=all&section=all
 .. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
-.. _FreeBSD ports: http://www.freshports.org/archivers/py-borgbackup/
+.. _FreeBSD ports: https://www.freshports.org/archivers/py-borgbackup/
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
 .. _pkgsrc: http://pkgsrc.se/sysutils/py-borgbackup
 .. _cauldron: http://madb.mageia.org/package/show/application/0/release/cauldron/name/borgbackup
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
-.. _OpenBSD ports: http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
-.. _OpenIndiana hipster repository: http://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
-.. _openSUSE official repository: http://software.opensuse.org/package/borgbackup
+.. _OpenBSD ports: https://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
+.. _OpenIndiana hipster repository: https://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
+.. _openSUSE official repository: https://software.opensuse.org/package/borgbackup
 .. _Homebrew: https://formulae.brew.sh/formula/borgbackup
-.. _Raspbian testing: http://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
-.. _Ubuntu packages: http://packages.ubuntu.com/xenial/borgbackup
+.. _Raspbian testing: https://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
+.. _Ubuntu packages: https://packages.ubuntu.com/xenial/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 
 Please ask package maintainers to build a package or, if you can package /

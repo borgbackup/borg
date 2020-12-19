@@ -207,7 +207,7 @@ class TestCacheSynchronizer:
 
 
 class TestAdHocCache:
-    @pytest.yield_fixture
+    @pytest.fixture
     def repository(self, tmpdir):
         self.repository_location = os.path.join(str(tmpdir), 'repository')
         with Repository(self.repository_location, exclusive=True, create=True) as repository:

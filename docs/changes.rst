@@ -248,12 +248,17 @@ Compatibility notes:
 Fixes:
 
 - use --timestamp for {utcnow} and {now} if given, #5189
-- export-tar: set tar format to GNU_FORMAT explicitly, #5274
 - create: fix --dry-run and --stats coexistence, #5415
+- export-tar:
+
+  - set tar format to GNU_FORMAT explicitly, #5274
+  - fix memory leak with ssh: remote repository, #5568
+  - fix potential memory leak with ssh: remote repository with partial extraction
 
 New features:
 
 - create: implement --stdin-mode, --stdin-user and --stdin-group, #5333
+- allow appending the files cache filename with BORG_FILES_CACHE_SUFFIX env var
 
 Other changes:
 
@@ -261,8 +266,11 @@ Other changes:
 - enable using libxxhash instead of bundled xxh64 code
 - update llfuse requirements (1.3.8)
 - set cython language_level in some files to fix warnings
+- allow EIO with warning when trying to hardlink
+- PropDict: fail early if internal_dict is not a dict
 - tests / CI
 
+  - add a test for the hashindex corruption bug, #5531 #4829
   - fix spurious failure in test_cache_files, #5438
   - added a github ci workflow
   - reduce testing on travis, no macOS, no py3x-dev, #5467
@@ -277,8 +285,14 @@ Other changes:
 
   - clarify '--one-file-system' for btrfs, #5391
   - add example for excluding content using the --pattern cmd line arg
+  - complement the documentation for pattern files and exclude files, #5524
   - made ansible playbook more generic, use package instead of pacman. also
     change state from "latest" to "present".
+  - complete documentation on append-only remote repos, #5497
+  - internals: rather talk about target size than statistics, #5336
+  - new compression algorithm policy, #1633 #5505
+  - faq: add a hint on sleeping computer, #5301
+  - note requirements for full disk access on macOS Catalina, #5303
 - modernize 1.1 code:
 
   - drop code/workarounds only needed to support Python 3.4

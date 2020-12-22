@@ -147,5 +147,5 @@ def set_all(path, xattrs, follow_symlinks=False):
                 logger.warning('%s: No space left on device while setting extended attribute %s (len = %d)' % (
                                path_str, k_str, len(v)))
             else:
-                raise
+                logger.warning('%s: when setting extended attribute %s: %s' % (path_str, k_str, str(e)))
     return warning

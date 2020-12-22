@@ -791,7 +791,8 @@ Utilization of max. archive size: {csize_max:.0%}
                         path, k.decode(), len(v)))
                     set_ec(EXIT_WARNING)
                 else:
-                    raise
+                    logger.warning('%s: when setting extended attribute %s: %s' % (path, k.decode(), str(e)))
+                    set_ec(EXIT_WARNING)
         # bsdflags include the immutable flag and need to be set last:
         if not self.nobsdflags and 'bsdflags' in item:
             try:

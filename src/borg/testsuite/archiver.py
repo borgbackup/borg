@@ -3006,7 +3006,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         assert bin_to_hex(repo_id) in export_contents
         assert export_contents.startswith('<!doctype html>')
-        assert export_contents.endswith('</html>')
+        assert export_contents.endswith('</html>\n')
 
     def test_key_export_directory(self):
         export_directory = self.output_path + '/exported'

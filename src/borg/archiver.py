@@ -203,7 +203,7 @@ def parse_storage_quota(storage_quota):
 
 
 def get_func(args):
-    # This works around http://bugs.python.org/issue9351
+    # This works around https://bugs.python.org/issue9351
     # func is used at the leaf parsers of the argparse parser tree,
     # fallback_func at next level towards the root,
     # fallback2_func at the 2nd next level (which is root in our case).

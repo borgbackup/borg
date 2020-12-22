@@ -214,6 +214,6 @@ and no other interpreter or application has to be deployed.
 See also
 --------
 
-* `SSH Daemon manpage <http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
+* `SSH Daemon manpage <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 * `Ansible <https://docs.ansible.com>`_
 * `Salt <https://docs.saltstack.com/>`_

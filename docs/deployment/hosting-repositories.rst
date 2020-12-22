@@ -80,5 +80,5 @@ But, ``--append-only`` arguments in ``authorized_keys`` will override the
 repository config, therefore append-only mode can be enabled on a key by key
 basis.
 
-Refer to the `sshd(8) <http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
+Refer to the `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 man page for more details on SSH options.

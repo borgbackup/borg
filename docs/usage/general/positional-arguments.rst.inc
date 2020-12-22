@@ -12,4 +12,4 @@ in the example), but not in between them:
     borg create -s repo::archive path --progress  # works, but ugly
     borg create repo::archive -s --progress path  # BAD
 
-This is due to a problem in the argparse module: http://bugs.python.org/issue15112
+This is due to a problem in the argparse module: https://bugs.python.org/issue15112

@@ -151,7 +151,7 @@ Links
 * `Offline Documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
 * `GitHub <https://github.com/borgbackup/borg>`_ and
   `Issue Tracker <https://github.com/borgbackup/borg/issues>`_.
-* `Web-Chat (IRC) <http://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
+* `Web-Chat (IRC) <https://webchat.freenode.net/?randomnick=1&channels=%23borgbackup&uio=MTY9dHJ1ZSY5PXRydWUa8>`_ and
   `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
 * `Security contact <https://borgbackup.readthedocs.io/en/latest/support.html#security-contact>`_

@@ -770,28 +770,23 @@ Utilization of max. archive size: {csize_max:.0%}
             try:
                 xattr.setxattr(fd or path, k, v, follow_symlinks=False)
             except OSError as e:
+                msg_format = '%s: when setting extended attribute %s: %%s' % (path, k.decode())
                 if e.errno == errno.E2BIG:
-                    # xattr is too big
-                    logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' %
-                                   (path, k.decode()))
-                    set_ec(EXIT_WARNING)
+                    err_str = 'too big for this filesystem'
                 elif e.errno == errno.ENOTSUP:
-                    # xattrs not supported here
-                    logger.warning('%s: Extended attributes are not supported on this filesystem' % path)
-                    set_ec(EXIT_WARNING)
-                elif e.errno == errno.EACCES:
-                    # permission denied to set this specific xattr (this may happen related to security.* keys)
-                    logger.warning('%s: Permission denied when setting extended attribute %s' % (path, k.decode()))
-                    set_ec(EXIT_WARNING)
+                    err_str = 'xattrs not supported on this filesystem'
                 elif e.errno == errno.ENOSPC:
                     # no space left on device while setting this specific xattr
                     # ext4 reports ENOSPC when trying to set an xattr with >4kiB while ext4 can only support 4kiB xattrs
                     # (in this case, this is NOT a "disk full" error, just a ext4 limitation).
-                    logger.warning('%s: No space left on device while setting extended attribute %s (len = %d)' % (
-                        path, k.decode(), len(v)))
-                    set_ec(EXIT_WARNING)
+                    err_str = 'no space left on device [xattr len = %d]' % (len(v), )
                 else:
-                    raise
+                    # generic handler
+                    # EACCES: permission denied to set this specific xattr (this may happen related to security.* keys)
+                    # EPERM: operation not permitted
+                    err_str = str(e)
+                logger.warning(msg_format % err_str)
+                set_ec(EXIT_WARNING)
         # bsdflags include the immutable flag and need to be set last:
         if not self.nobsdflags and 'bsdflags' in item:
             try:

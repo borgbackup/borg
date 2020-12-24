@@ -26,4 +26,6 @@ and readable after one of the failures mentioned above occurred, run
   it should be a move (not a copy) operation, and in case of a directory
   it should fail if the destination exists and is not an empty directory,
   since this is used for locking.
-- Hardlinks are needed for :ref:`borg_upgrade` (if ``--inplace`` option is not used)
+- Hardlinks are needed for :ref:`borg_upgrade` (if ``--inplace`` option is not used).
+  Also hardlinks are used for more safe and secure file updating (e.g. of the repo
+  config file), but the code tries to work also if hardlinks are not supported.

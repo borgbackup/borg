@@ -1,6 +1,6 @@
 #compdef borg borgfs -P -value-,BORG_*,-default-
 
-# Zsh completion for Borg Backup 1.1.14 (2020-09-27).
+# Zsh completion for Borg Backup 1.1.15.
 #
 # Recommended _borg specific settings:
 #
@@ -136,6 +136,9 @@ _borg-create() {
     '--no-cache-sync[experimental: do not synchronize the cache. Implies not using the files cache.]' \
     '--no-files-cache[do not load/update the file metadata cache used to detect unchanged files]' \
     '--stdin-name=[use NAME in archive for stdin data (default: "stdin")]:NAME' \
+    '--stdin-user=[set user USER in archive for stdin data (default: root)]:USER:_users' \
+    '--stdin-group=[set group GROUP in archive for stdin data (default: root)]:GROUP:_groups' \
+    '--stdin-mode=[set mode to M in archive for stdin data (default: 0660)]: : _borg_guard_numeric_mode "M"' \
     '--exclude-nodump[exclude files flagged NODUMP]' \
     '(-x --one-file-system)'{-x,--one-file-system}'[stay in the same file system]' \
     '--numeric-owner[only store numeric user and group identifiers]' \
@@ -270,7 +273,7 @@ _borg-delete() {
   _arguments -s -w -S : \
     $common_dry_run_stats_options \
     '--cache-only[delete only the local cache for the given repository]' \
-    '*--force[force deletion of corrupted archives, use --force --force in case --force does not work.]' \
+    '*--force[force deletion of corrupted archives, use "--force --force" in case "--force" does not work]' \
     '--save-space[work slower, but using less space]' \
     $common_archive_filters_options \
     $common_options \
@@ -492,7 +495,7 @@ _borg-prune() {
 
   _arguments -s -w -S : \
     $common_dry_run_stats_options \
-    '--force[force pruning of corrupted archives]' \
+    '*--force[force pruning of corrupted archives, use "--force --force" in case "--force" does not work]' \
     '--list[output verbose list of archives it keeps/prunes]' \
     '--keep-within[keep all archives within this time interval]: : _borg_guard_unsigned_number "INTERVAL"' \
     '(--keep-last --keep-secondly)'{--keep-last,--keep-secondly}'[number of secondly archives to keep]: : _borg_guard_unsigned_number "N"' \
@@ -514,10 +517,17 @@ _borg-recreate() {
   __borg_setup_common_options
   __borg_setup_common_create_options
 
+  local -a mods=(
+    'if-different:recompress if current compression is with a different compression algorithm (the level is not considered)'
+    'always:recompress even if current compression is with the same compression algorithm (use this to change the compression level)'
+    'never:do not recompress (use this option to explicitly prevent recompression)'
+  )
+  mods=( ${${(q)mods//\\/\\\\}//:/\\:} )
+
   _arguments -s -w -S : \
     $common_create_options \
-    '--target[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive "${line[1]%%\:\:*}"' \
-    '--recompress[recompress data chunks according to --compression]:params:((if-different always never\:\(default\)))' \
+    '--target=[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive "${line[1]%%\:\:*}"' \
+    '--recompress=[recompress data chunks according to "MODE" and "--compression"]:MODE:'"(($mods))" \
     $common_options \
     ':REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
@@ -612,7 +622,7 @@ __borg_setup_common_options() {
     '--bypass-lock[bypass locking mechanism]'
     '(- :)--show-version[show/log the borg version]'
     '--show-rc[show/log the return code (rc)]'
-    '--umask=[set umask to M (local and remote, default: 0077)]:M'
+    '--umask=[set umask to M (local and remote, default: 0077)]: : _borg_guard_numeric_mode "M"'
     '--remote-path=[set remote path to executable (default: "borg")]: :_cmdstring'
     '--remote-ratelimit=[set remote network upload rate limit in kiByte/s (default: 0=unlimited)]: : _borg_guard_unsigned_number "RATE"'
     '--consider-part-files[treat part files like normal files (e.g. to list/extract them)]'
@@ -729,6 +739,9 @@ _borg_parameters() {
   (HOST_ID)
     _message -e 'unique ID' && ret=0
     ;;
+  (FILES_CACHE_SUFFIX)
+    _message -e 'suffix' && ret=0
+    ;;
   (FILES_CACHE_TTL)
     _borg_guard_unsigned_number 'time to live (default: 20)' && ret=0
     ;;
@@ -747,7 +760,10 @@ _borg_parameters() {
     compadd "$expl[@]" YES NO && ret=0
     ;;
   (WORKAROUNDS)
-    _wanted workarounds expl 'workaround' _sequence compadd - basesyncfile && ret=0
+    _wanted workarounds expl 'workaround' _sequence -n 1 compadd - basesyncfile && ret=0
+    ;;
+  (KEYS_DIR)
+    _directories && ret=0
     ;;
   (*)
     _default && ret=0
@@ -1478,7 +1494,7 @@ _borg_chunker_params() {
   if compset -P '*,*,*,'; then
     _message -e 'HASH_WINDOW_SIZE'
   elif compset -P '*,*,'; then
-    _message -e 'HASH_MASK_BITS (statistical medium chunk size ~= 2^HASH_MASK_BITS B)'
+    _message -e 'HASH_MASK_BITS (target chunk size ~= 2^HASH_MASK_BITS B)'
   elif compset -P '*,'; then
     _message -e 'CHUNK_MAX_EXP (maximum chunk size = 2^CHUNK_MAX_EXP B)'
   else
@@ -1540,6 +1556,13 @@ _borg_guard_unsigned_number() {
   local -A opts
   zparseopts -K -D -A opts M+: J+: V+: 1 2 o+: n F: x+: X+:
   _guard '[0-9]#' ${1:-number}
+}
+
+(( $+functions[_borg_guard_numeric_mode] )) ||
+_borg_guard_numeric_mode() {
+  local -A opts
+  zparseopts -K -D -A opts M+: J+: V+: 1 2 o+: n F: x+: X+:
+  _guard '[0-7](#c0,4)' ${1:-mode}
 }
 
 _borg() {

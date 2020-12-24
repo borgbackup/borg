@@ -133,8 +133,10 @@ Examples::
     /home/*/junk
     *.tmp
     fm:aa:something/*
-    re:^/home/[^/]\.tmp/
-    sh:/home/*/.thumbnails
+    re:^home/[^/]\.tmp/
+    sh:home/*/.thumbnails
+     # Example with spaces, no need to escape as it is processed by borg
+    some file with spaces.txt
     EOF
     $ borg create --exclude-from exclude.txt backup /
 
@@ -213,11 +215,11 @@ and ``--remote-path`` values support these placeholders:
 
 {now}
     The current local date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.4/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.7/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
 {utcnow}
     The current UTC date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.4/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.7/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
 {user}
     The user name (or UID, if no name is available) of the user running borg.

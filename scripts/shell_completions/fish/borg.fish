@@ -92,13 +92,17 @@ complete -c borg -f      -l 'storage-quota'         -d 'Set storage QUOTA of the
 complete -c borg -f      -l 'make-parent-dirs'      -d 'Create parent directories'                  -n "__fish_seen_subcommand_from init"
 
 # borg create options
-complete -c borg -f -s n -l 'dry-run'               -d 'Do not change the repository'               -n "__fish_seen_subcommand_from create"
-complete -c borg -f -s s -l 'stats'                 -d 'Print verbose statistics'                   -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'list'                  -d 'Print verbose list of items'                -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'filter'                -d 'Only items with given STATUSCHARS'          -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'json'                  -d 'Print verbose stats as json'                -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'no-cache-sync'         -d 'Do not synchronize the cache'               -n "__fish_seen_subcommand_from create"
-complete -c borg -f      -l 'stdin-name'            -d 'Use NAME in archive for stdin data'         -n "__fish_seen_subcommand_from create"
+complete -c borg -f -s n -l 'dry-run'               -d 'Do not change the repository'                       -n "__fish_seen_subcommand_from create"
+complete -c borg -f -s s -l 'stats'                 -d 'Print verbose statistics'                           -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'list'                  -d 'Print verbose list of items'                        -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'filter'                -d 'Only items with given STATUSCHARS'                  -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'json'                  -d 'Print verbose stats as json'                        -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'no-cache-sync'         -d 'Do not synchronize the cache'                       -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'stdin-name'            -d 'Use NAME in archive for stdin data'                 -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'stdin-user'            -d 'Set user USER in archive for stdin data [root]'     -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'stdin-group'           -d 'Set group GROUP in archive for stdin data [root]'   -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'stdin-mode'            -d 'Set mode to M in archive for stdin data [0660]'     -n "__fish_seen_subcommand_from create"
+
 # Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from create"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from create"
@@ -288,7 +292,7 @@ complete -c borg -f      -l 'comment'               -d 'Add COMMENT to the archi
 complete -c borg -f      -l 'timestamp'             -d 'Set creation TIME (yyyy-mm-ddThh:mm:ss)'    -n "__fish_seen_subcommand_from recreate"
 complete -c borg         -l 'timestamp'             -d 'Set creation time using reference FILE'     -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f -s C -l 'compression'           -d 'Select compression ALGORITHM,LEVEL [lz4]' -a "$compression_methods" -n "__fish_seen_subcommand_from recreate"
-set -l recompress_when "if-different always"
+set -l recompress_when "if-different always never"
 complete -c borg -f      -l 'recompress'            -d 'Recompress chunks CONDITION' -a "$recompress_when" -n "__fish_seen_subcommand_from recreate"
 complete -c borg -f      -l 'chunker-params'        -d 'Chunker PARAMETERS [19,23,21,4095]'         -n "__fish_seen_subcommand_from recreate"
 

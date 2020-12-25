@@ -270,7 +270,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("bionic64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64", ".*fuse3.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64", ".*(fuse3|none).*")
   end
 
   config.vm.define "buster64" do |b|
@@ -302,7 +302,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("stretch64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64", ".*fuse3.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64", ".*(fuse3|none).*")
   end
 
   config.vm.define "arch64" do |b|
@@ -331,7 +331,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64", ".*fuse3.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64", ".*(fuse3|none).*")
   end
 
   config.vm.define "openbsd64" do |b|
@@ -370,7 +370,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64", ".*fuse3.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64", ".*(fuse3|none).*")
   end
 
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of

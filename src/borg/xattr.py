@@ -133,19 +133,19 @@ def set_all(path, xattrs, follow_symlinks=False):
                 path_str = '<FD %d>' % path
             else:
                 path_str = os.fsdecode(path)
+            msg_format = '%s: when setting extended attribute %s: %%s' % (path_str, k_str)
             if e.errno == errno.E2BIG:
-                logger.warning('%s: Value or key of extended attribute %s is too big for this filesystem' % (
-                               path_str, k_str))
+                err_str = 'too big for this filesystem'
             elif e.errno == errno.ENOTSUP:
-                logger.warning('%s: Extended attributes are not supported on this filesystem' % path_str)
-            elif e.errno == errno.EACCES:
-                # permission denied to set this specific xattr (this may happen related to security.* keys)
-                logger.warning('%s: Permission denied when setting extended attribute %s' % (path_str, k_str))
+                err_str = 'xattrs not supported on this filesystem'
             elif e.errno == errno.ENOSPC:
                 # ext4 reports ENOSPC when trying to set an xattr with >4kiB while ext4 can only support 4kiB xattrs
                 # (in this case, this is NOT a "disk full" error, just a ext4 limitation).
-                logger.warning('%s: No space left on device while setting extended attribute %s (len = %d)' % (
-                               path_str, k_str, len(v)))
+                err_str = 'no space left on device [xattr len = %d]' % (len(v),)
             else:
-                logger.warning('%s: when setting extended attribute %s: %s' % (path_str, k_str, str(e)))
+                # generic handler
+                # EACCES: permission denied to set this specific xattr (this may happen related to security.* keys)
+                # EPERM: operation not permitted
+                err_str = str(e)
+            logger.warning(msg_format % err_str)
     return warning

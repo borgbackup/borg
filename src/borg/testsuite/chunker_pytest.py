@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+import tempfile
 
 import pytest
 
@@ -65,7 +66,23 @@ def make_content(sparsemap, header_size=0):
     return content
 
 
-@pytest.mark.skipif(not has_seek_hole)
+def fs_supports_sparse():
+    if not has_seek_hole:
+        return False
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fn = os.path.join(tmpdir, 'test_sparse')
+        make_sparsefile(fn, [(0, BS, False), (BS, BS, True)])
+        with open(fn, 'rb') as f:
+            try:
+                offset_hole = f.seek(0, os.SEEK_HOLE)
+                offset_data = f.seek(0, os.SEEK_DATA)
+            except OSError:
+                # no sparse support if these seeks do not work
+                return False
+        return offset_hole == 0 and offset_data == BS
+
+
+@pytest.mark.skipif(not fs_supports_sparse(), reason='fs does not support sparse files')
 @pytest.mark.parametrize("fname, sparse_map", [
     ('sparse1', map_sparse1),
     ('sparse2', map_sparse2),
@@ -91,7 +108,7 @@ def test_sparsemap(tmpdir, fname, sparse_map):
     assert get_sparsemap_fd(fn) == sparse_map
 
 
-@pytest.mark.skipif(not has_seek_hole)
+@pytest.mark.skipif(not fs_supports_sparse(), reason='fs does not support sparse files')
 @pytest.mark.parametrize("fname, sparse_map, header_size, sparse", [
     ('sparse1', map_sparse1, 0, False),
     ('sparse1', map_sparse1, 0, True),

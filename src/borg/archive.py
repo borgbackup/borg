@@ -784,7 +784,7 @@ Utilization of max. archive size: {csize_max:.0%}
                     # generic handler
                     # EACCES: permission denied to set this specific xattr (this may happen related to security.* keys)
                     # EPERM: operation not permitted
-                    err_str = str(e)
+                    err_str = os.strerror(e.errno)
                 logger.warning(msg_format % err_str)
                 set_ec(EXIT_WARNING)
         # bsdflags include the immutable flag and need to be set last:

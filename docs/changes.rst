@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.15 (not released yet)
----------------------------------
+Version 1.1.15 (2020-12-25)
+---------------------------
 
 Compatibility notes:
 
@@ -247,13 +247,19 @@ Compatibility notes:
 
 Fixes:
 
-- use --timestamp for {utcnow} and {now} if given, #5189
-- create: fix --dry-run and --stats coexistence, #5415
+- extract:
+
+  - improve exception handling when setting xattrs, #5092.
+  - emit a warning message giving the path, xattr key and error message.
+  - continue trying to restore other xattrs and bsdflags of the same file
+    after an exception with xattr-setting happened.
 - export-tar:
 
   - set tar format to GNU_FORMAT explicitly, #5274
   - fix memory leak with ssh: remote repository, #5568
   - fix potential memory leak with ssh: remote repository with partial extraction
+- create: fix --dry-run and --stats coexistence, #5415
+- use --timestamp for {utcnow} and {now} if given, #5189
 
 New features:
 
@@ -268,6 +274,7 @@ Other changes:
 - set cython language_level in some files to fix warnings
 - allow EIO with warning when trying to hardlink
 - PropDict: fail early if internal_dict is not a dict
+- update shell completions
 - tests / CI
 
   - add a test for the hashindex corruption bug, #5531 #4829
@@ -293,6 +300,7 @@ Other changes:
   - new compression algorithm policy, #1633 #5505
   - faq: add a hint on sleeping computer, #5301
   - note requirements for full disk access on macOS Catalina, #5303
+  - fix/improve description of borg upgrade hardlink usage, #5518
 - modernize 1.1 code:
 
   - drop code/workarounds only needed to support Python 3.4

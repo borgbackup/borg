@@ -1309,16 +1309,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             input_abspath = os.path.abspath('input/file')
             with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (input_abspath + ': Value or key of extended attribute user.attribute is too big for this '
-                                               'filesystem\n')
+                assert out == (input_abspath + ': when setting extended attribute user.attribute: too big for this filesystem\n')
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (input_abspath + ': Extended attributes are not supported on this filesystem\n')
+                assert out == (input_abspath + ': when setting extended attribute user.attribute: xattrs not supported on this filesystem\n')
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert out == (input_abspath + ': Permission denied when setting extended attribute user.attribute\n')
+                assert out == (input_abspath + ': when setting extended attribute user.attribute: Permission denied\n')
             assert os.path.isfile(input_abspath)
 
     def test_path_normalization(self):

@@ -205,7 +205,7 @@ borg create repo::archive \-s \-\-progress path  # BAD
 .UNINDENT
 .UNINDENT
 .sp
-This is due to a problem in the argparse module: \fI\%http://bugs.python.org/issue15112\fP
+This is due to a problem in the argparse module: \fI\%https://bugs.python.org/issue15112\fP
 .SS Repository URLs
 .sp
 \fBLocal filesystem\fP (or locally mounted network filesystem):
@@ -441,6 +441,11 @@ the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
 When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
 Using \fB\-\-remote\-path PATH\fP commandline option overrides the environment variable.
 .TP
+.B BORG_FILES_CACHE_SUFFIX
+When set to a value at least one character long, instructs borg to use a specifically named
+(based on the suffix) alternative files cache. This can be used to avoid loading and saving
+cache entries for backup sources other than the current sources.
+.TP
 .B BORG_FILES_CACHE_TTL
 When set to a numeric value, this determines the maximum "time to live" for the files cache
 entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
@@ -584,7 +589,9 @@ Up to 1000 files per directory (10000 for repositories initialized with Borg 1.0
 .IP \(bu 2
 mkdir(2) should be atomic, since it is used for locking
 .IP \(bu 2
-Hardlinks are needed for \fIborg_upgrade\fP \fB\-\-inplace\fP
+Hardlinks are needed for \fIborg_upgrade\fP (if \fB\-\-inplace\fP option is not used).
+Also hardlinks are used for more safe and secure file updating (e.g. of the repo
+config file), but the code tries to work also if hardlinks are not supported.
 .UNINDENT
 .SS Units
 .sp

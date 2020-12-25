@@ -20,6 +20,12 @@ cdef extern from "_chunker.c":
     uint32_t c_buzhash_update  "buzhash_update"(uint32_t sum, unsigned char remove, unsigned char add, size_t len, uint32_t *h)
 
 
+# this will be True if Python's seek implementation supports data/holes seeking.
+# this does not imply that it will actually work on the filesystem,
+# because the FS also needs to support this.
+has_seek_hole = hasattr(os, 'SEEK_DATA') and hasattr(os, 'SEEK_HOLE')
+
+
 def dread(offset, size, fd=None, fh=-1):
     use_fh = fh >= 0
     if use_fh:
@@ -117,7 +123,7 @@ class ChunkerFixed:
         self.header_size = header_size
         # should borg try to do sparse input processing?
         # whether it actually can be done depends on the input file being seekable.
-        self.try_sparse = sparse and hasattr(os, 'SEEK_DATA') and hasattr(os, 'SEEK_HOLE')
+        self.try_sparse = sparse and has_seek_hole
         self.zeros = memoryview(bytes(block_size))
 
     def chunkify(self, fd=None, fh=-1, fmap=None):

@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from ..chunker import ChunkerFixed, sparsemap
+from ..chunker import ChunkerFixed, sparsemap, has_seek_hole
 from ..constants import *  # NOQA
 
 BS = 4096  # fs block size
@@ -65,6 +65,7 @@ def make_content(sparsemap, header_size=0):
     return content
 
 
+@pytest.mark.skipif(not has_seek_hole)
 @pytest.mark.parametrize("fname, sparse_map", [
     ('sparse1', map_sparse1),
     ('sparse2', map_sparse2),
@@ -90,6 +91,7 @@ def test_sparsemap(tmpdir, fname, sparse_map):
     assert get_sparsemap_fd(fn) == sparse_map
 
 
+@pytest.mark.skipif(not has_seek_hole)
 @pytest.mark.parametrize("fname, sparse_map, header_size, sparse", [
     ('sparse1', map_sparse1, 0, False),
     ('sparse1', map_sparse1, 0, True),

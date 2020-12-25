@@ -136,9 +136,9 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.9.0  # tests, version supporting openssl 1.1
+    pyenv install 3.9.1  # tests, version supporting openssl 1.1, binary build
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
-    pyenv install 3.7.9  # binary build, tests, version supporting openssl 1.1
+    pyenv install 3.7.0  # tests, version supporting openssl 1.1
     pyenv install 3.6.2  # tests, version supporting openssl 1.1. broken for older 3.6.x.
     pyenv rehash
   EOF
@@ -156,9 +156,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.7 release
-    pyenv global 3.7.9
-    pyenv virtualenv 3.7.9 borg-env
+    # use the latest 3.9 release
+    pyenv global 3.9.1
+    pyenv virtualenv 3.9.1 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -183,7 +183,7 @@ def install_pyinstaller()
     . borg-env/bin/activate
     git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    git checkout v4.0-maint
+    git checkout v4.1-maint
     python setup.py install
   EOF
 end
@@ -207,8 +207,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.6.2 3.7.9 3.8.0 3.9.0
-      pyenv local 3.6.2 3.7.9 3.8.0 3.9.0
+      pyenv global 3.6.2 3.7.0 3.8.0 3.9.1
+      pyenv local 3.6.2 3.7.0 3.8.0 3.9.1
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

@@ -986,7 +986,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 _next_match:
         /* at this stage, the following variables must be correctly set :
          * - ip : at start of LZ operation
-         * - match : at start of previous pattern occurence; can be within current prefix, or within extDict
+         * - match : at start of previous pattern occurrence; can be within current prefix, or within extDict
          * - offset : if maybe_ext_memSegment==1 (constant)
          * - lowLimit : must be == dictionary to mean "match is within extDict"; must be == source otherwise
          * - token and *token : position to write 4-bits for match length; higher 4-bits for literal length supposed already written
@@ -1340,8 +1340,8 @@ LZ4_stream_t* LZ4_createStream(void)
     return lz4s;
 }
 
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                     it reports an aligment of 8-bytes,
+#ifndef _MSC_VER  /* for some reason, Visual fails the alignment test on 32-bit x86 :
+                     it reports an alignment of 8-bytes,
                      while actually aligning LZ4_stream_t on 4 bytes. */
 static size_t LZ4_stream_t_alignment(void)
 {
@@ -1355,8 +1355,8 @@ LZ4_stream_t* LZ4_initStream (void* buffer, size_t size)
     DEBUGLOG(5, "LZ4_initStream");
     if (buffer == NULL) { return NULL; }
     if (size < sizeof(LZ4_stream_t)) { return NULL; }
-#ifndef _MSC_VER  /* for some reason, Visual fails the aligment test on 32-bit x86 :
-                     it reports an aligment of 8-bytes,
+#ifndef _MSC_VER  /* for some reason, Visual fails the alignment test on 32-bit x86 :
+                     it reports an alignment of 8-bytes,
                      while actually aligning LZ4_stream_t on 4 bytes. */
     if (((size_t)buffer) & (LZ4_stream_t_alignment() - 1)) { return NULL; } /* alignment check */
 #endif

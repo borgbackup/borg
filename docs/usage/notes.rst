@@ -78,7 +78,7 @@ You can use this to not query and store (or not extract and set) flags - in case
 you don't need them or if they are broken somehow for your fs.
 
 On Linux, dealing with the flags needs some additional syscalls. Especially when
-dealing with lots of small files, this causes a noticable overhead, so you can
+dealing with lots of small files, this causes a noticeable overhead, so you can
 use this option also for speeding up operations.
 
 ``--umask``

@@ -117,7 +117,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
 
 
 def find_parent_module():
-    """find the name of a the first module calling this module
+    """find the name of the first module calling this module
 
     if we cannot find it, we return the current module's name
     (__name__) instead.

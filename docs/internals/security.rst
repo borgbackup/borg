@@ -108,7 +108,7 @@ the tampering.
 
 Note that when using BORG_PASSPHRASE the attacker cannot swap the *entire*
 repository against a new repository with e.g. repokey mode and no passphrase,
-because Borg will abort access when BORG_PASSPRHASE is incorrect.
+because Borg will abort access when BORG_PASSPHRASE is incorrect.
 
 However, interactively a user might not notice this kind of attack
 immediately, if she assumes that the reason for the absent passphrase

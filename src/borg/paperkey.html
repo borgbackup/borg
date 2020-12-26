@@ -2012,7 +2012,7 @@ Sha256.Maj = function(x, y, z) { return (x & y) ^ (x & z) ^ (y & z); };
  * @private
  */
 Sha256.toHexStr = function(n) {
-    // note can't use toString(16) as it is implementation-dependant,
+    // note can't use toString(16) as it is implementation-dependent,
     // and in IE returns signed numbers when used on full words
     var s="", v;
     for (var i=7; i>=0; i--) { v = (n>>>(i*4)) & 0xf; s += v.toString(16); }

@@ -496,7 +496,7 @@ your repositories and it is not encrypted.
 However, the assumption is that the cache is being stored on the very
 same system which also contains the original files which are being
 backed up. So someone with access to the cache files would also have
-access the the original files anyway.
+access the original files anyway.
 
 The Internals section contains more details about :ref:`cache`. If you ever need to move the cache
 to a different location, this can be achieved by using the appropriate :ref:`env_vars`.
@@ -507,7 +507,7 @@ How can I specify the encryption passphrase programmatically?
 There are several ways to specify a passphrase without human intervention:
 
 Setting ``BORG_PASSPHRASE``
-  The passphrase can be specified using the ``BORG_PASSPHRASE`` enviroment variable.
+  The passphrase can be specified using the ``BORG_PASSPHRASE`` environment variable.
   This is often the simplest option, but can be insecure if the script that sets it
   is world-readable.
 
@@ -630,7 +630,7 @@ C to delete all backups residing on S.
 These are your options to protect against that:
 
 - Do not allow to permanently delete data from the repo, see :ref:`append_only_mode`.
-- Use a pull-mode setup using ``ssh -R``, see :ref:`pull_backup` for more informations.
+- Use a pull-mode setup using ``ssh -R``, see :ref:`pull_backup` for more information.
 - Mount C's filesystem on another machine and then create a backup of it.
 - Do not give C filesystem-level access to S.
 

@@ -147,7 +147,7 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
             # truncate the last argument, if no space is available
             if info is not None:
                 if not self.json:
-                    # no need to truncate if we're not outputing to a terminal
+                    # no need to truncate if we're not outputting to a terminal
                     terminal_space = get_terminal_size(fallback=(-1, -1))[0]
                     if terminal_space != -1:
                         space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))

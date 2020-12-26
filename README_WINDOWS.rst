@@ -27,7 +27,7 @@ What's working
 - ``borg list`` works as expected.
 - ``borg extract --strip-components 1 ::backup-XXXX`` works. 
   If absolute paths are extracted, it's important to pass ``--strip-components 1`` as
-  otherwise the data is resotred to the original location!
+  otherwise the data is restored to the original location!
 
 What's NOT working
 ------------------

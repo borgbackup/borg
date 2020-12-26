@@ -343,7 +343,7 @@ class Lock:
     """
     A Lock for a resource that can be accessed in a shared or exclusive way.
     Typically, write access to a resource needs an exclusive lock (1 writer,
-    noone is allowed reading) and read access to a resource needs a shared
+    no one is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
 
     If possible, try to use the contextmanager here like::

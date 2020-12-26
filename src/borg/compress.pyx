@@ -470,7 +470,7 @@ class ObfuscateSize(CompressorBase):
         # f = 0.1 .. 1.0 for r in 0.1 .. 0.01 == in 9% of cases
         # f = 1.0 .. 10.0 for r in 0.01 .. 0.001 = in 0.9% of cases
         # f = 10.0 .. 100.0 for r in 0.001 .. 0.0001 == in 0.09% of cases
-        r = max(self.min_r, random.random())  # 0..1, but dont get too close to 0
+        r = max(self.min_r, random.random())  # 0..1, but don't get too close to 0
         f = self.factor / r
         return int(compr_size * f)
 

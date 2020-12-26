@@ -1955,7 +1955,7 @@ class Archiver:
                 fd.write(data)
 
         if args.ghost:
-            # dump ghosty stuff from segment files: not yet committed objects, deleted / superceded objects, commit tags
+            # dump ghosty stuff from segment files: not yet committed objects, deleted / superseded objects, commit tags
 
             # set up the key without depending on a manifest obj
             for id, cdata, tag, segment, offset in repository.scan_low_level():
@@ -2046,7 +2046,7 @@ class Archiver:
                 # try to locate wanted sequence in data
                 count = data.count(wanted)
                 if count:
-                    offset = data.find(wanted)  # only determine first occurance's offset
+                    offset = data.find(wanted)  # only determine first occurrence's offset
                     info = "%d %s #%d" % (i, id.hex(), count)
                     print_finding(info, wanted, data, offset)
 
@@ -2291,7 +2291,7 @@ class Archiver:
 
                 Via ``--pattern`` or ``--patterns-from`` you can define BOTH inclusion and exclusion
                 of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
-                ``--exlude-from`` ONLY excludes are defined.
+                ``--exclude-from`` ONLY excludes are defined.
 
             Inclusion patterns are useful to include paths that are contained in an excluded
             path. The first matching pattern is used so if an include pattern matches before
@@ -3048,7 +3048,7 @@ class Archiver:
         so consider using the ``--progress`` option.
 
         A segment is compacted if the amount of saved space is above the percentage value
-        given by the ``--threshold`` option. If ommitted, a threshold of 10% is used.
+        given by the ``--threshold`` option. If omitted, a threshold of 10% is used.
         When using ``--verbose``, borg will output an estimate of the freed space.
 
         After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
@@ -4574,7 +4574,7 @@ class Archiver:
                     value = getattr(client_result, attr_name, not_present)
                     if value is not not_present:
                         # note: it is not possible to specify a allowlisted option via a forced command,
-                        # it always gets overridden by the value specified (or defaulted to) by the client commmand.
+                        # it always gets overridden by the value specified (or defaulted to) by the client command.
                         setattr(result, attr_name, value)
 
         return result

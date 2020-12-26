@@ -235,7 +235,7 @@ class BaseTestCase(unittest.TestCase):
         # the borg mount daemon to work properly or the tests
         # will just freeze. Therefore, if argument `fork` is not
         # specified, the default value is `True`, regardless of
-        # `FORK_DEFAULT`. However, leaving the possibilty to run
+        # `FORK_DEFAULT`. However, leaving the possibility to run
         # the command with `fork = False` is still necessary for
         # testing for mount failures, for example attempting to
         # mount a read-only repo.

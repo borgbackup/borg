@@ -299,7 +299,7 @@ XXH_PUBLIC_API XXH32_hash_t XXH32 (const void* input, size_t length, XXH32_hash_
 /*******   Streaming   *******/
 
 /*
- * Streaming functions generate the xxHash value from an incrememtal input.
+ * Streaming functions generate the xxHash value from an incremental input.
  * This method is slower than single-call functions, due to state management.
  * For small inputs, prefer `XXH32()` and `XXH64()`, which are better optimized.
  *
@@ -835,7 +835,7 @@ XXH_PUBLIC_API XXH128_hash_t XXH128(const void* data, size_t len, XXH64_hash_t s
  *
  * The check costs one initial branch per hash, which is generally negligible, but not zero.
  * Moreover, it's not useful to generate binary for an additional code path
- * if memory access uses same instruction for both aligned and unaligned adresses.
+ * if memory access uses same instruction for both aligned and unaligned addresses.
  *
  * In these cases, the alignment check can be removed by setting this macro to 0.
  * Then the code will always use unaligned memory access.
@@ -1044,7 +1044,7 @@ static xxh_u32 XXH_read32(const void* memPtr)
 #endif   /* XXH_FORCE_DIRECT_MEMORY_ACCESS */
 
 
-/* ***   Endianess   *** */
+/* ***   Endianness   *** */
 typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianess;
 
 /*!
@@ -1212,7 +1212,7 @@ static xxh_u32 XXH32_round(xxh_u32 acc, xxh_u32 input)
      * UGLY HACK:
      * This inline assembly hack forces acc into a normal register. This is the
      * only thing that prevents GCC and Clang from autovectorizing the XXH32
-     * loop (pragmas and attributes don't work for some resason) without globally
+     * loop (pragmas and attributes don't work for some reason) without globally
      * disabling SSE4.1.
      *
      * The reason we want to avoid vectorization is because despite working on
@@ -4629,7 +4629,7 @@ XXH128(const void* input, size_t len, XXH64_hash_t seed)
 
 /*
  * All the functions are actually the same as for 64-bit streaming variant.
- * The only difference is the finalizatiom routine.
+ * The only difference is the finalization routine.
  */
 
 static void

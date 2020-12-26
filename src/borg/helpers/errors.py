@@ -7,7 +7,7 @@ class Error(Exception):
     """Error: {}"""
     # Error base class
 
-    # if we raise such an Error and it is only catched by the uppermost
+    # if we raise such an Error and it is only caught by the uppermost
     # exception handler (that exits short after with the given exit_code),
     # it is always a (fatal and abrupt) EXIT_ERROR, never just a warning.
     exit_code = EXIT_ERROR

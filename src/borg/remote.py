@@ -32,7 +32,7 @@ from .helpers import msgpack
 from .repository import Repository
 from .version import parse_version, format_version
 from .algorithms.checksums import xxh64
-from .helpers.datastruct import EfficientBytesQueue
+from .helpers.datastruct import EfficientCollectionQueue
 
 logger = create_logger(__name__)
 
@@ -536,7 +536,7 @@ class RemoteRepository:
         self.msgid = 0
         self.rx_bytes = 0
         self.tx_bytes = 0
-        self.to_send = EfficientBytesQueue(1024 * 1024)
+        self.to_send = EfficientCollectionQueue(1024 * 1024, lambda: b'')
         self.stderr_received = b''  # incomplete stderr line bytes received (no \n yet)
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
@@ -713,7 +713,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         if not calls and cmd != 'async_responses':
             return
 
-        def fill_send_buffer():
+        def send_buffer():
             if self.to_send:
                 try:
                     written = self.ratelimit.write(self.stdin_fd, self.to_send.peek_front())
@@ -776,7 +776,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         calls = list(calls)
         waiting_for = []
         maximum_to_send = 0 if wait else self.upload_buffer_size_limit
-        fill_send_buffer()
+        send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
         while wait or calls:
             if self.shutdown_time and time.monotonic() > self.shutdown_time:
                 # we are shutting this RemoteRepository down already, make sure we do not waste
@@ -894,7 +894,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         else:
                             self.to_send.push_back(msgpack.packb((1, self.msgid, 'get', self.named_to_positional('get', args))))
 
-                fill_send_buffer()
+                send_buffer()
         self.ignore_responses |= set(waiting_for)  # we lose order here
 
     @api(since=parse_version('1.0.0'),

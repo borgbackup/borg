@@ -63,7 +63,7 @@ prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
 system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
 
 # Number of threads to use for cythonize, not used on windows
-cpu_threads = multiprocessing.cpu_count() if multiprocessing else 1
+cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != 'spawn' else None
 
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
@@ -236,7 +236,7 @@ if not on_rtd:
         )
         if not is_win32:
             # compile .pyx extensions to .c in parallel, does not work on windows
-            cython_opts['nthreads'] = cpu_threads + 1
+            cython_opts['nthreads'] = cpu_threads
 
         # generate C code from Cython for ALL supported platforms, so we have them in the sdist.
         # the sdist does not require Cython at install time, so we need all as C.

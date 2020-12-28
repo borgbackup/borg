@@ -653,7 +653,7 @@ class Archiver:
                     checkpoint_interval=args.checkpoint_interval, rechunkify=False)
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
-                    chunker_params=args.chunker_params, show_progress=args.progress)
+                    chunker_params=args.chunker_params, show_progress=args.progress, sparse=args.sparse)
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)
@@ -3354,6 +3354,8 @@ class Archiver:
                               help='deprecated, use ``--noflags`` instead')
         fs_group.add_argument('--noflags', dest='noflags', action='store_true',
                               help='do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive')
+        fs_group.add_argument('--sparse', dest='sparse', action='store_true',
+                               help='detect sparse holes in input (supported only by fixed chunker)')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
                               type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
                               help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)

@@ -32,6 +32,7 @@ from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
 from ..cache import Cache, LocalCache
+from ..chunker import has_seek_hole
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_cipher_blocks
 from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
@@ -563,7 +564,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             sparse = True
             if sparse and hasattr(st, 'st_blocks') and st.st_blocks * 512 >= st.st_size:
                 sparse = False
-            if sparse and hasattr(os, 'SEEK_HOLE') and hasattr(os, 'SEEK_DATA'):
+            if sparse and has_seek_hole:
                 with open(fn, 'rb') as fd:
                     # only check if the first hole is as expected, because the 2nd hole check
                     # is problematic on xfs due to its "dynamic speculative EOF preallocation

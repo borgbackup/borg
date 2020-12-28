@@ -43,7 +43,10 @@ Examples
     $ borg create --chunker-params buzhash,10,23,16,4095 /path/to/repo::small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
-    $ dd if=/dev/sdx bs=4M | borg create --chunker-params fixed,4194304 /path/to/repo::my-sdx -
+    $ borg create --read-special --chunker-params fixed,4194304 /path/to/repo::my-sdx /dev/sdX
+
+    # Backup a sparse disk image (must not be active/in use/mounted at that time)
+    $ borg create --sparse --chunker-params fixed,4194304 /path/to/repo::my-disk my-disk.raw
 
     # No compression (none)
     $ borg create --compression none /path/to/repo::arch ~

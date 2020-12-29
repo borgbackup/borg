@@ -5,7 +5,7 @@ from ..helpers.datastruct import EfficientCollectionQueue
 
 class TestEfficientQueue:
     def test_base_usage(self):
-        queue = EfficientCollectionQueue(100, lambda: b'')
+        queue = EfficientCollectionQueue(100, bytes)
         assert queue.peek_front() == b''
         queue.push_back(b'1234')
         assert queue.peek_front() == b'1234'
@@ -17,7 +17,7 @@ class TestEfficientQueue:
         assert not queue
 
     def test_usage_with_arrays(self):
-        queue = EfficientCollectionQueue(100, lambda: [])
+        queue = EfficientCollectionQueue(100, list)
         assert queue.peek_front() == []
         queue.push_back([1, 2, 3, 4])
         assert queue.peek_front() == [1, 2, 3, 4]
@@ -29,7 +29,7 @@ class TestEfficientQueue:
         assert not queue
 
     def test_chunking(self):
-        queue = EfficientCollectionQueue(2, lambda: b'')
+        queue = EfficientCollectionQueue(2, bytes)
         queue.push_back(b'1')
         queue.push_back(b'23')
         queue.push_back(b'4567')

@@ -536,7 +536,7 @@ class RemoteRepository:
         self.msgid = 0
         self.rx_bytes = 0
         self.tx_bytes = 0
-        self.to_send = EfficientCollectionQueue(1024 * 1024, lambda: b'')
+        self.to_send = EfficientCollectionQueue(1024 * 1024, bytes)
         self.stderr_received = b''  # incomplete stderr line bytes received (no \n yet)
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
@@ -721,9 +721,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     self.to_send.pop_front(written)
                 except OSError as e:
                     # io.write might raise EAGAIN even though select indicates
-                    # that the fd should be writable
+                    # that the fd should be writable.
                     # EWOULDBLOCK is added for defensive programming sake.
-                    if (e.errno != errno.EAGAIN) and (e.errno != errno.EWOULDBLOCK):
+                    if e.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
                         raise
 
         def pop_preload_msgid(chunkid):

@@ -59,7 +59,7 @@ class EfficientCollectionQueue:
     class SizeUnderflow(Error):
         """Could not pop_front first {} elements, collection only has {} elements.."""
 
-    def __init__(self, split_size, empty_collection_lambda):
+    def __init__(self, split_size, member_type):
         """
         Initializes empty queue.
         Requires split_size to define maximum chunk size.
@@ -68,7 +68,7 @@ class EfficientCollectionQueue:
         self.buffers = []
         self.size = 0
         self.split_size = split_size
-        self.empty_collection_lambda = empty_collection_lambda
+        self.member_type = member_type
 
     def peek_front(self):
         """
@@ -77,7 +77,7 @@ class EfficientCollectionQueue:
         Returns empty collection when nothing is queued.
         """
         if not self.buffers:
-            return self.empty_collection_lambda()
+            return self.member_type()
         buffer = self.buffers[0]
         return buffer
 
@@ -105,11 +105,11 @@ class EfficientCollectionQueue:
         Takes care to chunk data into split_size sized elements.
         """
         if not self.buffers:
-            self.buffers = [self.empty_collection_lambda()]
+            self.buffers = [self.member_type()]
         while data:
             buffer = self.buffers[-1]
             if len(buffer) >= self.split_size:
-                buffer = self.empty_collection_lambda()
+                buffer = self.member_type()
                 self.buffers.append(buffer)
 
             to_add = min(len(data), self.split_size - len(buffer))

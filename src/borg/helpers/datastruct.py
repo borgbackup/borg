@@ -63,7 +63,7 @@ class EfficientCollectionQueue:
         """
         Initializes empty queue.
         Requires split_size to define maximum chunk size.
-        Requires empty_collection_lambda to be lambda defining what base collection looks like.
+        Requires member_type to be type defining what base collection looks like.
         """
         self.buffers = []
         self.size = 0

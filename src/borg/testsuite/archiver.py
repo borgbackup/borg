@@ -444,6 +444,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
+    @requires_hardlinks
+    def test_create_duplicate_root(self):
+        # setup for #5603
+        path_a = os.path.join(self.input_path, 'a')
+        path_b = os.path.join(self.input_path, 'b')
+        os.mkdir(path_a)
+        os.mkdir(path_b)
+        hl_a = os.path.join(path_a, 'hardlink')
+        hl_b = os.path.join(path_b, 'hardlink')
+        self.create_regular_file(hl_a, contents=b'123456')
+        os.link(hl_a, hl_b)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input', 'input')  # give input twice!
+        # test if created archive has 'input' contents twice:
+        archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
+        # we have all fs items exactly once!
+        assert paths == ['input', 'input/a', 'input/a/hardlink', 'input/b', 'input/b/hardlink']
+
     def test_init_parent_dirs(self):
         parent_path = os.path.join(self.tmpdir, 'parent1', 'parent2')
         repository_path = os.path.join(parent_path, 'repository')

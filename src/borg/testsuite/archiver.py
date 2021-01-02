@@ -857,6 +857,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
 
+    @requires_hardlinks
+    def test_extract_hardlinks_twice(self):
+        # setup for #5603
+        path_a = os.path.join(self.input_path, 'a')
+        path_b = os.path.join(self.input_path, 'b')
+        os.mkdir(path_a)
+        os.mkdir(path_b)
+        hl_a = os.path.join(path_a, 'hardlink')
+        hl_b = os.path.join(path_b, 'hardlink')
+        self.create_regular_file(hl_a, contents=b'123456')
+        os.link(hl_a, hl_b)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input', 'input')  # give input twice!
+        # now test extraction
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            # if issue #5603 happens, extraction gives rc == 1 (triggering AssertionError) and warnings like:
+            # input/a/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/a/hardlink'
+            # input/b/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/b/hardlink'
+            # otherwise, when fixed, the hardlinks should be there and have a link count of 2
+            assert os.stat('input/a/hardlink').st_nlink == 2
+            assert os.stat('input/b/hardlink').st_nlink == 2
+
     def test_extract_include_exclude(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)

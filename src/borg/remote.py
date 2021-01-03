@@ -32,6 +32,7 @@ from .helpers import msgpack
 from .repository import Repository
 from .version import parse_version, format_version
 from .algorithms.checksums import xxh64
+from .helpers.datastruct import EfficientCollectionQueue
 
 logger = create_logger(__name__)
 
@@ -535,7 +536,7 @@ class RemoteRepository:
         self.msgid = 0
         self.rx_bytes = 0
         self.tx_bytes = 0
-        self.to_send = b''
+        self.to_send = EfficientCollectionQueue(1024 * 1024, bytes)
         self.stderr_received = b''  # incomplete stderr line bytes received (no \n yet)
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
@@ -543,6 +544,7 @@ class RemoteRepository:
         self.async_responses = {}
         self.shutdown_time = None
         self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
+        self.upload_buffer_size_limit = args.remote_buffer * 1024 * 1024 if args and args.remote_buffer else 0
         self.unpacker = get_limited_unpacker('client')
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
         self.p = None
@@ -711,6 +713,19 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         if not calls and cmd != 'async_responses':
             return
 
+        def send_buffer():
+            if self.to_send:
+                try:
+                    written = self.ratelimit.write(self.stdin_fd, self.to_send.peek_front())
+                    self.tx_bytes += written
+                    self.to_send.pop_front(written)
+                except OSError as e:
+                    # io.write might raise EAGAIN even though select indicates
+                    # that the fd should be writable.
+                    # EWOULDBLOCK is added for defensive programming sake.
+                    if e.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
+                        raise
+
         def pop_preload_msgid(chunkid):
             msgid = self.chunkid_to_msgids[chunkid].pop(0)
             if not self.chunkid_to_msgids[chunkid]:
@@ -760,6 +775,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
         calls = list(calls)
         waiting_for = []
+        maximum_to_send = 0 if wait else self.upload_buffer_size_limit
+        send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
         while wait or calls:
             if self.shutdown_time and time.monotonic() > self.shutdown_time:
                 # we are shutting this RemoteRepository down already, make sure we do not waste
@@ -850,7 +867,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     for line in lines:
                         handle_remote_line(line.decode())  # decode late, avoid partial utf-8 sequences
             if w:
-                while not self.to_send and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
+                while (len(self.to_send) <= maximum_to_send) and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
                         if is_preloaded:
                             assert cmd == 'get', "is_preload is only supported for 'get'"
@@ -864,29 +881,20 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                                 self.msgid += 1
                                 waiting_for.append(self.msgid)
                                 if self.dictFormat:
-                                    self.to_send = msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args})
+                                    self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
                                 else:
-                                    self.to_send = msgpack.packb((1, self.msgid, cmd, self.named_to_positional(cmd, args)))
+                                    self.to_send.push_back(msgpack.packb((1, self.msgid, cmd, self.named_to_positional(cmd, args))))
                     if not self.to_send and self.preload_ids:
                         chunk_id = self.preload_ids.pop(0)
                         args = {'id': chunk_id}
                         self.msgid += 1
                         self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
                         if self.dictFormat:
-                            self.to_send = msgpack.packb({MSGID: self.msgid, MSG: 'get', ARGS: args})
+                            self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: 'get', ARGS: args}))
                         else:
-                            self.to_send = msgpack.packb((1, self.msgid, 'get', self.named_to_positional('get', args)))
+                            self.to_send.push_back(msgpack.packb((1, self.msgid, 'get', self.named_to_positional('get', args))))
 
-                if self.to_send:
-                    try:
-                        written = self.ratelimit.write(self.stdin_fd, self.to_send)
-                        self.tx_bytes += written
-                        self.to_send = self.to_send[written:]
-                    except OSError as e:
-                        # io.write might raise EAGAIN even though select indicates
-                        # that the fd should be writable
-                        if e.errno != errno.EAGAIN:
-                            raise
+                send_buffer()
         self.ignore_responses |= set(waiting_for)  # we lose order here
 
     @api(since=parse_version('1.0.0'),

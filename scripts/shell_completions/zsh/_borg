@@ -650,6 +650,7 @@ __borg_setup_common_options() {
     '--umask=[set umask to M (local only, default: 0077)]:M'
     '--remote-path=[set remote path to executable (default: "borg")]: :_cmdstring'
     '--remote-ratelimit=[set remote network upload rate limit in kiByte/s (default: 0=unlimited)]: : _borg_guard_unsigned_number "RATE"'
+    '--remote-buffer=[set upload buffer size in MiB. (default: 0=no buffer)]: : _borg_guard_unsigned_number "UPLOAD_BUFFER"'
     '--consider-part-files[treat part files like normal files (e.g. to list/extract them)]'
     '--debug-profile=[write execution profile in Borg format into FILE]:FILE:_files'
     '--rsh=[use COMMAND instead of ssh]: :_cmdstring'

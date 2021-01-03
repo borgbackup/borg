@@ -2708,6 +2708,8 @@ class Archiver:
                               help='use PATH as borg executable on the remote (default: "borg")')
             add_common_option('--remote-ratelimit', metavar='RATE', dest='remote_ratelimit', type=int,
                               help='set remote network upload rate limit in kiByte/s (default: 0=unlimited)')
+            add_common_option('--remote-buffer', metavar='UPLOAD_BUFFER', dest='remote_buffer', type=int,
+                              help='set upload buffer size in MiB. (default: 0=no buffer)')
             add_common_option('--consider-part-files', dest='consider_part_files', action='store_true',
                               help='treat part files like normal files (e.g. to list/extract them)')
             add_common_option('--debug-profile', metavar='FILE', dest='debug_profile', default=None,

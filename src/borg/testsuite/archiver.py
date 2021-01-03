@@ -382,6 +382,8 @@ class ArchiverTestCaseBase(BaseTestCase):
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
+    requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+
     def test_basic_functionality(self):
         have_root = self.create_test_files()
         # fork required to test show-rc output
@@ -811,8 +813,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-
-    requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
 
     @requires_hardlinks
     @unittest.skipUnless(has_llfuse, 'llfuse not installed')

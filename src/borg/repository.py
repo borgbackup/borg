@@ -967,6 +967,7 @@ class Repository:
             pi.show(i)
             if segment > transaction_id:
                 continue
+            logger.debug('checking segment file %s...', filename)
             try:
                 objects = list(self.io.iter_objects(segment))
             except IntegrityError as err:

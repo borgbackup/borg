@@ -217,12 +217,12 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.2.0b1 (2020-12-06)
-----------------------------
+Version 1.2.0rc1 (not released yet)
+-----------------------------------
 
 Please note:
 
-This is code released for alpha testing (== helping us find bugs).
+This is code released for testing (== helping us find bugs).
 
 It is not suitable to run against your production backup repositories!
 
@@ -264,6 +264,41 @@ Compatibility notes:
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
 
+Fixes:
+
+- extract:
+  improve exception handling when setting xattrs, #5092.
+  emit a warning message giving the path, xattr key and error message.
+  continue trying to restore other xattrs and bsdflags of the same file
+  after an exception with xattr-setting happened.
+- export-tar:
+  fix memory leak with ssh: remote repository, #5568.
+  fix potential memory leak with ssh: remote repository with partial extraction.
+
+New features:
+
+- create --remote-buffer, add a upload buffer for remote repos, #5574
+- create --sparse, file map support for the "fixed" chunker, #14
+- prune: keep oldest archive when retention target not met
+
+Other changes:
+
+- create: add repository location to --stats output, #5491
+- check: debug log the segment filename
+- delete: add a --list switch to borg delete, #5116
+- docs:
+
+  - add another case of attempted hardlink usage
+  - fix description of borg upgrade hardlink usage, #5518
+  - use HTTPS everywhere
+- vagrant:
+
+  - use brew install --cask ..., #5557
+  - use Python 3.9.1 and PyInstaller 4.1 to build the borg binary
+
+
+Version 1.2.0b1 (2020-12-06)
+----------------------------
 
 Fixes:
 

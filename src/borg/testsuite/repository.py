@@ -14,7 +14,7 @@ from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, ConnectionClosedWithHint, handle_remote_line
-from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE
+from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
 from . import BaseTestCase
 from .hashindex import H
 
@@ -53,6 +53,16 @@ class RepositoryTestCaseBase(BaseTestCase):
         self.repository.put(H(1), b'bar2')
         self.repository.put(H(2), b'boo')
         self.repository.delete(H(3))
+
+    def repo_dump(self, label=None):
+        label = label + ': ' if label is not None else ''
+        H_trans = {H(i): i for i in range(10)}
+        H_trans[None] = -1  # key == None appears in commits
+        tag_trans = {TAG_PUT: 'put', TAG_DELETE: 'del', TAG_COMMIT: 'comm'}
+        for segment, fn in self.repository.io.segment_iterator():
+            for tag, key, offset, size in self.repository.io.iter_objects(segment):
+                print("%s%s H(%d) -> %s[%d..+%d]" % (label, tag_trans[tag], H_trans[key], fn, offset, size))
+        print()
 
 
 class RepositoryTestCase(RepositoryTestCaseBase):
@@ -313,8 +323,10 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.repository.put(H(1), b'1')
         self.repository.put(H(2), b'2')
         self.repository.commit()
+        self.repo_dump('p1 p2 cc')
         self.repository.delete(H(1))
         self.repository.commit()
+        self.repo_dump('d1 cc')
         last_segment = self.repository.io.get_latest_segment() - 1
         num_deletes = 0
         for tag, key, offset, size in self.repository.io.iter_objects(last_segment):
@@ -325,11 +337,16 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         assert last_segment in self.repository.compact
         self.repository.put(H(3), b'3')
         self.repository.commit()
+        self.repo_dump('p3 cc')
         assert last_segment not in self.repository.compact
         assert not self.repository.io.segment_exists(last_segment)
         for segment, _ in self.repository.io.segment_iterator():
             for tag, key, offset, size in self.repository.io.iter_objects(segment):
                 assert tag != TAG_DELETE
+                assert key != H(1)
+        # after compaction, there should be no empty shadowed_segments lists left over.
+        # we have no put or del any more for H(1), so we lost knowledge about H(1).
+        assert H(1) not in self.repository.shadow_index
 
     def test_shadowed_entries_are_preserved(self):
         get_latest_segment = self.repository.io.get_latest_segment
@@ -370,16 +387,19 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.repository.delete(H(1))
         assert self.repository.shadow_index[H(1)] == [0]
         self.repository.commit()
+        self.repo_dump('p1 d1 cc')
         # note how an empty list means that nothing is shadowed for sure
-        assert self.repository.shadow_index[H(1)] == []
+        assert self.repository.shadow_index[H(1)] == []  # because the delete is considered unstable
         self.repository.put(H(1), b'1')
         self.repository.delete(H(1))
+        self.repo_dump('p1 d1')
         # 0 put/delete; 1 commit; 2 compacted; 3 commit; 4 put/delete
         assert self.repository.shadow_index[H(1)] == [4]
         self.repository.rollback()
+        self.repo_dump('r')
         self.repository.put(H(2), b'1')
         # After the rollback segment 4 shouldn't be considered anymore
-        assert self.repository.shadow_index[H(1)] == []
+        assert self.repository.shadow_index[H(1)] == []  # because the delete is considered unstable
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
@@ -788,6 +808,25 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         with self.repository:
             self.check(repair=True)
             self.assert_equal(self.repository.get(H(0)), b'data2')
+
+
+class RepositoryHintsTestCase(RepositoryTestCaseBase):
+
+    def test_hints_behaviour(self):
+        self.repository.put(H(0), b'data')
+        self.assert_equal(self.repository.shadow_index, {})
+        self.assert_true(len(self.repository.compact) == 0)
+        self.repository.delete(H(0))
+        self.repository.commit()
+        # this is to make the previous delete "stable", see delete_is_not_stable:
+        self.repository.put(H(1), b'data')
+        self.repository.commit()
+        # in 1.1-maint, commit() always implicitly compacts.
+        # nothing to compact any more! no info left about stuff that does not exist any more:
+        self.assert_not_in(H(0), self.repository.shadow_index)
+        # segment 0 was compacted away, no info about it left:
+        self.assert_not_in(0, self.repository.compact)
+        self.assert_not_in(0, self.repository.segments)
 
 
 class RemoteRepositoryTestCase(RepositoryTestCase):

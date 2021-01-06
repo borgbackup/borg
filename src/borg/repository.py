@@ -794,6 +794,8 @@ class Repository:
                     try:
                         self.shadow_index[key].remove(segment)
                     except (KeyError, ValueError):
+                        # do not remove entry with empty shadowed_segments list here,
+                        # it is needed for shadowed_put_exists code (see below)!
                         pass
                 elif tag == TAG_DELETE and not in_index:
                     # If the shadow index doesn't contain this key, then we can't say if there's a shadowed older tag,
@@ -845,6 +847,11 @@ class Repository:
                             new_segment, size = self.io.write_delete(key)
                         self.compact[new_segment] += size
                         segments.setdefault(new_segment, 0)
+                    else:
+                        # we did not keep the delete tag for key (see if-branch)
+                        if not self.shadow_index[key]:
+                            # shadowed segments list is empty -> remove it
+                            del self.shadow_index[key]
             assert segments[segment] == 0, 'Corrupted segment reference count - corrupted index or hints'
             unused.append(segment)
             pi.show()

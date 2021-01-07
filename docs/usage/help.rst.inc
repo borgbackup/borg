@@ -156,7 +156,7 @@ Examples::
 
         Via ``--pattern`` or ``--patterns-from`` you can define BOTH inclusion and exclusion
         of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
-        ``--exclude-from`` ONLY excludes are defined.
+        ``--exlude-from`` ONLY excludes are defined.
 
     Inclusion patterns are useful to include paths that are contained in an excluded
     path. The first matching pattern is used so if an include pattern matches before

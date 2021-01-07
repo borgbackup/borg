@@ -1071,7 +1071,7 @@ class Repository:
         """Very low level scan over all segment file entries.
 
         It does NOT care about what's committed and what not.
-        It does NOT care whether an object might be deleted or superceded later.
+        It does NOT care whether an object might be deleted or superseded later.
         It just yields anything it finds in the segment files.
 
         This is intended as a last-resort way to get access to all repo contents of damaged repos,

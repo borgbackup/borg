@@ -374,7 +374,7 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
 
     cmd = cmd_prefix_map.get(cmd_line_str[0])
     if cmd is None:
-        raise argparse.ArgumentTypeError("A pattern/command must start with any one of: %s" %
+        raise argparse.ArgumentTypeError("A pattern/command must start with anyone of: %s" %
                                          ', '.join(cmd_prefix_map))
 
     # remaining text on command-line following the command character

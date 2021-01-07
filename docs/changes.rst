@@ -124,7 +124,7 @@ Steps you should take:
 Prior versions can access and modify repositories with this measure enabled, however,
 to 1.0.9 or later their modifications are indiscernible from an attack and will
 raise an error until the below procedure is followed. We are aware that this can
-be be annoying in some circumstances, but don't see a way to fix the vulnerability
+be annoying in some circumstances, but don't see a way to fix the vulnerability
 otherwise.
 
 In case a version prior to 1.0.9 is used to modify a repository where above procedure
@@ -426,7 +426,7 @@ Version 1.2.0a8 (2020-04-22)
 Fixes:
 
 - fixed potential index corruption / data loss issue due to bug in hashindex_set, #4829.
-  Please read and follow the more detailled notes close to the top of this document.
+  Please read and follow the more detailed notes close to the top of this document.
 - fix crash when upgrading erroneous hints file, #4922
 - commit-time free space calc: ignore bad compact map entries, #4796
 - info: if the archive doesn't exist, print a pretty message, #4793
@@ -454,7 +454,7 @@ New features:
   we just extract another copy instead of making a hardlink.
 - move sync_file_range to its own extension for better platform compatibility.
 - new --bypass-lock option to bypass locking, e.g. for read-only repos
-- accept absolute pathes by removing leading slashes in patterns of all
+- accept absolute paths by removing leading slashes in patterns of all
   sorts but re: style, #4029
 - delete: new --keep-security-info option
 
@@ -880,7 +880,7 @@ Compatibility notes:
 Fixes:
 
 - fixed potential index corruption / data loss issue due to bug in hashindex_set, #4829.
-  Please read and follow the more detailled notes close to the top of this document.
+  Please read and follow the more detailed notes close to the top of this document.
 - upgrade bundled xxhash to 0.7.3, #4891.
   0.7.2 is the minimum requirement for correct operations on ARMv6 in non-fixup
   mode, where unaligned memory accesses cause bus errors.
@@ -1168,7 +1168,7 @@ New features:
 - init: add warning to store both key and passphrase at safe place(s)
 - BORG_HOST_ID env var to work around all-zero MAC address issue, #3985
 - borg debug dump-repo-objs --ghost (dump everything from segment files,
-  including deleted or superceded objects or commit tags)
+  including deleted or superseded objects or commit tags)
 - borg debug search-repo-objs (search in repo objects for hex bytes or strings)
 
 Other changes:
@@ -1361,7 +1361,7 @@ Compatibility notes:
 Fixes:
 
 - check: data corruption fix: fix for borg check --repair malfunction, #3444.
-  See the more detailled notes close to the top of this document.
+  See the more detailed notes close to the top of this document.
 - delete: also delete security dir when deleting a repo, #3427
 - prune: fix building the "borg prune" man page, #3398
 - init: use given --storage-quota for local repo, #3470
@@ -2702,8 +2702,8 @@ Bug fixes:
   Fixes a chmod/chown/chgrp/unlink/rename/... crash race between getting
   dirents and dispatching to process_symlink.
 - yes(): abort on wrong answers, saying so, #1622
-- fixed exception borg serve raised when connection was closed before reposiory
-  was openend. add an error message for this.
+- fixed exception borg serve raised when connection was closed before repository
+  was opened. Add an error message for this.
 - fix read-from-closed-FD issue, #1551
   (this seems not to get triggered in 1.0.x, but was discovered in master)
 - hashindex: fix iterators (always raise StopIteration when exhausted)
@@ -3206,7 +3206,7 @@ Bug fixes:
 - do not sleep for >60s while waiting for lock, #773
 - unpack file stats before passing to FUSE
 - fix build on illumos
-- don't try to backup doors or event ports (Solaris and derivates)
+- don't try to backup doors or event ports (Solaris and derivatives)
 - remove useless/misleading libc version display, #738
 - test suite: reset exit code of persistent archiver, #844
 - RemoteRepository: clean up pipe if remote open() fails

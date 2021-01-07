@@ -1,7 +1,7 @@
 from distutils.version import LooseVersion
 
 # IMPORTANT keep imports from borg here to a minimum because our testsuite depends on
-# beeing able to import borg.constants and then monkey patching borg.constants.PBKDF2_ITERATIONS
+# being able to import borg.constants and then monkey patching borg.constants.PBKDF2_ITERATIONS
 from ._version import version as __version__
 
 

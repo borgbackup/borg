@@ -1158,7 +1158,7 @@ __borg_complete_keys() {
   compset -S '[^A-Za-z]##*'
 
   [[ -n $ISUFFIX ]] && compstate[to_end]=''
-  # NOTE: `[[ -n $ISUFFIX ]]` is a workarond for a bug that causes cursor movement to the right further than it should
+  # NOTE: `[[ -n $ISUFFIX ]]` is a workaround for a bug that causes cursor movement to the right further than it should
   # NOTE: the _oldlist completer doesn't respect compstate[to_end]=''
 
   local ipref suf

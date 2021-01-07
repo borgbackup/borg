@@ -250,7 +250,7 @@ messages such as::
 
     /Users/you/Pictures/Photos Library.photoslibrary: scandir: [Errno 1] Operation not permitted:
 
-To fix this problem, you should grant full disk acccess to cron, and to your
+To fix this problem, you should grant full disk access to cron, and to your
 Terminal application. More information `can be found here
 <https://osxdaily.com/2020/04/27/fix-cron-permissions-macos-full-disk-access/>`__.
 

@@ -2009,12 +2009,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert extracted_data == data
 
     def test_create_read_special_broken_symlink(self):
-        os.symlink('somewhere doesnt exist', os.path.join(self.input_path, 'link'))
+        os.symlink('somewhere does not exist', os.path.join(self.input_path, 'link'))
         self.cmd('init', '--encryption=repokey', self.repository_location)
         archive = self.repository_location + '::test'
         self.cmd('create', '--read-special', archive, 'input')
         output = self.cmd('list', archive)
-        assert 'input/link -> somewhere doesnt exist' in output
+        assert 'input/link -> somewhere does not exist' in output
 
     # def test_cmdline_compatibility(self):
     #    self.create_regular_file('file1', size=1024 * 80)

@@ -192,7 +192,7 @@ class HashIndexRefcountingTestCase(BaseTestCase):
         idx = ChunkIndex()
         idx[H(1)] = ChunkIndex.MAX_VALUE - 1, 1, 2
 
-        # 5 is arbitray, any number of incref/decrefs shouldn't move it once it's limited
+        # 5 is arbitrary, any number of incref/decrefs shouldn't move it once it's limited
         for i in range(5):
             # first incref to move it to the limit
             refcount, *_ = idx.incref(H(1))

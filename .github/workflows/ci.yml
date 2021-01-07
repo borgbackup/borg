@@ -74,7 +74,7 @@ jobs:
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
-      PKG_CONFIG_PATH: /usr/local/opt/openssl@1.1/lib/pkgconfig
+      PKG_CONFIG_PATH: C:\Program Files\OpenSSL-Win64
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
@@ -121,6 +121,7 @@ jobs:
       if: ${{ runner.os == 'Windows' }}
       run: |
         choco install openssl
+        dir /s 'C:\Program Files\OpenSSL-Win64\'
         choco install pkgconfiglite
 
     - name: Install Python requirements

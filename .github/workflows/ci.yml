@@ -68,6 +68,9 @@ jobs:
               # neverending RuntimeError crashes...
               python-version: 3.7
               toxenv: py37-fuse2
+            - os: windows-latest
+              python-version: 3.7
+              toxenv: py37-none
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
@@ -113,6 +116,11 @@ jobs:
         brew install lz4 || brew upgrade lz4
         brew install openssl@1.1 || brew upgrade openssl@1.1
         brew install homebrew/cask/osxfuse || brew upgrade homebrew/cask/osxfuse  # Required for Python llfuse module
+
+    - name: Install Windows packages
+      if: ${{ runner.os == 'Windows' }}
+      run: |
+        choco install openssl
 
     - name: Install Python requirements
       run: |

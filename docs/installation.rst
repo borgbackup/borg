@@ -184,7 +184,7 @@ Debian / Ubuntu
 
 Install the dependencies with development headers::
 
-    sudo apt-get install python3 python3-dev python3-pip python-virtualenv \
+    sudo apt-get install python3 python3-dev python3-pip python3-virtualenv \
     libacl1-dev libacl1 \
     libssl-dev libb2-dev \
     liblz4-dev libzstd-dev \

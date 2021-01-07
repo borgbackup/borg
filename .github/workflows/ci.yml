@@ -103,8 +103,6 @@ jobs:
     - name: Install Windows packages
       if: ${{ runner.os == 'Windows' }}
       run: |
-        choco install openssl
-        dir /s 'C:\Program Files\OpenSSL-Win64\'
         choco install pkgconfiglite
 
     - name: Install Python requirements

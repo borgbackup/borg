@@ -181,7 +181,7 @@ class HashIndexSizeTestCase(BaseTestCase):
         idx = ChunkIndex()
         for i in range(1234):
             idx[H(i)] = i, i**2, i**3
-            
+
         file, name = tempfile.mkstemp()
         try:
             # Close the file, on windows a file cannot be opened multiple times.

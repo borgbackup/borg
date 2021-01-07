@@ -121,6 +121,7 @@ jobs:
       if: ${{ runner.os == 'Windows' }}
       run: |
         choco install openssl
+        choco install pkgconfiglite
 
     - name: Install Python requirements
       run: |

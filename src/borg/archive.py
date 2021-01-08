@@ -1983,11 +1983,7 @@ class ArchiveRecreater:
         target.process_file_chunks(item, self.cache, target.stats, self.progress, chunk_iterator, chunk_processor)
 
     def chunk_processor(self, target, chunk):
-        # as this is recreate (we do not read from the fs), we never have CH_HOLE here,
-        # but we need to add support for CH_ALLOC - TODO!
-        assert chunk.meta['allocation'] == CH_DATA
-        data = chunk.data
-        chunk_id = self.key.id_hash(data)
+        chunk_id, data = chunk_to_id_data(chunk, self.key.id_hash)
         if chunk_id in self.seen_chunks:
             return self.cache.chunk_incref(chunk_id, target.stats)
         overwrite = self.recompress

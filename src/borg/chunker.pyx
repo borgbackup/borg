@@ -178,7 +178,7 @@ class ChunkerFixed:
         # should borg try to do sparse input processing?
         # whether it actually can be done depends on the input file being seekable.
         self.try_sparse = sparse and has_seek_hole
-        self.zeros = memoryview(bytes(block_size))
+        assert block_size <= len(zeros)
 
     def chunkify(self, fd=None, fh=-1, fmap=None):
         """
@@ -233,7 +233,7 @@ class ChunkerFixed:
                     # read block from the range
                     data = dread(offset, wanted, fd, fh)
                     got = len(data)
-                    if data == self.zeros[:got]:
+                    if zeros.startswith(data):
                         data = None
                         is_zero = True
                     else:

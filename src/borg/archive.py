@@ -19,7 +19,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import get_chunker, max_chunk_size, Chunk, chunk_to_id_data, zeros
+from .chunker import get_chunker, max_chunk_size, Chunk, cached_hash, zeros
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
@@ -1133,7 +1133,7 @@ class ChunksProcessor:
     def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None):
         if not chunk_processor:
             def chunk_processor(chunk):
-                chunk_id, data = chunk_to_id_data(chunk, self.key.id_hash)
+                chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 chunk_entry = cache.add_chunk(chunk_id, data, stats, wait=False)
                 self.cache.repository.async_response(wait=False)
                 return chunk_entry
@@ -1983,7 +1983,7 @@ class ArchiveRecreater:
         target.process_file_chunks(item, self.cache, target.stats, self.progress, chunk_iterator, chunk_processor)
 
     def chunk_processor(self, target, chunk):
-        chunk_id, data = chunk_to_id_data(chunk, self.key.id_hash)
+        chunk_id, data = cached_hash(chunk, self.key.id_hash)
         if chunk_id in self.seen_chunks:
             return self.cache.chunk_incref(chunk_id, target.stats)
         overwrite = self.recompress

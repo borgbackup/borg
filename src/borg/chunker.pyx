@@ -61,7 +61,7 @@ zeros = bytes(MAX_DATA_SIZE)
 # have different hash_funcs within the same borg run.
 zero_chunk_ids = LRUCache(10, dispose=lambda _: None)
 
-def chunk_to_id_data(chunk, id_hash):
+def cached_hash(chunk, id_hash):
     allocation = chunk.meta['allocation']
     if allocation == CH_DATA:
         data = chunk.data

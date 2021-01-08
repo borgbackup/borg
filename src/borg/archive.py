@@ -19,7 +19,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import get_chunker, max_chunk_size, Chunk
+from .chunker import get_chunker, max_chunk_size, Chunk, chunk_to_id_data
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
@@ -43,7 +43,6 @@ from .helpers import msgpack
 from .helpers import sig_int
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
-from .lrucache import LRUCache
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
@@ -1105,8 +1104,6 @@ class ChunksProcessor:
         self.checkpoint_interval = checkpoint_interval
         self.last_checkpoint = time.monotonic()
         self.rechunkify = rechunkify
-        self.zero_chunk_ids = LRUCache(10, dispose=lambda _: None)  # length of all-zero chunk -> chunk_id
-        self.zeros = memoryview(bytes(MAX_DATA_SIZE))
 
     def write_part_file(self, item, from_chunk, number):
         item = Item(internal_dict=item.as_dict())
@@ -1139,20 +1136,7 @@ class ChunksProcessor:
     def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None):
         if not chunk_processor:
             def chunk_processor(chunk):
-                allocation = chunk.meta['allocation']
-                if allocation == CH_DATA:
-                    data = chunk.data
-                    chunk_id = self.key.id_hash(data)
-                elif allocation in (CH_HOLE, CH_ALLOC):
-                    size = chunk.meta['size']
-                    data = self.zeros[:size]
-                    try:
-                        chunk_id = self.zero_chunk_ids[size]
-                    except KeyError:
-                        chunk_id = self.key.id_hash(data)
-                        self.zero_chunk_ids[size] = chunk_id
-                else:
-                    raise ValueError('unexpected allocation type')
+                chunk_id, data = chunk_to_id_data(chunk, self.key.id_hash)
                 chunk_entry = cache.add_chunk(chunk_id, data, stats, wait=False)
                 self.cache.repository.async_response(wait=False)
                 return chunk_entry

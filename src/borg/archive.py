@@ -19,7 +19,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import get_chunker, max_chunk_size, Chunk, chunk_to_id_data
+from .chunker import get_chunker, max_chunk_size, Chunk, chunk_to_id_data, zeros
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
@@ -424,7 +424,6 @@ class Archive:
             if info is None:
                 raise self.DoesNotExist(name)
             self.load(info.id)
-            self.zeros = None
 
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
@@ -737,8 +736,6 @@ Utilization of max. archive size: {csize_max:.0%}
                                      hardlink_masters) as hardlink_set:
                 if hardlink_set:
                     return
-                if sparse and self.zeros is None:
-                    self.zeros = b'\0' * max_chunk_size(*self.chunker_params)
                 with backup_io('open'):
                     fd = open(path, 'wb')
                 with fd:
@@ -747,7 +744,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         if pi:
                             pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                         with backup_io('write'):
-                            if sparse and self.zeros.startswith(data):
+                            if sparse and zeros.startswith(data):
                                 # all-zero chunk: create a hole in a sparse file
                                 fd.seek(len(data), 1)
                             else:

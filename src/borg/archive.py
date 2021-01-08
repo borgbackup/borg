@@ -1662,8 +1662,8 @@ class ArchiveChecker:
             If a previously missing file chunk re-appears, the replacement chunk is replaced by the correct one.
             """
             def replacement_chunk(size):
-                data = bytes(size)
-                chunk_id = self.key.id_hash(data)
+                chunk = Chunk(None, allocation=CH_ALLOC, size=size)
+                chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 cdata = self.key.encrypt(data)
                 csize = len(cdata)
                 return chunk_id, size, csize, cdata

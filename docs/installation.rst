@@ -81,6 +81,18 @@ Please ask package maintainers to build a package or, if you can package /
 submit it yourself, please help us with that! See :issue:`105` on
 github to followup on packaging efforts.
 
+**Current status of package in the repositories**
+
+.. start-badges
+
+|Packaging status|
+ 
+.. |Packaging status| image:: https://repology.org/badge/vertical-allrepos/borgbackup.svg
+        :alt: Packaging status
+        :target: https://repology.org/project/borgbackup/versions
+
+.. end-badges
+
 .. _pyinstaller-binary:
 
 Standalone Binary

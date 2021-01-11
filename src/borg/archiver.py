@@ -603,6 +603,9 @@ class Archiver:
                                        exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                        keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
                                        restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
+                        # if we get back here, we've finished recursing into <path>,
+                        # we do not ever want to get back in there (even if path is given twice as recursion root)
+                        skip_inodes.add((st.st_ino, st.st_dev))
             if not dry_run:
                 if args.progress:
                     archive.stats.show_progress(final=True)

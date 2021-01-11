@@ -381,6 +381,8 @@ class ArchiverTestCaseBase(BaseTestCase):
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
+    requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+
     def test_basic_functionality(self):
         have_root = self.create_test_files()
         # fork required to test show-rc output
@@ -443,6 +445,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
+
+    @requires_hardlinks
+    def test_create_duplicate_root(self):
+        # setup for #5603
+        path_a = os.path.join(self.input_path, 'a')
+        path_b = os.path.join(self.input_path, 'b')
+        os.mkdir(path_a)
+        os.mkdir(path_b)
+        hl_a = os.path.join(path_a, 'hardlink')
+        hl_b = os.path.join(path_b, 'hardlink')
+        self.create_regular_file(hl_a, contents=b'123456')
+        os.link(hl_a, hl_b)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input', 'input')  # give input twice!
+        # test if created archive has 'input' contents twice:
+        archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
+        # we have all fs items exactly once!
+        assert paths == ['input', 'input/a', 'input/a/hardlink', 'input/b', 'input/b/hardlink']
 
     def test_init_parent_dirs(self):
         parent_path = os.path.join(self.tmpdir, 'parent1', 'parent2')
@@ -792,8 +813,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
 
-    requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
-
     @requires_hardlinks
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_mount_hardlinks(self):
@@ -856,6 +875,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
+
+    @requires_hardlinks
+    def test_extract_hardlinks_twice(self):
+        # setup for #5603
+        path_a = os.path.join(self.input_path, 'a')
+        path_b = os.path.join(self.input_path, 'b')
+        os.mkdir(path_a)
+        os.mkdir(path_b)
+        hl_a = os.path.join(path_a, 'hardlink')
+        hl_b = os.path.join(path_b, 'hardlink')
+        self.create_regular_file(hl_a, contents=b'123456')
+        os.link(hl_a, hl_b)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input', 'input')  # give input twice!
+        # now test extraction
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            # if issue #5603 happens, extraction gives rc == 1 (triggering AssertionError) and warnings like:
+            # input/a/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/a/hardlink'
+            # input/b/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/b/hardlink'
+            # otherwise, when fixed, the hardlinks should be there and have a link count of 2
+            assert os.stat('input/a/hardlink').st_nlink == 2
+            assert os.stat('input/b/hardlink').st_nlink == 2
 
     def test_extract_include_exclude(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

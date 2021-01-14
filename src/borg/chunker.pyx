@@ -6,7 +6,7 @@ import errno
 import os
 from collections import namedtuple
 
-from .constants import CH_DATA, CH_ALLOC, CH_HOLE, MAX_DATA_SIZE
+from .constants import CH_DATA, CH_ALLOC, CH_HOLE, MAX_DATA_SIZE, zeros
 from .lrucache import LRUCache
 
 from libc.stdlib cimport free
@@ -52,8 +52,6 @@ _Chunk.__doc__ = """\
 def Chunk(data, **meta):
     return _Chunk(meta, data)
 
-
-zeros = bytes(MAX_DATA_SIZE)
 
 # remember a few recently used all-zero chunk hashes in this mapping.
 # (hash_func, chunk_length) -> chunk_hash

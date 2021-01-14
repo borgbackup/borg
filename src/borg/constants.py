@@ -45,6 +45,10 @@ assert MAX_OBJECT_SIZE == 20 * 1024 * 1024
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
 MAX_SEGMENT_SIZE_LIMIT = 2 ** 32 - MAX_OBJECT_SIZE
 
+# have one all-zero bytes object
+# we use it at all places where we need to detect or create all-zero buffers
+zeros = bytes(MAX_DATA_SIZE)
+
 # borg.remote read() buffer size
 BUFSIZE = 10 * 1024 * 1024
 

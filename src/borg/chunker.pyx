@@ -308,15 +308,6 @@ def get_chunker(algo, *params, **kw):
     raise TypeError('unsupported chunker algo %r' % algo)
 
 
-def max_chunk_size(algo, *params):
-    # see also parseformat.ChunkerParams return values
-    if algo == 'buzhash':
-        return 1 << params[1]
-    if algo == 'fixed':
-        return max(params[0], params[1])
-    raise TypeError('unsupported chunker algo %r' % algo)
-
-
 def buzhash(data, unsigned long seed):
     cdef uint32_t *table
     cdef uint32_t sum

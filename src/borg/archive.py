@@ -19,7 +19,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import get_chunker, Chunk, cached_hash
+from .chunker import get_chunker, Chunk
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
@@ -41,6 +41,7 @@ from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import os_open, flags_normal, flags_dir
 from .helpers import msgpack
 from .helpers import sig_int
+from .lrucache import LRUCache
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
@@ -1086,6 +1087,32 @@ class MetadataCollector:
         attrs = self.stat_simple_attrs(st)
         attrs.update(self.stat_ext_attrs(st, path, fd=fd))
         return attrs
+
+
+# remember a few recently used all-zero chunk hashes in this mapping.
+# (hash_func, chunk_length) -> chunk_hash
+# we play safe and have the hash_func in the mapping key, in case we
+# have different hash_funcs within the same borg run.
+zero_chunk_ids = LRUCache(10, dispose=lambda _: None)
+
+
+def cached_hash(chunk, id_hash):
+    allocation = chunk.meta['allocation']
+    if allocation == CH_DATA:
+        data = chunk.data
+        chunk_id = id_hash(data)
+    elif allocation in (CH_HOLE, CH_ALLOC):
+        size = chunk.meta['size']
+        assert size <= len(zeros)
+        data = memoryview(zeros)[:size]
+        try:
+            chunk_id = zero_chunk_ids[(id_hash, size)]
+        except KeyError:
+            chunk_id = id_hash(data)
+            zero_chunk_ids[(id_hash, size)] = chunk_id
+    else:
+        raise ValueError('unexpected allocation type')
+    return chunk_id, data
 
 
 class ChunksProcessor:

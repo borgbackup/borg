@@ -7,7 +7,6 @@ import os
 from collections import namedtuple
 
 from .constants import CH_DATA, CH_ALLOC, CH_HOLE, MAX_DATA_SIZE, zeros
-from .lrucache import LRUCache
 
 from libc.stdlib cimport free
 
@@ -51,31 +50,6 @@ _Chunk.__doc__ = """\
 
 def Chunk(data, **meta):
     return _Chunk(meta, data)
-
-
-# remember a few recently used all-zero chunk hashes in this mapping.
-# (hash_func, chunk_length) -> chunk_hash
-# we play safe and have the hash_func in the mapping key, in case we
-# have different hash_funcs within the same borg run.
-zero_chunk_ids = LRUCache(10, dispose=lambda _: None)
-
-def cached_hash(chunk, id_hash):
-    allocation = chunk.meta['allocation']
-    if allocation == CH_DATA:
-        data = chunk.data
-        chunk_id = id_hash(data)
-    elif allocation in (CH_HOLE, CH_ALLOC):
-        size = chunk.meta['size']
-        assert size <= len(zeros)
-        data = memoryview(zeros)[:size]
-        try:
-            chunk_id = zero_chunk_ids[(id_hash, size)]
-        except KeyError:
-            chunk_id = id_hash(data)
-            zero_chunk_ids[(id_hash, size)] = chunk_id
-    else:
-        raise ValueError('unexpected allocation type')
-    return chunk_id, data
 
 
 def dread(offset, size, fd=None, fh=-1):

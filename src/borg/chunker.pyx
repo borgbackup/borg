@@ -207,19 +207,19 @@ class ChunkerFixed:
                     got = len(data)
                     if zeros.startswith(data):
                         data = None
-                        is_zero = True
+                        allocation = CH_ALLOC
                     else:
-                        is_zero = False
+                        allocation = CH_DATA
                 else:  # hole
                     # seek over block from the range
                     pos = dseek(wanted, os.SEEK_CUR, fd, fh)
                     got = pos - offset
                     data = None
-                    is_zero = True
+                    allocation = CH_HOLE
                 if got > 0:
                     offset += got
                     range_size -= got
-                    yield Chunk(data, size=got, allocation=(CH_ALLOC if is_zero else CH_DATA) if is_data else CH_HOLE)
+                    yield Chunk(data, size=got, allocation=allocation)
                 if got < wanted:
                     # we did not get enough data, looks like EOF.
                     return

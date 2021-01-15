@@ -242,6 +242,7 @@ cdef class Chunker:
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
+        assert max_size <= len(zeros)
         # see chunker_process, first while loop condition, first term must be able to get True:
         assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
         hash_mask = (1 << hash_mask_bits) - 1
@@ -267,7 +268,16 @@ cdef class Chunker:
 
     def __next__(self):
         data = chunker_process(self.chunker)
-        return Chunk(data, size=len(data), allocation=CH_DATA)  # no sparse support here
+        got = len(data)
+        # we do not have SEEK_DATA/SEEK_HOLE support in chunker_process C code,
+        # but we can just check if data was all-zero (and either came from a hole
+        # or from stored zeros - we can not detect that here).
+        if zeros.startswith(data):
+            data = None
+            allocation = CH_ALLOC
+        else:
+            allocation = CH_DATA
+        return Chunk(data, size=got, allocation=allocation)
 
 
 def get_chunker(algo, *params, **kw):

@@ -4,6 +4,7 @@ import tempfile
 
 import pytest
 
+from .chunker import cf
 from ..chunker import ChunkerFixed, sparsemap, has_seek_hole
 from ..constants import *  # NOQA
 
@@ -50,20 +51,18 @@ def make_sparsefile(fname, sparsemap, header_size=0):
 
 
 def make_content(sparsemap, header_size=0):
-    with BytesIO() as fd:
-        total = 0
-        if header_size:
-            fd.write(b'H' * header_size)
-            total += header_size
-        for offset, size, is_data in sparsemap:
-            if is_data:
-                fd.write(b'X' * size)
-            else:
-                fd.write(b'\0' * size)
-            total += size
-        content = fd.getvalue()
-    assert len(content) == total
-    return content
+    result = []
+    total = 0
+    if header_size:
+        result.append(b'H' * header_size)
+        total += header_size
+    for offset, size, is_data in sparsemap:
+        if is_data:
+            result.append(b'X' * size)  # bytes!
+        else:
+            result.append(size)  # int!
+        total += size
+    return result
 
 
 def fs_supports_sparse():
@@ -132,7 +131,7 @@ def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
     def get_chunks(fname, sparse, header_size):
         chunker = ChunkerFixed(4096, header_size=header_size, sparse=sparse)
         with open(fname, 'rb') as fd:
-            return b''.join([c for c in chunker.chunkify(fd)])
+            return cf(chunker.chunkify(fd))
 
     fn = str(tmpdir / fname)
     make_sparsefile(fn, sparse_map, header_size=header_size)

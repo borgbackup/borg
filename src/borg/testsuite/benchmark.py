@@ -11,6 +11,7 @@ import os
 import pytest
 
 from .archiver import changedir, cmd
+from ..constants import zeros
 
 
 @pytest.fixture
@@ -34,12 +35,13 @@ def repo(request, cmd, repo_url):
 @pytest.fixture(scope='session', params=["zeros", "random"])
 def testdata(request, tmpdir_factory):
     count, size = 10, 1000*1000
+    assert size <= len(zeros)
     p = tmpdir_factory.mktemp('data')
     data_type = request.param
     if data_type == 'zeros':
         # do not use a binary zero (\0) to avoid sparse detection
         def data(size):
-            return b'0' * size
+            return memoryview(zeros)[:size]
     elif data_type == 'random':
         def data(size):
             return os.urandom(size)

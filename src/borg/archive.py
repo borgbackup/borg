@@ -19,7 +19,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import get_chunker, max_chunk_size
+from .chunker import get_chunker, Chunk
 from .cache import ChunkListEntry
 from .crypto.key import key_factory
 from .compress import Compressor, CompressionSpec
@@ -41,6 +41,7 @@ from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import os_open, flags_normal, flags_dir
 from .helpers import msgpack
 from .helpers import sig_int
+from .lrucache import LRUCache
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
@@ -336,7 +337,10 @@ class ChunkBuffer:
         self.buffer.seek(0)
         # The chunker returns a memoryview to its internal buffer,
         # thus a copy is needed before resuming the chunker iterator.
-        chunks = list(bytes(s) for s in self.chunker.chunkify(self.buffer))
+        # note: this is the items metadata stream chunker, we only will get CH_DATA allocation here (because there are,
+        #       no all-zero chunks in a metadata stream), thus chunk.data will always be bytes/memoryview and allocation
+        #       is always CH_DATA and never CH_ALLOC/CH_HOLE).
+        chunks = list(bytes(chunk.data) for chunk in self.chunker.chunkify(self.buffer))
         self.buffer.seek(0)
         self.buffer.truncate(0)
         # Leave the last partial chunk in the buffer unless flush is True
@@ -422,7 +426,6 @@ class Archive:
             if info is None:
                 raise self.DoesNotExist(name)
             self.load(info.id)
-            self.zeros = None
 
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
@@ -735,8 +738,6 @@ Utilization of max. archive size: {csize_max:.0%}
                                      hardlink_masters) as hardlink_set:
                 if hardlink_set:
                     return
-                if sparse and self.zeros is None:
-                    self.zeros = b'\0' * max_chunk_size(*self.chunker_params)
                 with backup_io('open'):
                     fd = open(path, 'wb')
                 with fd:
@@ -745,7 +746,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         if pi:
                             pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                         with backup_io('write'):
-                            if sparse and self.zeros.startswith(data):
+                            if sparse and zeros.startswith(data):
                                 # all-zero chunk: create a hole in a sparse file
                                 fd.seek(len(data), 1)
                             else:
@@ -1089,6 +1090,32 @@ class MetadataCollector:
         return attrs
 
 
+# remember a few recently used all-zero chunk hashes in this mapping.
+# (hash_func, chunk_length) -> chunk_hash
+# we play safe and have the hash_func in the mapping key, in case we
+# have different hash_funcs within the same borg run.
+zero_chunk_ids = LRUCache(10, dispose=lambda _: None)
+
+
+def cached_hash(chunk, id_hash):
+    allocation = chunk.meta['allocation']
+    if allocation == CH_DATA:
+        data = chunk.data
+        chunk_id = id_hash(data)
+    elif allocation in (CH_HOLE, CH_ALLOC):
+        size = chunk.meta['size']
+        assert size <= len(zeros)
+        data = memoryview(zeros)[:size]
+        try:
+            chunk_id = zero_chunk_ids[(id_hash, size)]
+        except KeyError:
+            chunk_id = id_hash(data)
+            zero_chunk_ids[(id_hash, size)] = chunk_id
+    else:
+        raise ValueError('unexpected allocation type')
+    return chunk_id, data
+
+
 class ChunksProcessor:
     # Processes an iterator of chunks for an Item
 
@@ -1133,8 +1160,9 @@ class ChunksProcessor:
 
     def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None):
         if not chunk_processor:
-            def chunk_processor(data):
-                chunk_entry = cache.add_chunk(self.key.id_hash(data), data, stats, wait=False)
+            def chunk_processor(chunk):
+                chunk_id, data = cached_hash(chunk, self.key.id_hash)
+                chunk_entry = cache.add_chunk(chunk_id, data, stats, wait=False)
                 self.cache.repository.async_response(wait=False)
                 return chunk_entry
 
@@ -1145,8 +1173,8 @@ class ChunksProcessor:
             del item.chunks_healthy
         from_chunk = 0
         part_number = 1
-        for data in chunk_iter:
-            item.chunks.append(chunk_processor(data))
+        for chunk in chunk_iter:
+            item.chunks.append(chunk_processor(chunk))
             if show_progress:
                 stats.show_progress(item=item, dt=0.2)
             from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
@@ -1662,8 +1690,8 @@ class ArchiveChecker:
             If a previously missing file chunk re-appears, the replacement chunk is replaced by the correct one.
             """
             def replacement_chunk(size):
-                data = bytes(size)
-                chunk_id = self.key.id_hash(data)
+                chunk = Chunk(None, allocation=CH_ALLOC, size=size)
+                chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 cdata = self.key.encrypt(data)
                 csize = len(cdata)
                 return chunk_id, size, csize, cdata
@@ -1982,8 +2010,8 @@ class ArchiveRecreater:
         chunk_processor = partial(self.chunk_processor, target)
         target.process_file_chunks(item, self.cache, target.stats, self.progress, chunk_iterator, chunk_processor)
 
-    def chunk_processor(self, target, data):
-        chunk_id = self.key.id_hash(data)
+    def chunk_processor(self, target, chunk):
+        chunk_id, data = cached_hash(chunk, self.key.id_hash)
         if chunk_id in self.seen_chunks:
             return self.cache.chunk_incref(chunk_id, target.stats)
         overwrite = self.recompress
@@ -2007,7 +2035,7 @@ class ArchiveRecreater:
             yield from target.chunker.chunkify(file)
         else:
             for chunk in chunk_iterator:
-                yield chunk
+                yield Chunk(chunk, size=len(chunk), allocation=CH_DATA)
 
     def save(self, archive, target, comment=None, replace_original=True):
         if self.dry_run:

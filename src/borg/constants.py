@@ -45,6 +45,10 @@ assert MAX_OBJECT_SIZE == 20 * 1024 * 1024
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
 MAX_SEGMENT_SIZE_LIMIT = 2 ** 32 - MAX_OBJECT_SIZE
 
+# have one all-zero bytes object
+# we use it at all places where we need to detect or create all-zero buffers
+zeros = bytes(MAX_DATA_SIZE)
+
 # borg.remote read() buffer size
 BUFSIZE = 10 * 1024 * 1024
 
@@ -74,6 +78,9 @@ CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH
 
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)
+
+# normal on-disk data, allocated (but not written, all zeros), not allocated hole (all zeros)
+CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
 
 # operating mode of the files cache (for fast skipping of unchanged files)
 DEFAULT_FILES_CACHE_MODE_UI = 'ctime,size,inode'

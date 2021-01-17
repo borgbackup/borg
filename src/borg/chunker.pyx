@@ -4,6 +4,9 @@ API_VERSION = '1.2_01'
 
 import errno
 import os
+from collections import namedtuple
+
+from .constants import CH_DATA, CH_ALLOC, CH_HOLE, MAX_DATA_SIZE, zeros
 
 from libc.stdlib cimport free
 
@@ -24,6 +27,29 @@ cdef extern from "_chunker.c":
 # this does not imply that it will actually work on the filesystem,
 # because the FS also needs to support this.
 has_seek_hole = hasattr(os, 'SEEK_DATA') and hasattr(os, 'SEEK_HOLE')
+
+
+_Chunk = namedtuple('_Chunk', 'meta data')
+_Chunk.__doc__ = """\
+    Chunk namedtuple
+
+    meta is always a dictionary, data depends on allocation.
+
+    data chunk read from a DATA range of a file (not from a sparse hole):
+        meta = {'allocation' = CH_DATA, 'size' = size_of_chunk }
+        data = read_data [bytes or memoryview]
+
+    all-zero chunk read from a DATA range of a file (not from a sparse hole, but detected to be all-zero):
+        meta = {'allocation' = CH_ALLOC, 'size' = size_of_chunk }
+        data = None
+
+    all-zero chunk from a HOLE range of a file (from a sparse hole):
+        meta = {'allocation' = CH_HOLE, 'size' = size_of_chunk }
+        data = None
+"""
+
+def Chunk(data, **meta):
+    return _Chunk(meta, data)
 
 
 def dread(offset, size, fd=None, fh=-1):
@@ -124,7 +150,7 @@ class ChunkerFixed:
         # should borg try to do sparse input processing?
         # whether it actually can be done depends on the input file being seekable.
         self.try_sparse = sparse and has_seek_hole
-        self.zeros = memoryview(bytes(block_size))
+        assert block_size <= len(zeros)
 
     def chunkify(self, fd=None, fh=-1, fmap=None):
         """
@@ -178,15 +204,22 @@ class ChunkerFixed:
                 if is_data:
                     # read block from the range
                     data = dread(offset, wanted, fd, fh)
+                    got = len(data)
+                    if zeros.startswith(data):
+                        data = None
+                        allocation = CH_ALLOC
+                    else:
+                        allocation = CH_DATA
                 else:  # hole
                     # seek over block from the range
                     pos = dseek(wanted, os.SEEK_CUR, fd, fh)
-                    data = self.zeros[:pos - offset]  # for now, create zero-bytes here
-                got = len(data)
+                    got = pos - offset
+                    data = None
+                    allocation = CH_HOLE
                 if got > 0:
                     offset += got
                     range_size -= got
-                    yield data  # later, use a better api that tags data vs. hole
+                    yield Chunk(data, size=got, allocation=allocation)
                 if got < wanted:
                     # we did not get enough data, looks like EOF.
                     return
@@ -209,6 +242,7 @@ cdef class Chunker:
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
+        assert max_size <= len(zeros)
         # see chunker_process, first while loop condition, first term must be able to get True:
         assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
         hash_mask = (1 << hash_mask_bits) - 1
@@ -233,7 +267,17 @@ cdef class Chunker:
         return self
 
     def __next__(self):
-        return chunker_process(self.chunker)
+        data = chunker_process(self.chunker)
+        got = len(data)
+        # we do not have SEEK_DATA/SEEK_HOLE support in chunker_process C code,
+        # but we can just check if data was all-zero (and either came from a hole
+        # or from stored zeros - we can not detect that here).
+        if zeros.startswith(data):
+            data = None
+            allocation = CH_ALLOC
+        else:
+            allocation = CH_DATA
+        return Chunk(data, size=got, allocation=allocation)
 
 
 def get_chunker(algo, *params, **kw):
@@ -243,15 +287,6 @@ def get_chunker(algo, *params, **kw):
     if algo == 'fixed':
         sparse = kw['sparse']
         return ChunkerFixed(*params, sparse=sparse)
-    raise TypeError('unsupported chunker algo %r' % algo)
-
-
-def max_chunk_size(algo, *params):
-    # see also parseformat.ChunkerParams return values
-    if algo == 'buzhash':
-        return 1 << params[1]
-    if algo == 'fixed':
-        return max(params[0], params[1])
     raise TypeError('unsupported chunker algo %r' % algo)
 
 

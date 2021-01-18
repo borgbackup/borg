@@ -1216,11 +1216,11 @@ class Repository:
             segment, offset = self.index.pop(id)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
-        self.shadow_index.setdefault(id, []).append(segment)
         self._delete(id, segment, offset)
 
     def _delete(self, id, segment, offset):
         # common code used by put and delete
+        self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         size = self.io.read(segment, offset, id, read_data=False)
         self.storage_quota_use -= size

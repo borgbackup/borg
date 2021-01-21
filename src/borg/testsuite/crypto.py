@@ -1,7 +1,7 @@
 from binascii import hexlify, unhexlify
 
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
-                               IntegrityError, blake2b_256, hmac_sha256, openssl10
+                               IntegrityError, blake2b_128, blake2b_256, hmac_sha256, openssl10
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 
@@ -218,6 +218,12 @@ class CryptoTestCase(BaseTestCase):
         key = unhexlify('e944973af2256d4d670c12dd75304c319f58f4e40df6fb18ef996cb47e063676')
         data = memoryview(b'1234567890' * 100)
         assert blake2b_256(key, data) == unhexlify('97ede832378531dd0f4c668685d166e797da27b47d8cd441e885b60abd5e0cb2')
+
+    def test_blake2b_128(self):
+        # (see above)
+        assert blake2b_128(b'') == unhexlify('cae66941d9efbd404e4d88758ea67670')
+        assert blake2b_128(b'abc') == unhexlify('cf4ab791c62b8d2b2109c90275287816')
+        assert blake2b_128(b'abcd'*8) == unhexlify('0f759d9a32d3f99250c1781a8baa58b9')
 
     # These test vectors come from https://www.kullo.net/blog/hkdf-sha-512-test-vectors/
     # who claims to have verified these against independent Python and C++ implementations.

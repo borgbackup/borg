@@ -81,7 +81,7 @@ Examples
     # Use --paths-from-command with find to only backup files from a given user
     $ borg create --paths-from-command -- /path/to/repo::joes-files find ~ -user joe
     # Use --paths-from-stdin with --paths-delimiter to backup files listed in a csv file
-    $ cat ~files-to-backup.csv | borg create \
+    $ cat ~/files-to-backup.csv | borg create \
         --paths-from-stdin \
         --paths-delimiter "," \
         /path/to/repo::csv-specified-files

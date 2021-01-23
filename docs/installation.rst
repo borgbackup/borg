@@ -86,7 +86,7 @@ github to followup on packaging efforts.
 .. start-badges
 
 |Packaging status|
- 
+
 .. |Packaging status| image:: https://repology.org/badge/vertical-allrepos/borgbackup.svg
         :alt: Packaging status
         :target: https://repology.org/project/borgbackup/versions
@@ -377,9 +377,9 @@ While we try not to break master, there are no guarantees on anything.
     or
     pip install -e .[llfuse]   # in-place editable mode, use llfuse
 
-    # optional: run all the tests, on all supported Python versions
+    # optional: run all the tests, on all installed Python versions
     # requires fakeroot, available through your package manager
-    fakeroot -u tox
+    fakeroot -u tox --skip-missing-interpreters
 
 By default the system installation of python will be used.
 If you need to use a different version of Python you can install this using ``pyenv``:

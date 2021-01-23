@@ -880,8 +880,8 @@ I am seeing 'A' (added) status for an unchanged file!?
 
 The files cache is used to determine whether Borg already
 "knows" / has backed up a file and if so, to skip the file from
-chunking. It does intentionally *not* contain files that have a timestamp
-same as the newest timestamp in the created archive.
+chunking. It intentionally *excludes* files that have a timestamp
+which is the same as the newest timestamp in the created archive.
 
 So, if you see an 'A' status for unchanged file(s), they are likely the files
 with the most recent timestamp in that archive.

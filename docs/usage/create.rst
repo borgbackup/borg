@@ -80,8 +80,8 @@ Examples
     $ find ~ -size -1000k | borg create --paths-from-stdin /path/to/repo::small-files-only
     # Use --paths-from-command with find to only backup files from a given user
     $ borg create --paths-from-command -- /path/to/repo::joes-files find ~ -user joe
-    # Use --paths-from-stdin with --paths-delimiter to backup files listed in a csv file
-    $ cat ~/files-to-backup.csv | borg create \
+    # Use --paths-from-stdin with --paths-delimiter (for example, for files with newlines in them)
+    $ find ~ -size -1000k -print0 | borg create \
         --paths-from-stdin \
-        --paths-delimiter "," \
-        /path/to/repo::csv-specified-files
+        --paths-delimiter "\0" \
+        /path/to/repo::smallfiles-handle-newline

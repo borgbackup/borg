@@ -47,10 +47,6 @@ is_win32 = sys.platform.startswith('win32')
 # needed: openssl >=1.0.2 or >=1.1.0 (or compatible)
 system_prefix_openssl = os.environ.get('BORG_OPENSSL_PREFIX')
 
-# needed: blake2 (>= 0.98.1)
-prefer_system_libb2 = not bool(os.environ.get('BORG_USE_BUNDLED_B2'))
-system_prefix_libb2 = os.environ.get('BORG_LIBB2_PREFIX')
-
 # needed: lz4 (>= 1.7.0 / r129)
 prefer_system_liblz4 = not bool(os.environ.get('BORG_USE_BUNDLED_LZ4'))
 system_prefix_liblz4 = os.environ.get('BORG_LIBLZ4_PREFIX')
@@ -180,7 +176,6 @@ if not on_rtd:
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source, crypto_helpers]),
         setup_crypto.crypto_ext_kwargs(pc, system_prefix_openssl),
-        setup_crypto.b2_ext_kwargs(pc, prefer_system_libb2, system_prefix_libb2),
     )
 
     compress_ext_kwargs = members_appended(

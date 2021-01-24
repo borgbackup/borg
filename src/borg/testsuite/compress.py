@@ -147,7 +147,7 @@ def test_obfuscate():
     # 2 id bytes compression, 2 id bytes obfuscator. 4 length bytes
     assert len(data) + 8 <= len(compressed) <= len(data) * 101 + 8
     # compressing 100 times the same data should give at least 50 different result sizes
-    assert len(set(len(compressor.compress(data)) for i in range(100))) > 50
+    assert len({len(compressor.compress(data)) for i in range(100)}) > 50
 
     cs = CompressionSpec('obfuscate,2,lz4')
     assert isinstance(cs.inner.compressor, LZ4)
@@ -158,7 +158,7 @@ def test_obfuscate():
     min_compress, max_compress = 0.2, 0.001  # estimate compression factor outer boundaries
     assert max_compress * len(data) + 8 <= len(compressed) <= min_compress * len(data) * 1001 + 8
     # compressing 100 times the same data should give multiple different result sizes
-    assert len(set(len(compressor.compress(data)) for i in range(100))) > 10
+    assert len({len(compressor.compress(data)) for i in range(100)}) > 10
 
     cs = CompressionSpec('obfuscate,6,zstd,3')
     assert isinstance(cs.inner.compressor, ZSTD)
@@ -169,7 +169,7 @@ def test_obfuscate():
     min_compress, max_compress = 0.2, 0.001  # estimate compression factor outer boundaries
     assert max_compress * len(data) + 8 <= len(compressed) <= min_compress * len(data) * 10000001 + 8
     # compressing 100 times the same data should give multiple different result sizes
-    assert len(set(len(compressor.compress(data)) for i in range(100))) > 90
+    assert len({len(compressor.compress(data)) for i in range(100)}) > 90
 
     cs = CompressionSpec('obfuscate,2,auto,zstd,10')
     assert isinstance(cs.inner.compressor, Auto)
@@ -180,7 +180,7 @@ def test_obfuscate():
     min_compress, max_compress = 0.2, 0.001  # estimate compression factor outer boundaries
     assert max_compress * len(data) + 8 <= len(compressed) <= min_compress * len(data) * 1001 + 8
     # compressing 100 times the same data should give multiple different result sizes
-    assert len(set(len(compressor.compress(data)) for i in range(100))) > 10
+    assert len({len(compressor.compress(data)) for i in range(100)}) > 10
 
     cs = CompressionSpec('obfuscate,110,none')
     assert isinstance(cs.inner.compressor, CNONE)

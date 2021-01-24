@@ -173,9 +173,9 @@ class BaseTestCase(unittest.TestCase):
 
     @contextmanager
     def assert_creates_file(self, path):
-        self.assert_true(not os.path.exists(path), '{} should not exist'.format(path))
+        self.assert_true(not os.path.exists(path), f'{path} should not exist')
         yield
-        self.assert_true(os.path.exists(path), '{} should exist'.format(path))
+        self.assert_true(os.path.exists(path), f'{path} should exist')
 
     def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)
@@ -294,7 +294,7 @@ class BaseTestCase(unittest.TestCase):
             if os.path.ismount(mountpoint) == mounted:
                 return
             time.sleep(0.1)
-        message = 'Waiting for %s of %s' % ('mount' if mounted else 'umount', mountpoint)
+        message = 'Waiting for {} of {}'.format('mount' if mounted else 'umount', mountpoint)
         raise TimeoutError(message)
 
     @contextmanager

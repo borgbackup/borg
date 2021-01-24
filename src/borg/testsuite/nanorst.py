@@ -1,4 +1,3 @@
-
 import pytest
 
 from ..nanorst import rst_to_text

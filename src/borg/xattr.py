@@ -92,7 +92,7 @@ def get_all(path, follow_symlinks=False):
                     pass
                 elif e.errno == errno.EPERM:
                     # we were not permitted to read this attribute, still can continue trying to read others
-                    logger.warning('%s: Operation not permitted when reading extended attribute %s' % (
+                    logger.warning('{}: Operation not permitted when reading extended attribute {}'.format(
                                    path_str, name_str))
                 else:
                     raise
@@ -133,7 +133,7 @@ def set_all(path, xattrs, follow_symlinks=False):
                 path_str = '<FD %d>' % path
             else:
                 path_str = os.fsdecode(path)
-            msg_format = '%s: when setting extended attribute %s: %%s' % (path_str, k_str)
+            msg_format = f'{path_str}: when setting extended attribute {k_str}: %s'
             if e.errno == errno.E2BIG:
                 err_str = 'too big for this filesystem'
             elif e.errno == errno.ENOTSUP:

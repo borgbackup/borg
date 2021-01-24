@@ -374,7 +374,7 @@ class Archiver:
                 else:
                     manager.export(args.path)
             except IsADirectoryError:
-                self.print_error("'{}' must be a file, not a directory".format(args.path))
+                self.print_error(f"'{args.path}' must be a file, not a directory")
                 return EXIT_ERROR
         return EXIT_SUCCESS
 
@@ -1144,7 +1144,7 @@ class Archiver:
         """Diff contents of two archives"""
 
         def print_output(diff, path):
-            print("{:<19} {}".format(diff, path))
+            print(f"{diff:<19} {path}")
 
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2,
@@ -1794,12 +1794,12 @@ class Archiver:
                     value = default_values.get(key)
                     if value is None:
                         raise Error('The repository config is missing the %s key which has no default value' % key)
-                print('%s = %s' % (key, value))
+                print(f'{key} = {value}')
             for key in ['last_segment_checked', ]:
                 value = config.get('repository', key, fallback=None)
                 if value is None:
                     continue
-                print('%s = %s' % (key, value))
+                print(f'{key} = {value}')
 
         if not args.list:
             if args.name is None:
@@ -2002,7 +2002,7 @@ class Archiver:
         def print_finding(info, wanted, data, offset):
             before = data[offset - context:offset]
             after = data[offset + len(wanted):offset + len(wanted) + context]
-            print('%s: %s %s %s == %r %r %r' % (info, before.hex(), wanted.hex(), after.hex(),
+            print('{}: {} {} {} == {!r} {!r} {!r}'.format(info, before.hex(), wanted.hex(), after.hex(),
                                                 before, wanted, after))
 
         wanted = args.wanted
@@ -4708,7 +4708,7 @@ def sig_info_handler(sig_no, stack):  # pragma: no cover
                     total = loc['st'].st_size
                 except Exception:
                     pos, total = 0, 0
-                logger.info("{0} {1}/{2}".format(path, format_file_size(pos), format_file_size(total)))
+                logger.info("{} {}/{}".format(path, format_file_size(pos), format_file_size(total)))
                 break
             if func in ('extract_item', ):  # extract op
                 path = loc['item'].path
@@ -4716,7 +4716,7 @@ def sig_info_handler(sig_no, stack):  # pragma: no cover
                     pos = loc['fd'].tell()
                 except Exception:
                     pos = 0
-                logger.info("{0} {1}/???".format(path, format_file_size(pos)))
+                logger.info("{} {}/???".format(path, format_file_size(pos)))
                 break
 
 
@@ -4754,7 +4754,7 @@ def main():  # pragma: no cover
         except Error as e:
             msg = e.get_message()
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            tb = f'{traceback.format_exc()}\n{sysinfo()}'
             # we might not have logging setup yet, so get out quickly
             print(msg, file=sys.stderr)
             if tb_log_level == logging.ERROR:
@@ -4767,7 +4767,7 @@ def main():  # pragma: no cover
             msg = e.get_message()
             msgid = type(e).__qualname__
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-            tb = "%s\n%s" % (traceback.format_exc(), sysinfo())
+            tb = f"{traceback.format_exc()}\n{sysinfo()}"
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
             important = e.exception_class not in ('LockTimeout', ) and e.traceback
@@ -4784,18 +4784,18 @@ def main():  # pragma: no cover
             msg = 'Local Exception'
             msgid = 'Exception'
             tb_log_level = logging.ERROR
-            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            tb = f'{traceback.format_exc()}\n{sysinfo()}'
             exit_code = EXIT_ERROR
         except KeyboardInterrupt:
             msg = 'Keyboard interrupt'
             tb_log_level = logging.DEBUG
-            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            tb = f'{traceback.format_exc()}\n{sysinfo()}'
             exit_code = EXIT_SIGNAL_BASE + 2
         except SigTerm:
             msg = 'Received SIGTERM'
             msgid = 'Signal.SIGTERM'
             tb_log_level = logging.DEBUG
-            tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+            tb = f'{traceback.format_exc()}\n{sysinfo()}'
             exit_code = EXIT_SIGNAL_BASE + 15
         except SigHup:
             msg = 'Received SIGHUP.'

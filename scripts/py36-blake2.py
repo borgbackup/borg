@@ -1,4 +1,3 @@
-
 """
 This script checks compatibility of crypto.blake2b_256 against hashlib.blake2b in CPython 3.6.
 """

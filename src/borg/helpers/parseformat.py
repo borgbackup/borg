@@ -79,7 +79,7 @@ def interval(s):
         # range suffixes in ascending multiplier order
         ranges = [k for k, v in sorted(multiplier.items(), key=lambda t: t[1])]
         raise argparse.ArgumentTypeError(
-            'Unexpected interval time unit "%s": expected one of %r' % (s[-1], ranges))
+            'Unexpected interval time unit "{}": expected one of {!r}'.format(s[-1], ranges))
 
     try:
         hours = int(number) * multiplier[suffix]
@@ -152,7 +152,7 @@ def partial_format(format, mapping):
     """
     for key, value in mapping.items():
         key = re.escape(key)
-        format = re.sub(r'(?<!\{)((\{%s\})|(\{%s:[^\}]*\}))' % (key, key),
+        format = re.sub(fr'(?<!\{{)((\{{{key}\}})|(\{{{key}:[^\}}]*\}}))',
                         lambda match: match.group(1).format_map(mapping),
                         format)
     return format
@@ -281,7 +281,7 @@ def sizeof_fmt_decimal(num, suffix='B', sep='', precision=2, sign=False):
 
 
 def format_archive(archive):
-    return '%-36s %s [%s]' % (
+    return '{:<36} {} [{}]'.format(
         archive.name,
         format_time(to_localtime(archive.ts)),
         bin_to_hex(archive.id),
@@ -391,7 +391,7 @@ class Location:
             return False
         valid = self._parse(repo)
         self.archive = m.group('archive')
-        self.orig = repo if not self.archive else '%s::%s' % (repo, self.archive)
+        self.orig = repo if not self.archive else f'{repo}::{self.archive}'
         return valid
 
     def _parse(self, text):
@@ -478,9 +478,9 @@ class Location:
                 path = '/./' + self.path  # /./x = path x relative to cwd
             else:
                 path = self.path
-            return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
+            return 'ssh://{}{}{}{}'.format(f'{self.user}@' if self.user else '',
                                            self._host,  # needed for ipv6 addrs
-                                           ':{}'.format(self.port) if self.port else '',
+                                           f':{self.port}' if self.port else '',
                                            path)
 
     def with_timestamp(self, timestamp):
@@ -922,7 +922,7 @@ def ellipsis_truncate(msg, space):
         # if there is very little space, just show ...
         return '...' + ' ' * (space - ellipsis_width)
     if space < ellipsis_width + msg_width:
-        return '%s...%s' % (swidth_slice(msg, space // 2 - ellipsis_width),
+        return '{}...{}'.format(swidth_slice(msg, space // 2 - ellipsis_width),
                             swidth_slice(msg, -space // 2))
     return msg + ' ' * (space - msg_width)
 

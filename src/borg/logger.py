@@ -46,7 +46,7 @@ configured = False
 
 def _log_warning(message, category, filename, lineno, file=None, line=None):
     # for warnings, we just want to use the logging system, not stderr or other files
-    msg = "{0}:{1}: {2}: {3}".format(filename, lineno, category.__name__, message)
+    msg = f"{filename}:{lineno}: {category.__name__}: {message}"
     logger = create_logger(__name__)
     # Note: the warning will look like coming from here,
     # but msg contains info about where it really comes from
@@ -82,7 +82,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
             logger = logging.getLogger(__name__)
             borg_logger = logging.getLogger('borg')
             borg_logger.json = json
-            logger.debug('using logging configuration read from "{0}"'.format(conf_fname))
+            logger.debug(f'using logging configuration read from "{conf_fname}"')
             warnings.showwarning = _log_warning
             return None
         except Exception as err:  # XXX be more precise
@@ -110,7 +110,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
     configured = True
     logger = logging.getLogger(__name__)
     if err_msg:
-        logger.warning('setup_logging for "{0}" failed with "{1}".'.format(conf_fname, err_msg))
+        logger.warning(f'setup_logging for "{conf_fname}" failed with "{err_msg}".')
     logger.debug('using builtin fallback logging configuration')
     warnings.showwarning = _log_warning
     return handler

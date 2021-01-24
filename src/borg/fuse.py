@@ -233,7 +233,7 @@ class ItemCache:
         self.write_offset = write_offset
 
 
-class FuseBackend(object):
+class FuseBackend:
     """Virtual filesystem based on archive(s) to provide information to fuse
     """
 

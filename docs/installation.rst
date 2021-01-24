@@ -164,7 +164,6 @@ following dependencies first:
 
   - liblz4_ >= 1.7.0 (r129)
   - libzstd_ >= 1.3.0
-  - libb2_ >= 0.98.1 (older do not have pkg-config support)
 * pkg-config (cli tool) and pkgconfig python package (borg uses these to
   discover header and library location - if it can't import pkgconfig and
   is not pointed to header/library locations via env vars [see setup.py],
@@ -198,7 +197,7 @@ Install the dependencies with development headers::
 
     sudo apt-get install python3 python3-dev python3-pip python3-virtualenv \
     libacl1-dev libacl1 \
-    libssl-dev libb2-dev \
+    libssl-dev \
     liblz4-dev libzstd-dev \
     build-essential \
     pkg-config python3-pkgconfig
@@ -216,7 +215,7 @@ Install the dependencies with development headers::
 
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv \
     libacl-devel libacl \
-    openssl-devel libb2-devel \
+    openssl-devel \
     lz4-devel libzstd-devel \
     pkgconf python3-pkgconfig
     sudo dnf install gcc gcc-c++ redhat-rpm-config

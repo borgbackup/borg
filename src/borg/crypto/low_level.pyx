@@ -47,14 +47,6 @@ API_VERSION = '1.2_01'
 cdef extern from "openssl/crypto.h":
     int CRYPTO_memcmp(const void *a, const void *b, size_t len)
 
-cdef extern from "../algorithms/blake2-libselect.h":
-    ctypedef struct blake2b_state:
-        pass
-
-    int blake2b_init(blake2b_state *S, size_t outlen) nogil
-    int blake2b_update(blake2b_state *S, const void *input, size_t inlen) nogil
-    int blake2b_final(blake2b_state *S, void *out, size_t outlen) nogil
-
 
 cdef extern from "openssl/evp.h":
     ctypedef struct EVP_MD:
@@ -439,22 +431,10 @@ cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
                      unsigned char *mac_buf):
-        cdef blake2b_state state
-        cdef int rc
-        rc = blake2b_init(&state, self.mac_len)
-        if rc == -1:
-            raise Exception('blake2b_init() failed')
-        with nogil:
-            rc = blake2b_update(&state, self.mac_key, 128)
-            if rc != -1:
-                rc = blake2b_update(&state, data1, data1_len)
-                if rc != -1:
-                    rc = blake2b_update(&state, data2, data2_len)
-        if rc == -1:
-            raise Exception('blake2b_update() failed')
-        rc = blake2b_final(&state, mac_buf, self.mac_len)
-        if rc == -1:
-            raise Exception('blake2b_final() failed')
+        data = self.mac_key[:128] + data1[:data1_len] + data2[:data2_len]
+        mac = hashlib.blake2b(data, digest_size=self.mac_len).digest()
+        for i in range(self.mac_len):
+            mac_buf[i] = mac[i]
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,
@@ -813,59 +793,12 @@ def hmac_sha256(key, data):
     return PyBytes_FromStringAndSize(<char*> &md[0], 32)
 
 
-cdef blake2b_update_from_buffer(blake2b_state *state, obj):
-    cdef Py_buffer buf = ro_buffer(obj)
-    try:
-        with nogil:
-            rc = blake2b_update(state, buf.buf, buf.len)
-        if rc == -1:
-            raise Exception('blake2b_update() failed')
-    finally:
-        PyBuffer_Release(&buf)
-
-
 def blake2b_256(key, data):
-    cdef blake2b_state state
-    if blake2b_init(&state, 32) == -1:
-        raise Exception('blake2b_init() failed')
-
-    cdef unsigned char md[32]
-    cdef unsigned char *key_ptr = key
-
-    # This is secure, because BLAKE2 is not vulnerable to length-extension attacks (unlike SHA-1/2, MD-5 and others).
-    # See the BLAKE2 paper section 2.9 "Keyed hashing (MAC and PRF)" for details.
-    # A nice benefit is that this simpler prefix-MAC mode has less overhead than the more complex HMAC mode.
-    # We don't use the BLAKE2 parameter block (via blake2s_init_key) for this to
-    # avoid incompatibility with the limited API of OpenSSL.
-    rc = blake2b_update(&state, key_ptr, len(key))
-    if rc == -1:
-        raise Exception('blake2b_update() failed')
-    blake2b_update_from_buffer(&state, data)
-
-    rc = blake2b_final(&state, &md[0], 32)
-    if rc == -1:
-        raise Exception('blake2b_final() failed')
-
-    return PyBytes_FromStringAndSize(<char*> &md[0], 32)
+    return hashlib.blake2b(key+data, digest_size=32).digest()
 
 
 def blake2b_128(data):
-    cdef blake2b_state state
-    cdef unsigned char md[16]
-    cdef unsigned char *data_ptr = data
-
-    if blake2b_init(&state, 16) == -1:
-        raise Exception('blake2b_init() failed')
-
-    rc = blake2b_update(&state, data_ptr, len(data))
-    if rc == -1:
-        raise Exception('blake2b_update() failed')
-
-    rc = blake2b_final(&state, &md[0], 16)
-    if rc == -1:
-        raise Exception('blake2b_final() failed')
-
-    return PyBytes_FromStringAndSize(<char*> &md[0], 16)
+    return hashlib.blake2b(data, digest_size=16).digest()
 
 
 def hkdf_hmac_sha512(ikm, salt, info, output_length):

@@ -3416,7 +3416,6 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_import_tar(self):
         self.create_test_files()
         os.unlink('input/flagfile')
-        os.unlink('input/fifo1')  # TODO: not yet supported
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', self.repository_location + '::src', 'input')
         self.cmd('export-tar', self.repository_location + '::src', 'simple.tar')
@@ -3431,7 +3430,8 @@ input/dir2
 input/dir2/file2
 input/link1
 input/fusexattr
-input/empty""".splitlines())
+input/empty
+input/fifo1""".splitlines())
 
     def test_detect_attic_repo(self):
         path = make_attic_repo(self.repository_path)

@@ -1789,8 +1789,19 @@ class Archiver:
                 status = 'h'
                 item = tarinfo_to_item(tarinfo, stat.S_IFREG)
                 item.source = tarinfo.linkname
+            elif tarinfo.isblk():
+                status = 'b'
+                item = tarinfo_to_item(tarinfo, stat.S_IFBLK)
+                item.rdev = os.makedev(tarinfo.devmajor, tarinfo.devminor)
+            elif tarinfo.ischr():
+                status = 'c'
+                item = tarinfo_to_item(tarinfo, stat.S_IFCHR)
+                item.rdev = os.makedev(tarinfo.devmajor, tarinfo.devminor)
+            elif tarinfo.isfifo():
+                status = 'f'
+                item = tarinfo_to_item(tarinfo, stat.S_IFIFO)
             else:
-                # TODO: chr and blk devices, fifos? GNUTYPE_SPARSE?
+                # TODO: GNUTYPE_SPARSE?
                 self.print_warning('%s: Unsupported tar type %s', tarinfo.name, tarinfo.type)
                 self.print_file_status('E', tarinfo.name)
                 continue

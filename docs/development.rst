@@ -156,7 +156,7 @@ controlled by that flag.  See ``_setup_implied_logging()`` in
 Building a development environment
 ----------------------------------
 
-First, just install borg into a virtual env as described before.
+First, just install borg into a virtual env :ref:`as described before <git-installation>`.
 
 To install some additional packages needed for running the tests, activate your
 virtual env and run::

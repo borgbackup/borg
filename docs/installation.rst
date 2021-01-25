@@ -338,8 +338,8 @@ While we try not to break master, there are no guarantees on anything.
     pip install -r requirements.d/fuse.txt  # optional, for FUSE support
     pip install -e .  # in-place editable mode
 
-    # optional: run all the tests, on all supported Python versions
+    # optional: run all the tests, on all installed Python versions
     # requires fakeroot, available through your package manager
-    fakeroot -u tox
+    fakeroot -u tox --skip-missing-interpreters
 
 .. note:: As a developer or power user, you always want to use a virtual environment.

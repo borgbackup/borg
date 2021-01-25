@@ -1701,7 +1701,7 @@ class Archiver:
         return self.exit_code
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
-    def do_create_from_tar(self, args, repository, manifest, key, cache):
+    def do_import_tar(self, args, repository, manifest, key, cache):
         self.output_filter = args.output_filter
         self.output_list = args.output_list
 
@@ -1731,7 +1731,7 @@ class Archiver:
 
         tar = tarfile.open(fileobj=tarstream, mode='r|')
 
-        self._create_from_tar(args, repository, manifest, key, cache, tar)
+        self._import_tar(args, repository, manifest, key, cache, tar)
 
         if filter:
             logger.debug('Done creating archive, waiting for filter to die...')
@@ -1747,7 +1747,7 @@ class Archiver:
 
         return self.exit_code
 
-    def _create_from_tar(self, args, repository, manifest, key, cache, tar):
+    def _import_tar(self, args, repository, manifest, key, cache, tar):
         def tarinfo_to_item(tarinfo, type=0):
             return Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
                         uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname, group=tarinfo.gname,
@@ -1797,9 +1797,9 @@ class Archiver:
             self.print_file_status(status, tarinfo.name)
             archive.add_item(item)
 
-        self._cft_save_archive(args, archive)
+        self._it_save_archive(args, archive)
 
-    def _cft_save_archive(self, args, archive):
+    def _it_save_archive(self, args, archive):
         archive.save(comment=args.comment, timestamp=args.timestamp)
         if args.progress:
             archive.stats.show_progress(final=True)
@@ -4730,7 +4730,8 @@ class Archiver:
         subparser.add_argument('args', metavar='ARGS', nargs=argparse.REMAINDER,
                                help='command arguments')
 
-        create_from_tar_epilog = process_epilog("""
+        # borg import-tar
+        import_tar_epilog = process_epilog("""
         This command creates a backup archive from a tarball.
 
         When giving '-' as path, Borg will read a tar stream from standard input.
@@ -4749,15 +4750,22 @@ class Archiver:
         Most documentation of borg create applies. Note that this command does not
         support excluding files.
 
-        create-from-tar reads POSIX.1-1988 (ustar), POSIX.1-2001 (pax), GNU tar,
-        UNIX V7 tar and SunOS tar with extended attributes.
+        import-tar is a lossy conversion:
+        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
+        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
+        otherwise supported by Borg.
+
+        A ``--sparse`` option (as found in borg create) is not supported.
+
+        import-tar reads POSIX.1-1988 (ustar), POSIX.1-2001 (pax), GNU tar, UNIX V7 tar
+        and SunOS tar with extended attributes.
         """)
-        subparser = subparsers.add_parser('create-from-tar', parents=[common_parser], add_help=False,
-                                          description=self.do_create_from_tar.__doc__,
-                                          epilog=create_from_tar_epilog,
+        subparser = subparsers.add_parser('import-tar', parents=[common_parser], add_help=False,
+                                          description=self.do_import_tar.__doc__,
+                                          epilog=import_tar_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help=self.do_create_from_tar.__doc__)
-        subparser.set_defaults(func=self.do_create_from_tar)
+                                          help=self.do_import_tar.__doc__)
+        subparser.set_defaults(func=self.do_import_tar)
         subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
                                help='filter program to pipe data through')
         subparser.add_argument('-s', '--stats', dest='stats',

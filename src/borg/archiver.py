@@ -52,7 +52,7 @@ try:
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
+    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes, make_path_safe
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from .helpers import timestamp
     from .helpers import get_cache_dir, os_stat
@@ -1700,7 +1700,7 @@ class Archiver:
             cache.commit()
         return self.exit_code
 
-    @with_repository(cache=True, exclusive=True)
+    @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_create_from_tar(self, args, repository, manifest, key, cache):
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -1717,10 +1717,8 @@ class Archiver:
         else:
             filter = args.tar_filter
 
-        if args.tarfile == '-':
-            tarstream, tarstream_close = sys.stdin, False
-        else:
-            tarstream, tarstream_close = open(args.tarfile, 'rb'), True
+        tarstream = dash_open(args.tarfile, 'rb')
+        tarstream_close = args.tarfile != '-'
 
         if filter:
             filterin = tarstream
@@ -1747,6 +1745,8 @@ class Archiver:
         if tarstream_close:
             tarstream.close()
 
+        return self.exit_code
+
     def _create_from_tar(self, args, repository, manifest, key, cache, tar):
         def tarinfo_to_item(tarinfo, type=0):
             return Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
@@ -1760,7 +1760,6 @@ class Archiver:
                           create=True, checkpoint_interval=args.checkpoint_interval,
                           progress=args.progress,
                           chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
-                          compression=args.compression, compression_files=args.compression_files,
                           log_json=args.log_json)
 
         while True:
@@ -1772,15 +1771,13 @@ class Archiver:
                 status = 'A'
                 fd = tar.extractfile(tarinfo)
                 item = tarinfo_to_item(tarinfo, stat.S_IFREG)
-                compress = archive.compression_decider1.decide(tarinfo.name)
-                archive.file_compression_logger.debug('%s -> compression %s', tarinfo.name, compress['name'])
-                archive.chunk_file(item, cache, archive.stats, backup_io_iter(archive.chunker.chunkify(fd)), compress=compress)
+                fd = fd  # avoid "unused fd" warning
+                item.chunks = []  # TODO, see do_create
                 item.get_size(memorize=True)
                 archive.stats.nfiles += 1
             elif tarinfo.isdir():
                 status = 'd'
                 item = tarinfo_to_item(tarinfo, stat.S_IFDIR)
-                archive.add_item(item)
             elif tarinfo.issym():
                 status = 's'
                 item = tarinfo_to_item(tarinfo, stat.S_IFLNK)
@@ -1793,6 +1790,7 @@ class Archiver:
                 item = tarinfo_to_item(tarinfo, stat.S_IFREG)
                 item.source = tarinfo.linkname
             else:
+                # TODO: chr and blk devices, fifos? GNUTYPE_SPARSE?
                 self.print_warning('%s: Unsupported tar type %s', tarinfo.name, tarinfo.type)
                 self.print_file_status('E', tarinfo.name)
                 continue
@@ -3873,7 +3871,7 @@ class Archiver:
         - .tar.bz2: bzip2
         - .tar.xz: xz
 
-        Alternatively a ``--tar-filter`` program may be explicitly specified. It should
+        Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
         read the uncompressed tar stream from stdin and write a compressed/filtered
         tar stream to stdout.
 
@@ -4738,13 +4736,13 @@ class Archiver:
         When giving '-' as path, Borg will read a tar stream from standard input.
 
         By default (--tar-filter=auto) Borg will detect whether the file is compressed
-        based on it's file extension and pipe the file through an appropriate filter:
+        based on its file extension and pipe the file through an appropriate filter:
 
         - .tar.gz: gunzip
         - .tar.bz2: bunzip2
         - .tar.xz: unxz
 
-        Alternatively a --tar-filter program may be explicitly specified. It should
+        Alternatively, a --tar-filter program may be explicitly specified. It should
         read compressed data from stdin and output an uncompressed tar stream on
         stdout.
 
@@ -4765,11 +4763,6 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
-        subparser.add_argument('-p', '--progress', dest='progress',
-                               action='store_true', default=False,
-                               help='show progress display while creating the archive, showing Original, '
-                                    'Compressed and Deduplicated sizes, followed by the Number of files seen '
-                                    'and the path being processed, default: %(default)s')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')
@@ -4792,23 +4785,18 @@ class Archiver:
         archive_group.add_argument('--chunker-params', dest='chunker_params',
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',
-                                   help='specify the chunker parameters (CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %d,%d,%d,%d' % CHUNKER_PARAMS)
-        archive_group.add_argument('-C', '--compression', dest='compression',
-                                   type=CompressionSpec, default=dict(name='lz4'), metavar='COMPRESSION',
+                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
+        archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
+                                   type=CompressionSpec, default=CompressionSpec('lz4'),
                                    help='select compression algorithm, see the output of the '
-                                        '"borg help compression" command for details.')
-        archive_group.add_argument('--compression-from', dest='compression_files',
-                                   type=argparse.FileType('r'), action='append',
-                                   metavar='COMPRESSIONCONFIG',
-                                   help='read compression patterns from COMPRESSIONCONFIG, see the output of the '
                                         '"borg help compression" command for details.')
 
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
         subparser.add_argument('tarfile', metavar='TARFILE',
-                               help='paths to recreate; patterns are supported')
+                               help='input tar file. "-" to read from stdin instead.')
         return parser
 
     def get_args(self, argv, cmd):

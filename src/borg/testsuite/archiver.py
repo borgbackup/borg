@@ -3413,6 +3413,26 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
 
+    def test_import_tar(self):
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        os.unlink('input/fifo1')  # TODO: not yet supported
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar')
+        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
+        list_output = self.cmd('list', '--short', self.repository_location + '::dst')
+        # TODO: use extract and compare to input once it works better
+        assert set(list_output.splitlines()) == set("""\
+input
+input/hardlink
+input/file1
+input/dir2
+input/dir2/file2
+input/link1
+input/fusexattr
+input/empty""".splitlines())
+
     def test_detect_attic_repo(self):
         path = make_attic_repo(self.repository_path)
         cmds = [

@@ -360,7 +360,7 @@ function __fish_borg_list_repos_or_archives
     if string match --quiet --regex '.*::' '"'(commandline --current-token)'"'
         # If the current token contains "::" then list the archives:
         set -l repository_name (string replace --regex '::.*' '' (commandline --current-token))
-        borg list --format="$repository_name::{archive}{NEWLINE}" "$repository_name" ^/dev/null
+        borg list --format="$repository_name::{archive}{TAB}{comment}{NEWLINE}" "$repository_name" ^/dev/null
     else
         # Otherwise list the repositories, directories and user@host entries:
         set -l directories (commandline --cut-at-cursor --current-token)*/
@@ -378,15 +378,20 @@ end
 complete -c borg -f -n "__fish_borg_is_argument_n 2" -a '(__fish_borg_list_repos_or_archives)'
 
 
-# Second archive listing for borg diff
+# Additional archive listings
 
 function __fish_borg_is_diff_second_archive
     return (string match --quiet --regex ' diff .*::[^ ]+ '(commandline --current-token)'$' (commandline))
 end
 
-function __fish_borg_list_diff_archives
-    set -l repo_matches (string match --regex '([^ ]*)::' (commandline))
-    borg list --format="{archive}{NEWLINE}" "$repo_matches[2]" ^/dev/null
+function __fish_borg_is_delete_additional_archive
+    return (string match --quiet --regex ' delete .*::[^ ]+ ' (commandline))
 end
 
-complete -c borg -f -n __fish_borg_is_diff_second_archive -a '(__fish_borg_list_diff_archives)'
+function __fish_borg_list_only_archives
+    set -l repo_matches (string match --regex '([^ ]*)::' (commandline))
+    borg list --format="{archive}{TAB}{comment}{NEWLINE}" "$repo_matches[2]" ^/dev/null
+end
+
+complete -c borg -f -n __fish_borg_is_diff_second_archive -a '(__fish_borg_list_only_archives)'
+complete -c borg -f -n __fish_borg_is_delete_additional_archive -a '(__fish_borg_list_only_archives)'

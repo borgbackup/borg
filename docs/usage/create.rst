@@ -74,3 +74,14 @@ Examples
     $ cd /home/user/Documents
     # The root directory of the archive will be "projectA"
     $ borg create /path/to/repo::daily-projectA-{now:%Y-%m-%d} projectA
+
+    # Use external command to determine files to archive
+    # Use --paths-from-stdin with find to only backup files less than 1MB in size
+    $ find ~ -size -1000k | borg create --paths-from-stdin /path/to/repo::small-files-only
+    # Use --paths-from-command with find to only backup files from a given user
+    $ borg create --paths-from-command /path/to/repo::joes-files -- find /srv/samba/shared -user joe
+    # Use --paths-from-stdin with --paths-delimiter (for example, for filenames with newlines in them)
+    $ find ~ -size -1000k -print0 | borg create \
+        --paths-from-stdin \
+        --paths-delimiter "\0" \
+        /path/to/repo::smallfiles-handle-newline

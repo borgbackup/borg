@@ -265,15 +265,13 @@ on widely used libraries providing them:
   We think this is not an additional risk, since we don't ever
   use OpenSSL's networking, TLS or X.509 code, but only their
   primitives implemented in libcrypto.
-- SHA-256 and SHA-512 from Python's hashlib_ standard library module are used.
+- SHA-256, SHA-512 and BLAKE2b from Python's hashlib_ standard library module are used.
   Borg requires a Python built with OpenSSL support (due to PBKDF2), therefore
   these functions are delegated to OpenSSL by Python.
 - HMAC, PBKDF2 and a constant-time comparison from Python's hmac_ standard
   library module is used. While the HMAC implementation is written in Python,
   the PBKDF2 implementation is provided by OpenSSL. The constant-time comparison
   (``compare_digest``) is written in C and part of Python.
-- BLAKE2b is either provided by the system's libb2, an official implementation,
-  or a bundled copy of the BLAKE2 reference implementation (written in C).
 
 Implemented cryptographic constructions are:
 

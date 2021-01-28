@@ -24,7 +24,7 @@ try:
     import tarfile
     import textwrap
     import time
-    from binascii import unhexlify
+    from binascii import unhexlify, hexlify
     from contextlib import contextmanager
     from datetime import datetime, timedelta
     from io import TextIOWrapper
@@ -2129,6 +2129,24 @@ class Archiver:
                     print("object %s not found [info from chunks cache]." % hex_id)
         return EXIT_SUCCESS
 
+    @with_repository(manifest=False, exclusive=True)
+    def do_debug_dump_hints(self, args, repository):
+        """dump repository hints"""
+        if not repository._active_txn:
+            repository.prepare_txn(repository.get_transaction_id())
+        try:
+            hints = dict(
+                segments=repository.segments,
+                compact=repository.compact,
+                storage_quota_use=repository.storage_quota_use,
+                shadow_index={hexlify(k).decode(): v for k, v in repository.shadow_index.items()}
+            )
+            with dash_open(args.path, 'w') as fd:
+                json.dump(hints, fd, indent=4)
+        finally:
+            repository.rollback()
+        return EXIT_SUCCESS
+
     def do_debug_convert_profile(self, args):
         """convert Borg profile to Python profile"""
         import marshal
@@ -3558,6 +3576,21 @@ class Archiver:
                                help='repository to use')
         subparser.add_argument('ids', metavar='IDs', nargs='+', type=str,
                                help='hex object ID(s) to show refcounts for')
+
+        debug_dump_hints_epilog = process_epilog("""
+        This command dumps the repository hints data.
+        """)
+        subparser = debug_parsers.add_parser('dump-hints', parents=[common_parser], add_help=False,
+                                          description=self.do_debug_dump_hints.__doc__,
+                                          epilog=debug_dump_hints_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='dump repo hints (debug)')
+        subparser.set_defaults(func=self.do_debug_dump_hints)
+        subparser.add_argument('location', metavar='REPOSITORY',
+                               type=location_validator(archive=False),
+                               help='repository to dump')
+        subparser.add_argument('path', metavar='PATH', type=str,
+                               help='file to dump data into')
 
         debug_convert_profile_epilog = process_epilog("""
         Convert a Borg profile to a Python cProfile compatible profile.

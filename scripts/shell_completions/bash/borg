@@ -146,35 +146,33 @@ _borg()
     # Get the repository name if available
     # If there is a space before the "::" it means that no repository name was typed,
     # so probably $BORG_REPO was set and we can still list the archives.
-    local repository_name=`expr match "${COMP_LINE}" "\(.*\)::"`
+    local repository_name="${COMP_LINE%%::*}"
     repository_name=${repository_name##* }
 
     # Listing archives.
     # Since "::" is treated as separate word in Bash,
     #   it is $cur when the cursor is right behind it
     #   and $prev if the user has started to type an archive name.
-    local typed_word=""
-    local please_list_the_archives=false
+    local typed_word=${cur}
+    local -i list_archives=0
     if [[ ${cur} == "::" ]] ; then
-        please_list_the_archives=true
+        list_archives=1
+        typed_word=""
     fi
     if [[ ${prev} == "::" ]] ; then
-        please_list_the_archives=true
-        typed_word=${cur}
+        list_archives=1
     fi
     # Second archive listing for borg diff
     if [[ ${COMP_LINE} =~ ^.*\ diff\ .*::[^\ ]+\ ${cur}$ ]] ; then
-        please_list_the_archives=true
-        typed_word=${cur}
+        list_archives=1
     fi
     # Additional archive listing for borg delete
     if [[ ${COMP_LINE} =~ ^.*\ delete\ .*::[^\ ]+.*${cur}$ ]] ; then
-        please_list_the_archives=true
-        typed_word=${cur}
+        list_archives=1
     fi
-    if [[ $please_list_the_archives = true ]] ; then
-        local archive_list=$(borg list --short "${repository_name}" 2>/dev/null)
-        COMPREPLY=( $(compgen -W "${archive_list}" -- "${typed_word}" ) )
+    if (( $list_archives )) ; then
+        local archives=$(borg list --short "${repository_name}" 2>/dev/null)
+        COMPREPLY=( $(compgen -W "${archives}" -- "${typed_word}" ) )
         return 0
     fi
 

@@ -143,34 +143,36 @@ _borg()
         return 0
     fi
 
+    # Get the repository name if available
+    # If there is a space before the "::" it means that no repository name was typed,
+    # so probably $BORG_REPO was set and we can still list the archives.
+    local repository_name="${COMP_LINE%%::*}"
+    repository_name=${repository_name##* }
+
     # Listing archives.
-    # Since "::" is treated as separate word in bash,
+    # Since "::" is treated as separate word in Bash,
     #   it is $cur when the cursor is right behind it
     #   and $prev if the user has started to type an archive name.
-    local repository_name="" # If set, we'll list the archives
-    local typed_word=""
+    local typed_word=${cur}
+    local -i list_archives=0
     if [[ ${cur} == "::" ]] ; then
-        repository_name=${prev}
+        list_archives=1
+        typed_word=""
     fi
     if [[ ${prev} == "::" ]] ; then
-        repository_name=${prevprev}
-        typed_word=${cur}
+        list_archives=1
     fi
     # Second archive listing for borg diff
     if [[ ${COMP_LINE} =~ ^.*\ diff\ .*::[^\ ]+\ ${cur}$ ]] ; then
-        repository_name=`expr match "${COMP_LINE}" "\(.*\)::"`
-        repository_name=${repository_name##* }
-        typed_word=${cur}
+        list_archives=1
     fi
-    if [[ ${repository_name} != "" ]] ; then
-        if [[ ${COMP_LINE} == *" ::"* ]] ; then
-            # There is a space before the "::"
-            # which means that no repository name was typed,
-            # so probably $BORG_REPO is set.
-            repository_name=""
-        fi
-        local archive_list=$(borg list --short "${repository_name}" 2>/dev/null)
-        COMPREPLY=( $(compgen -W "${archive_list}" -- "${typed_word}" ) )
+    # Additional archive listing for borg delete
+    if [[ ${COMP_LINE} =~ ^.*\ delete\ .*::[^\ ]+.*${cur}$ ]] ; then
+        list_archives=1
+    fi
+    if (( $list_archives )) ; then
+        local archives=$(borg list --short "${repository_name}" 2>/dev/null)
+        COMPREPLY=( $(compgen -W "${archives}" -- "${typed_word}" ) )
         return 0
     fi
 

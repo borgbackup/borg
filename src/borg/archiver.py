@@ -617,20 +617,20 @@ class Archiver:
                     self.print_error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.save(comment=args.comment, timestamp=args.timestamp, stats=archive.stats)
-                args.stats |= args.json
-                if args.stats:
-                    if args.json:
-                        json_print(basic_json_data(manifest, cache=cache, extra={
-                            'archive': archive,
-                        }))
-                    else:
-                        log_multi(DASHES,
-                                  str(archive),
-                                  DASHES,
-                                  STATS_HEADER,
-                                  str(archive.stats),
-                                  str(cache),
-                                  DASHES, logger=logging.getLogger('borg.output.stats'))
+                    args.stats |= args.json
+                    if args.stats:
+                        if args.json:
+                            json_print(basic_json_data(manifest, cache=cache, extra={
+                                'archive': archive,
+                            }))
+                        else:
+                            log_multi(DASHES,
+                                      str(archive),
+                                      DASHES,
+                                      STATS_HEADER,
+                                      str(archive.stats),
+                                      str(cache),
+                                      DASHES, logger=logging.getLogger('borg.output.stats'))
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list

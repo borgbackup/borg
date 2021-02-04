@@ -1191,9 +1191,11 @@ class Repository:
         except KeyError:
             pass
         else:
-            # note: doing a delete first will do some bookkeeping,
-            # like updating the shadow_index, quota, ...
-            self._delete(id, segment, offset)
+            # note: doing a delete first will do some bookkeeping.
+            # we do not want to update the shadow_index here, because
+            # we know already that we will PUT to this id, so it will
+            # be in the repo index (and we won't need it in the shadow_index).
+            self._delete(id, segment, offset, update_shadow_index=False)
         segment, offset = self.io.write_put(id, data)
         self.storage_quota_use += len(data) + self.io.put_header_fmt.size
         self.segments.setdefault(segment, 0)
@@ -1216,11 +1218,16 @@ class Repository:
             segment, offset = self.index.pop(id)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
-        self._delete(id, segment, offset)
+        # if we get here, there is an object with this id in the repo,
+        # we write a DEL here that shadows the respective PUT.
+        # after the delete, the object is not in the repo index any more,
+        # for the compaction code, we need to update the shadow_index in this case.
+        self._delete(id, segment, offset, update_shadow_index=True)
 
-    def _delete(self, id, segment, offset):
+    def _delete(self, id, segment, offset, *, update_shadow_index):
         # common code used by put and delete
-        self.shadow_index.setdefault(id, []).append(segment)
+        if update_shadow_index:
+            self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         size = self.io.read(segment, offset, id, read_data=False)
         self.storage_quota_use -= size

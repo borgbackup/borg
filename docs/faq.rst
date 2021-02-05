@@ -833,7 +833,7 @@ E.g., for this setup:
 - repository is remote (does not matter much for unchanged files)
 - backup job runs while machine is otherwise idle
 
-The observed performance is that |project_name| can process about
+The observed performance is that Borg can process about
 **1 million unchanged files (and a few small changed ones) in 4 minutes!**
 
 If you are seeing much less than that in similar circumstances, read the next
@@ -844,7 +844,7 @@ few FAQ entries below.
 Why is backup slow for me?
 --------------------------
 
-So, if you feel your |project_name| backup is too slow somehow, you should find out why.
+So, if you feel your Borg backup is too slow somehow, you should find out why.
 
 The usual way to approach this is to add ``--list --filter=AME --stats`` to your
 ``borg create`` call to produce more log output, including a file list (with file status
@@ -856,15 +856,15 @@ Then you do the backup and look at the log output:
   In the stats you can see the overall volume of changed data, which needed to be
   added to the repo. If that is a lot, that can be the reason why it is slow.
 - ``A`` status ("added") in the file list:
-  If you see that often, you have a lot of new files (files that |project_name| did not find
+  If you see that often, you have a lot of new files (files that Borg did not find
   in the files cache). If you think there is something wrong with that (the file was there
   already in the previous backup), please read the FAQ entries below.
 - ``M`` status ("modified") in the file list:
-  If you see that often, |project_name| thinks that a lot of your files might be modified
-  (|project_name| found them in the files cache, but the metadata read from the filesystem did
+  If you see that often, Borg thinks that a lot of your files might be modified
+  (Borg found them in the files cache, but the metadata read from the filesystem did
   not match the metadata stored in the files cache).
-  In such a case, |project_name| will need to process the files' contents completely, which is
-  much slower than processing unmodified files (|project_name| does not read their contents!).
+  In such a case, Borg will need to process the files' contents completely, which is
+  much slower than processing unmodified files (Borg does not read their contents!).
   The metadata values used in this comparison are determined by the ``--files-cache`` option
   and could be e.g. size, ctime and inode number (see the ``borg create`` docs for more
   details and potential issues).

@@ -463,7 +463,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         # we have all fs items exactly once!
-        assert paths == ['input', 'input/a', 'input/a/hardlink', 'input/b', 'input/b/hardlink']
+        assert sorted(paths) == ['input', 'input/a', 'input/a/hardlink', 'input/b', 'input/b/hardlink']
 
     def test_init_parent_dirs(self):
         parent_path = os.path.join(self.tmpdir, 'parent1', 'parent2')

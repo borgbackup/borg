@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMMON 1 "2020-12-06" "" "borg backup tool"
+.TH BORG-COMMON 1 "2021-02-06" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .
@@ -80,6 +80,9 @@ use PATH as borg executable on the remote (default: "borg")
 .TP
 .BI \-\-remote\-ratelimit \ RATE
 set remote network upload rate limit in kiByte/s (default: 0=unlimited)
+.TP
+.BI \-\-remote\-buffer \ UPLOAD_BUFFER
+set upload buffer size in MiB. (default: 0=no buffer)
 .TP
 .B \-\-consider\-part\-files
 treat part files like normal files (e.g. to list/extract them)

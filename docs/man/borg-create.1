@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2020-12-06" "" "borg backup tool"
+.TH BORG-CREATE 1 "2021-02-06" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -231,6 +231,9 @@ deprecated, use \fB\-\-noflags\fP instead
 .B \-\-noflags
 do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive
 .TP
+.B \-\-sparse
+detect sparse holes in input (supported only by fixed chunker)
+.TP
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode
 .TP
@@ -300,7 +303,10 @@ $ fusermount \-u sshfs\-mount
 $ borg create \-\-chunker\-params buzhash,10,23,16,4095 /path/to/repo::small /smallstuff
 
 # Backup a raw device (must not be active/in use/mounted at that time)
-$ dd if=/dev/sdx bs=4M | borg create \-\-chunker\-params fixed,4194304 /path/to/repo::my\-sdx \-
+$ borg create \-\-read\-special \-\-chunker\-params fixed,4194304 /path/to/repo::my\-sdx /dev/sdX
+
+# Backup a sparse disk image (must not be active/in use/mounted at that time)
+$ borg create \-\-sparse \-\-chunker\-params fixed,4194304 /path/to/repo::my\-disk my\-disk.raw
 
 # No compression (none)
 $ borg create \-\-compression none /path/to/repo::arch ~
@@ -328,6 +334,17 @@ $ borg create /path/to/repo::{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f} ~
 $ cd /home/user/Documents
 # The root directory of the archive will be "projectA"
 $ borg create /path/to/repo::daily\-projectA\-{now:%Y\-%m\-%d} projectA
+
+# Use external command to determine files to archive
+# Use \-\-paths\-from\-stdin with find to only backup files less than 1MB in size
+$ find ~ \-size \-1000k | borg create \-\-paths\-from\-stdin /path/to/repo::small\-files\-only
+# Use \-\-paths\-from\-command with find to only backup files from a given user
+$ borg create \-\-paths\-from\-command /path/to/repo::joes\-files \-\- find /srv/samba/shared \-user joe
+# Use \-\-paths\-from\-stdin with \-\-paths\-delimiter (for example, for filenames with newlines in them)
+$ find ~ \-size \-1000k \-print0 | borg create \e
+    \-\-paths\-from\-stdin \e
+    \-\-paths\-delimiter "\e0" \e
+    /path/to/repo::smallfiles\-handle\-newline
 .ft P
 .fi
 .UNINDENT

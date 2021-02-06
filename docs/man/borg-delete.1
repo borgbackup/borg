@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2020-12-06" "" "borg backup tool"
+.TH BORG-DELETE 1 "2021-02-06" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .
@@ -45,6 +45,8 @@ When you delete a complete repository, the security info and local cache for it
 with the \fB\-\-cache\-only\fP option, or keep the security info with the
 \fB\-\-keep\-security\-info\fP option.
 .sp
+When in doubt, use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
+.sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
 deleted \- the "Deleted data" deduplicated size there is most interesting as
 that is how much your repository will shrink.
@@ -76,6 +78,9 @@ archives to delete
 .TP
 .B \-n\fP,\fB  \-\-dry\-run
 do not change repository
+.TP
+.B \-\-list
+output verbose list of archives
 .TP
 .B \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
@@ -128,7 +133,7 @@ $ borg delete \-\-prefix \(aq{hostname}\-\(aq /path/to/repo
 $ borg delete \-\-glob\-archives \(aq*\-2012\-*\(aq /path/to/repo
 
 # see what would be deleted if delete was run without \-\-dry\-run
-$ borg delete \-v \-\-dry\-run \-a \(aq*\-May\-*\(aq /path/to/repo
+$ borg delete \-\-list \-\-dry\-run \-a \(aq*\-May\-*\(aq /path/to/repo
 
 # delete the whole repository and the related local cache:
 $ borg delete /path/to/repo

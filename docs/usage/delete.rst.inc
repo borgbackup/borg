@@ -23,6 +23,8 @@ borg delete
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``-n``, ``--dry-run``                 | do not change repository                                                                                                                               |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--list``                            | output verbose list of archives                                                                                                                        |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``-s``, ``--stats``                   | print statistics for the deleted archive                                                                                                               |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--cache-only``                      | delete only the local cache for the given repository                                                                                                   |
@@ -68,6 +70,7 @@ borg delete
 
     optional arguments
         -n, --dry-run    do not change repository
+        --list          output verbose list of archives
         -s, --stats     print statistics for the deleted archive
         --cache-only    delete only the local cache for the given repository
         --force         force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
@@ -98,6 +101,8 @@ When you delete a complete repository, the security info and local cache for it
 (if any) are also deleted. Alternatively, you can delete just the local cache
 with the ``--cache-only`` option, or keep the security info with the
 ``--keep-security-info`` option.
+
+When in doubt, use ``--dry-run --list`` to see what would be deleted.
 
 When using ``--stats``, you will get some statistics about how much data was
 deleted - the "Deleted data" deduplicated size there is most interesting as

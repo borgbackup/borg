@@ -214,11 +214,9 @@ The best check that everything is ok is to run a dry-run extraction::
 
 .. _changelog:
 
-Changelog
-=========
 
-Version 1.2.0rc1 (not released yet)
------------------------------------
+Version 1.2.0b2 (2021-02-06)
+----------------------------
 
 Please note:
 
@@ -266,6 +264,8 @@ Compatibility notes:
 
 Fixes:
 
+- create: do not recurse into duplicate roots, #5603
+- create: only print stats if not ctrl-c'ed, fixes traceback, #5668
 - extract:
   improve exception handling when setting xattrs, #5092.
   emit a warning message giving the path, xattr key and error message.
@@ -274,23 +274,45 @@ Fixes:
 - export-tar:
   fix memory leak with ssh: remote repository, #5568.
   fix potential memory leak with ssh: remote repository with partial extraction.
+- remove empty shadowed_segments lists, #5275
+- fix bad default: manifest.archives.list(consider_checkpoints=False),
+  fixes tracebacks / KeyErros for missing objects in ChunkIndex, #5668
 
 New features:
 
+- create: improve sparse file support
+
+  - create --sparse (detect sparse file holes) and file map support,
+    only for the "fixed" chunker, #14
+  - detect all-zero chunks in read data in "buzhash" and "fixed" chunkers
+  - cached_hash: use a small LRU cache to accelerate all-zero chunks hashing
+  - use cached_hash also to generate all-zero replacement chunks
 - create --remote-buffer, add a upload buffer for remote repos, #5574
-- create --sparse, file map support for the "fixed" chunker, #14
 - prune: keep oldest archive when retention target not met
 
 Other changes:
 
+- use blake2 from python 3.6+ hashlib
+  (this removes the requirement for libb2 and the bundled blake2 code)
+- also accept msgpack up to 1.0.2.
+  exclude 1.0.1 though, which had some issues (not sure they affect borg).
 - create: add repository location to --stats output, #5491
 - check: debug log the segment filename
 - delete: add a --list switch to borg delete, #5116
+- borg debug dump-hints - implemented to e.g. to look at shadow_index
+- Tab completion support for additional archives for 'borg delete'
+- refactor: have one borg.constants.zero all-zero bytes object
+- refactor shadow_index updating repo.put/delete, #5661, #5636.
 - docs:
 
   - add another case of attempted hardlink usage
   - fix description of borg upgrade hardlink usage, #5518
   - use HTTPS everywhere
+  - add examples for --paths-from-stdin, --paths-from-command, --paths-separator, #5644
+  - fix typos/grammar
+  - update docs for dev environment installation instructions
+  - recomend running tests only on installed versions for setup
+  - add badge with current status of package
 - vagrant:
 
   - use brew install --cask ..., #5557

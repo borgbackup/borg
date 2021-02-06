@@ -66,7 +66,7 @@ Depending on the amount of segments that need compaction, it may take a while,
 so consider using the ``--progress`` option.
 
 A segment is compacted if the amount of saved space is above the percentage value
-given by the ``--threshold`` option. If ommitted, a threshold of 10% is used.
+given by the ``--threshold`` option. If omitted, a threshold of 10% is used.
 When using ``--verbose``, borg will output an estimate of the freed space.
 
 After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``

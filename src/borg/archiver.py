@@ -657,7 +657,8 @@ class Archiver:
                     checkpoint_interval=args.checkpoint_interval, rechunkify=False)
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
-                    chunker_params=args.chunker_params, show_progress=args.progress, sparse=args.sparse)
+                    chunker_params=args.chunker_params, show_progress=args.progress, sparse=args.sparse,
+                    log_json=args.log_json)
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)

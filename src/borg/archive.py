@@ -1200,7 +1200,8 @@ class FilesystemObjectProcessors:
 
     def __init__(self, *, metadata_collector, cache, key,
                  add_item, process_file_chunks,
-                 chunker_params, show_progress, sparse):
+                 chunker_params, show_progress, sparse,
+                 log_json):
         self.metadata_collector = metadata_collector
         self.cache = cache
         self.key = key
@@ -1209,7 +1210,7 @@ class FilesystemObjectProcessors:
         self.show_progress = show_progress
 
         self.hard_links = {}
-        self.stats = Statistics()  # threading: done by cache (including progress)
+        self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
         self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
 

@@ -244,12 +244,12 @@ Alternatively, you can enumerate all build dependencies in the command line::
     sudo zypper install python3-llfuse  # llfuse
 
 macOS
-++++++++
++++++
 
 When installing via Homebrew_, dependencies are installed automatically. To install
 dependencies manually::
 
-    brew install python3 readline openssl zstd lz4 xz xxhash
+    brew install python3 openssl zstd lz4 xxhash
     brew install pkg-config
     pip3 install virtualenv
 

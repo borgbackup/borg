@@ -48,7 +48,10 @@ Gentoo       `ebuild`_                                     ``emerge borgbackup``
 GNU Guix     `GNU Guix`_                                   ``guix package --install borg``
 Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbackup``
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
-macOS        `Homebrew`_                                   ``brew install borgbackup``
+macOS        `Homebrew`_                                   | ``brew install borgbackup`` (official formula, **no** FUSE support)
+                                                           | **or**
+                                                           | ``brew install --cask osxfuse`` (`private Tap`_, FUSE support) 
+                                                           | ``brew install borgbackup/tap/borgbackup-fuse``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
 NixOS        `.nix file`_                                  ``nix-env -i borgbackup``
@@ -73,6 +76,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _OpenIndiana hipster repository: https://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
 .. _openSUSE official repository: https://software.opensuse.org/package/borgbackup
 .. _Homebrew: https://formulae.brew.sh/formula/borgbackup
+.. _private Tap: https://github.com/borgbackup/homebrew-tap
 .. _Raspbian testing: https://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
 .. _Ubuntu packages: https://packages.ubuntu.com/xenial/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
@@ -106,7 +110,8 @@ are available on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
   Older glibc releases are untested and may not work.
-* **Mac OS X**: 10.10 (does not work with older OS X releases)
+* **MacOS**: 10.10 or newer (To avoid signing issues, remove the ``quarantine`` attribute 
+  after downloading: ``$ xattr -dr com.apple.quarantine borg-macosx64.tgz``)
 * **FreeBSD**: 10.2 (unknown whether it works for older releases)
 
 ARM binaries are built by Johann Bauer, see: https://borg.bauerj.eu/
@@ -238,21 +243,21 @@ Alternatively, you can enumerate all build dependencies in the command line::
     python3-sphinx_rtd_theme gcc gcc-c++
     sudo zypper install python3-llfuse  # llfuse
 
-Mac OS X
-++++++++
+macOS
++++++
 
 When installing via Homebrew_, dependencies are installed automatically. To install
 dependencies manually::
 
-    brew install python3 openssl
+    brew install python3 openssl zstd lz4 xxhash
     brew install pkg-config
     pip3 install virtualenv
 
 For FUSE support to mount the backup archives, you need at least version 3.0 of
-FUSE for OS X, which is available via `github
-<https://github.com/osxfuse/osxfuse/releases/latest>`__, or via Homebrew::
+macFUSE, which is available via `github
+<https://github.com/osxfuse/osxfuse/releases/latest>`__, or Homebrew::
 
-    brew cask install osxfuse  # needed for llfuse
+    brew install --cask osxfuse
 
 For OS X Catalina and later, be aware that you must authorize full disk access.
 It is no longer sufficient to run borg backups as root. If you have not yet

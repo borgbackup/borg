@@ -125,38 +125,26 @@ def default_read_extended_type(typecode, data):
 cdef inline int get_data_from_buffer(object obj,
                                      Py_buffer *view,
                                      char **buf,
-                                     Py_ssize_t *buffer_len,
-                                     int *new_protocol) except 0:
+                                     Py_ssize_t *buffer_len) except 0:
     cdef object contiguous
     cdef Py_buffer tmp
-    if PyObject_CheckBuffer(obj):
-        new_protocol[0] = 1
-        if PyObject_GetBuffer(obj, view, PyBUF_FULL_RO) == -1:
-            raise
-        if view.itemsize != 1:
-            PyBuffer_Release(view)
-            raise BufferError("cannot unpack from multi-byte object")
-        if PyBuffer_IsContiguous(view, 'A') == 0:
-            PyBuffer_Release(view)
-            # create a contiguous copy and get buffer
-            contiguous = PyMemoryView_GetContiguous(obj, PyBUF_READ, 'C')
-            PyObject_GetBuffer(contiguous, view, PyBUF_SIMPLE)
-            # view must hold the only reference to contiguous,
-            # so memory is freed when view is released
-            Py_DECREF(contiguous)
-        buffer_len[0] = view.len
-        buf[0] = <char*> view.buf
-        return 1
-    else:
-        new_protocol[0] = 0
-        if PyObject_AsReadBuffer(obj, <const void**> buf, buffer_len) == -1:
-            raise BufferError("could not get memoryview")
-        PyErr_WarnEx(RuntimeWarning,
-                     "using old buffer interface to unpack %s; "
-                     "this leads to unpacking errors if slicing is used and "
-                     "will be removed in a future version" % type(obj),
-                     1)
-        return 1
+    if PyObject_GetBuffer(obj, view, PyBUF_FULL_RO) == -1:
+        raise
+    if view.itemsize != 1:
+        PyBuffer_Release(view)
+        raise BufferError("cannot unpack from multi-byte object")
+    if PyBuffer_IsContiguous(view, b'A') == 0:
+        PyBuffer_Release(view)
+        # create a contiguous copy and get buffer
+        contiguous = PyMemoryView_GetContiguous(obj, PyBUF_READ, b'C')
+        PyObject_GetBuffer(contiguous, view, PyBUF_SIMPLE)
+        # view must hold the only reference to contiguous,
+        # so memory is freed when view is released
+        Py_DECREF(contiguous)
+    buffer_len[0] = view.len
+    buf[0] = <char*> view.buf
+    return 1
+
 
 def unpackb(object packed, object object_hook=None, object list_hook=None,
             bint use_list=True, bint raw=True,
@@ -183,7 +171,6 @@ def unpackb(object packed, object object_hook=None, object list_hook=None,
     cdef Py_ssize_t buf_len
     cdef const char* cenc = NULL
     cdef const char* cerr = NULL
-    cdef int new_protocol = 0
 
     if encoding is not None:
         PyErr_WarnEx(PendingDeprecationWarning, "encoding is deprecated, Use raw=False instead.", 1)
@@ -192,15 +179,14 @@ def unpackb(object packed, object object_hook=None, object list_hook=None,
     if unicode_errors is not None:
         cerr = unicode_errors
 
-    get_data_from_buffer(packed, &view, &buf, &buf_len, &new_protocol)
+    get_data_from_buffer(packed, &view, &buf, &buf_len)
     try:
         init_ctx(&ctx, object_hook, object_pairs_hook, list_hook, ext_hook,
                  use_list, raw, cenc, cerr,
                  max_str_len, max_bin_len, max_array_len, max_map_len, max_ext_len)
         ret = unpack_construct(&ctx, buf, buf_len, &off)
     finally:
-        if new_protocol:
-            PyBuffer_Release(&view);
+        PyBuffer_Release(&view);
 
     if ret == 1:
         obj = unpack_data(&ctx)
@@ -373,7 +359,6 @@ cdef class Unpacker(object):
     def feed(self, object next_bytes):
         """Append `next_bytes` to internal buffer."""
         cdef Py_buffer pybuff
-        cdef int new_protocol = 0
         cdef char* buf
         cdef Py_ssize_t buf_len
 
@@ -381,12 +366,11 @@ cdef class Unpacker(object):
             raise AssertionError(
                     "unpacker.feed() is not be able to use with `file_like`.")
 
-        get_data_from_buffer(next_bytes, &pybuff, &buf, &buf_len, &new_protocol)
+        get_data_from_buffer(next_bytes, &pybuff, &buf, &buf_len)
         try:
             self.append_buffer(buf, buf_len)
         finally:
-            if new_protocol:
-                PyBuffer_Release(&pybuff)
+            PyBuffer_Release(&pybuff)
 
     cdef append_buffer(self, void* _buf, Py_ssize_t _buf_len):
         cdef:

@@ -189,7 +189,6 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
         --compression lz4               \
         --exclude-caches                \
         --exclude '/home/*/.cache/*'    \
-        --exclude '/var/cache/*'        \
         --exclude '/var/tmp/*'          \
                                         \
         ::'{hostname}-{now}'            \

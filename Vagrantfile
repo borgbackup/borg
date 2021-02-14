@@ -11,6 +11,8 @@ def packages_debianoid(user)
   return <<-EOF
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
+    # in case we get a grub update, it must not interactively ask for boot device:
+    echo "set grub-pc/install_devices /dev/sda" | debconf-communicate
     # install all the (security and other) updates
     apt-get dist-upgrade -y
     # for building borgbackup and dependencies:

@@ -276,7 +276,7 @@ def install_pyinstaller()
     . borg-env/bin/activate
     git clone https://github.com/thomaswaldmann/pyinstaller.git
     cd pyinstaller
-    git checkout v4.0-maint
+    git checkout v4.2-maint
     python setup.py install
   EOF
 end
@@ -448,7 +448,7 @@ Vagrant.configure(2) do |config|
 
   # BSD
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd64"  # custom FreeBSD 10.3 box. official ones are broken, #3022.
+    b.vm.box = "freebsd/FreeBSD-11.4-STABLE"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

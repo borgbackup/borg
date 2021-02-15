@@ -137,7 +137,6 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # This is just an example, change it however you see fit
     borg create $BORG_OPTS \
       --exclude /root/.cache \
-      --exclude /var/cache \
       --exclude /var/lib/docker/devicemapper \
       $TARGET::$DATE-$$-system \
       / /boot

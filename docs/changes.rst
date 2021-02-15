@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.15 (2020-12-25)
----------------------------
+Version 1.1.16 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -244,6 +244,40 @@ Compatibility notes:
   In case you have scripts expecting rc == 2 for a signal exit, you need to
   update them to check for >= 128 (as documented since long).
 - 1.1.15 drops python 3.4 support, minimum requirement is 3.5 now.
+
+Fixes:
+
+- do not recurse into duplicate roots, #5603
+- remove empty shadowed_segments lists, #5275, #5614
+- fix libpython load error when borg fat binary / dir-based binary is invoked
+  via a symlink by upgrading pyinstaller to v4.2, #5688
+
+
+New features:
+
+- check: debug log segment filename
+- borg debug dump-hints
+
+Other changes:
+
+- Tab completion support for additional archives for 'borg delete'
+- deduplicate code of put and delete, no functional change
+- vagrant:
+
+  - avoid grub-install asking interactively for device
+  - upgrade FreeBSD VM to 11.4 (10.x is out of support)
+  - upgrade pyinstaller to v4.2, #5671
+- docs:
+
+  - update macOS install instructions, #5677
+  - update docs for dev environment installation instructions, #5643
+  - fix grammar in faq
+  - recomend running tests only on installed versions for setup
+  - add link back to git-installation
+
+
+Version 1.1.15 (2020-12-25)
+---------------------------
 
 Fixes:
 

@@ -260,6 +260,8 @@ macFUSE, which is available via `github
 
     brew install --cask osxfuse
 
+Since Homebrew won't link the installed ``openssl`` formula, set the ``BORG_OPENSSL_PREFIX`` environment variable to ``/usr/local/Cellar/openssl`` before running ``pip install``.
+
 For OS X Catalina and later, be aware that you must authorize full disk access.
 It is no longer sufficient to run borg backups as root. If you have not yet
 granted full disk access, and you run Borg backup from cron, you will see

@@ -279,6 +279,10 @@ class Archives(abc.MutableMapping):
         Apply *first* and *last* filters, and then possibly *reverse* the list.
 
         *sort_by* is a list of sort keys applied in reverse order.
+
+        Note: for better robustness, all filtering / limiting parameters must default to
+              "not limit / not filter", so a FULL archive list is produced by a simple .list().
+              some callers EXPECT to iterate over all archives in a repo for correct operation.
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError('sort_by must be a sequence of str')

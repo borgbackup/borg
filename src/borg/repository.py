@@ -774,6 +774,8 @@ class Repository:
                     try:
                         self.shadow_index[key].remove(segment)
                     except (KeyError, ValueError):
+                        # do not remove entry with empty shadowed_segments list here,
+                        # it is needed for shadowed_put_exists code (see below)!
                         pass
                 elif tag == TAG_DELETE and not in_index:
                     # If the shadow index doesn't contain this key, then we can't say if there's a shadowed older tag,
@@ -825,6 +827,11 @@ class Repository:
                             new_segment, size = self.io.write_delete(key)
                         self.compact[new_segment] += size
                         segments.setdefault(new_segment, 0)
+                    else:
+                        # we did not keep the delete tag for key (see if-branch)
+                        if not self.shadow_index[key]:
+                            # shadowed segments list is empty -> remove it
+                            del self.shadow_index[key]
             assert segments[segment] == 0, 'Corrupted segment reference count - corrupted index or hints'
             unused.append(segment)
             pi.show()
@@ -1135,13 +1142,11 @@ class Repository:
         except KeyError:
             pass
         else:
-            self.segments[segment] -= 1
-            size = self.io.read(segment, offset, id, read_data=False)
-            self.storage_quota_use -= size
-            self.compact[segment] += size
-            segment, size = self.io.write_delete(id)
-            self.compact[segment] += size
-            self.segments.setdefault(segment, 0)
+            # note: doing a delete first will do some bookkeeping.
+            # we do not want to update the shadow_index here, because
+            # we know already that we will PUT to this id, so it will
+            # be in the repo index (and we won't need it in the shadow_index).
+            self._delete(id, segment, offset, update_shadow_index=False)
         segment, offset = self.io.write_put(id, data)
         self.storage_quota_use += len(data) + self.io.put_header_fmt.size
         self.segments.setdefault(segment, 0)
@@ -1164,7 +1169,16 @@ class Repository:
             segment, offset = self.index.pop(id)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
-        self.shadow_index.setdefault(id, []).append(segment)
+        # if we get here, there is an object with this id in the repo,
+        # we write a DEL here that shadows the respective PUT.
+        # after the delete, the object is not in the repo index any more,
+        # for the compaction code, we need to update the shadow_index in this case.
+        self._delete(id, segment, offset, update_shadow_index=True)
+
+    def _delete(self, id, segment, offset, *, update_shadow_index):
+        # common code used by put and delete
+        if update_shadow_index:
+            self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         size = self.io.read(segment, offset, id, read_data=False)
         self.storage_quota_use -= size

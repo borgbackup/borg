@@ -551,6 +551,9 @@ class Archiver:
                 self._process(archive, cache, matcher, args.exclude_caches, args.exclude_if_present,
                               args.keep_exclude_tags, skip_inodes, path, restrict_dev,
                               read_special=args.read_special, dry_run=dry_run, st=st)
+                # if we get back here, we've finished recursing into <path>,
+                # we do not ever want to get back in there (even if path is given twice as recursion root)
+                skip_inodes.add((st.st_ino, st.st_dev))
             if not dry_run:
                 archive.save(comment=args.comment, timestamp=args.timestamp)
                 if args.progress:

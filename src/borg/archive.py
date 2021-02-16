@@ -912,13 +912,9 @@ Utilization of max. archive size: {csize_max:.0%}
 
     def stat_ext_attrs(self, st, path):
         attrs = {}
-        bsdflags = 0
-        xattrs = {}
         with backup_io('extended stat'):
-            if not self.noxattrs:
-                xattrs = xattr.get_all(path, follow_symlinks=False)
-            if not self.nobsdflags:
-                bsdflags = get_flags(path, st)
+            xattrs = {} if self.noxattrs else xattr.get_all(path, follow_symlinks=False)
+            bsdflags = 0 if self.nobsdflags else get_flags(path, st)
             if not self.noacls:
                 acl_get(path, attrs, st, self.numeric_owner)
         if xattrs:

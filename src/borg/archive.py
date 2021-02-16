@@ -380,7 +380,7 @@ class Archive:
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=1800, numeric_owner=False, noatime=False, noctime=False,
-                 noflags=False, noacls=False,
+                 noflags=False, noacls=False, noxattrs=False,
                  progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
                  consider_part_files=False, log_json=False):
         self.cwd = os.getcwd()
@@ -400,6 +400,7 @@ class Archive:
         self.noctime = noctime
         self.noflags = noflags
         self.noacls = noacls
+        self.noxattrs = noxattrs
         assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
             start = datetime.utcnow()
@@ -857,11 +858,12 @@ Utilization of max. archive size: {csize_max:.0%}
                 pass
             if not self.noacls:
                 acl_set(path, item, self.numeric_owner, fd=fd)
-            # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
-            # the Linux capabilities in the "security.capability" attribute.
-            warning = xattr.set_all(fd or path, item.get('xattrs', {}), follow_symlinks=False)
-            if warning:
-                set_ec(EXIT_WARNING)
+            if not self.noxattrs:
+                # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
+                # the Linux capabilities in the "security.capability" attribute.
+                warning = xattr.set_all(fd or path, item.get('xattrs', {}), follow_symlinks=False)
+                if warning:
+                    set_ec(EXIT_WARNING)
             # bsdflags include the immutable flag and need to be set last:
             if not self.noflags and 'bsdflags' in item:
                 try:
@@ -1042,11 +1044,13 @@ Utilization of max. archive size: {csize_max:.0%}
 
 
 class MetadataCollector:
-    def __init__(self, *, noatime, noctime, numeric_owner, noflags, nobirthtime):
+    def __init__(self, *, noatime, noctime, nobirthtime, numeric_owner, noflags, noacls, noxattrs):
         self.noatime = noatime
         self.noctime = noctime
         self.numeric_owner = numeric_owner
         self.noflags = noflags
+        self.noacls = noacls
+        self.noxattrs = noxattrs
         self.nobirthtime = nobirthtime
 
     def stat_simple_attrs(self, st):
@@ -1076,10 +1080,12 @@ class MetadataCollector:
     def stat_ext_attrs(self, st, path, fd=None):
         attrs = {}
         flags = 0
+        xattrs = {}
         with backup_io('extended stat'):
             if not self.noflags:
                 flags = get_flags(path, st, fd=fd)
-            xattrs = xattr.get_all(fd or path, follow_symlinks=False)
+            if not self.noxattrs:
+                xattrs = xattr.get_all(fd or path, follow_symlinks=False)
             if not self.noacls:
                 acl_get(path, attrs, st, self.numeric_owner, fd=fd)
         if xattrs:

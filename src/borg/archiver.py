@@ -190,6 +190,7 @@ def with_archive(method):
                           numeric_owner=getattr(args, 'numeric_owner', False),
                           noflags=getattr(args, 'nobsdflags', False) or getattr(args, 'noflags', False),
                           noacls=getattr(args, 'noacls', False),
+                          noxattrs=getattr(args, 'noxattrs', False),
                           cache=kwargs.get('cache'),
                           consider_part_files=args.consider_part_files, log_json=args.log_json)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
@@ -637,6 +638,7 @@ class Archiver:
         self.output_list = args.output_list
         self.noflags = args.nobsdflags or args.noflags
         self.noacls = args.noacls
+        self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
         t0 = datetime.utcnow()
@@ -653,7 +655,7 @@ class Archiver:
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
                 metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
-                    noflags=args.nobsdflags or args.noflags, noacls=args.noacls,
+                    noflags=args.nobsdflags or args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
                     numeric_owner=args.numeric_owner, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
@@ -3384,6 +3386,8 @@ class Archiver:
                               help='do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--noacls', dest='noacls', action='store_true',
                               help='do not read and store ACLs into archive')
+        fs_group.add_argument('--noxattrs', dest='noxattrs', action='store_true',
+                              help='do not read and store xattrs into archive')
         fs_group.add_argument('--sparse', dest='sparse', action='store_true',
                                help='detect sparse holes in input (supported only by fixed chunker)')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
@@ -3804,6 +3808,8 @@ class Archiver:
                                help='do not extract/set flags (e.g. NODUMP, IMMUTABLE)')
         subparser.add_argument('--noacls', dest='noacls', action='store_true',
                                help='do not extract/set ACLs')
+        subparser.add_argument('--noxattrs', dest='noxattrs', action='store_true',
+                               help='do not extract/set xattrs')
         subparser.add_argument('--stdout', dest='stdout', action='store_true',
                                help='write all extracted data to stdout')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',

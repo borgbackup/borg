@@ -315,7 +315,8 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=1800, numeric_owner=False, noatime=False, noctime=False, nobirthtime=False, nobsdflags=False,
+                 checkpoint_interval=1800, numeric_owner=False, noatime=False, noctime=False, nobirthtime=False,
+                 nobsdflags=False, noacls=False,
                  progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
                  consider_part_files=False, log_json=False):
         self.cwd = os.getcwd()
@@ -335,6 +336,7 @@ class Archive:
         self.noctime = noctime
         self.nobirthtime = nobirthtime
         self.nobsdflags = nobsdflags
+        self.noacls = noacls
         assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
             start = datetime.utcnow()
@@ -762,7 +764,8 @@ Utilization of max. archive size: {csize_max:.0%}
         except OSError:
             # some systems don't support calling utime on a symlink
             pass
-        acl_set(path, item, self.numeric_owner)
+        if not self.noacls:
+            acl_set(path, item, self.numeric_owner)
         # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
         # the Linux capabilities in the "security.capability" attribute.
         xattrs = item.get('xattrs', {})
@@ -912,7 +915,8 @@ Utilization of max. archive size: {csize_max:.0%}
             xattrs = xattr.get_all(path, follow_symlinks=False)
             if not self.nobsdflags:
                 bsdflags = get_flags(path, st)
-            acl_get(path, attrs, st, self.numeric_owner)
+            if not self.noacls:
+                acl_get(path, attrs, st, self.numeric_owner)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
         if bsdflags:

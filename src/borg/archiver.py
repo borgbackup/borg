@@ -186,6 +186,7 @@ def with_archive(method):
                           numeric_owner=getattr(args, 'numeric_owner', False),
                           nobsdflags=getattr(args, 'nobsdflags', False),
                           noacls=getattr(args, 'noacls', False),
+                          noxattrs=getattr(args, 'noxattrs', False),
                           cache=kwargs.get('cache'),
                           consider_part_files=args.consider_part_files, log_json=args.log_json)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
@@ -588,7 +589,7 @@ class Archiver:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_owner=args.numeric_owner, noatime=args.noatime, noctime=args.noctime, nobirthtime=args.nobirthtime,
-                                  nobsdflags=args.nobsdflags, noacls=args.noacls, progress=args.progress,
+                                  nobsdflags=args.nobsdflags, noacls=args.noacls, noxattrs=args.noxattrs, progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
                 create_inner(archive, cache)
@@ -3476,6 +3477,8 @@ class Archiver:
                               help='do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--noacls', dest='noacls', action='store_true',
                               help='do not read and store ACLs into archive')
+        fs_group.add_argument('--noxattrs', dest='noxattrs', action='store_true',
+                              help='do not read and store xattrs into archive')
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
@@ -3546,6 +3549,8 @@ class Archiver:
                                help='do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)')
         subparser.add_argument('--noacls', dest='noacls', action='store_true',
                                help='do not extract/set ACLs')
+        subparser.add_argument('--noxattrs', dest='noxattrs', action='store_true',
+                               help='do not extract/set xattrs')
         subparser.add_argument('--stdout', dest='stdout', action='store_true',
                                help='write all extracted data to stdout')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',

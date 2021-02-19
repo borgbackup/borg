@@ -151,9 +151,9 @@ class Manifest:
         # count and the need to be able to find all (directly and indirectly) referenced chunks of a given archive.
         DELETE = 'delete'
 
-    NO_OPERATION_CHECK = tuple()
+    NO_OPERATION_CHECK = tuple()  # type: ignore
 
-    SUPPORTED_REPO_FEATURES = frozenset([])
+    SUPPORTED_REPO_FEATURES = frozenset([])  # type: ignore
 
     MANIFEST_ID = b'\0' * 32
 

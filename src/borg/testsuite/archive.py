@@ -198,7 +198,7 @@ def item_keys_serialized():
 
 @pytest.mark.parametrize('packed',
     [b'', b'x', b'foobar', ] +
-    [msgpack.packb(o) for o in (
+    [msgpack.packb(o) for o in (  # type: ignore[var-annotated]
         [None, 0, 0.0, False, '', {}, [], ()] +
         [42, 23.42, True, b'foobar', {b'foo': b'bar'}, [b'foo', b'bar'], (b'foo', b'bar')]
     )])

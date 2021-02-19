@@ -35,7 +35,7 @@ mask::rw-
 other::r--
 """.strip().encode('ascii')
 
-_acls_working = None
+_acls_working = None  # type: ignore
 
 
 def fakeroot_detected():

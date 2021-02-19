@@ -113,9 +113,9 @@ class TestRepositoryCache:
 
         # Force cache to back off
         qsl = cache.query_size_limit
-        cache.query_size_limit = query_size_limit
+        cache.query_size_limit = query_size_limit  # type: ignore[assignment]
         cache.backoff()
-        cache.query_size_limit = qsl
+        cache.query_size_limit = qsl  # type: ignore[assignment]
         # Evicted H(1) and H(2)
         assert cache.evictions == 2
         assert H(1) not in cache.cache

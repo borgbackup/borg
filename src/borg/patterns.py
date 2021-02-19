@@ -174,7 +174,7 @@ def normalize_path(path):
 class PatternBase:
     """Shared logic for inclusion/exclusion patterns.
     """
-    PREFIX = NotImplemented
+    PREFIX = None  # type: ignore
 
     def __init__(self, pattern, recurse_dir=False):
         self.pattern_orig = pattern

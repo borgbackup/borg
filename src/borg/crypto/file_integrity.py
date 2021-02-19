@@ -54,8 +54,8 @@ class FileHashingWrapper(FileLikeWrapper):
     are illegal.
     """
 
-    ALGORITHM = None
-    FACTORY = None
+    ALGORITHM = None  # type: ignore
+    FACTORY = None  # type: ignore
 
     def __init__(self, backing_fd, write):
         self.fd = backing_fd

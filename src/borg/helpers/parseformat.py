@@ -296,7 +296,12 @@ def parse_stringified_list(s):
 class Location:
     """Object representing a repository / archive location
     """
-    proto = user = _host = port = path = archive = None
+    proto = None  # type: ignore
+    user = None  # type: ignore
+    _host = None  # type: ignore
+    port = None  # type: ignore
+    path = None  # type: ignore
+    archive = None  # type: ignore
 
     # user must not contain "@", ":" or "/".
     # Quoting adduser error message:
@@ -662,7 +667,7 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    hash_algorithms = hashlib.algorithms_guaranteed.union({'xxh64'})
+    hash_algorithms = set(hashlib.algorithms_guaranteed).union({'xxh64'})
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',

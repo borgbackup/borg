@@ -231,7 +231,7 @@ def iter_separated(fd, sep=None, read_size=4096):
     sep = sep or ('\n' if is_str else b'\n')
     while len(buf) > 0:
         part2, *items = buf.split(sep)
-        *full, part = (part + part2, *items)
+        *full, part = (part + part2, *items)  # type: ignore
         yield from full
         buf = fd.read(read_size)
     # won't yield an empty part if stream ended with `sep`

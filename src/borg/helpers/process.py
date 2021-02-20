@@ -15,7 +15,7 @@ from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
 from ..logger import create_logger
 logger = create_logger()
 
-from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_SIGNAL_BASE
+from ..constants import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
 
 
 @contextlib.contextmanager

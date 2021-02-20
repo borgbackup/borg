@@ -1,16 +1,17 @@
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from typing import Union
 
 from ..constants import ISO_FORMAT, ISO_FORMAT_NO_USECS
 
 
-def to_localtime(ts):
+def to_localtime(ts: datetime) -> datetime:
     """Convert datetime object from UTC to local time zone"""
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
-def parse_timestamp(timestamp, tzinfo=timezone.utc):
+def parse_timestamp(timestamp: str, tzinfo=timezone.utc) -> datetime:
     """Parse a ISO 8601 timestamp string"""
     fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS
     dt = datetime.strptime(timestamp, fmt)
@@ -19,7 +20,7 @@ def parse_timestamp(timestamp, tzinfo=timezone.utc):
     return dt
 
 
-def timestamp(s):
+def timestamp(s: str) -> datetime:
     """Convert a --timestamp=s argument to a datetime object"""
     try:
         # is it pointing to a file / directory?
@@ -66,7 +67,7 @@ else:
     MAX_S = MAX_NS // 1000000000
 
 
-def safe_s(ts):
+def safe_s(ts: Union[int, float]) -> Union[int, float]:
     if 0 <= ts <= MAX_S:
         return ts
     elif ts < 0:
@@ -75,7 +76,7 @@ def safe_s(ts):
         return MAX_S
 
 
-def safe_ns(ts):
+def safe_ns(ts: int) -> int:
     if 0 <= ts <= MAX_NS:
         return ts
     elif ts < 0:
@@ -84,19 +85,19 @@ def safe_ns(ts):
         return MAX_NS
 
 
-def safe_timestamp(item_timestamp_ns):
+def safe_timestamp(item_timestamp_ns: int) -> datetime:
     t_ns = safe_ns(item_timestamp_ns)
     return datetime.fromtimestamp(t_ns / 1e9)
 
 
-def format_time(ts: datetime, format_spec=''):
+def format_time(ts: datetime, format_spec: str = '') -> str:
     """
     Convert *ts* to a human-friendly format with textual weekday.
     """
     return ts.strftime('%a, %Y-%m-%d %H:%M:%S' if format_spec == '' else format_spec)
 
 
-def isoformat_time(ts: datetime):
+def isoformat_time(ts: datetime) -> str:
     """
     Format *ts* according to ISO 8601.
     """
@@ -104,7 +105,7 @@ def isoformat_time(ts: datetime):
     return ts.strftime(ISO_FORMAT)
 
 
-def format_timedelta(td):
+def format_timedelta(td: timedelta) -> str:
     """Format timedelta in a human friendly format
     """
     ts = td.total_seconds()

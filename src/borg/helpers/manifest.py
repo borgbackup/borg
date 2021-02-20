@@ -5,6 +5,7 @@ import re
 from collections import abc, namedtuple
 from datetime import datetime, timedelta
 from operator import attrgetter
+from typing import Sequence, Mapping, Set, FrozenSet, List, Tuple, NamedTuple, Dict, Union, Optional, Any
 
 from .errors import Error
 
@@ -26,7 +27,11 @@ class MandatoryFeatureUnsupported(Error):
     """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
 
 
-ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')
+class ArchiveInfo(NamedTuple):
+    name: str
+    id: bytes
+    ts: datetime
+
 
 AI_HUMAN_SORT_KEYS = ['timestamp'] + list(ArchiveInfo._fields)
 AI_HUMAN_SORT_KEYS.remove('ts')
@@ -48,7 +53,7 @@ class Archives(abc.MutableMapping):
     def __iter__(self):
         return iter(safe_decode(name) for name in self._archives)
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: str) -> ArchiveInfo:
         assert isinstance(name, str)
         _name = safe_encode(name)
         values = self._archives.get(_name)
@@ -57,7 +62,7 @@ class Archives(abc.MutableMapping):
         ts = parse_timestamp(values[b'time'].decode())
         return ArchiveInfo(name=name, id=values[b'id'], ts=ts)
 
-    def __setitem__(self, name, info):
+    def __setitem__(self, name: str, info: Tuple[bytes, Union[str, datetime]]):
         assert isinstance(name, str)
         name = safe_encode(name)
         assert isinstance(info, tuple)
@@ -66,15 +71,16 @@ class Archives(abc.MutableMapping):
         if isinstance(ts, datetime):
             ts = ts.replace(tzinfo=None).strftime(ISO_FORMAT)
         assert isinstance(ts, str)
-        ts = ts.encode()
-        self._archives[name] = {b'id': id, b'time': ts}
+        self._archives[name] = {b'id': id, b'time': ts.encode()}
 
-    def __delitem__(self, name):
+    def __delitem__(self, name: str):
         assert isinstance(name, str)
         name = safe_encode(name)
         del self._archives[name]
 
-    def list(self, *, glob=None, match_end=r'\Z', sort_by=(), consider_checkpoints=True, first=None, last=None, reverse=False):
+    def list(self, *, glob: str = None, match_end: str = r'\Z', sort_by: Sequence[str] = (),
+             consider_checkpoints: bool = True, first: int = None, last: int = None,
+             reverse: bool = False) -> List[ArchiveInfo]:
         """
         Return list of ArchiveInfo instances according to the parameters.
 
@@ -103,7 +109,7 @@ class Archives(abc.MutableMapping):
             archives.reverse()
         return archives
 
-    def list_considering(self, args):
+    def list_considering(self, args) -> List[ArchiveInfo]:
         """
         get a list of archives, considering --first/last/prefix/glob-archives/sort/consider-checkpoints cmdline args
         """
@@ -113,14 +119,14 @@ class Archives(abc.MutableMapping):
             args.glob_archives = args.prefix + '*'
         return self.list(sort_by=args.sort_by.split(','), consider_checkpoints=args.consider_checkpoints, glob=args.glob_archives, first=args.first, last=args.last)
 
-    def set_raw_dict(self, d):
+    def set_raw_dict(self, d: Mapping[bytes, dict]) -> None:
         """set the dict we get from the msgpack unpacker"""
         for k, v in d.items():
             assert isinstance(k, bytes)
             assert isinstance(v, dict) and b'id' in v and b'time' in v
             self._archives[k] = v
 
-    def get_raw_dict(self):
+    def get_raw_dict(self) -> Mapping[bytes, dict]:
         """get the dict we can give to the msgpack packer"""
         return self._archives
 
@@ -151,31 +157,31 @@ class Manifest:
         # count and the need to be able to find all (directly and indirectly) referenced chunks of a given archive.
         DELETE = 'delete'
 
-    NO_OPERATION_CHECK = tuple()  # type: ignore
+    NO_OPERATION_CHECK: Sequence[Operation] = tuple()
 
-    SUPPORTED_REPO_FEATURES = frozenset([])  # type: ignore
+    SUPPORTED_REPO_FEATURES: FrozenSet[str] = frozenset([])
 
     MANIFEST_ID = b'\0' * 32
 
-    def __init__(self, key, repository, item_keys=None):
+    def __init__(self, key, repository, item_keys: Set[str] = None):
         self.archives = Archives()
-        self.config = {}
+        self.config: Dict[bytes, Any] = {}
         self.key = key
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
         self.tam_verified = False
-        self.timestamp = None
+        self.timestamp: Optional[str] = None
 
     @property
-    def id_str(self):
+    def id_str(self) -> str:
         return bin_to_hex(self.id)
 
     @property
-    def last_timestamp(self):
+    def last_timestamp(self) -> datetime:
         return parse_timestamp(self.timestamp, tzinfo=None)
 
     @classmethod
-    def load(cls, repository, operations, key=None, force_tam_not_required=False):
+    def load(cls, repository, operations: Sequence[Operation], key=None, force_tam_not_required: bool = False):
         from ..item import ManifestItem
         from ..crypto.key import key_factory, tam_required_file, tam_required
         from ..repository import Repository
@@ -211,7 +217,7 @@ class Manifest:
         manifest.check_repository_compatibility(operations)
         return manifest, key
 
-    def check_repository_compatibility(self, operations):
+    def check_repository_compatibility(self, operations: Sequence[Operation]) -> None:
         for operation in operations:
             assert isinstance(operation, self.Operation)
             feature_flags = self.config.get(b'feature_flags', None)
@@ -225,8 +231,8 @@ class Manifest:
                 if unsupported:
                     raise MandatoryFeatureUnsupported([f.decode() for f in unsupported])
 
-    def get_all_mandatory_features(self):
-        result = {}
+    def get_all_mandatory_features(self) -> Dict[str, set]:
+        result: Dict[str, set] = {}
         feature_flags = self.config.get(b'feature_flags', None)
         if feature_flags is None:
             return result
@@ -236,7 +242,7 @@ class Manifest:
                 result[operation.decode()] = set([feature.decode() for feature in requirements[b'mandatory']])
         return result
 
-    def write(self):
+    def write(self) -> None:
         from ..item import ManifestItem
         if self.key.tam_required:
             self.config[b'tam_required'] = True

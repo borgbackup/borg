@@ -3,17 +3,19 @@ import json
 import os
 import os.path
 import sys
+from typing import Callable, IO, Sequence
 
 FALSISH = ('No', 'NO', 'no', 'N', 'n', '0', )
 TRUISH = ('Yes', 'YES', 'yes', 'Y', 'y', '1', )
 DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
 
 
-def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
-        retry_msg=None, invalid_msg=None, env_msg='{} (from {})',
-        falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
-        default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True,
-        msgid=None):
+def yes(msg: str = None, false_msg: str = None, true_msg: str = None, default_msg: str = None,
+        retry_msg: str = None, invalid_msg: str = None, env_msg: str = '{} (from {})',
+        falsish: Sequence[str] = FALSISH, truish: Sequence[str] = TRUISH, defaultish: Sequence[str] = DEFAULTISH,
+        default: bool = False, retry: bool = True, env_var_override: str = None,
+        ofile: IO[str] = None, input: Callable = input, prompt: bool = True,
+        msgid: str = None) -> bool:
     """Output <msg> (usually a question) and let user input an answer.
     Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
     If it didn't qualify and retry is False (no retries wanted), return the default [which
@@ -43,7 +45,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
     :param input: input function [input from builtins]
     :return: boolean answer value, True or False
     """
-    def output(msg, msg_type, is_prompt=False, **kwargs):
+    def output(msg: str, msg_type: str, is_prompt: bool = False, **kwargs):
         json_output = getattr(logging.getLogger('borg'), 'json', False)
         if json_output:
             kwargs.update(dict(

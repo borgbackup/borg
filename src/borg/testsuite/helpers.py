@@ -1059,7 +1059,7 @@ def test_dash_open():
     assert dash_open('-', 'wb') is sys.stdout.buffer
 
 
-def test_iter_separated():
+def test_iter_separated_str():
     # newline and utf-8
     sep, items = '\n', ['foo', 'bar/baz', 'αáčő']
     fd = StringIO(sep.join(items))
@@ -1072,6 +1072,9 @@ def test_iter_separated():
     sep, items = 'SEP', ['foo/bar', 'baz', 'spam']
     fd = StringIO(sep.join(items))
     assert list(iter_separated(fd, sep=sep)) == items
+
+
+def test_iter_separated_bytes():
     # bytes
     sep, items = b'\n', [b'foo', b'blop\t', b'gr\xe4ezi']
     fd = BytesIO(sep.join(items))

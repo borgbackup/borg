@@ -20,7 +20,7 @@ def justify_to_terminal_size(message):
 
 class ProgressIndicatorBase:
     LOGGER = 'borg.output.progress'
-    JSON_TYPE = None  # type: ignore
+    JSON_TYPE: str = None
     json = False
 
     operation_id_counter = 0

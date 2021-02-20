@@ -241,7 +241,7 @@ def test_disk_full(cmd):
 
 
 class ArchiverTestCaseBase(BaseTestCase):
-    EXE = None  # type: ignore # python source based
+    EXE: str = None  # python source based
     FORK_DEFAULT = False
     prefix = ''
 

@@ -296,12 +296,12 @@ def parse_stringified_list(s):
 class Location:
     """Object representing a repository / archive location
     """
-    proto = None  # type: ignore
-    user = None  # type: ignore
-    _host = None  # type: ignore
-    port = None  # type: ignore
-    path = None  # type: ignore
-    archive = None  # type: ignore
+    proto: str = None
+    user: str = None
+    _host: str = None
+    port: int = None
+    path: str = None
+    archive: str = None
 
     # user must not contain "@", ":" or "/".
     # Quoting adduser error message:

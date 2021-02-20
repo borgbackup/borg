@@ -146,7 +146,7 @@ def tam_required(repository):
 
 class KeyBase:
     # Numeric key type ID, must fit in one byte. Override in subclasses.
-    TYPE = None  # type: ignore
+    TYPE: int = None
 
     # Human-readable name
     NAME = 'UNDEFINED'
@@ -158,7 +158,7 @@ class KeyBase:
     STORAGE = KeyBlobStorage.NO_STORAGE
 
     # Seed (type int) for the buzhash chunker (borg.algorithms.chunker.Chunker)
-    chunk_seed = None  # type: ignore
+    chunk_seed: int = None
 
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then

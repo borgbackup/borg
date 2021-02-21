@@ -1359,8 +1359,9 @@ def is_slow_msgpack():
 
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
-    return (0, 4, 6) <= msgpack.version <= (0, 5, 6) and \
-           msgpack.version not in [(0, 5, 0), (0, 5, 2), (0, 5, 3), (0, 5, 5)]
+    v = msgpack.version[:3]
+    return (0, 4, 6) <= v <= (0, 5, 6) and \
+           v not in [(0, 5, 0), (0, 5, 2), (0, 5, 3), (0, 5, 5)]
 
 
 FALSISH = ('No', 'NO', 'no', 'N', 'n', '0', )

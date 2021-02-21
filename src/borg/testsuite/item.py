@@ -23,9 +23,9 @@ def test_item_empty():
     with pytest.raises(ValueError):
         item.get('invalid-key')
     with pytest.raises(TypeError):
-        item.get(b'mode')
+        item.get(b'mode')  # type: ignore
     with pytest.raises(TypeError):
-        item.get(42)
+        item.get(42)  # type: ignore
 
     with pytest.raises(AttributeError):
         item.path
@@ -49,7 +49,7 @@ def test_item_from_dict():
 
     # invalid - no dict
     with pytest.raises(TypeError):
-        Item(42)
+        Item(42)  # type: ignore
 
     # invalid - no bytes/str key
     with pytest.raises(TypeError):

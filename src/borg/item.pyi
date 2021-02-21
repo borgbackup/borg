@@ -258,7 +258,8 @@ class ManifestItem(PropDict):
 
 class ItemDiff:
     def __init__(self, *args, **kwargs) -> None: ...
-    def _chunk_content_equal(self, c1: Iterator, c2: Iterator) -> bool: ...
+    @staticmethod
+    def _chunk_content_equal(c1: Iterator, c2: Iterator) -> bool: ...
 
 
 class Key(PropDict):

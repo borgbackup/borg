@@ -14,9 +14,9 @@ def test_item_empty():
     with pytest.raises(ValueError):
         'invalid-key' in item
     with pytest.raises(TypeError):
-        b'path' in item
+        b'path' in item  # type: ignore
     with pytest.raises(TypeError):
-        42 in item
+        42 in item  # type: ignore
 
     assert item.get('mode') is None
     assert item.get('mode', 0o666) == 0o666
@@ -74,7 +74,7 @@ def test_item_int_property():
     del item.mode
     assert item.as_dict() == {}
     with pytest.raises(TypeError):
-        item.mode = "invalid"
+        item.mode = "invalid"  # type: ignore
 
 
 def test_item_bigint_property():
@@ -105,7 +105,7 @@ def test_item_se_str_property():
     del item.path
     assert item.as_dict() == {}
     with pytest.raises(TypeError):
-        item.path = 42
+        item.path = 42  # type: ignore
 
     # non-utf-8 path, needing surrogate-escaping for latin-1 u-umlaut
     item = Item(internal_dict={'path': b'/a/\xfc/c'})
@@ -145,7 +145,7 @@ def test_unknown_property():
     # also they might be just typos of known attributes.
     item = Item()
     with pytest.raises(AttributeError):
-        item.unknown_attribute = None
+        item.unknown_attribute = None  # type: ignore[attr-defined]
 
 
 def test_item_file_size():

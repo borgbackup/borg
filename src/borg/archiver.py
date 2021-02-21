@@ -716,10 +716,10 @@ class Archiver:
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
-        elif stat.S_ISDOOR(st.st_mode):
+        elif stat.S_ISDOOR(st.st_mode):  # type: ignore[attr-defined]
             # Ignore Solaris doors
             return
-        elif stat.S_ISPORT(st.st_mode):
+        elif stat.S_ISPORT(st.st_mode):  # type: ignore[attr-defined]
             # Ignore Solaris event ports
             return
         else:

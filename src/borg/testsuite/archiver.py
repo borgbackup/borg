@@ -78,7 +78,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
             output = e.output
             ret = e.returncode
         except SystemExit as e:  # possibly raised by argparse
-            output = ''
+            output = b''
             ret = e.code
         if binary_output:
             return ret, output

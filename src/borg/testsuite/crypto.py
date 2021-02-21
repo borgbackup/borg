@@ -34,7 +34,7 @@ class CryptoTestCase(BaseTestCase):
         # this tests the layout as in attic / borg < 1.2 (1 type byte, no aad)
         mac_key = b'Y' * 32
         enc_key = b'X' * 32
-        iv = 0
+        iv = 0  # type: ignore
         data = b'foo' * 10
         header = b'\x42'
         # encrypt-then-mac
@@ -46,7 +46,7 @@ class CryptoTestCase(BaseTestCase):
         cdata = hdr_mac_iv_cdata[41:]
         self.assert_equal(hexlify(hdr), b'42')
         self.assert_equal(hexlify(mac), b'af90b488b0cc4a8f768fe2d6814fa65aec66b148135e54f7d4d29a27f22f57a8')
-        self.assert_equal(hexlify(iv), b'0000000000000000')
+        self.assert_equal(hexlify(iv), b'0000000000000000')  # type: ignore
         self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
         self.assert_equal(cs.next_iv(), 2)
         # auth-then-decrypt
@@ -63,7 +63,7 @@ class CryptoTestCase(BaseTestCase):
     def test_AES256_CTR_HMAC_SHA256_aad(self):
         mac_key = b'Y' * 32
         enc_key = b'X' * 32
-        iv = 0
+        iv = 0  # type: ignore
         data = b'foo' * 10
         header = b'\x12\x34\x56'
         # encrypt-then-mac
@@ -75,7 +75,7 @@ class CryptoTestCase(BaseTestCase):
         cdata = hdr_mac_iv_cdata[43:]
         self.assert_equal(hexlify(hdr), b'123456')
         self.assert_equal(hexlify(mac), b'7659a915d9927072ef130258052351a17ef882692893c3850dd798c03d2dd138')
-        self.assert_equal(hexlify(iv), b'0000000000000000')
+        self.assert_equal(hexlify(iv), b'0000000000000000')  # type: ignore
         self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
         self.assert_equal(cs.next_iv(), 2)
         # auth-then-decrypt
@@ -93,7 +93,7 @@ class CryptoTestCase(BaseTestCase):
         # used in legacy-like layout (1 type byte, no aad)
         mac_key = None
         enc_key = b'X' * 32
-        iv = 0
+        iv = 0  # type: ignore
         data = b'foo' * 10
         header = b'\x23'
         tests = [
@@ -119,7 +119,7 @@ class CryptoTestCase(BaseTestCase):
             cdata = hdr_mac_iv_cdata[29:]
             self.assert_equal(hexlify(hdr), b'23')
             self.assert_equal(hexlify(mac), exp_mac)
-            self.assert_equal(hexlify(iv), b'000000000000000000000000')
+            self.assert_equal(hexlify(iv), b'000000000000000000000000')  # type: ignore
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth/decrypt
@@ -137,7 +137,7 @@ class CryptoTestCase(BaseTestCase):
         # test with aad
         mac_key = None
         enc_key = b'X' * 32
-        iv = 0
+        iv = 0  # type: ignore
         data = b'foo' * 10
         header = b'\x12\x34\x56'
         tests = [
@@ -163,7 +163,7 @@ class CryptoTestCase(BaseTestCase):
             cdata = hdr_mac_iv_cdata[31:]
             self.assert_equal(hexlify(hdr), b'123456')
             self.assert_equal(hexlify(mac), exp_mac)
-            self.assert_equal(hexlify(iv), b'000000000000000000000000')
+            self.assert_equal(hexlify(iv), b'000000000000000000000000')  # type: ignore
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth/decrypt

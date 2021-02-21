@@ -1277,7 +1277,7 @@ class LoggedIO:
         self.segments_per_dir = segments_per_dir
         self.offset = 0
         self._write_fd = None
-        self._fds_cleaned = 0
+        self._fds_cleaned = 0.0
 
     def close(self):
         self.close_segment()

@@ -125,8 +125,8 @@ class TestDetachedIntegrityCheckedFileParts:
 
     @pytest.mark.parametrize('partial_read', (False, True))
     def test_part_independence(self, integrity_protected_file, partial_read):
-        with open(integrity_protected_file, 'ab') as fd:
-            fd.write(b'some extra stuff that does not belong')
+        with open(integrity_protected_file, 'ab') as _fd:
+            _fd.write(b'some extra stuff that does not belong')
         with pytest.raises(FileIntegrityError):
             with DetachedIntegrityCheckedFile(integrity_protected_file, write=False) as fd:
                 data1 = b'foo and bar'

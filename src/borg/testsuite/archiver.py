@@ -89,9 +89,9 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
         try:
             sys.stdin = StringIO(input.decode())
             sys.stdin.buffer = BytesIO(input)
-            output = BytesIO()
+            output_bio = BytesIO()
             # Always use utf-8 here, to simply .decode() below
-            output_text = sys.stdout = sys.stderr = io.TextIOWrapper(output, encoding='utf-8')
+            output_text = sys.stdout = sys.stderr = io.TextIOWrapper(output_bio, encoding='utf-8')
             if archiver is None:
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
@@ -104,10 +104,12 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
                 # the error code as-if we invoked a Borg binary.
             except SystemExit as e:
                 output_text.flush()
-                return e.code, output.getvalue() if binary_output else output.getvalue().decode()
+                output = output_bio.getvalue()
+                return e.code, output if binary_output else output.decode()
             ret = archiver.run(args)
             output_text.flush()
-            return ret, output.getvalue() if binary_output else output.getvalue().decode()
+            output = output_bio.getvalue()
+            return ret, output if binary_output else output.decode()
         finally:
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 

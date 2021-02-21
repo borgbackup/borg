@@ -1,4 +1,5 @@
 import os
+from typing import List, Dict, Any
 import zlib
 try:
     import lzma
@@ -103,6 +104,7 @@ def test_zlib_compat():
 
 
 def test_compressor():
+    params_list: List[Dict[str, Any]]
     params_list = [
         dict(name='none'),
         dict(name='lz4'),

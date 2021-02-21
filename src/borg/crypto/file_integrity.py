@@ -3,7 +3,7 @@ import io
 import json
 import os
 from hmac import compare_digest
-from typing import Callable
+from typing import Callable, Type
 
 from ..helpers import IntegrityError
 from ..logger import create_logger
@@ -130,7 +130,7 @@ class IntegrityCheckedFile(FileLikeWrapper):
         self.file_fd = override_fd or open(path, mode)
         self.digests = {}
 
-        hash_cls = XXH64FileHashingWrapper
+        hash_cls: Type[FileHashingWrapper] = XXH64FileHashingWrapper
 
         if not write:
             algorithm_and_digests = self.load_integrity_data(path, integrity_data)

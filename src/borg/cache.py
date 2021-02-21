@@ -902,7 +902,7 @@ class LocalCache(CacheStatsMixin):
         self.chunks = ChunkIndex()
         with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
             pass  # empty file
-        self.cache_config.manifest_id = ''
+        self.cache_config.manifest_id = b''
         self.cache_config._config.set('cache', 'manifest', '')
 
         self.cache_config.ignored_features = set()

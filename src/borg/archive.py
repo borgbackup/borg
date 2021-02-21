@@ -58,7 +58,7 @@ class Statistics:
         self.output_json = output_json
         self.osize = self.csize = self.usize = self.nfiles = 0
         self.osize_parts = self.csize_parts = self.usize_parts = self.nfiles_parts = 0
-        self.last_progress = 0  # timestamp when last progress was shown
+        self.last_progress = 0.0  # timestamp when last progress was shown
 
     def update(self, size, csize, unique, part=False):
         if not part:

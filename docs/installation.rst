@@ -50,7 +50,7 @@ Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbac
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
 macOS        `Homebrew`_                                   | ``brew install borgbackup`` (official formula, **no** FUSE support)
                                                            | **or**
-                                                           | ``brew install --cask osxfuse`` (`private Tap`_, FUSE support) 
+                                                           | ``brew install --cask macfuse`` (`private Tap`_, FUSE support) 
                                                            | ``brew install borgbackup/tap/borgbackup-fuse``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
@@ -243,7 +243,7 @@ For FUSE support to mount the backup archives, you need at least version 3.0 of
 macFUSE, which is available via `Github
 <https://github.com/osxfuse/osxfuse/releases/latest>`__, or Homebrew::
 
-    brew install --cask osxfuse
+    brew install --cask macfuse
 
 For OS X Catalina and later, be aware that you must authorize full disk access.
 It is no longer sufficient to run borg backups as root. If you have not yet

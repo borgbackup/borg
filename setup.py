@@ -168,7 +168,7 @@ library_dirs = []
 define_macros = []
 
 possible_openssl_prefixes = ['/usr', '/usr/local', '/usr/local/opt/openssl', '/usr/local/ssl', '/usr/local/openssl',
-                             '/usr/local/borg', '/opt/local', '/opt/pkg', ]
+                             '/usr/local/borg', '/opt/local', '/opt/pkg', '/opt/homebrew/opt/openssl@1.1', ]
 if os.environ.get('BORG_OPENSSL_PREFIX'):
     possible_openssl_prefixes.insert(0, os.environ.get('BORG_OPENSSL_PREFIX'))
 ssl_prefix = detect_openssl(possible_openssl_prefixes)

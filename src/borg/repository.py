@@ -443,7 +443,7 @@ class Repository:
         self.append_only = self.append_only or self.config.getboolean('repository', 'append_only', fallback=False)
         if self.storage_quota is None:
             # self.storage_quota is None => no explicit storage_quota was specified, use repository setting.
-            self.storage_quota = self.config.getint('repository', 'storage_quota', fallback=0)
+            self.storage_quota = parse_file_size(self.config.get('repository', 'storage_quota', fallback=0))
         self.id = unhexlify(self.config.get('repository', 'id').strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
         if self.check_segment_magic:

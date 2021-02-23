@@ -432,7 +432,7 @@ class Repository:
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             self.close()
             raise self.InvalidRepository(path)
-        self.max_segment_size = self.config.getint('repository', 'max_segment_size')
+        self.max_segment_size = parse_file_size(self.config.get('repository', 'max_segment_size'))
         if self.max_segment_size >= MAX_SEGMENT_SIZE_LIMIT:
             self.close()
             raise self.InvalidRepositoryConfig(path, 'max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)  # issue 3592

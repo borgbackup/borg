@@ -1744,16 +1744,13 @@ class Archiver:
         def repo_validate(section, name, value=None, check_value=True):
             if section not in ['repository', ]:
                 raise ValueError('Invalid section')
-            if name in ['segments_per_dir', 'max_segment_size', 'last_segment_checked', ]:
+            if name in ['segments_per_dir', 'last_segment_checked', ]:
                 if check_value:
                     try:
                         int(value)
                     except ValueError:
                         raise ValueError('Invalid value') from None
-                    if name == 'max_segment_size':
-                        if int(value) >= MAX_SEGMENT_SIZE_LIMIT:
-                            raise ValueError('Invalid value: max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)
-            elif name in ['additional_free_space', 'storage_quota', ]:
+            elif name in ['max_segment_size', 'additional_free_space', 'storage_quota', ]:
                 if check_value:
                     try:
                         parse_file_size(value)
@@ -1762,6 +1759,9 @@ class Archiver:
                     if name == 'storage_quota':
                         if parse_file_size(value) < parse_file_size('10M'):
                             raise ValueError('Invalid value: storage_quota < 10M')
+                    elif name == 'max_segment_size':
+                        if parse_file_size(value) >= MAX_SEGMENT_SIZE_LIMIT:
+                            raise ValueError('Invalid value: max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)
             elif name in ['append_only', ]:
                 if check_value and value not in ['0', '1']:
                     raise ValueError('Invalid value')

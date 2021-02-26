@@ -1087,11 +1087,11 @@ class Archiver:
             # regular file is replaced with a link or vice versa, it is
             # indicated in compare_mode instead.
             if item1.get('deleted'):
-                return 'added link'
+                return ({"type": 'added link'}, 'added link')
             elif item2.get('deleted'):
-                return 'removed link'
+                return ({"type": 'removed link'}, 'removed link')
             elif 'source' in item1 and 'source' in item2 and item1.source != item2.source:
-                return 'changed link'
+                return ({"type": 'changed link'}, 'changed link')
 
         def contents_changed(item1, item2):
             if item1.get('deleted') != item2.get('deleted'):
@@ -1111,35 +1111,45 @@ class Archiver:
         def compare_content(path, item1, item2):
             if contents_changed(item1, item2):
                 if item1.get('deleted'):
-                    return 'added {:>13}'.format(format_file_size(sum_chunk_size(item2)))
+                    sz = sum_chunk_size(item2)
+                    return ({"type": "added", "size": sz},
+                        'added {:>13}'.format(format_file_size(sz)))
                 if item2.get('deleted'):
-                    return 'removed {:>11}'.format(format_file_size(sum_chunk_size(item1)))
+                    sz = sum_chunk_size(item1)
+                    return ({"type": "removed", "size": sz},
+                        'removed {:>11}'.format(format_file_size(sz)))
                 if not can_compare_chunk_ids:
-                    return 'modified'
+                    return ({"type": "modified"}, "modified")
                 chunk_ids1 = {c.id for c in item1.chunks}
                 chunk_ids2 = {c.id for c in item2.chunks}
                 added_ids = chunk_ids2 - chunk_ids1
                 removed_ids = chunk_ids1 - chunk_ids2
                 added = sum_chunk_size(item2, added_ids)
                 removed = sum_chunk_size(item1, removed_ids)
-                return '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
-                                            format_file_size(-removed, precision=1, sign=True))
+                return ({"type": "modified", "added": added, "removed": removed},
+                    '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
+                    format_file_size(-removed, precision=1, sign=True)))
 
         def compare_directory(item1, item2):
             if item2.get('deleted') and not item1.get('deleted'):
-                return 'removed directory'
+                return ({"type": 'removed directory'}, 'removed directory')
             elif item1.get('deleted') and not item2.get('deleted'):
-                return 'added directory'
+                return ({"type": 'added directory'}, 'added directory')
 
         def compare_owner(item1, item2):
             user1, group1 = get_owner(item1)
             user2, group2 = get_owner(item2)
             if user1 != user2 or group1 != group2:
-                return '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2)
+                str = '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2)
+                return ({"type": "owner", "olduser": user1, "oldgroup": group1,
+                        "newuser": user2, "newgroup": group2}, str)
 
         def compare_mode(item1, item2):
             if item1.mode != item2.mode:
-                return '[{} -> {}]'.format(get_mode(item1), get_mode(item2))
+                mode1 = get_mode(item1)
+                mode2 = get_mode(item2)
+                str = '[{} -> {}]'.format(mode1, mode2)
+                return ({"type": "mode", "oldmode": mode1, "newmode": mode2}, str)
 
         def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
             """
@@ -1169,15 +1179,22 @@ class Archiver:
 
             changes = [x for x in changes if x]
             if changes:
-                output_line = (remove_surrogates(path), ' '.join(changes))
+                output_line = (remove_surrogates(path), changes)
 
                 if args.sort:
                     output.append(output_line)
+                elif args.json_lines:
+                    print_json_output(output_line)
                 else:
-                    print_output(output_line)
+                    print_text_output(output_line)
 
-        def print_output(line):
-            print("{:<19} {}".format(line[1], line[0]))
+        def print_text_output(line):
+            path, diff = line
+            print("{:<19} {}".format(' '.join([txt for j, txt in diff]), path))
+
+        def print_json_output(line):
+            path, diff = line
+            print(json.dumps({"changes": [j for j, txt in diff], "path": path}))
 
         def compare_archives(archive1, archive2, matcher):
             def hardlink_master_seen(item):
@@ -1242,6 +1259,11 @@ class Archiver:
                 assert hardlink_master_seen(item1)
                 assert hardlink_master_seen(item2)
                 compare_items(output, item1.path, item1, item2, hardlink_masters)
+
+            if args.json_lines:
+                print_output = print_json_output
+            else:
+                print_output = print_text_output
 
             for line in sorted(output):
                 print_output(line)
@@ -3649,6 +3671,8 @@ class Archiver:
                                help='Override check of chunker parameters.')
         subparser.add_argument('--sort', dest='sort', action='store_true',
                                help='Sort the output lines by file path.')
+        subparser.add_argument('--json-lines', action='store_true',
+                               help='Format output as JSON Lines. ')
         subparser.add_argument('location', metavar='REPO::ARCHIVE1',
                                type=location_validator(archive=True),
                                help='repository location and ARCHIVE1 name')

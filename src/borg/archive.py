@@ -1320,13 +1320,14 @@ class FilesystemObjectProcessors:
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
                 if not hardlinked or hardlink_master:
                     if not is_special_file:
-                        path_hash = self.key.id_hash(safe_encode(os.path.join(self.cwd, path)))
-                        known, ids = cache.file_known_and_unchanged(path_hash, st)
+                        hashed_path = safe_encode(os.path.join(self.cwd, path))
+                        path_hash = self.key.id_hash(hashed_path)
+                        known, ids = cache.file_known_and_unchanged(hashed_path, path_hash, st)
                     else:
                         # in --read-special mode, we may be called for special files.
                         # there should be no information in the cache about special files processed in
                         # read-special mode, but we better play safe as this was wrong in the past:
-                        path_hash = None
+                        hashed_path = path_hash = None
                         known, ids = False, None
                     chunks = None
                     if ids is not None:
@@ -1363,7 +1364,7 @@ class FilesystemObjectProcessors:
                             # block or char device will change without its mtime/size/inode changing.
                             # also, we must not memorize a potentially inconsistent/corrupt file that
                             # changed while we backed it up.
-                            cache.memorize_file(path_hash, st, [c.id for c in item.chunks])
+                            cache.memorize_file(hashed_path, path_hash, st, [c.id for c in item.chunks])
                     self.stats.nfiles += 1
                 item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
                 item.get_size(memorize=True)

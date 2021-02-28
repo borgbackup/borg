@@ -10,6 +10,8 @@ from .logger import create_logger
 
 logger = create_logger()
 
+files_cache_logger = create_logger('borg.debug.files_cache')
+
 from .constants import CACHE_README, DEFAULT_FILES_CACHE_MODE
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Location
@@ -530,6 +532,7 @@ class LocalCache(CacheStatsMixin):
         self.files = {}
         self._newest_cmtime = None
         logger.debug('Reading files cache ...')
+        files_cache_logger.debug("FILES-CACHE-LOAD: starting...")
         msg = None
         try:
             with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=False,
@@ -556,6 +559,7 @@ class LocalCache(CacheStatsMixin):
             logger.warning(msg)
             logger.warning('Continuing without files cache - expect lower performance.')
             self.files = {}
+        files_cache_logger.debug("FILES-CACHE-LOAD: finished, %d entries loaded.", len(self.files))
 
     def begin_txn(self):
         # Initialize transaction snapshot
@@ -590,7 +594,9 @@ class LocalCache(CacheStatsMixin):
                 self._newest_cmtime = 2 ** 63 - 1  # nanoseconds, good until y2262
             ttl = int(os.environ.get('BORG_FILES_CACHE_TTL', 20))
             pi.output('Saving files cache')
+            files_cache_logger.debug("FILES-CACHE-SAVE: starting...")
             with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=True) as fd:
+                entry_count = 0
                 for path_hash, item in self.files.items():
                     # Only keep files seen in this backup that are older than newest cmtime seen in this backup -
                     # this is to avoid issues with filesystem snapshots and cmtime granularity.
@@ -599,6 +605,10 @@ class LocalCache(CacheStatsMixin):
                     if entry.age == 0 and bigint_to_int(entry.cmtime) < self._newest_cmtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
+                        entry_count += 1
+            files_cache_logger.debug("FILES-CACHE-KILL: removed all old entries with age >= TTL [%d]", ttl)
+            files_cache_logger.debug("FILES-CACHE-KILL: removed all current entries with newest cmtime %d", self._newest_cmtime)
+            files_cache_logger.debug("FILES-CACHE-SAVE: finished, %d remaining entries saved.", entry_count)
             self.cache_config.integrity[files_cache_name()] = fd.integrity_data
         pi.output('Saving chunks cache')
         with IntegrityCheckedFile(path=os.path.join(self.path, 'chunks'), write=True) as fd:
@@ -949,36 +959,46 @@ class LocalCache(CacheStatsMixin):
         else:
             stats.update(-size, -csize, False, part=part)
 
-    def file_known_and_unchanged(self, path_hash, st):
+    def file_known_and_unchanged(self, hashed_path, path_hash, st):
         """
         Check if we know the file that has this path_hash (know == it is in our files cache) and
         whether it is unchanged (the size/inode number/cmtime is same for stuff we check in this cache_mode).
 
-        :param path_hash: hash(file_path), to save some memory in the files cache
+        :param hashed_path: the file's path as we gave it to hash(hashed_path)
+        :param path_hash: hash(hashed_path), to save some memory in the files cache
         :param st: the file's stat() result
         :return: known, ids (known is True if we have infos about this file in the cache,
                              ids is the list of chunk ids IF the file has not changed, otherwise None).
         """
+        if not stat.S_ISREG(st.st_mode):
+            return False, None
         cache_mode = self.cache_mode
-        if 'd' in cache_mode or not stat.S_ISREG(st.st_mode):  # d(isabled)
+        if 'd' in cache_mode:  # d(isabled)
+            files_cache_logger.debug('UNKNOWN: files cache disabled')
             return False, None
         # note: r(echunk) does not need the files cache in this method, but the files cache will
         # be updated and saved to disk to memorize the files. To preserve previous generations in
         # the cache, this means that it also needs to get loaded from disk first.
         if 'r' in cache_mode:  # r(echunk)
+            files_cache_logger.debug('UNKNOWN: rechunking enforced')
             return False, None
         entry = self.files.get(path_hash)
         if not entry:
+            files_cache_logger.debug('UNKNOWN: no file metadata in cache for: %r', hashed_path)
             return False, None
         # we know the file!
         entry = FileCacheEntry(*msgpack.unpackb(entry))
         if 's' in cache_mode and entry.size != st.st_size:
+            files_cache_logger.debug('KNOWN-CHANGED: file size has changed: %r', hashed_path)
             return True, None
         if 'i' in cache_mode and entry.inode != st.st_ino:
+            files_cache_logger.debug('KNOWN-CHANGED: file inode number has changed: %r', hashed_path)
             return True, None
         if 'c' in cache_mode and bigint_to_int(entry.cmtime) != st.st_ctime_ns:
+            files_cache_logger.debug('KNOWN-CHANGED: file ctime has changed: %r', hashed_path)
             return True, None
         elif 'm' in cache_mode and bigint_to_int(entry.cmtime) != st.st_mtime_ns:
+            files_cache_logger.debug('KNOWN-CHANGED: file mtime has changed: %r', hashed_path)
             return True, None
         # we ignored the inode number in the comparison above or it is still same.
         # if it is still the same, replacing it in the tuple doesn't change it.
@@ -991,18 +1011,26 @@ class LocalCache(CacheStatsMixin):
         self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
         return True, entry.chunk_ids
 
-    def memorize_file(self, path_hash, st, ids):
+    def memorize_file(self, hashed_path, path_hash, st, ids):
+        if not stat.S_ISREG(st.st_mode):
+            return
         cache_mode = self.cache_mode
         # note: r(echunk) modes will update the files cache, d(isabled) mode won't
-        if 'd' in cache_mode or not stat.S_ISREG(st.st_mode):
+        if 'd' in cache_mode:
+            files_cache_logger.debug('FILES-CACHE-NOUPDATE: files cache disabled')
             return
         if 'c' in cache_mode:
+            cmtime_type = 'ctime'
             cmtime_ns = safe_ns(st.st_ctime_ns)
         elif 'm' in cache_mode:
+            cmtime_type = 'mtime'
             cmtime_ns = safe_ns(st.st_mtime_ns)
         entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_bigint(cmtime_ns), chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
         self._newest_cmtime = max(self._newest_cmtime or 0, cmtime_ns)
+        files_cache_logger.debug('FILES-CACHE-UPDATE: put %r [has %s] <- %r',
+                                 entry._replace(chunk_ids='[%d entries]' % len(entry.chunk_ids)),
+                                 cmtime_type, hashed_path)
 
 
 class AdHocCache(CacheStatsMixin):
@@ -1044,10 +1072,11 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     files = None
     cache_mode = 'd'
 
-    def file_known_and_unchanged(self, path_hash, st):
+    def file_known_and_unchanged(self, hashed_path, path_hash, st):
+        files_cache_logger.debug("UNKNOWN: files cache not implemented")
         return False, None
 
-    def memorize_file(self, path_hash, st, ids):
+    def memorize_file(self, hashed_path, path_hash, st, ids):
         pass
 
     def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):

@@ -432,7 +432,7 @@ class Repository:
         if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
             self.close()
             raise self.InvalidRepository(path)
-        self.max_segment_size = self.config.getint('repository', 'max_segment_size')
+        self.max_segment_size = parse_file_size(self.config.get('repository', 'max_segment_size'))
         if self.max_segment_size >= MAX_SEGMENT_SIZE_LIMIT:
             self.close()
             raise self.InvalidRepositoryConfig(path, 'max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)  # issue 3592
@@ -443,7 +443,7 @@ class Repository:
         self.append_only = self.append_only or self.config.getboolean('repository', 'append_only', fallback=False)
         if self.storage_quota is None:
             # self.storage_quota is None => no explicit storage_quota was specified, use repository setting.
-            self.storage_quota = self.config.getint('repository', 'storage_quota', fallback=0)
+            self.storage_quota = parse_file_size(self.config.get('repository', 'storage_quota', fallback=0))
         self.id = unhexlify(self.config.get('repository', 'id').strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
         if self.check_segment_magic:

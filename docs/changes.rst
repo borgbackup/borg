@@ -247,14 +247,31 @@ Compatibility notes:
 
 Fixes:
 
+- setup.py: add special openssl prefix for Apple M1 compatibility
 - do not recurse into duplicate roots, #5603
 - remove empty shadowed_segments lists, #5275, #5614
 - fix libpython load error when borg fat binary / dir-based binary is invoked
   via a symlink by upgrading pyinstaller to v4.2, #5688
-
+- config: accept non-int value for max_segment_size or storage_quota, #5639:
+  borg config REPO max_segment_size 500M
+  borg config REPO storage_quota 100G
+  note: when setting a non-int value for this in a repo config,
+  using the repo will require borg >= 1.1.16.
 
 New features:
 
+- test on and support Python 3.10
+- bundled msgpack: drop support for old buffer protocol to support Python 3.10
+- verbose files cache logging via --debug-topic=files_cache, #5659.
+  Use this if you suspect that borg does not detect unmodified files as expected.
+- create/extract: add --noxattrs option, #3955.
+  when given with borg create, borg will not get xattrs from input files
+  (and thus, it will not archive xattrs). when given with borg extract,
+  borg will not read xattrs from archive and it will not set xattrs on extracted files.
+- create/extract: add --noacls option, #3955.
+  when given with borg create, borg will not get ACLs from input files
+  (and thus, it will not archive ACLs). when given with borg extract,
+  borg will not read ACLs from archive and it will not set ACLs on extracted files.
 - check: debug log segment filename
 - borg debug dump-hints
 
@@ -270,10 +287,14 @@ Other changes:
 - docs:
 
   - update macOS install instructions, #5677
+  - use macFUSE (not osxfuse) for Apple M1 compatibility.
   - update docs for dev environment installation instructions, #5643
   - fix grammar in faq
   - recomend running tests only on installed versions for setup
   - add link back to git-installation
+  - remove /var/cache exclusion in example commands, #5625.
+    This is generally a poor idea and shouldn't be promoted through examples.
+  - add repology.org badge with current packaging status
 
 
 Version 1.1.15 (2020-12-25)

@@ -1125,8 +1125,8 @@ class Archiver:
                 added = sum_chunk_size(item2, added_ids)
                 removed = sum_chunk_size(item1, removed_ids)
                 return ({"type": "modified", "added": added, "removed": removed},
-                    '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
-                    format_file_size(-removed, precision=1, sign=True)))
+                        '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
+                        format_file_size(-removed, precision=1, sign=True)))
 
         def compare_directory(item1, item2):
             if item2.get('deleted') and not item1.get('deleted'):

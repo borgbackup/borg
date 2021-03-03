@@ -3742,10 +3742,8 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             joutput = [json.loads(line) for line in output.split('\n') if line]
 
             # File contents changed (deleted and replaced with a new file)
-            if can_compare_ids:
-                assert {'type': 'modified', 'added': 4096, 'removed': 1024} in get_changes('input/file_replaced', joutput)
-            else:
-                assert {'type': 'modified'} in get_changes('input/file_replaced', joutput)
+            expected = {'type': 'modified', 'added': 4096, 'removed': 1024} if can_compare_ids else {'type': 'modified'}
+            assert expected in get_changes('input/file_replaced', joutput)
 
             # File unchanged
             assert not any(get_changes('input/file_unchanged', joutput))
@@ -3766,18 +3764,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
                 assert {'type': 'removed link'} in get_changes('input/link_removed', joutput)
 
                 # Symlink replacing or being replaced
-                if sys.platform == "darwin":
-                    # wierd: on macOS, symlink mode is 'lrwx------'. Is this true, or is there an
-                    # underlying problem here.
-                    assert {'type': 'mode', 'oldmode': "drwx------", 'newmode': 'lrwx------'} in \
-                        get_changes('input/dir_replaced_with_link', joutput)
-                    assert {'type': 'mode', 'oldmode': 'lrwx------', 'newmode': '-rw-------'} in \
-                        get_changes('input/link_replaced_by_file', joutput)
-                else:
-                    assert {'type': 'mode', 'oldmode': "drwx------", 'newmode': 'lrwxrwxrwx'} in \
-                        get_changes('input/dir_replaced_with_link', joutput)
-                    assert {'type': 'mode', 'oldmode': 'lrwxrwxrwx', 'newmode': '-rw-------'} in \
-                        get_changes('input/link_replaced_by_file', joutput)
+                assert any(chg['type'] == 'mode' and chg['newmode'].startswith('l') for chg in
+                    get_changes('input/dir_replaced_with_link', joutput))
+                assert any(chg['type'] == 'mode' and chg['oldmode'].startswith('l') for chg in
+                    get_changes('input/link_replaced_by_file', joutput))
 
                 # Symlink target removed. Should not affect the symlink at all.
                 assert not any(get_changes('input/link_target_removed', joutput))
@@ -3785,16 +3775,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
-            if can_compare_ids:
-                assert {'type': 'modified', 'added': 13, 'removed': 0} in get_changes('input/empty', joutput)
-            else:
-                assert {'type': 'modified'} in get_changes('input/empty', joutput)
+            expected = {'type': 'modified', 'added': 13, 'removed': 0} if can_compare_ids else {'type': 'modified'}
+            assert expected in get_changes('input/empty', joutput)
             if are_hardlinks_supported():
-                if can_compare_ids:
-                    assert {'type': 'modified', 'added': 13, 'removed': 0} in \
-                        get_changes('input/hardlink_contents_changed', joutput)
-                else:
-                    assert {'type': 'modified'} in get_changes('input/hardlink_contents_changed', joutput)
+                assert expected in get_changes('input/hardlink_contents_changed', joutput)
             if are_symlinks_supported():
                 assert not any(get_changes('input/link_target_contents_changed', joutput))
 

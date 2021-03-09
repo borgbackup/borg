@@ -231,11 +231,16 @@ Standard output
 *stdout* is different and more command-dependent than logging. Commands like :ref:`borg_info`, :ref:`borg_create`
 and :ref:`borg_list` implement a ``--json`` option which turns their regular output into a single JSON object.
 
+Some commands, like :ref:`borg_list` and :ref:`borg_diff`, can produce *a lot* of JSON. Since many JSON implementations
+don't support a streaming mode of operation, which is pretty much required to deal with this amount of JSON, these
+commands implement a ``--json-lines`` option which generates output in the `JSON lines <http://jsonlines.org/>`_ format,
+which is simply a number of JSON objects separated by new lines.
+
 Dates are formatted according to ISO 8601 in local time. No explicit time zone is specified *at this time*
 (subject to change). The equivalent strftime format string is '%Y-%m-%dT%H:%M:%S.%f',
 e.g. ``2017-08-07T12:27:20.123456``.
 
-The root object at least contains a *repository* key with an object containing:
+The root object of '--json' output will contain at least a *repository* key with an object containing:
 
 id
     The ID of the repository, normally 64 hex characters
@@ -439,18 +444,85 @@ The same archive with more information (``borg info --last 1 --json``)::
 File listings
 +++++++++++++
 
-Listing the contents of an archive can produce *a lot* of JSON. Since many JSON implementations
-don't support a streaming mode of operation, which is pretty much required to deal with this amount of
-JSON, output is generated in the `JSON lines <http://jsonlines.org/>`_ format, which is simply
-a number of JSON objects separated by new lines.
-
-Each item (file, directory, ...) is described by one object in the :ref:`borg_list` output.
+Each archive item (file, directory, ...) is described by one object in the :ref:`borg_list` output.
 Refer to the *borg list* documentation for the available keys and their meaning.
 
 Example (excerpt) of ``borg list --json-lines``::
 
     {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "source": "", "linktarget": "", "flags": null, "mtime": "2017-02-27T12:27:20.023407", "size": 0}
     {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "source": "", "linktarget": "", "flags": null, "mtime": "2017-02-27T12:27:20.585407", "size": 0}
+
+Archive Differencing
+++++++++++++++++++++
+
+Each archive difference item (file contents, user/group/mode) output by :ref:`borg_diff` is represented by an *ItemDiff* object.
+The propertiese of an *ItemDiff* object are:
+
+path:
+    The filename/path of the *Item* (file, directory, symlink).
+
+changes:
+    A list of *Change* objects describing the changes made to the item in the two archives. For example,
+    there will be two changes if the contents of a file are changed, and its ownership are changed.
+
+The *Change* object can contain a number of properties depending on the type of change that occured. 
+If a 'property' is not required for the type of change, it is not output.
+The possible properties of a *Change* object are:
+
+type:
+  The **type** property is always present. It identifies the type of change and will be one of these values:
+  
+  - *modified* - file contents changed.
+  - *added* - the file was added.
+  - *removed* - the file was removed.
+  - *added directory* - the directory was added.
+  - *removed directory* - the directory was removed.
+  - *added link* - the symlink was added.
+  - *removed link* - the symlink was removed.
+  - *changed link* - the symlink target was changed.
+  - *mode* - the file/directory/link mode was changed. Note - this could indicate a change from a
+    file/directory/link type to a different type (file/directory/link), such as -- a file is deleted and replaced
+    with a directory of the same name.
+  - *owner* - user and/or group ownership changed.
+
+size:
+    If **type** == '*added*' or '*removed*', then **size** provides the size of the added or removed file.
+
+added:
+    If **type** == '*modified*' and chunk ids can be compared, then **added** and **removed** indicate the amount
+    of data 'added' and 'removed'. If chunk ids can not be compared, then **added** and **removed** properties are
+    not provided and the only information available is that the file contents were modified.
+
+removed:
+    See **added** property.
+    
+old_mode:
+    If **type** == '*mode*', then **old_mode** and **new_mode** provide the mode and permissions changes.
+
+new_mode:
+    See **old_mode** property.
+ 
+old_user:
+    If **type** == '*owner*', then **old_user**, **new_user**, **old_group** and **new_group** provide the user
+    and group ownership changes.
+
+old_group:
+    See **old_user** property.
+ 
+new_user:
+    See **old_user** property.
+ 
+new_group:
+    See **old_user** property.
+    
+
+Example (excerpt) of ``borg diff --json-lines``::
+
+    {"path": "file1", "changes": [{"path": "file1", "changes": [{"type": "modified", "added": 17, "removed": 5}, {"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"}]}]}
+    {"path": "file2", "changes": [{"type": "modified", "added": 135, "removed": 252}]}
+    {"path": "file4", "changes": [{"type": "added", "size": 0}]}
+    {"path": "file3", "changes": [{"type": "removed", "size": 0}]}
+
 
 .. _msgid:
 

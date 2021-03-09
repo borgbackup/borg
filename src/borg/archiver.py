@@ -1149,8 +1149,13 @@ class Archiver:
     def do_diff(self, args, repository, manifest, key, archive):
         """Diff contents of two archives"""
 
-        def print_output(diff, path):
-            print("{:<19} {}".format(diff, path))
+        def print_json_output(diff, path):
+            print(json.dumps({"path": path, "changes": [j for j, str in diff]}))
+
+        def print_text_output(diff, path):
+            print("{:<19} {}".format(' '.join([str for j, str in diff]), path))
+
+        print_output = print_json_output if args.json_lines else print_text_output
 
         archive1 = archive
         archive2 = Archive(repository, key, manifest, args.archive2,
@@ -1167,7 +1172,7 @@ class Archiver:
 
         diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids)
         # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs = ((path, str(diff)) for path, diff in diffs if not diff.equal)
+        diffs = ((path, diff.changes()) for path, diff in diffs if not diff.equal)
 
         if args.sort:
             diffs = sorted(diffs)
@@ -3709,6 +3714,8 @@ class Archiver:
                                help='Override check of chunker parameters.')
         subparser.add_argument('--sort', dest='sort', action='store_true',
                                help='Sort the output lines by file path.')
+        subparser.add_argument('--json-lines', action='store_true',
+                               help='Format output as JSON Lines. ')
         subparser.add_argument('location', metavar='REPO::ARCHIVE1',
                                type=location_validator(archive=True),
                                help='repository location and ARCHIVE1 name')

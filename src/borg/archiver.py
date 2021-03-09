@@ -1138,14 +1138,14 @@ class Archiver:
             user1, group1 = get_owner(item1)
             user2, group2 = get_owner(item2)
             if user1 != user2 or group1 != group2:
-                return ({"type": "owner", "olduser": user1, "oldgroup": group1, "newuser": user2, "newgroup": group2},
+                return ({"type": "owner", "old_user": user1, "old_group": group1, "new_user": user2, "new_group": group2},
                         '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2))
 
         def compare_mode(item1, item2):
             if item1.mode != item2.mode:
                 mode1 = get_mode(item1)
                 mode2 = get_mode(item2)
-                return ({"type": "mode", "oldmode": mode1, "newmode": mode2}, '[{} -> {}]'.format(mode1, mode2))
+                return ({"type": "mode", "old_mode": mode1, "new_mode": mode2}, '[{} -> {}]'.format(mode1, mode2))
 
         def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
             """

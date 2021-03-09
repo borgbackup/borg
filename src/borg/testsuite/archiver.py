@@ -3750,7 +3750,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
             # Directory replaced with a regular file
             if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
-                assert {'type': 'mode', 'oldmode': 'drwxr-xr-x', 'newmode': '-rwxr-xr-x'} in \
+                assert {'type': 'mode', 'old_mode': 'drwxr-xr-x', 'new_mode': '-rwxr-xr-x'} in \
                     get_changes('input/dir_replaced_with_file', joutput)
 
             # Basic directory cases
@@ -3764,9 +3764,9 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
                 assert {'type': 'removed link'} in get_changes('input/link_removed', joutput)
 
                 # Symlink replacing or being replaced
-                assert any(chg['type'] == 'mode' and chg['newmode'].startswith('l') for chg in
+                assert any(chg['type'] == 'mode' and chg['new_mode'].startswith('l') for chg in
                     get_changes('input/dir_replaced_with_link', joutput))
-                assert any(chg['type'] == 'mode' and chg['oldmode'].startswith('l') for chg in
+                assert any(chg['type'] == 'mode' and chg['old_mode'].startswith('l') for chg in
                     get_changes('input/link_replaced_by_file', joutput))
 
                 # Symlink target removed. Should not affect the symlink at all.

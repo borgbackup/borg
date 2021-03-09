@@ -491,29 +491,29 @@ added:
 removed:
     see ``added`` key.
     
-oldmode:
-    if ``type`` is *mode*, then ``oldmode`` and ``newmode`` provide the mode and permissions changes.
+old_mode:
+    if ``type`` is *mode*, then ``old_mode`` and ``new_mode`` provide the mode and permissions changes.
 
-newmode:
-    see ``oldmode`` key.
+new_mode:
+    see ``old_mode`` key.
  
-olduser:
-    if ``type`` is *owner*, then the ``olduser``, ``newuser``, ``oldgroup`` and ``newgroup`` keys provide the user
+old_user:
+    if ``type`` is *owner*, then the ``old_user``, ``new_user``, ``old_group`` and ``new_group`` keys provide the user
     and group ownership changes.
 
-oldgroup:
-    see ``olduser``.
+old_group:
+    see ``old_user``.
  
-newuser:
-    see ``olduser``.
+new_user:
+    see ``old_user``.
  
-newgroup:
-    see ``olduser``.
+new_group:
+    see ``old_user``.
     
 
 Example (excerpt) of ``borg diff --json-lines``::
 
-    {"path": "file1", "changes": [{"type": "mode", "oldmode": "-rw-r--r--", "newmode": "-rwxr-xr-x"}]}
+    {"path": "file1", "changes": [{"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"}]}
     {"path": "file2", "changes": [{"type": "modified", "added": 135, "removed": 252}]}
     {"path": "file4", "changes": [{"type": "added", "size": 0}]}
     {"path": "file3", "changes": [{"type": "removed", "size": 0}]}

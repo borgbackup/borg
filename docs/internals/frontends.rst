@@ -231,11 +231,16 @@ Standard output
 *stdout* is different and more command-dependent than logging. Commands like :ref:`borg_info`, :ref:`borg_create`
 and :ref:`borg_list` implement a ``--json`` option which turns their regular output into a single JSON object.
 
+Some commands, like :ref:`borg_list` and :ref:`borg_diff`, can produce *a lot* of JSON. Since many JSON implementations
+don't support a streaming mode of operation, which is pretty much required to deal with this amount of JSON, these
+commands implement a ``--json-lines`` option which generates output in the `JSON lines <http://jsonlines.org/>`_ format,
+which is simply a number of JSON objects separated by new lines.
+
 Dates are formatted according to ISO 8601 in local time. No explicit time zone is specified *at this time*
 (subject to change). The equivalent strftime format string is '%Y-%m-%dT%H:%M:%S.%f',
 e.g. ``2017-08-07T12:27:20.123456``.
 
-The root object at least contains a *repository* key with an object containing:
+The root object of '--json' output will contain at least a *repository* key with an object containing:
 
 id
     The ID of the repository, normally 64 hex characters
@@ -438,18 +443,81 @@ The same archive with more information (``borg info --last 1 --json``)::
 File listings
 +++++++++++++
 
-Listing the contents of an archive can produce *a lot* of JSON. Since many JSON implementations
-don't support a streaming mode of operation, which is pretty much required to deal with this amount of
-JSON, output is generated in the `JSON lines <http://jsonlines.org/>`_ format, which is simply
-a number of JSON objects separated by new lines.
-
-Each item (file, directory, ...) is described by one object in the :ref:`borg_list` output.
+Each archive item (file, directory, ...) is described by one object in the :ref:`borg_list` output.
 Refer to the *borg list* documentation for the available keys and their meaning.
 
 Example (excerpt) of ``borg list --json-lines``::
 
     {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "source": "", "linktarget": "", "flags": null, "mtime": "2017-02-27T12:27:20.023407", "size": 0}
     {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "source": "", "linktarget": "", "flags": null, "mtime": "2017-02-27T12:27:20.585407", "size": 0}
+
+Archive Differencing
+++++++++++++++++++++
+
+Each difference item is described by one object in the :ref:`borg_diff` output.
+The keys in the *borg diff* output are:
+
+path:
+    the filename/path of the file or directory object.
+
+changes:
+    a list of 'changeset' objects describing the changes between the two instances of the object, ``path``, from the
+    two archives.
+
+The keys of a 'changeset' object are:
+
+type:
+  identifies the type of changeset and will contain one of these values
+  
+  - *modified* - file contents changed
+  - *added* - this file was added
+  - *removed* - this file was removed
+  - *added directory* - this directory was added
+  - *removed directory* - this directory was removed
+  - *added link* - this symlink was added
+  - *removed link* - removed symlink
+  - *changed link* - symlink target changed.
+  - *mode* - file/directory/link mode and/or permissions changed. Note - this could indicate a change from a
+    file/directory/link type item to a different type (file/directory/link) item.
+  - *owner* - user and/or group ownership changed.
+
+size:
+    if ``type`` is *added* or *removed*, then the ``size`` key provides the size of the added or removed item.
+
+added:
+    if ``type`` is *modified* and chunk ids can be compared, then ``added`` and ``removed`` keys indicate the amount
+    of data 'added' and 'removed'.
+
+removed:
+    see ``added`` key.
+    
+oldmode:
+    if ``type`` is *mode*, then ``oldmode`` and ``newmode`` provide the mode and permissions changes.
+
+newmode:
+    see ``oldmode`` key.
+ 
+olduser:
+    if ``type`` is *owner*, then the ``olduser``, ``newuser``, ``oldgroup`` and ``newgroup`` keys provide the user
+    and group ownership changes.
+
+oldgroup:
+    see ``olduser``.
+ 
+newuser:
+    see ``olduser``.
+ 
+newgroup:
+    see ``olduser``.
+    
+
+Example (excerpt) of ``borg diff --json-lines``::
+
+    {"path": "file1", "changes": [{"type": "mode", "oldmode": "-rw-r--r--", "newmode": "-rwxr-xr-x"}]}
+    {"path": "file2", "changes": [{"type": "modified", "added": 135, "removed": 252}]}
+    {"path": "file4", "changes": [{"type": "added", "size": 0}]}
+    {"path": "file3", "changes": [{"type": "removed", "size": 0}]}
+
 
 .. _msgid:
 

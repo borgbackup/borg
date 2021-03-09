@@ -3742,32 +3742,42 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             joutput = [json.loads(line) for line in output.split('\n') if line]
 
             # File contents changed (deleted and replaced with a new file)
-            # assert 'file_replaced' in output  # added to debug #3494
-            assert any(('type', 'modified') in chg.items()
-                    for chg in get_changes('input/file_replaced', joutput))
+            if can_compare_ids:
+                assert {'type': 'modified', 'added': 4096, 'removed': 1024} in get_changes('input/file_replaced', joutput)
+            else:
+                assert {'type': 'modified'} in get_changes('input/file_replaced', joutput)
 
             # File unchanged
             assert not any(get_changes('input/file_unchanged', joutput))
 
             # Directory replaced with a regular file
             if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
-                assert any((('type', 'mode') in chg.items()) and (('oldmode', 'drwxr-xr-x') in chg.items()) and
-                        (('newmode', '-rwxr-xr-x') in chg.items()) for chg in
-                        get_changes('input/dir_replaced_with_file', joutput))
+                assert {'type': 'mode', 'oldmode': 'drwxr-xr-x', 'newmode': '-rwxr-xr-x'} in \
+                    get_changes('input/dir_replaced_with_file', joutput)
 
             # Basic directory cases
-            assert any(('type', 'added directory') in chg.items() for chg in get_changes('input/dir_added', joutput))
-            assert any(('type', 'removed directory') in chg.items() for chg in get_changes('input/dir_removed', joutput))
+            assert {'type': 'added directory'} in get_changes('input/dir_added', joutput)
+            assert {'type': 'removed directory'} in get_changes('input/dir_removed', joutput)
 
             if are_symlinks_supported():
                 # Basic symlink cases
-                assert any(('type', 'changed link') in chg.items() for chg in get_changes('input/link_changed', joutput))
-                assert any(('type', 'added link') in chg.items() for chg in get_changes('input/link_added', joutput))
-                assert any(('type', 'removed link') in chg.items() for chg in get_changes('input/link_removed', joutput))
+                assert {'type': 'changed link'} in get_changes('input/link_changed', joutput)
+                assert {'type': 'added link'} in get_changes('input/link_added', joutput)
+                assert {'type': 'removed link'} in get_changes('input/link_removed', joutput)
 
                 # Symlink replacing or being replaced
-                assert any(('type', 'mode') in chg.items() for chg in get_changes('input/dir_replaced_with_link', joutput))
-                assert any(('type', 'mode') in chg.items() for chg in get_changes('input/link_replaced_by_file', joutput))
+                if sys.platform == "darwin":
+                    # wierd: on macOS, symlink mode is 'lrwx------'. Is this true, or is there an
+                    # underlying problem here.
+                    assert {'type': 'mode', 'oldmode': "drwx------", 'newmode': 'lrwx------'} in \
+                        get_changes('input/dir_replaced_with_link', joutput)
+                    assert {'type': 'mode', 'oldmode': 'lrwx------', 'newmode': '-rw-------'} in \
+                        get_changes('input/link_replaced_by_file', joutput)
+                else:
+                    assert {'type': 'mode', 'oldmode': "drwx------", 'newmode': 'lrwxrwxrwx'} in \
+                        get_changes('input/dir_replaced_with_link', joutput)
+                    assert {'type': 'mode', 'oldmode': 'lrwxrwxrwx', 'newmode': '-rw-------'} in \
+                        get_changes('input/link_replaced_by_file', joutput)
 
                 # Symlink target removed. Should not affect the symlink at all.
                 assert not any(get_changes('input/link_target_removed', joutput))
@@ -3775,27 +3785,33 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
-            assert any(('type', 'modified') in chg.items() for chg in get_changes('input/empty', joutput))
+            if can_compare_ids:
+                assert {'type': 'modified', 'added': 13, 'removed': 0} in get_changes('input/empty', joutput)
+            else:
+                assert {'type': 'modified'} in get_changes('input/empty', joutput)
             if are_hardlinks_supported():
-                assert any(('type', 'modified') in chg.items() for chg in get_changes('input/hardlink_contents_changed', joutput))
+                if can_compare_ids:
+                    assert {'type': 'modified', 'added': 13, 'removed': 0} in \
+                        get_changes('input/hardlink_contents_changed', joutput)
+                else:
+                    assert {'type': 'modified'} in get_changes('input/hardlink_contents_changed', joutput)
             if are_symlinks_supported():
                 assert not any(get_changes('input/link_target_contents_changed', joutput))
 
             # Added a new file and a hard link to it. Both links to the same
             # inode should appear as separate files.
-            assert any(('type', 'added') in chg.items() and ('size', 2048) in chg.items() for chg in get_changes('input/file_added', joutput))
+            assert {'type': 'added', 'size': 2048} in get_changes('input/file_added', joutput)
             if are_hardlinks_supported():
-                # assert any(('added', 2048) in chg.items() for chg in get_changes('input/hardlink_added', joutput))
-                assert any(('type', 'added') in chg.items() and ('size', 2048) in chg.items() for chg in get_changes('input/hardlink_added', joutput))
+                assert {'type': 'added', 'size': 2048} in get_changes('input/hardlink_added', joutput)
 
             # check if a diff between non-existent and empty new file is found
-            assert any(('type', 'added') in chg.items() and ('size', 0) in chg.items() for chg in get_changes('input/file_empty_added', joutput))
+            assert {'type': 'added', 'size': 0} in get_changes('input/file_empty_added', joutput)
 
             # The inode has two links and both of them are deleted. They should
             # appear as two deleted files.
-            assert any(('type', 'removed') in chg.items() and ('size', 256) in chg.items() for chg in get_changes('input/file_removed', joutput))
+            assert {'type': 'removed', 'size': 256} in get_changes('input/file_removed', joutput)
             if are_hardlinks_supported():
-                assert any(('type', 'removed') in chg.items() and ('size', 256) in chg.items() for chg in get_changes('input/hardlink_removed', joutput))
+                assert {'type': 'removed', 'size': 256} in get_changes('input/hardlink_removed', joutput)
 
             # Another link (marked previously as the source in borg) to the
             # same inode was removed. This should not change this link at all.

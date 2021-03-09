@@ -1112,12 +1112,10 @@ class Archiver:
             if contents_changed(item1, item2):
                 if item1.get('deleted'):
                     sz = sum_chunk_size(item2)
-                    return ({"type": "added", "size": sz},
-                        'added {:>13}'.format(format_file_size(sz)))
+                    return ({"type": "added", "size": sz}, 'added {:>13}'.format(format_file_size(sz)))
                 if item2.get('deleted'):
                     sz = sum_chunk_size(item1)
-                    return ({"type": "removed", "size": sz},
-                        'removed {:>11}'.format(format_file_size(sz)))
+                    return ({"type": "removed", "size": sz}, 'removed {:>11}'.format(format_file_size(sz)))
                 if not can_compare_chunk_ids:
                     return ({"type": "modified"}, "modified")
                 chunk_ids1 = {c.id for c in item1.chunks}
@@ -1140,16 +1138,14 @@ class Archiver:
             user1, group1 = get_owner(item1)
             user2, group2 = get_owner(item2)
             if user1 != user2 or group1 != group2:
-                return ({"type": "owner", "olduser": user1, "oldgroup": group1,
-                        "newuser": user2, "newgroup": group2},
+                return ({"type": "owner", "olduser": user1, "oldgroup": group1, "newuser": user2, "newgroup": group2},
                         '[{}:{} -> {}:{}]'.format(user1, group1, user2, group2))
 
         def compare_mode(item1, item2):
             if item1.mode != item2.mode:
                 mode1 = get_mode(item1)
                 mode2 = get_mode(item2)
-                return ({"type": "mode", "oldmode": mode1, "newmode": mode2},
-                        '[{} -> {}]'.format(mode1, mode2))
+                return ({"type": "mode", "oldmode": mode1, "newmode": mode2}, '[{} -> {}]'.format(mode1, mode2))
 
         def compare_items(output, path, item1, item2, hardlink_masters, deleted=False):
             """
@@ -1177,13 +1173,12 @@ class Archiver:
                 changes.append(compare_owner(item1, item2))
                 changes.append(compare_mode(item1, item2))
 
-            # changes is a list of paths and changesets:  [ (path1, [{changeset1}, ...]), (path2, [{changeset1}, ...]), ... ]
+            # changes is a list of paths, changesets:  [(path1, [{changeset1}, ..]), (path2, [{changeset1}, ..]), ..]
             changes = [x for x in changes if x]
             if changes:
                 output_line = (remove_surrogates(path), changes)
 
-                # if sorting, save changes for later, otherwise go ahead and output
-                # the results as they are generated.
+                # if sorting, save changes for later, otherwise go ahead and output the results as they are generated.
                 if args.sort:
                     output.append(output_line)
                 elif args.json_lines:
@@ -1197,7 +1192,7 @@ class Archiver:
 
         def print_json_output(line):
             path, diff = line
-            print(json.dumps({"changes": [j for j, txt in diff], "path": path}))
+            print(json.dumps({"path": path, "changes": [j for j, txt in diff]}))
 
         def compare_archives(archive1, archive2, matcher):
             def hardlink_master_seen(item):
@@ -1263,10 +1258,7 @@ class Archiver:
                 assert hardlink_master_seen(item2)
                 compare_items(output, item1.path, item1, item2, hardlink_masters)
 
-            if args.json_lines:
-                print_output = print_json_output
-            else:
-                print_output = print_text_output
+            print_output = print_json_output if args.json_lines else print_text_output
 
             # if we wanted sorted output (args.sort is true), then results are collected in 'output' and
             # need to be sort them before printing. Otherwise results were already printed and 'output' is empty.

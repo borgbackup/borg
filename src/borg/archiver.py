@@ -2822,6 +2822,8 @@ class Archiver:
                                 help='stay in foreground, do not daemonize')
             parser.add_argument('-o', dest='options', type=str,
                                 help='Extra mount options')
+            parser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+                                  help='use numeric user and group identifiers from archive(s)')
             define_archive_filters_group(parser)
             parser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                    help='paths to extract; patterns are supported')

@@ -8,10 +8,11 @@ import pytest
 from . import BaseTestCase
 from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
-from ..archive import BackupOSError, backup_io, backup_io_iter
+from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
 from ..helpers import Manifest
 from ..helpers import msgpack
 from ..item import Item, ArchiveItem
+from ..platform import uid2user, gid2group
 
 
 @pytest.fixture()
@@ -249,3 +250,68 @@ def test_backup_io_iter():
     normal_iterator = Iterator(StopIteration)
     for _ in backup_io_iter(normal_iterator):
         assert False, 'StopIteration handled incorrectly'
+
+
+def test_get_item_uid_gid():
+    # test requires that:
+    # - a name for user 0 and group 0 exists, usually root:root or root:wheel.
+    # - a system user/group udoesnotexist:gdoesnotexist does NOT exist.
+
+    user0, group0 = uid2user(0), gid2group(0)
+
+    # this is intentionally a "strange" item, with not matching ids/names.
+    item = Item(path='filename', uid=1, gid=2, user=user0, group=group0)
+
+    uid, gid = get_item_uid_gid(item, numeric=False)
+    # these are found via a name-to-id lookup
+    assert uid == 0
+    assert gid == 0
+
+    uid, gid = get_item_uid_gid(item, numeric=True)
+    # these are directly taken from the item.uid and .gid
+    assert uid == 1
+    assert gid == 2
+
+    uid, gid = get_item_uid_gid(item, numeric=False, uid_forced=3, gid_forced=4)
+    # these are enforced (not from item metadata)
+    assert uid == 3
+    assert gid == 4
+
+    # item metadata broken, has negative ids.
+    item = Item(path='filename', uid=-1, gid=-2, user=user0, group=group0)
+
+    uid, gid = get_item_uid_gid(item, numeric=True)
+    # use the uid/gid defaults (which both default to 0).
+    assert uid == 0
+    assert gid == 0
+
+    uid, gid = get_item_uid_gid(item, numeric=True, uid_default=5, gid_default=6)
+    # use the uid/gid defaults (as given).
+    assert uid == 5
+    assert gid == 6
+
+    # item metadata broken, has negative ids and non-existing user/group names.
+    item = Item(path='filename', uid=-3, gid=-4, user='udoesnotexist', group='gdoesnotexist')
+
+    uid, gid = get_item_uid_gid(item, numeric=False)
+    # use the uid/gid defaults (which both default to 0).
+    assert uid == 0
+    assert gid == 0
+
+    uid, gid = get_item_uid_gid(item, numeric=True, uid_default=7, gid_default=8)
+    # use the uid/gid defaults (as given).
+    assert uid == 7
+    assert gid == 8
+
+    # item metadata has valid uid/gid, but non-existing user/group names.
+    item = Item(path='filename', uid=9, gid=10, user='udoesnotexist', group='gdoesnotexist')
+
+    uid, gid = get_item_uid_gid(item, numeric=False)
+    # because user/group name does not exist here, use valid numeric ids from item metadata.
+    assert uid == 9
+    assert gid == 10
+
+    uid, gid = get_item_uid_gid(item, numeric=False, uid_default=11, gid_default=12)
+    # because item uid/gid seems valid, do not use the given uid/gid defaults
+    assert uid == 9
+    assert gid == 10

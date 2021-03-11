@@ -33,12 +33,13 @@ logger = create_logger()
 
 from .crypto.low_level import blake2b_128
 from .archiver import Archiver
-from .archive import Archive
+from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, daemonizing, hardlinkable, signal_handler, format_file_size
 from .helpers import msgpack
 from .item import Item
 from .lrucache import LRUCache
+from .platform import uid2user, gid2group
 from .remote import RemoteRepository
 
 
@@ -240,6 +241,7 @@ class FuseBackend(object):
     def __init__(self, key, manifest, repository, args, decrypted_repository):
         self.repository_uncached = repository
         self._args = args
+        self.numeric_owner = args.numeric_owner
         self._manifest = manifest
         self.key = key
         # Maps inode numbers to Item instances. This is used for synthetic inodes, i.e. file-system objects that are
@@ -311,7 +313,7 @@ class FuseBackend(object):
         """
         ino = self._allocate_inode()
         if mtime is not None:
-            self._items[ino] = Item(**self.default_dir.as_dict())
+            self._items[ino] = Item(internal_dict=self.default_dir.as_dict())
             self._items[ino].mtime = mtime
         else:
             self._items[ino] = self.default_dir
@@ -530,8 +532,13 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         self.umask = pop_option(options, 'umask', 0, 0, int, int_base=8)  # umask is octal, e.g. 222 or 0222
         dir_uid = self.uid_forced if self.uid_forced is not None else self.default_uid
         dir_gid = self.gid_forced if self.gid_forced is not None else self.default_gid
+        dir_user = uid2user(dir_uid)
+        dir_group = gid2group(dir_gid)
+        assert isinstance(dir_user, str)
+        assert isinstance(dir_group, str)
         dir_mode = 0o40755 & ~self.umask
-        self.default_dir = Item(mode=dir_mode, mtime=int(time.time() * 1e9), uid=dir_uid, gid=dir_gid)
+        self.default_dir = Item(mode=dir_mode, mtime=int(time.time() * 1e9),
+                                user=dir_user, group=dir_group, uid=dir_uid, gid=dir_gid)
         self._create_filesystem()
         llfuse.init(self, mountpoint, options)
         if not foreground:
@@ -581,8 +588,9 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         entry.attr_timeout = 300
         entry.st_mode = item.mode & ~self.umask
         entry.st_nlink = item.get('nlink', 1)
-        entry.st_uid = self.uid_forced if self.uid_forced is not None else item.uid if item.uid >= 0 else self.default_uid
-        entry.st_gid = self.gid_forced if self.gid_forced is not None else item.gid if item.gid >= 0 else self.default_gid
+        entry.st_uid, entry.st_gid = get_item_uid_gid(item, numeric=self.numeric_owner,
+                                                      uid_default=self.default_uid, gid_default=self.default_gid,
+                                                      uid_forced=self.uid_forced, gid_forced=self.gid_forced)
         entry.st_rdev = item.get('rdev', 0)
         entry.st_size = item.get_size()
         entry.st_blksize = 512

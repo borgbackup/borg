@@ -367,6 +367,24 @@ class CacheChunkBuffer(ChunkBuffer):
         return id_
 
 
+def get_item_uid_gid(item, *, numeric, uid_forced=None, gid_forced=None, uid_default=0, gid_default=0):
+    if uid_forced is not None:
+        uid = uid_forced
+    else:
+        uid = None if numeric else user2uid(item.user)
+        uid = item.uid if uid is None else uid
+        if uid < 0:
+            uid = uid_default
+    if gid_forced is not None:
+        gid = gid_forced
+    else:
+        gid = None if numeric else group2gid(item.group)
+        gid = item.gid if gid is None else gid
+        if gid < 0:
+            gid = gid_default
+    return uid, gid
+
+
 class Archive:
 
     class DoesNotExist(Error):
@@ -809,12 +827,7 @@ Utilization of max. archive size: {csize_max:.0%}
         Does not access the repository.
         """
         backup_io.op = 'attrs'
-        uid = gid = None
-        if not self.numeric_owner:
-            uid = user2uid(item.user)
-            gid = group2gid(item.group)
-        uid = item.uid if uid is None else uid
-        gid = item.gid if gid is None else gid
+        uid, gid = get_item_uid_gid(item, numeric=self.numeric_owner)
         # This code is a bit of a mess due to os specific differences
         if not is_win32:
             try:

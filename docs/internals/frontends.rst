@@ -454,66 +454,70 @@ Example (excerpt) of ``borg list --json-lines``::
 Archive Differencing
 ++++++++++++++++++++
 
-Each difference item is described by one object in the :ref:`borg_diff` output.
-The keys in the *borg diff* output are:
+Each archive difference item (file contents, user/group/mode) output by :ref:`borg_diff` is represented by an *ItemDiff* object.
+The propertiese of an *ItemDiff* object are:
 
 path:
-    the filename/path of the file or directory object.
+    The filename/path of the *Item* (file, directory, symlink).
 
 changes:
-    a list of 'changeset' objects describing the changes between the two instances of the object, ``path``, from the
-    two archives.
+    A list of *Change* objects describing the changes made to the item in the two archives. For example,
+    there will be two changes if the contents of a file are changed, and its ownership are changed.
 
-The keys of a 'changeset' object are:
+The *Change* object can contain a number of properties depending on the type of change that occured. 
+If a 'property' is not required for the type of change, it is not output.
+The possible properties of a *Change* object are:
 
 type:
-  identifies the type of changeset and will contain one of these values
+  The **type** property is always present. It identifies the type of change and will be one of these values:
   
-  - *modified* - file contents changed
-  - *added* - this file was added
-  - *removed* - this file was removed
-  - *added directory* - this directory was added
-  - *removed directory* - this directory was removed
-  - *added link* - this symlink was added
-  - *removed link* - removed symlink
-  - *changed link* - symlink target changed.
-  - *mode* - file/directory/link mode and/or permissions changed. Note - this could indicate a change from a
-    file/directory/link type item to a different type (file/directory/link) item.
+  - *modified* - file contents changed.
+  - *added* - the file was added.
+  - *removed* - the file was removed.
+  - *added directory* - the directory was added.
+  - *removed directory* - the directory was removed.
+  - *added link* - the symlink was added.
+  - *removed link* - the symlink was removed.
+  - *changed link* - the symlink target was changed.
+  - *mode* - the file/directory/link mode was changed. Note - this could indicate a change from a
+    file/directory/link type to a different type (file/directory/link), such as -- a file is deleted and replaced
+    with a directory of the same name.
   - *owner* - user and/or group ownership changed.
 
 size:
-    if ``type`` is *added* or *removed*, then the ``size`` key provides the size of the added or removed item.
+    If **type** == '*added*' or '*removed*', then **size** provides the size of the added or removed file.
 
 added:
-    if ``type`` is *modified* and chunk ids can be compared, then ``added`` and ``removed`` keys indicate the amount
-    of data 'added' and 'removed'.
+    If **type** == '*modified*' and chunk ids can be compared, then **added** and **removed** indicate the amount
+    of data 'added' and 'removed'. If chunk ids can not be compared, then **added** and **removed** properties are
+    not provided and the only information available is that the file contents were modified.
 
 removed:
-    see ``added`` key.
+    See **added** property.
     
 old_mode:
-    if ``type`` is *mode*, then ``old_mode`` and ``new_mode`` provide the mode and permissions changes.
+    If **type** == '*mode*', then **old_mode** and **new_mode** provide the mode and permissions changes.
 
 new_mode:
-    see ``old_mode`` key.
+    See **old_mode** property.
  
 old_user:
-    if ``type`` is *owner*, then the ``old_user``, ``new_user``, ``old_group`` and ``new_group`` keys provide the user
+    If **type** == '*owner*', then **old_user**, **new_user**, **old_group** and **new_group** provide the user
     and group ownership changes.
 
 old_group:
-    see ``old_user``.
+    See **old_user** property.
  
 new_user:
-    see ``old_user``.
+    See **old_user** property.
  
 new_group:
-    see ``old_user``.
+    See **old_user** property.
     
 
 Example (excerpt) of ``borg diff --json-lines``::
 
-    {"path": "file1", "changes": [{"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"}]}
+    {"path": "file1", "changes": [{"path": "file1", "changes": [{"type": "modified", "added": 17, "removed": 5}, {"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"}]}]}
     {"path": "file2", "changes": [{"type": "modified", "added": 135, "removed": 252}]}
     {"path": "file4", "changes": [{"type": "added", "size": 0}]}
     {"path": "file3", "changes": [{"type": "removed", "size": 0}]}

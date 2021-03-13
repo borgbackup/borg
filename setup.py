@@ -13,7 +13,6 @@ except ImportError:
 from setuptools.command.build_ext import build_ext
 from setuptools import setup, find_packages, Extension
 from setuptools.command.sdist import sdist
-from distutils.command.clean import clean
 
 try:
     from Cython.Build import cythonize
@@ -137,23 +136,11 @@ def rm(file):
         pass
 
 
-class Clean(clean):
-    def run(self):
-        super().run()
-        for source in cython_sources:
-            genc = source.replace('.pyx', '.c')
-            rm(genc)
-            compiled_glob = source.replace('.pyx', '.cpython*')
-            for compiled in sorted(glob(compiled_glob)):
-                rm(compiled)
-
-
 cmdclass = {
     'build_ext': build_ext,
     'build_usage': setup_docs.build_usage,
     'build_man': setup_docs.build_man,
     'sdist': Sdist,
-    'clean': Clean,
 }
 
 ext_modules = []

@@ -52,10 +52,8 @@ extras_require = {
     ],
 }
 
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.sdist import sdist
-from distutils.core import Command
-from distutils.command.clean import clean
 
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
@@ -146,7 +144,7 @@ except ImportError:
     msgpack_packer_source = msgpack_packer_source.replace('.pyx', '.cpp')
     msgpack_unpacker_source = msgpack_unpacker_source.replace('.pyx', '.cpp')
 
-    from distutils.command.build_ext import build_ext
+    from setuptools.command.build_ext import build_ext
     if not on_rtd and not all(os.path.exists(path) for path in [
         compress_source, crypto_ll_source, chunker_source, hashindex_source, item_source, checksums_source,
         platform_posix_source, platform_linux_source, platform_syncfilerange_source, platform_freebsd_source, platform_darwin_source,
@@ -767,9 +765,16 @@ def rm(file):
         pass
 
 
-class Clean(clean):
+class Clean(Command):
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
     def run(self):
-        super().run()
         for source in cython_c_sources:
             genc = source.replace('.pyx', '.c')
             rm(genc)
@@ -786,7 +791,7 @@ cmdclass = {
     'build_usage': build_usage,
     'build_man': build_man,
     'sdist': Sdist,
-    'clean': Clean,
+    'clean2': Clean,
 }
 
 ext_modules = []

@@ -11,9 +11,8 @@ except ImportError:
     multiprocessing = None
 
 from setuptools.command.build_ext import build_ext
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.sdist import sdist
-from distutils.command.clean import clean
 
 try:
     from Cython.Build import cythonize
@@ -137,9 +136,16 @@ def rm(file):
         pass
 
 
-class Clean(clean):
+class Clean(Command):
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
     def run(self):
-        super().run()
         for source in cython_sources:
             genc = source.replace('.pyx', '.c')
             rm(genc)
@@ -153,7 +159,7 @@ cmdclass = {
     'build_usage': setup_docs.build_usage,
     'build_man': setup_docs.build_man,
     'sdist': Sdist,
-    'clean': Clean,
+    'clean2': Clean,
 }
 
 ext_modules = []
@@ -220,8 +226,8 @@ if not on_rtd:
 
     # sometimes there's no need to cythonize
     # this breaks chained commands like 'clean sdist'
-    cythonizing = len(sys.argv) > 1 and sys.argv[1] not in ('clean', 'egg_info', '--help-commands', '--version') \
-                  and '--help' not in sys.argv[1:]
+    cythonizing = len(sys.argv) > 1 and sys.argv[1] not in (
+        ('clean', 'clean2', 'egg_info', '--help-commands', '--version')) and '--help' not in sys.argv[1:]
 
     if cythonize and cythonizing:
         cython_opts = dict(

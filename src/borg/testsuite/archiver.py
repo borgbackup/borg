@@ -4060,9 +4060,87 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert 'input/hardlink_target_replaced' not in output
 
+        def do_json_asserts(output, can_compare_ids):
+            def get_changes(filename, data):
+                chgsets = [j['changes'] for j in data if j['path'] == filename]
+                assert len(chgsets) < 2
+                # return a flattened list of changes for given filename
+                return [chg for chgset in chgsets for chg in chgset]
+
+            # convert output to list of dicts
+            joutput = [json.loads(line) for line in output.split('\n') if line]
+
+            # File contents changed (deleted and replaced with a new file)
+            expected = {'type': 'modified', 'added': 4096, 'removed': 1024} if can_compare_ids else {'type': 'modified'}
+            assert expected in get_changes('input/file_replaced', joutput)
+
+            # File unchanged
+            assert not any(get_changes('input/file_unchanged', joutput))
+
+            # Directory replaced with a regular file
+            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
+                assert {'type': 'mode', 'old_mode': 'drwxr-xr-x', 'new_mode': '-rwxr-xr-x'} in \
+                    get_changes('input/dir_replaced_with_file', joutput)
+
+            # Basic directory cases
+            assert {'type': 'added directory'} in get_changes('input/dir_added', joutput)
+            assert {'type': 'removed directory'} in get_changes('input/dir_removed', joutput)
+
+            if are_symlinks_supported():
+                # Basic symlink cases
+                assert {'type': 'changed link'} in get_changes('input/link_changed', joutput)
+                assert {'type': 'added link'} in get_changes('input/link_added', joutput)
+                assert {'type': 'removed link'} in get_changes('input/link_removed', joutput)
+
+                # Symlink replacing or being replaced
+                assert any(chg['type'] == 'mode' and chg['new_mode'].startswith('l') for chg in
+                    get_changes('input/dir_replaced_with_link', joutput))
+                assert any(chg['type'] == 'mode' and chg['old_mode'].startswith('l') for chg in
+                    get_changes('input/link_replaced_by_file', joutput))
+
+                # Symlink target removed. Should not affect the symlink at all.
+                assert not any(get_changes('input/link_target_removed', joutput))
+
+            # The inode has two links and the file contents changed. Borg
+            # should notice the changes in both links. However, the symlink
+            # pointing to the file is not changed.
+            expected = {'type': 'modified', 'added': 13, 'removed': 0} if can_compare_ids else {'type': 'modified'}
+            assert expected in get_changes('input/empty', joutput)
+            if are_hardlinks_supported():
+                assert expected in get_changes('input/hardlink_contents_changed', joutput)
+            if are_symlinks_supported():
+                assert not any(get_changes('input/link_target_contents_changed', joutput))
+
+            # Added a new file and a hard link to it. Both links to the same
+            # inode should appear as separate files.
+            assert {'type': 'added', 'size': 2048} in get_changes('input/file_added', joutput)
+            if are_hardlinks_supported():
+                assert {'type': 'added', 'size': 2048} in get_changes('input/hardlink_added', joutput)
+
+            # check if a diff between non-existent and empty new file is found
+            assert {'type': 'added', 'size': 0} in get_changes('input/file_empty_added', joutput)
+
+            # The inode has two links and both of them are deleted. They should
+            # appear as two deleted files.
+            assert {'type': 'removed', 'size': 256} in get_changes('input/file_removed', joutput)
+            if are_hardlinks_supported():
+                assert {'type': 'removed', 'size': 256} in get_changes('input/hardlink_removed', joutput)
+
+            # Another link (marked previously as the source in borg) to the
+            # same inode was removed. This should not change this link at all.
+            if are_hardlinks_supported():
+                assert not any(get_changes('input/hardlink_target_removed', joutput))
+
+            # Another link (marked previously as the source in borg) to the
+            # same inode was replaced with a new regular file. This should not
+            # change this link at all.
+            if are_hardlinks_supported():
+                assert not any(get_changes('input/hardlink_target_replaced', joutput))
+
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), True)
         # We expect exit_code=1 due to the chunker params warning
         do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), False)
+        do_json_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a', '--json-lines'), True)
 
     def test_sort_option(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

@@ -317,7 +317,7 @@ Use the Cygwin installer to install the dependencies::
 
     python3 python3-devel libcrypt-devel python3-setuptools
     binutils gcc-g++
-    libopenssl openssl-devel
+    libopenssl libssl-devel
     git make openssh
 
 You can then install ``pip`` and ``virtualenv``::

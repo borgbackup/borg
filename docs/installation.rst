@@ -322,7 +322,7 @@ Use the Cygwin installer to install the dependencies::
 
 You can then install ``pip`` and ``virtualenv``::
 
-    easy_install-3.6 pip
+    easy_install-3.8 pip
     pip install virtualenv
 
 

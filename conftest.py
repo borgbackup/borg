@@ -15,16 +15,15 @@ if hasattr(pytest, 'register_assert_rewrite'):
     pytest.register_assert_rewrite('borg.testsuite')
 
 
-import borg.cache
-from borg.logger import setup_logging
+import borg.cache  # noqa: E402
+from borg.logger import setup_logging  # noqa: E402
 
 # Ensure that the loggers exist for all tests
 setup_logging()
 
-from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3
-from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported
-from borg.testsuite.platform import fakeroot_detected, are_acls_working
-from borg import xattr
+from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3  # noqa: E402
+from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported  # noqa: E402
+from borg.testsuite.platform import fakeroot_detected  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -67,7 +66,8 @@ class DefaultPatches:
         self.org_cache_wipe_cache = borg.cache.LocalCache.wipe_cache
 
         def wipe_should_not_be_called(*a, **kw):
-            raise AssertionError("Cache wipe was triggered, if this is part of the test add @pytest.mark.allow_cache_wipe")
+            raise AssertionError("Cache wipe was triggered, if this is part of the test add "
+                                 "@pytest.mark.allow_cache_wipe")
         if 'allow_cache_wipe' not in request.keywords:
             borg.cache.LocalCache.wipe_cache = wipe_should_not_be_called
         request.addfinalizer(self.undo)

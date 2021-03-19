@@ -119,7 +119,7 @@ cdef _get_acl(p, type, item, attribute, flags, fd=None):
             acl_free(text)
         acl_free(acl)
 
-#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
+# note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_get(path, item, st, numeric_owner=False, fd=None):
     """Saves ACL Entries
 
@@ -138,7 +138,7 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         _get_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', flags, fd=fd)
         _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
 
-#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
+# note: attribute numeric_owner is now deprecated. Use numeric_id instead
 cdef _set_acl(p, type, item, attribute, numeric_owner=False, fd=None):
     cdef acl_t acl
     text = item.get(attribute)
@@ -169,7 +169,7 @@ cdef _nfs4_use_stored_uid_gid(acl):
                 entries.append(entry)
     return safe_encode('\n'.join(entries))
 
-#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
+# note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_set(path, item, numeric_owner=False, fd=None):
     """Restore ACL Entries
 

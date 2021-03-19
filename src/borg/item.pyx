@@ -411,7 +411,7 @@ class ItemDiff:
     The items may have different paths and still be considered equal (e.g. for renames).
     It does not include extended or time attributes in the comparison.
     """
-    #Note:attribute numeric_owner is now deprecated. Use numeric_id instead
+    # note:attribute numeric_owner is now deprecated. Use numeric_id instead
     def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_owner=False, can_compare_chunk_ids=False):
         self._item1 = item1
         self._item2 = item2
@@ -450,7 +450,7 @@ class ItemDiff:
             return True
 
         attr_list = ['deleted', 'mode', 'source']
-        #Note:attribute numeric_owner is now deprecated. Use numeric_id instead
+        # note:attribute numeric_owner is now deprecated. Use numeric_id instead
         attr_list += ['uid', 'gid'] if self._numeric_owner else ['user', 'group']
         for attr in attr_list:
             if self._item1.get(attr) != self._item2.get(attr):
@@ -500,7 +500,7 @@ class ItemDiff:
             return ({"type": 'added directory'}, 'added directory')
 
     def _owner_diff(self):
-        #Note: attribute numeric_owner is now deprecated. Use numeric_id instead
+        # note: attribute numeric_owner is now deprecated. Use numeric_id instead
         u_attr, g_attr = ('uid', 'gid') if self._numeric_owner else ('user', 'group')
         u1, g1 = self._item1.get(u_attr), self._item1.get(g_attr)
         u2, g2 = self._item2.get(u_attr), self._item2.get(g_attr)

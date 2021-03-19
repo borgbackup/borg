@@ -226,7 +226,7 @@ cdef acl_numeric_ids(acl):
                 entries.append(entry)
     return safe_encode('\n'.join(entries))
 
-#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
+# note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_get(path, item, st, numeric_owner=False, fd=None):
     cdef acl_t default_acl = NULL
     cdef acl_t access_acl = NULL
@@ -268,7 +268,7 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         acl_free(access_text)
         acl_free(access_acl)
 
-#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
+# note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_set(path, item, numeric_owner=False, fd=None):
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL

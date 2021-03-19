@@ -2,6 +2,7 @@
 # https://www.borgbackup.org/
 # Note:
 # Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
+# (Note: ``--numeric-owner`` is deprecated. Use ``--numeric-id`` instead)   
 # Install:
 # Copy this file to /usr/share/bash-completion/completions/ or /etc/bash_completion.d/
 

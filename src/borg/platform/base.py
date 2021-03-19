@@ -61,20 +61,20 @@ def setxattr(path, name, value, *, follow_symlinks=False):
     and only applies when *path* is not an open file descriptor.
     """
 
-
+#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_get(path, item, st, numeric_owner=False, fd=None):
     """
     Saves ACL Entries
 
-    If `numeric_owner` is True the user/group field is not preserved only uid/gid
+    If `numeric_owner` (soon to be 'numeric_id') is True the user/group field is not preserved only uid/gid
     """
 
-
+#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_set(path, item, numeric_owner=False, fd=None):
     """
     Restore ACL Entries
 
-    If `numeric_owner` is True the stored uid/gid is used instead
+    If `numeric_owner` (soon to be 'numeric_id') is True the stored uid/gid is used instead
     of the user/group names
     """
 

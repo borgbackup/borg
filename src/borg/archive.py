@@ -395,7 +395,7 @@ class Archive:
 
     class IncompatibleFilesystemEncodingError(Error):
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
-
+    #Note: attribute numeric_owner is deprecated, use numeric_id instead
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=1800, numeric_owner=False, noatime=False, noctime=False,
                  noflags=False, noacls=False, noxattrs=False,
@@ -827,6 +827,7 @@ Utilization of max. archive size: {csize_max:.0%}
         Does not access the repository.
         """
         backup_io.op = 'attrs'
+        #Note: Deprecate attribute numeric_owner, use numeric_id instead
         uid, gid = get_item_uid_gid(item, numeric=self.numeric_owner)
         # This code is a bit of a mess due to os specific differences
         if not is_win32:
@@ -870,6 +871,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 # some systems don't support calling utime on a symlink
                 pass
             if not self.noacls:
+                #Note: Numeric_owner is now DEPRECATED. Use numeric_id instead
                 acl_set(path, item, self.numeric_owner, fd=fd)
             if not self.noxattrs:
                 # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
@@ -1057,6 +1059,7 @@ Utilization of max. archive size: {csize_max:.0%}
 
 
 class MetadataCollector:
+    #Note: Attribute numeric_owner is now deprecated. Use numeric_id instead
     def __init__(self, *, noatime, noctime, nobirthtime, numeric_owner, noflags, noacls, noxattrs):
         self.noatime = noatime
         self.noctime = noctime
@@ -1083,6 +1086,7 @@ class MetadataCollector:
         if not self.nobirthtime and hasattr(st, 'st_birthtime'):
             # sadly, there's no stat_result.st_birthtime_ns
             attrs['birthtime'] = safe_ns(int(st.st_birthtime * 10**9))
+            #Note: attribute numeric_owner is now deprecated. Use numeric_id instead
         if self.numeric_owner:
             attrs['user'] = attrs['group'] = None
         else:
@@ -1096,6 +1100,7 @@ class MetadataCollector:
             flags = 0 if self.noflags else get_flags(path, st, fd=fd)
             xattrs = {} if self.noxattrs else xattr.get_all(fd or path, follow_symlinks=False)
             if not self.noacls:
+                #Note: attribute numeric_owner is now deprecated. Use numeric_id instead
                 acl_get(path, attrs, st, self.numeric_owner, fd=fd)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)

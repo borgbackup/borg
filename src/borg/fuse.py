@@ -241,6 +241,7 @@ class FuseBackend(object):
     def __init__(self, key, manifest, repository, args, decrypted_repository):
         self.repository_uncached = repository
         self._args = args
+        #Note: attribute numeric_owner is now deprecated. Use numeric_id instead
         self.numeric_owner = args.numeric_owner
         self._manifest = manifest
         self.key = key
@@ -588,6 +589,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         entry.attr_timeout = 300
         entry.st_mode = item.mode & ~self.umask
         entry.st_nlink = item.get('nlink', 1)
+        #Note: attribute numeric_owner is now deprecated. Use numeric_id instead
         entry.st_uid, entry.st_gid = get_item_uid_gid(item, numeric=self.numeric_owner,
                                                       uid_default=self.default_uid, gid_default=self.default_gid,
                                                       uid_forced=self.uid_forced, gid_forced=self.gid_forced)

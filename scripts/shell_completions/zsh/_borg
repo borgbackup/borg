@@ -2,6 +2,7 @@
 
 # Zsh completion for Borg Backup 1.2.0a9 (2020-09-27).
 #
+# (Note: ``--numeric-owner`` is deprecated. Use ``--numeric-id`` instead)
 # Recommended _borg specific settings:
 #
 #   zstyle -e ':completion:*:*:borg-*:argument-rest:*' tag-order \

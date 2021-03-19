@@ -109,7 +109,7 @@ def _remove_non_numeric_identifier(acl):
                 entries.append(entry)
     return safe_encode('\n'.join(entries))
 
-
+#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_get(path, item, st, numeric_owner=False, fd=None):
     cdef acl_t acl = NULL
     cdef char *text = NULL
@@ -133,7 +133,7 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         acl_free(text)
         acl_free(acl)
 
-
+#Note: attribute numeric_owner is now deprecated. Use numeric_id instead
 def acl_set(path, item, numeric_owner=False, fd=None):
     cdef acl_t acl = NULL
     acl_text = item.get('acl_extended')

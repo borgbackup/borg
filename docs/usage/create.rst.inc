@@ -75,7 +75,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs. |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--numeric-owner``                               | only store numeric user and group identifiers                                                                                                        |
+    |  (Note: this option is deprecated)                    | ``--numeric-owner`` (Use ``--numeric-id``)        | only store numeric user and group identifiers                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--noatime``                                     | do not store atime into archive                                                                                                                      |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -138,7 +138,7 @@ borg create
         --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
         --paths-from-stdin    read DELIM-separated list of paths to backup from stdin. Will not recurse into directories.
         --paths-from-command    interpret PATH as command and treat its output as ``--paths-from-stdin``
-        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \n) 
+        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \n)
 
 
     :ref:`common_options`

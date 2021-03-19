@@ -167,6 +167,7 @@ the ID-to-name mapping, ``/etc/passwd`` and ``/etc/group``). Everything will be
 consistent automatically if we restore the numeric IDs stored in the archive. So
 there is no need for a chroot environment; we just mount the client file system
 and extract a backup, utilizing the ``--numeric-owner`` option:
+(Note: ``--numeric-owner`` is deprecated and will be replaced by ``--numeric-id``)
 
 ::
 

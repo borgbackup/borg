@@ -610,6 +610,27 @@ def test_file_size():
         assert format_file_size(size) == fmt
 
 
+def test_file_size_iec():
+    """test the size formatting routines"""
+    iec_size_map = {
+        0: '0 B',
+        2**0: '1 B',
+        2**10: '1.00 KiB',
+        2**20: '1.00 MiB',
+        2**30: '1.00 GiB',
+        2**40: '1.00 TiB',
+        2**50: '1.00 PiB',
+        2**60: '1.00 EiB',
+        2**70: '1.00 ZiB',
+        2**80: '1.00 YiB',
+        -2**0: '-1 B',
+        -2**10: '-1.00 KiB',
+        -2**20: '-1.00 MiB',
+    }
+    for size, fmt in iec_size_map.items():
+        assert format_file_size(size, iec=True) == fmt
+
+
 def test_file_size_precision():
     assert format_file_size(1234, precision=1) == '1.2 kB'  # rounded down
     assert format_file_size(1254, precision=1) == '1.3 kB'  # rounded up

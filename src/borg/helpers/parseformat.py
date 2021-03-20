@@ -222,15 +222,21 @@ def SortBySpec(text):
     return text.replace('timestamp', 'ts')
 
 
-def format_file_size(v, precision=2, sign=False):
+def format_file_size(v, precision=2, sign=False, iec=False):
     """Format file size into a human friendly format
     """
-    return sizeof_fmt_decimal(v, suffix='B', sep=' ', precision=precision, sign=sign)
+    fn = sizeof_fmt_iec if iec else sizeof_fmt_decimal
+    return fn(v, suffix='B', sep=' ', precision=precision, sign=sign)
 
 
 class FileSize(int):
+    def __new__(cls, value, iec=False):
+        obj = int.__new__(cls, value)
+        obj.iec = iec
+        return obj
+
     def __format__(self, format_spec):
-        return format_file_size(int(self)).__format__(format_spec)
+        return format_file_size(int(self), iec=self.iec).__format__(format_spec)
 
 
 def parse_file_size(s):
@@ -593,7 +599,7 @@ class ArchiveFormatter(BaseFormatter):
         assert not keys, str(keys)
         return "\n".join(help)
 
-    def __init__(self, format, repository, manifest, key, *, json=False):
+    def __init__(self, format, repository, manifest, key, *, json=False, iec=False):
         self.repository = repository
         self.manifest = manifest
         self.key = key
@@ -601,6 +607,7 @@ class ArchiveFormatter(BaseFormatter):
         self.id = None
         self._archive = None
         self.json = json
+        self.iec = iec
         static_keys = {}  # here could be stuff on repo level, above archive level
         static_keys.update(self.FIXED_KEYS)
         self.format = partial_format(format, static_keys)
@@ -644,7 +651,7 @@ class ArchiveFormatter(BaseFormatter):
         """lazy load / update loaded archive"""
         if self._archive is None or self._archive.id != self.id:
             from ..archive import Archive
-            self._archive = Archive(self.repository, self.key, self.manifest, self.name)
+            self._archive = Archive(self.repository, self.key, self.manifest, self.name, iec=self.iec)
         return self._archive
 
     def get_meta(self, key, rs):

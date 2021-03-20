@@ -367,15 +367,15 @@ class Cache:
 
     def __new__(cls, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
                 progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE,
-                consider_part_files=False):
+                consider_part_files=False, iec=False):
 
         def local():
             return LocalCache(repository=repository, key=key, manifest=manifest, path=path, sync=sync,
-                              warn_if_unencrypted=warn_if_unencrypted, progress=progress,
+                              warn_if_unencrypted=warn_if_unencrypted, progress=progress, iec=iec,
                               lock_wait=lock_wait, cache_mode=cache_mode, consider_part_files=consider_part_files)
 
         def adhoc():
-            return AdHocCache(repository=repository, key=key, manifest=manifest, lock_wait=lock_wait,
+            return AdHocCache(repository=repository, key=key, manifest=manifest, lock_wait=lock_wait, iec=iec,
                               consider_part_files=consider_part_files)
 
         if not permit_adhoc_cache:
@@ -404,6 +404,9 @@ All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
 
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
+
+    def __init__(self, iec=False):
+        self.iec = iec
 
     def __str__(self):
         return self.str_format.format(self.format_tuple())
@@ -435,7 +438,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def format_tuple(self):
         stats = self.stats()
         for field in ['total_size', 'total_csize', 'unique_csize']:
-            stats[field] = format_file_size(stats[field])
+            stats[field] = format_file_size(stats[field], iec=self.iec)
         return self.Summary(**stats)
 
     def chunks_stored_size(self):
@@ -448,13 +451,15 @@ class LocalCache(CacheStatsMixin):
     """
 
     def __init__(self, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
-                 progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE, consider_part_files=False):
+                 progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE, consider_part_files=False,
+                 iec=False):
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
         :param lock_wait: timeout for lock acquisition (int [s] or None [wait forever])
         :param sync: do :meth:`.sync`
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
+        CacheStatsMixin.__init__(self, iec=iec)
         self.repository = repository
         self.key = key
         self.manifest = manifest
@@ -1049,7 +1054,9 @@ All archives:                unknown              unknown              unknown
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
-    def __init__(self, repository, key, manifest, warn_if_unencrypted=True, lock_wait=None, consider_part_files=False):
+    def __init__(self, repository, key, manifest, warn_if_unencrypted=True, lock_wait=None, consider_part_files=False,
+                 iec=False):
+        CacheStatsMixin.__init__(self, iec=iec)
         self.repository = repository
         self.key = key
         self.manifest = manifest

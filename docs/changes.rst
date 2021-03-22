@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.16 (not released yet)
----------------------------------
+Version 1.1.16 (2021-03-23)
+---------------------------
 
 Compatibility notes:
 
@@ -252,42 +252,40 @@ Fixes:
 - remove empty shadowed_segments lists, #5275, #5614
 - fix libpython load error when borg fat binary / dir-based binary is invoked
   via a symlink by upgrading pyinstaller to v4.2, #5688
-- config: accept non-int value for max_segment_size or storage_quota, #5639:
-  borg config REPO max_segment_size 500M
-  borg config REPO storage_quota 100G
-  note: when setting a non-int value for this in a repo config,
+- config: accept non-int value (like 500M or 100G) for max_segment_size or
+  storage_quota, #5639.
+  please note: when setting a non-int value for this in a repo config,
   using the repo will require borg >= 1.1.16.
 
 New features:
 
-- test on and support Python 3.10
 - bundled msgpack: drop support for old buffer protocol to support Python 3.10
 - verbose files cache logging via --debug-topic=files_cache, #5659.
   Use this if you suspect that borg does not detect unmodified files as expected.
-- create/extract: add --noxattrs option, #3955.
-  when given with borg create, borg will not get xattrs from input files
-  (and thus, it will not archive xattrs). when given with borg extract,
-  borg will not read xattrs from archive and it will not set xattrs on extracted files.
-- create/extract: add --noacls option, #3955.
-  when given with borg create, borg will not get ACLs from input files
-  (and thus, it will not archive ACLs). when given with borg extract,
-  borg will not read ACLs from archive and it will not set ACLs on extracted files.
+- create/extract: add --noxattrs and --noacls option, #3955.
+  when given with borg create, borg will not get xattrs / ACLs from input files
+  (and thus, it will not archive xattrs / ACLs). when given with borg extract,
+  borg will not read xattrs / ACLs from archive and will not set xattrs / ACLs
+  on extracted files.
+- diff: add --json-lines option, #3765
 - check: debug log segment filename
 - borg debug dump-hints
 
 Other changes:
 
 - Tab completion support for additional archives for 'borg delete'
-- deduplicate code of put and delete, no functional change
+- repository: deduplicate code of put and delete, no functional change
+- tests: fix result order issue (sporadic test failure on openindiana)
 - vagrant:
 
-  - avoid grub-install asking interactively for device
-  - upgrade FreeBSD VM to 11.4 (10.x is out of support)
   - upgrade pyinstaller to v4.2, #5671
+  - avoid grub-install asking interactively for device
+  - remove the xenial box
+  - update freebsd box to 12.1
 - docs:
 
   - update macOS install instructions, #5677
-  - use macFUSE (not osxfuse) for Apple M1 compatibility.
+  - use macFUSE (not osxfuse) for Apple M1 compatibility
   - update docs for dev environment installation instructions, #5643
   - fix grammar in faq
   - recomend running tests only on installed versions for setup
@@ -295,7 +293,8 @@ Other changes:
   - remove /var/cache exclusion in example commands, #5625.
     This is generally a poor idea and shouldn't be promoted through examples.
   - add repology.org badge with current packaging status
-
+  - explain hash collision
+  - add unsafe workaround to use an old repo copy, #5722
 
 Version 1.1.15 (2020-12-25)
 ---------------------------

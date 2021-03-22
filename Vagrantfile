@@ -381,18 +381,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64")
   end
 
-  config.vm.define "xenial64" do |b|
-    b.vm.box = "ubuntu/xenial64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("xenial64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("xenial64")
-  end
-
   config.vm.define "buster64" do |b|
     b.vm.box = "debian/buster64"
     b.vm.provider :virtualbox do |v|
@@ -450,7 +438,7 @@ Vagrant.configure(2) do |config|
 
   # BSD
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd/FreeBSD-11.4-STABLE"
+    b.vm.box = "freebsd121-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

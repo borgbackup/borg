@@ -29,6 +29,8 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------+
     |                                                       | ``--sort``                            | Sort the output lines by file path.                                        |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------+
+    |                                                       | ``--json-lines``                      | Format output as JSON Lines.                                               |
+    +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                             |
     |                                                                                                                                                                            |
     | :ref:`common_options`                                                                                                                                                      |
@@ -66,6 +68,7 @@ borg diff
         --numeric-owner    only consider numeric user and group identifiers
         --same-chunker-params    Override check of chunker parameters.
         --sort     Sort the output lines by file path.
+        --json-lines    Format output as JSON Lines. 
 
 
     :ref:`common_options`

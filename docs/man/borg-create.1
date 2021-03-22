@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2020-12-24" "" "borg backup tool"
+.TH BORG-CREATE 1 "2021-03-22" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -214,6 +214,12 @@ do not store birthtime (creation date) into archive
 .TP
 .B \-\-nobsdflags
 do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive
+.TP
+.B \-\-noacls
+do not read and store ACLs into archive
+.TP
+.B \-\-noxattrs
+do not read and store xattrs into archive
 .TP
 .B \-\-ignore\-inode
 ignore inode data in the file metadata cache used to detect unchanged files.

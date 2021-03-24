@@ -4199,6 +4199,13 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
         assert all(x in line for x, line in zip(expected, output.splitlines()))
 
+    def test_format_option(self):
+        msg = (
+            "Write me; get inspired by self.test_sort_option and "
+            "ArchiverTestCase.test_list_format"
+        )
+        assert False, msg
+
 
 def test_get_args():
     archiver = Archiver()

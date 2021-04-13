@@ -233,7 +233,7 @@ class Manifest:
 
         for operation, requirements in feature_flags.items():
             if b'mandatory' in requirements:
-                result[operation.decode()] = set([feature.decode() for feature in requirements[b'mandatory']])
+                result[operation.decode()] = {feature.decode() for feature in requirements[b'mandatory']}
         return result
 
     def write(self):

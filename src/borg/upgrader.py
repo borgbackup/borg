@@ -36,7 +36,7 @@ class AtticRepositoryUpgrader(Repository):
         with self:
             backup = None
             if not inplace:
-                backup = '{}.before-upgrade-{:%Y-%m-%d-%H:%M:%S}'.format(self.path, datetime.datetime.now())
+                backup = f'{self.path}.before-upgrade-{datetime.datetime.now():%Y-%m-%d-%H:%M:%S}'
                 logger.info('making a hardlink copy in %s', backup)
                 if not dryrun:
                     shutil.copytree(self.path, backup, copy_function=os.link)
@@ -144,7 +144,7 @@ class AtticRepositoryUpgrader(Repository):
         problem because the keyfiles are small (compared to, say,
         all the segments)."""
         logger.info("converting keyfile %s" % keyfile)
-        with open(keyfile, 'r') as f:
+        with open(keyfile) as f:
             data = f.read()
         data = data.replace(AtticKeyfileKey.FILE_ID, KeyfileKey.FILE_ID, 1)
         keyfile = os.path.join(get_keys_dir(), os.path.basename(keyfile))
@@ -214,12 +214,12 @@ class AtticRepositoryUpgrader(Repository):
                 if os.path.exists(borg_file):
                     logger.warning("borg cache file already exists in %s, not copying from Attic", borg_file)
                 else:
-                    logger.info("copying attic cache file from %s to %s" % (attic_file, borg_file))
+                    logger.info(f"copying attic cache file from {attic_file} to {borg_file}")
                     if not dryrun:
                         shutil.copyfile(attic_file, borg_file)
                 return borg_file
             else:
-                logger.warning("no %s cache file found in %s" % (path, attic_file))
+                logger.warning(f"no {path} cache file found in {attic_file}")
                 return None
 
         # XXX: untested, because generating cache files is a PITA, see
@@ -270,7 +270,7 @@ class AtticKeyfileKey(KeyfileKey):
             raise KeyfileNotFoundError(repository.path, keys_dir)
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
-            with open(filename, 'r') as fd:
+            with open(filename) as fd:
                 line = fd.readline().strip()
                 if line and line.startswith(cls.FILE_ID) and line[10:] == repository.id_str:
                     return filename
@@ -319,7 +319,7 @@ class Borg0xxKeyfileKey(KeyfileKey):
             raise KeyfileNotFoundError(repository.path, keys_dir)
         for name in os.listdir(keys_dir):
             filename = os.path.join(keys_dir, name)
-            with open(filename, 'r') as fd:
+            with open(filename) as fd:
                 line = fd.readline().strip()
                 if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID) + 1:] == repository.id_str:
                     return filename

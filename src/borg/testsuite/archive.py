@@ -55,10 +55,10 @@ def tests_stats_progress(stats, monkeypatch, columns=80):
 def test_stats_format(stats):
     assert str(stats) == """\
 This archive:                   20 B                 10 B                 10 B"""
-    s = "{0.osize_fmt}".format(stats)
+    s = f"{stats.osize_fmt}"
     assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
-    assert repr(stats) == '<Statistics object at {:#x} (20, 10, 10)>'.format(id(stats))
+    assert repr(stats) == f'<Statistics object at {id(stats):#x} (20, 10, 10)>'
 
 
 class MockCache:

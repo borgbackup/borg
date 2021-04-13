@@ -42,7 +42,7 @@ class TimeoutTimer:
         self.end_time = None
 
     def __repr__(self):
-        return "<%s: start=%r end=%r timeout=%r sleep=%r>" % (
+        return "<{}: start={!r} end={!r} timeout={!r} sleep={!r}>".format(
             self.__class__.__name__, self.start_time, self.end_time,
             self.timeout_interval, self.sleep_interval)
 
@@ -118,7 +118,7 @@ class ExclusiveLock:
         self.release()
 
     def __repr__(self):
-        return "<%s: %r>" % (self.__class__.__name__, self.unique_name)
+        return f"<{self.__class__.__name__}: {self.unique_name!r}>"
 
     def acquire(self, timeout=None, sleep=None):
         if timeout is None:
@@ -299,7 +299,7 @@ class LockRoster:
 
     def get(self, key):
         roster = self.load()
-        return set(tuple(e) for e in roster.get(key, []))
+        return {tuple(e) for e in roster.get(key, [])}
 
     def empty(self, *keys):
         return all(not self.get(key) for key in keys)
@@ -307,7 +307,7 @@ class LockRoster:
     def modify(self, key, op):
         roster = self.load()
         try:
-            elements = set(tuple(e) for e in roster[key])
+            elements = {tuple(e) for e in roster[key]}
         except KeyError:
             elements = set()
         if op == ADD:
@@ -374,7 +374,7 @@ class Lock:
         self.release()
 
     def __repr__(self):
-        return "<%s: %r>" % (self.__class__.__name__, self.id)
+        return f"<{self.__class__.__name__}: {self.id!r}>"
 
     def acquire(self, exclusive=None, remove=None, sleep=None):
         if exclusive is None:

@@ -14,7 +14,7 @@ class TestLRUCache:
         for i, x in enumerate('abc'):
             c[x] = i
         assert len(c) == 2
-        assert c.items() == set([('b', 1), ('c', 2)])
+        assert c.items() == {('b', 1), ('c', 2)}
         assert 'a' not in c
         assert 'b' in c
         with pytest.raises(KeyError):

@@ -33,7 +33,7 @@ def translate(pat, match_end=r"\Z"):
             if i + 1 < n and pat[i] == "*" and pat[i + 1] == sep:
                 # **/ == wildcard for 0+ full (relative) directory names with trailing slashes; the forward slash stands
                 # for the platform-specific path separator
-                res += r"(?:[^\%s]*\%s)*" % (sep, sep)
+                res += fr"(?:[^\{sep}]*\{sep})*"
                 i += 2
             else:
                 # * == wildcard for name parts (does not cross path separator)

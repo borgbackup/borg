@@ -131,7 +131,7 @@ class Statistics:
             else:
                 columns, lines = get_terminal_size()
                 if not final:
-                    msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
+                    msg = f'{self.osize_fmt} O {self.csize_fmt} C {self.usize_fmt} D {self.nfiles} N '
                     path = remove_surrogates(item.path) if item else ''
                     space = columns - swidth(msg)
                     if space < 12:
@@ -175,7 +175,7 @@ class BackupOSError(Exception):
 
     def __str__(self):
         if self.op:
-            return '%s: %s' % (self.op, self.os_error)
+            return f'{self.op}: {self.os_error}'
         else:
             return str(self.os_error)
 
@@ -438,7 +438,7 @@ class Archive:
                 raise self.AlreadyExists(name)
             i = 0
             while True:
-                self.checkpoint_name = '%s.checkpoint%s' % (name, i and ('.%d' % i) or '')
+                self.checkpoint_name = '{}.checkpoint{}'.format(name, i and ('.%d' % i) or '')
                 if self.checkpoint_name not in manifest.archives:
                     break
                 i += 1
@@ -520,22 +520,17 @@ class Archive:
         return info
 
     def __str__(self):
-        return '''\
-Repository: {location}
-Archive name: {0.name}
-Archive fingerprint: {0.fpr}
-Time (start): {start}
-Time (end):   {end}
-Duration: {0.duration}
-Number of files: {0.stats.nfiles}
-Utilization of max. archive size: {csize_max:.0%}
-'''.format(
-            self,
-            start=OutputTimestamp(self.start.replace(tzinfo=timezone.utc)),
-            end=OutputTimestamp(self.end.replace(tzinfo=timezone.utc)),
-            csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
-            location=self.repository._location.canonical_path()
-)
+
+        return f'''\
+Repository: {self.repository._location.canonical_path()}
+Archive name: {self.name}
+Archive fingerprint: {self.fpr}
+Time (start): {OutputTimestamp(self.start.replace(tzinfo=timezone.utc))}
+Time (end):   {OutputTimestamp(self.end.replace(tzinfo=timezone.utc))}
+Duration: {self.duration}
+Number of files: {self.stats.nfiles}
+Utilization of max. archive size: {self.cache.chunks[self.id].csize / MAX_DATA_SIZE:.0%}
+'''
 
     def __repr__(self):
         return 'Archive(%r)' % self.name
@@ -723,8 +718,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 if 'size' in item:
                     item_size = item.size
                     if item_size != item_chunks_size:
-                        raise BackupError('Size inconsistency detected: size {}, chunks size {}'.format(
-                                          item_size, item_chunks_size))
+                        raise BackupError(f'Size inconsistency detected: size {item_size}, chunks size {item_chunks_size}')
             if has_damaged_chunks:
                 raise BackupError('File has damaged (all-zero) chunks. Try running borg check --repair.')
             return
@@ -780,8 +774,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 if 'size' in item:
                     item_size = item.size
                     if item_size != item_chunks_size:
-                        raise BackupError('Size inconsistency detected: size {}, chunks size {}'.format(
-                                          item_size, item_chunks_size))
+                        raise BackupError(f'Size inconsistency detected: size {item_size}, chunks size {item_chunks_size}')
                 if has_damaged_chunks:
                     raise BackupError('File has damaged (all-zero) chunks. Try running borg check --repair.')
             return
@@ -1725,7 +1718,7 @@ class ArchiveChecker:
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
             if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
                 # should never happen, but there was issue #3218.
-                logger.warning('{}: {}: Invalid chunks_healthy metadata removed!'.format(archive_name, item.path))
+                logger.warning(f'{archive_name}: {item.path}: Invalid chunks_healthy metadata removed!')
                 del item.chunks_healthy
                 has_chunks_healthy = False
                 chunks_healthy = chunks_current
@@ -1734,23 +1727,20 @@ class ArchiveChecker:
                 if chunk_id not in self.chunks:
                     # a chunk of the healthy list is missing
                     if chunk_current == chunk_healthy:
-                        logger.error('{}: {}: New missing file chunk detected (Byte {}-{}). '
-                                     'Replacing with all-zero chunk.'.format(
-                                     archive_name, item.path, offset, offset + size))
+                        logger.error(f'{archive_name}: {item.path}: New missing file chunk detected (Byte {offset}-{offset + size}). '
+                                     'Replacing with all-zero chunk.')
                         self.error_found = chunks_replaced = True
                         chunk_id, size, csize, cdata = replacement_chunk(size)
                         add_reference(chunk_id, size, csize, cdata)
                     else:
-                        logger.info('{}: {}: Previously missing file chunk is still missing (Byte {}-{}). It has a '
-                                    'all-zero replacement chunk already.'.format(
-                                    archive_name, item.path, offset, offset + size))
+                        logger.info(f'{archive_name}: {item.path}: Previously missing file chunk is still missing (Byte {offset}-{offset + size}). It has a '
+                                    'all-zero replacement chunk already.')
                         chunk_id, size, csize = chunk_current
                         if chunk_id in self.chunks:
                             add_reference(chunk_id, size, csize)
                         else:
-                            logger.warning('{}: {}: Missing all-zero replacement chunk detected (Byte {}-{}). '
-                                           'Generating new replacement chunk.'.format(
-                                           archive_name, item.path, offset, offset + size))
+                            logger.warning(f'{archive_name}: {item.path}: Missing all-zero replacement chunk detected (Byte {offset}-{offset + size}). '
+                                           'Generating new replacement chunk.')
                             self.error_found = chunks_replaced = True
                             chunk_id, size, csize, cdata = replacement_chunk(size)
                             add_reference(chunk_id, size, csize, cdata)
@@ -1759,8 +1749,8 @@ class ArchiveChecker:
                         # normal case, all fine.
                         add_reference(chunk_id, size, csize)
                     else:
-                        logger.info('{}: {}: Healed previously missing file chunk! '
-                                    '(Byte {}-{}).'.format(archive_name, item.path, offset, offset + size))
+                        logger.info(f'{archive_name}: {item.path}: Healed previously missing file chunk! '
+                                    f'(Byte {offset}-{offset + size}).')
                         add_reference(chunk_id, size, csize)
                         mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
                 chunk_list.append([chunk_id, size, csize])  # list-typed element as chunks_healthy is list-of-lists
@@ -1769,7 +1759,7 @@ class ArchiveChecker:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
                 item.chunks_healthy = item.chunks
             if has_chunks_healthy and chunk_list == chunks_healthy:
-                logger.info('{}: {}: Completely healed previously damaged file!'.format(archive_name, item.path))
+                logger.info(f'{archive_name}: {item.path}: Completely healed previously damaged file!')
                 del item.chunks_healthy
             item.chunks = chunk_list
             if 'size' in item:
@@ -1777,8 +1767,7 @@ class ArchiveChecker:
                 item_chunks_size = item.get_size(compressed=False, from_chunks=True)
                 if item_size != item_chunks_size:
                     # just warn, but keep the inconsistency, so that borg extract can warn about it.
-                    logger.warning('{}: {}: size inconsistency detected: size {}, chunks size {}'.format(
-                                   archive_name, item.path, item_size, item_chunks_size))
+                    logger.warning(f'{archive_name}: {item.path}: size inconsistency detected: size {item_size}, chunks size {item_chunks_size}')
 
         def robust_iterator(archive):
             """Iterates through all archive items
@@ -1804,7 +1793,7 @@ class ArchiveChecker:
                 logger.error(msg)
 
             def list_keys_safe(keys):
-                return ', '.join((k.decode(errors='replace') if isinstance(k, bytes) else str(k) for k in keys))
+                return ', '.join(k.decode(errors='replace') if isinstance(k, bytes) else str(k) for k in keys)
 
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
@@ -1871,7 +1860,7 @@ class ArchiveChecker:
 
         with cache_if_remote(self.repository) as repository:
             for i, info in enumerate(archive_infos):
-                logger.info('Analyzing archive {} ({}/{})'.format(info.name, i + 1, num_archives))
+                logger.info(f'Analyzing archive {info.name} ({i + 1}/{num_archives})')
                 archive_id = info.id
                 if archive_id not in self.chunks:
                     logger.error('Archive metadata block is missing!')
@@ -1906,7 +1895,7 @@ class ArchiveChecker:
             unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
             orphaned = unused - self.possibly_superseded
             if orphaned:
-                logger.error('{} orphaned objects found!'.format(len(orphaned)))
+                logger.error(f'{len(orphaned)} orphaned objects found!')
                 self.error_found = True
             if self.repair and unused:
                 logger.info('Deleting %d orphaned and %d superseded objects...' % (

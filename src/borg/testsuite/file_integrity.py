@@ -1,4 +1,3 @@
-
 import pytest
 
 from ..crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError

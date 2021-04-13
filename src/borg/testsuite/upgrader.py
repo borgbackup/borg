@@ -54,7 +54,7 @@ def key_valid(path):
     """
     keyfile = os.path.join(get_keys_dir(),
                            os.path.basename(path))
-    with open(keyfile, 'r') as f:
+    with open(keyfile) as f:
         return f.read().startswith(KeyfileKey.FILE_ID)
 
 

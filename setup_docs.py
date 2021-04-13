@@ -12,7 +12,7 @@ from setuptools import Command
 
 
 def long_desc_from_readme():
-    with open('README.rst', 'r') as fd:
+    with open('README.rst') as fd:
         long_description = fd.read()
         # remove header, but have one \n before first headline
         start = long_description.find('What is BorgBackup?')
@@ -33,7 +33,7 @@ def format_metavar(option):
     elif option.nargs is None:
         return option.metavar
     else:
-        raise ValueError('Can\'t format metavar %s, unknown nargs %s!' % (option.metavar, option.nargs))
+        raise ValueError(f'Can\'t format metavar {option.metavar}, unknown nargs {option.nargs}!')
 
 
 class build_usage(Command):
@@ -91,17 +91,17 @@ class build_usage(Command):
                 doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n\n")
                 if command == 'help':
                     for topic in Archiver.helptext:
-                        params = {"topic": topic,
-                                  "underline": '~' * len('borg help ' + topic)}
-                        doc.write(".. _borg_{topic}:\n\n".format(**params))
-                        doc.write("borg help {topic}\n{underline}\n\n".format(**params))
+                        underline = '~' * len('borg help ' + topic)
+
+                        doc.write(f".. _borg_{topic}:\n\n")
+                        doc.write(f"borg help {topic}\n{underline}\n\n")
                         doc.write(Archiver.helptext[topic])
                 else:
-                    params = {"command": command,
-                              "command_": command.replace(' ', '_'),
-                              "underline": '-' * len('borg ' + command)}
-                    doc.write(".. _borg_{command_}:\n\n".format(**params))
-                    doc.write("borg {command}\n{underline}\n.. code-block:: none\n\n    borg [common options] {command}".format(**params))
+
+                    command_ = command.replace(' ', '_'),
+                    underline = '-' * len('borg ' + command)
+                    doc.write(f".. _borg_{command_}:\n\n")
+                    doc.write(f"borg {command}\n{underline}\n.. code-block:: none\n\n    borg [common options] {command}")
                     self.write_usage(parser, doc)
                     epilog = parser.epilog
                     parser.epilog = None
@@ -366,7 +366,7 @@ class build_man(Command):
                 subparsers = [action for action in parser._actions if 'SubParsersAction' in str(action.__class__)][0]
                 for subcommand in subparsers.choices:
                     write('| borg', '[common options]', command, subcommand, '...')
-                    self.see_also.setdefault(command, []).append('%s-%s' % (command, subcommand))
+                    self.see_also.setdefault(command, []).append(f'{command}-{subcommand}')
             else:
                 if command == "borgfs":
                     write(command, end='')

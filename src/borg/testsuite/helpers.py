@@ -223,7 +223,7 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv('BORG_REPO', raising=False)
         test_pid = os.getpid()
         assert repr(Location('/some/path::archive{pid}')) == \
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{}')".format(test_pid)
+            f"Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{test_pid}')"
         location_time1 = Location('/some/path::archive{now:%s}')
         sleep(1.1)
         location_time2 = Location('/some/path::archive{now:%s}')
@@ -360,7 +360,7 @@ class MockArchive:
         self.id = id
 
     def __repr__(self):
-        return "{0}: {1}".format(self.id, self.ts.isoformat())
+        return f"{self.id}: {self.ts.isoformat()}"
 
 
 @pytest.mark.parametrize(

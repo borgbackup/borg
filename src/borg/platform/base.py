@@ -240,7 +240,7 @@ def getfqdn(name=''):
         name = socket.gethostname()
     try:
         addrs = socket.getaddrinfo(name, None, 0, socket.SOCK_DGRAM, 0, socket.AI_CANONNAME)
-    except socket.error:
+    except OSError:
         pass
     else:
         for addr in addrs:
@@ -263,7 +263,7 @@ hostname = hostname.split('.')[0]
 # thus, we offer BORG_HOST_ID where a user can set an own, unique id for each of his hosts.
 hostid = os.environ.get('BORG_HOST_ID')
 if not hostid:
-    hostid = '%s@%s' % (fqdn, uuid.getnode())
+    hostid = f'{fqdn}@{uuid.getnode()}'
 
 
 def get_process_id():

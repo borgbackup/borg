@@ -9,5 +9,3 @@ Examples
 
     # same as above plus clean up 17byte commit-only segments
     $ borg compact --cleanup-commits /path/to/repo
-
-

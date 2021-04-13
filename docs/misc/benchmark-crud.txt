@@ -61,4 +61,3 @@ C-R-SMALL        11.08 MB/s (10000 * 10.00 kB random files: 9.02s)
 R-R-SMALL        92.34 MB/s (10000 * 10.00 kB random files: 1.08s)
 U-R-SMALL        64.49 MB/s (10000 * 10.00 kB random files: 1.55s)
 D-R-SMALL        46.96 MB/s (10000 * 10.00 kB random files: 2.13s)
-

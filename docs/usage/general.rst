@@ -51,4 +51,3 @@ Examples
 
     # Create an archive and log: borg version, files list, return code
     $ borg create --show-version --list --show-rc /path/to/repo::my-files files
-

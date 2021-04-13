@@ -2,4 +2,3 @@
 # some bears (checkers) have additional requirements.
 coala
 coala-bears
-

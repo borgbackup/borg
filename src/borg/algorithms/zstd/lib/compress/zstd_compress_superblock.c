@@ -809,7 +809,7 @@ static size_t ZSTD_compressSubBlock_multi(const seqStore_t* seqStorePtr,
         if (sp < send) {
             seqDef const* seq;
             repcodes_t rep;
-            memcpy(&rep, prevCBlock->rep, sizeof(rep)); 
+            memcpy(&rep, prevCBlock->rep, sizeof(rep));
             for (seq = sstart; seq < sp; ++seq) {
                 rep = ZSTD_updateRep(rep.rep, seq->offset - 1, ZSTD_getSequenceLength(seqStorePtr, seq).litLength == 0);
             }

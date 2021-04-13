@@ -6,7 +6,7 @@ $dest = "external"
 
 $ErrorActionPreference = "Stop"
 
-Write-Output "Downloading OpenSSL from cpython-bin-deps repository ..." 
+Write-Output "Downloading OpenSSL from cpython-bin-deps repository ..."
 Invoke-WebRequest $url -OutFile openssl.zip
 
 Write-Output "Extracting OpenSSL"

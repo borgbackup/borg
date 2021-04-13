@@ -50,7 +50,7 @@ Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbac
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
 macOS        `Homebrew`_                                   | ``brew install borgbackup`` (official formula, **no** FUSE support)
                                                            | **or**
-                                                           | ``brew install --cask macfuse`` (`private Tap`_, FUSE support) 
+                                                           | ``brew install --cask macfuse`` (`private Tap`_, FUSE support)
                                                            | ``brew install borgbackup/tap/borgbackup-fuse``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``

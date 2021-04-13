@@ -465,13 +465,13 @@ changes:
     A list of *Change* objects describing the changes made to the item in the two archives. For example,
     there will be two changes if the contents of a file are changed, and its ownership are changed.
 
-The *Change* object can contain a number of properties depending on the type of change that occured. 
+The *Change* object can contain a number of properties depending on the type of change that occured.
 If a 'property' is not required for the type of change, it is not output.
 The possible properties of a *Change* object are:
 
 type:
   The **type** property is always present. It identifies the type of change and will be one of these values:
-  
+
   - *modified* - file contents changed.
   - *added* - the file was added.
   - *removed* - the file was removed.
@@ -495,26 +495,26 @@ added:
 
 removed:
     See **added** property.
-    
+
 old_mode:
     If **type** == '*mode*', then **old_mode** and **new_mode** provide the mode and permissions changes.
 
 new_mode:
     See **old_mode** property.
- 
+
 old_user:
     If **type** == '*owner*', then **old_user**, **new_user**, **old_group** and **new_group** provide the user
     and group ownership changes.
 
 old_group:
     See **old_user** property.
- 
+
 new_user:
     See **old_user** property.
- 
+
 new_group:
     See **old_user** property.
-    
+
 
 Example (excerpt) of ``borg diff --json-lines``::
 

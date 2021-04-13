@@ -39,4 +39,3 @@ def xxhash_ext_kwargs(pc, prefer_system, system_prefix):
     include_dirs = multi_join(xxhash_includes, xxhash_bundled_path)
     define_macros = [('BORG_USE_BUNDLED_XXHASH', 'YES')]
     return dict(sources=sources, include_dirs=include_dirs, define_macros=define_macros)
-

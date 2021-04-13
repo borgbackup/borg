@@ -25,7 +25,7 @@ What's working
   Note that absolute paths only work if the protocol is explicitly set to file://
 - ``borg create ::backup-{now} D:\DemoData`` works as expected.
 - ``borg list`` works as expected.
-- ``borg extract --strip-components 1 ::backup-XXXX`` works. 
+- ``borg extract --strip-components 1 ::backup-XXXX`` works.
   If absolute paths are extracted, it's important to pass ``--strip-components 1`` as
   otherwise the data is restored to the original location!
 
@@ -45,4 +45,3 @@ Luckily the python developers provide all required files in a separate repositor
 The `win-download-openssl.ps1` script can be used to download the package from
 https://github.com/python/cpython-bin-deps and extract the files to the correct location.
 For Anaconda, the required libraries can be installed with `conda install -c anaconda openssl`.
-

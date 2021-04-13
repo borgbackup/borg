@@ -138,7 +138,7 @@ borg create
         --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
         --paths-from-stdin    read DELIM-separated list of paths to backup from stdin. Will not recurse into directories.
         --paths-from-command    interpret PATH as command and treat its output as ``--paths-from-stdin``
-        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \n) 
+        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \n)
 
 
     :ref:`common_options`

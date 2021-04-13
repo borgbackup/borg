@@ -18,5 +18,3 @@ Examples
 
     # make a repo append-only
     $ borg config /path/to/repo append_only 1
-
-

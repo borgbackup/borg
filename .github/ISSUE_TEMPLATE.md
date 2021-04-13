@@ -6,7 +6,7 @@ Thank you for reporting an issue.
  - FAQ: https://borgbackup.readthedocs.io/en/stable/faq.html
  and
  - open issues in Github tracker: https://github.com/borgbackup/borg/issues
-  
+
 If you cannot find a similar problem, then create a new issue.
 
 Please fill in as much of the template as possible.
@@ -45,8 +45,8 @@ If this complaint relates to borg performance, please include CRUD benchmark
 results and any steps you took to troubleshoot.
 How to run benchmark: http://borgbackup.readthedocs.io/en/stable/usage/benchmark.html
 
-*IMPORTANT* - Please mark logs and text output from terminal commands 
-or else Github will not display them correctly. 
+*IMPORTANT* - Please mark logs and text output from terminal commands
+or else Github will not display them correctly.
 An example is provided below.
 
 Example:

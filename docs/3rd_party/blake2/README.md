@@ -10,4 +10,3 @@ at your choosing.
 More: [https://blake2.net](https://blake2.net). [GitHub repository](https://github.com/BLAKE2/BLAKE2).
 
 Contact: contact@blake2.net
-

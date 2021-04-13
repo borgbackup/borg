@@ -434,7 +434,7 @@ class ItemDiff:
             changes.append(self._mode_diff())
 
         # filter out empty changes
-        self._changes = [ch for ch in changes if ch] 
+        self._changes = [ch for ch in changes if ch]
 
     def changes(self):
         return self._changes
@@ -491,7 +491,7 @@ class ItemDiff:
         return ({"type": "modified", "added": added, "removed": removed},
             '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
             format_file_size(-removed, precision=1, sign=True)))
- 
+
     def _dir_diff(self):
         if self._item2.get('deleted') and not self._item1.get('deleted'):
             return ({"type": 'removed directory'}, 'removed directory')

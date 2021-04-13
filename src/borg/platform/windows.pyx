@@ -27,12 +27,12 @@ def user2uid(user, default=None):
 @lru_cache(maxsize=None)
 def gid2group(gid, default=None):
     return default
-    
+
 
 @lru_cache(maxsize=None)
 def group2gid(group, default=None):
     return default
-    
+
 
 def getosusername():
     """Return the os user name."""

@@ -2745,13 +2745,13 @@ class Archiver:
                               help='set umask to M (local only, default: %(default)04o)')
             add_common_option('--remote-path', metavar='PATH', dest='remote_path',
                               help='use PATH as borg executable on the remote (default: "borg")')
-            add_common_option('--remote-ratelimit', metavar='RATE', dest='remote_ratelimit', type=int,
+            add_common_option('--remote-ratelimit', metavar='RATE', dest='upload_ratelimit', type=int,
                               help='deprecated, use --upload-ratelimit')
-            add_common_option('--upload-ratelimit', metavar='RATE', dest='remote_ratelimit', type=int,
+            add_common_option('--upload-ratelimit', metavar='RATE', dest='upload_ratelimit', type=int,
                               help='set network upload rate limit in kiByte/s (default: 0=unlimited)')
-            add_common_option('--remote-buffer', metavar='UPLOAD_BUFFER', dest='remote_buffer', type=int,
+            add_common_option('--remote-buffer', metavar='UPLOAD_BUFFER', dest='upload_buffer', type=int,
                               help='deprecated, use --upload-buffer')
-            add_common_option('--upload-buffer', metavar='UPLOAD_BUFFER', dest='remote_buffer', type=int,
+            add_common_option('--upload-buffer', metavar='UPLOAD_BUFFER', dest='upload_buffer', type=int,
                               help='set network upload buffer size in MiB. (default: 0=no buffer)')
             add_common_option('--consider-part-files', dest='consider_part_files', action='store_true',
                               help='treat part files like normal files (e.g. to list/extract them)')

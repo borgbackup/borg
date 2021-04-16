@@ -543,8 +543,8 @@ class RemoteRepository:
         self.responses = {}
         self.async_responses = {}
         self.shutdown_time = None
-        self.ratelimit = SleepingBandwidthLimiter(args.remote_ratelimit * 1024 if args and args.remote_ratelimit else 0)
-        self.upload_buffer_size_limit = args.remote_buffer * 1024 * 1024 if args and args.remote_buffer else 0
+        self.ratelimit = SleepingBandwidthLimiter(args.upload_ratelimit * 1024 if args and args.upload_ratelimit else 0)
+        self.upload_buffer_size_limit = args.upload_buffer * 1024 * 1024 if args and args.upload_buffer else 0
         self.unpacker = get_limited_unpacker('client')
         self.server_version = parse_version('1.0.8')  # fallback version if server is too old to send version information
         self.p = None

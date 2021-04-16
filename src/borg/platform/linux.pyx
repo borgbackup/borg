@@ -227,7 +227,7 @@ cdef acl_numeric_ids(acl):
     return safe_encode('\n'.join(entries))
 
 
-def acl_get(path, item, st, numeric_owner=False, fd=None):
+def acl_get(path, item, st, numeric_ids=False, fd=None):
     cdef acl_t default_acl = NULL
     cdef acl_t access_acl = NULL
     cdef char *default_text = NULL
@@ -242,7 +242,7 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         or
         fd is None and acl_extended_file(path) <= 0):
         return
-    if numeric_owner:
+    if numeric_ids:
         converter = acl_numeric_ids
     else:
         converter = acl_append_numeric_ids
@@ -269,7 +269,7 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         acl_free(access_acl)
 
 
-def acl_set(path, item, numeric_owner=False, fd=None):
+def acl_set(path, item, numeric_ids=False, fd=None):
     cdef acl_t access_acl = NULL
     cdef acl_t default_acl = NULL
 
@@ -279,7 +279,7 @@ def acl_set(path, item, numeric_owner=False, fd=None):
 
     if fd is None and isinstance(path, str):
         path = os.fsencode(path)
-    if numeric_owner:
+    if numeric_ids:
         converter = posix_acl_use_stored_uid_gid
     else:
         converter = acl_use_local_uid_gid

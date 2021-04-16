@@ -120,10 +120,10 @@ cdef _get_acl(p, type, item, attribute, flags, fd=None):
         acl_free(acl)
 
 
-def acl_get(path, item, st, numeric_owner=False, fd=None):
+def acl_get(path, item, st, numeric_ids=False, fd=None):
     """Saves ACL Entries
 
-    If `numeric_owner` is True the user/group field is not preserved only uid/gid
+    If `numeric_ids` is True the user/group field is not preserved only uid/gid
     """
     cdef int flags = ACL_TEXT_APPEND_ID
     if isinstance(path, str):
@@ -131,7 +131,7 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
     ret = lpathconf(path, _PC_ACL_NFS4)
     if ret < 0 and errno == EINVAL:
         return
-    flags |= ACL_TEXT_NUMERIC_IDS if numeric_owner else 0
+    flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
     if ret > 0:
         _get_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', flags, fd=fd)
     else:
@@ -139,13 +139,13 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
 
 
-cdef _set_acl(p, type, item, attribute, numeric_owner=False, fd=None):
+cdef _set_acl(p, type, item, attribute, numeric_ids=False, fd=None):
     cdef acl_t acl
     text = item.get(attribute)
     if text:
-        if numeric_owner and type == ACL_TYPE_NFS4:
+        if numeric_ids and type == ACL_TYPE_NFS4:
             text = _nfs4_use_stored_uid_gid(text)
-        elif numeric_owner and type in(ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
+        elif numeric_ids and type in(ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
             text = posix_acl_use_stored_uid_gid(text)
         acl = acl_from_text(<bytes>text)
         if acl:
@@ -170,14 +170,14 @@ cdef _nfs4_use_stored_uid_gid(acl):
     return safe_encode('\n'.join(entries))
 
 
-def acl_set(path, item, numeric_owner=False, fd=None):
+def acl_set(path, item, numeric_ids=False, fd=None):
     """Restore ACL Entries
 
-    If `numeric_owner` is True the stored uid/gid is used instead
+    If `numeric_ids` is True the stored uid/gid is used instead
     of the user/group names
     """
     if isinstance(path, str):
         path = os.fsencode(path)
-    _set_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_owner, fd=fd)
-    _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_owner, fd=fd)
-    _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_owner, fd=fd)
+    _set_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_ids, fd=fd)
+    _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_ids, fd=fd)
+    _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_ids, fd=fd)

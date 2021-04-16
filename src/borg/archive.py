@@ -397,7 +397,7 @@ class Archive:
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
-                 checkpoint_interval=1800, numeric_owner=False, noatime=False, noctime=False,
+                 checkpoint_interval=1800, numeric_ids=False, noatime=False, noctime=False,
                  noflags=False, noacls=False, noxattrs=False,
                  progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
                  consider_part_files=False, log_json=False):
@@ -413,7 +413,7 @@ class Archive:
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
         self.checkpoint_interval = checkpoint_interval
-        self.numeric_owner = numeric_owner
+        self.numeric_ids = numeric_ids
         self.noatime = noatime
         self.noctime = noctime
         self.noflags = noflags
@@ -827,7 +827,7 @@ Utilization of max. archive size: {csize_max:.0%}
         Does not access the repository.
         """
         backup_io.op = 'attrs'
-        uid, gid = get_item_uid_gid(item, numeric=self.numeric_owner)
+        uid, gid = get_item_uid_gid(item, numeric=self.numeric_ids)
         # This code is a bit of a mess due to os specific differences
         if not is_win32:
             try:
@@ -870,7 +870,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 # some systems don't support calling utime on a symlink
                 pass
             if not self.noacls:
-                acl_set(path, item, self.numeric_owner, fd=fd)
+                acl_set(path, item, self.numeric_ids, fd=fd)
             if not self.noxattrs:
                 # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
                 # the Linux capabilities in the "security.capability" attribute.
@@ -1057,10 +1057,10 @@ Utilization of max. archive size: {csize_max:.0%}
 
 
 class MetadataCollector:
-    def __init__(self, *, noatime, noctime, nobirthtime, numeric_owner, noflags, noacls, noxattrs):
+    def __init__(self, *, noatime, noctime, nobirthtime, numeric_ids, noflags, noacls, noxattrs):
         self.noatime = noatime
         self.noctime = noctime
-        self.numeric_owner = numeric_owner
+        self.numeric_ids = numeric_ids
         self.noflags = noflags
         self.noacls = noacls
         self.noxattrs = noxattrs
@@ -1083,7 +1083,7 @@ class MetadataCollector:
         if not self.nobirthtime and hasattr(st, 'st_birthtime'):
             # sadly, there's no stat_result.st_birthtime_ns
             attrs['birthtime'] = safe_ns(int(st.st_birthtime * 10**9))
-        if self.numeric_owner:
+        if self.numeric_ids:
             attrs['user'] = attrs['group'] = None
         else:
             attrs['user'] = uid2user(st.st_uid)
@@ -1096,7 +1096,7 @@ class MetadataCollector:
             flags = 0 if self.noflags else get_flags(path, st, fd=fd)
             xattrs = {} if self.noxattrs else xattr.get_all(fd or path, follow_symlinks=False)
             if not self.noacls:
-                acl_get(path, attrs, st, self.numeric_owner, fd=fd)
+                acl_get(path, attrs, st, self.numeric_ids, fd=fd)
         if xattrs:
             attrs['xattrs'] = StableDict(xattrs)
         if flags:

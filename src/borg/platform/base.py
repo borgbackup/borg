@@ -62,19 +62,19 @@ def setxattr(path, name, value, *, follow_symlinks=False):
     """
 
 
-def acl_get(path, item, st, numeric_owner=False, fd=None):
+def acl_get(path, item, st, numeric_ids=False, fd=None):
     """
     Saves ACL Entries
 
-    If `numeric_owner` is True the user/group field is not preserved only uid/gid
+    If `numeric_ids` is True the user/group field is not preserved only uid/gid
     """
 
 
-def acl_set(path, item, numeric_owner=False, fd=None):
+def acl_set(path, item, numeric_ids=False, fd=None):
     """
     Restore ACL Entries
 
-    If `numeric_owner` is True the stored uid/gid is used instead
+    If `numeric_ids` is True the stored uid/gid is used instead
     of the user/group names
     """
 

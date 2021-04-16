@@ -110,7 +110,7 @@ def _remove_non_numeric_identifier(acl):
     return safe_encode('\n'.join(entries))
 
 
-def acl_get(path, item, st, numeric_owner=False, fd=None):
+def acl_get(path, item, st, numeric_ids=False, fd=None):
     cdef acl_t acl = NULL
     cdef char *text = NULL
     if isinstance(path, str):
@@ -125,7 +125,7 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         text = acl_to_text(acl, NULL)
         if text == NULL:
             return
-        if numeric_owner:
+        if numeric_ids:
             item['acl_extended'] = _remove_non_numeric_identifier(text)
         else:
             item['acl_extended'] = text
@@ -134,12 +134,12 @@ def acl_get(path, item, st, numeric_owner=False, fd=None):
         acl_free(acl)
 
 
-def acl_set(path, item, numeric_owner=False, fd=None):
+def acl_set(path, item, numeric_ids=False, fd=None):
     cdef acl_t acl = NULL
     acl_text = item.get('acl_extended')
     if acl_text is not None:
         try:
-            if numeric_owner:
+            if numeric_ids:
                 acl = acl_from_text(acl_text)
             else:
                 acl = acl_from_text(<bytes>_remove_numeric_id_if_possible(acl_text))

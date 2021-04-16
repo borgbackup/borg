@@ -412,10 +412,10 @@ class ItemDiff:
     It does not include extended or time attributes in the comparison.
     """
 
-    def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_owner=False, can_compare_chunk_ids=False):
+    def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_ids=False, can_compare_chunk_ids=False):
         self._item1 = item1
         self._item2 = item2
-        self._numeric_owner = numeric_owner
+        self._numeric_ids = numeric_ids
         self._can_compare_chunk_ids = can_compare_chunk_ids
         self.equal = self._equal(chunk_iterator1, chunk_iterator2)
         changes = []
@@ -434,7 +434,7 @@ class ItemDiff:
             changes.append(self._mode_diff())
 
         # filter out empty changes
-        self._changes = [ch for ch in changes if ch] 
+        self._changes = [ch for ch in changes if ch]
 
     def changes(self):
         return self._changes
@@ -450,7 +450,7 @@ class ItemDiff:
             return True
 
         attr_list = ['deleted', 'mode', 'source']
-        attr_list += ['uid', 'gid'] if self._numeric_owner else ['user', 'group']
+        attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
         for attr in attr_list:
             if self._item1.get(attr) != self._item2.get(attr):
                 return False
@@ -491,7 +491,7 @@ class ItemDiff:
         return ({"type": "modified", "added": added, "removed": removed},
             '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
             format_file_size(-removed, precision=1, sign=True)))
- 
+
     def _dir_diff(self):
         if self._item2.get('deleted') and not self._item1.get('deleted'):
             return ({"type": 'removed directory'}, 'removed directory')
@@ -499,7 +499,7 @@ class ItemDiff:
             return ({"type": 'added directory'}, 'added directory')
 
     def _owner_diff(self):
-        u_attr, g_attr = ('uid', 'gid') if self._numeric_owner else ('user', 'group')
+        u_attr, g_attr = ('uid', 'gid') if self._numeric_ids else ('user', 'group')
         u1, g1 = self._item1.get(u_attr), self._item1.get(g_attr)
         u2, g2 = self._item2.get(u_attr), self._item2.get(g_attr)
         if (u1, g1) != (u2, g2):

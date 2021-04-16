@@ -187,7 +187,7 @@ def with_archive(method):
     @functools.wraps(method)
     def wrapper(self, args, repository, key, manifest, **kwargs):
         archive = Archive(repository, key, manifest, args.location.archive,
-                          numeric_owner=getattr(args, 'numeric_owner', False),
+                          numeric_ids=getattr(args, 'numeric_ids', False),
                           noflags=getattr(args, 'nobsdflags', False) or getattr(args, 'noflags', False),
                           noacls=getattr(args, 'noacls', False),
                           noxattrs=getattr(args, 'noxattrs', False),
@@ -650,13 +650,13 @@ class Archiver:
                        cache_mode=args.files_cache_mode) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
-                                  numeric_owner=args.numeric_owner, noatime=not args.atime, noctime=args.noctime,
+                                  numeric_ids=args.numeric_ids, noatime=not args.atime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json)
                 metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
                     noflags=args.nobsdflags or args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
-                    numeric_owner=args.numeric_owner, nobirthtime=args.nobirthtime)
+                    numeric_ids=args.numeric_ids, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
                     checkpoint_interval=args.checkpoint_interval, rechunkify=False)
@@ -2828,9 +2828,9 @@ class Archiver:
                                 help='stay in foreground, do not daemonize')
             parser.add_argument('-o', dest='options', type=str,
                                 help='Extra mount options')
-            parser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+            parser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
                                   help='deprecated, use ``--numeric-ids`` instead')
-            parser.add_argument('--numeric-ids', dest='numeric_owner', action='store_true',
+            parser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                   help='use numeric user and group identifiers from archive(s)')
             define_archive_filters_group(parser)
             parser.add_argument('paths', metavar='PATH', nargs='*', type=str,
@@ -3381,9 +3381,9 @@ class Archiver:
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
                               help='stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.')
-        fs_group.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+        fs_group.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
                               help='deprecated, use ``--numeric-ids`` instead')
-        fs_group.add_argument('--numeric-ids', dest='numeric_owner', action='store_true',
+        fs_group.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                               help='only store numeric user and group identifiers')
         # --noatime is the default now and the flag is deprecated. args.noatime is not used any more.
         # use --atime if you want to store the atime (default behaviour before borg 1.2.0a7)..
@@ -3713,9 +3713,9 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='find differences in archive contents')
         subparser.set_defaults(func=self.do_diff)
-        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+        subparser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
                                help='deprecated, use ``--numeric-ids`` instead')
-        subparser.add_argument('--numeric-ids', dest='numeric_owner', action='store_true',
+        subparser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                help='only consider numeric user and group identifiers')
         subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
                                help='Override check of chunker parameters.')
@@ -3819,9 +3819,9 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not actually change any files')
-        subparser.add_argument('--numeric-owner', dest='numeric_owner', action='store_true',
+        subparser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
                                help='deprecated, use ``--numeric-ids`` instead')
-        subparser.add_argument('--numeric-ids', dest='numeric_owner', action='store_true',
+        subparser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                help='only obey numeric user and group identifiers')
         subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
                                help='deprecated, use ``--noflags`` instead')

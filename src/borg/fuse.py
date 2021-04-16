@@ -241,7 +241,7 @@ class FuseBackend(object):
     def __init__(self, key, manifest, repository, args, decrypted_repository):
         self.repository_uncached = repository
         self._args = args
-        self.numeric_owner = args.numeric_owner
+        self.numeric_ids = args.numeric_ids
         self._manifest = manifest
         self.key = key
         # Maps inode numbers to Item instances. This is used for synthetic inodes, i.e. file-system objects that are
@@ -588,7 +588,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         entry.attr_timeout = 300
         entry.st_mode = item.mode & ~self.umask
         entry.st_nlink = item.get('nlink', 1)
-        entry.st_uid, entry.st_gid = get_item_uid_gid(item, numeric=self.numeric_owner,
+        entry.st_uid, entry.st_gid = get_item_uid_gid(item, numeric=self.numeric_ids,
                                                       uid_default=self.default_uid, gid_default=self.default_gid,
                                                       uid_forced=self.uid_forced, gid_forced=self.gid_forced)
         entry.st_rdev = item.get('rdev', 0)

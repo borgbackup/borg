@@ -93,6 +93,31 @@ Also, you must not run borg against multiple instances of the same repo
 
 See also: :ref:`faq_corrupt_repo`
 
+"this is either an attack or unsafe" warning
+--------------------------------------------
+
+About the warning:
+
+  Cache, or information obtained from the security directory is newer than
+  repository - this is either an attack or unsafe (multiple repos with same ID)
+
+"unsafe": If not following the advice from the previous section, you can easily
+run into this by yourself by restoring an older copy of your repository.
+
+"attack": maybe an attacker has replaced your repo by an older copy, trying to
+trick you into AES counter reuse, trying to break your repo encryption.
+
+If you'ld decide to ignore this and accept unsafe operation for this repository,
+you could delete the manifest-timestamp and the local cache:
+
+::
+
+  borg config repo id   # shows the REPO_ID
+  rm ~/.config/borg/REPO_ID/manifest-timestamp
+  borg delete --cache-only REPO
+
+This is an unsafe and unsupported way to use borg, you have been warned.
+
 Which file types, attributes, etc. are *not* preserved?
 -------------------------------------------------------
 

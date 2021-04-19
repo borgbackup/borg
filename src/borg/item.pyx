@@ -7,6 +7,7 @@ from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 from .helpers import format_file_size
 from libc.string cimport memcmp
+from cpython.bytes cimport PyBytes_AsStringAndSize
 
 cdef extern from "_item.c":
     object _object_to_optr(object obj)
@@ -545,28 +546,26 @@ def chunks_contents_equal(chunks1, chunks2):
     """
     cdef:
         bytes a, b
-        const char *  ap,* bp
-        size_t slicelen = 0
-        size_t alen = 0, ai = 0
-        size_t blen = 0, bi = 0
+        char *  ap, * bp
+        Py_ssize_t slicelen = 0
+        Py_ssize_t alen = 0
+        Py_ssize_t blen = 0
 
     while True:
-        if not alen - ai:
+        if not alen:
             a = next(chunks1, None)
             if a is None:
-                return not blen - bi and next(chunks2, None) is None
-            ap = <const char*> a;
-            alen = len(a)
-            ai = 0
-        if not blen - bi:
+                return not blen and next(chunks2, None) is None
+            PyBytes_AsStringAndSize(a, &ap, &alen)
+        if not blen:
             b = next(chunks2, None)
             if b is None:
-                return not alen - ai and next(chunks1, None) is None
-            bp = <const char*> b;
-            blen = len(b)
-            bi = 0
-        slicelen = min(alen - ai, blen - bi)
-        if memcmp((<const char*>a) + ai,  (<const char*>b) + bi, slicelen) != 0:
+                return not alen and next(chunks1, None) is None
+            PyBytes_AsStringAndSize(b, &bp, &blen)
+        slicelen = min(alen, blen)
+        if memcmp(ap, bp, slicelen) != 0:
             return False
-        ai += slicelen
-        bi += slicelen
+        ap += slicelen
+        bp += slicelen
+        alen -= slicelen
+        blen -= slicelen

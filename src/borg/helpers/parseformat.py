@@ -141,9 +141,6 @@ def FilesCacheMode(s):
     return mode
 
 
-assert FilesCacheMode(DEFAULT_FILES_CACHE_MODE_UI) == DEFAULT_FILES_CACHE_MODE  # keep these 2 values in sync!
-
-
 def partial_format(format, mapping):
     """
     Apply format.format_map(mapping) while preserving unknown keys

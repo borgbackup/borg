@@ -210,6 +210,12 @@ This is not a problem anymore.
 
 For more details, see :ref:`checkpoints_parts`.
 
+My machine goes to sleep causing `Broken pipe`
+----------------------------------------------
+
+When backing up your data over the network, your machine should not go to sleep.
+On macOS you can use `caffeinate` to avoid that.
+
 How can I switch append-only mode on and off?
 -----------------------------------------------------------------------------------------------------------------------------------
 
@@ -627,7 +633,7 @@ C to delete all backups residing on S.
 These are your options to protect against that:
 
 - Do not allow to permanently delete data from the repo, see :ref:`append_only_mode`.
-- Use a pull-mode setup using ``ssh -R``, see :issue:`900`.
+- Use a pull-mode setup using ``ssh -R``, see :ref:`pull_backup` for more informations.
 - Mount C's filesystem on another machine and then create a backup of it.
 - Do not give C filesystem-level access to S.
 

@@ -544,8 +544,9 @@ def chunks_contents_equal(chunks1, chunks2):
     """
 
     end = object()
-    alen = ai = 0
-    blen = bi = 0
+    cdef size_t alen = 0, ai = 0
+    cdef size_t blen = 0, bi = 0
+
     while True:
         if not alen - ai:
             a = next(chunks1, end)

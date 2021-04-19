@@ -214,9 +214,8 @@ The best check that everything is ok is to run a dry-run extraction::
 
 .. _changelog:
 
-
-Version 1.2.0b2 (2021-02-06)
-----------------------------
+Version 1.2.0xx (not released yet)
+----------------------------------
 
 Please note:
 
@@ -235,6 +234,7 @@ Compatibility notes:
   In case your OS does not provide Python >= 3.6, consider using our binary,
   which does not need an external Python interpreter.
 - freeing repository space only happens when "borg compact" is invoked.
+- mount: the default for --numeric-ids is False now (same as borg extract)
 - borg create --noatime is deprecated. Not storing atime is the default behaviour
   now (use --atime if you want to store the atime).
 - list: corrected mix-up of "isomtime" and "mtime" formats.
@@ -261,6 +261,33 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+Fixes:
+
+- create: fix --progress --log-json, #4360#issuecomment-774580052
+
+New features:
+
+- create/extract: add --noxattrs and --noacls options, #3955
+- create: verbose files cache logging via --debug-topic=files_cache, #5659
+- mount: implement --numeric-ids (default: False!), #2377
+- diff: add --json-lines option
+
+Other changes:
+
+- create: add --upload-(ratelimit|buffer), deprecate --remote-* options, #5611
+- create/extract/mount: add --numeric-ids, deprecate --numeric-owner option, #5724
+- config: accept non-int value for max_segment_size / storage_quota
+- use PyInstaller v4.2, #5671
+- cleanup code style checks
+- docs:
+
+  - remove bad /var/cache exclusion in example commands, #5625
+  - misc. fixes and improvements, esp. for macOS
+
+
+Version 1.2.0b2 (2021-02-06)
+----------------------------
 
 Fixes:
 

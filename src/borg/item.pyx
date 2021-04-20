@@ -6,6 +6,7 @@ from .helpers import safe_encode, safe_decode
 from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 from .helpers import format_file_size
+from libc.string cimport memcmp
 
 cdef extern from "_item.c":
     object _object_to_optr(object obj)
@@ -542,28 +543,30 @@ def chunks_contents_equal(chunks1, chunks2):
 
     The chunks must be given as chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`).
     """
-
-    end = object()
-    cdef size_t alen = 0, ai = 0
-    cdef size_t blen = 0, bi = 0
+    cdef:
+        bytes a, b
+        const char *  ap,* bp
+        size_t slicelen = 0
+        size_t alen = 0, ai = 0
+        size_t blen = 0, bi = 0
 
     while True:
         if not alen - ai:
-            a = next(chunks1, end)
-            if a is end:
-                return not blen - bi and next(chunks2, end) is end
-            a = memoryview(a)
+            a = next(chunks1, None)
+            if a is None:
+                return not blen - bi and next(chunks2, None) is None
+            ap = <const char*> a;
             alen = len(a)
             ai = 0
         if not blen - bi:
-            b = next(chunks2, end)
-            if b is end:
-                return not alen - ai and next(chunks1, end) is end
-            b = memoryview(b)
+            b = next(chunks2, None)
+            if b is None:
+                return not alen - ai and next(chunks1, None) is None
+            bp = <const char*> b;
             blen = len(b)
             bi = 0
         slicelen = min(alen - ai, blen - bi)
-        if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
+        if memcmp((<const char*>a) + ai,  (<const char*>b) + bi, slicelen) != 0:
             return False
         ai += slicelen
         bi += slicelen

@@ -546,21 +546,22 @@ def chunks_contents_equal(chunks1, chunks2):
     """
     cdef:
         bytes a, b
-        char *  ap, * bp
+        char * ap,
+        char * bp
         Py_ssize_t slicelen = 0
         Py_ssize_t alen = 0
         Py_ssize_t blen = 0
 
     while True:
         if not alen:
-            a = next(chunks1, None)
+            a = next(chunks_a, None)
             if a is None:
-                return not blen and next(chunks2, None) is None
+                return not blen and next(chunks_b, None) is None
             PyBytes_AsStringAndSize(a, &ap, &alen)
         if not blen:
-            b = next(chunks2, None)
+            b = next(chunks_b, None)
             if b is None:
-                return not alen and next(chunks1, None) is None
+                return not alen and next(chunks_a, None) is None
             PyBytes_AsStringAndSize(b, &bp, &blen)
         slicelen = min(alen, blen)
         if memcmp(ap, bp, slicelen) != 0:

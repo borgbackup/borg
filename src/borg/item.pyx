@@ -106,13 +106,10 @@ cdef class PropDictProperty:
     cdef str type_error_msg
     cdef str attr_error_msg
 
-    def __cinit__(self, str key, value_type, value_type_name=None, encode=None, decode=None):
-       self.key = key
+    def __cinit__(self, value_type, value_type_name=None, encode=None, decode=None):
+       self.key = None
        self.value_type = value_type
        self.value_type_name = value_type_name if value_type_name is not None else value_type.__name__
-       self.__doc__ = "%s (%s)" % (key, value_type_name)
-       self.type_error_msg = "%s value must be %s" % (key, self.value_type_name)
-       self.attr_error_msg = "attribute %s not found" % key
        self.encode = encode
        self.decode = decode
 
@@ -132,13 +129,17 @@ cdef class PropDictProperty:
             value = self.encode(value)
         obj._dict[self.key] = value
 
-
     def __delete__(self, PropDict instance):
         try:
             del instance._dict[self.key]
         except KeyError:
             raise AttributeError(self.attr_error_msg) from None
 
+    cdef __set_name__(self, name):
+       self.key = name
+       self.__doc__ = "%s (%s)" % (name, self.value_type_name)
+       self.type_error_msg = "%s value must be %s" % (name, self.value_type_name)
+       self.attr_error_msg = "attribute %s not found" % name
 
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
@@ -160,49 +161,47 @@ cdef class Item(PropDict):
     We must never re-use this key. See test_attic013_acl_bug for details.
     """
 
-    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys
-
-    __slots__ = ()
+    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }
 
     # properties statically defined, so that IDEs can know their names:
 
-    path = PropDictProperty('path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    source = PropDictProperty('source', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    user = PropDictProperty('user', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
-    group = PropDictProperty('group', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+    path = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    source = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    user = PropDictProperty((str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+    group = PropDictProperty((str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
 
-    acl_access = PropDictProperty('acl_access', bytes)
-    acl_default = PropDictProperty('acl_default', bytes)
-    acl_extended = PropDictProperty('acl_extended', bytes)
-    acl_nfs4 = PropDictProperty('acl_nfs4', bytes)
+    acl_access = PropDictProperty(bytes)
+    acl_default = PropDictProperty(bytes)
+    acl_extended = PropDictProperty(bytes)
+    acl_nfs4 = PropDictProperty(bytes)
 
-    mode = PropDictProperty('mode', int)
-    uid = PropDictProperty('uid', int)
-    gid = PropDictProperty('gid', int)
-    rdev = PropDictProperty('rdev', int)
-    bsdflags = PropDictProperty('bsdflags', int)
+    mode = PropDictProperty(int)
+    uid = PropDictProperty(int)
+    gid = PropDictProperty(int)
+    rdev = PropDictProperty(int)
+    bsdflags = PropDictProperty(int)
 
     # note: we need to keep the bigint conversion for compatibility with borg 1.0 archives.
-    atime = PropDictProperty('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    ctime = PropDictProperty('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    mtime = PropDictProperty('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    birthtime = PropDictProperty('birthtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    atime = PropDictProperty(int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    ctime = PropDictProperty(int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    mtime = PropDictProperty(int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    birthtime = PropDictProperty(int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
 
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
     # compatibility note: this is a new feature, in old archives size will be missing.
-    size = PropDictProperty('size', int)
+    size = PropDictProperty(int)
 
-    hardlink_master = PropDictProperty('hardlink_master', bool)
+    hardlink_master = PropDictProperty(bool)
 
-    chunks = PropDictProperty('chunks', (list, type(None)), 'list or None')
-    chunks_healthy = PropDictProperty('chunks_healthy', (list, type(None)), 'list or None')
+    chunks = PropDictProperty((list, type(None)), 'list or None')
+    chunks_healthy = PropDictProperty((list, type(None)), 'list or None')
 
-    xattrs = PropDictProperty('xattrs', StableDict)
+    xattrs = PropDictProperty(StableDict)
 
-    deleted = PropDictProperty('deleted', bool)
-    nlink = PropDictProperty('nlink', int)
+    deleted = PropDictProperty(bool)
+    nlink = PropDictProperty(int)
 
-    part = PropDictProperty('part', int)
+    part = PropDictProperty(int)
 
     def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
         """
@@ -306,16 +305,14 @@ cdef class EncryptedKey(PropDict):
     If a EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data'}  # str-typed keys
+    VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data'}
 
-    __slots__ = ( )  # avoid setting attributes not supported by properties
-
-    version = PropDictProperty('version', int)
-    algorithm = PropDictProperty('algorithm', str, encode=str.encode, decode=bytes.decode)
-    iterations = PropDictProperty('iterations', int)
-    salt = PropDictProperty('salt', bytes)
-    hash = PropDictProperty('hash', bytes)
-    data = PropDictProperty('data', bytes)
+    version = PropDictProperty(int)
+    algorithm = PropDictProperty(str, encode=str.encode, decode=bytes.decode)
+    iterations = PropDictProperty(int)
+    salt = PropDictProperty(bytes)
+    hash = PropDictProperty(bytes)
+    data = PropDictProperty(bytes)
 
 
 cdef class Key(PropDict):
@@ -330,15 +327,15 @@ cdef class Key(PropDict):
     If a Key shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed', 'tam_required'}  # str-typed keys
+    VALID_KEYS = {'version', 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed', 'tam_required'}
 
-    version = PropDictProperty('version', int)
-    repository_id = PropDictProperty('repository_id', bytes)
-    enc_key = PropDictProperty('enc_key', bytes)
-    enc_hmac_key = PropDictProperty('enc_hmac_key', bytes)
-    id_key = PropDictProperty('id_key', bytes)
-    chunk_seed = PropDictProperty('chunk_seed', int)
-    tam_required = PropDictProperty('tam_required', bool)
+    version = PropDictProperty(int)
+    repository_id = PropDictProperty(bytes)
+    enc_key = PropDictProperty(bytes)
+    enc_hmac_key = PropDictProperty(bytes)
+    id_key = PropDictProperty(bytes)
+    chunk_seed = PropDictProperty(int)
+    tam_required = PropDictProperty(bool)
 
 
 def tuple_encode(t):
@@ -367,27 +364,27 @@ cdef class ArchiveItem(PropDict):
 
     VALID_KEYS = ARCHIVE_KEYS  # str-typed keys
 
-    version = PropDictProperty('version', int)
-    name = PropDictProperty('name', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    items = PropDictProperty('items', list)
-    cmdline = PropDictProperty('cmdline', list)  # list of s-e-str
-    hostname = PropDictProperty('hostname', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    username = PropDictProperty('username', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    time = PropDictProperty('time', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    time_end = PropDictProperty('time_end', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    comment = PropDictProperty('comment', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    chunker_params = PropDictProperty('chunker_params', tuple, 'chunker-params tuple', encode=tuple_encode, decode=tuple_decode)
-    recreate_cmdline = PropDictProperty('recreate_cmdline', list)  # list of s-e-str
+    version = PropDictProperty(int)
+    name = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    items = PropDictProperty(list)
+    cmdline = PropDictProperty(list)  # list of s-e-str
+    hostname = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    username = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    time = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    time_end = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    comment = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    chunker_params = PropDictProperty(tuple, 'chunker-params tuple', encode=tuple_encode, decode=tuple_decode)
+    recreate_cmdline = PropDictProperty(list)  # list of s-e-str
     # recreate_source_id, recreate_args, recreate_partial_chunks were used in 1.1.0b1 .. b2
-    recreate_source_id = PropDictProperty('recreate_source_id', bytes)
-    recreate_args = PropDictProperty('recreate_args', list)  # list of s-e-str
-    recreate_partial_chunks = PropDictProperty('recreate_partial_chunks', list)  # list of tuples
-    size = PropDictProperty('size', int)
-    csize = PropDictProperty('csize', int)
-    nfiles = PropDictProperty('nfiles', int)
-    size_parts = PropDictProperty('size_parts', int)
-    csize_parts = PropDictProperty('csize_parts', int)
-    nfiles_parts = PropDictProperty('nfiles_parts', int)
+    recreate_source_id = PropDictProperty(bytes)
+    recreate_args = PropDictProperty(list)  # list of s-e-str
+    recreate_partial_chunks = PropDictProperty(list)  # list of tuples
+    size = PropDictProperty(int)
+    csize = PropDictProperty(int)
+    nfiles = PropDictProperty(int)
+    size_parts = PropDictProperty(int)
+    csize_parts = PropDictProperty(int)
+    nfiles_parts = PropDictProperty(int)
 
 
 cdef class ManifestItem(PropDict):
@@ -401,13 +398,27 @@ cdef class ManifestItem(PropDict):
 
     If a ManifestItem shall be serialized, give as_dict() method output to msgpack packer.
     """
-    VALID_KEYS = {'version', 'archives', 'timestamp', 'config', 'item_keys', }  # str-typed keys
+    VALID_KEYS = {'version', 'archives', 'timestamp', 'config', 'item_keys', }
 
-    version = PropDictProperty('version', int)
-    archives = PropDictProperty('archives', dict)  # name -> dict
-    timestamp = PropDictProperty('timestamp', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    config = PropDictProperty('config', dict)
-    item_keys = PropDictProperty('item_keys', tuple)
+    version = PropDictProperty(int)
+    archives = PropDictProperty(dict)  # name -> dict
+    timestamp = PropDictProperty(str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    config = PropDictProperty(dict)
+    item_keys = PropDictProperty(tuple)
+
+
+cpdef _init_names():
+    """
+    re-implements python __set_name__
+    """
+    cdef PropDictProperty val = None
+    for cls in PropDict.__subclasses__():
+         for name, value  in vars(cls).items():
+             if isinstance(value, PropDictProperty):
+                 val = value
+                 val.__set_name__(name)
+
+_init_names()
 
 class ItemDiff:
     """

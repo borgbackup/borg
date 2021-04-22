@@ -12,7 +12,7 @@ import pytest
 
 from .archiver import changedir, cmd
 from ..constants import zeros
-
+from ..item import Item
 
 @pytest.fixture
 def repo_url(request, tmpdir, monkeypatch):
@@ -101,3 +101,25 @@ def test_check(benchmark, cmd, archive):
 def test_help(benchmark, cmd):
     result, out = benchmark(cmd, 'help')
     assert result == 0
+
+
+
+
+@pytest.mark.parametrize("type, key, value", [
+    (Item, "size", 1000),
+    (Item, "mode", 0x777),
+    (Item, "deleted", False),
+])
+
+def test_propdict_attributes(benchmark, type, key, value):
+
+
+    propdict = type()
+
+    def getattr_setattr(item, key, value):
+        setattr(item, key, value)
+        assert item.get(key) == value
+        assert getattr(item, key) == value
+        item.as_dict()
+        
+    benchmark(getattr_setattr, propdict, key, value)

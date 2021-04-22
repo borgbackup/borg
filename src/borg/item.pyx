@@ -99,10 +99,10 @@ cdef class PropDict:
 
 cdef class PropDictProperty:
     """return a property that deals with self._dict[key] of  PropDict"""
-    cdef str key
-    cdef object value_type
+    cpdef readonly str key
+    cpdef readonly object value_type
     cdef str value_type_name
-    cdef str __doc__
+    cpdef readonly str __doc__
     cdef object encode
     cdef object decode
     cdef str type_error_msg
@@ -137,7 +137,7 @@ cdef class PropDictProperty:
         except KeyError:
             raise AttributeError(self.attr_error_msg) from None
 
-    cdef __set_name__(self, name):
+    cpdef __set_name__(self, name):
        self.key = name
        self.__doc__ = "%s (%s)" % (name, self.value_type_name)
        self.type_error_msg = "%s value must be %s" % (name, self.value_type_name)
@@ -413,12 +413,10 @@ cpdef _init_names():
     """
     re-implements python __set_name__
     """
-    cdef PropDictProperty val = None
     for cls in PropDict.__subclasses__():
          for name, value  in vars(cls).items():
              if isinstance(value, PropDictProperty):
-                 val = value
-                 val.__set_name__(name)
+                value.__set_name__(name)
 
 _init_names()
 

@@ -1222,13 +1222,14 @@ class FilesystemObjectProcessors:
     def __init__(self, *, metadata_collector, cache, key,
                  add_item, process_file_chunks,
                  chunker_params, show_progress, sparse,
-                 log_json, iec):
+                 log_json, iec, file_status_printer=None):
         self.metadata_collector = metadata_collector
         self.cache = cache
         self.key = key
         self.add_item = add_item
         self.process_file_chunks = process_file_chunks
         self.show_progress = show_progress
+        self.print_file_status = file_status_printer or (lambda *args: None)
 
         self.hard_links = {}
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
@@ -1301,6 +1302,9 @@ class FilesystemObjectProcessors:
             return status
 
     def process_pipe(self, *, path, cache, fd, mode, user, group):
+        status = 'i'  # stdin (or other pipe)
+        self.print_file_status(status, path)
+        status = None  # we already printed the status
         uid = user2uid(user)
         if uid is None:
             raise Error("no such user: %s" % user)
@@ -1319,7 +1323,7 @@ class FilesystemObjectProcessors:
         item.get_size(memorize=True)
         self.stats.nfiles += 1
         self.add_item(item, stats=self.stats)
-        return 'i'  # stdin
+        return status
 
     def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
@@ -1356,6 +1360,8 @@ class FilesystemObjectProcessors:
                             status = 'U'  # regular file, unchanged
                     else:
                         status = 'M' if known else 'A'  # regular file, modified or added
+                    self.print_file_status(status, path)
+                    status = None  # we already printed the status
                     item.hardlink_master = hardlinked
                     # Only chunkify the file if needed
                     if chunks is not None:
@@ -2018,11 +2024,14 @@ class ArchiveRecreater:
             target.stats.show_progress(final=True)
 
     def process_item(self, archive, target, item):
+        status = file_status(item.mode)
         if 'chunks' in item:
+            self.print_file_status(status, item.path)
+            status = None
             self.process_chunks(archive, target, item)
             target.stats.nfiles += 1
         target.add_item(item, stats=target.stats)
-        self.print_file_status(file_status(item.mode), item.path)
+        self.print_file_status(status, item.path)
 
     def process_chunks(self, archive, target, item):
         if not self.recompress and not target.recreate_rechunkify:

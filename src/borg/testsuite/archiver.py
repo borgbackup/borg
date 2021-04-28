@@ -4200,6 +4200,28 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         assert all(x in line for x, line in zip(expected, output.splitlines()))
 
     def test_format_option(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        self.create_regular_file('a_file', size=8)
+        test_archive = self.repository_location + '::test0'
+        self.cmd('create', test_archive, 'input')
+
+        os.unlink('input/a_file')
+        self.create_regular_file('a_file', size=16)
+        test_archive = self.repository_location + '::test1'
+        self.cmd('create', test_archive, 'input')
+
+        output_file_mod = self.cmd('diff', test_archive, "test1")
+        # aquin
+        output_2 = self.cmd(
+            'diff', '--format',
+            '{newsize:8d} B {oldsize:8d} B {path}{NEWLINE}', test_archive)
+        output_3 = self.cmd(
+            'diff', '--format',
+            '{change} ({deltasize:8d} B) {mtime:%s} {path}{NL}', test_archive)
+        self.assert_equal(output_file_mod, output_2)
+        self.assert_not_equal(output_file_mod, output_3)
+
         msg = (
             "Write me; get inspired by self.test_sort_option and "
             "ArchiverTestCase.test_list_format"

@@ -54,8 +54,9 @@ has_link = hasattr(os, 'link')
 
 class Statistics:
 
-    def __init__(self, output_json=False):
+    def __init__(self, output_json=False, iec=False):
         self.output_json = output_json
+        self.iec = iec
         self.osize = self.csize = self.usize = self.nfiles = 0
         self.osize_parts = self.csize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
@@ -75,7 +76,7 @@ class Statistics:
     def __add__(self, other):
         if not isinstance(other, Statistics):
             raise TypeError('can only add Statistics objects')
-        stats = Statistics(self.output_json)
+        stats = Statistics(self.output_json, self.iec)
         stats.osize = self.osize + other.osize
         stats.csize = self.csize + other.csize
         stats.usize = self.usize + other.usize
@@ -97,23 +98,23 @@ class Statistics:
 
     def as_dict(self):
         return {
-            'original_size': FileSize(self.osize),
-            'compressed_size': FileSize(self.csize),
-            'deduplicated_size': FileSize(self.usize),
+            'original_size': FileSize(self.osize, iec=self.iec),
+            'compressed_size': FileSize(self.csize, iec=self.iec),
+            'deduplicated_size': FileSize(self.usize, iec=self.iec),
             'nfiles': self.nfiles,
         }
 
     @property
     def osize_fmt(self):
-        return format_file_size(self.osize)
+        return format_file_size(self.osize, iec=self.iec)
 
     @property
     def usize_fmt(self):
-        return format_file_size(self.usize)
+        return format_file_size(self.usize, iec=self.iec)
 
     @property
     def csize_fmt(self):
-        return format_file_size(self.csize)
+        return format_file_size(self.csize, iec=self.iec)
 
     def show_progress(self, item=None, final=False, stream=None, dt=None):
         now = time.monotonic()
@@ -400,14 +401,15 @@ class Archive:
                  checkpoint_interval=1800, numeric_ids=False, noatime=False, noctime=False,
                  noflags=False, noacls=False, noxattrs=False,
                  progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
-                 consider_part_files=False, log_json=False):
+                 consider_part_files=False, log_json=False, iec=False):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
         self.cache = cache
         self.manifest = manifest
         self.hard_links = {}
-        self.stats = Statistics(output_json=log_json)
+        self.stats = Statistics(output_json=log_json, iec=iec)
+        self.iec = iec
         self.show_progress = progress
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
@@ -644,7 +646,7 @@ Utilization of max. archive size: {csize_max:.0%}
             unique_csize = archive_index.stats_against(cache.chunks)[3]
             pi.finish()
 
-        stats = Statistics()
+        stats = Statistics(iec=self.iec)
         stats.usize = unique_csize  # the part files use same chunks as the full file
         if not have_borg12_meta:
             if self.consider_part_files:
@@ -1220,7 +1222,7 @@ class FilesystemObjectProcessors:
     def __init__(self, *, metadata_collector, cache, key,
                  add_item, process_file_chunks,
                  chunker_params, show_progress, sparse,
-                 log_json):
+                 log_json, iec):
         self.metadata_collector = metadata_collector
         self.cache = cache
         self.key = key
@@ -1229,7 +1231,7 @@ class FilesystemObjectProcessors:
         self.show_progress = show_progress
 
         self.hard_links = {}
-        self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
+        self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
         self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
 

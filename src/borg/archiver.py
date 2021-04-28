@@ -175,7 +175,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
                                cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE),
-                               consider_part_files=getattr(args, 'consider_part_files', False)) as cache_:
+                               consider_part_files=getattr(args, 'consider_part_files', False),
+                               iec=getattr(args, 'iec', False)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)
@@ -192,7 +193,7 @@ def with_archive(method):
                           noacls=getattr(args, 'noacls', False),
                           noxattrs=getattr(args, 'noxattrs', False),
                           cache=kwargs.get('cache'),
-                          consider_part_files=args.consider_part_files, log_json=args.log_json)
+                          consider_part_files=args.consider_part_files, log_json=args.log_json, iec=args.iec)
         return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
     return wrapper
 
@@ -647,13 +648,13 @@ class Archiver:
         if not dry_run:
             with Cache(repository, key, manifest, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
-                       cache_mode=args.files_cache_mode) as cache:
+                       cache_mode=args.files_cache_mode, iec=args.iec) as cache:
                 archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_ids=args.numeric_ids, noatime=not args.atime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
-                                  log_json=args.log_json)
+                                  log_json=args.log_json, iec=args.iec)
                 metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
                     noflags=args.nobsdflags or args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
                     numeric_ids=args.numeric_ids, nobirthtime=args.nobirthtime)
@@ -663,7 +664,7 @@ class Archiver:
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
                     chunker_params=args.chunker_params, show_progress=args.progress, sparse=args.sparse,
-                    log_json=args.log_json)
+                    log_json=args.log_json, iec=args.iec)
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)
@@ -1408,7 +1409,7 @@ class Archiver:
             format = "{archive}{NL}"
         else:
             format = "{archive:<36} {time} [{id}]{NL}"
-        formatter = ArchiveFormatter(format, repository, manifest, key, json=args.json)
+        formatter = ArchiveFormatter(format, repository, manifest, key, json=args.json, iec=args.iec)
 
         output_data = []
 
@@ -1449,7 +1450,7 @@ class Archiver:
 
         for i, archive_name in enumerate(archive_names, 1):
             archive = Archive(repository, key, manifest, archive_name, cache=cache,
-                              consider_part_files=args.consider_part_files)
+                              consider_part_files=args.consider_part_files, iec=args.iec)
             info = archive.info()
             if args.json:
                 output_data.append(info)
@@ -2730,6 +2731,8 @@ class Archiver:
                                    'The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.')
             add_common_option('-p', '--progress', dest='progress', action='store_true',
                               help='show progress information')
+            add_common_option('--iec', action='store_true',
+                              help='format using IEC units (1KiB = 1024B)')
             add_common_option('--log-json', dest='log_json', action='store_true',
                               help='Output one JSON object per log line instead of formatted text.')
             add_common_option('--lock-wait', metavar='SECONDS', dest='lock_wait', type=int, default=1,

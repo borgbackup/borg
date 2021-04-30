@@ -235,7 +235,8 @@ class Archiver:
         logger.warning(msg)
 
     def print_file_status(self, status, path):
-        if self.output_list and (self.output_filter is None or status in self.output_filter):
+        # if we get called with status == None, the final file status was already printed
+        if self.output_list and status is not None and (self.output_filter is None or status in self.output_filter):
             if self.log_json:
                 print(json.dumps({
                     'type': 'file_status',
@@ -562,8 +563,6 @@ class Archiver:
                         status = 'E'
                     if status == 'C':
                         self.print_warning('%s: file changed while we backed it up', path)
-                    if status is None:
-                        status = '?'
                     self.print_file_status(status, path)
                 if args.paths_from_command:
                     rc = proc.wait()
@@ -664,7 +663,7 @@ class Archiver:
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
                     chunker_params=args.chunker_params, show_progress=args.progress, sparse=args.sparse,
-                    log_json=args.log_json, iec=args.iec)
+                    log_json=args.log_json, iec=args.iec, file_status_printer=self.print_file_status)
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)
@@ -820,8 +819,6 @@ class Archiver:
             status = 'E'
         if status == 'C':
             self.print_warning('%s: file changed while we backed it up', path)
-        if status is None:
-            status = '?'  # need to add a status code somewhere
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
 

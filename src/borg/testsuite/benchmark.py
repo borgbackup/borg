@@ -14,6 +14,7 @@ from .archiver import changedir, cmd
 from ..constants import zeros
 from ..item import Item
 
+
 @pytest.fixture
 def repo_url(request, tmpdir, monkeypatch):
     monkeypatch.setenv('BORG_PASSPHRASE', '123456')
@@ -103,16 +104,12 @@ def test_help(benchmark, cmd):
     assert result == 0
 
 
-
-
 @pytest.mark.parametrize("type, key, value", [
     (Item, "size", 1000),
     (Item, "mode", 0x777),
     (Item, "deleted", False),
 ])
-
 def test_propdict_attributes(benchmark, type, key, value):
-
 
     propdict = type()
 
@@ -121,5 +118,5 @@ def test_propdict_attributes(benchmark, type, key, value):
         assert item.get(key) == value
         assert getattr(item, key) == value
         item.as_dict()
-        
+
     benchmark(getattr_setattr, propdict, key, value)

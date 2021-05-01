@@ -37,7 +37,9 @@ if my_python < min_python:
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
-install_requires = []
+install_requires = [
+    'packaging',
+]
 
 # note for package maintainers: if you package borgbackup for distribution,
 # please add llfuse as a *requirement* on all platforms that have a working

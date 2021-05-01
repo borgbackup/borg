@@ -1,11 +1,12 @@
-from distutils.version import LooseVersion
+from packaging.version import parse as parse_version
 
 # IMPORTANT keep imports from borg here to a minimum because our testsuite depends on
 # being able to import borg.constants and then monkey patching borg.constants.PBKDF2_ITERATIONS
 from ._version import version as __version__
 
 
-__version_tuple__ = tuple(LooseVersion(__version__).version[:3])
+_v = parse_version(__version__)
+__version_tuple__ = _v._version.release
 
 # assert that all semver components are integers
 # this is mainly to show errors when people repackage poorly

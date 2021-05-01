@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from distutils.version import LooseVersion
+from packaging.version import parse as parse_version
 
 from .helpers import prepare_subprocess_env
 
@@ -29,8 +29,8 @@ if sys.platform.startswith('linux'):
         if preload.startswith("libfakeroot"):
             env = prepare_subprocess_env(system=True)
             fakeroot_output = subprocess.check_output(['fakeroot', '-v'], env=env)
-            fakeroot_version = LooseVersion(fakeroot_output.decode('ascii').split()[-1])
-            if fakeroot_version >= LooseVersion("1.20.2"):
+            fakeroot_version = parse_version(fakeroot_output.decode('ascii').split()[-1])
+            if fakeroot_version >= parse_version("1.20.2"):
                 # 1.20.2 has been confirmed to have xattr support
                 # 1.18.2 has been confirmed not to have xattr support
                 # Versions in-between are unknown

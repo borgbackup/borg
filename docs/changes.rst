@@ -243,6 +243,10 @@ Compatibility notes:
   The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
   and the default is now "mtime".
   "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+- create/recreate --list: file status for all files used to get announced *AFTER*
+  the file (with borg < 1.2). Now, file status is announced *BEFORE* the file
+  contents are processed. If the file status changes later (e.g. due to an error
+  or a content change), the updated/final file status will be printed again.
 - removed deprecated-since-long stuff (deprecated since):
 
   - command "borg change-passphrase" (2017-02), use "borg key ..."
@@ -265,13 +269,17 @@ Compatibility notes:
 Fixes:
 
 - create: fix --progress --log-json, #4360#issuecomment-774580052
+- do not load files cache for commands not using it, #5673
+- fix repeated cache tag file writing bug
 
 New features:
 
+- create/recreate: print preliminary file status early, #5417
 - create/extract: add --noxattrs and --noacls options, #3955
 - create: verbose files cache logging via --debug-topic=files_cache, #5659
 - mount: implement --numeric-ids (default: False!), #2377
 - diff: add --json-lines option
+- info / create --stats: add --iec option to print sizes in powers of 1024.
 
 Other changes:
 
@@ -280,11 +288,14 @@ Other changes:
 - config: accept non-int value for max_segment_size / storage_quota
 - use PyInstaller v4.2, #5671
 - cleanup code style checks
+- get rid of distutils, use setuptools+packaging
+- github CI: test on Python 3.10-dev
+- check: missing / healed chunks: always tell chunk ID, #5704
 - docs:
 
   - remove bad /var/cache exclusion in example commands, #5625
   - misc. fixes and improvements, esp. for macOS
-
+  - add unsafe workaround to use an old repo copy, #5722
 
 Version 1.2.0b2 (2021-02-06)
 ----------------------------

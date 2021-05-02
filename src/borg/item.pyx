@@ -517,36 +517,36 @@ class ItemDiff:
             return self._item1.chunks == self._item2.chunks
         if self._item1.get_size() != self._item2.get_size():
             return False
-        return ItemDiff._chunk_content_equal(chunk_iterator1, chunk_iterator2)
+        return chunks_contents_equal(chunk_iterator1, chunk_iterator2)
 
-    @staticmethod
-    def _chunk_content_equal(chunks1, chunks2):
-        """
-        Compare chunk content and return True if they are identical.
 
-        The chunks must be given as chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`).
-        """
+def chunks_contents_equal(chunks1, chunks2):
+    """
+    Compare chunk content and return True if they are identical.
 
-        end = object()
-        alen = ai = 0
-        blen = bi = 0
-        while True:
-            if not alen - ai:
-                a = next(chunks1, end)
-                if a is end:
-                    return not blen - bi and next(chunks2, end) is end
-                a = memoryview(a)
-                alen = len(a)
-                ai = 0
-            if not blen - bi:
-                b = next(chunks2, end)
-                if b is end:
-                    return not alen - ai and next(chunks1, end) is end
-                b = memoryview(b)
-                blen = len(b)
-                bi = 0
-            slicelen = min(alen - ai, blen - bi)
-            if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
-                return False
-            ai += slicelen
-            bi += slicelen
+    The chunks must be given as chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`).
+    """
+
+    end = object()
+    alen = ai = 0
+    blen = bi = 0
+    while True:
+        if not alen - ai:
+            a = next(chunks1, end)
+            if a is end:
+                return not blen - bi and next(chunks2, end) is end
+            a = memoryview(a)
+            alen = len(a)
+            ai = 0
+        if not blen - bi:
+            b = next(chunks2, end)
+            if b is end:
+                return not alen - ai and next(chunks1, end) is end
+            b = memoryview(b)
+            blen = len(b)
+            bi = 0
+        slicelen = min(alen - ai, blen - bi)
+        if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
+            return False
+        ai += slicelen
+        bi += slicelen

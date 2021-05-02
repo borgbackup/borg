@@ -47,7 +47,7 @@ from ..helpers import msgpack
 from ..helpers import flags_noatime, flags_normal
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
-from ..item import Item, ItemDiff
+from ..item import Item, ItemDiff, chunks_contents_equal
 from ..locking import LockFailed
 from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
@@ -4218,8 +4218,8 @@ def test_chunk_content_equal():
     def ccc(a, b):
         chunks_a = [data for data in a]
         chunks_b = [data for data in b]
-        compare1 = ItemDiff._chunk_content_equal(iter(chunks_a), iter(chunks_b))
-        compare2 = ItemDiff._chunk_content_equal(iter(chunks_b), iter(chunks_a))
+        compare1 = chunks_contents_equal(iter(chunks_a), iter(chunks_b))
+        compare2 = chunks_contents_equal(iter(chunks_b), iter(chunks_a))
         assert compare1 == compare2
         return compare1
     assert ccc([

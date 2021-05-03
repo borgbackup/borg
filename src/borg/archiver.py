@@ -2728,7 +2728,7 @@ class Archiver:
                                    'The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.')
             add_common_option('-p', '--progress', dest='progress', action='store_true',
                               help='show progress information')
-            add_common_option('--iec', action='store_true',
+            add_common_option('--iec', dest='iec', action='store_true',
                               help='format using IEC units (1KiB = 1024B)')
             add_common_option('--log-json', dest='log_json', action='store_true',
                               help='Output one JSON object per log line instead of formatted text.')

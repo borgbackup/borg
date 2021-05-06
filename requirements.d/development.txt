@@ -1,4 +1,4 @@
-setuptools
+setuptools>=45
 setuptools_scm
 pip
 virtualenv

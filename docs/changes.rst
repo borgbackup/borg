@@ -214,6 +214,9 @@ The best check that everything is ok is to run a dry-run extraction::
 
 .. _changelog:
 
+Change Log
+==========
+
 Version 1.2.0xx (not released yet)
 ----------------------------------
 

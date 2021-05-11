@@ -75,7 +75,9 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs. |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--numeric-owner``                               | only store numeric user and group identifiers                                                                                                        |
+    |                                                       | ``--numeric-owner``                               | deprecated, use ``--numeric-ids`` instead                                                                                                            |
+    +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--numeric-ids``                                 | only store numeric user and group identifiers                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--noatime``                                     | do not store atime into archive                                                                                                                      |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -88,6 +90,10 @@ borg create
     |                                                       | ``--nobsdflags``                                  | deprecated, use ``--noflags`` instead                                                                                                                |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--noflags``                                     | do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive                                                                                    |
+    +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--noacls``                                      | do not read and store ACLs into archive                                                                                                              |
+    +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--noxattrs``                                    | do not read and store xattrs into archive                                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--sparse``                                      | detect sparse holes in input (supported only by fixed chunker)                                                                                       |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -157,13 +163,16 @@ borg create
 
     Filesystem options
         -x, --one-file-system     stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
-        --numeric-owner           only store numeric user and group identifiers
+        --numeric-owner           deprecated, use ``--numeric-ids`` instead
+        --numeric-ids             only store numeric user and group identifiers
         --noatime                 do not store atime into archive
         --atime                   do store atime into archive
         --noctime                 do not store ctime into archive
         --nobirthtime             do not store birthtime (creation date) into archive
         --nobsdflags              deprecated, use ``--noflags`` instead
         --noflags                 do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive
+        --noacls                  do not read and store ACLs into archive
+        --noxattrs                do not read and store xattrs into archive
         --sparse                  detect sparse holes in input (supported only by fixed chunker)
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.

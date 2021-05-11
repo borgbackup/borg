@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2021-02-06" "" "borg backup tool"
+.TH BORG-CREATE 1 "2021-05-11" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .
@@ -211,6 +211,9 @@ exclude files flagged NODUMP
 stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
 .TP
 .B \-\-numeric\-owner
+deprecated, use \fB\-\-numeric\-ids\fP instead
+.TP
+.B \-\-numeric\-ids
 only store numeric user and group identifiers
 .TP
 .B \-\-noatime
@@ -230,6 +233,12 @@ deprecated, use \fB\-\-noflags\fP instead
 .TP
 .B \-\-noflags
 do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive
+.TP
+.B \-\-noacls
+do not read and store ACLs into archive
+.TP
+.B \-\-noxattrs
+do not read and store xattrs into archive
 .TP
 .B \-\-sparse
 detect sparse holes in input (supported only by fixed chunker)

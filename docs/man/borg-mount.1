@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-MOUNT 1 "2021-02-06" "" "borg backup tool"
+.TH BORG-MOUNT 1 "2021-05-11" "" "borg backup tool"
 .SH NAME
 borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .
@@ -101,6 +101,12 @@ stay in foreground, do not daemonize
 .TP
 .B \-o
 Extra mount options
+.TP
+.B \-\-numeric\-owner
+deprecated, use \fB\-\-numeric\-ids\fP instead
+.TP
+.B \-\-numeric\-ids
+use numeric user and group identifiers from archive(s)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

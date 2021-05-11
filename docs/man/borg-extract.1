@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXTRACT 1 "2021-02-06" "" "borg backup tool"
+.TH BORG-EXTRACT 1 "2021-05-11" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .
@@ -78,6 +78,9 @@ output verbose list of items (files, dirs, ...)
 do not actually change any files
 .TP
 .B \-\-numeric\-owner
+deprecated, use \fB\-\-numeric\-ids\fP instead
+.TP
+.B \-\-numeric\-ids
 only obey numeric user and group identifiers
 .TP
 .B \-\-nobsdflags
@@ -85,6 +88,12 @@ deprecated, use \fB\-\-noflags\fP instead
 .TP
 .B \-\-noflags
 do not extract/set flags (e.g. NODUMP, IMMUTABLE)
+.TP
+.B \-\-noacls
+do not extract/set ACLs
+.TP
+.B \-\-noxattrs
+do not extract/set xattrs
 .TP
 .B \-\-stdout
 write all extracted data to stdout

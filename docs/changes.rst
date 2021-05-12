@@ -214,8 +214,11 @@ The best check that everything is ok is to run a dry-run extraction::
 
 .. _changelog:
 
-Version 1.2.0xx (not released yet)
-----------------------------------
+Change Log
+==========
+
+Version 1.2.0b3 (2ß21-05-12)
+----------------------------
 
 Please note:
 
@@ -286,7 +289,9 @@ Other changes:
 - create: add --upload-(ratelimit|buffer), deprecate --remote-* options, #5611
 - create/extract/mount: add --numeric-ids, deprecate --numeric-owner option, #5724
 - config: accept non-int value for max_segment_size / storage_quota
-- use PyInstaller v4.2, #5671
+- use PyInstaller v4.3, #5671
+- vagrant: use Python 3.9.5 to build binaries
+- tox.ini: modernize and enable execution without preinstalling deps
 - cleanup code style checks
 - get rid of distutils, use setuptools+packaging
 - github CI: test on Python 3.10-dev

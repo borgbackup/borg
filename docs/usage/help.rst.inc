@@ -98,14 +98,14 @@ Path full-match, selector `pf:`
     wildcards at most.
 
 Exclusions can be passed via the command line option ``--exclude``. When used
-from within a shell the patterns should be quoted to protect them from
+from within a shell, the patterns should be quoted to protect them from
 expansion.
 
 The ``--exclude-from`` option permits loading exclusion patterns from a text
 file with one pattern per line. Lines empty or starting with the number sign
 ('#') after removing whitespace on both ends are ignored. The optional style
 selector prefix is also supported for patterns loaded from a file. Due to
-whitespace removal paths with whitespace at the beginning or end can only be
+whitespace removal, paths with whitespace at the beginning or end can only be
 excluded using regular expressions.
 
 To test your exclusion patterns without performing an actual backup you can

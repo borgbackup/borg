@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMMON 1 "2021-02-06" "" "borg backup tool"
+.TH BORG-COMMON 1 "2021-05-11" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .
@@ -57,6 +57,9 @@ enable TOPIC debugging (can be specified multiple times). The logger path is bor
 .B \-p\fP,\fB  \-\-progress
 show progress information
 .TP
+.B \-\-iec
+format using IEC units (1KiB = 1024B)
+.TP
 .B \-\-log\-json
 Output one JSON object per log line instead of formatted text.
 .TP
@@ -79,10 +82,16 @@ set umask to M (local only, default: 0077)
 use PATH as borg executable on the remote (default: "borg")
 .TP
 .BI \-\-remote\-ratelimit \ RATE
-set remote network upload rate limit in kiByte/s (default: 0=unlimited)
+deprecated, use \fB\-\-upload\-ratelimit\fP instead
+.TP
+.BI \-\-upload\-ratelimit \ RATE
+set network upload rate limit in kiByte/s (default: 0=unlimited)
 .TP
 .BI \-\-remote\-buffer \ UPLOAD_BUFFER
-set upload buffer size in MiB. (default: 0=no buffer)
+deprecated, use \fB\-\-upload\-buffer\fP instead
+.TP
+.BI \-\-upload\-buffer \ UPLOAD_BUFFER
+set network upload buffer size in MiB. (default: 0=no buffer)
 .TP
 .B \-\-consider\-part\-files
 treat part files like normal files (e.g. to list/extract them)

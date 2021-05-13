@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.0b3 (2ß21-05-12)
+Version 1.2.0b3 (2021-05-12)
 ----------------------------
 
 Please note:

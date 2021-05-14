@@ -1877,8 +1877,11 @@ class ArchiveChecker:
                 return
         num_archives = len(archive_infos)
 
+        pi = ProgressIndicatorPercent(total=num_archives, msg='Checking archives %3.1f%%', step=0.1,
+                                      msgid='check.rebuild_refcounts')
         with cache_if_remote(self.repository) as repository:
             for i, info in enumerate(archive_infos):
+                pi.show(i)
                 logger.info('Analyzing archive {} ({}/{})'.format(info.name, i + 1, num_archives))
                 archive_id = info.id
                 if archive_id not in self.chunks:
@@ -1908,6 +1911,7 @@ class ArchiveChecker:
                 cdata = self.key.encrypt(data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)
                 self.manifest.archives[info.name] = (new_archive_id, info.ts)
+            pi.finish()
 
     def orphan_chunks_check(self):
         if self.check_all:

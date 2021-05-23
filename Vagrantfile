@@ -18,6 +18,8 @@ def packages_debianoid(user)
     apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
+    apt install -y locales || true
+    sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
     usermod -a -G fuse #{user}
     chgrp fuse /dev/fuse
     chmod 666 /dev/fuse
@@ -119,11 +121,14 @@ end
 
 def install_pyenv(boxname)
   return <<-EOF
-    curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
-    echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bash_profile
-    echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
-    echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bash_profile
+    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bash_profile
+    . ~/.bash_profile
+    curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
+    echo 'eval "$(pyenv init --path)"' >> ~/.bash_profile
+    echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+    echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
   EOF
 end
 
@@ -136,6 +141,7 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
+    pyenv install 3.10-dev  # tests, version supporting openssl 1.1
     pyenv install 3.9.5  # tests, version supporting openssl 1.1, binary build
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv install 3.7.0  # tests, version supporting openssl 1.1
@@ -207,8 +213,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.6.2 3.7.0 3.8.0 3.9.5
-      pyenv local 3.6.2 3.7.0 3.8.0 3.9.5
+      pyenv global 3.6.2 3.7.0 3.8.0 3.9.5 3.10-dev
+      pyenv local 3.6.2 3.7.0 3.8.0 3.9.5 3.10-dev
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -271,6 +277,22 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("bionic64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64", ".*(fuse3|none).*")
+  end
+
+  config.vm.define "bullseye64" do |b|
+    b.vm.box = "debian/bullseye64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("bullseye64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("bullseye64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("bullseye64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("bullseye64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bullseye64", ".*none.*")
   end
 
   config.vm.define "buster64" do |b|

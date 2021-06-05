@@ -1670,7 +1670,7 @@ class ArchiveChecker:
                         self.repository.delete(defect_chunk)
                         logger.debug('chunk %s deleted.', bin_to_hex(defect_chunk))
                     else:
-                        logger.warning('chunk %s not deleted, did not consistently fail.')
+                        logger.warning('chunk %s not deleted, did not consistently fail.', bin_to_hex(defect_chunk))
             else:
                 logger.warning('Found defect chunks. With --repair, they would get deleted, so affected '
                                'files could get repaired then and maybe healed later.')

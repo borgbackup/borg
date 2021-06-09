@@ -75,6 +75,7 @@ try:
     from .helpers import msgpack
     from .helpers import sig_int
     from .helpers import iter_separated
+    from .helpers import get_tar_filter
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
@@ -951,18 +952,7 @@ class Archiver:
         # that it has to be installed -- hardly a problem, considering that
         # the decompressor must be installed as well to make use of the exported tarball!
 
-        filter = None
-        if args.tar_filter == 'auto':
-            # Note that filter remains None if tarfile is '-'.
-            if args.tarfile.endswith('.tar.gz'):
-                filter = 'gzip'
-            elif args.tarfile.endswith('.tar.bz2'):
-                filter = 'bzip2'
-            elif args.tarfile.endswith('.tar.xz'):
-                filter = 'xz'
-            logger.debug('Automatically determined tar filter: %s', filter)
-        else:
-            filter = args.tar_filter
+        filter = get_tar_filter(args.tarfile) if args.tar_filter == 'auto' else args.tar_filter
 
         tarstream = dash_open(args.tarfile, 'wb')
         tarstream_close = args.tarfile != '-'
@@ -1705,17 +1695,7 @@ class Archiver:
         self.output_filter = args.output_filter
         self.output_list = args.output_list
 
-        filter = None
-        if args.tar_filter == 'auto' and args.tarfile != '-':
-            if args.tarfile.endswith('.tar.gz'):
-                filter = 'gunzip'
-            elif args.tarfile.endswith('.tar.bz2'):
-                filter = 'bunzip2'
-            elif args.tarfile.endswith('.tar.xz'):
-                filter = 'unxz'
-            logger.debug('Automatically determined tar filter: %s', filter)
-        else:
-            filter = args.tar_filter
+        filter = get_tar_filter(args.tarfile) if args.tar_filter == 'auto' else args.tar_filter
 
         tarstream = dash_open(args.tarfile, 'rb')
         tarstream_close = args.tarfile != '-'
@@ -3861,9 +3841,11 @@ class Archiver:
         based on its file extension and pipe the tarball through an appropriate filter
         before writing it to FILE:
 
-        - .tar.gz: gzip
-        - .tar.bz2: bzip2
-        - .tar.xz: xz
+        - .tar.gz or .tgz: gzip
+        - .tar.bz2 or .tbz: bzip2
+        - .tar.xz or .txz: xz
+        - .tar.zstd: zstd
+        - .tar.lz4: lz4
 
         Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
         read the uncompressed tar stream from stdin and write a compressed/filtered
@@ -4733,9 +4715,11 @@ class Archiver:
         By default (--tar-filter=auto) Borg will detect whether the file is compressed
         based on its file extension and pipe the file through an appropriate filter:
 
-        - .tar.gz: gunzip
-        - .tar.bz2: bunzip2
-        - .tar.xz: unxz
+        - .tar.gz or .tgz: gzip -d
+        - .tar.bz2 or .tbz: bzip2 -d
+        - .tar.xz or .txz: xz -d
+        - .tar.zstd: zstd -d
+        - .tar.lz4: lz4 -d
 
         Alternatively, a --tar-filter program may be explicitly specified. It should
         read compressed data from stdin and output an uncompressed tar stream on

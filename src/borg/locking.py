@@ -156,7 +156,13 @@ class ExclusiveLock:
         return os.path.exists(self.unique_name)
 
     def kill_stale_lock(self):
-        for name in os.listdir(self.path):
+        try:
+            names = os.listdir(self.path)
+        except FileNotFoundError:
+            # if another borg process won the race for killing a stale lock, we get here.
+            return False
+
+        for name in names:
             try:
                 host_pid, thread_str = name.rsplit('-', 1)
                 host, pid_str = host_pid.rsplit('.', 1)

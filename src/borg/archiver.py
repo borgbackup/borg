@@ -1793,12 +1793,10 @@ class Archiver:
                 self.print_warning('%s: Unsupported tar type %s', tarinfo.name, tarinfo.type)
             self.print_file_status(status, tarinfo.name)
 
-        self._it_save_archive(args, archive)
-
-    def _it_save_archive(self, args, archive):
-        archive.save(comment=args.comment, timestamp=args.timestamp)
         if args.progress:
             archive.stats.show_progress(final=True)
+        archive.stats += tfo.stats
+        archive.save(comment=args.comment, timestamp=args.timestamp)
         args.stats |= args.json
         if args.stats:
             if args.json:

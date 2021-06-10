@@ -240,7 +240,7 @@ def iter_separated(fd, sep=None, read_size=4096):
         yield part
 
 
-def get_tar_filter(fname):
+def get_tar_filter(fname, decompress):
     # Note that filter is None if fname is '-'.
     if fname.endswith(('.tar.gz', '.tgz')):
         filter = 'gzip -d' if decompress else 'gzip'

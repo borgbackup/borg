@@ -3424,6 +3424,20 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
+    @requires_gzip
+    def test_import_tar_gz(self):
+        if not shutil.which('gzip'):
+            pytest.skip('gzip is not installed')
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tgz')
+        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tgz')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+        self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
+
     def test_detect_attic_repo(self):
         path = make_attic_repo(self.repository_path)
         cmds = [

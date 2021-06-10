@@ -68,7 +68,7 @@ try:
     from .helpers import basic_json_data, json_print
     from .helpers import replace_placeholders
     from .helpers import ChunkIteratorFileWrapper
-    from .helpers import popen_with_error_handling, prepare_subprocess_env
+    from .helpers import popen_with_error_handling, prepare_subprocess_env, create_filter_process
     from .helpers import dash_open
     from .helpers import umount
     from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
@@ -952,45 +952,13 @@ class Archiver:
         # that it has to be installed -- hardly a problem, considering that
         # the decompressor must be installed as well to make use of the exported tarball!
 
-        filter = get_tar_filter(args.tarfile) if args.tar_filter == 'auto' else args.tar_filter
+        filter = get_tar_filter(args.tarfile, decompress=False) if args.tar_filter == 'auto' else args.tar_filter
 
         tarstream = dash_open(args.tarfile, 'wb')
         tarstream_close = args.tarfile != '-'
 
-        if filter:
-            # When we put a filter between us and the final destination,
-            # the selected output (tarstream until now) becomes the output of the filter (=filterout).
-            # The decision whether to close that or not remains the same.
-            filterout = tarstream
-            filterout_close = tarstream_close
-            env = prepare_subprocess_env(system=True)
-            # There is no deadlock potential here (the subprocess docs warn about this), because
-            # communication with the process is a one-way road, i.e. the process can never block
-            # for us to do something while we block on the process for something different.
-            filterproc = popen_with_error_handling(filter, stdin=subprocess.PIPE, stdout=filterout,
-                                                   log_prefix='--tar-filter: ', env=env)
-            if not filterproc:
-                return EXIT_ERROR
-            # Always close the pipe, otherwise the filter process would not notice when we are done.
-            tarstream = filterproc.stdin
-            tarstream_close = True
-
-        self._export_tar(args, archive, tarstream)
-
-        if tarstream_close:
-            tarstream.close()
-
-        if filter:
-            logger.debug('Done creating tar, waiting for filter to die...')
-            rc = filterproc.wait()
-            if rc:
-                logger.error('--tar-filter exited with code %d, output file is likely unusable!', rc)
-                self.exit_code = EXIT_ERROR
-            else:
-                logger.debug('filter exited with code %d', rc)
-
-            if filterout_close:
-                filterout.close()
+        with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=False) as _stream:
+            self._export_tar(args, archive, _stream)
 
         return self.exit_code
 
@@ -1695,33 +1663,13 @@ class Archiver:
         self.output_filter = args.output_filter
         self.output_list = args.output_list
 
-        filter = get_tar_filter(args.tarfile) if args.tar_filter == 'auto' else args.tar_filter
+        filter = get_tar_filter(args.tarfile, decompress=True) if args.tar_filter == 'auto' else args.tar_filter
 
         tarstream = dash_open(args.tarfile, 'rb')
         tarstream_close = args.tarfile != '-'
 
-        if filter:
-            filterin = tarstream
-            filterin_close = tarstream_close
-            filterproc = subprocess.Popen(shlex.split(filter), stdin=filterin.fileno(), stdout=subprocess.PIPE)
-            # We can't deadlock. Why? Because we just give the FD of the stream to the filter process,
-            # it can read as much data as it wants!
-            tarstream = filterproc.stdout
-            tarstream_close = False
-
-        self._import_tar(args, repository, manifest, key, cache, tarstream)
-
-        if filter:
-            logger.debug('Done creating archive, waiting for filter to die...')
-            rc = filterproc.wait()
-            logger.debug('filter exited with code %d', rc)
-            self.exit_code = max(self.exit_code, rc)
-
-            if filterin_close:
-                filterin.close()
-
-        if tarstream_close:
-            tarstream.close()
+        with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=True) as _stream:
+            self._import_tar(args, repository, manifest, key, cache, _stream)
 
         return self.exit_code
 

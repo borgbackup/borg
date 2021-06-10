@@ -52,7 +52,7 @@ try:
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes, make_path_safe
+    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from .helpers import timestamp
     from .helpers import get_cache_dir, os_stat
@@ -1713,6 +1713,9 @@ class Archiver:
 
         self._import_tar(args, repository, manifest, key, cache, tar)
 
+        # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
+        tar.close()
+
         if filter:
             logger.debug('Done creating archive, waiting for filter to die...')
             rc = filterproc.wait()
@@ -1768,9 +1771,8 @@ class Archiver:
             elif tarinfo.isfifo():
                 status = tfo.process_fifo(tarinfo=tarinfo, status='f', type=stat.S_IFIFO)
             else:
-                # TODO: GNUTYPE_SPARSE?
                 status = 'E'
-                self.print_warning('%s: Unsupported tar type %s', tarinfo.name, tarinfo.type)
+                self.print_warning('%s: Unsupported tarinfo type %s', tarinfo.name, tarinfo.type)
             self.print_file_status(status, tarinfo.name)
 
         if args.progress:

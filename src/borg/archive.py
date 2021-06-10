@@ -1421,11 +1421,11 @@ class TarfileObjectProcessors:
             return status
 
     def process_fifo(self, *, tarinfo, status, type):
-        with self.create_helper(tarinfo, status, type) as (item, status):  # fifo
+        with self.create_helper(tarinfo, status, type) as (item, status):
             return status
 
     def process_dev(self, *, tarinfo, status, type):
-        with self.create_helper(tarinfo, status, type) as (item, status):  # char/block device
+        with self.create_helper(tarinfo, status, type) as (item, status):
             item.rdev = os.makedev(tarinfo.devmajor, tarinfo.devminor)
             return status
 

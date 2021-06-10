@@ -975,14 +975,7 @@ class Archiver:
             tarstream = filterproc.stdin
             tarstream_close = True
 
-        # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
-        # where it never seeks on the passed fileobj.
-        tar = tarfile.open(fileobj=tarstream, mode='w|', format=tarfile.GNU_FORMAT)
-
-        self._export_tar(args, archive, tar)
-
-        # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
-        tar.close()
+        self._export_tar(args, archive, tarstream)
 
         if tarstream_close:
             tarstream.close()
@@ -1001,7 +994,7 @@ class Archiver:
 
         return self.exit_code
 
-    def _export_tar(self, args, archive, tar):
+    def _export_tar(self, args, archive, tarstream):
         matcher = self.build_matcher(args.patterns, args.paths)
 
         progress = args.progress
@@ -1016,6 +1009,10 @@ class Archiver:
                 hardlink_masters[item.get('path')] = (item.get('chunks'), None)
 
         filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
+
+        # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
+        # where it never seeks on the passed fileobj.
+        tar = tarfile.open(fileobj=tarstream, mode='w|', format=tarfile.GNU_FORMAT)
 
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Processing: %s', step=0.1, msgid='extract')
@@ -1127,6 +1124,9 @@ class Archiver:
 
         if pi:
             pi.finish()
+
+        # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
+        tar.close()
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)
@@ -1709,12 +1709,7 @@ class Archiver:
             tarstream = filterproc.stdout
             tarstream_close = False
 
-        tar = tarfile.open(fileobj=tarstream, mode='r|')
-
-        self._import_tar(args, repository, manifest, key, cache, tar)
-
-        # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
-        tar.close()
+        self._import_tar(args, repository, manifest, key, cache, tarstream)
 
         if filter:
             logger.debug('Done creating archive, waiting for filter to die...')
@@ -1730,7 +1725,7 @@ class Archiver:
 
         return self.exit_code
 
-    def _import_tar(self, args, repository, manifest, key, cache, tar):
+    def _import_tar(self, args, repository, manifest, key, cache, tarstream):
         t0 = datetime.utcnow()
         t0_monotonic = time.monotonic()
 
@@ -1747,6 +1742,8 @@ class Archiver:
                                       chunker_params=args.chunker_params, show_progress=args.progress,
                                       log_json=args.log_json, iec=args.iec,
                                       file_status_printer=self.print_file_status)
+
+        tar = tarfile.open(fileobj=tarstream, mode='r|')
 
         while True:
             tarinfo = tar.next()
@@ -1774,6 +1771,9 @@ class Archiver:
                 status = 'E'
                 self.print_warning('%s: Unsupported tarinfo type %s', tarinfo.name, tarinfo.type)
             self.print_file_status(status, tarinfo.name)
+
+        # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
+        tar.close()
 
         if args.progress:
             archive.stats.show_progress(final=True)

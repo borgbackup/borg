@@ -130,7 +130,7 @@ def ChunkerParams(s):
 
 def FilesCacheMode(s):
     ENTRIES_MAP = dict(ctime='c', mtime='m', size='s', inode='i', rechunk='r', disabled='d')
-    VALID_MODES = ('cis', 'ims', 'cs', 'ms', 'cr', 'mr', 'd')  # letters in alpha order
+    VALID_MODES = ('cis', 'ims', 'cs', 'ms', 'cr', 'mr', 'd', 's')  # letters in alpha order
     entries = set(s.strip().split(','))
     if not entries <= set(ENTRIES_MAP):
         raise ValueError('cache mode must be a comma-separated list of: %s' % ','.join(sorted(ENTRIES_MAP)))

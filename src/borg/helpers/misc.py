@@ -238,3 +238,21 @@ def iter_separated(fd, sep=None, read_size=4096):
     # or if there was no data before EOF
     if len(part) > 0:
         yield part
+
+
+def get_tar_filter(fname, decompress):
+    # Note that filter is None if fname is '-'.
+    if fname.endswith(('.tar.gz', '.tgz')):
+        filter = 'gzip -d' if decompress else 'gzip'
+    elif fname.endswith(('.tar.bz2', '.tbz')):
+        filter = 'bzip2 -d' if decompress else 'bzip2'
+    elif fname.endswith(('.tar.xz', '.txz')):
+        filter = 'xz -d' if decompress else 'xz'
+    elif fname.endswith(('.tar.lz4', )):
+        filter = 'lz4 -d' if decompress else 'lz4'
+    elif fname.endswith(('.tar.zstd', )):
+        filter = 'zstd -d' if decompress else 'zstd'
+    else:
+        filter = None
+    logger.debug('Automatically determined tar filter: %s', filter)
+    return filter

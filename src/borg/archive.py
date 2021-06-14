@@ -1392,6 +1392,60 @@ class FilesystemObjectProcessors:
                 return status
 
 
+class TarfileObjectProcessors:
+    def __init__(self, *, cache, key,
+                 add_item, process_file_chunks,
+                 chunker_params, show_progress,
+                 log_json, iec, file_status_printer=None):
+        self.cache = cache
+        self.key = key
+        self.add_item = add_item
+        self.process_file_chunks = process_file_chunks
+        self.show_progress = show_progress
+        self.print_file_status = file_status_printer or (lambda *args: None)
+
+        self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
+        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=False)
+
+    @contextmanager
+    def create_helper(self, tarinfo, status=None, type=None):
+        item = Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
+                    uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname, group=tarinfo.gname,
+                    mtime=tarinfo.mtime * 1000**3)
+        yield item, status
+        # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
+        self.add_item(item, stats=self.stats)
+
+    def process_dir(self, *, tarinfo, status, type):
+        with self.create_helper(tarinfo, status, type) as (item, status):
+            return status
+
+    def process_fifo(self, *, tarinfo, status, type):
+        with self.create_helper(tarinfo, status, type) as (item, status):
+            return status
+
+    def process_dev(self, *, tarinfo, status, type):
+        with self.create_helper(tarinfo, status, type) as (item, status):
+            item.rdev = os.makedev(tarinfo.devmajor, tarinfo.devminor)
+            return status
+
+    def process_link(self, *, tarinfo, status, type):
+        with self.create_helper(tarinfo, status, type) as (item, status):
+            item.source = tarinfo.linkname
+            return status
+
+    def process_file(self, *, tarinfo, status, type, tar):
+        with self.create_helper(tarinfo, status, type) as (item, status):
+            self.print_file_status(status, tarinfo.name)
+            status = None  # we already printed the status
+            fd = tar.extractfile(tarinfo)
+            self.process_file_chunks(item, self.cache, self.stats, self.show_progress,
+                                     backup_io_iter(self.chunker.chunkify(fd)))
+            item.get_size(memorize=True)
+            self.stats.nfiles += 1
+            return status
+
+
 def valid_msgpacked_dict(d, keys_serialized):
     """check if the data <d> looks like a msgpacked dict"""
     d_len = len(d)

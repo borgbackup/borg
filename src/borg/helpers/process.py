@@ -15,7 +15,7 @@ from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
 from ..logger import create_logger
 logger = create_logger()
 
-from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_SIGNAL_BASE
+from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_SIGNAL_BASE, Error
 
 
 @contextlib.contextmanager
@@ -300,3 +300,45 @@ def prepare_subprocess_env(system, env=None):
     # for information, give borg version to the subprocess
     env['BORG_VERSION'] = __version__
     return env
+
+
+@contextlib.contextmanager
+def create_filter_process(cmd, stream, stream_close, inbound=True):
+    if cmd:
+        # put a filter process between stream and us (e.g. a [de]compression command)
+        # inbound: <stream> --> filter --> us
+        # outbound: us --> filter --> <stream>
+        filter_stream = stream
+        filter_stream_close = stream_close
+        env = prepare_subprocess_env(system=True)
+        # There is no deadlock potential here (the subprocess docs warn about this), because
+        # communication with the process is a one-way road, i.e. the process can never block
+        # for us to do something while we block on the process for something different.
+        if inbound:
+            proc = popen_with_error_handling(cmd, stdout=subprocess.PIPE, stdin=filter_stream,
+                                             log_prefix='filter-process: ', env=env)
+        else:
+            proc = popen_with_error_handling(cmd, stdin=subprocess.PIPE, stdout=filter_stream,
+                                             log_prefix='filter-process: ', env=env)
+        if not proc:
+            raise Error('filter %s: process creation failed' % (cmd, ))
+        stream = proc.stdout if inbound else proc.stdin
+        # inbound: do not close the pipe (this is the task of the filter process [== writer])
+        # outbound: close the pipe, otherwise the filter process would not notice when we are done.
+        stream_close = not inbound
+
+    try:
+        yield stream
+
+    finally:
+        if stream_close:
+            stream.close()
+
+        if cmd:
+            logger.debug('Done, waiting for filter to die...')
+            rc = proc.wait()
+            logger.debug('filter cmd exited with code %d', rc)
+            if filter_stream_close:
+                filter_stream.close()
+            if rc:
+                raise Error('filter %s failed, rc=%d' % (cmd, rc))

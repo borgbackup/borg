@@ -651,8 +651,9 @@ class Archiver:
                         # if we are already recursing in an excluded dir, we do not need to do anything else than
                         # returning (we do not need to archive or recurse into tagged directories), see #3991:
                         if not recurse_excluded_dir:
-                            if keep_exclude_tags and not dry_run:
-                                archive.process_dir(path, st)
+                            if keep_exclude_tags:
+                                if not dry_run:
+                                    archive.process_dir(path, st)
                                 for tag_path in tag_paths:
                                     self._process(archive, cache, matcher, exclude_caches, exclude_if_present,
                                                   keep_exclude_tags, skip_inodes, tag_path, restrict_dev,

@@ -55,7 +55,7 @@ time for the purposes of the log.
 Config file
 ~~~~~~~~~~~
 
-Each repository has a ``config`` file which which is a ``INI``-style file
+Each repository has a ``config`` file which is a ``INI``-style file
 and looks like this::
 
     [repository]

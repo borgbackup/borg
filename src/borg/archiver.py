@@ -791,8 +791,9 @@ class Archiver:
                             # if we are already recursing in an excluded dir, we do not need to do anything else than
                             # returning (we do not need to archive or recurse into tagged directories), see #3991:
                             if not recurse_excluded_dir:
-                                if keep_exclude_tags and not dry_run:
-                                    fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
+                                if keep_exclude_tags:
+                                    if not dry_run:
+                                        fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
                                     for tag_name in tag_names:
                                         tag_path = os.path.join(path, tag_name)
                                         self._rec_walk(

@@ -112,7 +112,7 @@ class Error(Exception):
     """Error: {}"""
     # Error base class
 
-    # if we raise such an Error and it is only catched by the uppermost
+    # if we raise such an Error and it is only caught by the uppermost
     # exception handler (that exits short after with the given exit_code),
     # it is always a (fatal and abrupt) EXIT_ERROR, never just a warning.
     exit_code = EXIT_ERROR
@@ -1640,7 +1640,7 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
             # truncate the last argument, if no space is available
             if info is not None:
                 if not self.json:
-                    # no need to truncate if we're not outputing to a terminal
+                    # no need to truncate if we're not outputting to a terminal
                     terminal_space = get_terminal_size(fallback=(-1, -1))[0]
                     if terminal_space != -1:
                         space = terminal_space - len(self.msg % tuple([pct] + info[:-1] + ['']))

@@ -4322,13 +4322,7 @@ class TestCommonOptions:
 
     @pytest.fixture
     def subparsers(self, basic_parser):
-        if sys.version_info >= (3, 7):
-            # py37 pre-release defaults to unwanted required=True, in 3.7.0+ it was fixed to =False
-            return basic_parser.add_subparsers(title='required arguments', metavar='<command>', required=False)
-        else:
-            # py36 does not support required=... argument (but behaves like required=False).
-            # note: use below call for 3.6 and 3.7 when there are no alphas/betas/RCs of 3.7.0 around any more.
-            return basic_parser.add_subparsers(title='required arguments', metavar='<command>')
+        return basic_parser.add_subparsers(title='required arguments', metavar='<command>')
 
     @pytest.fixture
     def parser(self, basic_parser):

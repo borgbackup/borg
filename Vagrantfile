@@ -145,7 +145,6 @@ def install_pythons(boxname)
     pyenv install 3.9.5  # tests, version supporting openssl 1.1, binary build
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv install 3.7.0  # tests, version supporting openssl 1.1
-    pyenv install 3.6.2  # tests, version supporting openssl 1.1. broken for older 3.6.x.
     pyenv rehash
   EOF
 end
@@ -174,7 +173,7 @@ def install_borg(fuse)
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install -U wheel  # upgrade wheel, too old for 3.5
+    pip install -U wheel  # upgrade wheel, might be too old
     cd borg
     pip install -r requirements.d/development.txt
     python setup.py clean
@@ -213,8 +212,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.6.2 3.7.0 3.8.0 3.9.5 3.10-dev
-      pyenv local 3.6.2 3.7.0 3.8.0 3.9.5 3.10-dev
+      pyenv global 3.7.0 3.8.0 3.9.5 3.10-dev
+      pyenv local 3.7.0 3.8.0 3.9.5 3.10-dev
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -409,6 +408,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
   end
 
-  # TODO: create more VMs with python 3.6+ and openssl 1.1.
+  # TODO: create more VMs with python 3.7+ and openssl 1.1.
   # See branch 1.1-maint for a better equipped Vagrantfile (but still on py34 and openssl 1.0).
 end

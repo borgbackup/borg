@@ -314,18 +314,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64", ".*(fuse3|none).*")
   end
 
-  config.vm.define "arch64" do |b|
-    b.vm.box = "terrywang/archlinux"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages arch", :type => :shell, :privileged => true, :inline => packages_arch
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("arch64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64", ".*none.*")
-  end
-
   config.vm.define "freebsd64" do |b|
     b.vm.box = "freebsd121-64"
     b.vm.provider :virtualbox do |v|

@@ -87,6 +87,27 @@ def packages_openbsd
   EOF
 end
 
+def packages_netbsd
+  return <<-EOF
+    pkg_add zstd lz4 xxhash git
+    sed -i 's/Version: /Version: 0.8.0/g' /usr/pkg/lib/pkgconfig/libxxhash.pc  # bug in netbsd 9.2, version missing
+    pkg_add bash
+    chsh -s bash vagrant
+    echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
+    echo "export PROMPT_COMMAND=" >> ~root/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
+    pkg_add pkg-config
+    # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
+    # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
+    pkg_add python38 py38-sqlite3 py38-pip py38-virtualenv
+    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv3
+  EOF
+end
+
 def packages_darwin
   return <<-EOF
     # install all the (security and other) updates
@@ -340,6 +361,18 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64", ".*fuse.*")
+  end
+
+  config.vm.define "netbsd64" do |b|
+    b.vm.box = "generic/netbsd9"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 2048 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64", ".*fuse.*")
   end
 
   config.vm.define "darwin64" do |b|

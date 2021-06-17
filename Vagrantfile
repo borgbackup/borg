@@ -78,13 +78,33 @@ end
 def packages_openbsd
   return <<-EOF
     pkg_add bash
-    chsh -s /usr/local/bin/bash vagrant
+    chsh -s bash vagrant
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
     pkg_add py3-pip
     pkg_add py3-virtualenv
-    ln -sf /usr/local/bin/virtualenv-3 /usr/local/bin/virtualenv
+  EOF
+end
+
+def packages_netbsd
+  return <<-EOF
+    pkg_add zstd lz4 xxhash git
+    sed -i 's/Version: /Version: 0.8.0/g' /usr/pkg/lib/pkgconfig/libxxhash.pc  # bug in netbsd 9.2, version missing
+    pkg_add bash
+    chsh -s bash vagrant
+    echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
+    echo "export PROMPT_COMMAND=" >> ~root/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
+    pkg_add pkg-config
+    # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
+    # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
+    pkg_add python38 py38-sqlite3 py38-pip py38-virtualenv
+    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv3
   EOF
 end
 
@@ -266,18 +286,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64", ".*none.*")
   end
 
-  config.vm.define "bionic64" do |b|
-    b.vm.box = "ubuntu/bionic64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("bionic64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bionic64", ".*(fuse3|none).*")
-  end
-
   config.vm.define "bullseye64" do |b|
     b.vm.box = "debian/bullseye64"
     b.vm.provider :virtualbox do |v|
@@ -326,18 +334,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64", ".*(fuse3|none).*")
   end
 
-  config.vm.define "arch64" do |b|
-    b.vm.box = "terrywang/archlinux"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages arch", :type => :shell, :privileged => true, :inline => packages_arch
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("arch64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("arch64", ".*none.*")
-  end
-
   config.vm.define "freebsd64" do |b|
     b.vm.box = "freebsd121-64"
     b.vm.provider :virtualbox do |v|
@@ -356,16 +352,27 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "openbsd64-64"
+    b.vm.box = "generic/openbsd6"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.ssh.shell = "sh"
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64", ".*fuse.*")
+  end
+
+  config.vm.define "netbsd64" do |b|
+    b.vm.box = "generic/netbsd9"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 2048 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64", ".*fuse.*")
   end
 
   config.vm.define "darwin64" do |b|

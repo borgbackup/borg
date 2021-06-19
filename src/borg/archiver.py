@@ -3042,6 +3042,11 @@ class Archiver:
         check --repair is a potentially dangerous function and might lead to data loss
         (for kinds of corruption it is not capable of dealing with). BE VERY CAREFUL!
 
+        Pursuant to the previous warning it is also highly recommended to test the
+        reliability of the hardware running this software with stress testing software
+        such as memory testers. Unreliable hardware can also lead to data loss especially
+        when this command is run in repair mode.
+
         First, the underlying repository data files are checked:
 
         - For all segments, the segment magic header is checked.

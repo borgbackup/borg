@@ -125,6 +125,10 @@ Second, the consistency and correctness of the archive metadata is verified:
 - In repair mode, when all the archives were checked, orphaned chunks are deleted
   from the repo. One cause of orphaned chunks are input file related errors (like
   read errors) in the archive creation process.
+- In verify-data mode, a complete cryptographic verification of the archive data
+  integrity is performed. This conflicts with ``--repository-only`` as this mode
+  only makes sense if the archive checks are enabled. The full details of this mode
+  are documented below.
 - If checking a remote repo via ``ssh:``, the archive check is executed on the
   client machine because it requires decryption, and this is always done client-side
   as key access is needed.

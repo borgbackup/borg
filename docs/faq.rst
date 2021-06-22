@@ -1118,6 +1118,22 @@ checking for free disk space::
 
     borg config -- $REPO_LOCATION additional_free_space -2T
 
+How do I rename a repository?
+-----------------------------
+
+There is nothing special that needs to be done, you can simply rename the
+directory that corresponds to the repository. However, the next time borg
+interacts with the repository (i.e, via ``borg list``), depending on the value
+of ``BORG_RELOCATED_REPO_ACCESS_IS_OK``, borg may warn you that the repository
+has been moved. You will be given a prompt to confirm you are OK with this.
+
+If ``BORG_RELOCATED_REPO_ACCESS_IS_OK`` is unset, borg will interactively ask for
+each repository whether it's OK.
+
+It may be useful to set ``BORG_RELOCATED_REPO_ACCESS_IS_OK=yes`` to avoid the
+prompts when renaming multiple repositories or in a non-interactive context
+such as a script. See :doc:`deployment` for an example.
+
 
 Miscellaneous
 #############

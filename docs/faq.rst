@@ -1124,14 +1124,15 @@ How do I rename a repository?
 There is nothing special that needs to be done, you can simply rename the
 directory that corresponds to the repository. However, the next time borg
 interacts with the repository (i.e, via ``borg list``), depending on the value
-of ``BORG_RELOCATED_REPO_ACCESS_IS_OK``, borg may warn you that the repostiory
-has been moved. You will be given a prompt that confirms you are OK with this.
+of ``BORG_RELOCATED_REPO_ACCESS_IS_OK``, borg may warn you that the repository
+has been moved. You will be given a prompt to confirm you are OK with this.
 
 If ``BORG_RELOCATED_REPO_ACCESS_IS_OK`` is unset, borg will interactively ask for
 each repository whether it's OK.
 
-If you are renaming multiple repositories, it may be useful to set
-``BORG_RELOCATED_REPO_ACCESS_IS_OK=yes`` to avoid the prompts.
+It may be useful to set ``BORG_RELOCATED_REPO_ACCESS_IS_OK=yes`` to avoid the
+prompts when renaming multiple repositories or in a non-interactive context
+such as a script. See :ref:`deployment` for an example.
 
 
 Miscellaneous

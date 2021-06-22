@@ -171,8 +171,8 @@ $ cat >exclude.txt <<EOF
 /home/*/junk
 *.tmp
 fm:aa:something/*
-re:^home/[^/]\e.tmp/
-sh:home/*/.thumbnails
+re:^/home/[^/]+\e.tmp/
+sh:/home/*/.thumbnails
 # Example with spaces, no need to escape as it is processed by borg
 some file with spaces.txt
 EOF

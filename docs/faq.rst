@@ -1132,7 +1132,7 @@ each repository whether it's OK.
 
 It may be useful to set ``BORG_RELOCATED_REPO_ACCESS_IS_OK=yes`` to avoid the
 prompts when renaming multiple repositories or in a non-interactive context
-such as a script. See :ref:`deployment` for an example.
+such as a script. See :doc:`deployment` for an example.
 
 
 Miscellaneous

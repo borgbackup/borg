@@ -2348,8 +2348,8 @@ class Archiver:
             /home/*/junk
             *.tmp
             fm:aa:something/*
-            re:^home/[^/]\\.tmp/
-            sh:home/*/.thumbnails
+            re:^/home/[^/]+\\.tmp/
+            sh:/home/*/.thumbnails
             # Example with spaces, no need to escape as it is processed by borg
             some file with spaces.txt
             EOF

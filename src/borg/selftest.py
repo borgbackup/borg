@@ -12,8 +12,7 @@ To assert that self test discovery works correctly the number of tests is kept i
 variable. SELFTEST_COUNT must be updated if new tests are added or removed to or from any of the tests
 used here.
 """
-
-
+import os
 import sys
 import time
 from unittest import TestResult, TestSuite, defaultTestLoader
@@ -56,6 +55,9 @@ class SelfTestResult(TestResult):
 
 
 def selftest(logger):
+    if os.environ.get('BORG_SELFTEST') == 'disabled':
+        logger.debug("borg selftest disabled via BORG_SELFTEST env variable")
+        return
     selftest_started = time.perf_counter()
     result = SelfTestResult()
     test_suite = TestSuite()

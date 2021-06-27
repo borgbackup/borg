@@ -78,6 +78,14 @@ General:
         - ``pyfuse3``: only try to load pyfuse3
         - ``llfuse``: only try to load llfuse
         - ``none``: do not try to load an implementation
+    BORG_SELFTEST
+        This can be used to influence borg's builtin self-tests. The default is to execute the tests
+        at the beginning of each borg command invocation.
+
+        BORG_SELFTEST=disabled can be used to switch off the tests and rather save some time.
+        Disabling is not recommended for normal borg users, but large scale borg storage providers can
+        use this to optimize production servers after at least doing a one-time test borg (with
+        selftests not disabled) when installing or upgrading machines / OS / borg.
     BORG_WORKAROUNDS
         A list of comma separated strings that trigger workarounds in borg,
         e.g. to work around bugs in other software.

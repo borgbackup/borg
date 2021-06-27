@@ -62,7 +62,7 @@ def get_all(path, follow_symlinks=True):
             return {}
 
 
-libc_name = find_library('c')
+libc_name = os.environ.get('BORG_LIBC') or find_library('c')
 if libc_name is None:
     # find_library didn't work, maybe we are on some minimal system that misses essential
     # tools used by find_library, like ldconfig, gcc/cc, objdump.

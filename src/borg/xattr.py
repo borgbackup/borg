@@ -73,8 +73,6 @@ if libc_name is None:
     # so we can only try some "usual" names for the C library:
     if sys.platform.startswith('linux'):
         libc_name = 'libc.so.6'
-    elif sys.platform.startswith(('freebsd', 'netbsd')):
-        libc_name = 'libc.so'
     elif sys.platform == 'darwin':
         libc_name = 'libc.dylib'
     else:

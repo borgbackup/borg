@@ -230,13 +230,14 @@ all the part files and manually concatenate them together.
 
 For more details, see :ref:`checkpoints_parts`.
 
-How can I compare contents of the archive to my local filesystem?
+How can I compare contents of an archive to my local filesystem?
 -----------------------------------------------------------------
 
-You can instruct ``export-tar`` to send tar archive to the stdout, and
+You can instruct ``export-tar`` to send a tar stream to the stdout, and
 then use ``tar`` to perform the comparison:
 
 ::
+
     borg export-tar /path/to/repo::archive-name - | tar --compare -f - -C /path/to/compare/to
 
 

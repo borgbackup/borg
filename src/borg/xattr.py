@@ -34,7 +34,6 @@ if sys.platform.startswith('linux'):
                 # 1.20.2 has been confirmed to have xattr support
                 # 1.18.2 has been confirmed not to have xattr support
                 # Versions in-between are unknown
-                libc_name = preload
                 XATTR_FAKEROOT = True
             break
 

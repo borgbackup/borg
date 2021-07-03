@@ -249,6 +249,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.environ['BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         os.environ['BORG_PASSPHRASE'] = 'waytooeasyonlyfortests'
+        os.environ['BORG_SELFTEST'] = 'disabled'
         self.archiver = not self.FORK_DEFAULT and Archiver() or None
         self.tmpdir = tempfile.mkdtemp()
         self.repository_path = os.path.join(self.tmpdir, 'repository')

@@ -231,6 +231,18 @@ You could do that (via borg config REPO append_only 0/1), but using different
 ssh keys and different entries in ``authorized_keys`` is much easier and also
 maybe has less potential of things going wrong somehow.
 
+How can I compare contents of an archive to my local filesystem?
+-----------------------------------------------------------------
+
+You can instruct ``export-tar`` to send a tar stream to the stdout, and
+then use ``tar`` to perform the comparison:
+
+::
+
+    borg export-tar /path/to/repo::archive-name - | tar --compare -f - -C /path/to/compare/to
+
+
+.. _faq_corrupt_repo:
 
 My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------

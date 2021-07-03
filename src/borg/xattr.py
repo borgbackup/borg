@@ -62,21 +62,22 @@ def get_all(path, follow_symlinks=True):
             return {}
 
 
-libc_name = find_library('c')
+HINT_MSG = "Try installing ldconfig, gcc/cc or objdump or use BORG_LIBC."
+LIBC_NOT_FOUND_NO_FALLBACK_MSG = "Can't find C library. No fallback known. " + HINT_MSG
+LIBC_NOT_FOUND_FNAME_MSG = "Can't find C library [%s]. " + HINT_MSG
+
+libc_name = os.environ.get('BORG_LIBC') or find_library('c')
 if libc_name is None:
     # find_library didn't work, maybe we are on some minimal system that misses essential
     # tools used by find_library, like ldconfig, gcc/cc, objdump.
     # so we can only try some "usual" names for the C library:
     if sys.platform.startswith('linux'):
         libc_name = 'libc.so.6'
-    elif sys.platform.startswith(('freebsd', 'netbsd')):
-        libc_name = 'libc.so'
     elif sys.platform == 'darwin':
         libc_name = 'libc.dylib'
     else:
-        msg = "Can't find C library. No fallback known. Try installing ldconfig, gcc/cc or objdump."
-        print(msg, file=sys.stderr)  # logger isn't initialized at this stage
-        raise Exception(msg)
+        print(LIBC_NOT_FOUND_NO_FALLBACK_MSG, file=sys.stderr)  # logger isn't initialized at this stage
+        raise Exception(LIBC_NOT_FOUND_NO_FALLBACK_MSG)
 
 # If we are running with fakeroot on Linux, then use the xattr functions of fakeroot. This is needed by
 # the 'test_extract_capabilities' test, but also allows xattrs to work with fakeroot on Linux in normal use.
@@ -102,8 +103,7 @@ if sys.platform.startswith('linux'):
 try:
     libc = CDLL(libc_name, use_errno=True)
 except OSError as e:
-    msg = "Can't find C library [%s]. Try installing ldconfig, gcc/cc or objdump." % e
-    raise Exception(msg)
+    raise Exception(LIBC_NOT_FOUND_FNAME_MSG % e)
 
 
 def split_string0(buf):

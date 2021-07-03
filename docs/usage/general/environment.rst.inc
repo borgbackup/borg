@@ -68,6 +68,11 @@ General:
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.
         Please only use for good reasons as it makes issues harder to analyze.
+    BORG_LIBC
+        borg uses ``ctypes.util.find_library`` to locate the 'c' library (aka libc).
+        find_library needs a shell and will invoke some tools like ldconfig, gcc/cc or objdump.
+        If a shell or these tools are not available, you can give the name of your libc via
+        BORG_LIBC=libc.so.6 (for example) and borg will not try the ``find_library`` call.
     BORG_SELFTEST
         This can be used to influence borg's builtin self-tests. The default is to execute the tests
         at the beginning of each borg command invocation.

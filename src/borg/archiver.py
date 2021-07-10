@@ -318,6 +318,7 @@ class Archiver:
             logger.warning(
                 '\n'
                 'IMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\n'
+                'If you used a repokey mode, the key is stored in the repo, but you should back it up separately.\n'
                 'Use "borg key export" to export the key, optionally in printable format.\n'
                 'Write down the passphrase. Store both at safe place(s).\n')
         return self.exit_code

@@ -32,6 +32,21 @@ completely in every aspect from such a backup.
     client. Therefore, pull mode should be used only from servers you do fully
     trust!
 
+.. warning::
+
+    Additionally, while being chrooted into the client's root file system,
+    code from the client will be executed. Thus, you should only do that when
+    fully trusting the client.
+
+.. warning::
+
+    The chroot method was chosen to get the right user and group name-id
+    mappings, assuming they only come from files (/etc/passwd and group).
+    This assumption might be wrong, e.g. if users/groups also come from
+    ldap or other providers.
+    Thus, it might be better to use ``--numeric-owner`` and not archive any
+    user or group names (but just the numeric IDs) and not use chroot.
+
 Creating a backup
 -----------------
 

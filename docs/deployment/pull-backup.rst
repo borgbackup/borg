@@ -18,7 +18,7 @@ file system will probably change, and you may not have access to those files if
 BorgBackup is not run with root privileges.
 
 SSHFS is a FUSE file system and uses the SFTP protocol, so there may be also
-other unsupported features that the actual implementations of ssfs, libfuse and
+other unsupported features that the actual implementations of sshfs, libfuse and
 sftp on the backup server do not support, like file name encodings, ACLs, xattrs
 or bsdflags. So there is no guarantee that you are able to restore a system
 completely in every aspect from such a backup.

@@ -295,19 +295,12 @@ class Archiver:
                 'for details about the security implications.', shlex.quote(path))
 
         if key.NAME != 'plaintext':
-            if 'repokey' in key.NAME:
-                logger.warning(
-                    '\n'
-                    'IMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\n'
-                    'The key is included in the repository config, but should be backed up in case the repository gets corrupted.\n'
-                    'Use "borg key export" to export the key, optionally in printable format.\n'
-                    'Write down the passphrase. Store both at safe place(s).\n')
-            else:
-                logger.warning(
-                    '\n'
-                    'IMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\n'
-                    'Use "borg key export" to export the key, optionally in printable format.\n'
-                    'Write down the passphrase. Store both at safe place(s).\n')
+            logger.warning(
+                '\n'
+                'IMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\n'
+                'If you used a repokey mode, the key is stored in the repo, but you should back it up separately.\n'
+                'Use "borg key export" to export the key, optionally in printable format.\n'
+                'Write down the passphrase. Store both at safe place(s).\n')
         return self.exit_code
 
     @with_repository(exclusive=True, manifest=False)

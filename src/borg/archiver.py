@@ -456,16 +456,18 @@ class Archiver:
 
         @contextmanager
         def test_files(path, count, size, random):
-            path = os.path.join(path, 'borg-test-data')
-            os.makedirs(path)
-            z_buff = None if random else memoryview(zeros)[:size] if size <= len(zeros) else b'\0' * size
-            for i in range(count):
-                fname = os.path.join(path, 'file_%d' % i)
-                data = z_buff if not random else os.urandom(size)
-                with SyncFile(fname, binary=True) as fd:  # used for posix_fadvise's sake
-                    fd.write(data)
-            yield path
-            shutil.rmtree(path)
+            try:
+                path = os.path.join(path, 'borg-test-data')
+                os.makedirs(path)
+                z_buff = None if random else memoryview(zeros)[:size] if size <= len(zeros) else b'\0' * size
+                for i in range(count):
+                    fname = os.path.join(path, 'file_%d' % i)
+                    data = z_buff if not random else os.urandom(size)
+                    with SyncFile(fname, binary=True) as fd:  # used for posix_fadvise's sake
+                        fd.write(data)
+                yield path
+            finally:
+                shutil.rmtree(path)
 
         if '_BORG_BENCHMARK_CRUD_TEST' in os.environ:
             tests = [

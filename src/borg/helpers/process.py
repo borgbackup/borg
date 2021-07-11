@@ -290,10 +290,9 @@ def prepare_subprocess_env(system, env=None):
             #    in the original env (in this case, the pyinstaller bootloader
             #    does *not* put ..._ORIG into the env either).
             #    in this case, we must kill LDLP.
-            # The directory used by pyinstaller is created by mkdtemp("_MEIXXXXXX"),
-            # we can use that to differentiate between the cases.
+            #    We can recognize this via sys.frozen and sys._MEIPASS being set.
             lp = env.get(lp_key)
-            if lp is not None and re.search(r'/_MEI......', lp):
+            if lp is not None and getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
                 env.pop(lp_key)
     # security: do not give secrets to subprocess
     env.pop('BORG_PASSPHRASE', None)

@@ -108,27 +108,22 @@ end
 
 def packages_netbsd
   return <<-EOF
-    hostname netbsd  # the box we use has an invalid hostname
-    PKG_PATH="ftp://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/7.0.1/All"
-    export PKG_PATH
-    pkg_add mozilla-rootcerts lz4 git
+    pkg_add zstd lz4 xxhash git
+    sed -i 's/Version: /Version: 0.8.0/g' /usr/pkg/lib/pkgconfig/libxxhash.pc  # bug in netbsd 9.2, version missing
+    pkg_add bash
     chsh -s bash vagrant
-    mkdir -p /usr/local/opt/lz4/include
-    mkdir -p /usr/local/opt/lz4/lib
-    ln -s /usr/pkg/include/lz4*.h /usr/local/opt/lz4/include/
-    ln -s /usr/pkg/lib/liblz4* /usr/local/opt/lz4/lib/
-    touch /etc/openssl/openssl.cnf  # avoids a flood of "can't open ..."
-    mozilla-rootcerts install
-    pkg_add pkg-config  # avoids some "pkg-config missing" error msg, even without fuse pkg
+    echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
+    echo "export PROMPT_COMMAND=" >> ~root/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
+    pkg_add pkg-config
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python37 py37-sqlite3 py37-pip py37-virtualenv
-    ln -s /usr/pkg/bin/python3.7 /usr/pkg/bin/python
-    ln -s /usr/pkg/bin/python3.7 /usr/pkg/bin/python3
-    ln -s /usr/pkg/bin/pip3.7 /usr/pkg/bin/pip
-    ln -s /usr/pkg/bin/pip3.7 /usr/pkg/bin/pip3
-    ln -s /usr/pkg/bin/virtualenv-3.7 /usr/pkg/bin/virtualenv
-    ln -s /usr/pkg/bin/virtualenv-3.7 /usr/pkg/bin/virtualenv3
+    pkg_add python38 py38-sqlite3 py38-pip py38-virtualenv
+    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv3
   EOF
 end
 
@@ -468,7 +463,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "netbsd64" do |b|
-    b.vm.box = "netbsd70-64"
+    b.vm.box = "generic/netbsd9"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

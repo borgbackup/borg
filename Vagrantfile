@@ -194,14 +194,16 @@ def install_cygwin_venv
 end
 
 def install_pyenv(boxname)
-  script = <<-EOF
-    curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
-    echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bash_profile
-    echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
-    echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
+  return <<-EOF
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bash_profile
+    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bash_profile
+    . ~/.bash_profile
+    curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
+    echo 'eval "$(pyenv init --path)"' >> ~/.bash_profile
+    echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+    echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
   EOF
-  return script
 end
 
 def fix_pyenv_darwin(boxname)

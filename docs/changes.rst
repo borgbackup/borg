@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.16 (2021-03-23)
+Version 1.1.17 (2021-07-xx)
 ---------------------------
 
 Compatibility notes:
@@ -244,6 +244,59 @@ Compatibility notes:
   In case you have scripts expecting rc == 2 for a signal exit, you need to
   update them to check for >= 128 (as documented since long).
 - 1.1.15 drops python 3.4 support, minimum requirement is 3.5 now.
+- 1.1.17 install_requires now the "packaging" pypi package
+
+Fixes:
+
+- pyinstaller dir-mode: fix pyi detection / LIBPATH treatment, #5897
+- handle crash due to kill stale lock race, #5828
+- fix BORG_CACHE_DIR crashing borg if empty, #5216
+- create --dry-run: fix display of kept tagfile, #5834
+- fix missing parameter in "did not consistently fail" msg, #5822
+- missing / healed chunks: always tell chunk ID, #5704
+- benchmark: make sure cleanup happens even on exceptions, #5630
+
+New features:
+
+- implement BORG_SELFTEST env variable, #5871.
+  this can be used to accelerate borg startup a bit. not recommended for
+  normal usage, but borg mass hosters with a lot of borg invocations can
+  save some resources with this. on my laptop, this saved ~100ms cpu time
+  (sys+user) per borg command invocation.
+- implement BORG_LIBC env variable to give the libc filename, #5870.
+  you can use this if a borg does not find your libc.
+- check: add progress indicator for archive check
+- allow --files-cache=size (not recommended, make sure you know what you do)
+
+Other changes:
+
+- get rid of distutils, use packaging and setuptools.
+  distutils is deprecated and gives warnings on py 3.10.
+- setup.py: rename "clean" to "clean2" to avoid shadowing the "clean" command.
+- remove libc filename fallback for the BSDs (there is no "usual" name)
+- github CI: test on py310 (again)
+- cleanup flake8 checks, fix some pep8 violations
+- docs building: replace deprecated function ".add_stylesheet()" for Sphinx 4 compatibility
+- docs:
+
+  - add a hint on sleeping computer and ssh connections, #5301
+  - update the documentation on hacked backup client, #5480.
+  - improve docs/FAQ about append-only remote repos, #5497
+  - complement the documentation for pattern files and exclude files, #5520
+  - "filename with spaces" example added to exclude file, #5236
+    note: no whitespace escaping needed, processed by borg.
+  - add info on renaming repositories, #5240
+  - clarify borg check --verify-data, #5808
+  - add notice about defective hardware to check documentation, #5753
+  - add paragraph added in #5855 to utility documentation source
+  - add missing leading slashes in help patterns, #5857
+  - clarify "you will need key and passphrase" borg init warning, #4622
+  - pull mode: add some warnings, #5827
+  - mention tar --compare (compare archive to fs files), #5880
+  - fix typos, backport of #5597
+
+Version 1.1.16 (2021-03-23)
+---------------------------
 
 Fixes:
 

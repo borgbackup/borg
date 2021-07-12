@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2021-03-22" "" "borg backup tool"
+.TH BORG-PATTERNS 1 "2021-07-12" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .
@@ -168,9 +168,9 @@ $ cat >exclude.txt <<EOF
 /home/*/junk
 *.tmp
 fm:aa:something/*
-re:^home/[^/]\e.tmp/
-sh:home/*/.thumbnails
- # Example with spaces, no need to escape as it is processed by borg
+re:^/home/[^/]+\e.tmp/
+sh:/home/*/.thumbnails
+# Example with spaces, no need to escape as it is processed by borg
 some file with spaces.txt
 EOF
 $ borg create \-\-exclude\-from exclude.txt backup /
@@ -190,7 +190,7 @@ with the prefix \-, an exclude\-norecurse rule starts with !, all followed by a 
 .INDENT 3.5
 Via \fB\-\-pattern\fP or \fB\-\-patterns\-from\fP you can define BOTH inclusion and exclusion
 of files using pattern prefixes \fB+\fP and \fB\-\fP\&. With \fB\-\-exclude\fP and
-\fB\-\-exlude\-from\fP ONLY excludes are defined.
+\fB\-\-exclude\-from\fP ONLY excludes are defined.
 .UNINDENT
 .UNINDENT
 .sp

@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.17 (2021-07-xx)
+Version 1.1.17 (2021-07-12)
 ---------------------------
 
 Compatibility notes:
@@ -244,7 +244,7 @@ Compatibility notes:
   In case you have scripts expecting rc == 2 for a signal exit, you need to
   update them to check for >= 128 (as documented since long).
 - 1.1.15 drops python 3.4 support, minimum requirement is 3.5 now.
-- 1.1.17 install_requires now the "packaging" pypi package
+- 1.1.17 install_requires the "packaging" pypi package now.
 
 Fixes:
 
@@ -265,22 +265,25 @@ New features:
   (sys+user) per borg command invocation.
 - implement BORG_LIBC env variable to give the libc filename, #5870.
   you can use this if a borg does not find your libc.
-- check: add progress indicator for archive check
+- check: add progress indicator for archive check.
 - allow --files-cache=size (not recommended, make sure you know what you do)
 
 Other changes:
 
+- Python 3.10 now officially supported!
+  we test on py310-dev on github CI since a while and now also on the vagrant
+  machines, so it should work ok.
+- github CI: test on py310 (again)
 - get rid of distutils, use packaging and setuptools.
   distutils is deprecated and gives warnings on py 3.10.
 - setup.py: rename "clean" to "clean2" to avoid shadowing the "clean" command.
 - remove libc filename fallback for the BSDs (there is no "usual" name)
-- github CI: test on py310 (again)
-- cleanup flake8 checks, fix some pep8 violations
+- cleanup flake8 checks, fix some pep8 violations.
 - docs building: replace deprecated function ".add_stylesheet()" for Sphinx 4 compatibility
 - docs:
 
   - add a hint on sleeping computer and ssh connections, #5301
-  - update the documentation on hacked backup client, #5480.
+  - update the documentation on hacked backup client, #5480
   - improve docs/FAQ about append-only remote repos, #5497
   - complement the documentation for pattern files and exclude files, #5520
   - "filename with spaces" example added to exclude file, #5236
@@ -294,6 +297,14 @@ Other changes:
   - pull mode: add some warnings, #5827
   - mention tar --compare (compare archive to fs files), #5880
   - fix typos, backport of #5597
+- vagrant:
+
+  - add py3.7.11 for binary build, also add 3.10-dev.
+  - use latest Cython 0.29.23 for py310 compat fixes.
+  - more RAM for openindiana upgrade plan resolver, it just hangs (swaps?) if
+    there is too little RAM.
+  - fix install_pyenv to adapt to recent changes in pyenv (same as in master now).
+  - use generic/netbsd9 box, copied from master branch.
 
 Version 1.1.16 (2021-03-23)
 ---------------------------

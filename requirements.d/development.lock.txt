@@ -9,5 +9,5 @@ pytest==6.1.1
 pytest-xdist==2.1.0
 pytest-cov==2.10.1
 pytest-benchmark==3.2.3
-Cython==0.29.21
+Cython==0.29.23
 twine==1.15.0

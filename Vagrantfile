@@ -482,7 +482,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "openindiana64" do |b|
     b.vm.box = "openindiana"
     b.vm.provider :virtualbox do |v|
-      v.memory = 1536 + $wmem
+      v.memory = 3072 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana

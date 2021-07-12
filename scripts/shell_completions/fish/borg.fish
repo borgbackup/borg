@@ -123,7 +123,7 @@ complete -c borg -f      -l 'nobsdflags'            -d 'Do not store bsdflags'  
 complete -c borg -f      -l 'noacls'                -d 'Do not read and store ACLs into archive'    -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'noxattrs'              -d 'Do not read and store xattrs into archive'  -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'ignore-inode'          -d 'Ignore inode data in file metadata cache'   -n "__fish_seen_subcommand_from create"
-set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
+set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime size disabled"
 complete -c borg -f      -l 'files-cache'           -d 'Operate files cache in MODE' -a "$files_cache_mode" -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'read-special'          -d 'Open device files like regular files'       -n "__fish_seen_subcommand_from create"
 # Archive options

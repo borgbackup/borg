@@ -42,7 +42,7 @@ _borg()
             return 0
             ;;
         '--files-cache')
-            local files_cache_mode="ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
+            local files_cache_mode="ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime size disabled"
             COMPREPLY=( $(compgen -W "${files_cache_mode}" -- ${cur}) )
             return 0
             ;;

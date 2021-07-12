@@ -1,6 +1,6 @@
 #compdef borg borgfs -P -value-,BORG_*,-default-
 
-# Zsh completion for Borg Backup 1.1.16.
+# Zsh completion for Borg Backup 1.1.17.
 #
 # Recommended _borg specific settings:
 #
@@ -149,7 +149,7 @@ _borg-create() {
     '--noacls[do not read and store ACLs into archive]' \
     '--noxattrs[do not read and store xattrs into archive]' \
     '--ignore-inode[ignore inode data in the file metadata cache used to detect unchanged files]' \
-    '--files-cache=[operate files cache in MODE. default: ctime,size,inode]:MODE:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled)' \
+    '--files-cache=[operate files cache in MODE. default: ctime,size,inode]:MODE:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime size disabled)' \
     '--read-special[open and read block and char device files as well as FIFOs as if they were regular files]' \
     $common_options \
     ':ARCHIVE: _borg_repository_or_archive -a -p' \
@@ -770,6 +770,14 @@ _borg_parameters() {
   ((CHECK|DELETE)_I_KNOW_WHAT_I_AM_DOING)
     _description values expl 'value'
     compadd "$expl[@]" YES NO && ret=0
+    ;;
+  (LIBC)
+    _wanted libraries expl 'library' \
+      compadd - ${^=LD_LIBRARY_PATH:-/usr/lib /usr/local/lib}/lib*.(a|so*)(:t:fr:s/lib//) && ret=0
+    ;;
+  (SELFTEST)
+    _description values expl 'value'
+    compadd "$expl[@]" disabled && ret=0
     ;;
   (WORKAROUNDS)
     _wanted workarounds expl 'workaround' _sequence -n 1 compadd - basesyncfile && ret=0

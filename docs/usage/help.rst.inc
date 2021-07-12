@@ -133,9 +133,9 @@ Examples::
     /home/*/junk
     *.tmp
     fm:aa:something/*
-    re:^home/[^/]\.tmp/
-    sh:home/*/.thumbnails
-     # Example with spaces, no need to escape as it is processed by borg
+    re:^/home/[^/]+\.tmp/
+    sh:/home/*/.thumbnails
+    # Example with spaces, no need to escape as it is processed by borg
     some file with spaces.txt
     EOF
     $ borg create --exclude-from exclude.txt backup /
@@ -153,7 +153,7 @@ Examples::
 
         Via ``--pattern`` or ``--patterns-from`` you can define BOTH inclusion and exclusion
         of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
-        ``--exlude-from`` ONLY excludes are defined.
+        ``--exclude-from`` ONLY excludes are defined.
 
     Inclusion patterns are useful to include paths that are contained in an excluded
     path. The first matching pattern is used so if an include pattern matches before

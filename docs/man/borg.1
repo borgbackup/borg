@@ -456,6 +456,21 @@ When set to no (default: yes), system information (like OS, Python version, ...)
 exceptions is not shown.
 Please only use for good reasons as it makes issues harder to analyze.
 .TP
+.B BORG_LIBC
+borg uses \fBctypes.util.find_library\fP to locate the \(aqc\(aq library (aka libc).
+find_library needs a shell and will invoke some tools like ldconfig, gcc/cc or objdump.
+If a shell or these tools are not available, you can give the name of your libc via
+BORG_LIBC=libc.so.6 (for example) and borg will not try the \fBfind_library\fP call.
+.TP
+.B BORG_SELFTEST
+This can be used to influence borg\(aqs builtin self\-tests. The default is to execute the tests
+at the beginning of each borg command invocation.
+.sp
+BORG_SELFTEST=disabled can be used to switch off the tests and rather save some time.
+Disabling is not recommended for normal borg users, but large scale borg storage providers can
+use this to optimize production servers after at least doing a one\-time test borg (with
+selftests not disabled) when installing or upgrading machines / OS / borg.
+.TP
 .B BORG_WORKAROUNDS
 A list of comma separated strings that trigger workarounds in borg,
 e.g. to work around bugs in other software.

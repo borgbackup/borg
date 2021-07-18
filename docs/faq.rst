@@ -211,7 +211,7 @@ This is not a problem anymore.
 For more details, see :ref:`checkpoints_parts`.
 
 How can I switch append-only mode on and off?
------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------
 
 You could do that (via borg config REPO append_only 0/1), but using different
 ssh keys and different entries in ``authorized_keys`` is much easier and also
@@ -223,13 +223,6 @@ My machine goes to sleep causing `Broken pipe`
 
 When backing up your data over the network, your machine should not go to sleep.
 On macOS you can use `caffeinate` to avoid that.
-
-How can I switch append-only mode on and off?
------------------------------------------------------------------------------------------------------------------------------------
-
-You could do that (via borg config REPO append_only 0/1), but using different
-ssh keys and different entries in ``authorized_keys`` is much easier and also
-maybe has less potential of things going wrong somehow.
 
 How can I compare contents of an archive to my local filesystem?
 -----------------------------------------------------------------
@@ -243,12 +236,6 @@ then use ``tar`` to perform the comparison:
 
 
 .. _faq_corrupt_repo:
-
-My machine goes to sleep causing `Broken pipe`
-----------------------------------------------
-
-When backing up your data over the network, your machine should not go to sleep.
-On macOS you can use `caffeinate` to avoid that.
 
 How can I restore huge file(s) over an unstable connection?
 -----------------------------------------------------------

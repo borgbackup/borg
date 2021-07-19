@@ -32,7 +32,7 @@ file system will probably change, and you may not have access to those files if
 BorgBackup is not run with root privileges.
 
 SSHFS is a FUSE file system and uses the SFTP protocol, so there may be also
-other unsupported features that the actual implementations of ssfs, libfuse and
+other unsupported features that the actual implementations of sshfs, libfuse and
 sftp on the backup server do not support, like file name encodings, ACLs, xattrs
 or flags. So there is no guarantee that you are able to restore a system
 completely in every aspect from such a backup.
@@ -45,6 +45,21 @@ completely in every aspect from such a backup.
     mode the server (when logged in as root) could cause unlimited damage to the
     client. Therefore, pull mode should be used only from servers you do fully
     trust!
+
+.. warning::
+
+    Additionally, while being chrooted into the client's root file system,
+    code from the client will be executed. Thus, you should only do that when
+    fully trusting the client.
+
+.. warning::
+
+    The chroot method was chosen to get the right user and group name-id
+    mappings, assuming they only come from files (/etc/passwd and group).
+    This assumption might be wrong, e.g. if users/groups also come from
+    ldap or other providers.
+    Thus, it might be better to use ``--numeric-owner`` and not archive any
+    user or group names (but just the numeric IDs) and not use chroot.
 
 Creating a backup
 -----------------

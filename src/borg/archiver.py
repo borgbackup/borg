@@ -3776,6 +3776,11 @@ class Archiver:
                                help='Sort the output lines by file path.')
         subparser.add_argument('--json-lines', action='store_true',
                                help='Format output as JSON Lines. ')
+        subparser.add_argument('--format', '--diff-format', metavar='FORMAT', dest='format',
+                               help=(
+                                   'specify format for file differences (default: '
+                                   '"{newsize:8d} B {oldsize:8d} B {path}{NL}")'
+                                ))
         subparser.add_argument('location', metavar='REPO::ARCHIVE1',
                                type=location_validator(archive=True),
                                help='repository location and ARCHIVE1 name')

@@ -4203,30 +4203,37 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
 
         self.create_regular_file('a_file', size=8)
-        test_archive = self.repository_location + '::test0'
-        self.cmd('create', test_archive, 'input')
+        test_archive0 = self.repository_location + '::test0'
+        self.cmd('create', test_archive0, self.input_path)
 
         os.unlink('input/a_file')
-        self.create_regular_file('a_file', size=16)
-        test_archive = self.repository_location + '::test1'
-        self.cmd('create', test_archive, 'input')
+        self.create_regular_file('a_file', size=33)
+        atime, mtime = 123457520, 234900290
+        os.utime('input/a_file', (atime, mtime))
 
-        output_file_mod = self.cmd('diff', test_archive, "test1")
-        # aquin
-        output_2 = self.cmd(
-            'diff', '--format',
-            '{newsize:8d} B {oldsize:8d} B {path}{NEWLINE}', test_archive)
-        output_3 = self.cmd(
-            'diff', '--format',
-            '{change} ({deltasize:8d} B) {mtime:%s} {path}{NL}', test_archive)
-        self.assert_equal(output_file_mod, output_2)
-        self.assert_not_equal(output_file_mod, output_3)
+        test_archive1 = self.repository_location + '::test1'
+        self.cmd('create', test_archive1, self.input_path)
 
-        msg = (
-            "Write me; get inspired by self.test_sort_option and "
-            "ArchiverTestCase.test_list_format"
-        )
-        assert False, msg
+        output_file_mod = self.cmd('diff', test_archive0, "test1")
+        output2 = self.cmd(
+            'diff', '--format',
+            '{newsize:8d} B {oldsize:8d} B {path}{NEWLINE}',
+            test_archive0, "test1")
+        output3 = self.cmd(
+            'diff', '--format',
+            '{change} ({deltasize:8d} B) {mtime:%s} {path}{NL}',
+            test_archive0, "test1")
+        self.assert_equal(output_file_mod, output2)
+        self.assert_not_equal(output_file_mod, output3)
+        expected2 = [
+            "     +25 B       -8 B input/a_file\n"
+        ]
+        expected3 = [
+            "modified (     +25 B) 234900290 input/a_file\n"
+        ]
+        assert all(_ in line for _, line in zip(expected2, output2))
+        assert all(_ in line for _, line in zip(expected3, output3))
+        # need more scenarios!
 
 
 def test_get_args():

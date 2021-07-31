@@ -1,3 +1,4 @@
+.. include:: global.rst.inc
 .. _important_notes:
 
 Important notes
@@ -1619,7 +1620,7 @@ New features:
 Other changes:
 
 - remove annoying hardlinked symlinks warning, #3175
-- vagrant: use self-made FreeBSD 10.3 box, #3022
+- vagrant: use self-made FreeBSD |freebsd_version| box, #3022
 - travis: don't brew update, hopefully fixes #2532
 - docs:
 
@@ -3866,7 +3867,7 @@ Other changes:
   - Debian 7 "wheezy" 32bit, Debian 8 "jessie" 64bit
   - Ubuntu 12.04 32bit, Ubuntu 14.04 64bit
   - Centos 7 64bit
-  - FreeBSD 10.2 64bit
+  - FreeBSD |freebsd_version| 64bit
   - OpenBSD 5.7 64bit
   - NetBSD 6.1.5 64bit
   - Darwin (OS X Yosemite)

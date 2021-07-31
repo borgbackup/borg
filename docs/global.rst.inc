@@ -3,6 +3,7 @@
 .. |package_filename| replace:: |package_dirname|.tar.gz
 .. |package_url| replace:: https://pypi.python.org/packages/source/b/borgbackup/|package_filename|
 .. |git_url| replace:: https://github.com/borgbackup/borg.git
+.. |freebsd_version| replace:: 12.1
 .. _github: https://github.com/borgbackup/borg
 .. _issue tracker: https://github.com/borgbackup/borg/issues
 .. _deduplication: https://en.wikipedia.org/wiki/Data_deduplication

@@ -4204,7 +4204,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
         self.create_regular_file('a_file', size=8)
         test_archive0 = self.repository_location + '::test0'
-        self.cmd('create', test_archive0, self.input_path)
+        self.cmd('create', test_archive0, "input")#self.input_path)
 
         os.unlink('input/a_file')
         self.create_regular_file('a_file', size=33)
@@ -4212,28 +4212,28 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         os.utime('input/a_file', (atime, mtime))
 
         test_archive1 = self.repository_location + '::test1'
-        self.cmd('create', test_archive1, self.input_path)
+        self.cmd('create', test_archive1, "input")#self.input_path)
 
-        output_file_mod = self.cmd('diff', test_archive0, "test1")
-        output2 = self.cmd(
+        output_default = self.cmd('diff', test_archive0, "test1")
+        output_default_explicit_fmt = self.cmd(
             'diff', '--format',
             '{newsize:8d} B {oldsize:8d} B {path}{NEWLINE}',
             test_archive0, "test1")
-        output3 = self.cmd(
+        expected_default = [
+            "    +33 B      -8 B input/a_file"
+        ]
+        self.assert_equal(output_default, output_default_explicit_fmt)
+        self.assert_equal(expected_default, output_default_explicit_fmt.splitlines())
+
+        output_nontrivial_fmt1 = self.cmd(
             'diff', '--format',
             '{change} ({deltasize:8d} B) {mtime:%s} {path}{NL}',
             test_archive0, "test1")
-        self.assert_equal(output_file_mod, output2)
-        self.assert_not_equal(output_file_mod, output3)
-        expected2 = [
-            "     +25 B       -8 B input/a_file\n"
+        expected_nontrivial_fmt1 = [
+            "modified (     +33 B) 234900290 input/a_file"
         ]
-        expected3 = [
-            "modified (     +25 B) 234900290 input/a_file\n"
-        ]
-        assert all(_ in line for _, line in zip(expected2, output2))
-        assert all(_ in line for _, line in zip(expected3, output3))
-        # need more scenarios!
+        self.assert_equal(expected_nontrivial_fmt1, output_nontrivial_fmt1.splitlines())
+        # need more scenarios?
 
 
 def test_get_args():

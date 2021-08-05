@@ -110,10 +110,10 @@ are available on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.13 (ok for most supported Linux releases).
   Older glibc releases are untested and may not work.
-* **MacOS**: 10.10 or newer (To avoid signing issues download the file via
+* **MacOS**: 10.12 or newer (To avoid signing issues download the file via
   command line **or** remove the ``quarantine`` attribute after downloading:
   ``$ xattr -dr com.apple.quarantine borg-macosx64.tgz``)
-* **FreeBSD**: 10.2 (unknown whether it works for older releases)
+* **FreeBSD**: 12.1 (unknown whether it works for older releases)
 
 ARM binaries are built by Johann Bauer, see: https://borg.bauerj.eu/
 

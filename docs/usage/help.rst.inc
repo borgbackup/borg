@@ -69,12 +69,15 @@ Regular expressions, selector `re:`
     the re module <https://docs.python.org/3/library/re.html>`_.
 
 Path prefix, selector `pp:`
-    This pattern style is useful to match whole sub-directories. The pattern
-    `pp:root/somedir` matches `root/somedir` and everything therein. A leading
-    path separator is always removed.
+    This pattern style matches either the whole path or an initial segment
+    of the path up to but not including a path separator. For consistency
+    with the `fn:` and `sh:` patterns, a path separator is added to the
+    end of the path before matching. For example, `pp:root/somedir`
+    matches `root/somedir` and everything therein. A leading path
+    separator is always removed. A trailing slash makes no difference.
 
 Path full-match, selector `pf:`
-    This pattern style is (only) useful to match full paths.
+    This pattern style is (only) useful to match full (exact) paths.
     This is kind of a pseudo pattern as it can not have any variable or
     unspecified parts - the full path must be given. `pf:root/file.ext` matches
     `root/file.ext` only. A leading path separator is always removed.

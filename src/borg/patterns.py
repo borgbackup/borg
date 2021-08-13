@@ -9,6 +9,7 @@ from enum import Enum
 
 from . import shellpattern
 from .helpers import clean_lines
+from .helpers.errors import Error
 
 
 def parse_patternfile_line(line, roots, ie_commands, fallback):
@@ -53,8 +54,11 @@ class ArgparsePatternFileAction(argparse.Action):
         Lines empty or starting with '#' after stripping whitespace on both line ends are ignored.
         """
         filename = values[0]
-        with open(filename) as f:
-            self.parse(f, args)
+        try:
+            with open(filename) as f:
+                self.parse(f, args)
+        except FileNotFoundError as e:
+            raise Error(str(e))
 
     def parse(self, fobj, args):
         load_pattern_file(fobj, args.paths, args.patterns)

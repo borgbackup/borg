@@ -32,3 +32,12 @@ Examples
     drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code/myproject
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
     ...
+
+    $ borg list /path/to/repo::archiveA 'code/myproject'
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code/myproject
+    -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
+    ...
+
+    $ borg list /path/to/repo::archiveA 'pf:code/myproject'
+    drwxrwxr-x user   user          0 Sun, 2015-02-01 11:00:00 code/myproject
+    ...

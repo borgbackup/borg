@@ -124,16 +124,6 @@ To allow a regular user to use fstab entries, add the ``user`` option:
 
 For FUSE configuration and mount options, see the mount.fuse(8) manual page.
 
-The man page references ``user_id`` and ``uid``, which are not the same thing.
-``user_id`` is set by libfuse (or the filesystem) and contains the effective
-user id of the mount owner. ``uid`` on the other hand refers to the actual
-owner of the file. While you can pass ``uid`` as a mount option to borg to
-change the owner of all of the files (i.e, ``borg mount -o uid=1000,gid=1000``)
-it is recommended you use the ``--numeric-ids`` switch instead.
-
-``numeric-ids`` will use the ``uid``s and ``gid``s from the archive instead of
-attempting to map username and groupnames to local ids.
-
 Additional mount options supported by borg:
 
 - versions: when used with a repository mount, this gives a merged, versioned

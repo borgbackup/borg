@@ -2230,7 +2230,9 @@ class Archiver:
         File patterns support these styles: fnmatch, shell, regular expressions,
         path prefixes and path full-matches. By default, fnmatch is used for
         ``--exclude`` patterns and shell-style is used for the experimental
-        ``--pattern`` option.
+        ``--pattern`` option. For commands that support patterns in their
+        ``PATH`` argument like (``borg list``), the default pattern is path
+        prefix.
 
         Starting with Borg 1.2, for all but regular expression pattern matching
         styles, all paths are treated as relative, meaning that a leading path

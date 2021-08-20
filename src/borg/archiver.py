@@ -2916,16 +2916,19 @@ class Archiver:
 
         For FUSE configuration and mount options, see the mount.fuse(8) manual page.
 
-        The man page references ``user_id`` and ``uid``, which are not the same
-        thing. ``user_id`` is set by libfuse (or the filesystem) and contains
-        the effective user id of the mount owner. ``uid`` on the other hand
-        refers to the actual owner of the file. While you can pass ``uid`` as a
-        mount option to borg to change the owner of all of the files (i.e,
-        ``borg mount -o uid=1000,gid=1000``) you can use the ``--numeric-ids``
-        switch instead.
+        Borg's default behavior is use the archived user and group names of each file
+        and map them to the system's respective user and group ids. Alternatively, using
+        ``numeric-ids`` will instead used the archived user and group ids without any
+        mapping.
 
-        ``numeric-ids`` will use the ``uid``s and ``gid``s from the archive
-        instead of attempting to map username and groupnames to local ids.
+        The ``uid`` and ``gid`` mount options (implemented by Borg) can be used to
+        override the user and group ids of all files (i.e, ``borg mount -o
+        uid=1000,gid=1000``).
+
+        The man page references ``user_id`` and ``group_id`` mount options (implemented
+        by fuse) which specify the user and group id of the mount owner (aka, the user
+        who does the mounting). It is set automatically by libfuse (or the filesystem if
+        libfuse is not used). However, you should not specify these manually.
 
         Additional mount options supported by borg:
 

@@ -987,6 +987,12 @@ stable. If the directory where you mount a filesystem is different every time,
 Borg assumes they are different files. This is true even if you backup these
 files with relative pathnames - borg uses full pathnames in files cache regardless.
 
+It is possible for some filesystems, such as ``mergerfs`` or network filesystems,
+to return inconsistent inode numbers across runs, causing borg to consider them changed.
+A workaround is to set the option ``--files-cache=ctime,size`` to exclude the inode
+number comparison from the files cache check so that files with different inode
+numbers won't be treated as modified.
+
 
 Is there a way to limit bandwidth with Borg?
 --------------------------------------------

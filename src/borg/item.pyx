@@ -155,6 +155,7 @@ class Item(PropDict):
     # properties statically defined, so that IDEs can know their names:
 
     path = PropDict._make_property('path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    source_path = PropDict._make_property('source_path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     source = PropDict._make_property('source', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
     user = PropDict._make_property('user', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
     group = PropDict._make_property('group', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)

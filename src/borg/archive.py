@@ -694,7 +694,7 @@ Utilization of max. archive size: {csize_max:.0%}
                 # In this case, we *want* to extract twice, because there is no other way.
                 pass
 
-    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
+    def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, ex2src=False, sparse=False,
                      hardlink_masters=None, stripped_components=0, original_path=None, pi=None):
         """
         Extract archive item.
@@ -703,6 +703,7 @@ Utilization of max. archive size: {csize_max:.0%}
         :param restore_attrs: restore file attributes
         :param dry_run: do not write any data
         :param stdout: write extracted data to stdout
+        :param ex2src: extract the content to its source path where it was backup from
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
         :param stripped_components: stripped leading path components to correct hard link extraction
@@ -730,12 +731,17 @@ Utilization of max. archive size: {csize_max:.0%}
             if has_damaged_chunks:
                 raise BackupError('File has damaged (all-zero) chunks. Try running borg check --repair.')
             return
-
-        original_path = original_path or item.path
-        dest = self.cwd
-        if item.path.startswith(('/', '../')):
-            raise Exception('Path should be relative and local')
-        path = os.path.join(dest, item.path)
+            
+        if ex2src:
+            original_path = original_path or item.source_path
+            path = item.source_path
+            dest = ''
+        else:
+            original_path = original_path or item.path
+            dest = self.cwd
+            if item.path.startswith(('/', '../')):
+                raise Exception('Path should be relative and local')
+            path = os.path.join(dest, item.path)
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.stat(path, follow_symlinks=False)
@@ -767,7 +773,7 @@ Utilization of max. archive size: {csize_max:.0%}
                     ids = [c.id for c in item.chunks]
                     for data in self.pipeline.fetch_many(ids, is_preloaded=True):
                         if pi:
-                            pi.show(increase=len(data), info=[remove_surrogates(item.path)])
+                            pi.show(increase=len(data), info=[remove_surrogates(original_path)])
                         with backup_io('write'):
                             if sparse and zeros.startswith(data):
                                 # all-zero chunk: create a hole in a sparse file
@@ -1239,7 +1245,7 @@ class FilesystemObjectProcessors:
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True):
         safe_path = make_path_safe(path)
-        item = Item(path=safe_path)
+        item = Item(path=safe_path, source_path=path)
         hardlink_master = False
         hardlinked = hardlinkable and st.st_nlink > 1
         if hardlinked:

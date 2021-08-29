@@ -849,6 +849,7 @@ class Archiver:
         output_list = args.output_list
         dry_run = args.dry_run
         stdout = args.stdout
+        ex2src = args.ex2src
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
@@ -886,21 +887,24 @@ class Archiver:
                 while dirs and not item.path.startswith(dirs[-1].path):
                     dir_item = dirs.pop(-1)
                     try:
-                        archive.extract_item(dir_item, stdout=stdout)
+                        archive.extract_item(dir_item, stdout=stdout, ex2src=ex2src)
                     except BackupOSError as e:
                         self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
             if output_list:
-                logging.getLogger('borg.output.list').info(remove_surrogates(item.path))
+                if ex2src:
+                    logging.getLogger('borg.output.list').info(remove_surrogates(item.source_path))
+                else:
+                    logging.getLogger('borg.output.list').info(remove_surrogates(item.path))
             try:
                 if dry_run:
-                    archive.extract_item(item, dry_run=True, pi=pi)
+                    archive.extract_item(item, dry_run=True, pi=pi, ex2src=ex2src)
                 else:
                     if stat.S_ISDIR(item.mode):
                         dirs.append(item)
-                        archive.extract_item(item, stdout=stdout, restore_attrs=False)
+                        archive.extract_item(item, stdout=stdout, restore_attrs=False, ex2src=ex2src)
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
-                                             stripped_components=strip_components, original_path=orig_path, pi=pi)
+                                             stripped_components=strip_components, original_path=orig_path, pi=pi, ex2src=ex2src)
             except (BackupOSError, BackupError) as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
 
@@ -914,7 +918,7 @@ class Archiver:
                 pi.show()
                 dir_item = dirs.pop(-1)
                 try:
-                    archive.extract_item(dir_item, stdout=stdout)
+                    archive.extract_item(dir_item, stdout=stdout, ex2src=ex2src)
                 except BackupOSError as e:
                     self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
         for pattern in matcher.get_unmatched_include_patterns():
@@ -3907,6 +3911,8 @@ class Archiver:
                                help='do not extract/set xattrs')
         subparser.add_argument('--stdout', dest='stdout', action='store_true',
                                help='write all extracted data to stdout')
+        subparser.add_argument('--extract-to-source-path', dest='ex2src', action='store_true',
+                               help='extract the content back to its source path where it was backup from')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',
                                help='create holes in output sparse file from all-zero chunks')
         subparser.add_argument('location', metavar='ARCHIVE',

@@ -61,15 +61,20 @@ def get_base_dir():
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-
-    keys_dir = os.environ.get('BORG_KEYS_DIR', os.path.join(get_config_dir(), 'keys'))
+    keys_dir = os.environ.get('BORG_KEYS_DIR')
+    if keys_dir is None:
+        # note: do not just give this as default to the environment.get(), see issue #5979.
+        keys_dir = os.path.join(get_config_dir(), 'keys')
     ensure_dir(keys_dir)
     return keys_dir
 
 
 def get_security_dir(repository_id=None):
     """Determine where to store local security information."""
-    security_dir = os.environ.get('BORG_SECURITY_DIR', os.path.join(get_config_dir(), 'security'))
+    security_dir = os.environ.get('BORG_SECURITY_DIR')
+    if security_dir is None:
+        # note: do not just give this as default to the environment.get(), see issue #5979.
+        security_dir = os.path.join(get_config_dir(), 'security')
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     ensure_dir(security_dir)

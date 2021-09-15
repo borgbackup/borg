@@ -52,10 +52,10 @@ def packages_freebsd
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
-    # for building python:
-    pkg install -y python37 py37-sqlite3 py37-virtualenv py37-pip
+    # for building python (for the tests we use pyenv built pythons):
+    pkg install -y python38 py38-sqlite3 py38-virtualenv py38-pip
     # make sure there is a python3 command
-    ln -sf /usr/local/bin/python3.7 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.8 /usr/local/bin/python3
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd
@@ -129,12 +129,10 @@ def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
     #pkg update
-    # already installed:
-    #pkg install python-37 python-35 virtualenv-35 pip-35 clang-40 lz4 zstd git
-    pkg install gcc-7
-    ln -sf /usr/bin/python3.7 /usr/bin/python3
+    #pkg install gcc-7 python-39 setuptools-39
+    ln -sf /usr/bin/python3.9 /usr/bin/python3
     python3 -m ensurepip
-    ln -sf /usr/bin/pip3.7 /usr/bin/pip3
+    ln -sf /usr/bin/pip3.9 /usr/bin/pip3
     pip3 install virtualenv
   EOF
 end
@@ -164,7 +162,6 @@ def install_pythons(boxname)
     pyenv install 3.10-dev  # tests, version supporting openssl 1.1
     pyenv install 3.9.7  # tests, version supporting openssl 1.1, binary build
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
-    pyenv install 3.7.0  # tests, version supporting openssl 1.1
     pyenv rehash
   EOF
 end
@@ -232,8 +229,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.7.0 3.8.0 3.9.7 3.10-dev
-      pyenv local 3.7.0 3.8.0 3.9.7 3.10-dev
+      pyenv global 3.8.0 3.9.7 3.10-dev
+      pyenv local 3.8.0 3.9.7 3.10-dev
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

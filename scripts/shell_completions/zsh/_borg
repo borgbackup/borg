@@ -1,6 +1,6 @@
 #compdef borg borgfs -P -value-,BORG_*,-default-
 
-# Zsh completion for Borg Backup 1.1.15.
+# Zsh completion for Borg Backup 1.1.17.
 #
 # Recommended _borg specific settings:
 #
@@ -146,8 +146,10 @@ _borg-create() {
     '--noctime[do not store ctime into archive]' \
     '--nobirthtime[do not store birthtime (creation date) into archive]' \
     '--nobsdflags[do not read and store bsdflags (e.g. NODUMP, IMMUTABLE) into archive]' \
+    '--noacls[do not read and store ACLs into archive]' \
+    '--noxattrs[do not read and store xattrs into archive]' \
     '--ignore-inode[ignore inode data in the file metadata cache used to detect unchanged files]' \
-    '--files-cache=[operate files cache in MODE. default: ctime,size,inode]:MODE:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled)' \
+    '--files-cache=[operate files cache in MODE. default: ctime,size,inode]:MODE:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime size disabled)' \
     '--read-special[open and read block and char device files as well as FIFOs as if they were regular files]' \
     $common_options \
     ':ARCHIVE: _borg_repository_or_archive -a -p' \
@@ -180,6 +182,7 @@ _borg-debug() {
       'put-obj:put object to repository'
       'delete-obj:delete object from repository'
       'refcount-obj:show refcount for object from repository'
+      'dump-hints:dump repository hints'
       'convert-profile:convert Borg profile to Python profile'
     )
     _describe -t commands 'command' debug_commands && ret=0
@@ -245,6 +248,12 @@ _borg-debug() {
         ': :_borg_repository' \
         '*:ID (hex object):'  && ret=0
       ;;
+    (dump-hints)
+      _arguments -s -w -S : \
+        $common_options \
+        ': :_borg_repository' \
+        '*:PATH:_files' && ret=0
+      ;;
     (convert-profile)
       _arguments -s -w -S : \
         $common_options \
@@ -291,6 +300,7 @@ _borg-diff() {
     '--numeric-owner[only obey numeric user and group identifiers]' \
     '--same-chunker-params[override check of chunker parameters]' \
     '--sort[sort the output lines by file path]' \
+    '--json-lines[format output as JSON Lines]' \
     $common_exclude_options \
     $common_options \
     ':ARCHIVE1: _borg_repository_or_archive -a' \
@@ -325,6 +335,8 @@ _borg-extract() {
     '(-n --dry-run)'{-n,--dry-run}'[do not actually change any files]' \
     '--numeric-owner[only obey numeric user and group identifiers]' \
     '--nobsdflags[do not extract/set bsdflags (e.g. NODUMP, IMMUTABLE)]' \
+    '--noacls[do not extract/set ACLs]' \
+    '--noxattrs[do not extract/set xattrs]' \
     '--stdout[write all extracted data to stdout]' \
     '--sparse[create holes in output sparse file from all-zero chunks]' \
     $common_exclude_extract_options \
@@ -758,6 +770,14 @@ _borg_parameters() {
   ((CHECK|DELETE)_I_KNOW_WHAT_I_AM_DOING)
     _description values expl 'value'
     compadd "$expl[@]" YES NO && ret=0
+    ;;
+  (LIBC)
+    _wanted libraries expl 'library' \
+      compadd - ${^=LD_LIBRARY_PATH:-/usr/lib /usr/local/lib}/lib*.(a|so*)(:t:fr:s/lib//) && ret=0
+    ;;
+  (SELFTEST)
+    _description values expl 'value'
+    compadd "$expl[@]" disabled && ret=0
     ;;
   (WORKAROUNDS)
     _wanted workarounds expl 'workaround' _sequence -n 1 compadd - basesyncfile && ret=0

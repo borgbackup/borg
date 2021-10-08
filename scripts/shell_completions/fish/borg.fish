@@ -118,8 +118,10 @@ complete -c borg -f      -l 'noatime'               -d 'Do not store atime'     
 complete -c borg -f      -l 'noctime'               -d 'Do not store ctime'                             -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'nobirthtime'           -d 'Do not store creation date'                     -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'nobsdflags'            -d 'Do not store bsdflags'                          -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'noacls'                -d 'Do not read and store ACLs into archive'        -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'noxattrs'              -d 'Do not read and store xattrs into archive'      -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'noflags'               -d 'Do not store flags'                             -n "__fish_seen_subcommand_from create"
-set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
+set -l files_cache_mode "ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime size disabled"
 complete -c borg -f      -l 'files-cache'           -d 'Operate files cache in MODE' -a "$files_cache_mode" -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'read-special'          -d 'Open device files like regular files'           -n "__fish_seen_subcommand_from create"
 # Archive options
@@ -137,6 +139,8 @@ complete -c borg -f -s n -l 'dry-run'               -d 'Do not actually extract 
 complete -c borg -f      -l 'numeric-owner'         -d 'Only obey numeric user:group identifiers'   -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'nobsdflags'            -d 'Do not extract/set bsdflags'                -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'noflags'               -d 'Do not extract/set flags'                   -n "__fish_seen_subcommand_from extract"
+complete -c borg -f      -l 'noacls'                -d 'Do not extract/set ACLs'                    -n "__fish_seen_subcommand_from extract"
+complete -c borg -f      -l 'noxattrs'              -d 'Do not extract/set xattrs'                  -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'stdout'                -d 'Write all extracted data to stdout'         -n "__fish_seen_subcommand_from extract"
 complete -c borg -f      -l 'sparse'                -d 'Create holes in output sparse file'         -n "__fish_seen_subcommand_from extract"
 # Exclusion options
@@ -185,6 +189,7 @@ complete -c borg         -l 'patterns-from'         -d 'Include/exclude paths fr
 complete -c borg -f      -l 'numeric-owner'         -d 'Only consider numeric user:group'           -n "__fish_seen_subcommand_from diff"
 complete -c borg -f      -l 'same-chunker-params'   -d 'Override check of chunker parameters'       -n "__fish_seen_subcommand_from diff"
 complete -c borg -f      -l 'sort'                  -d 'Sort the output lines by file path'         -n "__fish_seen_subcommand_from diff"
+complete -c borg -f      -l 'json-lines'            -d 'Format output as JSON Lines'                -n "__fish_seen_subcommand_from diff"
 # Exclusion options
 complete -c borg    -s e -l 'exclude'               -d 'Exclude paths matching PATTERN'             -n "__fish_seen_subcommand_from diff"
 complete -c borg         -l 'exclude-from'          -d 'Read exclude patterns from EXCLUDEFILE'     -n "__fish_seen_subcommand_from diff"

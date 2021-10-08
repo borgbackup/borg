@@ -42,7 +42,7 @@ _borg()
             return 0
             ;;
         '--files-cache')
-            local files_cache_mode="ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime disabled"
+            local files_cache_mode="ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime size disabled"
             COMPREPLY=( $(compgen -W "${files_cache_mode}" -- ${cur}) )
             return 0
             ;;
@@ -75,10 +75,10 @@ _borg()
                 local opts="-e --encryption --append-only --storage-quota --make-parent-dirs ${common_opts}"
                 ;;
             *' create '*)
-                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name --content-from-command -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --noflags --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name --content-from-command -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --nobsdflags --noacls --noxattrs --noflags --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
                 ;;
             *' extract '*)
-                local opts="--list -n --dry-run --numeric-owner --nobsdflags --noflags --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
+                local opts="--list -n --dry-run --numeric-owner --nobsdflags --noacls --noxattrs --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
                 ;;
             *' check '*)
                 local opts="--repository-only --archives-only --verify-data --repair --save-space --max-duration -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"
@@ -89,7 +89,7 @@ _borg()
                 local opts="--short --format --json --json-lines -P --prefix -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
                 ;;
             *' diff '*)
-                local opts="--numeric-owner --same-chunker-params --sort -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
+                local opts="--numeric-owner --same-chunker-params --sort --json-lines -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
                 ;;
             *' delete '*)
                 local opts="-n --dry-run -s --stats --cache-only --force --save-space -P --prefix -a --glob-archives --sort-by --first --last ${common_opts}"

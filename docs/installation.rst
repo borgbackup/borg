@@ -71,7 +71,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
 .. _pkgsrc: http://pkgsrc.se/sysutils/py-borgbackup
 .. _cauldron: http://madb.mageia.org/package/show/application/0/release/cauldron/name/borgbackup
-.. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borg/default.nix
+.. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borgbackup/default.nix
 .. _OpenBSD ports: https://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
 .. _OpenIndiana hipster repository: https://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
 .. _openSUSE official repository: https://software.opensuse.org/package/borgbackup

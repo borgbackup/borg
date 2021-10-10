@@ -4283,7 +4283,7 @@ class Archiver:
         Important: Repository disk space is **not** freed until you run ``borg compact``.
 
         This command is normally used by automated backup scripts wanting to keep a
-        certain number of historic backups. This retention policy is commonly referred to
+        certain number of historic backups. This retention policy is commonly referred to as
         `GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
         (Grandfather-father-son) backup rotation scheme.
 

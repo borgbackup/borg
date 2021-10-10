@@ -773,7 +773,7 @@ _borg_parameters() {
     ;;
   (LIBC)
     _wanted libraries expl 'library' \
-      compadd - ${^=LD_LIBRARY_PATH:-/usr/lib /usr/local/lib}/lib*.(a|so*)(:t:fr:s/lib//) && ret=0
+      compadd - ${^=LD_LIBRARY_PATH:-/usr/lib /usr/local/lib}/lib*.(a|so*)(:t) && ret=0
     ;;
   (SELFTEST)
     _description values expl 'value'

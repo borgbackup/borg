@@ -39,6 +39,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import os_open, flags_normal, flags_dir
+from .helpers import os_stat
 from .helpers import msgpack
 from .helpers import sig_int
 from .lrucache import LRUCache
@@ -1284,7 +1285,7 @@ class FilesystemObjectProcessors:
         with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
             # looks like we can not work fd-based here without causing issues when trying to open/close the device
             with backup_io('stat'):
-                st = stat_update_check(st, os.stat(name, dir_fd=parent_fd, follow_symlinks=False))
+                st = stat_update_check(st, os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False))
             item.rdev = st.st_rdev
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status

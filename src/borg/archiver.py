@@ -681,7 +681,7 @@ class Archiver:
                 return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
             else:
                 try:
-                    st_target = os.stat(name, dir_fd=parent_fd, follow_symlinks=True)
+                    st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
                 except OSError:
                     special = False
                 else:

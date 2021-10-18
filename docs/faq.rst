@@ -113,7 +113,7 @@ you could delete the manifest-timestamp and the local cache:
 ::
 
   borg config repo id   # shows the REPO_ID
-  rm ~/.config/borg/REPO_ID/manifest-timestamp
+  rm ~/.config/borg/security/REPO_ID/manifest-timestamp
   borg delete --cache-only REPO
 
 This is an unsafe and unsupported way to use borg, you have been warned.

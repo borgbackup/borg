@@ -1518,10 +1518,8 @@ class LoggedIO:
                         dst_fd.write(MAGIC)
                         while len(d) >= self.header_fmt.size:
                             crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
-                            if size < self.header_fmt.size or size > len(d):
-                                d = d[1:]
-                                continue
-                            if crc32(d[4:size]) & 0xffffffff != crc:
+                            if size > MAX_OBJECT_SIZE or size < self.header_fmt.size or size > len(d)
+                               or crc32(d[4:size]) & 0xffffffff != crc:
                                 d = d[1:]
                                 continue
                             dst_fd.write(d[:size])

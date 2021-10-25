@@ -38,6 +38,15 @@ TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
 
+# Highest ID usable as TAG_* value
+#
+# Code may expect not to find any tags exceeding this value. In particular,
+# in order to speed up `borg check --repair`, any tag greater than MAX_TAG_ID
+# is assumed to be corrupted. When increasing this value, in order to add more
+# tags, keep in mind that old versions of Borg accessing a new repository
+# may not be able to handle the new tags.
+MAX_TAG_ID = 15
+
 FreeSpace = partial(defaultdict, int)
 
 
@@ -1518,8 +1527,8 @@ class LoggedIO:
                         dst_fd.write(MAGIC)
                         while len(d) >= self.header_fmt.size:
                             crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
-                            if size > MAX_OBJECT_SIZE or size < self.header_fmt.size or size > len(d)
-                               or crc32(d[4:size]) & 0xffffffff != crc:
+                            if size > MAX_OBJECT_SIZE or tag > MAX_TAG_ID or size < self.header_fmt.size \
+                               or size > len(d) or crc32(d[4:size]) & 0xffffffff != crc:
                                 d = d[1:]
                                 continue
                             dst_fd.write(d[:size])
@@ -1548,6 +1557,10 @@ class LoggedIO:
 
     def _read(self, fd, fmt, header, segment, offset, acceptable_tags, read_data=True):
         # some code shared by read() and iter_objects()
+
+        # See comment on MAX_TAG_ID for details
+        assert max(acceptable_tags) <= MAX_TAG_ID, 'Exceeding MAX_TAG_ID will break backwards compatibility'
+
         try:
             hdr_tuple = fmt.unpack(header)
         except struct.error as err:

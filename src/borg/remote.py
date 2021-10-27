@@ -738,7 +738,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             args = unpacked.get(b'exception_args')
 
             if error == 'DoesNotExist':
-                raise Repository.DoesNotExist(self.location.orig)
+                raise Repository.DoesNotExist(self.location.orig.split('::')[0])
             elif error == 'AlreadyExists':
                 raise Repository.AlreadyExists(self.location.orig)
             elif error == 'CheckNeeded':

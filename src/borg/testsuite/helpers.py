@@ -439,6 +439,19 @@ def test_prune_split_keep_oldest():
     assert kept_because[4][0] == "yearly"
 
 
+def test_prune_split_no_archives():
+    def subset(lst, ids):
+        return {i for i in lst if i.id in ids}
+
+    archives = []
+
+    kept_because = {}
+    keep = prune_split(archives, "yearly", 3, kept_because)
+
+    assert keep == []
+    assert kept_because == {}
+
+
 class IntervalTestCase(BaseTestCase):
     def test_interval(self):
         self.assert_equal(interval('1H'), 1)

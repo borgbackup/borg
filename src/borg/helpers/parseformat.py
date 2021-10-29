@@ -492,6 +492,10 @@ class Location:
             'utcnow': DatetimeWrapper(timestamp),
         })
 
+    def omit_archive(self):
+        #self.orig = self.orig.split("::")[0]
+        return self
+
 
 def location_validator(archive=None, proto=None):
     def validator(text):
@@ -519,6 +523,8 @@ def archivename_validator():
             raise argparse.ArgumentTypeError('Invalid archive name: "%s"' % text)
         return text
     return validator
+
+
 
 
 class BaseFormatter:

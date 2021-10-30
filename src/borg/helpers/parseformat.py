@@ -493,8 +493,9 @@ class Location:
         })
 
     def omit_archive(self):
-        #self.orig = self.orig.split("::")[0]
-        return self
+        loc = Location(self.orig)
+        loc.orig = loc.orig.split("::")[0]
+        return loc
 
 
 def location_validator(archive=None, proto=None):

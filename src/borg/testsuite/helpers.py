@@ -237,7 +237,7 @@ class TestLocationWithoutEnv:
     def test_omit_archive(self):
         loc = Location('ssh://user@host:1234/some/path::archive')
         loc_without_archive = loc.omit_archive()
-        assert loc.archive == "archive"
+        assert loc_without_archive.archive == "archive"
         assert loc_without_archive.orig == "ssh://user@host:1234/some/path"
 
 

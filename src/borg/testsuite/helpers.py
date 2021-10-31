@@ -240,6 +240,12 @@ class TestLocationWithoutEnv:
         assert loc_without_archive.archive == "archive"
         assert loc_without_archive.orig == "ssh://user@host:1234/some/path"
 
+    def test_omit_null_archive(self):
+        loc = Location('ssh://user@host:1234/some/path')
+        loc_without_archive = loc.omit_archive()
+        assert loc_without_archive.archive is None
+        assert loc_without_archive.orig == "ssh://user@host:1234/some/path"
+
 
 class TestLocationWithEnv:
     def test_ssh(self, monkeypatch):

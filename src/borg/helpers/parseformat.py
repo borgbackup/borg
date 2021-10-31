@@ -526,8 +526,6 @@ def archivename_validator():
     return validator
 
 
-
-
 class BaseFormatter:
     FIXED_KEYS = {
         # Formatting aids

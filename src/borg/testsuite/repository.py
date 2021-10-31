@@ -856,7 +856,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
     repository = None  # type: RemoteRepository
 
     def open(self, create=False):
-        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')+"::archive"),
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
                                 exclusive=True, create=create)
 
     def _get_mock_args(self):

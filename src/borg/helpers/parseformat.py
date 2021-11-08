@@ -494,6 +494,7 @@ class Location:
 
     def omit_archive(self):
         loc = Location(self.orig)
+        loc.archive = None
         loc.orig = loc.orig.split("::")[0]
         return loc
 

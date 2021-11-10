@@ -288,19 +288,21 @@ class DownloadPipeline:
                     # corresponding hardlink slave is selected (== is extracted).
                     # due to a side effect of the filter() call, we now have hardlink_masters dict populated.
                     for item in items:
-                        if 'chunks' in item:  # regular file, maybe a hardlink master
-                            _preload(item.chunks)
-                            # if this is a hardlink master, remember that we already preloaded it:
-                            if 'source' not in item and hardlinkable(item.mode) and item.get('hardlink_master', True):
-                                masters_preloaded.add(item.path)
-                        elif 'source' in item and hardlinkable(item.mode):  # hardlink slave
-                            source = item.source
-                            if source not in masters_preloaded:
-                                # we only need to preload *once* (for the 1st selected slave)
-                                chunks, _ = hardlink_masters[source]
-                                if chunks is not None:
-                                    _preload(chunks)
-                                masters_preloaded.add(source)
+                        if hardlinkable(item.mode):
+                            source = item.get('source')
+                            if source is None:  # maybe a hardlink master
+                                if 'chunks' in item:
+                                    _preload(item.chunks)
+                                # if this is a hl master, remember that we already preloaded all chunks of it (if any):
+                                if item.get('hardlink_master', True):
+                                    masters_preloaded.add(item.path)
+                            else:  # hardlink slave
+                                if source not in masters_preloaded:
+                                    # we only need to preload *once* (for the 1st selected slave)
+                                    chunks, _ = hardlink_masters[source]
+                                    if chunks is not None:
+                                        _preload(chunks)
+                                    masters_preloaded.add(source)
                 else:
                     # easy: we do not have a filter, thus all items are selected, thus we need to preload all chunks.
                     for item in items:

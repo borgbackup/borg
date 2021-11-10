@@ -158,7 +158,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
             elif location.proto == 'ssh':
-                repository = RemoteRepository(location, create=create, exclusive=argument(args, exclusive),
+                repository = RemoteRepository(location.omit_archive(), create=create, exclusive=argument(args, exclusive),
                                               lock_wait=self.lock_wait, lock=lock, append_only=append_only,
                                               make_parent_dirs=make_parent_dirs, args=args)
             else:

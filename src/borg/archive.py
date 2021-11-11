@@ -37,6 +37,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
 from .helpers import msgpack
+from .helpers import workarounds
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
@@ -1115,6 +1116,12 @@ Utilization of max. archive size: {csize_max:.0%}
                 raise
             # Was this EPERM due to the O_NOATIME flag? Try again without it:
             return os.open(path, flags_normal)
+        except OSError as exc:
+            # O_NOATIME causes EROFS when accessing a volume shadow copy in WSL1
+            if 'retry_erofs' in workarounds and exc.errno == errno.EROFS and flags_noatime != flags_normal:
+                return os.open(path, flags_normal)
+            else:
+                raise
 
 
 def valid_msgpacked_dict(d, keys_serialized):

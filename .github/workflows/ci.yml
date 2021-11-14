@@ -160,12 +160,7 @@ jobs:
             ${{ runner.os }}-
 
     - name: Install macOS packages
-      run: |
-        brew install pkg-config || brew upgrade pkg-config
-        brew install zstd || brew upgrade zstd
-        brew install lz4 || brew upgrade lz4
-        brew install xxhash || brew upgrade xxhash
-        brew install openssl@1.1 || brew upgrade openssl@1.1
+      run: brew bundle install
 
     - name: Install Python requirements
       run: |

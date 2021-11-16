@@ -10,6 +10,7 @@ import textwrap
 from .errors import Error
 
 from .process import prepare_subprocess_env
+from ..platform import SaveFile
 from ..platformflags import is_win32
 
 from ..constants import *  # NOQA
@@ -92,15 +93,14 @@ def get_cache_dir():
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(cache_home, 'borg'))
     # Create path if it doesn't exist yet
     ensure_dir(cache_dir)
-    cache_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
-    if not os.path.exists(cache_fn):
-        with open(cache_fn, 'wb') as fd:
-            fd.write(CACHE_TAG_CONTENTS)
-            fd.write(textwrap.dedent("""
-            # This file is a cache directory tag created by Borg.
-            # For information about cache directory tags, see:
-            #       http://www.bford.info/cachedir/spec.html
-            """).encode('ascii'))
+    cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
+    cache_tag_contents = CACHE_TAG_CONTENTS + textwrap.dedent("""
+    # This file is a cache directory tag created by Borg.
+    # For information about cache directory tags, see:
+    #       http://www.bford.info/cachedir/spec.html
+    """).encode('ascii')
+    with SaveFile(cache_tag_fn, binary=True) as fd:
+        fd.write(cache_tag_contents)
     return cache_dir
 
 

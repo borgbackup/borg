@@ -10,7 +10,6 @@ import textwrap
 from .errors import Error
 
 from .process import prepare_subprocess_env
-from ..platform import SaveFile
 from ..platformflags import is_win32
 
 from ..constants import *  # NOQA
@@ -99,6 +98,7 @@ def get_cache_dir():
     # For information about cache directory tags, see:
     #       http://www.bford.info/cachedir/spec.html
     """).encode('ascii')
+    from ..platform import SaveFile
     with SaveFile(cache_tag_fn, binary=True) as fd:
         fd.write(cache_tag_contents)
     return cache_dir

@@ -626,7 +626,11 @@ The idea of content-defined chunking is assigning every byte where a
 cut *could* be placed a hash. The hash is based on some number of bytes
 (the window size) before the byte in question. Chunks are cut
 where the hash satisfies some condition
-(usually "n numbers of trailing/leading zeroes").
+(usually "n numbers of trailing/leading zeroes"). This causes chunks to be cut
+in the same location relative to the file's contents, even if bytes are inserted
+or removed before/after a cut, as long as the bytes within the window stay the same.
+This results in a high chance that a single cluster of changes to a file will only
+result in 1-2 new chunks, aiding deduplication.
 
 Using normal hash functions this would be extremely slow,
 requiring hashing ``window size * file size`` bytes.

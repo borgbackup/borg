@@ -615,12 +615,29 @@ with data and seeking over the empty hole ranges).
 +++++++++++++++++
 
 The buzhash chunker triggers (chunks) when the last HASH_MASK_BITS bits of the
-hash are zero, producing chunks with a target size of 2^HASH_MASK_BITS Bytes.
+hash are zero, producing chunks with a target size of 2^HASH_MASK_BITS bytes.
 
 Buzhash is **only** used for cutting the chunks at places defined by the
 content, the buzhash value is **not** used as the deduplication criteria (we
 use a cryptographically strong hash/MAC over the chunk contents for this, the
 id_hash).
+
+The idea of content-defined chunking is assigning every byte where a
+cut *could* be placed a hash. The hash is based on some number of bytes
+(the window size) before the byte in question. Chunks are cut
+where the hash satisfies some condition
+(usually "n numbers of trailing/leading zeroes").
+
+Using normal hash functions this would be extremely slow,
+requiring hashing ``window size * file size`` bytes.
+A rolling hash is used instead, which allows to add a new input byte and
+compute a new hash as well as *remove* a previously added input byte
+from the computed hash. This makes the cost of computing a hash for each
+input byte largely independent of the window size.
+
+Borg defines minimum and maximum chunk sizes (CHUNK_MIN_EXP and CHUNK_MAX_EXP, respectively)
+which narrows down where cuts may be made, greatly reducing the amount of data
+that is actually hashed for content-defined chunking.
 
 ``borg create --chunker-params buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
 can be used to tune the chunker parameters, the default is:

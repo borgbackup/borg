@@ -792,7 +792,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         # EACCES: permission denied to set this specific xattr (this may happen related to security.* keys)
                         # EPERM: operation not permitted
                         err_str = os.strerror(e.errno)
-                    logger.warning('%s: when setting extended attribute %s: %s' % (path, k.decode(), err_str))
+                    logger.warning('%s: when setting extended attribute %s: %s', path, k.decode(), err_str)
                     set_ec(EXIT_WARNING)
         # bsdflags include the immutable flag and need to be set last:
         if not self.nobsdflags and 'bsdflags' in item:

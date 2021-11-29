@@ -794,10 +794,6 @@ _borg_parameters() {
     _description values expl 'value'
     compadd "$expl[@]" YES NO && ret=0
     ;;
-  (LIBC)
-    _wanted libraries expl 'library' \
-      compadd - ${^=LD_LIBRARY_PATH:-/usr/lib /usr/local/lib}/lib*.(a|so*)(:t:fr:s/lib//) && ret=0
-    ;;
   (SELFTEST)
     _description values expl 'value'
     compadd "$expl[@]" disabled && ret=0

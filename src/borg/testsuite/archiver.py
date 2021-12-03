@@ -3916,6 +3916,13 @@ class RemoteArchiverTestCase(ArchiverTestCase):
                 res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
                 self.assert_true(marker not in res)
 
+    def test_do_not_mention_archive_if_you_can_not_find_repo(self):
+        """https://github.com/borgbackup/borg/issues/6014"""
+        archive = self.repository_location + '-this-repository-does-not-exist' + '::test'
+        output = self.cmd('info', archive, exit_code=2, fork=True)
+        self.assert_in('this-repository-does-not-exist', output)
+        self.assert_not_in('this-repository-does-not-exist::test', output)
+
 
 class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
     def setUp(self):

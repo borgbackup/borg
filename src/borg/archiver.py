@@ -4245,7 +4245,7 @@ class Archiver:
                 help='Show checkpoint archives in the repository contents list (default: hidden).')
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',
+        subparser.add_argument('--format', metavar='FORMAT', dest='format',
                                help='specify format for file listing '
                                     '(default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")')
         subparser.add_argument('--json', action='store_true',

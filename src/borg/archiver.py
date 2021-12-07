@@ -4223,16 +4223,41 @@ class Archiver:
 
         .. man NOTES
 
-        The following keys are available for ``--format``:
+        The FORMAT specifier syntax
+        +++++++++++++++++++++++++++
 
+        The ``--format`` option uses python's `format string syntax
+        <https://docs.python.org/3.8/library/string.html#formatstrings>`_.
+
+        Examples:
+        ::
+
+            $ borg list --format '{archive}{NL}' /path/to/repo
+            ArchiveFoo
+            ArchiveBar
+            ...
+
+            # {VAR:NUMBER} - pad to NUMBER columns.
+            # Note: most fields are left-aligned, but some are right-aligned.
+            $ borg list --format '{path:20} {mode} {uid:20}{NL}' /path/to/repo::ArchiveFoo
+            file-foo             -rw-rw-r--                 1000
+            ...
+
+            # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
+            # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
+            $ borg list --format '{path:>20} {mode} {uid:<20}more text here{NL}' /path/to/repo::ArchiveFoo
+                        file-foo -rw-rw-r-- 1000                more text here
+            ...
+
+        The following keys are always available:
 
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
-        Keys for listing repository archives:
+        Keys available only when listing archives in a repository:
 
         """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
 
-        Keys for listing archive files:
+        Keys available only when listing files:
 
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
@@ -4246,8 +4271,9 @@ class Archiver:
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',
-                               help='specify format for file listing '
-                                    '(default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")')
+                               help='specify format for file or archive listing '
+                                    '(default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; '
+                                    'for archives: "{archive:<36} {time} [{id}]{NL}")')
         subparser.add_argument('--json', action='store_true',
                                help='Only valid for listing repository contents. Format output as JSON. '
                                     'The form of ``--format`` is ignored, '

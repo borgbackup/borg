@@ -549,7 +549,7 @@ class BaseFormatter:
     def keys_help():
         return "- NEWLINE: OS dependent line separator\n" \
                "- NL: alias of NEWLINE\n" \
-               "- NUL: NUL character for creating print0 / xargs -0 like output, see barchive/bpath\n" \
+               "- NUL: NUL character for creating print0 / xargs -0 like output, see barchive and bpath keys below\n" \
                "- SPACE\n" \
                "- TAB\n" \
                "- CR\n" \

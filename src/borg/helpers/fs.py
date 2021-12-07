@@ -93,14 +93,15 @@ def get_cache_dir():
     # Create path if it doesn't exist yet
     ensure_dir(cache_dir)
     cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
-    cache_tag_contents = CACHE_TAG_CONTENTS + textwrap.dedent("""
-    # This file is a cache directory tag created by Borg.
-    # For information about cache directory tags, see:
-    #       http://www.bford.info/cachedir/spec.html
-    """).encode('ascii')
-    from ..platform import SaveFile
-    with SaveFile(cache_tag_fn, binary=True) as fd:
-        fd.write(cache_tag_contents)
+    if not os.path.exists(cache_tag_fn):
+        cache_tag_contents = CACHE_TAG_CONTENTS + textwrap.dedent("""
+        # This file is a cache directory tag created by Borg.
+        # For information about cache directory tags, see:
+        #       http://www.bford.info/cachedir/spec.html
+        """).encode('ascii')
+        from ..platform import SaveFile
+        with SaveFile(cache_tag_fn, binary=True) as fd:
+            fd.write(cache_tag_contents)
     return cache_dir
 
 

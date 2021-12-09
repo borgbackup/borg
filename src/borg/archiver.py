@@ -4254,7 +4254,7 @@ class Archiver:
 
         The following keys are always available:
 
-        
+
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
         Keys available only when listing archives in a repository:
@@ -4274,7 +4274,7 @@ class Archiver:
                 help='Show checkpoint archives in the repository contents list (default: hidden).')
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
-        subparser.add_argument('--format', '--list-format', metavar='FORMAT', dest='format',
+        subparser.add_argument('--format', metavar='FORMAT', dest='format',
                                help='specify format for file or archive listing '
                                     '(default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; '
                                     'for archives: "{archive:<36} {time} [{id}]{NL}")')

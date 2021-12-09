@@ -132,7 +132,6 @@ def set_all(path, xattrs, follow_symlinks=False):
                 path_str = '<FD %d>' % path
             else:
                 path_str = os.fsdecode(path)
-            msg_format = '%s: when setting extended attribute %s: %%s' % (path_str, k_str)
             if e.errno == errno.E2BIG:
                 err_str = 'too big for this filesystem'
             elif e.errno == errno.ENOTSUP:
@@ -146,5 +145,5 @@ def set_all(path, xattrs, follow_symlinks=False):
                 # EACCES: permission denied to set this specific xattr (this may happen related to security.* keys)
                 # EPERM: operation not permitted
                 err_str = os.strerror(e.errno)
-            logger.warning(msg_format % err_str)
+            logger.warning('%s: when setting extended attribute %s: %s', path_str, k_str, err_str)
     return warning

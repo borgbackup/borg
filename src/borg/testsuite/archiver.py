@@ -3459,6 +3459,38 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             output = self.cmd(*args, fork=True, exit_code=2)
             assert 'Attic repository detected.' in output
 
+    # derived from test_extract_xattrs_errors()
+    @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
+                                                         'fakeroot')
+    def test_do_not_fail_when_percent_is_in_xattr_name(self):
+        """https://github.com/borgbackup/borg/issues/6063"""
+        def patched_setxattr_EACCES(*args, **kwargs):
+            raise OSError(errno.EACCES, 'EACCES')
+
+        self.create_regular_file('file')
+        xattr.setxattr(b'input/file', b'user.attribute%p', b'value')
+        self.cmd('init', self.repository_location, '-e' 'none')
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
+                self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+
+    # derived from test_extract_xattrs_errors()
+    @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
+                                                         'fakeroot')
+    def test_do_not_fail_when_percent_is_in_file_name(self):
+        """https://github.com/borgbackup/borg/issues/6063"""
+        def patched_setxattr_EACCES(*args, **kwargs):
+            raise OSError(errno.EACCES, 'EACCES')
+
+        os.makedirs(os.path.join(self.input_path, 'dir%p'))
+        xattr.setxattr(b'input/dir%p', b'user.attribute', b'value')
+        self.cmd('init', self.repository_location, '-e' 'none')
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
+                self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):
@@ -3883,6 +3915,13 @@ class RemoteArchiverTestCase(ArchiverTestCase):
             with self.assert_creates_file('input/dir/file'):
                 res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
                 self.assert_true(marker not in res)
+
+    def test_do_not_mention_archive_if_you_can_not_find_repo(self):
+        """https://github.com/borgbackup/borg/issues/6014"""
+        archive = self.repository_location + '-this-repository-does-not-exist' + '::test'
+        output = self.cmd('info', archive, exit_code=2, fork=True)
+        self.assert_in('this-repository-does-not-exist', output)
+        self.assert_not_in('this-repository-does-not-exist::test', output)
 
 
 class ArchiverCorruptionTestCase(ArchiverTestCaseBase):

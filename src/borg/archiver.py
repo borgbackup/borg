@@ -4238,15 +4238,18 @@ class Archiver:
             ...
 
             # {VAR:NUMBER} - pad to NUMBER columns.
-            # Note: most fields are left-aligned, but some are right-aligned.
-            $ borg list --format '{path:20} {mode} {uid:20}{NL}' /path/to/repo::ArchiveFoo
-            file-foo             -rw-rw-r--                 1000
+            # Strings are left-aligned, numbers are right-aligned.
+            # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
+            $ borg list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+            ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
+            $ borg list --format '{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}' /path/to/repo::ArchiveFoo
+            -rw-rw-r-- user   user       1024 Thu, 2021-12-09 10:22:17 file-foo
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg list --format '{path:>20} {mode} {uid:<20}more text here{NL}' /path/to/repo::ArchiveFoo
-                        file-foo -rw-rw-r-- 1000                more text here
+            $ borg list --format '{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}' /path/to/repo::ArchiveFoo
+            -rw-rw-r--   user   user 1024     Thu, 2021-12-09 10:22:17 file-foo
             ...
 
         The following keys are always available:
@@ -4257,7 +4260,7 @@ class Archiver:
 
         """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
 
-        Keys available only when listing files:
+        Keys available only when listing files in an archive:
 
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,

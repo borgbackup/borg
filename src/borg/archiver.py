@@ -4223,16 +4223,45 @@ class Archiver:
 
         .. man NOTES
 
-        The following keys are available for ``--format``:
+        The FORMAT specifier syntax
+        +++++++++++++++++++++++++++
+
+        The ``--format`` option uses python's `format string syntax
+        <https://docs.python.org/3.8/library/string.html#formatstrings>`_.
+
+        Examples:
+        ::
+
+            $ borg list --format '{archive}{NL}' /path/to/repo
+            ArchiveFoo
+            ArchiveBar
+            ...
+
+            # {VAR:NUMBER} - pad to NUMBER columns.
+            # Strings are left-aligned, numbers are right-aligned.
+            # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
+            $ borg list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+            ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
+            $ borg list --format '{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}' /path/to/repo::ArchiveFoo
+            -rw-rw-r-- user   user       1024 Thu, 2021-12-09 10:22:17 file-foo
+            ...
+
+            # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
+            # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
+            $ borg list --format '{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}' /path/to/repo::ArchiveFoo
+            -rw-rw-r--   user   user 1024     Thu, 2021-12-09 10:22:17 file-foo
+            ...
+
+        The following keys are always available:
 
 
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
-        Keys for listing repository archives:
+        Keys available only when listing archives in a repository:
 
         """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
 
-        Keys for listing archive files:
+        Keys available only when listing files in an archive:
 
         """) + ItemFormatter.keys_help()
         subparser = subparsers.add_parser('list', parents=[common_parser], add_help=False,
@@ -4246,8 +4275,9 @@ class Archiver:
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', metavar='FORMAT', dest='format',
-                               help='specify format for file listing '
-                                    '(default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")')
+                               help='specify format for file or archive listing '
+                                    '(default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; '
+                                    'for archives: "{archive:<36} {time} [{id}]{NL}")')
         subparser.add_argument('--json', action='store_true',
                                help='Only valid for listing repository contents. Format output as JSON. '
                                     'The form of ``--format`` is ignored, '

@@ -1656,6 +1656,7 @@ class Archiver:
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, key, cache):
+        """Create a backup archive from a tarball"""
         self.output_filter = args.output_filter
         self.output_list = args.output_list
 

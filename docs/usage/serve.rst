@@ -3,14 +3,16 @@
 Examples
 ~~~~~~~~
 
-borg serve has special support for ssh forced commands (see ``authorized_keys``
-example below): it will detect that you use such a forced command and extract
-the value of the ``--restrict-to-path`` option(s).
+``borg serve`` has special support for ssh forced commands (see ``authorized_keys``
+example below): if the environment variable SSH_ORIGINAL_COMMAND is set it will
+ignore some options given on the command line and use the values from the
+variable instead. This only applies to a carefully controlled allowlist of safe
+options. This list currently contains:
 
-It will then parse the original command that came from the client, makes sure
-that it is also ``borg serve`` and enforce path restriction(s) as given by the
-forced command. That way, other options given by the client (like ``--info`` or
-``--umask``) are preserved (and are not fixed by the forced command).
+- Options that control the log level and debug topics printed
+  such as ``--verbose``, ``--info``, ``--debug``, ``--debug-topic``, etc.
+- ``--lock-wait`` to allow the client to control how long to wait before
+  giving up and aborting the operation when another process is holding a lock.
 
 Environment variables (such as BORG_XXX) contained in the original
 command sent by the client are *not* interpreted, but ignored. If BORG_XXX environment
@@ -40,6 +42,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     ``no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc``
     in this case.
 
+Details about sshd usage: `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 
 SSH Configuration
 ~~~~~~~~~~~~~~~~~

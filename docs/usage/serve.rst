@@ -9,8 +9,8 @@ ignore some options given on the command line and use the values from the
 variable instead. This only applies to a carefully controlled allowlist of safe
 options. This list currently contains:
 
-- Options that control the amount of debug information printed
-  such as ``--debug``, ``--verbose``, ``--debug-topic`` etc.
+- Options that control the log level and debug topics printed
+  such as ``--verbose``, ``--info``, ``--debug``, ``--debug-topic``, etc.
 - ``--lock-wait`` to allow the client to control how long to wait before
   giving up and aborting the operation when another process is holding a lock.
 
@@ -42,8 +42,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     ``no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc``
     in this case.
 
-Refer to the `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
-man page for more details on SSH options.
+Details about sshd usage: `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 
 SSH Configuration
 ~~~~~~~~~~~~~~~~~

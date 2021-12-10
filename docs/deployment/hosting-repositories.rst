@@ -82,3 +82,4 @@ basis.
 
 Refer to the `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 man page for more details on SSH options.
+See also :ref:`borg_serve`

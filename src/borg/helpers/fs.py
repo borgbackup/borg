@@ -92,15 +92,22 @@ def get_cache_dir():
     cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(cache_home, 'borg'))
     # Create path if it doesn't exist yet
     ensure_dir(cache_dir)
-    cache_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
-    if not os.path.exists(cache_fn):
-        with open(cache_fn, 'wb') as fd:
-            fd.write(CACHE_TAG_CONTENTS)
-            fd.write(textwrap.dedent("""
-            # This file is a cache directory tag created by Borg.
-            # For information about cache directory tags, see:
-            #       http://www.bford.info/cachedir/spec.html
-            """).encode('ascii'))
+    cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
+    if not os.path.exists(cache_tag_fn):
+        cache_tag_contents = CACHE_TAG_CONTENTS + textwrap.dedent("""
+        # This file is a cache directory tag created by Borg.
+        # For information about cache directory tags, see:
+        #       http://www.bford.info/cachedir/spec.html
+        """).encode('ascii')
+        from ..platform import SaveFile
+        try:
+            with SaveFile(cache_tag_fn, binary=True) as fd:
+                fd.write(cache_tag_contents)
+        except FileExistsError:
+            # if we have multiple SaveFile calls running in parallel for same cache_tag_fn,
+            # it is fine if just one (usually first/quicker one) of them run gets through
+            # and all others raise FileExistsError.
+            pass
     return cache_dir
 
 

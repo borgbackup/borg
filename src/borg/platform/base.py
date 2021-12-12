@@ -141,12 +141,14 @@ class SyncFile:
     Note that POSIX doesn't specify *anything* about power failures (or similar failures). A system that
     routinely loses files or corrupts file on power loss is POSIX compliant.
 
+    Calling SyncFile(path) for an existing path will raise FileExistsError, see comment in __init__.
+
     TODO: Use F_FULLSYNC on OSX.
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
     def __init__(self, path, binary=False):
-        mode = 'xb' if binary else 'x'
+        mode = 'xb' if binary else 'x'  # x -> raise FileExists exception in open() if file exists already
         self.fd = open(path, mode)
         self.fileno = self.fd.fileno()
 
@@ -193,6 +195,11 @@ class SaveFile:
     On a journaling file system the file contents are always updated
     atomically and won't become corrupted, even on power failures or
     crashes (for caveats see SyncFile).
+
+    Calling SaveFile(path) in parallel for same path is safe (even when using the same SUFFIX), but the
+    caller needs to catch potential FileExistsError exceptions that may happen in this racy situation.
+    The caller executing SaveFile->SyncFile->open() first will win.
+    All other callers will raise a FileExistsError in open(), at least until the os.replace is executed.
     """
 
     SUFFIX = '.tmp'

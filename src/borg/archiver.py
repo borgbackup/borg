@@ -364,8 +364,9 @@ class Archiver:
             manager.export_paperkey(args.path)
         else:
             if not args.path:
-                self.print_error("output file to export key to expected")
-                return EXIT_ERROR
+                print("No output path provided. Printing key:")
+                manager.export_paperkey(None)
+                return EXIT_SUCCESS
             try:
                 if args.qr:
                     manager.export_qr(args.path)

@@ -1,4 +1,4 @@
-1. Before a backup can be made a repository has to be initialized::
+1. Before a backup can be converted into a repository it needs to be initialized (init)::
 
     $ borg init --encryption=repokey /path/to/repo
 
@@ -11,9 +11,9 @@
 
     $ borg create --stats /path/to/repo::Tuesday ~/src ~/Documents
 
-   This backup will be a lot quicker and a lot smaller since only new never
-   before seen data is stored. The ``--stats`` option causes Borg to
-   output statistics about the newly created archive such as the amount of unique
+   This backup will increase efficiency as the load is smaller and faster while 
+   only seeking for new data. The ``--stats`` option causes Borg to output 
+   statistics about the newly created archive such as the amount of unique
    data (not shared with other archives)::
 
     ------------------------------------------------------------------------------

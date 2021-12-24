@@ -99,6 +99,11 @@ General:
             Using this does not affect data safety, but might result in a more bursty
             write to disk behaviour (not continuously streaming to disk).
 
+        retry_erofs
+            Retry opening a file without O_NOATIME if opening a file with O_NOATIME
+            caused EROFS. You will need this to make archives from volume shadow copies
+            in WSL1 (Windows Subsystem for Linux 1).
+
 Some automatic "answerers" (if set, they automatically answer confirmation questions):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: Attempting to access a previously unknown unencrypted repository"

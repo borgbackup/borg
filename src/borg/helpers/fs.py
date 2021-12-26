@@ -286,6 +286,13 @@ def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
                 raise
             # Was this EPERM due to the O_NOATIME flag? Try again without it:
             fd = os.open(fname, _flags_normal, dir_fd=parent_fd)
+        except OSError as exc:
+            # O_NOATIME causes EROFS when accessing a volume shadow copy in WSL1
+            from . import workarounds
+            if 'retry_erofs' in workarounds and exc.errno == errno.EROFS and _flags_noatime != _flags_normal:
+                fd = os.open(fname, _flags_normal, dir_fd=parent_fd)
+            else:
+                raise
     else:
         fd = os.open(fname, _flags_normal, dir_fd=parent_fd)
     return fd

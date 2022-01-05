@@ -1148,7 +1148,7 @@ _borg_format_keys() {
   local repo_or_arch=${(Q)1}
 
   local -a keys=( NEWLINE NL NUL SPACE TAB CR LF )
-  local -a repository_keys=( archive name barchive comment bcomment id start time end hostname username )
+  local -a repository_keys=( archive name barchive comment bcomment id start time end command_line hostname username )
   local -a archive_keys=( type mode uid gid user group path bpath source linktarget flags size csize dsize dcsize
     num_chunks unique_chunks mtime ctime atime isomtime isoctime isoatime blake2b blake2s md5 sha1 sha224 sha256 sha384
     sha3_224 sha3_256 sha3_384 sha3_512 sha512 shake_128 shake_256 archiveid archivename extra health )

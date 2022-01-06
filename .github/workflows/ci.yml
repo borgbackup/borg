@@ -62,7 +62,7 @@ jobs:
               toxenv: py310-fuse3
             - os: macos-latest
               python-version: '3.8'
-              toxenv: py38-fuse2
+              toxenv: py38-none
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
@@ -107,7 +107,7 @@ jobs:
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
         brew install openssl@1.1 || brew upgrade openssl@1.1
-        brew install homebrew/cask/osxfuse || brew upgrade homebrew/cask/osxfuse  # Required for Python llfuse module
+        #brew install homebrew/cask/osxfuse || brew upgrade homebrew/cask/osxfuse  # Required for Python llfuse module
 
     - name: Install Python requirements
       run: |

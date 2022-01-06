@@ -107,7 +107,7 @@ jobs:
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
         brew install openssl@1.1 || brew upgrade openssl@1.1
-        brew install homebrew/cask/osxfuse || brew upgrade homebrew/cask/osxfuse  # Required for Python llfuse module
+        brew install homebrew/cask/macfuse || brew upgrade homebrew/cask/macfuse  # Required for Python llfuse module
 
     - name: Install Python requirements
       run: |

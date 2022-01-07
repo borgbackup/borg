@@ -3527,6 +3527,14 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
         else:
             super().test_fuse()
 
+    @unittest.skip('patches objects')
+    def test_do_not_fail_when_percent_is_in_xattr_name(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_do_not_fail_when_percent_is_in_file_name(self):
+        pass
+
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):
 

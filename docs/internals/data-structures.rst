@@ -633,7 +633,7 @@ This results in a high chance that a single cluster of changes to a file will on
 result in 1-2 new chunks, aiding deduplication.
 
 Using normal hash functions this would be extremely slow,
-requiring hashing ``window size * file size`` bytes.
+requiring hashing approximately ``window size * file size`` bytes.
 A rolling hash is used instead, which allows to add a new input byte and
 compute a new hash as well as *remove* a previously added input byte
 from the computed hash. This makes the cost of computing a hash for each

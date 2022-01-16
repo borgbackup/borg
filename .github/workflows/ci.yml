@@ -69,7 +69,7 @@ jobs:
             - os: ubuntu-20.04
               python-version: '3.10-dev'
               toxenv: py310
-            - os: macos-latest
+            - os: macos-10.15  # macos-latest is macos 11.6.2 and hanging at test_fuse, #6099
               # note: it seems that 3.8 and 3.9 are currently broken,
               # neverending RuntimeError crashes...
               python-version: '3.7'
@@ -117,7 +117,7 @@ jobs:
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
         brew install openssl@1.1 || brew upgrade openssl@1.1
-        brew install homebrew/cask/osxfuse || brew upgrade homebrew/cask/osxfuse  # Required for Python llfuse module
+        brew install --cask macfuse || brew upgrade --cask macfuse  # Required for Python llfuse module
 
     - name: Install Python requirements
       run: |

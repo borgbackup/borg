@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.0b3 (2021-05-12)
+Version 1.2.0xx (2022-xx-xx)
 ----------------------------
 
 Please note:
@@ -233,9 +233,10 @@ See there for feedback: https://github.com/borgbackup/borg/issues/4360
 
 Compatibility notes:
 
-- dropped support / testing for Python 3.4 and 3.5, minimum requirement is 3.6.
-  In case your OS does not provide Python >= 3.6, consider using our binary,
-  which does not need an external Python interpreter.
+- dropped support / testing for older Pythons, minimum requirement is 3.8.
+  In case your OS does not provide Python >= 3.8, consider using our binary,
+  which does not need an external Python interpreter. Or continue using
+  borg 1.1.x, which is still supported.
 - freeing repository space only happens when "borg compact" is invoked.
 - mount: the default for --numeric-ids is False now (same as borg extract)
 - borg create --noatime is deprecated. Not storing atime is the default behaviour
@@ -268,6 +269,78 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+
+Fixes:
+
+- create: fix passing device nodes and symlinks to --paths-from-stdin, #6009
+- create --dry-run: fix display of kept tagfile, #5834
+- check --repair: fix missing parameter in "did not consistently fail" msg, #5822
+- fix hardlinkable file type check, #6037
+- list: remove placeholders for shake_* hashes, #6082
+- prune: handle case of calling prune_split when there are no archives, #6015
+- benchmark crud: make sure cleanup of borg-test-data files/dir happens, #5630
+- do not show archive name in repository-related error msgs, #6014
+- prettier error msg (no stacktrace) if exclude file is missing, #5734
+- do not require BORG_CONFIG_DIR if BORG_{SECURITY,KEYS}_DIR are set, #5979
+- fix pyinstaller detection for dir-mode, #5897
+- atomically create the CACHE_TAG file, #6028
+- deal with the SaveFile/SyncFile race, docs, see #6056 708a5853
+- avoid expanding path into LHS of formatting operation + tests, #6064 #6063
+
+New features:
+
+- check --repair: significantly speed up search for next valid object in segment, #6022
+- check: add progress indicator for archive check, #5809
+- create: add retry_erofs workaround for O_NOATIME issue on volume shadow copies in WSL1, #6024
+- create: allow --files-cache=size (this is potentially dangerous, use on your own risk), #5686
+- import-tar: implement import-tar to complement export-tar, #2233
+- implement BORG_SELFTEST env variable (can be carefully used to speedup borg hosting), #5871
+
+Other changes:
+
+- require python 3.8+, #5975
+- use pyinstaller 4.7
+- allow msgpack 1.0.3
+- import-tar / export-tar: tar file related changes:
+
+  - check for short tarfile extensions
+  - add .lz4 and .zstd
+  - fix docs about extensions and decompression commands
+- vagrant:
+
+  - box updates / add new boxes / remove outdated and broken boxes
+  - use Python 3.9.9 (incl. binary builds) and 3.10.0
+  - fix pyenv initialisation, #5798
+- shell completions:
+
+  - update shell completions to 1.1.17, #5923
+  - remove BORG_LIBC completion, since 9914968 borg no longer uses find_library().
+- docs:
+
+  - fixed readme.rst irc webchat link (we use libera chat now, not freenode)
+  - fix exceptions thrown by `setup.py build_man`
+  - check --repair: recommend checking hw before check --repair, #5855
+  - check --verify-data: clarify and document conflict with --repository-only, #5808
+  - serve: improve ssh forced commands docs, #6083
+  - list: improve docs for `borg list` --format, #6061
+  - list: remove --list-format from borg list
+  - FAQ: fix manifest-timestamp path (inside security dir)
+  - fix the broken link to .nix file
+  - document behavior for filesystems with inconsistent inodes, #5770
+  - clarify user_id vs uid for fuse, #5723
+  - clarify pattern usage with commands, #5176
+  - clarify pp vs. pf pattern type, #5300
+  - update referenced freebsd/macOS versions used for binary build, #5942
+  - pull mode: add some warnings, #5827
+  - clarify "you will need key and passphrase" borg init warning, #4622
+  - add missing leading slashes in help patterns, #5857
+  - add info on renaming repositories, #5240
+  - check: add notice about defective hardware, #5753
+  - mention tar --compare (compare archive to fs files), #5880
+
+Version 1.2.0b3 (2021-05-12)
+----------------------------
 
 Fixes:
 

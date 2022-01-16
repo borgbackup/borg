@@ -356,7 +356,7 @@ function __fish_borg_is_dir_a_repository
     set -l config_content
     if test -f $argv[1]/README
     and test -f $argv[1]/config
-        read config_content < $argv[1]/config ^/dev/null
+        read config_content < $argv[1]/config 2>/dev/null
     end
     return (string match --quiet '[repository]' $config_content)
 end
@@ -365,7 +365,7 @@ function __fish_borg_list_repos_or_archives
     if string match --quiet --regex '.*::' '"'(commandline --current-token)'"'
         # If the current token contains "::" then list the archives:
         set -l repository_name (string replace --regex '::.*' '' (commandline --current-token))
-        borg list --format="$repository_name::{archive}{TAB}{comment}{NEWLINE}" "$repository_name" ^/dev/null
+        borg list --format="$repository_name::{archive}{TAB}{comment}{NEWLINE}" "$repository_name" 2>/dev/null
     else
         # Otherwise list the repositories, directories and user@host entries:
         set -l directories (commandline --cut-at-cursor --current-token)*/
@@ -395,7 +395,7 @@ end
 
 function __fish_borg_list_only_archives
     set -l repo_matches (string match --regex '([^ ]*)::' (commandline))
-    borg list --format="{archive}{TAB}{comment}{NEWLINE}" "$repo_matches[2]" ^/dev/null
+    borg list --format="{archive}{TAB}{comment}{NEWLINE}" "$repo_matches[2]" 2>/dev/null
 end
 
 complete -c borg -f -n __fish_borg_is_diff_second_archive -a '(__fish_borg_list_only_archives)'

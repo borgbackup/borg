@@ -60,9 +60,9 @@ jobs:
             - os: ubuntu-20.04
               python-version: '3.10'
               toxenv: py310-fuse3
-            - os: macos-latest
+            - os: macos-10.15  # macos-latest is macos 11.6.2 and hanging at test_fuse, #6099
               python-version: '3.8'
-              toxenv: py38-none
+              toxenv: py38-fuse2
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
@@ -107,7 +107,7 @@ jobs:
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
         brew install openssl@1.1 || brew upgrade openssl@1.1
-        #brew install homebrew/cask/osxfuse || brew upgrade homebrew/cask/osxfuse  # Required for Python llfuse module
+        brew install --cask macfuse || brew upgrade --cask macfuse  # Required for Python llfuse module
 
     - name: Install Python requirements
       run: |

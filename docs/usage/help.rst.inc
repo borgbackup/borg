@@ -170,7 +170,7 @@ Examples::
     .. note::
 
         It's possible that a sub-directory/file is matched while parent directories are not.
-        In that case, parent directories are not backed up thus their user, group, permission,=
+        In that case, parent directories are not backed up thus their user, group, permission,
         etc. can not be restored.
 
         For example, with `--pattern=+/home/user/subdir --pattern=-/home/user/*`,

@@ -121,5 +121,5 @@ pass over the archive metadata.
     so make sure you ``cd`` to the right place before calling ``borg extract``.
 
     When parent directories are not extracted (because of using file/directory selection
-    or any other reasons), borg can not restore those directories' metadata, e.g. owner,
+    or any other reason), borg can not restore parent directories' metadata, e.g. owner,
     group, permission, etc.

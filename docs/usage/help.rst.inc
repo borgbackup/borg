@@ -173,10 +173,6 @@ Examples::
         In that case, parent directories are not backed up thus their user, group, permission,
         etc. can not be restored.
 
-        For example, with `--pattern=+/home/user/subdir --pattern=-/home/user/*`,
-        `/home/user/subdir` can be restored with correct metadata, while `\home`and
-        `/home/user` can not.
-
     Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
     shell style (`sh:`), so those patterns behave similar to rsync include/exclude
     patterns. The pattern style can be set via the `P` prefix.

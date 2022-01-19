@@ -363,9 +363,6 @@ class Archiver:
         if args.paper:
             manager.export_paperkey(args.path)
         else:
-            if not args.path:
-                print(manager.get_keyfile_data())
-                return EXIT_SUCCESS
             try:
                 if args.qr:
                     manager.export_qr(args.path)

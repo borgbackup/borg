@@ -260,7 +260,7 @@ setup(
     license='BSD',
     platforms=['Linux', 'MacOS X', 'FreeBSD', 'OpenBSD', 'NetBSD', ],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Environment :: Console',
         'Intended Audience :: System Administrators',
         'License :: OSI Approved :: BSD License',

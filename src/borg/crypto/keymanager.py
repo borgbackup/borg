@@ -88,7 +88,7 @@ class KeyManager:
         if path is None:
             path = '-'
 
-        with open(path, 'wb') as fd:
+        with dash_open(path, 'wb') as fd:
             key_data = self.get_keyfile_data()
             html = pkgutil.get_data('borg', 'paperkey.html')
             html = html.replace(b'</textarea>', key_data.encode() + b'</textarea>')

@@ -75,20 +75,29 @@ class KeyManager:
         return data
 
     def store_keyfile(self, target):
-        with open(target, 'w') as fd:
+        with dash_open(target, 'w') as fd:
             fd.write(self.get_keyfile_data())
 
     def export(self, path):
+        if path is None:
+            path = '-'
+
         self.store_keyfile(path)
 
     def export_qr(self, path):
-        with open(path, 'wb') as fd:
+        if path is None:
+            path = '-'
+
+        with dash_open(path, 'wb') as fd:
             key_data = self.get_keyfile_data()
             html = pkgutil.get_data('borg', 'paperkey.html')
             html = html.replace(b'</textarea>', key_data.encode() + b'</textarea>')
             fd.write(html)
 
     def export_paperkey(self, path):
+        if path is None:
+            path = '-'
+
         def grouped(s):
             ret = ''
             i = 0
@@ -118,11 +127,8 @@ class KeyManager:
             export += '{0:2d}: {1} - {2}\n'.format(idx, grouped(bin_to_hex(binline)), checksum)
             binary = binary[18:]
 
-        if path:
-            with open(path, 'w') as fd:
-                fd.write(export)
-        else:
-            print(export)
+        with dash_open(path, 'w') as fd:
+            fd.write(export)
 
     def import_keyfile(self, args):
         file_id = KeyfileKey.FILE_ID

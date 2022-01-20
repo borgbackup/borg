@@ -363,9 +363,6 @@ class Archiver:
         if args.paper:
             manager.export_paperkey(args.path)
         else:
-            if not args.path:
-                self.print_error("output file to export key to expected")
-                return EXIT_ERROR
             try:
                 if args.qr:
                     manager.export_qr(args.path)

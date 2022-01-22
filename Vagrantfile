@@ -185,6 +185,7 @@ def install_borg(fuse)
     cd borg
     pip install -r requirements.d/development.txt
     python setup.py clean
+    python setup.py clean2
     pip install -e .[#{fuse}]
   EOF
 end

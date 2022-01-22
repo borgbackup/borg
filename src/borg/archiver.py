@@ -1530,8 +1530,6 @@ class Archiver:
             archive_names = (args.location.archive,)
         else:
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
-            if not archive_names:
-                return self.exit_code
 
         output_data = []
 

@@ -930,7 +930,7 @@ class Repository:
                 else:
                     report(msg)
         if self.segments[segment] == 0:
-            self.compact[segment] += self.io.segment_size(segment)
+            self.compact[segment] = self.io.segment_size(segment)
 
     def _rebuild_sparse(self, segment):
         """Rebuild sparse bytes count for a single segment relative to the current index."""

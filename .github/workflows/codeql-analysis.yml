@@ -56,7 +56,8 @@ jobs:
     # ℹ️ Command-line programs to run using the OS shell.
     # 📚 https://git.io/JvXDl
 
-    - run: |
+    - name: Install requirements, build and install Borg
+      run: |
        sudo apt install libacl1-dev
        pip3 install -r requirements.d/development.txt
        pip3 install -e .

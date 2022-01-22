@@ -367,7 +367,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "darwin64" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 2048 + $wmem
+      v.memory = 4096 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']

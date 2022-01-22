@@ -816,8 +816,11 @@ if not on_rtd:
                                                system_prefix=libxxhash_prefix, system=libxxhash_system,
                                                **crypto_ext_kwargs)
 
-    msgpack_endian = '__BIG_ENDIAN__' if (sys.byteorder == 'big') else '__LITTLE_ENDIAN__'
-    msgpack_macros = [(msgpack_endian, '1')]
+    msgpack_macros = []  # setup.py of msgpack 0.5.6 defines __LITTLE_ENDIAN__ / __BIG_ENDIAN__ - which
+                         # leads to troubles when trying cross-platform builds, see borg issue #6105.
+                         # in current msgpack, this was fixed to ONLY define __LITTLE_ENDIAN__ ON WIN32.
+                         # as borg 1.1.x does not support native win32 anyway, we do not have that here.
+
     msgpack_packer_ext_kwargs = dict(
         sources=[msgpack_packer_source],
         include_dirs=include_dirs,

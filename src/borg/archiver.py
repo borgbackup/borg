@@ -1391,8 +1391,6 @@ class Archiver:
         else:
             args.consider_checkpoints = True
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
-            if not archive_names:
-                return self.exit_code
 
         output_data = []
 

@@ -71,26 +71,20 @@ Also helpful:
 Important note about permissions
 --------------------------------
 
-Using root likely will be required if you want to backup files of other users
-or the operating system. If you only back up your own files, you neither need
-nor want to use root.
+To avoid permissions issues (in your borg repository or borg cache), **always
+access the repository using the same user account**.
 
-Avoid to create a mixup of users and permissions in your repository (or cache).
+If you want to backup files of other users or the operating system, running
+borg as root likely will be required (otherwise you'ld get `Permission denied`
+errors).
+If you only back up your own files, you neither need nor want to run borg as
+root, just run it as your normal user.
 
-This can easily happen if you run borg using different user accounts (e.g. your
-non-privileged user and root) while accessing the same repo.
-
-Of course, a non-root user will have no permission to work with the files
-created by root (or another user) and borg operations will just fail with
-`Permission denied`.
-
-The easy way to avoid this is to always access the repo as the same user:
-
-For a local repository just always invoke borg as same user.
+For a local repository just always use the same user to invoke borg.
 
 For a remote repository: always use e.g. borg@remote_host. You can use this
-from different local users, the remote user accessing the repo will always be
-borg.
+from different local users, the remote user running borg and accessing the
+repo will always be `borg`.
 
 If you need to access a local repository from different users, you can use the
 same method by using ssh to borg@localhost.

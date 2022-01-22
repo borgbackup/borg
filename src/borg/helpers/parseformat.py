@@ -4,6 +4,7 @@ import json
 import os
 import os.path
 import re
+import shlex
 import socket
 import stat
 import uuid
@@ -567,13 +568,14 @@ class ArchiveFormatter(BaseFormatter):
         'start': 'time (start) of creation of the archive',
         'time': 'alias of "start"',
         'end': 'time (end) of creation of the archive',
+        'command_line': 'command line which was used to create the archive',
         'id': 'internal ID of the archive',
         'hostname': 'hostname of host on which this archive was created',
         'username': 'username of user who created this archive',
     }
     KEY_GROUPS = (
         ('archive', 'name', 'barchive', 'comment', 'bcomment', 'id'),
-        ('start', 'time', 'end'),
+        ('start', 'time', 'end', 'command_line'),
         ('hostname', 'username'),
     )
 
@@ -624,6 +626,7 @@ class ArchiveFormatter(BaseFormatter):
             'comment': partial(self.get_meta, 'comment', rs=True),
             'bcomment': partial(self.get_meta, 'comment', rs=False),
             'end': self.get_ts_end,
+            'command_line': self.get_cmdline,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
         if self.json:
@@ -663,6 +666,13 @@ class ArchiveFormatter(BaseFormatter):
     def get_meta(self, key, rs):
         value = self.archive.metadata.get(key, '')
         return remove_surrogates(value) if rs else value
+
+    def get_cmdline(self):
+        cmdline = map(remove_surrogates, self.archive.metadata.get('cmdline', []))
+        if self.json:
+            return list(cmdline)
+        else:
+            return ' '.join(map(shlex.quote, cmdline))
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)

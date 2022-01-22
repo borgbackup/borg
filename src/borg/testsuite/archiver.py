@@ -1476,7 +1476,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert datetime.strptime(archive['start'], ISO_FORMAT)
         assert datetime.strptime(archive['end'], ISO_FORMAT)
 
-    @pytest.mark.xfail(strict=True)
     def test_info_json_of_empty_archive(self):
         """See https://github.com/borgbackup/borg/issues/6120"""
         self.cmd('init', '--encryption=repokey', self.repository_location)

@@ -261,6 +261,7 @@ def install_borg(fuse)
     cd borg
     pip install -r requirements.d/development.lock.txt
     python setup.py clean
+    python setup.py clean2
   EOF
   if fuse
     script += <<-EOF

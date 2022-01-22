@@ -13,7 +13,7 @@ import os
 # xxhash files, structure as seen in XXHASH (reference implementation) project repository:
 
 xxhash_sources = [
-    'xxhash.c',
+#    'xxhash.c',  # do not compile xxhash.c (it is included by xxhash-libselect.h)
 ]
 
 xxhash_includes = [

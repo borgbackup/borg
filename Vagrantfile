@@ -30,17 +30,6 @@ def packages_debianoid(user)
   EOF
 end
 
-def packages_arch
-  return <<-EOF
-    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-    locale-gen
-    localectl set-locale LANG=en_US.UTF-8
-    chown vagrant.vagrant /vagrant
-    pacman -Syu --noconfirm python-virtualenv python-pip fuse2 fuse3
-    modprobe fuse
-  EOF
-end
-
 def packages_freebsd
   return <<-EOF
     # in case the VM has no hostname set
@@ -119,7 +108,7 @@ def packages_darwin
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
     brew install pkg-config readline openssl@1.1 zstd lz4 xz fakeroot git
-    brew install --cask osxfuse
+    brew install --cask macfuse
     brew upgrade  # upgrade everything
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
   EOF
@@ -145,6 +134,8 @@ def install_pyenv(boxname)
     . ~/.bash_profile
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
     echo 'eval "$(pyenv init --path)"' >> ~/.bash_profile
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
     echo 'eval "$(pyenv init -)"' >> ~/.bashrc
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
   EOF
@@ -194,6 +185,7 @@ def install_borg(fuse)
     cd borg
     pip install -r requirements.d/development.txt
     python setup.py clean
+    python setup.py clean2
     pip install -e .[#{fuse}]
   EOF
 end
@@ -375,7 +367,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "darwin64" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 2048 + $wmem
+      v.memory = 4096 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']
@@ -403,7 +395,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "openindiana64" do |b|
     b.vm.box = "openindiana"
     b.vm.provider :virtualbox do |v|
-      v.memory = 1536 + $wmem
+      v.memory = 2048 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
@@ -412,6 +404,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
   end
 
-  # TODO: create more VMs with python 3.7+ and openssl 1.1.
-  # See branch 1.1-maint for a better equipped Vagrantfile (but still on py34 and openssl 1.0).
+  # TODO: create more VMs with python 3.8+ and openssl 1.1.
+  # See branch 1.1-maint for a better equipped Vagrantfile (but still on py35 and openssl 1.0).
 end

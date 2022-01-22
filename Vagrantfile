@@ -404,6 +404,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
   end
 
-  # TODO: create more VMs with python 3.7+ and openssl 1.1.
-  # See branch 1.1-maint for a better equipped Vagrantfile (but still on py34 and openssl 1.0).
+  # TODO: create more VMs with python 3.8+ and openssl 1.1.
+  # See branch 1.1-maint for a better equipped Vagrantfile (but still on py35 and openssl 1.0).
 end

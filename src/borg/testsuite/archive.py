@@ -125,11 +125,11 @@ class ChunkBufferTestCase(BaseTestCase):
         chunks.flush(flush=False)
         # the code is expected to leave the last partial chunk in the buffer
         self.assert_equal(len(chunks.chunks), 3)
-        self.assert_true(chunks.buffer.tell() > 0)
+        assert chunks.buffer.tell() > 0
         # now really flush
         chunks.flush(flush=True)
         self.assert_equal(len(chunks.chunks), 4)
-        self.assert_true(chunks.buffer.tell() == 0)
+        assert chunks.buffer.tell() == 0
         unpacker = msgpack.Unpacker()
         for id in chunks.chunks:
             unpacker.feed(cache.objects[id])

@@ -836,7 +836,7 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
     def test_hints_behaviour(self):
         self.repository.put(H(0), b'data')
         self.assert_equal(self.repository.shadow_index, {})
-        self.assert_true(len(self.repository.compact) == 0)
+        assert len(self.repository.compact) == 0
         self.repository.delete(H(0))
         self.repository.commit(compact=False)
         # now there should be an entry for H(0) in shadow_index

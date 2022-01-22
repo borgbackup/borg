@@ -164,7 +164,6 @@ class BaseTestCase(unittest.TestCase):
     assert_not_in = unittest.TestCase.assertNotIn
     assert_equal = unittest.TestCase.assertEqual
     assert_not_equal = unittest.TestCase.assertNotEqual
-    assert_true = unittest.TestCase.assertTrue
 
     if raises:
         assert_raises = staticmethod(raises)
@@ -173,9 +172,9 @@ class BaseTestCase(unittest.TestCase):
 
     @contextmanager
     def assert_creates_file(self, path):
-        self.assert_true(not os.path.exists(path), '{} should not exist'.format(path))
+        assert not os.path.exists(path), '{} should not exist'.format(path)
         yield
-        self.assert_true(os.path.exists(path), '{} should exist'.format(path))
+        assert os.path.exists(path), '{} should exist'.format(path)
 
     def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)

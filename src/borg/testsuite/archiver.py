@@ -1538,6 +1538,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert datetime.strptime(archive['start'], ISO_FORMAT)
         assert datetime.strptime(archive['end'], ISO_FORMAT)
 
+    def test_info_json_of_empty_archive(self):
+        """See https://github.com/borgbackup/borg/issues/6120"""
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        info_repo = json.loads(self.cmd('info', '--json', '--first=1', self.repository_location))
+        assert info_repo["archives"] == []
+        info_repo = json.loads(self.cmd('info', '--json', '--last=1', self.repository_location))
+        assert info_repo["archives"] == []
+
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)

@@ -169,7 +169,7 @@ class BaseTestCase(unittest.TestCase):
     def assert_creates_file(self, path):
         assert not os.path.exists(path), '{} should not exist'.format(path)
         yield
-        assert not os.path.exists(path), '{} should not exist'.format(path)
+        assert os.path.exists(path), '{} should exist'.format(path)
 
     def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)

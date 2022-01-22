@@ -30,17 +30,6 @@ def packages_debianoid(user)
   EOF
 end
 
-def packages_arch
-  return <<-EOF
-    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-    locale-gen
-    localectl set-locale LANG=en_US.UTF-8
-    chown vagrant.vagrant /vagrant
-    pacman -Syu --noconfirm python-virtualenv python-pip fuse2 fuse3
-    modprobe fuse
-  EOF
-end
-
 def packages_freebsd
   return <<-EOF
     # in case the VM has no hostname set

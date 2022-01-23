@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-INIT 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-init \- Initialize an empty repository
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-INIT" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-init \- Initialize an empty repository
 .SH SYNOPSIS
 .sp
 borg [common options] init [options] [REPOSITORY]
@@ -192,13 +192,13 @@ repository to create
 .BI \-e \ MODE\fR,\fB \ \-\-encryption \ MODE
 select encryption key mode \fB(required)\fP
 .TP
-.B \-\-append\-only
+.B  \-\-append\-only
 create an append\-only mode repository. Note that this only affects the low level structure of the repository, and running \fIdelete\fP or \fIprune\fP will still be allowed. See \fIappend_only_mode\fP in Additional Notes for more details.
 .TP
 .BI \-\-storage\-quota \ QUOTA
 Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .TP
-.B \-\-make\-parent\-dirs
+.B  \-\-make\-parent\-dirs
 create the parent directories of the repository directory, if they are missing.
 .UNINDENT
 .SH EXAMPLES

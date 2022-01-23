@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORGFS 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORGFS" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
 .sp
 borgfs [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT [PATH...]
@@ -48,6 +48,23 @@ To allow a regular user to use fstab entries, add the \fBuser\fP option:
 \fB/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0\fP
 .sp
 For FUSE configuration and mount options, see the mount.fuse(8) manual page.
+.sp
+Borg\(aqs default behavior is to use the archived user and group names of each
+file and map them to the system\(aqs respective user and group ids.
+Alternatively, using \fBnumeric\-ids\fP will instead use the archived user and
+group ids without any mapping.
+.sp
+The \fBuid\fP and \fBgid\fP mount options (implemented by Borg) can be used to
+override the user and group ids of all files (i.e., \fBborg mount \-o
+uid=1000,gid=1000\fP).
+.sp
+The man page references \fBuser_id\fP and \fBgroup_id\fP mount options
+(implemented by fuse) which specify the user and group id of the mount owner
+(aka, the user who does the mounting). It is set automatically by libfuse (or
+the filesystem if libfuse is not used). However, you should not specify these
+manually. Unlike the \fBuid\fP and \fBgid\fP mount options which affect all files,
+\fBuser_id\fP and \fBgroup_id\fP affect the user and group id of the mounted
+(base) directory.
 .sp
 Additional mount options supported by borg:
 .INDENT 0.0
@@ -93,22 +110,22 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-V\fP,\fB  \-\-version
+.B  \-V\fP,\fB  \-\-version
 show version number and exit
 .TP
-.B \-\-consider\-checkpoints
+.B  \-\-consider\-checkpoints
 Show checkpoint archives in the repository contents list (default: hidden).
 .TP
-.B \-f\fP,\fB  \-\-foreground
+.B  \-f\fP,\fB  \-\-foreground
 stay in foreground, do not daemonize
 .TP
-.B \-o
+.B  \-o
 Extra mount options
 .TP
-.B \-\-numeric\-owner
+.B  \-\-numeric\-owner
 deprecated, use \fB\-\-numeric\-ids\fP instead
 .TP
-.B \-\-numeric\-ids
+.B  \-\-numeric\-ids
 use numeric user and group identifiers from archive(s)
 .UNINDENT
 .SS Archive filters

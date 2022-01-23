@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CHECK 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-check \- Check repository consistency
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-CHECK" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-check \- Check repository consistency
 .SH SYNOPSIS
 .sp
 borg [common options] check [options] [REPOSITORY_OR_ARCHIVE]
@@ -39,6 +39,11 @@ The check command verifies the consistency of a repository and the corresponding
 .sp
 check \-\-repair is a potentially dangerous function and might lead to data loss
 (for kinds of corruption it is not capable of dealing with). BE VERY CAREFUL!
+.sp
+Pursuant to the previous warning it is also highly recommended to test the
+reliability of the hardware running this software with stress testing software
+such as memory testers. Unreliable hardware can also lead to data loss especially
+when this command is run in repair mode.
 .sp
 First, the underlying repository data files are checked:
 .INDENT 0.0
@@ -83,6 +88,11 @@ In repair mode, when all the archives were checked, orphaned chunks are deleted
 from the repo. One cause of orphaned chunks are input file related errors (like
 read errors) in the archive creation process.
 .IP \(bu 2
+In verify\-data mode, a complete cryptographic verification of the archive data
+integrity is performed. This conflicts with \fB\-\-repository\-only\fP as this mode
+only makes sense if the archive checks are enabled. The full details of this mode
+are documented below.
+.IP \(bu 2
 If checking a remote repo via \fBssh:\fP, the archive check is executed on the
 client machine because it requires decryption, and this is always done client\-side
 as key access is needed.
@@ -122,19 +132,19 @@ repository or archive to check consistency of
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-repository\-only
+.B  \-\-repository\-only
 only perform repository checks
 .TP
-.B \-\-archives\-only
+.B  \-\-archives\-only
 only perform archives checks
 .TP
-.B \-\-verify\-data
+.B  \-\-verify\-data
 perform cryptographic archive data integrity verification (conflicts with \fB\-\-repository\-only\fP)
 .TP
-.B \-\-repair
+.B  \-\-repair
 attempt to repair any inconsistencies found
 .TP
-.B \-\-save\-space
+.B  \-\-save\-space
 work slower, but using less space
 .TP
 .BI \-\-max\-duration \ SECONDS

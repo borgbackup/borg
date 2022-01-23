@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-create \- Create new archive
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-CREATE" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-create \- Create new archive
 .SH SYNOPSIS
 .sp
 borg [common options] create [options] ARCHIVE [PATH...]
@@ -135,22 +135,22 @@ paths to archive
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-n\fP,\fB  \-\-dry\-run
+.B  \-n\fP,\fB  \-\-dry\-run
 do not create a backup archive
 .TP
-.B \-s\fP,\fB  \-\-stats
+.B  \-s\fP,\fB  \-\-stats
 print statistics for the created archive
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters (see description)
 .TP
-.B \-\-json
+.B  \-\-json
 output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
-.B \-\-no\-cache\-sync
+.B  \-\-no\-cache\-sync
 experimental: do not synchronize the cache. Implies not using the files cache.
 .TP
 .BI \-\-stdin\-name \ NAME
@@ -160,18 +160,18 @@ use NAME in archive for stdin data (default: \(aqstdin\(aq)
 set user USER in archive for stdin data (default: \(aqroot\(aq)
 .TP
 .BI \-\-stdin\-group \ GROUP
-set group GROUP in archive for stdin data (default: \(aqroot\(aq)
+set group GROUP in archive for stdin data (default: \(aqwheel\(aq)
 .TP
 .BI \-\-stdin\-mode \ M
 set mode to M in archive for stdin data (default: 0660)
 .TP
-.B \-\-content\-from\-command
+.B  \-\-content\-from\-command
 interpret PATH as command and store its stdout. See also section Reading from stdin below.
 .TP
-.B \-\-paths\-from\-stdin
+.B  \-\-paths\-from\-stdin
 read DELIM\-separated list of paths to backup from stdin. Will not recurse into directories.
 .TP
-.B \-\-paths\-from\-command
+.B  \-\-paths\-from\-command
 interpret PATH as command and treat its output as \fB\-\-paths\-from\-stdin\fP
 .TP
 .BI \-\-paths\-delimiter \ DELIM
@@ -192,61 +192,61 @@ experimental: include/exclude paths matching PATTERN
 .BI \-\-patterns\-from \ PATTERNFILE
 experimental: read include/exclude patterns from PATTERNFILE, one per line
 .TP
-.B \-\-exclude\-caches
+.B  \-\-exclude\-caches
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.bford.info/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
-.B \-\-keep\-exclude\-tags
+.B  \-\-keep\-exclude\-tags
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
 .TP
-.B \-\-exclude\-nodump
+.B  \-\-exclude\-nodump
 exclude files flagged NODUMP
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
 .TP
-.B \-x\fP,\fB  \-\-one\-file\-system
+.B  \-x\fP,\fB  \-\-one\-file\-system
 stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
 .TP
-.B \-\-numeric\-owner
+.B  \-\-numeric\-owner
 deprecated, use \fB\-\-numeric\-ids\fP instead
 .TP
-.B \-\-numeric\-ids
+.B  \-\-numeric\-ids
 only store numeric user and group identifiers
 .TP
-.B \-\-noatime
+.B  \-\-noatime
 do not store atime into archive
 .TP
-.B \-\-atime
+.B  \-\-atime
 do store atime into archive
 .TP
-.B \-\-noctime
+.B  \-\-noctime
 do not store ctime into archive
 .TP
-.B \-\-nobirthtime
+.B  \-\-nobirthtime
 do not store birthtime (creation date) into archive
 .TP
-.B \-\-nobsdflags
+.B  \-\-nobsdflags
 deprecated, use \fB\-\-noflags\fP instead
 .TP
-.B \-\-noflags
+.B  \-\-noflags
 do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive
 .TP
-.B \-\-noacls
+.B  \-\-noacls
 do not read and store ACLs into archive
 .TP
-.B \-\-noxattrs
+.B  \-\-noxattrs
 do not read and store xattrs into archive
 .TP
-.B \-\-sparse
+.B  \-\-sparse
 detect sparse holes in input (supported only by fixed chunker)
 .TP
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode
 .TP
-.B \-\-read\-special
+.B  \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 .UNINDENT
 .SS Archive options

@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-UPGRADE 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-upgrade \- upgrade a repository from a previous version
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-UPGRADE" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-upgrade \- upgrade a repository from a previous version
 .SH SYNOPSIS
 .sp
 borg [common options] upgrade [options] [REPOSITORY]
@@ -134,19 +134,19 @@ path to the repository to be upgraded
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-n\fP,\fB  \-\-dry\-run
+.B  \-n\fP,\fB  \-\-dry\-run
 do not change repository
 .TP
-.B \-\-inplace
+.B  \-\-inplace
 rewrite repository in place, with no chance of going back to older versions of the repository.
 .TP
-.B \-\-force
+.B  \-\-force
 Force upgrade
 .TP
-.B \-\-tam
+.B  \-\-tam
 Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).
 .TP
-.B \-\-disable\-tam
+.B  \-\-disable\-tam
 Disable manifest authentication (in key and cache).
 .UNINDENT
 .SH EXAMPLES

@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-list \- List archive or repository contents
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-LIST" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-list \- List archive or repository contents
 .SH SYNOPSIS
 .sp
 borg [common options] list [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
@@ -53,19 +53,19 @@ paths to list; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-consider\-checkpoints
+.B  \-\-consider\-checkpoints
 Show checkpoint archives in the repository contents list (default: hidden).
 .TP
-.B \-\-short
+.B  \-\-short
 only print file/directory names, nothing else
 .TP
-.BI \-\-format \ FORMAT\fR,\fB \ \-\-list\-format \ FORMAT
-specify format for file listing (default: "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NL}")
+.BI \-\-format \ FORMAT
+specify format for file or archive listing (default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; for archives: "{archive:<36} {time} [{id}]{NL}")
 .TP
-.B \-\-json
+.B  \-\-json
 Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
 .TP
-.B \-\-json\-lines
+.B  \-\-json\-lines
 Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 .UNINDENT
 .SS Archive filters
@@ -134,21 +134,64 @@ drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 .
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
+\-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
+\&...
+
+$ borg list /path/to/repo/::archiveA \-\-pattern \(aqre:\e.ext$\(aq
+\-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
+\&...
+
+$ borg list /path/to/repo/::archiveA \-\-pattern \(aqre:.ext$\(aq
+\-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
+\-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .SH NOTES
+.SS The FORMAT specifier syntax
 .sp
-The following keys are available for \fB\-\-format\fP:
+The \fB\-\-format\fP option uses python\(aqs \fI\%format string syntax\fP\&.
+.sp
+Examples:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ borg list \-\-format \(aq{archive}{NL}\(aq /path/to/repo
+ArchiveFoo
+ArchiveBar
+\&...
+
+# {VAR:NUMBER} \- pad to NUMBER columns.
+# Strings are left\-aligned, numbers are right\-aligned.
+# Note: time columns except \(ga\(gaisomtime\(ga\(ga, \(ga\(gaisoctime\(ga\(ga and \(ga\(gaisoatime\(ga\(ga cannot be padded.
+$ borg list \-\-format \(aq{archive:36} {time} [{id}]{NL}\(aq /path/to/repo
+ArchiveFoo                           Thu, 2021\-12\-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
+$ borg list \-\-format \(aq{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}\(aq /path/to/repo::ArchiveFoo
+\-rw\-rw\-r\-\- user   user       1024 Thu, 2021\-12\-09 10:22:17 file\-foo
+\&...
+
+# {VAR:<NUMBER} \- pad to NUMBER columns left\-aligned.
+# {VAR:>NUMBER} \- pad to NUMBER columns right\-aligned.
+$ borg list \-\-format \(aq{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}\(aq /path/to/repo::ArchiveFoo
+\-rw\-rw\-r\-\-   user   user 1024     Thu, 2021\-12\-09 10:22:17 file\-foo
+\&...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The following keys are always available:
 .INDENT 0.0
 .IP \(bu 2
 NEWLINE: OS dependent line separator
 .IP \(bu 2
 NL: alias of NEWLINE
 .IP \(bu 2
-NUL: NUL character for creating print0 / xargs \-0 like output, see barchive/bpath
+NUL: NUL character for creating print0 / xargs \-0 like output, see barchive and bpath keys below
 .IP \(bu 2
 SPACE
 .IP \(bu 2
@@ -159,7 +202,7 @@ CR
 LF
 .UNINDENT
 .sp
-Keys for listing repository archives:
+Keys available only when listing archives in a repository:
 .INDENT 0.0
 .IP \(bu 2
 archive: archive name interpreted as text (might be missing non\-text characters, see barchive)
@@ -180,12 +223,14 @@ time: alias of "start"
 .IP \(bu 2
 end: time (end) of creation of the archive
 .IP \(bu 2
+command_line: command line which was used to create the archive
+.IP \(bu 2
 hostname: hostname of host on which this archive was created
 .IP \(bu 2
 username: username of user who created this archive
 .UNINDENT
 .sp
-Keys for listing archive files:
+Keys available only when listing files in an archive:
 .INDENT 0.0
 .IP \(bu 2
 type
@@ -257,10 +302,6 @@ sha3_384
 sha3_512
 .IP \(bu 2
 sha512
-.IP \(bu 2
-shake_128
-.IP \(bu 2
-shake_256
 .IP \(bu 2
 xxh64: XXH64 checksum of this file (note: this is NOT a cryptographic hash!)
 .IP \(bu 2

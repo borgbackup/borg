@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMPACT 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-compact \- compact segment files in the repository
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-COMPACT" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-compact \- compact segment files in the repository
 .SH SYNOPSIS
 .sp
 borg [common options] compact [options] [REPOSITORY]
@@ -68,7 +68,7 @@ repository to compact
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-cleanup\-commits
+.B  \-\-cleanup\-commits
 cleanup commit\-only 17\-byte segment files
 .TP
 .BI \-\-threshold \ PERCENT

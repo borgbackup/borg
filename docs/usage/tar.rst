@@ -1,3 +1,5 @@
+.. include:: import-tar.rst.inc
+
 .. include:: export-tar.rst.inc
 
 Examples

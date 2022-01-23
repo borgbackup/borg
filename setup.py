@@ -222,6 +222,7 @@ libxxhash_prefix = setup_xxhash.xxhash_system_prefix(possible_libxxhash_prefixes
 if prefer_system_libxxhash and libxxhash_prefix:
     print('Detected and preferring libxxhash over bundled XXHASH')
     define_macros.append(('BORG_USE_LIBXXHASH', 'YES'))
+    define_macros.append(('XXH_PRIVATE_API', 'YES'))  # do not use this for bundled zstd or xxh64, breaks the build
     libxxhash_system = True
 else:
     libxxhash_system = False

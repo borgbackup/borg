@@ -119,7 +119,3 @@ pass over the archive metadata.
 
     Currently, extract always writes into the current working directory ("."),
     so make sure you ``cd`` to the right place before calling ``borg extract``.
-
-    When parent directories are not extracted (because of using file/directory selection
-    or any other reason), borg can not restore parent directories' metadata, e.g. owner,
-    group, permission, etc.

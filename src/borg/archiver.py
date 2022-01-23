@@ -2369,6 +2369,12 @@ class Archiver:
             a directory, it won't recurse into it and won't discover any potential matches for
             include rules below that directory.
 
+            .. note::
+
+                It's possible that a sub-directory/file is matched while parent directories are not.
+                In that case, parent directories are not backed up thus their user, group, permission,
+                etc. can not be restored.
+
             Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
             shell style (`sh:`), so those patterns behave similar to rsync include/exclude
             patterns. The pattern style can be set via the `P` prefix.
@@ -3878,6 +3884,10 @@ class Archiver:
 
             Currently, extract always writes into the current working directory ("."),
             so make sure you ``cd`` to the right place before calling ``borg extract``.
+
+            When parent directories are not extracted (because of using file/directory selection
+            or any other reason), borg can not restore parent directories' metadata, e.g. owner,
+            group, permission, etc.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,

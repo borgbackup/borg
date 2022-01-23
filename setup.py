@@ -225,6 +225,7 @@ if prefer_system_libxxhash and libxxhash_prefix:
     define_macros.append(('XXH_PRIVATE_API', 'YES'))  # do not use this for bundled zstd or xxh64, breaks the build
     libxxhash_system = True
 else:
+    define_macros.append(('XXH_VECTOR', '0'))  # avoid compile issues with CPU specific stuff
     libxxhash_system = False
 
 

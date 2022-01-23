@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.0xx (2022-xx-xx)
+Version 1.2.0b4 (2022-01-23)
 ----------------------------
 
 Please note:
@@ -287,6 +287,8 @@ Fixes:
 - atomically create the CACHE_TAG file, #6028
 - deal with the SaveFile/SyncFile race, docs, see #6056 708a5853
 - avoid expanding path into LHS of formatting operation + tests, #6064 #6063
+- repository: quota / compactable computation fixes
+- info: emit repo info even if repo has 0 archives + test, #6120
 
 New features:
 
@@ -296,22 +298,29 @@ New features:
 - create: allow --files-cache=size (this is potentially dangerous, use on your own risk), #5686
 - import-tar: implement import-tar to complement export-tar, #2233
 - implement BORG_SELFTEST env variable (can be carefully used to speedup borg hosting), #5871
+- key export: print key if path is '-' or not given, #6092
+- list --format: Add command_line to format keys
 
 Other changes:
 
+- pypi metadata: alpha -> beta
 - require python 3.8+, #5975
 - use pyinstaller 4.7
 - allow msgpack 1.0.3
+- upgrade to bundled xxhash to 0.8.1
 - import-tar / export-tar: tar file related changes:
 
   - check for short tarfile extensions
   - add .lz4 and .zstd
   - fix docs about extensions and decompression commands
+- add github codeql analysis, #6148
 - vagrant:
 
   - box updates / add new boxes / remove outdated and broken boxes
-  - use Python 3.9.9 (incl. binary builds) and 3.10.0
+  - use Python 3.9.10 (incl. binary builds) and 3.10.0
   - fix pyenv initialisation, #5798
+  - fix vagrant scp on macOS, #5921
+  - use macfuse instead of osxfuse
 - shell completions:
 
   - update shell completions to 1.1.17, #5923
@@ -338,6 +347,13 @@ Other changes:
   - add info on renaming repositories, #5240
   - check: add notice about defective hardware, #5753
   - mention tar --compare (compare archive to fs files), #5880
+  - add note about grandfather-father-son backup retention policy / rotation scheme, #6006
+  - permissions note rewritten to make it less confusing
+  - create github security policy
+  - remove leftovers of BORG_HOSTNAME_IS_UNIQUE
+  - excluded parent dir's metadata can't restore. (#6062)
+  - if parent dir is not extracted, we do not have its metadata
+  - clarify who starts the remote agent
 
 
 Version 1.2.0b3 (2021-05-12)

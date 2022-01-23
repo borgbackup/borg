@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXPORT-TAR 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-export-tar \- Export archive contents as a tarball
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-EXPORT-TAR" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-export-tar \- Export archive contents as a tarball
 .SH SYNOPSIS
 .sp
 borg [common options] export\-tar [options] ARCHIVE FILE [PATH...]
@@ -44,14 +44,18 @@ based on its file extension and pipe the tarball through an appropriate filter
 before writing it to FILE:
 .INDENT 0.0
 .IP \(bu 2
-\&.tar.gz: gzip
+\&.tar.gz or .tgz: gzip
 .IP \(bu 2
-\&.tar.bz2: bzip2
+\&.tar.bz2 or .tbz: bzip2
 .IP \(bu 2
-\&.tar.xz: xz
+\&.tar.xz or .txz: xz
+.IP \(bu 2
+\&.tar.zstd: zstd
+.IP \(bu 2
+\&.tar.lz4: lz4
 .UNINDENT
 .sp
-Alternatively a \fB\-\-tar\-filter\fP program may be explicitly specified. It should
+Alternatively, a \fB\-\-tar\-filter\fP program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered
 tar stream to stdout.
 .sp
@@ -90,10 +94,10 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-tar\-filter
+.B  \-\-tar\-filter
 filter program to pipe data through
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .UNINDENT
 .SS Exclusion options

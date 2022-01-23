@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg \- deduplicating and encrypting backup tool
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
 .sp
 borg [common options] <command> [options] [arguments]
@@ -415,11 +415,6 @@ Main usecase for this is to fully automate \fBborg change\-passphrase\fP\&.
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
 .TP
-.B BORG_HOSTNAME_IS_UNIQUE=no
-Borg assumes that it can derive a unique hostname / identity (see \fBborg debug info\fP).
-If this is not the case or you do not want Borg to automatically remove stale locks,
-set this to \fIno\fP\&.
-.TP
 .B BORG_HOST_ID
 Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
 a unique id based on the MAC address of the network interface. Except if that MAC happens to be all\-zero \- in
@@ -473,6 +468,15 @@ given order, e.g.:
 \fBnone\fP: do not try to load an implementation
 .UNINDENT
 .TP
+.B BORG_SELFTEST
+This can be used to influence borg\(aqs builtin self\-tests. The default is to execute the tests
+at the beginning of each borg command invocation.
+.sp
+BORG_SELFTEST=disabled can be used to switch off the tests and rather save some time.
+Disabling is not recommended for normal borg users, but large scale borg storage providers can
+use this to optimize production servers after at least doing a one\-time test borg (with
+selftests not disabled) when installing or upgrading machines / OS / borg.
+.TP
 .B BORG_WORKAROUNDS
 A list of comma separated strings that trigger workarounds in borg,
 e.g. to work around bugs in other software.
@@ -486,6 +490,11 @@ You might need this to run borg on WSL (Windows Subsystem for Linux) or
 in systemd.nspawn containers on some architectures (e.g. ARM).
 Using this does not affect data safety, but might result in a more bursty
 write to disk behaviour (not continuously streaming to disk).
+.TP
+.B retry_erofs
+Retry opening a file without O_NOATIME if opening a file with O_NOATIME
+caused EROFS. You will need this to make archives from volume shadow copies
+in WSL1 (Windows Subsystem for Linux 1).
 .UNINDENT
 .UNINDENT
 .TP
@@ -593,7 +602,8 @@ know a list of affected hardware.
 If you are suspicious whether your Borg repository is still consistent
 and readable after one of the failures mentioned above occurred, run
 \fBborg check \-\-verify\-data\fP to make sure it is consistent.
-Requirements for Borg repository file systems.INDENT 0.0
+Requirements for Borg repository file systems
+.INDENT 0.0
 .IP \(bu 2
 Long file names
 .IP \(bu 2

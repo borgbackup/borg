@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-PATTERNS 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-patterns \- Details regarding patterns
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-PATTERNS" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
 .sp
 The path/filenames used as input for the pattern matching start from the
@@ -49,7 +49,9 @@ store all files as \fIsome/path/.../file.ext\fP and \fBborg create
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full\-matches. By default, fnmatch is used for
 \fB\-\-exclude\fP patterns and shell\-style is used for the experimental
-\fB\-\-pattern\fP option.
+\fB\-\-pattern\fP option. For commands that support patterns in their
+\fBPATH\fP argument like (\fBborg list\fP), the default pattern is path
+prefix.
 .sp
 Starting with Borg 1.2, for all but regular expression pattern matching
 styles, all paths are treated as relative, meaning that a leading path
@@ -171,8 +173,8 @@ $ cat >exclude.txt <<EOF
 /home/*/junk
 *.tmp
 fm:aa:something/*
-re:^home/[^/]\e.tmp/
-sh:home/*/.thumbnails
+re:^/home/[^/]+\e.tmp/
+sh:/home/*/.thumbnails
 # Example with spaces, no need to escape as it is processed by borg
 some file with spaces.txt
 EOF

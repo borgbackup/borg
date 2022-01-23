@@ -23,7 +23,9 @@ store all files as `some/path/.../file.ext` and ``borg create
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full-matches. By default, fnmatch is used for
 ``--exclude`` patterns and shell-style is used for the experimental
-``--pattern`` option.
+``--pattern`` option. For commands that support patterns in their
+``PATH`` argument like (``borg list``), the default pattern is path
+prefix.
 
 Starting with Borg 1.2, for all but regular expression pattern matching
 styles, all paths are treated as relative, meaning that a leading path
@@ -69,15 +71,12 @@ Regular expressions, selector `re:`
     the re module <https://docs.python.org/3/library/re.html>`_.
 
 Path prefix, selector `pp:`
-    This pattern style matches either the whole path or an initial segment
-    of the path up to but not including a path separator. For consistency
-    with the `fn:` and `sh:` patterns, a path separator is added to the
-    end of the path before matching. For example, `pp:root/somedir`
-    matches `root/somedir` and everything therein. A leading path
-    separator is always removed. A trailing slash makes no difference.
+    This pattern style is useful to match whole sub-directories. The pattern
+    `pp:root/somedir` matches `root/somedir` and everything therein. A leading
+    path separator is always removed.
 
 Path full-match, selector `pf:`
-    This pattern style is (only) useful to match full (exact) paths.
+    This pattern style is (only) useful to match full paths.
     This is kind of a pseudo pattern as it can not have any variable or
     unspecified parts - the full path must be given. `pf:root/file.ext` matches
     `root/file.ext` only. A leading path separator is always removed.
@@ -139,8 +138,8 @@ Examples::
     /home/*/junk
     *.tmp
     fm:aa:something/*
-    re:^home/[^/]\.tmp/
-    sh:home/*/.thumbnails
+    re:^/home/[^/]+\.tmp/
+    sh:/home/*/.thumbnails
     # Example with spaces, no need to escape as it is processed by borg
     some file with spaces.txt
     EOF
@@ -166,12 +165,6 @@ Examples::
     an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
     a directory, it won't recurse into it and won't discover any potential matches for
     include rules below that directory.
-
-    .. note::
-
-        It's possible that a sub-directory/file is matched while parent directories are not.
-        In that case, parent directories are not backed up thus their user, group, permission,
-        etc. can not be restored.
 
     Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
     shell style (`sh:`), so those patterns behave similar to rsync include/exclude

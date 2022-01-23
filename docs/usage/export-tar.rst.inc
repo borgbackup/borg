@@ -89,11 +89,13 @@ By default (``--tar-filter=auto``) Borg will detect whether the FILE should be c
 based on its file extension and pipe the tarball through an appropriate filter
 before writing it to FILE:
 
-- .tar.gz: gzip
-- .tar.bz2: bzip2
-- .tar.xz: xz
+- .tar.gz or .tgz: gzip
+- .tar.bz2 or .tbz: bzip2
+- .tar.xz or .txz: xz
+- .tar.zstd: zstd
+- .tar.lz4: lz4
 
-Alternatively a ``--tar-filter`` program may be explicitly specified. It should
+Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered
 tar stream to stdout.
 

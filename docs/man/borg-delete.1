@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-DELETE 1 "2021-05-11" "" "borg backup tool"
-.SH NAME
-borg-delete \- Delete an existing repository or archives
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-DELETE" 1 "2022-01-23" "" "borg backup tool"
+.SH NAME
+borg-delete \- Delete an existing repository or archives
 .SH SYNOPSIS
 .sp
 borg [common options] delete [options] [REPOSITORY_OR_ARCHIVE] [ARCHIVE...]
@@ -76,25 +76,25 @@ archives to delete
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-n\fP,\fB  \-\-dry\-run
+.B  \-n\fP,\fB  \-\-dry\-run
 do not change repository
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of archives
 .TP
-.B \-s\fP,\fB  \-\-stats
+.B  \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
 .TP
-.B \-\-cache\-only
+.B  \-\-cache\-only
 delete only the local cache for the given repository
 .TP
-.B \-\-force
+.B  \-\-force
 force deletion of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
 .TP
-.B \-\-keep\-security\-info
+.B  \-\-keep\-security\-info
 keep the local security info when deleting a repository
 .TP
-.B \-\-save\-space
+.B  \-\-save\-space
 work slower, but using less space
 .UNINDENT
 .SS Archive filters

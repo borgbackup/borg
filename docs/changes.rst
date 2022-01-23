@@ -3038,7 +3038,7 @@ Bug fixes:
   - do pre-mount checks before opening repository
   - check llfuse is installed before asking for passphrase
 - borg rename: expand placeholders, #2386
-- borg serve: fix forced command lines containing BORG_ env vars
+- borg serve: fix forced command lines containing BORG_* env vars
 - fix error msg, it is --keep-within, not --within
 - fix borg key/debug/benchmark crashing without subcommand, #2240
 - chunker: fix invalid use of types, don't do uint32_t >> 32

@@ -78,8 +78,11 @@ end
 
 def packages_netbsd
   return <<-EOF
+    # use the latest stuff, some packages in "9.2" are quite broken
+    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.0_current/All' > /usr/pkg/etc/pkgin/repositories.conf
+    pkgin update
+    pkgin -y upgrade
     pkg_add zstd lz4 xxhash git
-    sed -i 's/Version: /Version: 0.8.0/g' /usr/pkg/lib/pkgconfig/libxxhash.pc  # bug in netbsd 9.2, version missing
     pkg_add bash
     chsh -s bash vagrant
     echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
@@ -87,13 +90,16 @@ def packages_netbsd
     pkg_add pkg-config
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python38 py38-sqlite3 py38-pip py38-virtualenv
-    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python
-    ln -s /usr/pkg/bin/python3.8 /usr/pkg/bin/python3
-    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip
-    ln -s /usr/pkg/bin/pip3.8 /usr/pkg/bin/pip3
-    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv
-    ln -s /usr/pkg/bin/virtualenv-3.8 /usr/pkg/bin/virtualenv3
+    pkg_add python38 py38-sqlite3 py38-pip py38-virtualenv py38-expat
+    ln -s /usr/pkg/lib/python3.8/_sysconfigdata_netbsd9.py /usr/pkg/lib/python3.8/_sysconfigdata__netbsd9_.py  # bug in netbsd 9.2, expected filename not there.
+    pkg_add python39 py39-sqlite3 py39-pip py39-virtualenv py39-expat
+    ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.9 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.9 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.9 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.9 /usr/pkg/bin/virtualenv3
+    ln -s /usr/pkg/lib/python3.9/_sysconfigdata_netbsd9.py /usr/pkg/lib/python3.9/_sysconfigdata__netbsd9_.py  # bug in netbsd 9.2, expected filename not there.
   EOF
 end
 
@@ -355,7 +361,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "netbsd64" do |b|
     b.vm.box = "generic/netbsd9"
     b.vm.provider :virtualbox do |v|
-      v.memory = 2048 + $wmem
+      v.memory = 4096 + $wmem  # need big /tmp tmpfs in RAM!
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd

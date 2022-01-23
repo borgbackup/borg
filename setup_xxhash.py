@@ -17,7 +17,7 @@ xxhash_sources = [
 ]
 
 xxhash_includes = [
-    '.',
+    '',
 ]
 
 

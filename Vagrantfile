@@ -220,7 +220,7 @@ def install_pythons(boxname)
     pyenv install 3.7.11  # binary build, use latest 3.7.x release
     pyenv install 3.8.0  # tests
     pyenv install 3.9.0  # tests
-    pyenv install 3.10-dev  # tests
+    pyenv install 3.10.0  # tests
     pyenv rehash
   EOF
 end
@@ -300,9 +300,9 @@ def run_tests(boxname)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions.
-      # on some dists, 3.10-dev does not compile, so if pyenv fails due to this, try without 3.10.
-      pyenv global 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0 3.10-dev || pyenv global 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0
-      pyenv local 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0 3.10-dev || pyenv local 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0
+      # on some dists, 3.10 does not compile, so if pyenv fails due to this, try without 3.10.
+      pyenv global 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0 3.10.0 || pyenv global 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0
+      pyenv local 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0 3.10.0 || pyenv local 3.5.3 3.6.2 3.7.11 3.8.0 3.9.0
     fi
     # otherwise: just use the system python
     if which fakeroot 2> /dev/null; then

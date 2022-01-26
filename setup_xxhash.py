@@ -13,11 +13,11 @@ import os
 # xxhash files, structure as seen in XXHASH (reference implementation) project repository:
 
 xxhash_sources = [
-    'xxhash.c',
+#    'xxhash.c',  # do not compile xxhash.c (it is included by xxhash-libselect.h)
 ]
 
 xxhash_includes = [
-    '.',
+    '',
 ]
 
 
@@ -67,7 +67,9 @@ def xxhash_ext_kwargs(bundled_path, system_prefix=None, system=False, **kwargs):
     if not use_system:
         extra_compile_args += []  # not used yet
 
+    define_macros = kwargs.get('define_macros', [])
+
     ret = dict(**kwargs)
-    ret.update(dict(sources=sources, extra_compile_args=extra_compile_args,
+    ret.update(dict(sources=sources, extra_compile_args=extra_compile_args, define_macros=define_macros,
                     include_dirs=include_dirs, library_dirs=library_dirs, libraries=libraries))
     return ret

@@ -222,8 +222,10 @@ libxxhash_prefix = setup_xxhash.xxhash_system_prefix(possible_libxxhash_prefixes
 if prefer_system_libxxhash and libxxhash_prefix:
     print('Detected and preferring libxxhash over bundled XXHASH')
     define_macros.append(('BORG_USE_LIBXXHASH', 'YES'))
+    define_macros.append(('XXH_PRIVATE_API', 'YES'))  # do not use this for bundled zstd or xxh64, breaks the build
     libxxhash_system = True
 else:
+    define_macros.append(('XXH_VECTOR', '0'))  # avoid compile issues with CPU specific stuff
     libxxhash_system = False
 
 
@@ -811,10 +813,11 @@ if not on_rtd:
     crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
                                                system_prefix=libb2_prefix, system=libb2_system,
                                                **crypto_ext_kwargs)
-
-    crypto_ext_kwargs = setup_xxhash.xxhash_ext_kwargs(bundled_path='src/borg/algorithms/xxh64',
+    checksums_ext_kwargs = dict(sources=[checksums_source], include_dirs=include_dirs, library_dirs=library_dirs,
+                                define_macros=define_macros)
+    checksums_ext_kwargs = setup_xxhash.xxhash_ext_kwargs(bundled_path='src/borg/algorithms/xxh64',
                                                system_prefix=libxxhash_prefix, system=libxxhash_system,
-                                               **crypto_ext_kwargs)
+                                               **checksums_ext_kwargs)
 
     msgpack_macros = []  # setup.py of msgpack 0.5.6 defines __LITTLE_ENDIAN__ / __BIG_ENDIAN__ - which
                          # leads to troubles when trying cross-platform builds, see borg issue #6105.
@@ -844,7 +847,7 @@ if not on_rtd:
         Extension('borg.hashindex', [hashindex_source]),
         Extension('borg.item', [item_source]),
         Extension('borg.chunker', [chunker_source]),
-        Extension('borg.algorithms.checksums', [checksums_source]),
+        Extension('borg.algorithms.checksums', **checksums_ext_kwargs),
     ]
     if not sys.platform.startswith(('win32', )):
         ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))

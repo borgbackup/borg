@@ -461,13 +461,16 @@ class QuotaTestCase(RepositoryTestCaseBase):
         self.repository.put(H(2), bytes(5678))
         assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41
         self.repository.delete(H(1))
-        assert self.repository.storage_quota_use == 5678 + 41
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41  # we have not compacted yet
         self.repository.commit()
+        assert self.repository.storage_quota_use == 5678 + 41
         self.reopen()
         with self.repository:
             # Open new transaction; hints and thus quota data is not loaded unless needed.
             self.repository.put(H(3), b'')
             self.repository.delete(H(3))
+            assert self.repository.storage_quota_use == 5678 + 2 * 41  # we have not compacted yet
+            self.repository.commit()
             assert self.repository.storage_quota_use == 5678 + 41
 
     def test_exceed_quota(self):
@@ -484,10 +487,12 @@ class QuotaTestCase(RepositoryTestCaseBase):
         assert self.repository.storage_quota_use == 82
         self.reopen()
         with self.repository:
-            self.repository.storage_quota = 50
+            self.repository.storage_quota = 100
             # Open new transaction; hints and thus quota data is not loaded unless needed.
             self.repository.put(H(1), b'')
-            assert self.repository.storage_quota_use == 41
+            assert self.repository.storage_quota_use == 82  # we have 2 puts for H(1) here and not yet compacted.
+            self.repository.commit()
+            assert self.repository.storage_quota_use == 41  # now we have compacted.
 
 
 class NonceReservation(RepositoryTestCaseBase):

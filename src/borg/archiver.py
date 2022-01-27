@@ -3981,7 +3981,7 @@ class Archiver:
             borg init --encryption repokey /path/to/repo
 
         Borg will:
-        
+
         1. Ask you to come up with a passphrase.
         2. Generate a random key (3 keys to be more precise. See :ref:`key_files`).
         3. Encrypt the key with your passphrase.

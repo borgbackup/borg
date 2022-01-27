@@ -3917,7 +3917,7 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     def test_migrate_lock_alive(self):
         pass
 
-    def test_strip_components_doesnt_leak(self):
+    def test_remote_repo_strip_components_doesnt_leak(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('dir/file', contents=b"test file contents 1")
         self.create_regular_file('dir/file2', contents=b"test file contents 2")

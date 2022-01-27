@@ -2733,6 +2733,8 @@ class Archiver:
             'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
             'separate_compaction': '"Separate compaction"',
             'list_item_flags': '"Item flags"',
+            'key_files': 'https://borgbackup.readthedocs.io/en/master/internals/data-structures.html#key-files',
+            'borg_key_export': 'borg key export --help'
         }
 
         def process_epilog(epilog):
@@ -3967,31 +3969,35 @@ class Archiver:
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
 
-        Encryption can be enabled at repository init time. It cannot be changed later.
+        Encryption mode TLDR
+        ++++++++++++++++++++
 
-        It is not recommended to work without encryption. Repository encryption protects
-        you e.g. against the case that an attacker has access to your backup repository.
+        The encryption mode can only be configured when creating a new repository -
+        you can neither configure it on a per-archive basis nor change the
+        encryption mode of an existing repository.
 
-        Borg relies on randomly generated key material and uses that for chunking, id
-        generation, encryption and authentication. The key material is encrypted using
-        the passphrase you give before it is stored on-disk.
+        Use::
 
-        You need to be careful with the key / the passphrase:
+            borg init --encryption repokey /path/to/repo
 
-        If you want "passphrase-only" security, use one of the repokey modes. The
-        key will be stored inside the repository (in its "config" file). In above
-        mentioned attack scenario, the attacker will have the key (but not the
-        passphrase).
+        Borg will:
+        
+        1. Ask you to come up with a passphrase.
+        2. Generate a random key (3 keys to be more precise. See :ref:`key_files`).
+        3. Encrypt the key with your passphrase.
+        4. Store the encrypted key alongside the repository in ``/path/to/repo``.
+           This is why it is vital to use a secure passphrase.
+        5. Encrypt your backups to prevent anyone from reading them unless they
+           have the key and know the passphrase. Make sure to keep a backup of
+           your key **outside** the repository - do not lock yourself out by
+           "leaving your keys inside your car" (see :ref:`borg_key_export`).
+           For remote backups the encryption is done locally - the remote machine
+           never sees your passphrase, your unencrypted key or your unencrypted files.
+        6. Use the key when extracting files to verify that the contents of
+           the backups have not been accidentally or maliciously altered.
 
-        If you want "passphrase and having-the-key" security, use one of the keyfile
-        modes. The key will be stored in your home directory (in .config/borg/keys).
-        In the attack scenario, the attacker who has just access to your repo won't
-        have the key (and also not the passphrase).
-
-        Make a backup copy of the key file (keyfile mode) or repo config file
-        (repokey mode) and keep it at a safe place, so you still have the key in
-        case it gets corrupted or lost. Also keep the passphrase at a safe place.
-        The backup that is encrypted with that key won't help you with that, of course.
+        Picking a passphrase
+        ++++++++++++++++++++
 
         Make sure you use a good passphrase. Not too short, not too simple. The real
         encryption / decryption key is encrypted with / locked by your passphrase.
@@ -4011,14 +4017,22 @@ class Archiver:
         You can change your passphrase for existing repos at any time, it won't affect
         the encryption/decryption key or other secrets.
 
-        Encryption modes
-        ++++++++++++++++
+        More encryption modes
+        +++++++++++++++++++++
 
-        You can choose from the encryption modes seen in the table below on a per-repo
-        basis. The mode determines encryption algorithm, hash/MAC algorithm and also the
-        key storage location.
+        Only use ``--encryption none`` if you are OK with anyone who has access to
+        your repository being able to read your backups and tamper with their
+        contents without you noticing.
 
-        Example: `borg init --encryption repokey ...`
+        If you want "passphrase and having-the-key" security, use ``--encryption keyfile``.
+        The key will be stored in your home directory (in ``~/.config/borg/keys``).
+        TODO: where is the key stored on Windows?
+
+        If you do **not** want to encrypt the contents of your backups, but still
+        want to detect malicious tampering use ``--encryption authenticated``.
+
+        If you prefer ``BLAKE2b`` to ``SHA-256``, use ``--encryption authenticated-blake2``,
+        ``--encryption repokey-blake2`` or ``--encryption keyfile-blake2``.
 
         .. nanorst: inline-fill
 

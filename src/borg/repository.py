@@ -786,6 +786,7 @@ class Repository:
                         # do not remove entry with empty shadowed_segments list here,
                         # it is needed for shadowed_put_exists code (see below)!
                         pass
+                    self.storage_quota_use -= len(data) + self.io.put_header_fmt.size
                 elif tag == TAG_DELETE and not in_index:
                     # If the shadow index doesn't contain this key, then we can't say if there's a shadowed older tag,
                     # therefore we do not drop the delete, but write it to a current segment.
@@ -885,7 +886,7 @@ class Repository:
                     pass
                 self.index[key] = segment, offset
                 self.segments[segment] += 1
-                self.storage_quota_use += size
+                self.storage_quota_use += size  # note: size already includes the put_header_fmt overhead
             elif tag == TAG_DELETE:
                 try:
                     # if the deleted PUT is not in the index, there is nothing to clean up
@@ -898,7 +899,6 @@ class Repository:
                         # is already gone, then it was already compacted.
                         self.segments[s] -= 1
                         size = self.io.read(s, offset, key, read_data=False)
-                        self.storage_quota_use -= size
                         self.compact[s] += size
             elif tag == TAG_COMMIT:
                 continue
@@ -909,7 +909,7 @@ class Repository:
                 else:
                     report(msg)
         if self.segments[segment] == 0:
-            self.compact[segment] += self.io.segment_size(segment)
+            self.compact[segment] = self.io.segment_size(segment)
 
     def _rebuild_sparse(self, segment):
         """Rebuild sparse bytes count for a single segment relative to the current index."""
@@ -1191,7 +1191,6 @@ class Repository:
             self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         size = self.io.read(segment, offset, id, read_data=False)
-        self.storage_quota_use -= size
         self.compact[segment] += size
         segment, size = self.io.write_delete(id)
         self.compact[segment] += size

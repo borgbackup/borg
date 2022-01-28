@@ -3507,12 +3507,20 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.assert_not_in('this-repository-does-not-exist::test', output)
 
     def test_can_read_repo_even_if_nonce_is_deleted(self):
+        """Nonce is only used for encrypting new data.
+
+        It should be possible to retrieve the data from an archive even if
+        both the client and the server forget the nonce"""
         self.create_regular_file('file1', contents=b'Hello, borg')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
         # Oops! We have removed the repo-side memory of the nonce!
         # See https://github.com/borgbackup/borg/issues/5858
         os.remove(os.path.join(self.repository_path, 'nonce'))
+        # Oops! The client has lost the nonce too!
+        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+        security_dir = get_security_dir(repository_id)
+        os.remove(os.path.join(security_dir, 'nonce'))
 
         # The repo should still be readable
         repo_info = self.cmd('info', self.repository_location)

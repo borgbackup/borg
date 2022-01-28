@@ -3506,6 +3506,47 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.assert_in('this-repository-does-not-exist', output)
         self.assert_not_in('this-repository-does-not-exist::test', output)
 
+    def test_can_read_repo_even_if_nonce_is_deleted(self):
+        self.create_regular_file('file1', contents=b'Hello, borg')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # Oops! We have removed the repo-side memory of the nonce!
+        # See https://github.com/borgbackup/borg/issues/5858
+        os.remove(os.path.join(self.repository_path, 'nonce'))
+
+        # The repo should still be readable
+        repo_info = self.cmd('info', self.repository_location)
+        assert 'All archives:' in repo_info
+        repo_list = self.cmd('list', self.repository_location)
+        assert 'test' in repo_list
+        # The archive should still be readable
+        archive_info = self.cmd('info', self.repository_location + '::test')
+        assert 'Archive name: test\n' in archive_info
+        archive_list = self.cmd('list', self.repository_location + '::test')
+        assert 'file1' in archive_list
+        # Extracting the archive should work
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_dirs_equal('input', 'output/input')
+
+    def test_recovery_from_deleted_repo_nonce(self):
+        """We should be able to recover if path/to/repo/nonce is deleted.
+
+        The nonce is stored in two places: in the repo and in $HOME.
+        The nonce in the repo is only needed when multiple clients use the same
+        repo. Otherwise we can just use our own copy of the nonce.
+        """
+        self.create_regular_file('file1', contents=b'Hello, borg')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # Oops! We have removed the repo-side memory of the nonce!
+        # See https://github.com/borgbackup/borg/issues/5858
+        nonce = os.path.join(self.repository_path, 'nonce')
+        os.remove(nonce)
+
+        self.cmd('create', self.repository_location + '::test2', 'input')
+        assert os.path.exists(nonce)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

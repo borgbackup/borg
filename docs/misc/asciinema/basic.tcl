@@ -96,16 +96,3 @@ foreach line [split [string trimleft $script] \n] {
     eof
   }
 }
-
-
-
-if {0} {
-  spawn borg init --encryption=repokey /media/backup/borgdemo
-  expect
-  send -h "correct horse battery staple\n"
-  expect "Enter same passphrase again: "
-  send -h "correct horse battery staple\n"
-  expect -ex {Do you want your passphrase to be displayed for verification? [yN]: }
-  send \n
-  expect eof
-}

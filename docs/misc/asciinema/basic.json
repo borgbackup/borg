@@ -1,4862 +1,2505 @@
-{
-  "version": 1,
-  "width": 78,
-  "height": 25,
-  "duration": 379.234504,
-  "command": null,
-  "title": null,
-  "env": {
-    "TERM": "xterm-256color",
-    "SHELL": "/bin/zsh"
-  },
-  "stdout": [
-    [
-      0.000155,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000133,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000183,
-      "\u001b[?2004h"
-    ],
-    [
-      0.468833,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.413214,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.440799,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mH\u001b[0m\u001b[39m"
-    ],
-    [
-      0.155436,
-      "\b\u001b[1mH\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.153888,
-      "\b\u001b[1me\u001b[1mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.145046,
-      "\b\u001b[1mr\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.191005,
-      "\b\u001b[1me\u001b[1m you'll see some basic commands to start working with borg.\u001b[0m\u001b[39m"
-    ],
-    [
-      0.328571,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000462,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000787,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      7.2e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      1.4e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.0003,
-      "\u001b[?2004h"
-    ],
-    [
-      0.553943,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.254153,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.205346,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mN\u001b[0m\u001b[39m"
-    ],
-    [
-      0.164037,
-      "\b\u001b[1mN\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.198817,
-      "\b\u001b[1mo\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.157487,
-      "\b\u001b[1mt\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.348855,
-      "\b\u001b[1me\u001b[1m:\u001b[0m\u001b[39m"
-    ],
-    [
-      0.308837,
-      "\b\u001b[1m:\u001b[1m This teaser screencast was made with borg version 1.1.0 – older or n\u001b[1me\u001b[1mwer borg versions may behave differently.\u001b[0m\u001b[39m\u001b[K"
-    ],
-    [
-      0.760183,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001229,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.001043,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000111,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8.6e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000699,
-      "\u001b[?2004h"
-    ],
-    [
-      0.617302,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.269944,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.231147,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
-    ],
-    [
-      0.157768,
-      "\b\u001b[1mB\u001b[1mu\u001b[0m\u001b[39m"
-    ],
-    [
-      0.145012,
-      "\b\u001b[1mu\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.360132,
-      "\b\u001b[1mt\u001b[1m let's start.\u001b[0m\u001b[39m"
-    ],
-    [
-      0.808076,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000384,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.001063,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      1e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8.2e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000271,
-      "\u001b[?2004h"
-    ],
-    [
-      1.213811,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000271,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.001041,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      7e-06,
-      "\u001b]1;~/Pictures\u0007"
-    ],
-    [
-      4.2e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      5.3e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000167,
-      "\u001b[?2004h"
-    ],
-    [
-      0.326924,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.245919,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.173421,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mF\u001b[0m\u001b[39m"
-    ],
-    [
-      0.121947,
-      "\b\u001b[1mF\u001b[1mi\u001b[0m\u001b[39m"
-    ],
-    [
-      0.196316,
-      "\b\u001b[1mi\u001b[1mr\u001b[1ms\u001b[0m\u001b[39m"
-    ],
-    [
-      0.224037,
-      "\b\u001b[1ms\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.323925,
-      "\b\u001b[1mt\u001b[1m of all, you can always get help:\u001b[0m\u001b[39m"
-    ],
-    [
-      0.738987,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000395,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000643,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000107,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      3.8e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.00031,
-      "\u001b[?2004h"
-    ],
-    [
-      1.268663,
-      "\u001b[1m\u001b[31mb\u001b[0m\u001b[39m"
-    ],
-    [
-      0.19562,
-      "\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.100091,
-      "\b\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[1m\u001b[31mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.157538,
-      "\b\b\b\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.196595,
-      " "
-    ],
-    [
-      0.210071,
-      "h"
-    ],
-    [
-      0.124892,
-      "e"
-    ],
-    [
-      0.177906,
-      "l"
-    ],
-    [
-      0.121006,
-      "p"
-    ],
-    [
-      0.314487,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000695,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000777,
-      "\u001b]2;borg help\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.538908,
-      "usage: borg [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug]\r\n            [--debug-topic TOPIC] [-p] [--log-json] [--lock-wait N]\r\n            [--show-version] [--show-rc] [--no-files-cache] [--umask M]\r\n            [--remote-path PATH] [--remote-ratelimit rate]\r\n            [--consider-part-files] [--debug-profile FILE]\r\n            <command> ...\r\n\r\nBorg - Deduplicated Backups\r\n\r\noptional arguments:\r\n  -V, --version         show version number and exit\r\n\r\nCommon options:\r\n  -h, --help            show this help message and exit\r\n  --critical            work on log level CRITICAL\r\n  --error               work on log level ERROR\r\n  --warning             work on log level WARNING (default)\r\n  --info, -v, --verbose\r\n                        work on log level INFO\r\n  --debug               enable debug output, work on log level DEBUG\r\n  --debug-topic TOPIC   enable TOPIC debugging (can be specified multiple\r\n                        times). The logger path is borg.debug.<TOPIC> if TOPIC\r\n              "
-    ],
-    [
-      4.1e-05,
-      "          is not fully qualified.\r\n  -p, --progress        show progress information\r\n  --log-json            Output one JSON object per log line instead of\r\n                        formatted text.\r\n  --lock-wait N         wait for the lock, but max. N seconds (default: 1).\r\n  --show-version        show/log the borg version\r\n  --show-rc             show/log the return code (rc)\r\n  --no-files-cache      do not load/update the file metadata cache used to\r\n                        detect unchanged files\r\n  --umask M             set umask to M (local and remote, default: 0077)\r\n  --remote-path PATH    use PATH as borg executable on the remote (default:\r\n                        \"borg\")\r\n  --remote-ratelimit rate\r\n                        set remote network upload rate limit in kiByte/s\r\n                        (default: 0=unlimited)\r\n  --consider-part-files\r\n                        treat part files like normal files (e.g. to\r\n                        list/extract them)\r\n  --debug-profile FILE  Write execution profile"
-    ],
-    [
-      1.6e-05,
-      " in Borg format into FILE. For\r\n                        local use a Python-compatible file can be generated by\r\n                        suffixing FILE with \".pyprof\".\r\n\r\nrequired arguments:\r\n  <command>\r\n    serve               start repository server process\r\n    init                initialize empty repository\r\n    check               verify repository\r\n    key                 manage repository key\r\n    change-passphrase   change repository passphrase\r\n    create              create backup\r\n    extract             extract archive contents\r\n    export-tar          create tarball from archive\r\n    diff                find differences in archive contents\r\n    rename              rename archive\r\n    delete              delete archive\r\n    list                list archive or repository contents\r\n    mount               mount repository\r\n    umount              umount repository\r\n    info                show repository or archive information\r\n    break-lock          break repository and cache locks\r\n    prune     "
-    ],
-    [
-      2e-05,
-      "          prune archives\r\n    upgrade             upgrade repository format\r\n    recreate            Re-create archives\r\n    with-lock           run user command with lock held\r\n    debug               debugging command (not intended for normal use)\r\n    benchmark           benchmark command\r\n"
-    ],
-    [
-      0.043747,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      8e-06,
-      "\u001b]1;~/Pictures\u0007"
-    ],
-    [
-      5.2e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      4.6e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000163,
-      "\u001b[?2004h"
-    ],
-    [
-      1.509225,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.593308,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.334291,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mT\u001b[0m\u001b[39m"
-    ],
-    [
-      0.170683,
-      "\b\u001b[1mT\u001b[1mh\u001b[0m\u001b[39m"
-    ],
-    [
-      0.07295,
-      "\b\u001b[1mh\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.184509,
-      "\b\u001b[1me\u001b[1ms\u001b[0m\u001b[39m"
-    ],
-    [
-      0.136032,
-      "\b\u001b[1ms\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.250718,
-      "\b\u001b[1me\u001b[1m are a lot of commands, so better we start with a few:\u001b[0m\u001b[39m"
-    ],
-    [
-      1.088446,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000396,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000604,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000101,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      4.5e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000296,
-      "\u001b[?2004h"
-    ],
-    [
-      0.921744,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.276219,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.204903,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mL\u001b[0m\u001b[39m"
-    ],
-    [
-      0.137064,
-      "\b\u001b[1mL\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.16386,
-      "\b\u001b[1me\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.340061,
-      "\b\u001b[1mt\u001b[1m'\u001b[0m\u001b[39m"
-    ],
-    [
-      0.115905,
-      "\b\u001b[1m'\u001b[1ms\u001b[0m\u001b[39m"
-    ],
-    [
-      0.213255,
-      "\b\u001b[1ms\u001b[1m create a repo on an external drive:\u001b[0m\u001b[39m"
-    ],
-    [
-      1.086717,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000391,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000606,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000133,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.5e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000274,
-      "\u001b[?2004h"
-    ],
-    [
-      1.935612,
-      "\u001b[1m\u001b[31mb\u001b[0m\u001b[39m"
-    ],
-    [
-      0.184978,
-      "\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.115803,
-      "\b\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[1m\u001b[31mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.134282,
-      "\b\b\b\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.266061,
-      " "
-    ],
-    [
-      0.599046,
-      "i"
-    ],
-    [
-      0.183493,
-      "n"
-    ],
-    [
-      0.181453,
-      "i"
-    ],
-    [
-      0.258375,
-      "t"
-    ],
-    [
-      0.712329,
-      " "
-    ],
-    [
-      0.381053,
-      ""
-    ],
-    [
-      0.381053,
-     "-"
-    ],
-    [
-      0.119206,
-     "-"
-    ],
-    [
-      0.18993,
-      "e"
-    ],
-    [
-      0.175168,
-      "n"
-    ],
-    [
-      0.258977,
-      "c"
-    ],
-    [
-      0.139364,
-      "r"
-    ],
-    [
-      0.111012,
-      "y"
-    ],
-    [
-      0.55406,
-      "p"
-    ],
-    [
-      0.261667,
-      "t"
-    ],
-    [
-      0.284611,
-      "i"
-    ],
-    [
-      0.142087,
-      "o"
-    ],
-    [
-      0.195185,
-      "n"
-    ],
-    [
-      0.23882,
-      "="
-    ],
-    [
-      0.31059,
-      "r"
-    ],
-    [
-      0.151355,
-      "e"
-    ],
-    [
-      0.165925,
-      "p"
-    ],
-    [
-      0.132833,
-      "o"
-    ],
-    [
-      0.253402,
-      "k"
-    ],
-    [
-      0.174711,
-      "e"
-    ],
-    [
-      0.245888,
-      "y"
-    ],
-    [
-      0.759586,
-      " "
-    ],
-    [
-      0.383355,
-      "\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.189694,
-      "\b\u001b[4m/\u001b[4mm\u001b[24m"
-    ],
-    [
-      0.16364,
-      "\b\u001b[4mm\u001b[4me\u001b[24m"
-    ],
-    [
-      0.151451,
-      "\b\u001b[4me\u001b[4md\u001b[24m"
-    ],
-    [
-      0.239109,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.006487,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m init --encryption=repokey \u001b[4m/media\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.268216,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003429,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m init --encryption=repokey \u001b[4m/media/backup\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.232352,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003575,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m init --encryption=repokey \u001b[4m/media/backup/borgdemo\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.492094,
-      "\b\b\u001b[4mo\u001b[24m\u001b[0m\u001b[24m \b"
-    ],
-    [
-      0.748712,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001017,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000712,
-      "\u001b]2;borg init --encryption=repokey /media/backup/borgdemo\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.548105,
-      "Enter new passphrase: "
-    ],
-    [
-      2.119749,
-      "\r\n"
-    ],
-    [
-      0.000155,
-      "Enter same passphrase again: "
-    ],
-    [
-      1.606761,
-      "\r\n"
-    ],
-    [
-      5.8e-05,
-      "Do you want your passphrase to be displayed for verification? [yN]: "
-    ],
-    [
-      0.901237,
-      "\r\n"
-    ],
-    [
-      0.362453,
-      "\r\nBy default repositories initialized with this version will produce security\r\nerrors if written to with an older version (up to and including Borg 1.0.8).\r\n\r\nIf you want to use these older versions, you can disable the check by running:\r\nborg upgrade --disable-tam '/media/backup/borgdemo'\r\n\r\nSee https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability for details about the security implications.\r\n"
-    ],
-    [
-      0.050488,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      5e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      5.9e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000166,
-      "\u001b[?2004h"
-    ],
-    [
-      2.49308,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.308744,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.256774,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mT\u001b[0m\u001b[39m"
-    ],
-    [
-      0.157732,
-      "\b\u001b[1mT\u001b[1mh\u001b[0m\u001b[39m"
-    ],
-    [
-      0.127107,
-      "\b\u001b[1mh\u001b[1mi\u001b[0m\u001b[39m"
-    ],
-    [
-      0.178449,
-      "\b\u001b[1mi\u001b[1ms\u001b[0m\u001b[39m"
-    ],
-    [
-      0.179372,
-      "\b\u001b[1ms\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.383584,
-      "\b\u001b[1m \u001b[1mu\u001b[0m\u001b[39m"
-    ],
-    [
-      0.103361,
-      "\b\u001b[1mu\u001b[1ms\u001b[0m\u001b[39m"
-    ],
-    [
-      0.155066,
-      "\b\u001b[1ms\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.133308,
-      "\b\u001b[1me\u001b[1ms\u001b[0m\u001b[39m"
-    ],
-    [
-      0.23615,
-      "\b\u001b[1ms\u001b[1m the repokey encryption. You may look at \"borg help init\" or the \u001b[1mo\u001b[1mnline doc at https://borgbackup.readthedocs.io/ for other modes.\u001b[0m\u001b[39m\u001b[K"
-    ],
-    [
-      1.159159,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.0004,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000738,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000111,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8.5e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000286,
-      "\u001b[?2004h"
-    ],
-    [
-      1.645569,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000452,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000619,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.0001,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.3e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000161,
-      "\u001b[?2004h"
-    ],
-    [
-      1.17234,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.575706,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.205759,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mS\u001b[0m\u001b[39m"
-    ],
-    [
-      0.343517,
-      "\b\u001b[1mS\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.245497,
-      "\b\u001b[1mo\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.218486,
-      "\b\u001b[1m \u001b[1mn\u001b[0m\u001b[39m"
-    ],
-    [
-      0.171258,
-      "\b\u001b[1mn\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.146364,
-      "\b\u001b[1mo\u001b[1mw\u001b[0m\u001b[39m"
-    ],
-    [
-      0.25775,
-      "\b\u001b[1mw\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.271708,
-      "\b\b\u001b[1mw\u001b[0m\u001b[39m\u001b[0m\u001b[39m \b"
-    ],
-    [
-      0.213838,
-      "\b\u001b[1mw\u001b[1m,\u001b[0m\u001b[39m"
-    ],
-    [
-      0.422324,
-      "\b\u001b[1m,\u001b[1m let's create our first (compressed) backup.\u001b[0m\u001b[39m"
-    ],
-    [
-      0.561514,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000855,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000773,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      4.8e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      6.2e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000411,
-      "\u001b[?2004h"
-    ],
-    [
-      1.326196,
-      "\u001b[1m\u001b[31mb\u001b[0m\u001b[39m"
-    ],
-    [
-      0.191851,
-      "\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.136657,
-      "\b\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[1m\u001b[31mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.142499,
-      "\b\b\b\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.173217,
-      " "
-    ],
-    [
-      0.294445,
-      "c"
-    ],
-    [
-      0.200519,
-      "r"
-    ],
-    [
-      0.153078,
-      "e"
-    ],
-    [
-      0.133383,
-      "a"
-    ],
-    [
-      0.12891,
-      "t"
-    ],
-    [
-      0.151491,
-      "e"
-    ],
-    [
-      0.728709,
-      " "
-    ],
-    [
-      0.592118,
-      "-"
-    ],
-    [
-      0.118108,
-      "-"
-    ],
-    [
-      0.277349,
-      "s"
-    ],
-    [
-      0.134588,
-      "t"
-    ],
-    [
-      0.148057,
-      "a"
-    ],
-    [
-      0.090202,
-      "t"
-    ],
-    [
-      0.150971,
-      "s"
-    ],
-    [
-      0.307217,
-      " "
-    ],
-    [
-      0.481688,
-      "-"
-    ],
-    [
-      0.112243,
-      "-"
-    ],
-    [
-      0.234317,
-      "p"
-    ],
-    [
-      0.12453,
-      "r"
-    ],
-    [
-      0.116446,
-      "o"
-    ],
-    [
-      0.213657,
-      "g"
-    ],
-    [
-      0.12239,
-      "r"
-    ],
-    [
-      0.165156,
-      "e"
-    ],
-    [
-      0.256082,
-      "s"
-    ],
-    [
-      0.175158,
-      "s"
-    ],
-    [
-      0.302493,
-      " "
-    ],
-    [
-      0.490303,
-      "-"
-    ],
-    [
-      0.117279,
-      "-"
-    ],
-    [
-      0.130499,
-      "c"
-    ],
-    [
-      0.146261,
-      "o"
-    ],
-    [
-      0.139848,
-      "m"
-    ],
-    [
-      0.156108,
-      "p"
-    ],
-    [
-      0.190058,
-      "r"
-    ],
-    [
-      0.166862,
-      "e"
-    ],
-    [
-      0.261225,
-      "s"
-    ],
-    [
-      0.157133,
-      "s"
-    ],
-    [
-      0.281205,
-      "i"
-    ],
-    [
-      0.142487,
-      "o"
-    ],
-    [
-      0.179023,
-      "n"
-    ],
-    [
-      0.854723,
-      " "
-    ],
-    [
-      0.580178,
-      "l"
-    ],
-    [
-      0.29757,
-      "z"
-    ],
-    [
-      0.3111,
-      "4"
-    ],
-    [
-      1.085772,
-      " "
-    ],
-    [
-      0.635539,
-      "\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.268857,
-      "\b\u001b[4m/\u001b[4mm\u001b[24m"
-    ],
-    [
-      0.121341,
-      "\b\u001b[4mm\u001b[4me\u001b[24m"
-    ],
-    [
-      0.141645,
-      "\b\u001b[4me\u001b[4md\u001b[24m"
-    ],
-    [
-      0.230858,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.010346,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress --compression lz4 \u001b[4m/media\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.416084,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.004048,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress --compression lz4 \u001b[4m/media/backup\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.346657,
-      "\u001b[?7l"
-    ],
-    [
-      2.7e-05,
-      "\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003996,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m create --stats --progress --compression lz4 \u001b[4m/media/backup/borgdemo\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      1.068791,
-      "\b\b\u001b[4mo\u001b[24m\u001b[0m\u001b[24m \b"
-    ],
-    [
-      1.210608,
-      "\u001b[22D\u001b[24m/\u001b[24mm\u001b[24me\u001b[24md\u001b[24mi\u001b[24ma\u001b[24m/\u001b[24mb\u001b[24ma\u001b[24mc\u001b[24mk\u001b[24mu\u001b[24mp\u001b[24m/\u001b[24mb\u001b[24mo\u001b[24mr\u001b[24mg\u001b[24md\u001b[24me\u001b[24mm\u001b[24mo:"
-    ],
-    [
-      0.125995,
-      ":"
-    ],
-    [
-      0.376036,
-      "b"
-    ],
-    [
-      0.101011,
-      "a"
-    ],
-    [
-      0.178171,
-      "c \r\u001b[K"
-    ],
-    [
-      0.133561,
-      "k"
-    ],
-    [
-      0.162923,
-      "\rku"
-    ],
-    [
-      0.241519,
-      "p"
-    ],
-    [
-      1.426974,
-      "1"
-    ],
-    [
-      0.432275,
-      " "
-    ],
-    [
-      0.295102,
-      "\u001b[4mW\u001b[24m"
-    ],
-    [
-      0.158768,
-      "\b\u001b[4mW\u001b[4ma\u001b[24m"
-    ],
-    [
-      0.270666,
-      "\b\u001b[4ma\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.13015,
-      "\b\u001b[4ml\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.267749,
-      "\b\u001b[4ml\u001b[4mp\u001b[24m"
-    ],
-    [
-      0.173461,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003997,
-      "\u001b[A\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ "
-    ],
-    [
-      3.5e-05,
-      "\u001b[32mborg\u001b[39m create --stats --progress --compression lz4 /media/backup/borgdemo::backup1 \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.997225,
-      "\b\b\u001b[4mr\u001b[24m\u001b[K"
-    ],
-    [
-      0.447022,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.002978,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000917,
-      "\u001b]2;borg create --stats --progress --compression lz4 Wallpaper\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.630228,
-      "Enter passphrase for key /media/backup/borgdemo: "
-    ],
-    [
-      2.264647,
-      "\r\n"
-    ],
-    [
-      0.108689,
-      "0 B O 0 B C 0 B D 0 N Wallpaper                                               \r"
-    ],
-    [
-      0.024194,
-      "Initializing cache transaction: Reading config                                \r"
-    ],
-    [
-      0.000234,
-      "Initializing cache transaction: Reading chunks                                \r"
-    ],
-    [
-      0.000225,
-      "Initializing cache transaction: Reading files                                 \r"
-    ],
-    [
-      0.000215,
-      "                                                                              \r"
-    ],
-    [
-      0.179719,
-      "5.21 MB O 5.21 MB C 5.21 MB D 8 N Wallpaper/bigcollec...em_Wasserloch_im_Q.jpg\r"
-    ],
-    [
-      0.206362,
-      "17.55 MB O 17.51 MB C 15.18 MB D 31 N Wallpaper/bigcoll...ckr_OpenGetty_Im.jpg\r"
-    ],
-    [
-      0.202173,
-      "28.63 MB O 28.59 MB C 26.26 MB D 49 N Wallpaper/bigcoll...ortugal____Stefa.jpg\r"
-    ],
-    [
-      0.201105,
-      "41.30 MB O 41.26 MB C 38.94 MB D 71 N Wallpaper/bigcoll...e_in_der_Gro_auf.jpg\r"
-    ],
-    [
-      0.205913,
-      "53.63 MB O 53.54 MB C 51.21 MB D 93 N Wallpaper/bigcoll...De_Janeiro__Bras.jpg\r"
-    ],
-    [
-      0.201657,
-      "66.10 MB O 65.99 MB C 63.66 MB D 115 N Wallpaper/bigcol...Kenai-Fjords-Nat.jpg\r"
-    ],
-    [
-      0.222663,
-      "78.06 MB O 77.92 MB C 75.59 MB D 135 N Wallpaper/bigcol...ien____Nora_De_A.jpg\r"
-    ],
-    [
-      0.206809,
-      "89.99 MB O 89.82 MB C 85.43 MB D 155 N Wallpaper/bigcol...__De_Pere__Wisco.jpg\r"
-    ],
-    [
-      0.204475,
-      "101.51 MB O 101.32 MB C 96.93 MB D 175 N Wallpaper/bigco..._Silver_Falls_S.jpg\r"
-    ],
-    [
-      0.206201,
-      "115.08 MB O 114.89 MB C 110.50 MB D 199 N Wallpaper/bigco..._Garret_Suhrie.jpg\r"
-    ],
-    [
-      0.202147,
-      "126.51 MB O 126.28 MB C 119.47 MB D 220 N Wallpaper/bigco...fenmesserfisch.jpg\r"
-    ],
-    [
-      0.206629,
-      "138.74 MB O 138.50 MB C 131.69 MB D 243 N Wallpaper/bigco...tswana____Mich.jpg\r"
-    ],
-    [
-      0.214855,
-      "152.84 MB O 152.60 MB C 142.74 MB D 269 N Wallpaper/bigco...fest__Munich__.jpg\r"
-    ],
-    [
-      0.200083,
-      "163.05 MB O 162.80 MB C 152.94 MB D 288 N Wallpaper/bigco..._Marco_RomaniG.jpg\r"
-    ],
-    [
-      0.208535,
-      "175.85 MB O 175.57 MB C 164.47 MB D 308 N Wallpaper/bigco...gway__Colorado.jpg\r"
-    ],
-    [
-      0.21234,
-      "184.65 MB O 184.36 MB C 173.25 MB D 324 N Wallpaper/bigco...nstanz__Baden-.jpg\r"
-    ],
-    [
-      0.200087,
-      "194.92 MB O 194.59 MB C 183.49 MB D 343 N Wallpaper/bigco...op__Caledon__P.jpg\r"
-    ],
-    [
-      0.201257,
-      "204.71 MB O 204.38 MB C 191.68 MB D 361 N Wallpaper/bigco...izian_in_Jamni.jpg\r"
-    ],
-    [
-      0.213355,
-      "217.22 MB O 216.88 MB C 202.98 MB D 382 N Wallpaper/bigco...appadokien__T_.jpg\r"
-    ],
-    [
-      0.202274,
-      "230.56 MB O 230.16 MB C 212.45 MB D 404 N Wallpaper/bigco...eleiGetty_Imag.jpg\r"
-    ],
-    [
-      0.204836,
-      "242.95 MB O 242.53 MB C 224.34 MB D 426 N Wallpaper/bigco...g__Thailand___.jpg\r"
-    ],
-    [
-      0.205093,
-      "254.42 MB O 254.02 MB C 232.75 MB D 446 N Wallpaper/bigco...ame_Reserve__O.jpg\r"
-    ],
-    [
-      0.201488,
-      "265.77 MB O 265.39 MB C 242.76 MB D 466 N Wallpaper/bigco...e_Republik____.jpg\r"
-    ],
-    [
-      0.20036,
-      "278.64 MB O 278.26 MB C 254.62 MB D 488 N Wallpaper/bigco...ien____Patty_P.jpg\r"
-    ],
-    [
-      0.209301,
-      "288.82 MB O 288.45 MB C 264.81 MB D 505 N Wallpaper/bigco...Ruhpolding__Ch.jpg\r"
-    ],
-    [
-      0.214561,
-      "298.04 MB O 297.68 MB C 274.04 MB D 520 N Wallpaper/bigco...wo__Landkreis_.jpg\r"
-    ],
-    [
-      0.222111,
-      "311.03 MB O 310.66 MB C 287.02 MB D 543 N Wallpaper/bigco...a__Portugal___.jpg\r"
-    ],
-    [
-      0.204945,
-      "319.53 MB O 319.17 MB C 295.53 MB D 558 N Wallpaper/bigco...hinos__Hondura.jpg\r"
-    ],
-    [
-      0.213928,
-      "328.19 MB O 327.77 MB C 304.13 MB D 574 N Wallpaper/bigco...ndon__Gro_brit.jpg\r"
-    ],
-    [
-      0.206827,
-      "338.25 MB O 337.81 MB C 314.17 MB D 591 N Wallpaper/bigco...l_Forest__Bund.jpg\r"
-    ],
-    [
-      0.209094,
-      "347.40 MB O 346.96 MB C 323.32 MB D 606 N Wallpaper/bigco...tlantischen_Oz.jpg\r"
-    ],
-    [
-      0.200671,
-      "361.16 MB O 360.71 MB C 334.04 MB D 628 N Wallpaper/bigco...lpark__British.jpg\r"
-    ],
-    [
-      0.208778,
-      "375.20 MB O 374.77 MB C 348.09 MB D 650 N Wallpaper/bigco...swagen_beim_Ro.jpg\r"
-    ],
-    [
-      0.2023,
-      "385.94 MB O 385.47 MB C 358.79 MB D 669 N Wallpaper/bigco...-Bessin__Frank.jpg\r"
-    ],
-    [
-      0.201448,
-      "396.55 MB O 396.10 MB C 368.89 MB D 687 N Wallpaper/bigco...nian_Switzerla.jpg\r"
-    ],
-    [
-      0.200229,
-      "411.96 MB O 411.41 MB C 373.94 MB D 711 N Wallpaper/bigco...CREATISTAGetty.jpg\r"
-    ],
-    [
-      0.202083,
-      "420.92 MB O 420.38 MB C 382.91 MB D 727 N Wallpaper/bigco...LLCCorbisVCG_G.jpg\r"
-    ],
-    [
-      0.202677,
-      "430.76 MB O 430.21 MB C 392.74 MB D 745 N Wallpaper/bigco...r__Tansania___.jpg\r"
-    ],
-    [
-      0.206733,
-      "441.45 MB O 440.87 MB C 400.76 MB D 763 N Wallpaper/bigco...andenburg__Deu.jpg\r"
-    ],
-    [
-      0.205541,
-      "449.42 MB O 448.83 MB C 408.72 MB D 776 N Wallpaper/bigco...Wind_Cave_Nati.jpg\r"
-    ],
-    [
-      0.201764,
-      "458.56 MB O 457.97 MB C 417.20 MB D 792 N Wallpaper/bigco...dney_Harbour_B.jpg\r"
-    ],
-    [
-      0.206272,
-      "470.73 MB O 470.08 MB C 428.74 MB D 815 N Wallpaper/bigco...hland____Patri.jpg\r"
-    ],
-    [
-      0.210875,
-      "485.80 MB O 485.15 MB C 443.01 MB D 843 N Wallpaper/bigco...Hokkaido__Japa.jpg\r"
-    ],
-    [
-      0.227162,
-      "498.93 MB O 498.27 MB C 450.80 MB D 867 N Wallpaper/bigco...topher_Collins.jpg\r"
-    ],
-    [
-      0.206293,
-      "510.73 MB O 510.07 MB C 462.15 MB D 887 N Wallpaper/bigco...itzeinschlag_i.jpg\r"
-    ],
-    [
-      0.200265,
-      "520.54 MB O 519.86 MB C 471.39 MB D 903 N Wallpaper/bigco..._zwischen_Boli.jpg\r"
-    ],
-    [
-      0.204067,
-      "528.01 MB O 527.33 MB C 478.86 MB D 916 N Wallpaper/bigco...jall__Island__.jpg\r"
-    ],
-    [
-      0.209223,
-      "539.61 MB O 538.94 MB C 490.47 MB D 934 N Wallpaper/bigco..._amares__Provi.jpg\r"
-    ],
-    [
-      0.215843,
-      "551.16 MB O 550.49 MB C 501.50 MB D 952 N Wallpaper/bigco...tionalpark__Ut.jpg\r"
-    ],
-    [
-      0.212909,
-      "561.29 MB O 560.60 MB C 511.22 MB D 970 N Wallpaper/bigco..._Inseln__Niede.jpg\r"
-    ],
-    [
-      0.209655,
-      "571.59 MB O 570.86 MB C 520.92 MB D 989 N Wallpaper/bigco...rbeskopf__Huns.jpg\r"
-    ],
-    [
-      0.232431,
-      "582.52 MB O 581.80 MB C 525.99 MB D 1006 N Wallpaper/bigc...n__an_art_in 2.jpg\r"
-    ],
-    [
-      0.201199,
-      "593.36 MB O 592.12 MB C 536.31 MB D 1036 N Wallpaper/more/Green_Curves.jpg    \r"
-    ],
-    [
-      0.205747,
-      "604.80 MB O 603.52 MB C 547.71 MB D 1044 N Wallpaper/evenmore/ChipDE 06.jpg   \r"
-    ],
-    [
-      0.23016,
-      "Compacting segments   0%                                                      \r"
-    ],
-    [
-      0.174726,
-      "Compacting segments  50%                                                      \r"
-    ],
-    [
-      4.5e-05,
-      "                                                                              \r"
-    ],
-    [
-      0.04695,
-      "Saving files cache                                                            \r"
-    ],
-    [
-      0.005688,
-      "Saving chunks cache                                                           \r"
-    ],
-    [
-      0.000299,
-      "Saving cache config                                                           \r"
-    ],
-    [
-      0.107527,
-      "                                                                              \r"
-    ],
-    [
-      3.7e-05,
-      "                                                                              \r"
-    ],
-    [
-      0.000355,
-      "------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      3.7e-05,
-      "Archive name: backup1\r\n"
-    ],
-    [
-      1.4e-05,
-      "Archive fingerprint: 9758c7db339a066360bffad17b2ffac4fb368c6722c0be3a47a7a9b631f06407\r\n"
-    ],
-    [
-      0.000106,
-      "Time (start): Fri, 2017-07-14 21:54:06\r\nTime (end):   Fri, 2017-07-14 21:54:17\r\n"
-    ],
-    [
-      3.9e-05,
-      "Duration: 11.40 seconds\r\n"
-    ],
-    [
-      3.4e-05,
-      "Number of files: 1050\r\n"
-    ],
-    [
-      7.2e-05,
-      "Utilization of maximum supported archive size: 0%\r\n------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      4.7e-05,
-      "                       Original size      Compressed size    Deduplicated size\r\n"
-    ],
-    [
-      1.1e-05,
-      "This archive:              618.96 MB            617.47 MB            561.67 MB\r\n"
-    ],
-    [
-      2.7e-05,
-      "All archives:              618.96 MB            617.47 MB            561.67 MB\r\n"
-    ],
-    [
-      2.4e-05,
-      "\r\n"
-    ],
-    [
-      2.3e-05,
-      "                       Unique chunks         Total chunks\r\n"
-    ],
-    [
-      1.3e-05,
-      "Chunk index:                     999                 1093\r\n"
-    ],
-    [
-      2.4e-05,
-      "------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      0.04885,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000195,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.4e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000196,
-      "\u001b[?2004h"
-    ],
-    [
-      1.403148,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.918581,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.361872,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mT\u001b[0m\u001b[39m"
-    ],
-    [
-      0.12148,
-      "\b\u001b[1mT\u001b[1mh\u001b[0m\u001b[39m"
-    ],
-    [
-      0.21559,
-      "\b\u001b[1mh\u001b[1ma\u001b[0m\u001b[39m"
-    ],
-    [
-      0.152309,
-      "\b\u001b[1ma\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.941741,
-      "\b\u001b[1mt\u001b[1m's nice, so far.\u001b[0m\u001b[39m"
-    ],
-    [
-      1.005262,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.00039,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.001061,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      8.3e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      6.1e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000287,
-      "\u001b[?2004h"
-    ],
-    [
-      2.564637,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.34769,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.160447,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mS\u001b[0m\u001b[39m"
-    ],
-    [
-      0.153165,
-      "\b\u001b[1mS\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.17514,
-      "\b\u001b[1mo\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.198658,
-      "\b\u001b[1m \u001b[1ml\u001b[0m\u001b[39m"
-    ],
-    [
-      0.204631,
-      "\b\u001b[1ml\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.250815,
-      "\b\u001b[1me\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      1.190059,
-      "\b\u001b[1mt\u001b[1m's add a new file…\u001b[0m\u001b[39m"
-    ],
-    [
-      1.216941,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000401,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000756,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      2.1e-05,
-      "\u001b]1;~/Pictures\u0007"
-    ],
-    [
-      8.1e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      5.3e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000277,
-      "\u001b[?2004h"
-    ],
-    [
-      1.289557,
-      "\u001b[1m\u001b[31me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.216875,
-      "\b\u001b[1m\u001b[31me\u001b[1m\u001b[31mc\u001b[0m\u001b[39m"
-    ],
-    [
-      0.184187,
-      "\b\b\u001b[1m\u001b[31me\u001b[1m\u001b[31mc\u001b[1m\u001b[31mh\u001b[0m\u001b[39m"
-    ],
-    [
-      0.177444,
-      "\b\b\b\u001b[0m\u001b[32me\u001b[0m\u001b[32mc\u001b[0m\u001b[32mh\u001b[32mo\u001b[39m"
-    ],
-    [
-      0.226152,
-      " "
-    ],
-    [
-      0.320216,
-      "\u001b[33m\"\u001b[39m"
-    ],
-    [
-      0.404454,
-      "\b\u001b[33m\"\u001b[33ma\u001b[39m"
-    ],
-    [
-      0.267657,
-      "\b\u001b[33ma\u001b[33md\u001b[39m"
-    ],
-    [
-      0.130258,
-      "\b\u001b[33md\u001b[33md\u001b[39m"
-    ],
-    [
-      1.613237,
-      "\b\u001b[33md\u001b[33me\u001b[39m"
-    ],
-    [
-      0.175381,
-      "\b\u001b[33me\u001b[33md\u001b[39m"
-    ],
-    [
-      0.404248,
-      "\b\u001b[33md\u001b[33m \u001b[39m"
-    ],
-    [
-      0.669276,
-      "\b\u001b[33m \u001b[33mn\u001b[39m"
-    ],
-    [
-      0.128663,
-      "\b\u001b[33mn\u001b[33me\u001b[39m"
-    ],
-    [
-      0.132483,
-      "\b\u001b[33me\u001b[33mw\u001b[39m"
-    ],
-    [
-      0.175823,
-      "\b\u001b[33mw\u001b[33m \u001b[39m"
-    ],
-    [
-      0.220023,
-      "\b\u001b[33m \u001b[33mn\u001b[39m"
-    ],
-    [
-      0.156931,
-      "\b\u001b[33mn\u001b[33mi\u001b[39m"
-    ],
-    [
-      0.10604,
-      "\b\u001b[33mi\u001b[33mc\u001b[39m"
-    ],
-    [
-      0.166585,
-      "\b\u001b[33mc\u001b[33me\u001b[39m"
-    ],
-    [
-      0.306911,
-      "\b\u001b[33me\u001b[33m \u001b[39m"
-    ],
-    [
-      0.228895,
-      "\b\u001b[33m \u001b[33mf\u001b[39m"
-    ],
-    [
-      0.160772,
-      "\b\u001b[33mf\u001b[33mi\u001b[39m"
-    ],
-    [
-      0.144448,
-      "\b\u001b[33mi\u001b[33ml\u001b[39m"
-    ],
-    [
-      0.125193,
-      "\b\u001b[33ml\u001b[33me\u001b[39m"
-    ],
-    [
-      0.828758,
-      "\b\u001b[33me\u001b[33m\"\u001b[39m"
-    ],
-    [
-      0.566156,
-      " "
-    ],
-    [
-      0.349791,
-      ">"
-    ],
-    [
-      0.577663,
-      " "
-    ],
-    [
-      0.28936,
-      "\u001b[4mW\u001b[24m"
-    ],
-    [
-      0.157708,
-      "\b\u001b[4mW\u001b[4ma\u001b[24m"
-    ],
-    [
-      0.226616,
-      "\b\u001b[4ma\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.106124,
-      "\b\u001b[4ml\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.099397,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.00361,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mecho\u001b[39m \u001b[33m\"added new nice file\"\u001b[39m > \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.822747,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003743,
-      "\r\r\u001b[40C\u001b[0m\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.00018,
-      "\r\r\n\u001b[J"
-    ],
-    [
-      5.1e-05,
-      "\u001b[38;5;33m2048example\u001b[0m/    \u001b[38;5;13mdeer.jpg\u001b[0m        \u001b[38;5;33mmore\u001b[0m/                         \r\n\u001b[J\u001b[38;5;33mbigcollection\u001b[0m/  \u001b[J\u001b[38;5;33mevenmore\u001b[0m/       \u001b[J                            \u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mecho\u001b[39m \u001b[33m\"added new nice file\"\u001b[39m > \u001b[4mWallpaper/\u001b[24m\u001b[K"
-    ],
-    [
-      1.173525,
-      "\u001b[10D\u001b[24mW\u001b[24ma\u001b[24ml\u001b[24ml\u001b[24mp\u001b[24ma\u001b[24mp\u001b[24me\u001b[24mr\u001b[24m/n"
-    ],
-    [
-      0.118482,
-      "e"
-    ],
-    [
-      0.130187,
-      "w"
-    ],
-    [
-      0.499912,
-      "f"
-    ],
-    [
-      0.161863,
-      "i"
-    ],
-    [
-      0.13679,
-      "l"
-    ],
-    [
-      0.093681,
-      "e"
-    ],
-    [
-      0.261183,
-      "."
-    ],
-    [
-      0.312651,
-      "t"
-    ],
-    [
-      0.10665,
-      "x"
-    ],
-    [
-      0.131562,
-      "t"
-    ],
-    [
-      0.79879,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001397,
-      "\u001b[?2004l\r\r\n\u001b[J"
-    ],
-    [
-      0.000679,
-      "\u001b]2;echo \"added new nice file\" > Wallpaper/newfile.txt\u0007\u001b]1;echo\u0007"
-    ],
-    [
-      0.000151,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      5.4e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8.6e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000183,
-      "\u001b[?2004h"
-    ],
-    [
-      2.785656,
-      "\u001b[32mecho\u001b[39m \u001b[33m\"added new nice file\"\u001b[39m > \u001b[4mWallpaper/newfile.txt\u001b[24m"
-    ],
-    [
-      0.206019,
-      "\u001b[50D\u001b[1m#\u001b[1m \u001b[1mS\u001b[1mo\u001b[1m \u001b[1ml\u001b[1me\u001b[1mt\u001b[1m'\u001b[1ms\u001b[1m \u001b[1ma\u001b[1md\u001b[1md\u001b[1m \u001b[1ma\u001b[1m \u001b[1mn\u001b[1me\u001b[1mw\u001b[1m \u001b[1mf\u001b[1mi\u001b[1ml\u001b[1me\u001b[1m…\u001b[0m\u001b[39m   \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24m \u001b[24D"
-    ],
-    [
-      0.251309,
-      "\u001b[24D\u001b[1mT\u001b[1mh\u001b[1ma\u001b[1mt\u001b[1m'\u001b[1ms\u001b[1m \u001b[1mn\u001b[1mi\u001b[1mc\u001b[1me\u001b[1m,\u001b[1m \u001b[1ms\u001b[1mo\u001b[1m \u001b[1mf\u001b[1ma\u001b[1mr\u001b[1m.\u001b[0m\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \b\b\b\b"
-    ],
-    [
-      0.372268,
-      "\u001b[22D\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[0m\u001b[32mg\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39mc\u001b[0m\u001b[39mr\u001b[0m\u001b[39me\u001b[0m\u001b[39ma\u001b[0m\u001b[39mt\u001b[0m\u001b[39me\u001b[0m\u001b[39m \u001b[0m\u001b[39m-\u001b[0m\u001b[39m-\u001b[0m\u001b[39ms\u001b[0m\u001b[39mt\u001b[0m\u001b[39ma\u001b[0m\u001b[39mt\u001b[0m\u001b[39ms\u001b[0m\u001b[39m \u001b[0m\u001b[39m-\u001b[0m\u001b[39m-progress --compression lz4 /media/backup/borgdemo::backup1 \u001b[4mWallpaper\u001b[24m\u001b[K"
-    ],
-    [
-      0.686798,
-      "\b"
-    ],
-    [
-      0.49974,
-      "\b"
-    ],
-    [
-      0.029256,
-      "\b"
-    ],
-    [
-      0.030383,
-      "\b"
-    ],
-    [
-      0.030965,
-      "\b"
-    ],
-    [
-      0.02928,
-      "\b"
-    ],
-    [
-      0.030139,
-      "\b"
-    ],
-    [
-      0.029254,
-      "\b"
-    ],
-    [
-      0.03083,
-      "\b"
-    ],
-    [
-      0.030284,
-      "\b"
-    ],
-    [
-      0.030187,
-      "\b"
-    ],
-    [
-      0.030317,
-      "\b"
-    ],
-    [
-      0.439014,
-      "\u001b[1C"
-    ],
-    [
-      0.357869,
-      "\u001b[P\u001b[10C \u001b[11D"
-    ],
-    [
-      0.141225,
-      "2\u001b[24m \u001b[4mW\u001b[4ma\u001b[4ml\u001b[4ml\u001b[4mp\u001b[4ma\u001b[4mp\u001b[4me\u001b[4mr\u001b[24m\u001b[10D"
-    ],
-    [
-      0.615794,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001653,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000779,
-      "\u001b]2;borg create --stats --progress --compression lz4  Wallpaper\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.627474,
-      "Enter passphrase for key /media/backup/borgdemo: "
-    ],
-    [
-      3.666123,
-      "\r\n"
-    ],
-    [
-      0.128711,
-      "0 B O 0 B C 0 B D 0 N Wallpaper                                               \r"
-    ],
-    [
-      0.006399,
-      "Initializing cache transaction: Reading config                                \r"
-    ],
-    [
-      0.000208,
-      "Initializing cache transaction: Reading chunks                                \r"
-    ],
-    [
-      0.000253,
-      "Initializing cache transaction: Reading files                                 \r"
-    ],
-    [
-      0.000269,
-      "                                                                              \r"
-    ],
-    [
-      0.247567,
-      "584.80 MB O 584.09 MB C 65 B D 1011 N Wallpaper/newfile.txt                   \r"
-    ],
-    [
-      0.264517,
-      "Compacting segments   0%                                                      \r"
-    ],
-    [
-      0.000942,
-      "Compacting segments  50%                                                      \r"
-    ],
-    [
-      4e-05,
-      "                                                                              \r"
-    ],
-    [
-      0.0606,
-      "Saving files cache                                                            \r"
-    ],
-    [
-      0.005405,
-      "Saving chunks cache                                                           \r"
-    ],
-    [
-      0.000411,
-      "Saving cache config                                                           \r"
-    ],
-    [
-      0.079766,
-      "                                                                              \r"
-    ],
-    [
-      4.7e-05,
-      "                                                                              \r"
-    ],
-    [
-      0.000375,
-      "------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      2.4e-05,
-      "Archive name: backup2\r\n"
-    ],
-    [
-      2.7e-05,
-      "Archive fingerprint: 5aaf03d1c710cf774f9c9ff1c6317b621c14e519c6bac459f6d64b31e3bbd200\r\n"
-    ],
-    [
-      0.000102,
-      "Time (start): Fri, 2017-07-14 21:54:56\r\n"
-    ],
-    [
-      2.1e-05,
-      "Time (end):   Fri, 2017-07-14 21:54:56\r\nDuration: 0.33 seconds\r\n"
-    ],
-    [
-      7.4e-05,
-      "Number of files: 1051\r\n"
-    ],
-    [
-      8.3e-05,
-      "Utilization of maximum supported archive size: 0%\r\n------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      7e-06,
-      "                       Original size      Compressed size    Deduplicated size\r\n"
-    ],
-    [
-      2.8e-05,
-      "This archive:              618.96 MB            617.47 MB            106.70 kB\r\n"
-    ],
-    [
-      2.2e-05,
-      "All archives:                1.24 GB              1.23 GB            561.77 MB\r\n"
-    ],
-    [
-      5.3e-05,
-      "\r\n"
-    ],
-    [
-      7e-06,
-      "                       Unique chunks         Total chunks\r\n"
-    ],
-    [
-      2.2e-05,
-      "Chunk index:                    1002                 2187\r\n"
-    ],
-    [
-      2.3e-05,
-      "------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      0.046167,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      8.1e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8.5e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000212,
-      "\u001b[?2004h"
-    ],
-    [
-      1.922718,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.225243,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.166756,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mW\u001b[0m\u001b[39m"
-    ],
-    [
-      0.162323,
-      "\b\u001b[1mW\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.097757,
-      "\b\u001b[1mo\u001b[1mw\u001b[0m\u001b[39m"
-    ],
-    [
-      0.265877,
-      "\b\u001b[1mw\u001b[1m, this was a lot faster!\u001b[0m\u001b[39m"
-    ],
-    [
-      0.789811,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000392,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000754,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      7.2e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.2e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000273,
-      "\u001b[?2004h"
-    ],
-    [
-      1.15181,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.234049,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.209548,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mN\u001b[0m\u001b[39m"
-    ],
-    [
-      0.168421,
-      "\b\u001b[1mN\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.232312,
-      "\b\u001b[1mo\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.201133,
-      "\b\u001b[1mt\u001b[1mi\u001b[0m\u001b[39m"
-    ],
-    [
-      0.338758,
-      "\b\u001b[1mi\u001b[1mce the \"Deduplicated size\" in \"This archive\"?\u001b[0m\u001b[39m"
-    ],
-    [
-      2.236964,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000951,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.001084,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      9.7e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      9.6e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000505,
-      "\u001b[?2004h"
-    ],
-    [
-      2.51909,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.240091,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.216793,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
-    ],
-    [
-      0.192027,
-      "\b\u001b[1mB\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.138706,
-      "\b\u001b[1mo\u001b[1mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.129501,
-      "\b\u001b[1mr\u001b[1mg\u001b[0m\u001b[39m"
-    ],
-    [
-      0.536844,
-      "\b\u001b[1mg\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.143314,
-      "\b\u001b[1m \u001b[1mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.138384,
-      "\b\u001b[1mr\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.197658,
-      "\b\u001b[1me\u001b[1mcognized that most files did not change and deduplicated them.\u001b[0m\u001b[39m"
-    ],
-    [
-      1.432604,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000397,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.00069,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      6.4e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.1e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000319,
-      "\u001b[?2004h"
-    ],
-    [
-      1.153873,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000537,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000623,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000101,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000108,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000309,
-      "\u001b[?2004h"
-    ],
-    [
-      0.447325,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.257975,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.210602,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
-    ],
-    [
-      0.182148,
-      "\b\u001b[1mB\u001b[1mu\u001b[0m\u001b[39m"
-    ],
-    [
-      0.159923,
-      "\b\u001b[1mu\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.165905,
-      "\b\u001b[1mt\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.175925,
-      "\b\u001b[1m \u001b[1mw\u001b[0m\u001b[39m"
-    ],
-    [
-      0.116184,
-      "\b\u001b[1mw\u001b[1mh\u001b[0m\u001b[39m"
-    ],
-    [
-      0.125029,
-      "\b\u001b[1mh\u001b[1ma\u001b[0m\u001b[39m"
-    ],
-    [
-      0.110311,
-      "\b\u001b[1ma\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.26718,
-      "\b\u001b[1mt\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.393846,
-      "\b\u001b[1m \u001b[1mhappens, when we move a dir and create a new backup?\u001b[0m\u001b[39m"
-    ],
-    [
-      1.840157,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000398,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000678,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000105,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000102,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000242,
-      "\u001b[?2004h"
-    ],
-    [
-      1.044202,
-      "\u001b[1m\u001b[31mm\u001b[0m\u001b[39m"
-    ],
-    [
-      0.167573,
-      "\b\u001b[0m\u001b[32mm\u001b[32mv\u001b[39m"
-    ],
-    [
-      0.203794,
-      " "
-    ],
-    [
-      0.199502,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.002962,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mmv\u001b[39m \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.399299,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.004451,
-      "\r\r\u001b[14C\u001b[0m\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.000168,
-      "\r\r\n\u001b[J"
-    ],
-    [
-      3.2e-05,
-      "\u001b[38;5;33m2048example\u001b[0m/    \u001b[38;5;13mdeer.jpg\u001b[0m        \u001b[38;5;33mmore\u001b[0m/                         \r\n\u001b[J\u001b[38;5;33mbigcollection\u001b[0m/  \u001b[J\u001b[38;5;33mevenmore\u001b[0m/       \u001b[Jnewfile.txt     \u001b[J              \u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m \u001b[4mWallpaper/\u001b[24m\u001b[K"
-    ],
-    [
-      0.416097,
-      "\u001b[?7l"
-    ],
-    [
-      1.3e-05,
-      "\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.002339,
-      "\u001b[10D\u001b[24mW\u001b[24ma\u001b[24ml\u001b[24ml\u001b[24mp\u001b[24ma\u001b[24mp\u001b[24me\u001b[24mr\u001b[24m/2048example\u001b[1m/\u001b[0m"
-    ],
-    [
-      0.000184,
-      "\r\r\n"
-    ],
-    [
-      0.000156,
-      "\u001b[7m2048example/  \u001b[0m  \u001b[38;5;13mdeer.jpg\u001b[0m        \u001b[38;5;33mmore\u001b[0m/                         \u001b[K\r\n\u001b[J\u001b[38;5;33mbigcollection\u001b[0m/  \u001b[J\u001b[38;5;33mevenmore\u001b[0m/       \u001b[Jnewfile.txt     \u001b[J              \u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m Wallpaper/2048example\u001b[1m/\u001b[0m\u001b[K"
-    ],
-    [
-      0.23342,
-      "\r\r\n"
-    ],
-    [
-      1.4e-05,
-      "\u001b[7m2048example/  \u001b[0m  \r\u001b[7m2048example/  \u001b[0m  \r\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m Wallpaper/2048example\u001b[1m/\u001b[0m\u001b[K\u001b[12Dbigcollecti\u001b[0mon\u001b[1m/\u001b[0m"
-    ],
-    [
-      0.000154,
-      "\r\r\n"
-    ],
-    [
-      2.5e-05,
-      "\u001b[38;5;33m2048example\u001b[0m/    \r\u001b[1B\u001b[7mbigcollection/\u001b[0m  \r\u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m Wallpaper/bigcollection\u001b[1m/\u001b[0m\u001b[K"
-    ],
-    [
-      0.378809,
-      "\r\r\n\u001b[J\u001b[A\u001b[29C"
-    ],
-    [
-      0.002159,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mmv\u001b[39m \u001b[4mWallpaper/bigcollection\u001b[24m\u001b[K\u001b[1C"
-    ],
-    [
-      0.35586,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.007824,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mmv\u001b[39m \u001b[4mWallpaper/bigcollection\u001b[24m \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.248908,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.002608,
-      "\r\r\u001b[38C\u001b[0m\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.000171,
-      "\r\r\n\u001b[J"
-    ],
-    [
-      5.4e-05,
-      "\u001b[38;5;33m2048example\u001b[0m/    \u001b[38;5;13mdeer.jpg\u001b[0m        \u001b[38;5;33mmore\u001b[0m/                         \r\n\u001b[J\u001b[38;5;33mbigcollection\u001b[0m/  \u001b[J\u001b[38;5;33mevenmore\u001b[0m/       \u001b[Jnewfile.txt     \u001b[J              \u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m \u001b[4mWallpaper/bigcollection\u001b[24m \u001b[4mWallpaper/\u001b[24m\u001b[K"
-    ],
-    [
-      0.248788,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.004567,
-      "\u001b[10D\u001b[24mW\u001b[24ma\u001b[24ml\u001b[24ml\u001b[24mp\u001b[24ma\u001b[24mp\u001b[24me\u001b[24mr\u001b[24m/2048example\u001b[1m/\u001b[0m"
-    ],
-    [
-      0.000182,
-      "\r\r\n"
-    ],
-    [
-      9.1e-05,
-      "\u001b[7m2048example/  \u001b[0m  \u001b[38;5;13mdeer.jpg\u001b[0m        \u001b[38;5;33mmore\u001b[0m/                         \u001b[K\r\n\u001b[J\u001b[38;5;33mbigcollection\u001b[0m/  \u001b[J\u001b[38;5;33mevenmore\u001b[0m/       \u001b[Jnewfile.txt     \u001b[J              \u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m \u001b[4mWallpaper/bigcollection\u001b[24m Wallpaper/2048example\u001b[1m/\u001b[0m\u001b[K"
-    ],
-    [
-      0.24704,
-      "\r\r\n"
-    ],
-    [
-      3.2e-05,
-      "\u001b[7m2048example/  \u001b[0m  \r\u001b[7m2048example/  \u001b[0m  \r\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m \u001b[4mWallpaper/bigcollection\u001b[24m Wallpaper/2048example\u001b[1m/\u001b[0m\u001b[K\u001b[12Dbigcollecti\u001b[0mon\u001b[1m/\u001b[0m"
-    ],
-    [
-      0.000389,
-      "\r\r\n"
-    ],
-    [
-      3e-05,
-      "\u001b[38;5;33m2048example\u001b[0m/    \r\u001b[1B\u001b[7mbigcollection/\u001b[0m  \r\u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mmv\u001b[39m \u001b[4mWallpaper/bigcollection\u001b[24m Wallpaper/bigcollection\u001b[1m/\u001b[0m\u001b[K"
-    ],
-    [
-      0.595335,
-      "\r\r\n\u001b[J\u001b[A\u001b[53C"
-    ],
-    [
-      0.003755,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mmv\u001b[39m \u001b[4mWallpaper/bigcollection\u001b[24m \u001b[4mWallpaper/bigcollection\u001b[24m\u001b[K\u001b[1C"
-    ],
-    [
-      0.271014,
-      "\b"
-    ],
-    [
-      0.554135,
-      "\u001b[23D\u001b[24mW\u001b[24ma\u001b[24ml\u001b[24ml\u001b[24mp\u001b[24ma\u001b[24mp\u001b[24me\u001b[24mr\u001b[24m/\u001b[24mb\u001b[24mi\u001b[24mg\u001b[24mc\u001b[24mo\u001b[24ml\u001b[24ml\u001b[24me\u001b[24mc\u001b[24mt\u001b[24mi\u001b[24mo\u001b[24mn_"
-    ],
-    [
-      0.317529,
-      "N"
-    ],
-    [
-      0.104435,
-      "E"
-    ],
-    [
-      0.175308,
-      "W"
-    ],
-    [
-      0.956051,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001192,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000754,
-      "\u001b]2;mv -i Wallpaper/bigcollection Wallpaper/bigcollection_NEW\u0007\u001b]1;mv\u0007"
-    ],
-    [
-      0.001182,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      9.8e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.7e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000188,
-      "\u001b[?2004h"
-    ],
-    [
-      1.857261,
-      "\u001b[32mmv\u001b[39m Wallpaper/bigcollection \u001b[4mWallpaper/bigcollection_NEW\u001b[24m"
-    ],
-    [
-      0.208181,
-      "\u001b[54D\u001b[1m#\u001b[1m \u001b[1mB\u001b[1mu\u001b[1mt\u001b[1m \u001b[1mw\u001b[1mh\u001b[1ma\u001b[1mt\u001b[1m \u001b[1mh\u001b[1ma\u001b[1mp\u001b[1mp\u001b[1me\u001b[1mn\u001b[1ms\u001b[1m,\u001b[1m \u001b[1mw\u001b[1mh\u001b[1me\u001b[1mn\u001b[1m \u001b[1mw\u001b[1me\u001b[24m\u001b[1m \u001b[24m\u001b[1mm\u001b[24m\u001b[1mo\u001b[24m\u001b[1mv\u001b[24m\u001b[1me\u001b[24m\u001b[1m \u001b[24m\u001b[1ma\u001b[24m\u001b[1m \u001b[24m\u001b[1md\u001b[24m\u001b[1mi\u001b[24m\u001b[1mr\u001b[24m\u001b[1m \u001b[24m\u001b[1ma\u001b[24m\u001b[1mn\u001b[24m\u001b[1md\u001b[24m\u001b[1m \u001b[24m\u001b[1mc\u001b[24m\u001b[1mr\u001b[24m\u001b[1me\u001b[24m\u001b[1ma\u001b[24m\u001b[1mt\u001b[24m\u001b[1me\u001b[24m\u001b[1m \u001b[24m\u001b[1ma\u001b[24m\u001b[1m \u001b[24m\u001b[1mn\u001b[24m\u001b[1me\u001b[1mw backup?\u001b[0m\u001b[39m"
-    ],
-    [
-      0.2399,
-      "\u001b[60D\u001b[1mo\u001b[1mr\u001b[1mg\u001b[1m \u001b[1mr\u001b[1me\u001b[1mc\u001b[1mo\u001b[1mg\u001b[1mn\u001b[1mi\u001b[1mz\u001b[1me\u001b[1md\u001b[1m \u001b[1mt\u001b[1mh\u001b[1ma\u001b[1mt\u001b[1m \u001b[1mm\u001b[1mo\u001b[1ms\u001b[1mt\u001b[1m \u001b[1mf\u001b[1mi\u001b[1ml\u001b[1me\u001b[1ms\u001b[1m \u001b[1md\u001b[1mi\u001b[1md\u001b[1m \u001b[1mn\u001b[1mo\u001b[1mt\u001b[1m \u001b[1mc\u001b[1mh\u001b[1ma\u001b[1mn\u001b[1mg\u001b[1me\u001b[1m \u001b[1ma\u001b[1mn\u001b[1md\u001b[1m \u001b[1md\u001b[1me\u001b[1md\u001b[1mu\u001b[1mp\u001b[1ml\u001b[1mi\u001b[1mc\u001b[1ma\u001b[1mt\u001b[1med them.\u001b[0m\u001b[39m"
-    ],
-    [
-      0.227963,
-      "\u001b[69D\u001b[1mN\u001b[1mo\u001b[1mt\u001b[1mi\u001b[1mc\u001b[1me\u001b[1m \u001b[1mt\u001b[1mh\u001b[1me\u001b[1m \u001b[1m\"\u001b[1mD\u001b[2C\u001b[0m\u001b[39m\u001b[39P\u001b[10C\u001b[1ms\u001b[1mi\u001b[1mz\u001b[1me\u001b[1m\"\u001b[1m in \"This archive\"?\u001b[0m\u001b[39m                    \u001b[20D"
-    ],
-    [
-      0.344233,
-      "\u001b[49D\u001b[1mW\u001b[1mo\u001b[1mw\u001b[1m,\u001b[1m \u001b[1mt\u001b[1mh\u001b[1mi\u001b[1ms\u001b[1m \u001b[1mw\u001b[1ma\u001b[1ms\u001b[1m \u001b[1ma\u001b[1m \u001b[1ml\u001b[1mo\u001b[1mt\u001b[1m \u001b[1mf\u001b[1ma\u001b[1ms\u001b[1mt\u001b[1me\u001b[1mr\u001b[1m!\u001b[0m\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[0m\u001b[39m \u001b[22D"
-    ],
-    [
-      0.396096,
-      "\u001b[29D\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[0m\u001b[32mg\u001b[39m\u001b[0m\u001b[39m \u001b[0m\u001b[39mc\u001b[0m\u001b[39mr\u001b[0m\u001b[39me\u001b[0m\u001b[39ma\u001b[0m\u001b[39mt\u001b[0m\u001b[39me\u001b[0m\u001b[39m \u001b[0m\u001b[39m-\u001b[0m\u001b[39m-\u001b[0m\u001b[39ms\u001b[0m\u001b[39mt\u001b[0m\u001b[39ma\u001b[0m\u001b[39mt\u001b[0m\u001b[39ms\u001b[0m\u001b[39m \u001b[0m\u001b[39m-\u001b[0m\u001b[39m-\u001b[0m\u001b[39mp\u001b[0m\u001b[39mr\u001b[0m\u001b[39mo\u001b[0m\u001b[39mg\u001b[0m\u001b[39mr\u001b[0m\u001b[39me\u001b[0m\u001b[39mss --compression lz4 /media/backup/borgdemo::backup2 \u001b[4mWallpaper\u001b[24m\u001b[K"
-    ],
-    [
-      0.854343,
-      "\b"
-    ],
-    [
-      0.192067,
-      "\b"
-    ],
-    [
-      0.161921,
-      "\b"
-    ],
-    [
-      0.152949,
-      "\b"
-    ],
-    [
-      0.158914,
-      "\b"
-    ],
-    [
-      0.150013,
-      "\b"
-    ],
-    [
-      0.168061,
-      "\b"
-    ],
-    [
-      0.170964,
-      "\b"
-    ],
-    [
-      0.156237,
-      "\b"
-    ],
-    [
-      0.161813,
-      "\b"
-    ],
-    [
-      0.698972,
-      "\b\u001b[P\u001b[10C \u001b[11D"
-    ],
-    [
-      0.185005,
-      "3\u001b[24m \u001b[4mW\u001b[4ma\u001b[4ml\u001b[4ml\u001b[4mp\u001b[4ma\u001b[4mp\u001b[4me\u001b[4mr\u001b[24m\u001b[10D"
-    ],
-    [
-      0.670037,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.002029,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000793,
-      "\u001b]2;borg create --stats --progress --compression lz4  Wallpaper\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.621587,
-      "Enter passphrase for key /media/backup/borgdemo: "
-    ],
-    [
-      5.034162,
-      "\r\n"
-    ],
-    [
-      0.136527,
-      "0 B O 0 B C 0 B D 0 N Wallpaper                                               \r"
-    ],
-    [
-      0.028491,
-      "Initializing cache transaction: Reading config                                \r"
-    ],
-    [
-      0.000245,
-      "Initializing cache transaction: Reading chunks                                \r"
-    ],
-    [
-      0.000278,
-      "Initializing cache transaction: Reading files                                 \r"
-    ],
-    [
-      0.000296,
-      "                                                                              \r"
-    ],
-    [
-      0.173817,
-      "10.07 MB O 10.04 MB C 0 B D 17 N Wallpaper/bigcollec...rland__England____A.jpg\r"
-    ],
-    [
-      0.20311,
-      "29.10 MB O 29.05 MB C 0 B D 50 N Wallpaper/bigcollec...Creek_Redwoods_Stat.jpg\r"
-    ],
-    [
-      0.202422,
-      "47.67 MB O 47.62 MB C 0 B D 83 N Wallpaper/bigcollec...rson-Wildschutzgebi.jpg\r"
-    ],
-    [
-      0.216811,
-      "64.30 MB O 64.19 MB C 0 B D 112 N Wallpaper/bigcollec..._Planten_un_Blomen.jpg\r"
-    ],
-    [
-      0.214409,
-      "80.89 MB O 80.75 MB C 0 B D 140 N Wallpaper/bigcollec...g__Cologne__German.jpg\r"
-    ],
-    [
-      0.202244,
-      "100.45 MB O 100.26 MB C 0 B D 173 N Wallpaper/bigcolle..._Menorca__Spanien.jpg\r"
-    ],
-    [
-      0.202027,
-      "116.80 MB O 116.61 MB C 0 B D 202 N Wallpaper/bigcolle...artenkirchen__Bay.jpg\r"
-    ],
-    [
-      0.202003,
-      "130.38 MB O 130.15 MB C 0 B D 227 N Wallpaper/bigcolle..._zur_Felsenkirche.jpg\r"
-    ],
-    [
-      0.234918,
-      "143.32 MB O 143.09 MB C 0 B D 251 N Wallpaper/bigcolle...land__Antarktis__.jpg\r"
-    ],
-    [
-      0.204976,
-      "156.31 MB O 156.07 MB C 0 B D 275 N Wallpaper/bigcolle...-Stadion__Rio_de_.jpg\r"
-    ],
-    [
-      0.205408,
-      "173.36 MB O 173.09 MB C 0 B D 304 N Wallpaper/bigcolle...lpark__Alaska__US.jpg\r"
-    ],
-    [
-      0.221776,
-      "183.65 MB O 183.35 MB C 0 B D 322 N Wallpaper/bigcolle...lmeer____Pasquale.jpg\r"
-    ],
-    [
-      0.201052,
-      "195.95 MB O 195.63 MB C 0 B D 345 N Wallpaper/bigcolle...Schutzgebiet_Mary.jpg\r"
-    ],
-    [
-      0.240687,
-      "217.22 MB O 216.88 MB C 0 B D 382 N Wallpaper/bigcolle...__Kappadokien__T_.jpg\r"
-    ],
-    [
-      0.20767,
-      "233.09 MB O 232.68 MB C 0 B D 409 N Wallpaper/bigcolle...epublic_ImagesShu.jpg\r"
-    ],
-    [
-      0.210433,
-      "250.21 MB O 249.81 MB C 0 B D 439 N Wallpaper/bigcolle...ter__Pr_fektur_Fu.jpg\r"
-    ],
-    [
-      0.200954,
-      "268.90 MB O 268.51 MB C 0 B D 472 N Wallpaper/bigcolle...uth_Carolina__USA.jpg\r"
-    ],
-    [
-      0.212828,
-      "286.72 MB O 286.35 MB C 0 B D 502 N Wallpaper/bigcolle...l_Park__Cobham__E.jpg\r"
-    ],
-    [
-      0.206527,
-      "296.84 MB O 296.47 MB C 0 B D 518 N Wallpaper/bigcolle...entAlamy______Bin.jpg\r"
-    ],
-    [
-      0.205003,
-      "310.38 MB O 310.00 MB C 0 B D 542 N Wallpaper/bigcolle...ationalpark__Flor.jpg\r"
-    ],
-    [
-      0.209538,
-      "320.38 MB O 320.03 MB C 0 B D 559 N Wallpaper/bigcolle...ma__Bahamas____Ji.jpg\r"
-    ],
-    [
-      0.201896,
-      "331.76 MB O 331.35 MB C 0 B D 580 N Wallpaper/bigcolle...rd_Bay__Eyre-Halb.jpg\r"
-    ],
-    [
-      0.207585,
-      "347.40 MB O 346.96 MB C 0 B D 606 N Wallpaper/bigcolle...s_Atlantischen_Oz.jpg\r"
-    ],
-    [
-      0.200781,
-      "369.05 MB O 368.62 MB C 0 B D 640 N Wallpaper/bigcolle...ankreich____John_.jpg\r"
-    ],
-    [
-      0.202326,
-      "379.22 MB O 378.78 MB C 0 B D 657 N Wallpaper/bigcolle...chtanemone__Insel.jpg\r"
-    ],
-    [
-      0.211929,
-      "389.83 MB O 389.36 MB C 0 B D 676 N Wallpaper/bigcolle...ugal____Mikael_Sv.jpg\r"
-    ],
-    [
-      0.219553,
-      "402.12 MB O 401.68 MB C 0 B D 695 N Wallpaper/bigcolle...rk_Sarek__Schwede.jpg\r"
-    ],
-    [
-      0.20375,
-      "416.03 MB O 415.48 MB C 0 B D 718 N Wallpaper/bigcolle...em_taubenetzten_G.jpg\r"
-    ],
-    [
-      0.201474,
-      "428.93 MB O 428.38 MB C 0 B D 742 N Wallpaper/bigcolle...Francisco_Bay__Ka.jpg\r"
-    ],
-    [
-      0.200248,
-      "437.92 MB O 437.35 MB C 0 B D 756 N Wallpaper/bigcolle..._der_N_he_von_Tro.jpg\r"
-    ],
-    [
-      0.215254,
-      "446.04 MB O 445.46 MB C 0 B D 770 N Wallpaper/bigcolle...enver__Colorado__.jpg\r"
-    ],
-    [
-      0.202133,
-      "455.95 MB O 455.36 MB C 0 B D 787 N Wallpaper/bigcolle..._Son_Doong-H_hle_.jpg\r"
-    ],
-    [
-      0.208499,
-      "471.36 MB O 470.71 MB C 0 B D 816 N Wallpaper/bigcolle...ly_National_Monum.jpg\r"
-    ],
-    [
-      0.205116,
-      "491.46 MB O 490.81 MB C 0 B D 853 N Wallpaper/bigcolle...ted_during_the_ 1.jpg\r"
-    ],
-    [
-      0.220215,
-      "510.73 MB O 510.07 MB C 0 B D 887 N Wallpaper/bigcolle..._Blitzeinschlag_i.jpg\r"
-    ],
-    [
-      0.201825,
-      "522.32 MB O 521.65 MB C 0 B D 906 N Wallpaper/bigcolle...vador__Santiago__.jpg\r"
-    ],
-    [
-      0.202937,
-      "534.02 MB O 533.34 MB C 0 B D 925 N Wallpaper/bigcolle...doah_National_Par.jpg\r"
-    ],
-    [
-      0.202635,
-      "550.50 MB O 549.83 MB C 0 B D 951 N Wallpaper/bigcolle...liffs_National_Mo.jpg\r"
-    ],
-    [
-      0.202296,
-      "564.18 MB O 563.47 MB C 0 B D 976 N Wallpaper/bigcolle...n_in_Aktion____Va.jpg\r"
-    ],
-    [
-      0.203791,
-      "576.43 MB O 575.71 MB C 0 B D 996 N Wallpaper/bigcolle...______WRIGHTSuper.jpg\r"
-    ],
-    [
-      0.439796,
-      "Compacting segments   0%                                                      \r"
-    ],
-    [
-      0.000919,
-      "Compacting segments  50%                                                      \r"
-    ],
-    [
-      3.7e-05,
-      "                                                                              \r"
-    ],
-    [
-      0.040817,
-      "Saving files cache                                                            \r"
-    ],
-    [
-      0.010023,
-      "Saving chunks cache                                                           \r"
-    ],
-    [
-      0.000278,
-      "Saving cache config                                                           \r"
-    ],
-    [
-      0.093829,
-      "                                                                              \r"
-    ],
-    [
-      1.6e-05,
-      "                                                                              \r"
-    ],
-    [
-      0.000308,
-      "------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      9e-06,
-      "Archive name: backup3\r\n"
-    ],
-    [
-      3.8e-05,
-      "Archive fingerprint: 36cd8fdf9b8b2e3bbb3fc2bb600acd48609efaf3a0880f900e0701a47ff69d4d\r\n"
-    ],
-    [
-      2e-05,
-      "Time (start): Fri, 2017-07-14 21:55:37\r\n"
-    ],
-    [
-      2.4e-05,
-      "Time (end):   Fri, 2017-07-14 21:55:46\r\n"
-    ],
-    [
-      2.2e-05,
-      "Duration: 8.58 seconds\r\n"
-    ],
-    [
-      2.6e-05,
-      "Number of files: 1051\r\n"
-    ],
-    [
-      2.6e-05,
-      "Utilization of maximum supported archive size: 0%\r\n"
-    ],
-    [
-      2.1e-05,
-      "------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      2.6e-05,
-      "                       Original size      Compressed size    Deduplicated size\r\n"
-    ],
-    [
-      2.4e-05,
-      "This archive:              618.96 MB            617.47 MB            107.55 kB\r\n"
-    ],
-    [
-      2.1e-05,
-      "All archives:                1.86 GB              1.85 GB            561.88 MB\r\n"
-    ],
-    [
-      2.5e-05,
-      "\r\n"
-    ],
-    [
-      3.9e-05,
-      "                       Unique chunks         Total chunks\r\n"
-    ],
-    [
-      1.1e-05,
-      "Chunk index:                    1006                 3283\r\n"
-    ],
-    [
-      4.8e-05,
-      "------------------------------------------------------------------------------\r\n"
-    ],
-    [
-      0.048607,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      1.9e-05,
-      "\u001b]1;~/Pictures\u0007"
-    ],
-    [
-      7.7e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      6.2e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.00017,
-      "\u001b[?2004h"
-    ],
-    [
-      1.509372,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.261334,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.25826,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mS\u001b[0m\u001b[39m"
-    ],
-    [
-      0.162616,
-      "\b\u001b[1mS\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.27891,
-      "\b\u001b[1mt\u001b[1mi\u001b[0m\u001b[39m"
-    ],
-    [
-      0.174723,
-      "\b\u001b[1mi\u001b[1ml\u001b[0m\u001b[39m"
-    ],
-    [
-      0.124142,
-      "\b\u001b[1ml\u001b[1ml\u001b[0m\u001b[39m"
-    ],
-    [
-      1.012371,
-      "\b\u001b[1ml\u001b[1m quite fast…\u001b[0m\u001b[39m"
-    ],
-    [
-      0.74493,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000416,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000686,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      6e-06,
-      "\u001b]1;~/Pictures\u0007"
-    ],
-    [
-      8.8e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000111,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000271,
-      "\u001b[?2004h"
-    ],
-    [
-      2.038818,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.861519,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      2.235116,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mB\u001b[0m\u001b[39m"
-    ],
-    [
-      0.20981,
-      "\b\u001b[1mB\u001b[1mu\u001b[0m\u001b[39m"
-    ],
-    [
-      0.216676,
-      "\b\u001b[1mu\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.72822,
-      "\b\u001b[1mt\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      1.094756,
-      "\b\u001b[1m \u001b[1mw\u001b[0m\u001b[39m"
-    ],
-    [
-      0.315528,
-      "\b\u001b[1mw\u001b[1mh\u001b[0m\u001b[39m"
-    ],
-    [
-      0.23713,
-      "\b\u001b[1mh\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.286805,
-      "\b\u001b[1me\u001b[1mn\u001b[0m\u001b[39m"
-    ],
-    [
-      0.638764,
-      "\b\u001b[1mn\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.81778,
-      "\b\u001b[1m \u001b[1my\u001b[0m\u001b[39m"
-    ],
-    [
-      0.245269,
-      "\b\u001b[1my\u001b[1mou look at the \"deduplicated file size\" again, you see that borg\u001b[1m \u001b[1malso recognized that only the dir and not the files changed in this backup.\u001b[0m\u001b[39m\u001b[K"
-    ],
-    [
-      2.34618,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000453,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000631,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.00011,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000113,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000262,
-      "\u001b[?2004h"
-    ],
-    [
-      3.418707,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.275819,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.2004,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mN\u001b[0m\u001b[39m"
-    ],
-    [
-      0.172829,
-      "\b\u001b[1mN\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.308378,
-      "\b\u001b[1mo\u001b[1mw\u001b[0m\u001b[39m"
-    ],
-    [
-      0.703684,
-      "\b\u001b[1mw\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.8183,
-      "\b\u001b[1m \u001b[1ml\u001b[0m\u001b[39m"
-    ],
-    [
-      0.193322,
-      "\b\u001b[1ml\u001b[1me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.18438,
-      "\b\u001b[1me\u001b[1mt\u001b[0m\u001b[39m"
-    ],
-    [
-      0.389996,
-      "\b\u001b[1mt\u001b[1m's look into a repo.\u001b[0m\u001b[39m"
-    ],
-    [
-      0.857879,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000349,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000564,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      2.9e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.9e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000246,
-      "\u001b[?2004h"
-    ],
-    [
-      1.60039,
-      "\u001b[1m\u001b[31mb\u001b[0m\u001b[39m"
-    ],
-    [
-      0.177554,
-      "\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.117613,
-      "\b\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[1m\u001b[31mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.12982,
-      "\b\b\b\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.145309,
-      " "
-    ],
-    [
-      0.256078,
-      "l"
-    ],
-    [
-      0.145029,
-      "i"
-    ],
-    [
-      0.100415,
-      "s"
-    ],
-    [
-      0.137667,
-      "t"
-    ],
-    [
-      0.172051,
-      " "
-    ],
-    [
-      0.490083,
-      "\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.190449,
-      "\b\u001b[4m/\u001b[4mm\u001b[24m"
-    ],
-    [
-      0.216676,
-      "\b\u001b[4mm\u001b[4me\u001b[24m"
-    ],
-    [
-      0.174909,
-      "\b\u001b[4me\u001b[4md\u001b[24m"
-    ],
-    [
-      0.242368,
-      "\u001b[?7l\u001b[31m......\u001b[39m"
-    ],
-    [
-      3.2e-05,
-      "\u001b[?7h"
-    ],
-    [
-      0.00599,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m list \u001b[4m/media\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.345758,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003294,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m list \u001b[4m/media/backup\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.253376,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003389,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m list \u001b[4m/media/backup/borgdemo\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      1.036958,
-      "\b\b\u001b[4mo\u001b[24m\u001b[0m\u001b[24m \b"
-    ],
-    [
-      2.6e-05,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000854,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000717,
-      "\u001b]2;borg list /media/backup/borgdemo\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.624291,
-      "Enter passphrase for key /media/backup/borgdemo: "
-    ],
-    [
-      2.363577,
-      "\r\n"
-    ],
-    [
-      0.158203,
-      "backup1                              Fri, 2017-07-14 21:54:06 [9758c7db339a066360bffad17b2ffac4fb368c6722c0be3a47a7a9b631f06407]\r\nbackup2                              Fri, 2017-07-14 21:54:56 [5aaf03d1c710cf774f9c9ff1c6317b621c14e519c6bac459f6d64b31e3bbd200]\r\nbackup3                              Fri, 2017-07-14 21:55:37 [36cd8fdf9b8b2e3bbb3fc2bb600acd48609efaf3a0880f900e0701a47ff69d4d]\r\n"
-    ],
-    [
-      0.044143,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      5.2e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8.4e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000207,
-      "\u001b[?2004h"
-    ],
-    [
-      5.582312,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.371134,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.184918,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mY\u001b[0m\u001b[39m"
-    ],
-    [
-      0.177123,
-      "\b\u001b[1mY\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.148041,
-      "\b\u001b[1mo\u001b[1mu\u001b[0m\u001b[39m"
-    ],
-    [
-      0.461676,
-      "\b\u001b[1mu\u001b[1m'\u001b[0m\u001b[39m"
-    ],
-    [
-      0.668888,
-      "\b\u001b[1m'\u001b[1mll see a list of all backups.\u001b[0m\u001b[39m"
-    ],
-    [
-      0.876235,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000363,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.001075,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      8.2e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8.8e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000297,
-      "\u001b[?2004h"
-    ],
-    [
-      2.475491,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.382591,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.23474,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mY\u001b[0m\u001b[39m"
-    ],
-    [
-      0.210269,
-      "\b\u001b[1mY\u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.196151,
-      "\b\u001b[1mo\u001b[1mu\u001b[0m\u001b[39m"
-    ],
-    [
-      0.460253,
-      "\b\u001b[1mu\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.305764,
-      "\b\u001b[1m \u001b[1mc\u001b[0m\u001b[39m"
-    ],
-    [
-      0.184098,
-      "\b\u001b[1mc\u001b[1ma\u001b[0m\u001b[39m"
-    ],
-    [
-      0.212534,
-      "\b\u001b[1ma\u001b[1mn\u001b[0m\u001b[39m"
-    ],
-    [
-      0.305097,
-      "\b\u001b[1mn\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.163485,
-      "\b\u001b[1m \u001b[1ma\u001b[0m\u001b[39m"
-    ],
-    [
-      0.194803,
-      "\b\u001b[1ma\u001b[1ml\u001b[0m\u001b[39m"
-    ],
-    [
-      0.282791,
-      "\b\u001b[1ml\u001b[1mso use the same command to look into an archive. But we better f\u001b[1mi\u001b[1mlter the output here:\u001b[0m\u001b[39m\u001b[K"
-    ],
-    [
-      2.679252,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000434,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000646,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      3e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000107,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000302,
-      "\u001b[?2004h"
-    ],
-    [
-      1.162094,
-      "\u001b[1m\u001b[31mb\u001b[0m\u001b[39m"
-    ],
-    [
-      0.184756,
-      "\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.114887,
-      "\b\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[1m\u001b[31mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.143983,
-      "\b\b\b\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.230507,
-      " "
-    ],
-    [
-      0.414382,
-      "l"
-    ],
-    [
-      0.153591,
-      "i"
-    ],
-    [
-      0.044178,
-      "s"
-    ],
-    [
-      0.236299,
-      "t"
-    ],
-    [
-      0.330148,
-      " "
-    ],
-    [
-      0.70018,
-      "\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.193582,
-      "\b\u001b[4m/\u001b[4mm\u001b[24m"
-    ],
-    [
-      0.172118,
-      "\b\u001b[4mm\u001b[4me\u001b[24m"
-    ],
-    [
-      0.134283,
-      "\b\u001b[4me\u001b[4md\u001b[24m"
-    ],
-    [
-      0.250757,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.006227,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m list \u001b[4m/media\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.374078,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003992,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m list \u001b[4m/media/backup\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.2609,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003434,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m list \u001b[4m/media/backup/borgdemo\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.237963,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003371,
-      "\r\r\u001b[34C\u001b[0m\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.000178,
-      "\r\r\n\u001b[J"
-    ],
-    [
-      4.2e-05,
-      "\u001b[0mREADME        \u001b[38;5;33mdata\u001b[0m/         index.14      nonce                     \r\n\u001b[Jconfig        \u001b[Jhints.14      \u001b[Jintegrity.14  \u001b[J                        \u001b[A\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mborg\u001b[39m list \u001b[4m/media/backup/borgdemo/\u001b[24m\u001b[K"
-    ],
-    [
-      0.833604,
-      "\b\b\u001b[4mo\u001b[24m\u001b[24m \b"
-    ],
-    [
-      1.042199,
-      "\u001b[22D\u001b[24m/\u001b[24mm\u001b[24me\u001b[24md\u001b[24mi\u001b[24ma\u001b[24m/\u001b[24mb\u001b[24ma\u001b[24mc\u001b[24mk\u001b[24mu\u001b[24mp\u001b[24m/\u001b[24mb\u001b[24mo\u001b[24mr\u001b[24mg\u001b[24md\u001b[24me\u001b[24mm\u001b[24mo:"
-    ],
-    [
-      0.139477,
-      ":"
-    ],
-    [
-      0.711096,
-      "b"
-    ],
-    [
-      0.099664,
-      "a"
-    ],
-    [
-      0.149912,
-      "c"
-    ],
-    [
-      0.16888,
-      "k"
-    ],
-    [
-      0.923931,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.005451,
-      "\r\r\r\r\n\u001b[J\u001b[A\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m list /media/backup/borgdemo::back\u001b[K"
-    ],
-    [
-      0.885297,
-      "u"
-    ],
-    [
-      0.29853,
-      "p"
-    ],
-    [
-      0.456244,
-      "3"
-    ],
-    [
-      1.061844,
-      " "
-    ],
-    [
-      0.589511,
-      "|"
-    ],
-    [
-      0.527539,
-      " "
-    ],
-    [
-      0.343662,
-      "\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.117117,
-      "\b\u001b[32mg\u001b[32mr\u001b[39m"
-    ],
-    [
-      0.124331,
-      "\b\b\u001b[1m\u001b[31mg\u001b[1m\u001b[31mr\u001b[1m\u001b[31me\u001b[0m\u001b[39m"
-    ],
-    [
-      0.726149,
-      "\b\b\b\u001b[0m\u001b[32mg\u001b[0m\u001b[32mr\u001b[0m\u001b[32me\u001b[32mp\u001b[39m"
-    ],
-    [
-      0.198601,
-      " "
-    ],
-    [
-      0.476336,
-      "\u001b[33m'\u001b[39m"
-    ],
-    [
-      0.392009,
-      "\b\u001b[33m'\u001b[33md\u001b[39m"
-    ],
-    [
-      0.627529,
-      "\b\u001b[33md\u001b[33me\u001b[39m"
-    ],
-    [
-      0.142332,
-      "\b\u001b[33me\u001b[33me\u001b[39m"
-    ],
-    [
-      0.322681,
-      "\b\u001b[33me\u001b[33mr\u001b[39m"
-    ],
-    [
-      0.916328,
-      "\b\u001b[33mr\u001b[33m.\u001b[39m"
-    ],
-    [
-      0.50653,
-      "\b\u001b[33m.\u001b[33mj\u001b[39m"
-    ],
-    [
-      0.242318,
-      "\b\u001b[33mj\u001b[33mp\u001b[39m"
-    ],
-    [
-      0.272214,
-      "\b\u001b[33mp\u001b[33mg\u001b[39m"
-    ],
-    [
-      0.581098,
-      "\b\u001b[33mg\u001b[33m'\u001b[39m"
-    ],
-    [
-      2.559186,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001382,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000773,
-      "\u001b]2;borg list /media/backup/borgdemo::backup3 | grep --color 'deer.jpg'\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.628501,
-      "Enter passphrase for key /media/backup/borgdemo: "
-    ],
-    [
-      2.584332,
-      "\r\n"
-    ],
-    [
-      0.141205,
-      "-rw-rw-r-- rugk   rugk    3781749 Fri, 2017-07-14 17:01:45 Wallpaper/\u001b[01;31m\u001b[Kdeer.jpg\u001b[m\u001b[K\r\n"
-    ],
-    [
-      0.054041,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000135,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      2.7e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.00017,
-      "\u001b[?2004h"
-    ],
-    [
-      2.222435,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.269828,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.211035,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mO\u001b[0m\u001b[39m"
-    ],
-    [
-      0.184712,
-      "\b\u001b[1mO\u001b[1mh\u001b[0m\u001b[39m"
-    ],
-    [
-      0.374912,
-      "\b\u001b[1mh\u001b[1m, we found our picture. Now extract it:\u001b[0m\u001b[39m"
-    ],
-    [
-      1.545747,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000418,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.00063,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      3.1e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000135,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000463,
-      "\u001b[?2004h"
-    ],
-    [
-      1.638625,
-      "\u001b[1m\u001b[31mm\u001b[0m\u001b[39m"
-    ],
-    [
-      0.156977,
-      "\b\u001b[0m\u001b[32mm\u001b[32mv\u001b[39m"
-    ],
-    [
-      0.220013,
-      " "
-    ],
-    [
-      0.151118,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.002944,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mmv\u001b[39m \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.668654,
-      "\b\b\u001b[4mr\u001b[24m\u001b[0m\u001b[24m "
-    ],
-    [
-      0.297169,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.005693,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mmv\u001b[39m \u001b[4mWallpaper\u001b[24m \u001b[4mWallpaper\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.672973,
-      "\b\b\u001b[4mr\u001b[24m\u001b[0m\u001b[24m \b"
-    ],
-    [
-      0.263416,
-      "\u001b[9D\u001b[24mW\u001b[24ma\u001b[24ml\u001b[24ml\u001b[24mp\u001b[24ma\u001b[24mp\u001b[24me\u001b[24mr."
-    ],
-    [
-      0.334671,
-      "o"
-    ],
-    [
-      0.19768,
-      "r"
-    ],
-    [
-      0.142283,
-      "i"
-    ],
-    [
-      0.17833,
-      "g"
-    ],
-    [
-      0.688576,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001806,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000954,
-      "\u001b]2;mv -i Wallpaper Wallpaper.orig\u0007\u001b]1;mv\u0007"
-    ],
-    [
-      0.002076,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      5.7e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000153,
-      "\u001b[?2004h"
-    ],
-    [
-      1.864942,
-      "\u001b[1m\u001b[31mb\u001b[0m\u001b[39m"
-    ],
-    [
-      0.18048,
-      "\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.143872,
-      "\b\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[1m\u001b[31mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.161829,
-      "\b\b\b\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.170439,
-      " "
-    ],
-    [
-      0.248909,
-      "c"
-    ],
-    [
-      0.365319,
-      "\b \b"
-    ],
-    [
-      0.142233,
-      "e"
-    ],
-    [
-      0.157272,
-      "x"
-    ],
-    [
-      0.166861,
-      "t"
-    ],
-    [
-      0.115114,
-      "r"
-    ],
-    [
-      0.103674,
-      "a"
-    ],
-    [
-      0.102162,
-      "c"
-    ],
-    [
-      0.163264,
-      "t"
-    ],
-    [
-      0.308166,
-      " "
-    ],
-    [
-      1.386497,
-      "\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.183134,
-      "\b\u001b[4m/\u001b[4mm\u001b[24m"
-    ],
-    [
-      0.115533,
-      "\b\u001b[4mm\u001b[4me\u001b[24m"
-    ],
-    [
-      0.12416,
-      "\b\u001b[4me\u001b[4md\u001b[24m"
-    ],
-    [
-      0.206989,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003179,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m extract \u001b[4m/media\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.241808,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003324,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m extract \u001b[4m/media/backup\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.193552,
-      "\u001b[?7l"
-    ],
-    [
-      2.6e-05,
-      "\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003368,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mborg\u001b[39m extract \u001b[4m/media/backup/borgdemo\u001b[1m\u001b[4m/\u001b[0m\u001b[24m\u001b[K"
-    ],
-    [
-      0.700774,
-      "\b\b\u001b[4mo\u001b[24m\u001b[0m\u001b[24m \b"
-    ],
-    [
-      1.151074,
-      "\u001b[22D\u001b[24m/\u001b[24mm\u001b[24me\u001b[24md\u001b[24mi\u001b[24ma\u001b[24m/\u001b[24mb\u001b[24ma\u001b[24mc\u001b[24mk\u001b[24mu\u001b[24mp\u001b[24m/\u001b[24mb\u001b[24mo\u001b[24mr\u001b[24mg\u001b[24md\u001b[24me\u001b[24mm\u001b[24mo:"
-    ],
-    [
-      0.146222,
-      ":"
-    ],
-    [
-      0.579644,
-      "b"
-    ],
-    [
-      0.102789,
-      "a"
-    ],
-    [
-      0.178851,
-      "c"
-    ],
-    [
-      0.133936,
-      "k"
-    ],
-    [
-      0.124089,
-      "u"
-    ],
-    [
-      0.229823,
-      "p"
-    ],
-    [
-      0.174738,
-      "3"
-    ],
-    [
-      0.306821,
-      " "
-    ],
-    [
-      4.287483,
-      "\u001b[45D\u001b[39mb\u001b[39mo\u001b[39mr\u001b[39mg\u001b[41C\u001b[7mWallpaper/deer.jpg\u001b[27m"
-    ],
-    [
-      1.718396,
-      "\u001b[63D\u001b[32mb\u001b[32mo\u001b[32mr\u001b[32mg\u001b[39m\u001b[41C\u001b[27mW\u001b[27ma\u001b[27ml\u001b[27ml\u001b[27mp\u001b[27ma\u001b[27mp\u001b[27me\u001b[27mr\u001b[27m/\u001b[27md\u001b[27me\u001b[27me\u001b[27mr\u001b[27m.\u001b[27mj\u001b[27mp\u001b[27mg"
-    ],
-    [
-      6.4e-05,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001749,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000991,
-      "\u001b]2;borg extract /media/backup/borgdemo::backup3 Wallpaper/deer.jpg\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      0.633044,
-      "Enter passphrase for key /media/backup/borgdemo: "
-    ],
-    [
-      2.659432,
-      "\r\n"
-    ],
-    [
-      0.198939,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000134,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      7.9e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000169,
-      "\u001b[?2004h"
-    ],
-    [
-      4.506682,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.287992,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.13604,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mA\u001b[0m\u001b[39m"
-    ],
-    [
-      0.132241,
-      "\b\u001b[1mA\u001b[1mn\u001b[0m\u001b[39m"
-    ],
-    [
-      0.115152,
-      "\b\u001b[1mn\u001b[1md\u001b[0m\u001b[39m"
-    ],
-    [
-      0.190449,
-      "\b\u001b[1md\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.168765,
-      "\b\u001b[1m \u001b[1mc\u001b[0m\u001b[39m"
-    ],
-    [
-      0.248816,
-      "\b\u001b[1mc\u001b[1mheck that it's the same:\u001b[0m\u001b[39m"
-    ],
-    [
-      1.093037,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000401,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000745,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      7.7e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.0001,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000321,
-      "\u001b[?2004h"
-    ],
-    [
-      1.350298,
-      "\u001b[32md\u001b[39m"
-    ],
-    [
-      0.181769,
-      "\b\u001b[1m\u001b[31md\u001b[1m\u001b[31mi\u001b[0m\u001b[39m"
-    ],
-    [
-      0.148155,
-      "\b\b\u001b[1m\u001b[31md\u001b[1m\u001b[31mi\u001b[1m\u001b[31mf\u001b[0m\u001b[39m"
-    ],
-    [
-      0.13874,
-      "\b\b\b\u001b[0m\u001b[32md\u001b[0m\u001b[32mi\u001b[0m\u001b[32mf\u001b[32mf\u001b[39m"
-    ],
-    [
-      0.321772,
-      " "
-    ],
-    [
-      0.410311,
-      "-"
-    ],
-    [
-      0.160707,
-      "s"
-    ],
-    [
-      0.223167,
-      " "
-    ],
-    [
-      0.856546,
-      "\u001b[4mW\u001b[24m"
-    ],
-    [
-      0.184551,
-      "\b\u001b[4mW\u001b[4ma\u001b[24m"
-    ],
-    [
-      0.211734,
-      "\b\u001b[4ma\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.115481,
-      "\b\u001b[4ml\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.13804,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.007132,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper\u001b[24m\u001b[K"
-    ],
-    [
-      0.620064,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.004082,
-      "\r\r\u001b[19C"
-    ],
-    [
-      0.000148,
-      "\r\r\n\u001b[J\u001b[J\u001b[38;5;33mWallpaper\u001b[0m/       \u001b[J\u001b[38;5;33mWallpaper.orig\u001b[0m/\u001b[J\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper\u001b[24m\u001b[K"
-    ],
-    [
-      0.83944,
-      "\u001b[?7l"
-    ],
-    [
-      2.4e-05,
-      "\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.003487,
-      "\u001b[9D\u001b[24mW\u001b[24ma\u001b[24ml\u001b[24ml\u001b[24mp\u001b[24ma\u001b[24mp\u001b[24me\u001b[24mr\u001b[1m/\u001b[0m"
-    ],
-    [
-      0.000166,
-      "\r\r\n\u001b[J\u001b[7mWallpaper/     \u001b[0m  \u001b[J\u001b[38;5;33mWallpaper.orig\u001b[0m/\u001b[J\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mdiff\u001b[39m -s Wallpaper\u001b[1m/\u001b[0m\u001b[K"
-    ],
-    [
-      0.488495,
-      "\r\r\n"
-    ],
-    [
-      1.6e-05,
-      "\u001b[7mWallpaper/     \u001b[0m  \r\u001b[7mWallpaper/     \u001b[0m  \r\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mdiff\u001b[39m -s Wallpaper\u001b[1m/\u001b[0m\u001b[K\r\r\n\u001b[J\u001b[A\u001b[20C"
-    ],
-    [
-      0.001959,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper\u001b[24m\u001b[K\u001b[1C"
-    ],
-    [
-      0.285593,
-      "\b"
-    ],
-    [
-      0.303988,
-      "\b\u001b[4mr\u001b[4m/\u001b[24m"
-    ],
-    [
-      0.798187,
-      "\b\u001b[4m/\u001b[4md\u001b[24m"
-    ],
-    [
-      0.241007,
-      "\b\u001b[4md\u001b[4me\u001b[24m"
-    ],
-    [
-      0.21286,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.00579,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m\u001b[1m \u001b[0m\u001b[K"
-    ],
-    [
-      1.289271,
-      "\b\u001b[0m \u001b[4mW\u001b[24m"
-    ],
-    [
-      0.148557,
-      "\b\u001b[4mW\u001b[4ma\u001b[24m"
-    ],
-    [
-      0.16621,
-      "\b\u001b[4ma\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.097599,
-      "\b\u001b[4ml\u001b[4ml\u001b[24m"
-    ],
-    [
-      0.111176,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.005059,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m \u001b[4mWallpaper\u001b[24m\u001b[K"
-    ],
-    [
-      0.431538,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.005176,
-      "\r\r\u001b[38C"
-    ],
-    [
-      0.000155,
-      "\r\r\n\u001b[J\u001b[J\u001b[38;5;33mWallpaper\u001b[0m/       \u001b[J\u001b[38;5;33mWallpaper.orig\u001b[0m/\u001b[J\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m \u001b[4mWallpaper\u001b[24m\u001b[K"
-    ],
-    [
-      0.389092,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.004561,
-      "\u001b[9D\u001b[24mW\u001b[24ma\u001b[24ml\u001b[24ml\u001b[24mp\u001b[24ma\u001b[24mp\u001b[24me\u001b[24mr\u001b[1m/\u001b[0m"
-    ],
-    [
-      0.000155,
-      "\r\r\n\u001b[J\u001b[7mWallpaper/     \u001b[0m  \u001b[J\u001b[38;5;33mWallpaper.orig\u001b[0m/\u001b[J\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C"
-    ],
-    [
-      1.3e-05,
-      "\u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m Wallpaper\u001b[1m/\u001b[0m\u001b[K"
-    ],
-    [
-      0.260844,
-      "\r\r\n"
-    ],
-    [
-      3.6e-05,
-      "\u001b[7mWallpaper/     \u001b[0m  \r\u001b[7mWallpaper/     \u001b[0m  \r\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m Wallpaper\u001b[1m/\u001b[0m\u001b[K\b\u001b[0m.orig\u001b[1m/\u001b[0m"
-    ],
-    [
-      0.000163,
-      "\r\r\n\u001b[17C\u001b[7mWallpaper.orig/\u001b[0m\r\u001b[38;5;33mWallpaper\u001b[0m/       \r\u001b[A\u001b[0m\u001b[27m\u001b[24m\r\u001b[2C\u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m Wallpaper.orig\u001b[1m/\u001b[0m\u001b[K"
-    ],
-    [
-      0.598634,
-      "\r\r\n\u001b[J\u001b[A\u001b[44C"
-    ],
-    [
-      0.002461,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m \u001b[4mWallpaper.orig\u001b[24m\u001b[K\u001b[1C"
-    ],
-    [
-      0.275896,
-      "\b"
-    ],
-    [
-      0.321512,
-      "\b\u001b[4mg\u001b[4m/\u001b[24m"
-    ],
-    [
-      1.499007,
-      "\b\u001b[4m/\u001b[4md\u001b[24m"
-    ],
-    [
-      0.165243,
-      "\b\u001b[4md\u001b[4me\u001b[24m"
-    ],
-    [
-      0.260397,
-      "\u001b[?7l\u001b[31m......\u001b[39m\u001b[?7h"
-    ],
-    [
-      0.005274,
-      "\r\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[32mdiff\u001b[39m -s \u001b[4mWallpaper/deer.jpg\u001b[24m \u001b[4mWallpaper.orig/deer.jpg\u001b[24m\u001b[1m \u001b[0m\u001b[K"
-    ],
-    [
-      1.658125,
-      "\b\u001b[0m \b"
-    ],
-    [
-      1.5e-05,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001138,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000783,
-      "\u001b]2;diff -s Wallpaper/deer.jpg Wallpaper.orig/deer.jpg\u0007\u001b]1;diff\u0007"
-    ],
-    [
-      0.057035,
-      "Files Wallpaper/deer.jpg and Wallpaper.orig/deer.jpg are identical\r\n"
-    ],
-    [
-      0.000183,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      0.000114,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      9.1e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000199,
-      "\u001b[?2004h"
-    ],
-    [
-      3.579542,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.624347,
-      "\b\u001b[0m\u001b[39m \b"
-    ],
-    [
-      0.353186,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000351,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.0006,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      2.1e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.00013,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000185,
-      "\u001b[?2004h"
-    ],
-    [
-      0.726522,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.358332,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.183839,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mA\u001b[0m\u001b[39m"
-    ],
-    [
-      0.150451,
-      "\b\u001b[1mA\u001b[1mn\u001b[0m\u001b[39m"
-    ],
-    [
-      0.128839,
-      "\b\u001b[1mn\u001b[1md\u001b[0m\u001b[39m"
-    ],
-    [
-      0.583652,
-      "\b\u001b[1md\u001b[1m,\u001b[0m\u001b[39m"
-    ],
-    [
-      0.152149,
-      "\b\u001b[1m,\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.240696,
-      "\b\u001b[1m \u001b[1mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.130032,
-      "\b\u001b[1mo\u001b[1mf\u001b[0m\u001b[39m"
-    ],
-    [
-      0.306901,
-      "\b\u001b[1mf\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.181176,
-      "\b\u001b[1m \u001b[1mc\u001b[0m\u001b[39m"
-    ],
-    [
-      0.271007,
-      "\b\u001b[1mc\u001b[1mourse, we can also create remote repos via ssh when borg is setup\u001b[1m \u001b[1mthere. This command creates a new remote repo in a subdirectory called \"demo\"\u001b[1m:\u001b[0m\u001b[39m\u001b[K"
-    ],
-    [
-      2.040444,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000423,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000711,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      6.8e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      6.8e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000297,
-      "\u001b[?2004h"
-    ],
-    [
-      1.613372,
-      "\u001b[1m\u001b[31mb\u001b[0m\u001b[39m"
-    ],
-    [
-      0.204618,
-      "\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[0m\u001b[39m"
-    ],
-    [
-      0.121257,
-      "\b\b\u001b[1m\u001b[31mb\u001b[1m\u001b[31mo\u001b[1m\u001b[31mr\u001b[0m\u001b[39m"
-    ],
-    [
-      0.228506,
-      "\b\b\b\u001b[0m\u001b[32mb\u001b[0m\u001b[32mo\u001b[0m\u001b[32mr\u001b[32mg\u001b[39m"
-    ],
-    [
-      0.469213,
-      " "
-    ],
-    [
-      0.23811,
-      "i"
-    ],
-    [
-      0.139149,
-      "n"
-    ],
-    [
-      0.157285,
-      "i"
-    ],
-    [
-      0.219101,
-      "t"
-    ],
-    [
-      0.389153,
-      " "
-    ],
-    [
-      0.633813,
-      "-"
-    ],
-    [
-      0.102895,
-      "-"
-    ],
-    [
-      0.267338,
-      "e"
-    ],
-    [
-      0.244036,
-      "n"
-    ],
-    [
-      0.303722,
-      "c"
-    ],
-    [
-      0.117325,
-      "r"
-    ],
-    [
-      0.112606,
-      "y"
-    ],
-    [
-      0.250891,
-      "p"
-    ],
-    [
-      0.258828,
-      "t"
-    ],
-    [
-      0.276877,
-      "i"
-    ],
-    [
-      0.131491,
-      "o"
-    ],
-    [
-      0.206852,
-      "n"
-    ],
-    [
-      0.966102,
-      "="
-    ],
-    [
-      0.388021,
-      "r"
-    ],
-    [
-      0.146133,
-      "e"
-    ],
-    [
-      0.176939,
-      "p"
-    ],
-    [
-      0.139187,
-      "o"
-    ],
-    [
-      0.273188,
-      "k"
-    ],
-    [
-      0.172429,
-      "e"
-    ],
-    [
-      0.306306,
-      "y"
-    ],
-    [
-      0.851125,
-      " "
-    ],
-    [
-      0.868971,
-      "b"
-    ],
-    [
-      0.261136,
-      "o"
-    ],
-    [
-      0.12143,
-      "r"
-    ],
-    [
-      0.15507,
-      "g"
-    ],
-    [
-      0.186684,
-      "d"
-    ],
-    [
-      0.141974,
-      "e"
-    ],
-    [
-      0.13004,
-      "m"
-    ],
-    [
-      0.172673,
-      "o"
-    ],
-    [
-      1.041475,
-      "@"
-    ],
-    [
-      0.536019,
-      "r"
-    ],
-    [
-      0.02293,
-      "e"
-    ],
-    [
-      0.223755,
-      "m"
-    ],
-    [
-      0.152859,
-      "o"
-    ],
-    [
-      0.222368,
-      "t"
-    ],
-    [
-      0.095106,
-      "e"
-    ],
-    [
-      0.33914,
-      "s"
-    ],
-    [
-      0.213902,
-      "e"
-    ],
-    [
-      0.136448,
-      "r"
-    ],
-    [
-      0.196228,
-      "v"
-    ],
-    [
-      0.171447,
-      "e"
-    ],
-    [
-      0.154296,
-      "r"
-    ],
-    [
-      1.151168,
-      "."
-    ],
-    [
-      0.198973,
-      "e"
-    ],
-    [
-      0.195428,
-      "x"
-    ],
-    [
-      0.163512,
-      "a"
-    ],
-    [
-      0.157805,
-      "m"
-    ],
-    [
-      0.174865,
-      "p"
-    ],
-    [
-      0.103133,
-      "l"
-    ],
-    [
-      0.145276,
-      "e"
-    ],
-    [
-      2.109373,
-      ":"
-    ],
-    [
-      0.494126,
-      "."
-    ],
-    [
-      0.315325,
-      "/"
-    ],
-    [
-      0.182218,
-      "d"
-    ],
-    [
-      0.138815,
-      "e"
-    ],
-    [
-      0.143066,
-      "m"
-    ],
-    [
-      0.17136,
-      "o"
-    ],
-    [
-      1.831712,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001025,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000824,
-      "\u001b]2;borg init --encryption=repokey borgdemo@remoteserver.example:./demo\u0007\u001b]1;borg\u0007"
-    ],
-    [
-      6.069586,
-      "Enter new passphrase: "
-    ],
-    [
-      2.598936,
-      "\r\n"
-    ],
-    [
-      0.000189,
-      "Enter same passphrase again: "
-    ],
-    [
-      2.044707,
-      "\r\n"
-    ],
-    [
-      0.000198,
-      "Do you want your passphrase to be displayed for verification? [yN]: "
-    ],
-    [
-      1.415539,
-      "\r\n"
-    ],
-    [
-      1.950077,
-      "\r\nBy default repositories initialized with this version will produce security\r\nerrors if written to with an older version (up to and including Borg 1.0.8).\r\n\r\nIf you want to use these older versions, you can disable the check by running:\r\nborg upgrade --disable-tam 'ssh://borgdemo@remoteserver.example/./demo'\r\n\r\nSee https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability for details about the security implications.\r\n"
-    ],
-    [
-      0.548386,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      9.5e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000105,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000221,
-      "\u001b[?2004h"
-    ],
-    [
-      0.82377,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.662248,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.610999,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mE\u001b[0m\u001b[39m"
-    ],
-    [
-      0.267513,
-      "\b\u001b[1mE\u001b[1ma\u001b[0m\u001b[39m"
-    ],
-    [
-      0.185698,
-      "\b\u001b[1ma\u001b[1ms\u001b[0m\u001b[39m"
-    ],
-    [
-      0.161855,
-      "\b\u001b[1ms\u001b[1my\u001b[0m\u001b[39m"
-    ],
-    [
-      0.46273,
-      "\b\u001b[1my\u001b[1m, isn't it? That's all you need to know for basic usage.\u001b[0m\u001b[39m"
-    ],
-    [
-      1.861984,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.001044,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.001525,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      6.3e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      8e-05,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000316,
-      "\u001b[?2004h"
-    ],
-    [
-      1.009133,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.240205,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.217287,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mI\u001b[0m\u001b[39m"
-    ],
-    [
-      0.163888,
-      "\b\u001b[1mI\u001b[1mf\u001b[0m\u001b[39m"
-    ],
-    [
-      0.349458,
-      "\b\u001b[1mf\u001b[1m you want to see more, have a look at the screencast showing the \"advanc\u001b[1me\u001b[1md usage\".\u001b[0m\u001b[39m\u001b[K"
-    ],
-    [
-      2.780664,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000734,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000812,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      4.4e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000113,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000299,
-      "\u001b[?2004h"
-    ],
-    [
-      1.119856,
-      "\u001b[1m#\u001b[0m\u001b[39m"
-    ],
-    [
-      0.281915,
-      "\b\u001b[1m#\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.244389,
-      "\b\b\u001b[1m#\u001b[1m \u001b[1mI\u001b[0m\u001b[39m"
-    ],
-    [
-      0.143064,
-      "\b\u001b[1mI\u001b[1mn\u001b[0m\u001b[39m"
-    ],
-    [
-      0.171731,
-      "\b\u001b[1mn\u001b[1m \u001b[0m\u001b[39m"
-    ],
-    [
-      0.139438,
-      "\b\u001b[1m \u001b[1ma\u001b[0m\u001b[39m"
-    ],
-    [
-      0.388834,
-      "\b\u001b[1ma\u001b[1mny case, enjoy using borg!\u001b[0m\u001b[39m"
-    ],
-    [
-      1.502218,
-      "\u001b[?1l\u001b>"
-    ],
-    [
-      0.000883,
-      "\u001b[?2004l\r\r\n"
-    ],
-    [
-      0.000735,
-      "\u001b[1m\u001b[7m%\u001b[27m\u001b[1m\u001b[0m                                                                             \r \r"
-    ],
-    [
-      9.9e-05,
-      "\r\u001b[0m\u001b[27m\u001b[24m\u001b[J$ \u001b[K"
-    ],
-    [
-      0.000113,
-      "\u001b[?1h\u001b="
-    ],
-    [
-      0.000498,
-      "\u001b[?2004h"
-    ],
-    [
-      1.273251,
-      "\u001b[?2004l\r\r\n"
-    ]
-  ]
-}
+{"version": 2, "width": 142, "height": 24, "timestamp": 1643465023, "env": {"SHELL": "/bin/bash", "TERM": "xterm-256color"}}
+[0.020656, "o", "$ "]
+[0.021825, "o", "#"]
+[0.088434, "o", " "]
+[0.184733, "o", "H"]
+[0.206056, "o", "e"]
+[0.313257, "o", "r"]
+[0.322424, "o", "e"]
+[0.35568, "o", " "]
+[0.447982, "o", "y"]
+[0.497252, "o", "o"]
+[0.551474, "o", "u"]
+[0.635738, "o", "'"]
+[0.645052, "o", "l"]
+[0.694223, "o", "l"]
+[0.703516, "o", " "]
+[0.771624, "o", "s"]
+[0.780783, "o", "e"]
+[0.890086, "o", "e"]
+[1.090487, "o", " "]
+[1.161778, "o", "s"]
+[1.19585, "o", "o"]
+[1.205065, "o", "m"]
+[1.273321, "o", "e"]
+[1.286525, "o", " "]
+[1.305847, "o", "b"]
+[1.316333, "o", "a"]
+[1.348441, "o", "s"]
+[1.357631, "o", "i"]
+[1.452795, "o", "c"]
+[1.506027, "o", " "]
+[1.515212, "o", "c"]
+[1.524518, "o", "o"]
+[1.533682, "o", "m"]
+[1.577865, "o", "m"]
+[1.587082, "o", "a"]
+[1.611299, "o", "n"]
+[1.642519, "o", "d"]
+[1.748943, "o", "s"]
+[1.861135, "o", " "]
+[1.870401, "o", "t"]
+[1.886654, "o", "o"]
+[1.927903, "o", " "]
+[1.954925, "o", "s"]
+[1.975168, "o", "t"]
+[2.041582, "o", "a"]
+[2.074627, "o", "r"]
+[2.169778, "o", "t"]
+[2.320119, "o", " "]
+[2.343287, "o", "w"]
+[2.377508, "o", "o"]
+[2.415793, "o", "r"]
+[2.466926, "o", "k"]
+[2.492171, "o", "i"]
+[2.501429, "o", "n"]
+[2.574521, "o", "g"]
+[2.704912, "o", " "]
+[2.719113, "o", "w"]
+[2.728265, "o", "i"]
+[2.784585, "o", "t"]
+[2.793733, "o", "h"]
+[2.849868, "o", " "]
+[2.887218, "o", "b"]
+[2.896369, "o", "o"]
+[2.92861, "o", "r"]
+[2.937747, "o", "g"]
+[2.946976, "o", "."]
+[3.049909, "o", "\r\n"]
+[3.057626, "o", "$ #"]
+[3.182918, "o", " "]
+[3.202186, "o", "N"]
+[3.21351, "o", "o"]
+[3.224806, "o", "t"]
+[3.277897, "o", "e"]
+[3.376157, "o", ":"]
+[3.394387, "o", " "]
+[3.418509, "o", "T"]
+[3.427717, "o", "h"]
+[3.557972, "o", "i"]
+[3.69725, "o", "s"]
+[3.726624, "o", " "]
+[3.736584, "o", "t"]
+[3.768963, "o", "e"]
+[3.881265, "o", "a"]
+[3.925514, "o", "s"]
+[3.942731, "o", "e"]
+[3.996927, "o", "r"]
+[4.006006, "o", " "]
+[4.025325, "o", "s"]
+[4.055668, "o", "c"]
+[4.127877, "o", "r"]
+[4.154999, "o", "e"]
+[4.263368, "o", "e"]
+[4.272615, "o", "n"]
+[4.301853, "o", "c"]
+[4.311034, "o", "a"]
+[4.456294, "o", "s"]
+[4.470494, "o", "t"]
+[4.620882, "o", " "]
+[4.630111, "o", "w"]
+[4.768218, "o", "a"]
+[4.777456, "o", "s"]
+[4.809566, "o", " "]
+[4.926694, "o", "m"]
+[4.99602, "o", "a"]
+[5.111212, "o", "d"]
+[5.122381, "o", "e"]
+[5.322624, "o", " "]
+[5.398905, "o", "w"]
+[5.515158, "o", "i"]
+[5.563398, "o", "t"]
+[5.572594, "o", "h"]
+[5.581768, "o", " "]
+[5.681924, "o", "b"]
+[5.74216, "o", "o"]
+[5.800268, "o", "r"]
+[5.809566, "o", "g"]
+[5.823737, "o", " "]
+[5.899027, "o", "v"]
+[5.932252, "o", "e"]
+[5.976389, "o", "r"]
+[5.994627, "o", "s"]
+[6.049824, "o", "i"]
+[6.082082, "o", "o"]
+[6.091426, "o", "n"]
+[6.29167, "o", " "]
+[6.314743, "o", "T"]
+[6.324018, "o", "O"]
+[6.333337, "o", "D"]
+[6.342537, "o", "O"]
+[6.359715, "o", ":"]
+[6.369007, "o", " "]
+[6.383131, "o", "p"]
+[6.394292, "o", "u"]
+[6.578689, "o", "t"]
+[6.725858, "o", " "]
+[6.735637, "o", "v"]
+[6.888169, "o", "e"]
+[6.91837, "o", "r"]
+[7.027598, "o", "s"]
+[7.076986, "o", "i"]
+[7.086041, "o", "o"]
+[7.145311, "o", "n"]
+[7.272586, "o", " "]
+[7.411942, "o", "n"]
+[7.437127, "o", "u"]
+[7.446458, "o", "m"]
+[7.549658, "o", "b"]
+[7.586911, "o", "e"]
+[7.743075, "o", "r"]
+[7.787415, "o", " "]
+[7.796493, "o", "h"]
+[7.805722, "o", "e"]
+[7.814911, "o", "r"]
+[7.838311, "o", "e"]
+[7.858679, "o", " "]
+[7.981705, "o", "–"]
+[8.049122, "o", " "]
+[8.058323, "o", "o"]
+[8.143399, "o", "l"]
+[8.197724, "o", "d"]
+[8.383904, "o", "e"]
+[8.437024, "o", "r"]
+[8.553161, "o", " "]
+[8.562422, "o", "o"]
+[8.587612, "o", "r"]
+[8.612885, "o", " "]
+[8.622086, "o", "n"]
+[8.644401, "o", "e"]
+[8.700594, "o", "w"]
+[8.843911, "o", "e"]
+[9.043164, "o", "r"]
+[9.116333, "o", " "]
+[9.142446, "o", "b"]
+[9.173602, "o", "o"]
+[9.18578, "o", "r"]
+[9.266946, "o", "g"]
+[9.371107, "o", " "]
+[9.38028, "o", "v"]
+[9.400463, "o", "e"]
+[9.423619, "o", "r"]
+[9.453852, "o", "s"]
+[9.466045, "o", "i"]
+[9.476173, "o", "o"]
+[9.491382, "o", "n"]
+[9.534633, "o", "s"]
+[9.57979, "o", " "]
+[9.589269, "o", "m"]
+[9.598425, "o", "a"]
+[9.608588, "o", "y"]
+[9.753762, "o", " "]
+[9.825034, "o", "b"]
+[9.834309, "o", "e"]
+[9.861478, "o", "h"]
+[9.890815, "o", "a"]
+[9.910922, "o", "v"]
+[9.999159, "o", "e"]
+[10.111443, "o", " "]
+[10.120786, "o", "d"]
+[10.275949, "o", "i"]
+[10.285196, "o", "f"]
+[10.390479, "o", "f"]
+[10.451679, "o", "e"]
+[10.502796, "o", "r"]
+[10.519068, "o", "e"]
+[10.665307, "o", "n"]
+[10.715712, "o", "t"]
+[10.724886, "o", "l"]
+[10.770057, "o", "y"]
+[10.904269, "o", "."]
+[10.914503, "o", "\r\n"]
+[10.922704, "o", "$ "]
+[10.923023, "o", "#"]
+[10.934014, "o", " "]
+[10.96005, "o", "B"]
+[11.018296, "o", "u"]
+[11.049479, "o", "t"]
+[11.195602, "o", " "]
+[11.284027, "o", "l"]
+[11.309994, "o", "e"]
+[11.410325, "o", "t"]
+[11.419548, "o", "'"]
+[11.428904, "o", "s"]
+[11.479223, "o", " "]
+[11.488389, "o", "s"]
+[11.511647, "o", "t"]
+[11.558891, "o", "a"]
+[11.575087, "o", "r"]
+[11.586326, "o", "t"]
+[11.595521, "o", "."]
+[11.626419, "o", "\r\n"]
+[11.64494, "o", "$ \r\n"]
+[11.657095, "o", "$ #"]
+[11.676213, "o", " "]
+[11.726406, "o", "F"]
+[11.748672, "o", "i"]
+[11.794871, "o", "r"]
+[11.838173, "o", "s"]
+[11.847393, "o", "t"]
+[11.90969, "o", " "]
+[12.056008, "o", "o"]
+[12.123291, "o", "f"]
+[12.230628, "o", " "]
+[12.260693, "o", "a"]
+[12.322964, "o", "l"]
+[12.4153, "o", "l"]
+[12.43044, "o", ","]
+[12.575799, "o", " "]
+[12.622922, "o", "y"]
+[12.807097, "o", "o"]
+[12.816476, "o", "u"]
+[12.845376, "o", " "]
+[13.045343, "o", "c"]
+[13.063835, "o", "a"]
+[13.114737, "o", "n"]
+[13.315119, "o", " "]
+[13.344682, "o", "a"]
+[13.35358, "o", "l"]
+[13.546866, "o", "w"]
+[13.574012, "o", "a"]
+[13.583309, "o", "y"]
+[13.610698, "o", "s"]
+[13.652744, "o", " "]
+[13.661962, "o", "g"]
+[13.698312, "o", "e"]
+[13.767605, "o", "t"]
+[13.818792, "o", " "]
+[13.93102, "o", "h"]
+[13.940254, "o", "e"]
+[13.966452, "o", "l"]
+[13.988635, "o", "p"]
+[14.161028, "o", ":"]
+[14.286738, "o", "\r\n"]
+[14.293376, "o", "$ b"]
+[14.309624, "o", "o"]
+[14.358999, "o", "r"]
+[14.40808, "o", "g"]
+[14.429347, "o", " "]
+[14.450742, "o", "h"]
+[14.463938, "o", "e"]
+[14.601234, "o", "l"]
+[14.632545, "o", "p"]
+[14.698895, "o", "\r\n"]
+[15.274457, "o", "usage: borg [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json]\r\r\n            [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc] [--umask M] [--remote-path PATH] [--remote-ratelimit RATE]\r\r\n            [--upload-ratelimit RATE] [--remote-buffer UPLOAD_BUFFER] [--upload-buffer UPLOAD_BUFFER] [--consider-part-files]\r\r\n            [--debug-profile FILE] [--rsh RSH]\r\r\n            <command> ...\r\r\n\r\r\nBorg - Deduplicated Backups\r\r\n\r\r\noptional arguments:\r\r\n  -V, --version         show version number and exit\r\r\n\r\r\nCommon options:\r\r\n  -h, --help            show this help message and exit\r\r\n  --critical            work on log level CRITICAL\r\r\n  --error               work on log level ERROR\r\r\n  --warning             work on log level WARNING (default)\r\r\n  --info, -v, --verbose\r\r\n                        work on log level INFO\r\r\n  --debug               enable debug output, work on log level DEBUG\r\r\n  --debug-topic TOPIC   enable TOPIC debugging (ca"]
+[15.274539, "o", "n be specified multiple times). The logger path is borg.debug.<TOPIC> if TOPIC is not\r\r\n                        fully qualified.\r\r\n  -p, --progress        show progress information\r\r\n  --iec                 format using IEC units (1KiB = 1024B)\r\r\n  --log-json            Output one JSON object per log line instead of formatted text.\r\r\n  --lock-wait SECONDS   wait at most SECONDS for acquiring a repository/cache lock (default: 1).\r\r\n  --bypass-lock         Bypass locking mechanism\r\r\n  --show-version        show/log the borg version\r\r\n  --show-rc             show/log the return code (rc)\r\r\n  --umask M             set umask to M (local only, default: 0077)\r\r\n  --remote-path PATH    use PATH as borg executable on the remote (default: \"borg\")\r\r\n  --remote-ratelimit RATE\r\r\n                        deprecated, use ``--upload-ratelimit`` instead\r\r\n  --upload-ratelimit RATE\r\r\n                        set network upload rate limit in kiByte/s (default: 0=unlimited)\r\r\n  --remote-buffer UPLOAD_BUFFER\r\r\n                     "]
+[15.274561, "o", "   deprecated, use ``--upload-buffer`` instead\r\r\n  --upload-buffer UPLOAD_BUFFER\r\r\n                        set network upload buffer size in MiB. (default: 0=no buffer)\r\r\n  --consider-part-files\r\r\n                        treat part files like normal files (e.g. to list/extract them)\r\r\n  --debug-profile FILE  Write execution profile in Borg format into FILE. For local use a Python-compatible file can be generated by\r\r\n                        suffixing FILE with \".pyprof\".\r\r\n  --rsh RSH             Use this command to connect to the 'borg serve' process (default: 'ssh')\r\r\n\r\r\nrequired arguments:\r\r\n  <command>\r\r\n    benchmark           benchmark command\r\r\n    break-lock          break repository and cache locks\r\r\n    check               verify repository\r\r\n    compact             compact segment files / free space in repo\r\r\n    config              get and set configuration values\r\r\n    create              create backup\r\r\n    debug               debugging command (not intended for normal use)\r\r\n    delete         "]
+[15.274578, "o", "     delete archive\r\r\n    diff                find differences in archive contents\r\r\n    export-tar          create tarball from archive\r\r\n    extract             extract archive contents\r\r\n    info                show repository or archive information\r\r\n    init                initialize empty repository\r\r\n    key                 manage repository key\r\r\n    list                list archive or repository contents\r\r\n    mount               mount repository\r\r\n    prune               prune archives\r\r\n    recreate            Re-create archives\r\r\n    rename              rename archive\r\r\n"]
+[15.274998, "o", "    serve               start repository server process\r\r\n    umount              umount repository\r\r\n    upgrade             upgrade repository format\r\r\n    with-lock           run user command with lock held\r\r\n    import-tar          Create a backup archive from a tarball\r\r\n"]
+[15.368024, "o", "$ "]
+[15.368305, "o", "#"]
+[15.407737, "o", " "]
+[15.521058, "o", "T"]
+[15.5692, "o", "h"]
+[15.769498, "o", "e"]
+[15.898831, "o", "s"]
+[15.94398, "o", "e"]
+[15.996263, "o", " "]
+[16.006324, "o", "a"]
+[16.084921, "o", "r"]
+[16.155977, "o", "e"]
+[16.328261, "o", " "]
+[16.346595, "o", "a"]
+[16.379799, "o", " "]
+[16.580115, "o", "l"]
+[16.591129, "o", "o"]
+[16.615438, "o", "t"]
+[16.666802, "o", " "]
+[16.708862, "o", "o"]
+[16.720031, "o", "f"]
+[16.729436, "o", " "]
+[16.751606, "o", "c"]
+[16.765857, "o", "o"]
+[16.799171, "o", "m"]
+[16.869382, "o", "m"]
+[16.881589, "o", "a"]
+[16.971782, "o", "n"]
+[17.172118, "o", "d"]
+[17.181292, "o", "s"]
+[17.21758, "o", ","]
+[17.231749, "o", " "]
+[17.325071, "o", "s"]
+[17.420215, "o", "o"]
+[17.620541, "o", " "]
+[17.651657, "o", "b"]
+[17.743995, "o", "e"]
+[17.836216, "o", "t"]
+[17.926529, "o", "t"]
+[17.936342, "o", "e"]
+[17.985399, "o", "r"]
+[18.084673, "o", " "]
+[18.123874, "o", "w"]
+[18.136128, "o", "e"]
+[18.33641, "o", " "]
+[18.424667, "o", "s"]
+[18.435899, "o", "t"]
+[18.445335, "o", "a"]
+[18.645544, "o", "r"]
+[18.668741, "o", "t"]
+[18.736033, "o", " "]
+[18.90335, "o", "w"]
+[18.93456, "o", "i"]
+[18.98172, "o", "t"]
+[18.993835, "o", "h"]
+[19.194081, "o", " "]
+[19.217509, "o", "a"]
+[19.239757, "o", " "]
+[19.318997, "o", "f"]
+[19.32822, "o", "e"]
+[19.349453, "o", "w"]
+[19.359783, "o", ":"]
+[19.369097, "o", "\r\n"]
+[19.386826, "o", "$ "]
+[19.387129, "o", "#"]
+[19.451136, "o", " "]
+[19.46036, "o", "L"]
+[19.488614, "o", "e"]
+[19.50884, "o", "t"]
+[19.627123, "o", "'"]
+[19.642383, "o", "s"]
+[19.686659, "o", " "]
+[19.705848, "o", "c"]
+[19.821156, "o", "r"]
+[19.939327, "o", "e"]
+[19.977575, "o", "a"]
+[20.070806, "o", "t"]
+[20.137176, "o", "e"]
+[20.209449, "o", " "]
+[20.281753, "o", "a"]
+[20.409953, "o", " "]
+[20.52338, "o", "r"]
+[20.532518, "o", "e"]
+[20.590883, "o", "p"]
+[20.613143, "o", "o"]
+[20.715447, "o", " "]
+[20.771721, "o", "o"]
+[20.7909, "o", "n"]
+[20.943201, "o", " "]
+[21.04936, "o", "a"]
+[21.160677, "o", "n"]
+[21.278008, "o", " "]
+[21.29127, "o", "e"]
+[21.363561, "o", "x"]
+[21.459748, "o", "t"]
+[21.470921, "o", "e"]
+[21.48513, "o", "r"]
+[21.545505, "o", "n"]
+[21.596879, "o", "a"]
+[21.640992, "o", "l"]
+[21.692251, "o", " "]
+[21.749537, "o", "d"]
+[21.895867, "o", "r"]
+[21.959099, "o", "i"]
+[22.002159, "o", "v"]
+[22.097533, "o", "e"]
+[22.106719, "o", "…"]
+[22.117809, "o", "\r\n"]
+[22.124732, "o", "$ "]
+[22.124861, "o", "b"]
+[22.164091, "o", "o"]
+[22.229243, "o", "r"]
+[22.324539, "o", "g"]
+[22.381771, "o", " "]
+[22.452189, "o", "i"]
+[22.470395, "o", "n"]
+[22.51263, "o", "i"]
+[22.521808, "o", "t"]
+[22.722058, "o", " "]
+[22.777409, "o", "-"]
+[22.92558, "o", "-"]
+[22.97687, "o", "e"]
+[23.018192, "o", "n"]
+[23.069463, "o", "c"]
+[23.121679, "o", "r"]
+[23.130918, "o", "y"]
+[23.164182, "o", "p"]
+[23.21226, "o", "t"]
+[23.233508, "o", "i"]
+[23.244736, "o", "o"]
+[23.25992, "o", "n"]
+[23.403222, "o", "="]
+[23.425403, "o", "r"]
+[23.488811, "o", "e"]
+[23.54219, "o", "p"]
+[23.639329, "o", "o"]
+[23.656558, "o", "k"]
+[23.672919, "o", "e"]
+[23.780082, "o", "y"]
+[23.811302, "o", " "]
+[23.862496, "o", "/"]
+[23.872671, "o", "m"]
+[23.882032, "o", "e"]
+[23.91526, "o", "d"]
+[23.940483, "o", "i"]
+[24.010645, "o", "a"]
+[24.095978, "o", "/"]
+[24.287232, "o", "b"]
+[24.346561, "o", "a"]
+[24.366868, "o", "c"]
+[24.394093, "o", "k"]
+[24.445388, "o", "u"]
+[24.622628, "o", "p"]
+[24.761892, "o", "/"]
+[24.778136, "o", "b"]
+[24.802532, "o", "o"]
+[24.896741, "o", "r"]
+[24.93608, "o", "g"]
+[24.945417, "o", "d"]
+[25.122637, "o", "e"]
+[25.157914, "o", "m"]
+[25.166937, "o", "o"]
+[25.282388, "o", "\r\n"]
+[26.222373, "o", "Enter new passphrase: "]
+[27.534209, "o", "\r\r\n"]
+[27.53436, "o", "Enter same passphrase again: "]
+[29.268544, "o", "\r\r\nDo you want your passphrase to be displayed for verification? [yN]: "]
+[29.269126, "o", "\r\r\n"]
+[29.638698, "o", "\r\r\nBy default repositories initialized with this version will produce security\r\r\nerrors if written to with an older version (up to and including Borg 1.0.8).\r\r\n\r\r\nIf you want to use these older versions, you can disable the check by running:\r\r\nborg upgrade --disable-tam /media/backup/borgdemo\r\r\n\r\r\nSee https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability for details about the security implications.\r\r\n"]
+[29.639615, "o", "\r\r\nIMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\r\r\nIf you used a repokey mode, the key is stored in the repo, but you should back it up separately.\r\r\nUse \"borg key export\" to export the key, optionally in printable format.\r\r\nWrite down the passphrase. Store both at safe place(s).\r\r\n\r\r\n"]
+[29.728845, "o", "$ #"]
+[29.921202, "o", " "]
+[29.966517, "o", "T"]
+[29.996724, "o", "h"]
+[30.009974, "o", "i"]
+[30.02634, "o", "s"]
+[30.099543, "o", " "]
+[30.171726, "o", "u"]
+[30.180957, "o", "s"]
+[30.192248, "o", "e"]
+[30.24944, "o", "s"]
+[30.352718, "o", " "]
+[30.410924, "o", "t"]
+[30.558339, "o", "h"]
+[30.567472, "o", "e"]
+[30.686758, "o", " "]
+[30.752947, "o", "r"]
+[30.762184, "o", "e"]
+[30.783497, "o", "p"]
+[30.861851, "o", "o"]
+[30.871033, "o", "k"]
+[30.881186, "o", "e"]
+[30.954713, "o", "y"]
+[31.082996, "o", " "]
+[31.094091, "o", "e"]
+[31.121334, "o", "n"]
+[31.133667, "o", "c"]
+[31.152908, "o", "r"]
+[31.267135, "o", "y"]
+[31.353381, "o", "p"]
+[31.39161, "o", "t"]
+[31.442797, "o", "i"]
+[31.524073, "o", "o"]
+[31.642416, "o", "n"]
+[31.653555, "o", "."]
+[31.737208, "o", " "]
+[31.746289, "o", "Y"]
+[31.771462, "o", "o"]
+[31.814822, "o", "u"]
+[32.014314, "o", " "]
+[32.059554, "o", "m"]
+[32.073698, "o", "a"]
+[32.122951, "o", "y"]
+[32.132341, "o", " "]
+[32.310706, "o", "l"]
+[32.348877, "o", "o"]
+[32.41914, "o", "o"]
+[32.480393, "o", "k"]
+[32.56277, "o", " "]
+[32.664075, "o", "a"]
+[32.698301, "o", "t"]
+[32.781483, "o", " "]
+[32.790834, "o", "\""]
+[32.805999, "o", "b"]
+[32.82326, "o", "o"]
+[32.8386, "o", "r"]
+[32.868878, "o", "g"]
+[32.902064, "o", " "]
+[32.923448, "o", "h"]
+[32.932597, "o", "e"]
+[32.941875, "o", "l"]
+[32.996155, "o", "p"]
+[33.142386, "o", " "]
+[33.198789, "o", "i"]
+[33.240036, "o", "n"]
+[33.291288, "o", "i"]
+[33.324489, "o", "t"]
+[33.399103, "o", "\""]
+[33.408067, "o", " "]
+[33.417346, "o", "o"]
+[33.453519, "o", "r"]
+[33.505722, "o", " "]
+[33.514928, "o", "t"]
+[33.638272, "o", "h"]
+[33.669423, "o", "e"]
+[33.678646, "o", " "]
+[33.691005, "o", "o"]
+[33.891282, "o", "n"]
+[33.928532, "o", "l"]
+[33.967645, "o", "i"]
+[34.064866, "o", "n"]
+[34.144163, "o", "e"]
+[34.344394, "o", " "]
+[34.469754, "o", "d"]
+[34.560029, "o", "o"]
+[34.703231, "o", "c"]
+[34.903772, "o", " "]
+[34.913021, "o", "a"]
+[34.925274, "o", "t"]
+[34.934437, "o", " "]
+[34.94455, "o", "h"]
+[34.964865, "o", "t"]
+[35.032168, "o", "t"]
+[35.186388, "o", "p"]
+[35.261747, "o", "s"]
+[35.270974, "o", ":"]
+[35.293105, "o", "/"]
+[35.308394, "o", "/"]
+[35.33171, "o", "b"]
+[35.35692, "o", "o"]
+[35.366293, "o", "r"]
+[35.419534, "o", "g"]
+[35.502763, "o", "b"]
+[35.512051, "o", "a"]
+[35.554307, "o", "c"]
+[35.563503, "o", "k"]
+[35.764092, "o", "u"]
+[35.805244, "o", "p"]
+[35.814461, "o", "."]
+[35.851707, "o", "r"]
+[35.860964, "o", "e"]
+[35.970169, "o", "a"]
+[35.979446, "o", "d"]
+[36.180012, "o", "t"]
+[36.222025, "o", "h"]
+[36.353249, "o", "e"]
+[36.492544, "o", "d"]
+[36.529766, "o", "o"]
+[36.73121, "o", "c"]
+[36.865366, "o", "s"]
+[36.95859, "o", "."]
+[36.967852, "o", "i"]
+[36.977244, "o", "o"]
+[36.989381, "o", "/"]
+[37.102725, "o", " "]
+[37.185945, "o", "f"]
+[37.350162, "o", "o"]
+[37.365444, "o", "r"]
+[37.374597, "o", " "]
+[37.394951, "o", "o"]
+[37.423244, "o", "t"]
+[37.559459, "o", "h"]
+[37.759537, "o", "e"]
+[37.768749, "o", "r"]
+[37.780203, "o", " "]
+[37.799306, "o", "m"]
+[37.80855, "o", "o"]
+[37.911024, "o", "d"]
+[38.020183, "o", "e"]
+[38.119557, "o", "s"]
+[38.169708, "o", "."]
+[38.242004, "o", "\r\n"]
+[38.250379, "o", "$ "]
+[38.250696, "o", "\r\n"]
+[38.258942, "o", "$ "]
+[38.259141, "o", "#"]
+[38.330356, "o", " "]
+[38.339635, "o", "S"]
+[38.3498, "o", "o"]
+[38.413094, "o", " "]
+[38.462242, "o", "n"]
+[38.605556, "o", "o"]
+[38.631289, "o", "w"]
+[38.640237, "o", ","]
+[38.748585, "o", " "]
+[38.776738, "o", "l"]
+[38.88713, "o", "e"]
+[38.963316, "o", "t"]
+[38.972648, "o", "'"]
+[39.067826, "o", "s"]
+[39.237168, "o", " "]
+[39.24655, "o", "c"]
+[39.402655, "o", "r"]
+[39.416881, "o", "e"]
+[39.426181, "o", "a"]
+[39.572375, "o", "t"]
+[39.588653, "o", "e"]
+[39.788974, "o", " "]
+[39.798464, "o", "o"]
+[39.807683, "o", "u"]
+[39.88289, "o", "r"]
+[40.083056, "o", " "]
+[40.254342, "o", "f"]
+[40.398451, "o", "i"]
+[40.429663, "o", "r"]
+[40.462934, "o", "s"]
+[40.641258, "o", "t"]
+[40.650487, "o", " "]
+[40.693778, "o", "("]
+[40.703117, "o", "c"]
+[40.73427, "o", "o"]
+[40.924498, "o", "m"]
+[41.026824, "o", "p"]
+[41.078103, "o", "r"]
+[41.277378, "o", "e"]
+[41.347603, "o", "s"]
+[41.441922, "o", "s"]
+[41.493116, "o", "e"]
+[41.53127, "o", "d"]
+[41.731535, "o", ")"]
+[41.764752, "o", " "]
+[41.774004, "o", "b"]
+[41.839381, "o", "a"]
+[41.868556, "o", "c"]
+[41.891809, "o", "k"]
+[41.929166, "o", "u"]
+[41.938368, "o", "p"]
+[41.993842, "o", "."]
+[42.005273, "o", "\r\n"]
+[42.016018, "o", "$ b"]
+[42.053198, "o", "o"]
+[42.122436, "o", "r"]
+[42.244753, "o", "g"]
+[42.275043, "o", " "]
+[42.334215, "o", "c"]
+[42.358481, "o", "r"]
+[42.428812, "o", "e"]
+[42.457019, "o", "a"]
+[42.481211, "o", "t"]
+[42.501466, "o", "e"]
+[42.591732, "o", " "]
+[42.640961, "o", "-"]
+[42.659262, "o", "-"]
+[42.672507, "o", "s"]
+[42.681643, "o", "t"]
+[42.690874, "o", "a"]
+[42.891116, "o", "t"]
+[43.003325, "o", "s"]
+[43.12563, "o", " "]
+[43.14286, "o", "-"]
+[43.180125, "o", "-"]
+[43.352458, "o", "p"]
+[43.379501, "o", "r"]
+[43.394799, "o", "o"]
+[43.404958, "o", "g"]
+[43.448274, "o", "r"]
+[43.489474, "o", "e"]
+[43.510685, "o", "s"]
+[43.58391, "o", "s"]
+[43.72919, "o", " "]
+[43.749522, "o", "-"]
+[43.758657, "o", "-"]
+[43.794997, "o", "c"]
+[43.809233, "o", "o"]
+[43.829531, "o", "m"]
+[44.029768, "o", "p"]
+[44.055016, "o", "r"]
+[44.064457, "o", "e"]
+[44.091542, "o", "s"]
+[44.168799, "o", "s"]
+[44.179358, "o", "i"]
+[44.255337, "o", "o"]
+[44.265566, "o", "n"]
+[44.297858, "o", " "]
+[44.307109, "o", "l"]
+[44.320284, "o", "z"]
+[44.330114, "o", "4"]
+[44.338997, "o", " "]
+[44.452211, "o", "/"]
+[44.496503, "o", "m"]
+[44.514581, "o", "e"]
+[44.542845, "o", "d"]
+[44.582983, "o", "i"]
+[44.650254, "o", "a"]
+[44.711557, "o", "/"]
+[44.779855, "o", "b"]
+[44.789087, "o", "a"]
+[44.79832, "o", "c"]
+[44.899683, "o", "k"]
+[44.996874, "o", "u"]
+[45.037182, "o", "p"]
+[45.059277, "o", "/"]
+[45.189521, "o", "b"]
+[45.198744, "o", "o"]
+[45.211045, "o", "r"]
+[45.226409, "o", "g"]
+[45.235569, "o", "d"]
+[45.283825, "o", "e"]
+[45.293213, "o", "m"]
+[45.307413, "o", "o"]
+[45.326598, "o", ":"]
+[45.345903, "o", ":"]
+[45.35517, "o", "b"]
+[45.377361, "o", "a"]
+[45.400775, "o", "c"]
+[45.409898, "o", "k"]
+[45.455145, "o", "u"]
+[45.488317, "o", "p"]
+[45.497646, "o", "1"]
+[45.528081, "o", " "]
+[45.537431, "o", "W"]
+[45.546551, "o", "a"]
+[45.604804, "o", "l"]
+[45.630564, "o", "l"]
+[45.683521, "o", "p"]
+[45.81168, "o", "a"]
+[45.937022, "o", "p"]
+[46.004219, "o", "e"]
+[46.066393, "o", "r"]
+[46.222114, "o", "\r\n"]
+[46.865823, "o", "Enter passphrase for key /media/backup/borgdemo: "]
+[48.584491, "o", "\r\r\n"]
+[48.678802, "o", "0 B O 0 B C 0 B D 0 N Wallpaper                                                                                                               \r"]
+[48.680723, "o", "                                                                                                                                              \r"]
+[48.681734, "o", "Initializing cache transaction: Reading config                                                                                                \r"]
+[48.682756, "o", "Initializing cache transaction: Reading chunks                                                                                                \r"]
+[48.683812, "o", "Initializing cache transaction: Reading files                                                                                                 \r"]
+[48.684789, "o", "                                                                                                                                              \r"]
+[48.888718, "o", "Saving files cache                                                                                                                            \r"]
+[48.889614, "o", "Saving chunks cache                                                                                                                           \r"]
+[48.890905, "o", "Saving cache config                                                                                                                           \r"]
+[48.919326, "o", "                                                                                                                                              \r"]
+[48.920425, "o", "------------------------------------------------------------------------------"]
+[48.920808, "o", "\r\r\n"]
+[48.921465, "o", "Repository: /media/backup/borgdemo"]
+[48.921826, "o", "\r\r\n"]
+[48.9225, "o", "Archive name: backup1"]
+[48.923146, "o", "\r\r\n"]
+[48.924006, "o", "Archive fingerprint: c35e132ca383cd486e583d104e668aa6e410e5e391d9dbd3c8762c82a4e524b2"]
+[48.925071, "o", "\r\r\n"]
+[48.926175, "o", "Time (start): Sat, 2022-01-29 17:04:31"]
+[48.92701, "o", "\r\r\n"]
+[48.927955, "o", "Time (end):   Sat, 2022-01-29 17:04:32"]
+[48.929125, "o", "\r\r\nDuration: 0.06 seconds"]
+[48.929853, "o", "\r\r\nNumber of files: 1"]
+[48.930713, "o", "\r\r\nUtilization of max. archive size: 0%"]
+[48.93162, "o", "\r\r\n------------------------------------------------------------------------------"]
+[48.932507, "o", "\r\r\n                       Original size      Compressed size    Deduplicated size"]
+[48.933199, "o", "\r\r\nThis archive:                  563 B                566 B                566 B"]
+[48.934689, "o", "\r\r\nAll archives:                    0 B                  0 B                788 B\r\r\n\r\r\n"]
+[48.93547, "o", "                       Unique chunks         Total chunks"]
+[48.936176, "o", "\r\r\nChunk index:                       2                    2"]
+[48.937152, "o", "\r\r\n------------------------------------------------------------------------------"]
+[48.939116, "o", "\r\r\n"]
+[49.026836, "o", "$ "]
+[49.027777, "o", "\r\n"]
+[49.034122, "o", "$ "]
+[49.03438, "o", "#"]
+[49.055428, "o", " "]
+[49.111801, "o", "T"]
+[49.218076, "o", "h"]
+[49.270374, "o", "a"]
+[49.350598, "o", "t"]
+[49.54484, "o", "'"]
+[49.733993, "o", "s"]
+[49.874348, "o", " "]
+[49.886535, "o", "n"]
+[49.91475, "o", "i"]
+[49.979136, "o", "c"]
+[50.179376, "o", "e"]
+[50.314571, "o", ","]
+[50.38103, "o", " "]
+[50.491148, "o", "s"]
+[50.54369, "o", "o"]
+[50.703744, "o", " "]
+[50.728179, "o", "f"]
+[50.813438, "o", "a"]
+[50.873633, "o", "r"]
+[51.073987, "o", "."]
+[51.163407, "o", "\r\n"]
+[51.17311, "o", "$ #"]
+[51.182643, "o", " "]
+[51.196675, "o", "S"]
+[51.268014, "o", "o"]
+[51.449183, "o", " "]
+[51.470446, "o", "l"]
+[51.538858, "o", "e"]
+[51.569942, "o", "t"]
+[51.598313, "o", "'"]
+[51.607749, "o", "s"]
+[51.807922, "o", " "]
+[51.921192, "o", "a"]
+[51.95747, "o", "d"]
+[52.021704, "o", "d"]
+[52.160975, "o", " "]
+[52.195265, "o", "a"]
+[52.223387, "o", " "]
+[52.290783, "o", "n"]
+[52.349852, "o", "e"]
+[52.418393, "o", "w"]
+[52.549357, "o", " "]
+[52.577647, "o", "f"]
+[52.609776, "o", "i"]
+[52.658131, "o", "l"]
+[52.755384, "o", "e"]
+[52.787783, "o", "…"]
+[52.864061, "o", "\r\n"]
+[52.874305, "o", "$ "]
+[52.874534, "o", "e"]
+[52.942744, "o", "c"]
+[53.003842, "o", "h"]
+[53.020096, "o", "o"]
+[53.02946, "o", " "]
+[53.078775, "o", "\""]
+[53.096017, "o", "n"]
+[53.174208, "o", "e"]
+[53.20542, "o", "w"]
+[53.310787, "o", " "]
+[53.328997, "o", "n"]
+[53.390351, "o", "i"]
+[53.503665, "o", "c"]
+[53.529879, "o", "e"]
+[53.628018, "o", " "]
+[53.706355, "o", "f"]
+[53.836612, "o", "i"]
+[53.845869, "o", "l"]
+[53.864094, "o", "e"]
+[53.885381, "o", "\""]
+[53.894588, "o", " "]
+[53.9039, "o", ">"]
+[54.104106, "o", " "]
+[54.209485, "o", "W"]
+[54.24968, "o", "a"]
+[54.25883, "o", "l"]
+[54.281146, "o", "l"]
+[54.423491, "o", "p"]
+[54.572662, "o", "a"]
+[54.598825, "o", "p"]
+[54.663095, "o", "e"]
+[54.68837, "o", "r"]
+[54.704639, "o", "/"]
+[54.732883, "o", "n"]
+[54.789058, "o", "e"]
+[54.944472, "o", "w"]
+[54.953684, "o", "f"]
+[55.142988, "o", "i"]
+[55.179394, "o", "l"]
+[55.196402, "o", "e"]
+[55.246686, "o", "."]
+[55.333848, "o", "t"]
+[55.534192, "o", "x"]
+[55.543615, "o", "t"]
+[55.552717, "o", "\r\n"]
+[55.561384, "o", "$ "]
+[55.561585, "o", "\r\n"]
+[55.574095, "o", "$ b"]
+[55.634436, "o", "o"]
+[55.669761, "o", "r"]
+[55.807901, "o", "g"]
+[55.916156, "o", " "]
+[55.942504, "o", "c"]
+[56.014482, "o", "r"]
+[56.053089, "o", "e"]
+[56.070312, "o", "a"]
+[56.08002, "o", "t"]
+[56.105927, "o", "e"]
+[56.210185, "o", " "]
+[56.219403, "o", "-"]
+[56.242312, "o", "-"]
+[56.250845, "o", "s"]
+[56.319195, "o", "t"]
+[56.390481, "o", "a"]
+[56.580681, "o", "t"]
+[56.589895, "o", "s"]
+[56.613148, "o", " "]
+[56.673395, "o", "-"]
+[56.682534, "o", "-"]
+[56.69271, "o", "p"]
+[56.89298, "o", "r"]
+[56.910277, "o", "o"]
+[56.931539, "o", "g"]
+[57.016671, "o", "r"]
+[57.025867, "o", "e"]
+[57.052153, "o", "s"]
+[57.096465, "o", "s"]
+[57.155752, "o", " "]
+[57.16505, "o", "-"]
+[57.174131, "o", "-"]
+[57.23945, "o", "c"]
+[57.423822, "o", "o"]
+[57.489071, "o", "m"]
+[57.498281, "o", "p"]
+[57.533525, "o", "r"]
+[57.542712, "o", "e"]
+[57.554131, "o", "s"]
+[57.576347, "o", "s"]
+[57.606574, "o", "i"]
+[57.701891, "o", "o"]
+[57.726155, "o", "n"]
+[57.896387, "o", " "]
+[57.952657, "o", "l"]
+[57.961867, "o", "z"]
+[57.983126, "o", "4"]
+[58.038379, "o", " "]
+[58.047786, "o", "/"]
+[58.087886, "o", "m"]
+[58.097144, "o", "e"]
+[58.191378, "o", "d"]
+[58.226798, "o", "i"]
+[58.235842, "o", "a"]
+[58.436195, "o", "/"]
+[58.534403, "o", "b"]
+[58.595641, "o", "a"]
+[58.661977, "o", "c"]
+[58.678188, "o", "k"]
+[58.687319, "o", "u"]
+[58.842693, "o", "p"]
+[58.879874, "o", "/"]
+[58.889035, "o", "b"]
+[58.946275, "o", "o"]
+[58.955463, "o", "r"]
+[59.053758, "o", "g"]
+[59.097981, "o", "d"]
+[59.118228, "o", "e"]
+[59.174407, "o", "m"]
+[59.253582, "o", "o"]
+[59.371003, "o", ":"]
+[59.380116, "o", ":"]
+[59.407319, "o", "b"]
+[59.416671, "o", "a"]
+[59.480831, "o", "c"]
+[59.490169, "o", "k"]
+[59.66536, "o", "u"]
+[59.674698, "o", "p"]
+[59.691967, "o", "2"]
+[59.861255, "o", " "]
+[59.886476, "o", "W"]
+[59.896641, "o", "a"]
+[59.924908, "o", "l"]
+[60.041147, "o", "l"]
+[60.059405, "o", "p"]
+[60.080565, "o", "a"]
+[60.118882, "o", "p"]
+[60.194213, "o", "e"]
+[60.203611, "o", "r"]
+[60.369662, "o", "\r\n"]
+[61.062441, "o", "Enter passphrase for key /media/backup/borgdemo: "]
+[62.895305, "o", "\r\r\n"]
+[62.999845, "o", "0 B O 0 B C 0 B D 0 N Wallpaper                                                                                                               \r"]
+[63.000823, "o", "Initializing cache transaction: Reading config                                                                                                \r"]
+[63.001507, "o", "Initializing cache transaction: Reading chunks                                                                                                \r"]
+[63.002065, "o", "Initializing cache transaction: Reading files                                                                                                 \r"]
+[63.002715, "o", "                                                                                                                                              \r"]
+[63.059046, "o", "                                                                                                                                              \r"]
+[63.234112, "o", "Saving files cache                                                                                                                            \r"]
+[63.234925, "o", "Saving chunks cache                                                                                                                           \r"]
+[63.235838, "o", "Saving cache config                                                                                                                           \r"]
+[63.262412, "o", "                                                                                                                                              \r"]
+[63.267048, "o", "------------------------------------------------------------------------------"]
+[63.267913, "o", "\r\r\n"]
+[63.269301, "o", "Repository: /media/backup/borgdemo"]
+[63.270195, "o", "\r\r\n"]
+[63.271412, "o", "Archive name: backup2"]
+[63.272166, "o", "\r\r\n"]
+[63.273106, "o", "Archive fingerprint: 365749ed47cc151e435bb9bd0766c76d2c53145b3bf799a05d2087e6fd954fb4"]
+[63.274699, "o", "\r\r\nTime (start): Sat, 2022-01-29 17:04:46\r\r\nTime (end):   Sat, 2022-01-29 17:04:46"]
+[63.275435, "o", "\r\r\nDuration: 0.06 seconds"]
+[63.276143, "o", "\r\r\nNumber of files: 2"]
+[63.2765, "o", "\r\r\n"]
+[63.277036, "o", "Utilization of max. archive size: 0%"]
+[63.277681, "o", "\r\r\n------------------------------------------------------------------------------"]
+[63.277947, "o", "\r\r\n"]
+[63.278546, "o", "                       Original size      Compressed size    Deduplicated size"]
+[63.278763, "o", "\r\r\n"]
+[63.279212, "o", "This archive:                  577 B                622 B                622 B"]
+[63.27996, "o", "\r\r\nAll archives:                   14 B                 57 B              1.72 kB"]
+[63.280768, "o", "\r\r\n\r\r\n"]
+[63.281398, "o", "                       Unique chunks         Total chunks"]
+[63.282134, "o", "\r\r\nChunk index:                       5                    5"]
+[63.282846, "o", "\r\r\n------------------------------------------------------------------------------"]
+[63.283198, "o", "\r\r\n"]
+[63.389498, "o", "$ \r\n"]
+[63.398366, "o", "$ #"]
+[63.425621, "o", " "]
+[63.467951, "o", "W"]
+[63.513144, "o", "o"]
+[63.522424, "o", "w"]
+[63.698813, "o", ","]
+[63.738071, "o", " "]
+[63.757274, "o", "t"]
+[63.813573, "o", "h"]
+[63.835876, "o", "i"]
+[63.860123, "o", "s"]
+[63.870342, "o", " "]
+[63.879734, "o", "w"]
+[63.900841, "o", "a"]
+[63.961383, "o", "s"]
+[64.021421, "o", " "]
+[64.030736, "o", "a"]
+[64.080997, "o", " "]
+[64.156299, "o", "l"]
+[64.19875, "o", "o"]
+[64.207788, "o", "t"]
+[64.323002, "o", " "]
+[64.338339, "o", "f"]
+[64.347522, "o", "a"]
+[64.356799, "o", "s"]
+[64.45407, "o", "t"]
+[64.463399, "o", "e"]
+[64.495842, "o", "r"]
+[64.696169, "o", "!"]
+[64.825558, "o", "\r\n"]
+[64.834298, "o", "$ #"]
+[64.893537, "o", " "]
+[64.913786, "o", "N"]
+[64.935053, "o", "o"]
+[64.952293, "o", "t"]
+[64.987594, "o", "i"]
+[65.137831, "o", "c"]
+[65.184118, "o", "e"]
+[65.364414, "o", " "]
+[65.413764, "o", "t"]
+[65.480983, "o", "h"]
+[65.681299, "o", "e"]
+[65.749683, "o", " "]
+[65.843945, "o", "\""]
+[65.864223, "o", "D"]
+[66.032423, "o", "e"]
+[66.041483, "o", "d"]
+[66.050777, "o", "u"]
+[66.060014, "o", "p"]
+[66.155327, "o", "l"]
+[66.189003, "o", "i"]
+[66.205928, "o", "c"]
+[66.224138, "o", "a"]
+[66.260413, "o", "t"]
+[66.269707, "o", "e"]
+[66.279524, "o", "d"]
+[66.326744, "o", " "]
+[66.344137, "o", "s"]
+[66.387377, "o", "i"]
+[66.396774, "o", "z"]
+[66.407999, "o", "e"]
+[66.452023, "o", "\""]
+[66.5404, "o", " "]
+[66.580636, "o", "f"]
+[66.64299, "o", "o"]
+[66.753094, "o", "r"]
+[66.934337, "o", " "]
+[66.988628, "o", "\""]
+[67.003756, "o", "T"]
+[67.033082, "o", "h"]
+[67.042313, "o", "i"]
+[67.051396, "o", "s"]
+[67.107726, "o", " "]
+[67.126915, "o", "a"]
+[67.176215, "o", "r"]
+[67.214433, "o", "c"]
+[67.231715, "o", "h"]
+[67.292033, "o", "i"]
+[67.322286, "o", "v"]
+[67.349429, "o", "e"]
+[67.388659, "o", "\""]
+[67.526995, "o", "!"]
+[67.560304, "o", "\r\n"]
+[67.568076, "o", "$ "]
+[67.568601, "o", "#"]
+[67.598402, "o", " "]
+[67.625695, "o", "B"]
+[67.659832, "o", "o"]
+[67.705126, "o", "r"]
+[67.767696, "o", "g"]
+[67.776791, "o", " "]
+[67.841761, "o", "r"]
+[67.90097, "o", "e"]
+[67.929296, "o", "c"]
+[67.949548, "o", "o"]
+[67.958575, "o", "g"]
+[68.083933, "o", "n"]
+[68.284192, "o", "i"]
+[68.333355, "o", "z"]
+[68.376766, "o", "e"]
+[68.38599, "o", "d"]
+[68.395208, "o", " "]
+[68.421428, "o", "t"]
+[68.430749, "o", "h"]
+[68.446025, "o", "a"]
+[68.513356, "o", "t"]
+[68.57042, "o", " "]
+[68.651749, "o", "m"]
+[68.733018, "o", "o"]
+[68.854246, "o", "s"]
+[68.868504, "o", "t"]
+[69.068744, "o", " "]
+[69.082152, "o", "f"]
+[69.248377, "o", "i"]
+[69.262518, "o", "l"]
+[69.312801, "o", "e"]
+[69.323041, "o", "s"]
+[69.437588, "o", " "]
+[69.446743, "o", "d"]
+[69.487014, "o", "i"]
+[69.496175, "o", "d"]
+[69.696505, "o", " "]
+[69.705822, "o", "n"]
+[69.801978, "o", "o"]
+[69.812437, "o", "t"]
+[69.86148, "o", " "]
+[69.91274, "o", "c"]
+[69.92202, "o", "h"]
+[69.931456, "o", "a"]
+[69.946596, "o", "n"]
+[70.005687, "o", "g"]
+[70.015013, "o", "e"]
+[70.055254, "o", " "]
+[70.15946, "o", "a"]
+[70.359828, "o", "n"]
+[70.405018, "o", "d"]
+[70.500557, "o", " "]
+[70.510784, "o", "d"]
+[70.519882, "o", "e"]
+[70.547322, "o", "d"]
+[70.556417, "o", "u"]
+[70.567626, "o", "p"]
+[70.577985, "o", "l"]
+[70.599199, "o", "i"]
+[70.736343, "o", "c"]
+[70.76546, "o", "a"]
+[70.834791, "o", "t"]
+[70.945983, "o", "e"]
+[70.955484, "o", "d"]
+[71.063868, "o", " "]
+[71.093485, "o", "t"]
+[71.109751, "o", "h"]
+[71.162108, "o", "e"]
+[71.197579, "o", "m"]
+[71.3978, "o", "."]
+[71.491686, "o", "\r\n"]
+[71.502922, "o", "$ \r\n"]
+[71.513793, "o", "$ #"]
+[71.671103, "o", " "]
+[71.756424, "o", "B"]
+[71.800663, "o", "u"]
+[71.827995, "o", "t"]
+[71.973489, "o", " "]
+[72.031647, "o", "w"]
+[72.048701, "o", "h"]
+[72.086148, "o", "a"]
+[72.105608, "o", "t"]
+[72.217741, "o", " "]
+[72.280997, "o", "h"]
+[72.294209, "o", "a"]
+[72.395817, "o", "p"]
+[72.482969, "o", "p"]
+[72.511083, "o", "e"]
+[72.520434, "o", "n"]
+[72.662576, "o", "s"]
+[72.709006, "o", ","]
+[72.72418, "o", " "]
+[72.78333, "o", "w"]
+[72.7986, "o", "h"]
+[72.823848, "o", "e"]
+[72.8463, "o", "n"]
+[72.912447, "o", " "]
+[72.943594, "o", "w"]
+[73.018847, "o", "e"]
+[73.219087, "o", " "]
+[73.228419, "o", "m"]
+[73.276667, "o", "o"]
+[73.329922, "o", "v"]
+[73.360218, "o", "e"]
+[73.40245, "o", " "]
+[73.416815, "o", "a"]
+[73.426139, "o", " "]
+[73.464221, "o", "d"]
+[73.473452, "o", "i"]
+[73.540034, "o", "r"]
+[73.631095, "o", " "]
+[73.649658, "o", "a"]
+[73.727751, "o", "n"]
+[73.737006, "o", "d"]
+[73.746168, "o", " "]
+[73.826376, "o", "c"]
+[73.955642, "o", "r"]
+[74.051901, "o", "e"]
+[74.065382, "o", "a"]
+[74.134493, "o", "t"]
+[74.175669, "o", "e"]
+[74.222846, "o", " "]
+[74.23215, "o", "a"]
+[74.262331, "o", " "]
+[74.28899, "o", "n"]
+[74.299165, "o", "e"]
+[74.323449, "o", "w"]
+[74.52356, "o", " "]
+[74.549738, "o", "b"]
+[74.559063, "o", "a"]
+[74.613305, "o", "c"]
+[74.65156, "o", "k"]
+[74.691803, "o", "u"]
+[74.700977, "o", "p"]
+[74.901271, "o", "?"]
+[75.019581, "o", "\r\n"]
+[75.02614, "o", "$ "]
+[75.026391, "o", "m"]
+[75.107488, "o", "v"]
+[75.131819, "o", " "]
+[75.141011, "o", "W"]
+[75.159414, "o", "a"]
+[75.244487, "o", "l"]
+[75.27272, "o", "l"]
+[75.374043, "o", "p"]
+[75.477207, "o", "a"]
+[75.507449, "o", "p"]
+[75.561817, "o", "e"]
+[75.603103, "o", "r"]
+[75.612325, "o", "/"]
+[75.667572, "o", "b"]
+[75.676856, "o", "i"]
+[75.729046, "o", "g"]
+[75.738272, "o", "c"]
+[75.747507, "o", "o"]
+[75.803811, "o", "l"]
+[75.817056, "o", "l"]
+[75.826233, "o", "e"]
+[75.835485, "o", "c"]
+[75.844678, "o", "t"]
+[75.876966, "o", "i"]
+[75.886138, "o", "o"]
+[75.928448, "o", "n"]
+[76.083706, "o", " "]
+[76.123948, "o", "W"]
+[76.17816, "o", "a"]
+[76.218453, "o", "l"]
+[76.231651, "o", "l"]
+[76.240839, "o", "p"]
+[76.263106, "o", "a"]
+[76.275399, "o", "p"]
+[76.390507, "o", "e"]
+[76.418755, "o", "r"]
+[76.428053, "o", "/"]
+[76.448192, "o", "b"]
+[76.457557, "o", "i"]
+[76.513741, "o", "g"]
+[76.554166, "o", "c"]
+[76.620338, "o", "o"]
+[76.62975, "o", "l"]
+[76.65599, "o", "l"]
+[76.682071, "o", "e"]
+[76.691359, "o", "c"]
+[76.777716, "o", "t"]
+[76.790783, "o", "i"]
+[76.991041, "o", "o"]
+[77.006322, "o", "n"]
+[77.032809, "o", "_"]
+[77.041923, "o", "N"]
+[77.051039, "o", "E"]
+[77.074501, "o", "W"]
+[77.109739, "o", "\r\n"]
+[77.134745, "o", "$ \r\n"]
+[77.144348, "o", "$ b"]
+[77.153505, "o", "o"]
+[77.181857, "o", "r"]
+[77.206019, "o", "g"]
+[77.307298, "o", " "]
+[77.335468, "o", "c"]
+[77.344909, "o", "r"]
+[77.41712, "o", "e"]
+[77.469372, "o", "a"]
+[77.478868, "o", "t"]
+[77.644097, "o", "e"]
+[77.704363, "o", " "]
+[77.71375, "o", "-"]
+[77.722981, "o", "-"]
+[77.839246, "o", "s"]
+[77.872649, "o", "t"]
+[77.910754, "o", "a"]
+[78.036108, "o", "t"]
+[78.147359, "o", "s"]
+[78.271716, "o", " "]
+[78.280908, "o", "-"]
+[78.314129, "o", "-"]
+[78.455338, "o", "p"]
+[78.465213, "o", "r"]
+[78.535839, "o", "o"]
+[78.544861, "o", "g"]
+[78.632063, "o", "r"]
+[78.730355, "o", "e"]
+[78.749666, "o", "s"]
+[78.861901, "o", "s"]
+[78.995054, "o", " "]
+[79.004272, "o", "-"]
+[79.20055, "o", "-"]
+[79.209918, "o", "c"]
+[79.22007, "o", "o"]
+[79.24428, "o", "m"]
+[79.267728, "o", "p"]
+[79.288821, "o", "r"]
+[79.415279, "o", "e"]
+[79.424459, "o", "s"]
+[79.434626, "o", "s"]
+[79.541929, "o", "i"]
+[79.556222, "o", "o"]
+[79.577392, "o", "n"]
+[79.777788, "o", " "]
+[79.786758, "o", "l"]
+[79.875017, "o", "z"]
+[79.887264, "o", "4"]
+[79.896508, "o", " "]
+[79.929861, "o", "/"]
+[80.064949, "o", "m"]
+[80.166225, "o", "e"]
+[80.352925, "o", "d"]
+[80.456997, "o", "i"]
+[80.508327, "o", "a"]
+[80.577525, "o", "/"]
+[80.663838, "o", "b"]
+[80.6955, "o", "a"]
+[80.717857, "o", "c"]
+[80.84109, "o", "k"]
+[80.86335, "o", "u"]
+[80.964615, "o", "p"]
+[81.093768, "o", "/"]
+[81.103523, "o", "b"]
+[81.112422, "o", "o"]
+[81.238789, "o", "r"]
+[81.274014, "o", "g"]
+[81.284252, "o", "d"]
+[81.293708, "o", "e"]
+[81.320846, "o", "m"]
+[81.521049, "o", "o"]
+[81.546407, "o", ":"]
+[81.556072, "o", ":"]
+[81.568947, "o", "b"]
+[81.589189, "o", "a"]
+[81.660501, "o", "c"]
+[81.685869, "o", "k"]
+[81.695198, "o", "u"]
+[81.895553, "o", "p"]
+[81.908798, "o", "3"]
+[81.965024, "o", " "]
+[82.08949, "o", "W"]
+[82.098607, "o", "a"]
+[82.107834, "o", "l"]
+[82.149063, "o", "l"]
+[82.219323, "o", "p"]
+[82.275502, "o", "a"]
+[82.284755, "o", "p"]
+[82.484974, "o", "e"]
+[82.567177, "o", "r"]
+[82.576486, "o", "\r\n"]
+[83.285371, "o", "Enter passphrase for key /media/backup/borgdemo: "]
+[84.986738, "o", "\r\r\n"]
+[85.092817, "o", "0 B O 0 B C 0 B D 0 N Wallpaper                                                                                                               \r"]
+[85.093769, "o", "Initializing cache transaction: Reading config                                                                                                \r"]
+[85.094478, "o", "Initializing cache transaction: Reading chunks                                                                                                \r"]
+[85.095118, "o", "Initializing cache transaction: Reading files                                                                                                 \r                                                                                                                                              \r"]
+[85.096211, "o", "                                                                                                                                              \r"]
+[85.313125, "o", "Saving files cache                                                                                                                            \r"]
+[85.313931, "o", "Saving chunks cache                                                                                                                           \r"]
+[85.314757, "o", "Saving cache config                                                                                                                           \r"]
+[85.350198, "o", "                                                                                                                                              \r"]
+[85.357844, "o", "------------------------------------------------------------------------------\r\r\n"]
+[85.358668, "o", "Repository: /media/backup/borgdemo\r\r\nArchive name: backup3\r\r\nArchive fingerprint: a1efabf8493e2ef498aa5f333f393930d73a438db4c19bdf0c647069bdad011a\r\r\nTime (start): Sat, 2022-01-29 17:05:08\r\r\nTime (end):   Sat, 2022-01-29 17:05:08\r\r\nDuration: 0.06 seconds\r\r\nNumber of files: 2\r\r\nUtilization of max. archive size: 0%\r\r\n------------------------------------------------------------------------------\r\r\n                       Original size      Compressed size    Deduplicated size\r\r\nThis archive:                  577 B                622 B                565 B\r\r\nAll archives:                   28 B                114 B              2.60 kB\r\r\n\r\r\n                       Unique chunks         Total chunks\r\r\nChunk index:                       7                    8\r\r\n"]
+[85.359423, "o", "------------------------------------------------------------------------------\r\r\n"]
+[85.466722, "o", "$ \r\n"]
+[85.474418, "o", "$ "]
+[85.474625, "o", "#"]
+[85.498987, "o", " "]
+[85.551223, "o", "S"]
+[85.660455, "o", "t"]
+[85.686604, "o", "i"]
+[85.69595, "o", "l"]
+[85.816124, "o", "l"]
+[85.935596, "o", " "]
+[85.978657, "o", "q"]
+[85.989864, "o", "u"]
+[86.016113, "o", "i"]
+[86.025305, "o", "t"]
+[86.040588, "o", "e"]
+[86.240848, "o", " "]
+[86.296074, "o", "f"]
+[86.352384, "o", "a"]
+[86.361506, "o", "s"]
+[86.377861, "o", "t"]
+[86.407089, "o", "…"]
+[86.431459, "o", "\r\n"]
+[86.44031, "o", "$ "]
+[86.440432, "o", "#"]
+[86.449575, "o", " "]
+[86.458772, "o", "B"]
+[86.553038, "o", "u"]
+[86.620876, "o", "t"]
+[86.684792, "o", " "]
+[86.705159, "o", "w"]
+[86.714504, "o", "h"]
+[86.87393, "o", "e"]
+[86.89501, "o", "n"]
+[86.936343, "o", " "]
+[86.945495, "o", "y"]
+[86.980829, "o", "o"]
+[87.1811, "o", "u"]
+[87.303386, "o", " "]
+[87.360828, "o", "l"]
+[87.470992, "o", "o"]
+[87.519387, "o", "o"]
+[87.543631, "o", "k"]
+[87.570779, "o", " "]
+[87.616093, "o", "a"]
+[87.658289, "o", "t"]
+[87.686746, "o", " "]
+[87.788269, "o", "t"]
+[87.807298, "o", "h"]
+[87.864636, "o", "e"]
+[87.943864, "o", " "]
+[87.968016, "o", "\""]
+[88.130431, "o", "d"]
+[88.172817, "o", "e"]
+[88.21059, "o", "d"]
+[88.305949, "o", "u"]
+[88.328063, "o", "p"]
+[88.386497, "o", "l"]
+[88.4467, "o", "i"]
+[88.550036, "o", "c"]
+[88.685281, "o", "a"]
+[88.766514, "o", "t"]
+[88.775738, "o", "e"]
+[88.830086, "o", "d"]
+[88.847327, "o", " "]
+[88.868639, "o", "f"]
+[88.930998, "o", "i"]
+[88.959142, "o", "l"]
+[88.968406, "o", "e"]
+[89.023367, "o", " "]
+[89.032256, "o", "s"]
+[89.10391, "o", "i"]
+[89.112861, "o", "z"]
+[89.129115, "o", "e"]
+[89.138561, "o", "\""]
+[89.187742, "o", " "]
+[89.280003, "o", "a"]
+[89.289618, "o", "g"]
+[89.304813, "o", "a"]
+[89.437087, "o", "i"]
+[89.497282, "o", "n"]
+[89.585505, "o", ","]
+[89.605052, "o", " "]
+[89.633156, "o", "y"]
+[89.642458, "o", "o"]
+[89.691701, "o", "u"]
+[89.724915, "o", " "]
+[89.741189, "o", "s"]
+[89.760523, "o", "e"]
+[89.960755, "o", "e"]
+[89.978407, "o", " "]
+[89.987513, "o", "t"]
+[90.027841, "o", "h"]
+[90.037302, "o", "a"]
+[90.094289, "o", "t"]
+[90.219638, "o", " "]
+[90.235853, "o", "b"]
+[90.245111, "o", "o"]
+[90.373358, "o", "r"]
+[90.382641, "o", "g"]
+[90.469919, "o", " "]
+[90.479051, "o", "a"]
+[90.537409, "o", "l"]
+[90.561563, "o", "s"]
+[90.580821, "o", "o"]
+[90.698098, "o", " "]
+[90.775257, "o", "r"]
+[90.912605, "o", "e"]
+[90.945102, "o", "c"]
+[91.032991, "o", "o"]
+[91.133392, "o", "g"]
+[91.277563, "o", "n"]
+[91.303838, "o", "i"]
+[91.458109, "o", "z"]
+[91.481368, "o", "e"]
+[91.50158, "o", "d"]
+[91.588931, "o", " "]
+[91.616014, "o", "t"]
+[91.664368, "o", "h"]
+[91.719769, "o", "a"]
+[91.728853, "o", "t"]
+[91.809136, "o", " "]
+[91.868425, "o", "o"]
+[91.934786, "o", "n"]
+[91.968546, "o", "l"]
+[91.991696, "o", "y"]
+[92.016961, "o", " "]
+[92.056262, "o", "t"]
+[92.095506, "o", "h"]
+[92.10472, "o", "e"]
+[92.224986, "o", " "]
+[92.338226, "o", "d"]
+[92.502727, "o", "i"]
+[92.526781, "o", "r"]
+[92.536558, "o", " "]
+[92.552671, "o", "a"]
+[92.646946, "o", "n"]
+[92.739999, "o", "d"]
+[92.94049, "o", " "]
+[92.959842, "o", "n"]
+[93.016045, "o", "o"]
+[93.113332, "o", "t"]
+[93.143449, "o", " "]
+[93.240702, "o", "t"]
+[93.324085, "o", "h"]
+[93.350273, "o", "e"]
+[93.372446, "o", " "]
+[93.381514, "o", "f"]
+[93.427816, "o", "i"]
+[93.472078, "o", "l"]
+[93.563379, "o", "e"]
+[93.640662, "o", "s"]
+[93.655819, "o", " "]
+[93.694138, "o", "c"]
+[93.71135, "o", "h"]
+[93.736703, "o", "a"]
+[93.857821, "o", "n"]
+[93.874117, "o", "g"]
+[94.020416, "o", "e"]
+[94.032529, "o", "d"]
+[94.088868, "o", " "]
+[94.115082, "o", "i"]
+[94.124403, "o", "n"]
+[94.14166, "o", " "]
+[94.183906, "o", "t"]
+[94.331227, "o", "h"]
+[94.360458, "o", "i"]
+[94.387702, "o", "s"]
+[94.544974, "o", " "]
+[94.556097, "o", "b"]
+[94.591781, "o", "a"]
+[94.60467, "o", "c"]
+[94.613913, "o", "k"]
+[94.689346, "o", "u"]
+[94.698497, "o", "p"]
+[94.802908, "o", "."]
+[94.961397, "o", "\r\n"]
+[94.970476, "o", "$ "]
+[94.970604, "o", "\r\n"]
+[94.98039, "o", "$ #"]
+[95.021674, "o", " "]
+[95.075002, "o", "N"]
+[95.12729, "o", "o"]
+[95.136468, "o", "w"]
+[95.295786, "o", " "]
+[95.449095, "o", "l"]
+[95.476165, "o", "e"]
+[95.487901, "o", "t"]
+[95.537836, "o", "s"]
+[95.658082, "o", " "]
+[95.781259, "o", "l"]
+[95.879673, "o", "o"]
+[95.994843, "o", "o"]
+[96.015025, "o", "k"]
+[96.154285, "o", " "]
+[96.163535, "o", "i"]
+[96.280899, "o", "n"]
+[96.341676, "o", "t"]
+[96.358315, "o", "o"]
+[96.367304, "o", " "]
+[96.382433, "o", "a"]
+[96.452488, "o", " "]
+[96.49767, "o", "r"]
+[96.531949, "o", "e"]
+[96.552259, "o", "p"]
+[96.561517, "o", "o"]
+[96.606792, "o", "."]
+[96.675059, "o", "\r\n"]
+[96.681988, "o", "$ "]
+[96.682218, "o", "b"]
+[96.709385, "o", "o"]
+[96.729635, "o", "r"]
+[96.758739, "o", "g"]
+[96.767924, "o", " "]
+[96.83723, "o", "l"]
+[96.878415, "o", "i"]
+[96.930696, "o", "s"]
+[96.991911, "o", "t"]
+[97.130242, "o", " "]
+[97.224513, "o", "/"]
+[97.244707, "o", "m"]
+[97.257076, "o", "e"]
+[97.295159, "o", "d"]
+[97.471313, "o", "i"]
+[97.580605, "o", "a"]
+[97.779823, "o", "/"]
+[97.844074, "o", "b"]
+[97.907765, "o", "a"]
+[97.980726, "o", "c"]
+[97.990979, "o", "k"]
+[98.000312, "o", "u"]
+[98.049614, "o", "p"]
+[98.109874, "o", "/"]
+[98.125071, "o", "b"]
+[98.138208, "o", "o"]
+[98.202612, "o", "r"]
+[98.22479, "o", "g"]
+[98.236002, "o", "d"]
+[98.245272, "o", "e"]
+[98.254488, "o", "m"]
+[98.269766, "o", "o"]
+[98.30314, "o", "\r\n"]
+[98.946479, "o", "Enter passphrase for key /media/backup/borgdemo: "]
+[100.789463, "o", "\r\r\n"]
+[100.879679, "o", "backup1                              Sat, 2022-01-29 17:04:31 [c35e132ca383cd486e583d104e668aa6e410e5e391d9dbd3c8762c82a4e524b2]\r\r\nbackup2                              Sat, 2022-01-29 17:04:46 [365749ed47cc151e435bb9bd0766c76d2c53145b3bf799a05d2087e6fd954fb4]\r\r\nbackup3                              Sat, 2022-01-29 17:05:08 [a1efabf8493e2ef498aa5f333f393930d73a438db4c19bdf0c647069bdad011a]\r\r\n"]
+[100.965501, "o", "$ "]
+[100.965886, "o", "\r\n"]
+[100.972207, "o", "$ "]
+[100.972357, "o", "#"]
+[101.001525, "o", " "]
+[101.055796, "o", "Y"]
+[101.172952, "o", "o"]
+[101.199131, "o", "u"]
+[101.266472, "o", "'"]
+[101.393773, "o", "l"]
+[101.490158, "o", "l"]
+[101.499322, "o", " "]
+[101.518543, "o", "s"]
+[101.618787, "o", "e"]
+[101.666048, "o", "e"]
+[101.734332, "o", " "]
+[101.782622, "o", "a"]
+[101.959865, "o", " "]
+[101.977061, "o", "l"]
+[102.078341, "o", "i"]
+[102.278594, "o", "s"]
+[102.328793, "o", "t"]
+[102.365027, "o", " "]
+[102.426279, "o", "o"]
+[102.472515, "o", "f"]
+[102.494727, "o", " "]
+[102.552005, "o", "a"]
+[102.634274, "o", "l"]
+[102.721529, "o", "l"]
+[102.730757, "o", " "]
+[102.877074, "o", "b"]
+[102.886224, "o", "a"]
+[102.895414, "o", "c"]
+[102.904531, "o", "k"]
+[102.951811, "o", "u"]
+[102.982957, "o", "p"]
+[103.061284, "o", "s"]
+[103.134493, "o", "."]
+[103.18684, "o", "\r\n"]
+[103.196148, "o", "$ #"]
+[103.207298, "o", " "]
+[103.242621, "o", "Y"]
+[103.251913, "o", "o"]
+[103.290143, "o", "u"]
+[103.30527, "o", " "]
+[103.339564, "o", "c"]
+[103.348678, "o", "a"]
+[103.386953, "o", "n"]
+[103.426371, "o", " "]
+[103.43558, "o", "a"]
+[103.460737, "o", "l"]
+[103.470047, "o", "s"]
+[103.534289, "o", "o"]
+[103.657483, "o", " "]
+[103.699717, "o", "u"]
+[103.718984, "o", "s"]
+[103.84128, "o", "e"]
+[103.870447, "o", " "]
+[103.988731, "o", "t"]
+[104.024085, "o", "h"]
+[104.033312, "o", "e"]
+[104.13058, "o", " "]
+[104.151786, "o", "s"]
+[104.161143, "o", "a"]
+[104.197378, "o", "m"]
+[104.369468, "o", "e"]
+[104.40776, "o", " "]
+[104.426005, "o", "c"]
+[104.44038, "o", "o"]
+[104.614554, "o", "m"]
+[104.636886, "o", "m"]
+[104.668162, "o", "a"]
+[104.682353, "o", "n"]
+[104.695727, "o", "d"]
+[104.841848, "o", " "]
+[104.866107, "o", "t"]
+[104.90138, "o", "o"]
+[104.9847, "o", " "]
+[105.110904, "o", "l"]
+[105.156206, "o", "o"]
+[105.209507, "o", "o"]
+[105.2187, "o", "k"]
+[105.336971, "o", " "]
+[105.361371, "o", "i"]
+[105.403468, "o", "n"]
+[105.412767, "o", "t"]
+[105.444955, "o", "o"]
+[105.474218, "o", " "]
+[105.490504, "o", "a"]
+[105.500125, "o", "n"]
+[105.643211, "o", " "]
+[105.652403, "o", "a"]
+[105.727629, "o", "r"]
+[105.836766, "o", "c"]
+[105.846047, "o", "h"]
+[105.863261, "o", "i"]
+[105.912481, "o", "v"]
+[105.927725, "o", "e"]
+[105.974996, "o", "."]
+[106.081386, "o", " "]
+[106.090549, "o", "B"]
+[106.125782, "o", "u"]
+[106.135022, "o", "t"]
+[106.163261, "o", " "]
+[106.231461, "o", "w"]
+[106.339701, "o", "e"]
+[106.439934, "o", " "]
+[106.454167, "o", "b"]
+[106.484461, "o", "e"]
+[106.503727, "o", "t"]
+[106.551988, "o", "t"]
+[106.658273, "o", "e"]
+[106.684488, "o", "r"]
+[106.7218, "o", " "]
+[106.731078, "o", "f"]
+[106.931299, "o", "i"]
+[106.940489, "o", "l"]
+[106.976931, "o", "t"]
+[106.990021, "o", "e"]
+[107.015301, "o", "r"]
+[107.127634, "o", " "]
+[107.20084, "o", "t"]
+[107.235078, "o", "h"]
+[107.247403, "o", "e"]
+[107.302761, "o", " "]
+[107.331976, "o", "o"]
+[107.349187, "o", "u"]
+[107.358434, "o", "t"]
+[107.390777, "o", "p"]
+[107.445935, "o", "u"]
+[107.506139, "o", "t"]
+[107.572269, "o", " "]
+[107.581484, "o", "h"]
+[107.625777, "o", "e"]
+[107.69114, "o", "r"]
+[107.750267, "o", "e"]
+[107.777385, "o", ":"]
+[107.786683, "o", "\r\n"]
+[107.795708, "o", "$ "]
+[107.79596, "o", "b"]
+[107.854081, "o", "o"]
+[107.867219, "o", "r"]
+[107.887566, "o", "g"]
+[107.928778, "o", " "]
+[107.955024, "o", "l"]
+[107.982295, "o", "i"]
+[108.005412, "o", "s"]
+[108.014629, "o", "t"]
+[108.090953, "o", " "]
+[108.203177, "o", "/"]
+[108.212431, "o", "m"]
+[108.272868, "o", "e"]
+[108.293044, "o", "d"]
+[108.355523, "o", "i"]
+[108.52975, "o", "a"]
+[108.569864, "o", "/"]
+[108.579009, "o", "b"]
+[108.605274, "o", "a"]
+[108.654527, "o", "c"]
+[108.815987, "o", "k"]
+[108.929156, "o", "u"]
+[108.93845, "o", "p"]
+[108.994789, "o", "/"]
+[109.003879, "o", "b"]
+[109.013247, "o", "o"]
+[109.022399, "o", "r"]
+[109.128716, "o", "g"]
+[109.189903, "o", "d"]
+[109.204118, "o", "e"]
+[109.280466, "o", "m"]
+[109.29059, "o", "o"]
+[109.41786, "o", ":"]
+[109.427105, "o", ":"]
+[109.464377, "o", "b"]
+[109.473649, "o", "a"]
+[109.500962, "o", "c"]
+[109.564296, "o", "k"]
+[109.592795, "o", "u"]
+[109.615145, "o", "p"]
+[109.629356, "o", "3"]
+[109.669503, "o", " "]
+[109.707754, "o", "|"]
+[109.908218, "o", " "]
+[109.937459, "o", "g"]
+[109.952221, "o", "r"]
+[110.079302, "o", "e"]
+[110.15368, "o", "p"]
+[110.20299, "o", " "]
+[110.212027, "o", "'"]
+[110.237368, "o", "d"]
+[110.246529, "o", "e"]
+[110.321083, "o", "e"]
+[110.334287, "o", "r"]
+[110.414536, "o", "."]
+[110.541814, "o", "j"]
+[110.555882, "o", "p"]
+[110.598221, "o", "g"]
+[110.682409, "o", "'"]
+[110.843873, "o", "\r\n"]
+[111.594178, "o", "Enter passphrase for key /media/backup/borgdemo: "]
+[112.960498, "o", "\r\r\n"]
+[113.050799, "o", "-rw-rw-r-- user   user          0 Sat, 2022-01-29 17:03:43 Wallpaper/deer.jpg\r\r\n"]
+[113.141535, "o", "$ "]
+[113.14164, "o", "\r\n"]
+[113.149458, "o", "$ #"]
+[113.233771, "o", " "]
+[113.243906, "o", "O"]
+[113.444151, "o", "h"]
+[113.458451, "o", ","]
+[113.467648, "o", " "]
+[113.478908, "o", "w"]
+[113.496107, "o", "e"]
+[113.696419, "o", " "]
+[113.705749, "o", "f"]
+[113.812046, "o", "o"]
+[113.841149, "o", "u"]
+[113.862511, "o", "n"]
+[113.883753, "o", "d"]
+[113.909006, "o", " "]
+[113.924275, "o", "o"]
+[113.957495, "o", "u"]
+[113.990633, "o", "r"]
+[114.091868, "o", " "]
+[114.101088, "o", "p"]
+[114.158301, "o", "i"]
+[114.167629, "o", "c"]
+[114.1769, "o", "t"]
+[114.18599, "o", "u"]
+[114.195224, "o", "r"]
+[114.296418, "o", "e"]
+[114.496762, "o", "."]
+[114.595998, "o", " "]
+[114.607177, "o", "N"]
+[114.616517, "o", "o"]
+[114.625662, "o", "w"]
+[114.634964, "o", " "]
+[114.691139, "o", "e"]
+[114.700408, "o", "x"]
+[114.709613, "o", "t"]
+[114.793896, "o", "r"]
+[114.968232, "o", "a"]
+[114.981327, "o", "c"]
+[115.084564, "o", "t"]
+[115.284858, "o", " "]
+[115.309274, "o", "i"]
+[115.346521, "o", "t"]
+[115.3936, "o", "…"]
+[115.428913, "o", "\r\n"]
+[115.436921, "o", "$ m"]
+[115.483375, "o", "v"]
+[115.559571, "o", " "]
+[115.568697, "o", "W"]
+[115.666101, "o", "a"]
+[115.675238, "o", "l"]
+[115.69243, "o", "l"]
+[115.710766, "o", "p"]
+[115.728021, "o", "a"]
+[115.737493, "o", "p"]
+[115.755557, "o", "e"]
+[115.766845, "o", "r"]
+[115.967132, "o", " "]
+[116.124418, "o", "W"]
+[116.133599, "o", "a"]
+[116.258822, "o", "l"]
+[116.268087, "o", "l"]
+[116.468427, "o", "p"]
+[116.622639, "o", "a"]
+[116.656827, "o", "p"]
+[116.666121, "o", "e"]
+[116.734345, "o", "r"]
+[116.771506, "o", "."]
+[116.780805, "o", "o"]
+[116.976075, "o", "r"]
+[117.135226, "o", "i"]
+[117.211508, "o", "g"]
+[117.225761, "o", "\r\n"]
+[117.234711, "o", "$ b"]
+[117.243934, "o", "o"]
+[117.295173, "o", "r"]
+[117.304547, "o", "g"]
+[117.381159, "o", " "]
+[117.390337, "o", "e"]
+[117.404569, "o", "x"]
+[117.414087, "o", "t"]
+[117.423255, "o", "r"]
+[117.442395, "o", "a"]
+[117.473648, "o", "c"]
+[117.483886, "o", "t"]
+[117.502039, "o", " "]
+[117.578336, "o", "/"]
+[117.603603, "o", "m"]
+[117.712782, "o", "e"]
+[117.748131, "o", "d"]
+[117.780303, "o", "i"]
+[117.823605, "o", "a"]
+[117.863804, "o", "/"]
+[117.878141, "o", "b"]
+[117.915423, "o", "a"]
+[118.003555, "o", "c"]
+[118.024839, "o", "k"]
+[118.041139, "o", "u"]
+[118.162331, "o", "p"]
+[118.183681, "o", "/"]
+[118.192897, "o", "b"]
+[118.29517, "o", "o"]
+[118.487415, "o", "r"]
+[118.622684, "o", "g"]
+[118.631957, "o", "d"]
+[118.753151, "o", "e"]
+[118.795416, "o", "m"]
+[118.804656, "o", "o"]
+[118.828923, "o", ":"]
+[118.865204, "o", ":"]
+[118.881497, "o", "b"]
+[118.904491, "o", "a"]
+[118.930843, "o", "c"]
+[118.954054, "o", "k"]
+[119.048276, "o", "u"]
+[119.094503, "o", "p"]
+[119.112846, "o", "3"]
+[119.164046, "o", " "]
+[119.238314, "o", "W"]
+[119.249478, "o", "a"]
+[119.370813, "o", "l"]
+[119.385054, "o", "l"]
+[119.46033, "o", "p"]
+[119.473592, "o", "a"]
+[119.48867, "o", "p"]
+[119.498011, "o", "e"]
+[119.507202, "o", "r"]
+[119.604415, "o", "/"]
+[119.625772, "o", "d"]
+[119.824948, "o", "e"]
+[119.869305, "o", "e"]
+[119.878524, "o", "r"]
+[119.975806, "o", "."]
+[119.996119, "o", "j"]
+[120.005277, "o", "p"]
+[120.073554, "o", "g"]
+[120.102311, "o", "\r\n"]
+[120.697815, "o", "Enter passphrase for key /media/backup/borgdemo: "]
+[122.246556, "o", "\r\r\n"]
+[122.417381, "o", "$ \r\n"]
+[122.424289, "o", "$ "]
+[122.424376, "o", "\r\n"]
+[122.433405, "o", "$ "]
+[122.433631, "o", "#"]
+[122.44976, "o", " "]
+[122.458878, "o", "A"]
+[122.482514, "o", "n"]
+[122.491741, "o", "d"]
+[122.637011, "o", " "]
+[122.672152, "o", "c"]
+[122.681562, "o", "h"]
+[122.693696, "o", "e"]
+[122.702906, "o", "c"]
+[122.712113, "o", "k"]
+[122.72137, "o", " "]
+[122.738715, "o", "t"]
+[122.758856, "o", "h"]
+[122.808141, "o", "a"]
+[122.854359, "o", "t"]
+[122.898622, "o", " "]
+[122.90878, "o", "i"]
+[122.919102, "o", "t"]
+[122.944365, "o", "'"]
+[123.026583, "o", "s"]
+[123.043897, "o", " "]
+[123.073059, "o", "t"]
+[123.099363, "o", "h"]
+[123.162556, "o", "e"]
+[123.251806, "o", " "]
+[123.278079, "o", "s"]
+[123.302344, "o", "a"]
+[123.346561, "o", "m"]
+[123.355817, "o", "e"]
+[123.393146, "o", ":"]
+[123.407822, "o", "\r\n"]
+[123.414814, "o", "$ "]
+[123.41512, "o", "d"]
+[123.446105, "o", "i"]
+[123.47141, "o", "f"]
+[123.488649, "o", "f"]
+[123.514966, "o", " "]
+[123.57117, "o", "-"]
+[123.580459, "o", "s"]
+[123.641661, "o", " "]
+[123.672877, "o", "W"]
+[123.68514, "o", "a"]
+[123.703292, "o", "l"]
+[123.775673, "o", "l"]
+[123.794915, "o", "p"]
+[123.857187, "o", "a"]
+[123.866352, "o", "p"]
+[123.922633, "o", "e"]
+[124.037851, "o", "r"]
+[124.077036, "o", "/"]
+[124.193421, "o", "d"]
+[124.254575, "o", "e"]
+[124.268774, "o", "e"]
+[124.277928, "o", "r"]
+[124.478224, "o", "."]
+[124.673473, "o", "j"]
+[124.705794, "o", "p"]
+[124.715017, "o", "g"]
+[124.761271, "o", " "]
+[124.77065, "o", "W"]
+[124.782916, "o", "a"]
+[124.81303, "o", "l"]
+[124.822429, "o", "l"]
+[124.849789, "o", "p"]
+[124.907925, "o", "a"]
+[124.940242, "o", "p"]
+[124.973471, "o", "e"]
+[125.100617, "o", "r"]
+[125.300998, "o", "."]
+[125.347349, "o", "o"]
+[125.356351, "o", "r"]
+[125.380567, "o", "i"]
+[125.425923, "o", "g"]
+[125.45203, "o", "/"]
+[125.580402, "o", "d"]
+[125.704576, "o", "e"]
+[125.767897, "o", "e"]
+[125.777158, "o", "r"]
+[125.822432, "o", "."]
+[125.870614, "o", "j"]
+[125.879895, "o", "p"]
+[125.889112, "o", "g"]
+[125.900779, "o", "\r\n"]
+[125.914893, "o", "Files Wallpaper/deer.jpg and Wallpaper.orig/deer.jpg are identical\r\r\n"]
+[125.915923, "o", "$ \r\n"]
+[125.923566, "o", "$ #"]
+[125.994935, "o", " "]
+[126.004162, "o", "A"]
+[126.029334, "o", "n"]
+[126.117616, "o", "d"]
+[126.154943, "o", ","]
+[126.168104, "o", " "]
+[126.254295, "o", "o"]
+[126.326551, "o", "f"]
+[126.365925, "o", " "]
+[126.375131, "o", "c"]
+[126.405362, "o", "o"]
+[126.447585, "o", "u"]
+[126.48178, "o", "r"]
+[126.491039, "o", "s"]
+[126.525247, "o", "e"]
+[126.72558, "o", ","]
+[126.734784, "o", " "]
+[126.843047, "o", "w"]
+[126.875328, "o", "e"]
+[126.910532, "o", " "]
+[126.992769, "o", "c"]
+[127.001978, "o", "a"]
+[127.011316, "o", "n"]
+[127.113546, "o", " "]
+[127.150844, "o", "a"]
+[127.177006, "o", "l"]
+[127.259386, "o", "s"]
+[127.279586, "o", "o"]
+[127.311892, "o", " "]
+[127.512037, "o", "c"]
+[127.527474, "o", "r"]
+[127.608543, "o", "e"]
+[127.617801, "o", "a"]
+[127.672153, "o", "t"]
+[127.697353, "o", "e"]
+[127.726607, "o", " "]
+[127.844823, "o", "r"]
+[127.857092, "o", "e"]
+[127.866339, "o", "m"]
+[127.875481, "o", "o"]
+[127.888746, "o", "t"]
+[127.90288, "o", "e"]
+[127.98813, "o", " "]
+[128.02441, "o", "r"]
+[128.033581, "o", "e"]
+[128.125737, "o", "p"]
+[128.150046, "o", "o"]
+[128.162376, "o", "s"]
+[128.230543, "o", " "]
+[128.280725, "o", "v"]
+[128.29801, "o", "i"]
+[128.316271, "o", "a"]
+[128.47456, "o", " "]
+[128.483698, "o", "s"]
+[128.630991, "o", "s"]
+[128.640409, "o", "h"]
+[128.670628, "o", " "]
+[128.707849, "o", "w"]
+[128.735191, "o", "h"]
+[128.753404, "o", "e"]
+[128.789521, "o", "n"]
+[128.849767, "o", " "]
+[128.859015, "o", "b"]
+[128.890351, "o", "o"]
+[128.899472, "o", "r"]
+[128.9358, "o", "g"]
+[129.06102, "o", " "]
+[129.141359, "o", "i"]
+[129.177411, "o", "s"]
+[129.247728, "o", " "]
+[129.328031, "o", "s"]
+[129.365326, "o", "e"]
+[129.40164, "o", "t"]
+[129.410925, "o", "u"]
+[129.420179, "o", "p"]
+[129.533395, "o", " "]
+[129.603915, "o", "t"]
+[129.632102, "o", "h"]
+[129.688358, "o", "e"]
+[129.702472, "o", "r"]
+[129.711754, "o", "e"]
+[129.848099, "o", "."]
+[129.888271, "o", " "]
+[129.938485, "o", "T"]
+[129.983655, "o", "h"]
+[129.99987, "o", "i"]
+[130.034166, "o", "s"]
+[130.234474, "o", " "]
+[130.276717, "o", "c"]
+[130.335062, "o", "o"]
+[130.481239, "o", "m"]
+[130.490432, "o", "m"]
+[130.499717, "o", "a"]
+[130.508944, "o", "n"]
+[130.549258, "o", "d"]
+[130.558433, "o", " "]
+[130.579662, "o", "c"]
+[130.589159, "o", "r"]
+[130.679313, "o", "e"]
+[130.729701, "o", "a"]
+[130.77038, "o", "t"]
+[130.796754, "o", "e"]
+[130.806051, "o", "s"]
+[130.815456, "o", " "]
+[130.836666, "o", "a"]
+[130.858594, "o", " "]
+[130.893823, "o", "n"]
+[130.90322, "o", "e"]
+[130.928447, "o", "w"]
+[131.128719, "o", " "]
+[131.149039, "o", "r"]
+[131.163241, "o", "e"]
+[131.222466, "o", "m"]
+[131.276733, "o", "o"]
+[131.329107, "o", "t"]
+[131.346285, "o", "e"]
+[131.469616, "o", " "]
+[131.47873, "o", "r"]
+[131.613973, "o", "e"]
+[131.630178, "o", "p"]
+[131.721452, "o", "o"]
+[131.92188, "o", " "]
+[131.931057, "o", "i"]
+[132.001192, "o", "n"]
+[132.124532, "o", " "]
+[132.155674, "o", "a"]
+[132.313904, "o", " "]
+[132.402208, "o", "s"]
+[132.436356, "o", "u"]
+[132.461743, "o", "b"]
+[132.491871, "o", "d"]
+[132.575409, "o", "i"]
+[132.618543, "o", "r"]
+[132.666702, "o", "e"]
+[132.770145, "o", "c"]
+[132.886425, "o", "t"]
+[132.93074, "o", "o"]
+[132.939988, "o", "r"]
+[133.009197, "o", "y"]
+[133.154532, "o", " "]
+[133.163772, "o", "c"]
+[133.261046, "o", "a"]
+[133.270304, "o", "l"]
+[133.312583, "o", "l"]
+[133.329723, "o", "e"]
+[133.383944, "o", "d"]
+[133.485249, "o", " "]
+[133.494445, "o", "\""]
+[133.537755, "o", "d"]
+[133.580096, "o", "e"]
+[133.596329, "o", "m"]
+[133.606488, "o", "o"]
+[133.631869, "o", "\""]
+[133.641994, "o", ":"]
+[133.784809, "o", "\r\n"]
+[133.791174, "o", "$ "]
+[133.791411, "o", "#"]
+[133.843446, "o", " "]
+[133.878698, "o", "T"]
+[133.915928, "o", "O"]
+[134.044173, "o", "D"]
+[134.100478, "o", "O"]
+[134.300737, "o", ":"]
+[134.367031, "o", " "]
+[134.3813, "o", "r"]
+[134.405583, "o", "e"]
+[134.428941, "o", "m"]
+[134.560094, "o", "o"]
+[134.628362, "o", "t"]
+[134.665622, "o", "e"]
+[134.779902, "o", " "]
+[134.815285, "o", "r"]
+[134.840462, "o", "e"]
+[134.858685, "o", "p"]
+[134.895862, "o", "o"]
+[135.096376, "o", "\r\n"]
+[135.103343, "o", "$ "]
+[135.103544, "o", "#"]
+[135.259575, "o", " "]
+[135.305934, "o", "b"]
+[135.352155, "o", "o"]
+[135.39031, "o", "r"]
+[135.539598, "o", "g"]
+[135.644988, "o", " "]
+[135.708095, "o", "i"]
+[135.849295, "o", "n"]
+[135.941548, "o", "i"]
+[135.969808, "o", "t"]
+[136.072193, "o", " "]
+[136.087424, "o", "-"]
+[136.148643, "o", "-"]
+[136.157884, "o", "e"]
+[136.168175, "o", "n"]
+[136.192426, "o", "c"]
+[136.326543, "o", "r"]
+[136.385778, "o", "y"]
+[136.43705, "o", "p"]
+[136.455431, "o", "t"]
+[136.464597, "o", "i"]
+[136.506833, "o", "o"]
+[136.516072, "o", "n"]
+[136.539451, "o", "="]
+[136.548665, "o", "r"]
+[136.590806, "o", "e"]
+[136.665024, "o", "p"]
+[136.68527, "o", "o"]
+[136.785681, "o", "k"]
+[136.821872, "o", "e"]
+[136.955162, "o", "y"]
+[137.127435, "o", " "]
+[137.239589, "o", "b"]
+[137.257848, "o", "o"]
+[137.267022, "o", "r"]
+[137.359442, "o", "g"]
+[137.423573, "o", "d"]
+[137.471836, "o", "e"]
+[137.51207, "o", "m"]
+[137.553288, "o", "o"]
+[137.724518, "o", "@"]
+[137.734742, "o", "r"]
+[137.780119, "o", "e"]
+[137.817324, "o", "m"]
+[137.826658, "o", "o"]
+[137.866814, "o", "t"]
+[137.990002, "o", "e"]
+[137.99931, "o", "s"]
+[138.013533, "o", "e"]
+[138.03268, "o", "r"]
+[138.056928, "o", "v"]
+[138.076146, "o", "e"]
+[138.1895, "o", "r"]
+[138.24778, "o", "."]
+[138.308046, "o", "e"]
+[138.366299, "o", "x"]
+[138.442585, "o", "a"]
+[138.474757, "o", "m"]
+[138.551897, "o", "p"]
+[138.604345, "o", "l"]
+[138.675495, "o", "e"]
+[138.74175, "o", ":"]
+[138.755006, "o", "."]
+[138.808358, "o", "/"]
+[138.885548, "o", "d"]
+[138.894721, "o", "e"]
+[138.909971, "o", "m"]
+[138.946243, "o", "o"]
+[139.020541, "o", "\r\n"]
+[139.027457, "o", "$ "]
+[139.027946, "o", "\r\n"]
+[139.035508, "o", "$ "]
+[139.035742, "o", "#"]
+[139.056782, "o", " "]
+[139.134117, "o", "E"]
+[139.163281, "o", "a"]
+[139.266597, "o", "s"]
+[139.393905, "o", "y"]
+[139.4031, "o", ","]
+[139.443297, "o", " "]
+[139.643712, "o", "i"]
+[139.658936, "o", "s"]
+[139.767016, "o", "n"]
+[139.813446, "o", "'"]
+[139.83566, "o", "t"]
+[139.987748, "o", " "]
+[140.032024, "o", "i"]
+[140.041273, "o", "t"]
+[140.068533, "o", "?"]
+[140.077871, "o", " "]
+[140.09507, "o", "T"]
+[140.104292, "o", "h"]
+[140.144553, "o", "a"]
+[140.153796, "o", "t"]
+[140.226189, "o", "'"]
+[140.30633, "o", "s"]
+[140.372628, "o", " "]
+[140.381914, "o", "a"]
+[140.44316, "o", "l"]
+[140.512298, "o", "l"]
+[140.600639, "o", " "]
+[140.613761, "o", "y"]
+[140.634611, "o", "o"]
+[140.662883, "o", "u"]
+[140.75017, "o", " "]
+[140.759277, "o", "n"]
+[140.811486, "o", "e"]
+[140.823689, "o", "e"]
+[140.833046, "o", "d"]
+[140.888235, "o", " "]
+[140.96563, "o", "t"]
+[141.048842, "o", "o"]
+[141.110063, "o", " "]
+[141.165425, "o", "k"]
+[141.319575, "o", "n"]
+[141.403929, "o", "o"]
+[141.416081, "o", "w"]
+[141.493373, "o", " "]
+[141.595624, "o", "f"]
+[141.626937, "o", "o"]
+[141.656314, "o", "r"]
+[141.856691, "o", " "]
+[141.871853, "o", "b"]
+[141.88099, "o", "a"]
+[141.955377, "o", "s"]
+[142.029631, "o", "i"]
+[142.07279, "o", "c"]
+[142.102136, "o", " "]
+[142.195464, "o", "u"]
+[142.212703, "o", "s"]
+[142.221928, "o", "a"]
+[142.236917, "o", "g"]
+[142.250466, "o", "e"]
+[142.298074, "o", "."]
+[142.322926, "o", "\r\n"]
+[142.33032, "o", "$ #"]
+[142.344619, "o", " "]
+[142.3538, "o", "I"]
+[142.457161, "o", "f"]
+[142.492524, "o", " "]
+[142.506548, "o", "y"]
+[142.533941, "o", "o"]
+[142.6382, "o", "u"]
+[142.762361, "o", " "]
+[142.771487, "o", "w"]
+[142.8609, "o", "a"]
+[142.898012, "o", "n"]
+[142.90733, "o", "t"]
+[142.922516, "o", " "]
+[142.931711, "o", "t"]
+[142.950968, "o", "o"]
+[143.040283, "o", " "]
+[143.049523, "o", "s"]
+[143.093814, "o", "e"]
+[143.139096, "o", "e"]
+[143.244326, "o", " "]
+[143.253675, "o", "m"]
+[143.262823, "o", "o"]
+[143.382011, "o", "r"]
+[143.450343, "o", "e"]
+[143.477521, "o", ","]
+[143.535949, "o", " "]
+[143.682216, "o", "h"]
+[143.720414, "o", "a"]
+[143.729628, "o", "v"]
+[143.750866, "o", "e"]
+[143.771044, "o", " "]
+[143.780387, "o", "a"]
+[143.799638, "o", " "]
+[143.886672, "o", "l"]
+[143.908113, "o", "o"]
+[143.919279, "o", "o"]
+[143.933475, "o", "k"]
+[143.95976, "o", " "]
+[144.08108, "o", "a"]
+[144.090215, "o", "t"]
+[144.267559, "o", " "]
+[144.295797, "o", "t"]
+[144.308084, "o", "h"]
+[144.487258, "o", "e"]
+[144.533617, "o", " "]
+[144.572955, "o", "s"]
+[144.614196, "o", "c"]
+[144.628349, "o", "r"]
+[144.637741, "o", "e"]
+[144.646934, "o", "e"]
+[144.761162, "o", "n"]
+[144.776332, "o", "c"]
+[144.785573, "o", "a"]
+[144.867894, "o", "s"]
+[144.942152, "o", "t"]
+[144.985407, "o", " "]
+[145.00071, "o", "s"]
+[145.065016, "o", "h"]
+[145.119205, "o", "o"]
+[145.136383, "o", "w"]
+[145.228582, "o", "i"]
+[145.320828, "o", "n"]
+[145.330002, "o", "g"]
+[145.48531, "o", " "]
+[145.540596, "o", "t"]
+[145.55472, "o", "h"]
+[145.754959, "o", "e"]
+[145.872213, "o", " "]
+[145.886439, "o", "\""]
+[145.941662, "o", "a"]
+[146.025059, "o", "d"]
+[146.034198, "o", "v"]
+[146.043359, "o", "a"]
+[146.052496, "o", "n"]
+[146.0618, "o", "c"]
+[146.076046, "o", "e"]
+[146.096145, "o", "d"]
+[146.190544, "o", " "]
+[146.224789, "o", "u"]
+[146.256866, "o", "s"]
+[146.296133, "o", "a"]
+[146.305405, "o", "g"]
+[146.340774, "o", "e"]
+[146.397044, "o", "\""]
+[146.575141, "o", "."]
+[146.591557, "o", "\r\n"]
+[146.606539, "o", "$ "]
+[146.606765, "o", "#"]
+[146.619746, "o", " "]
+[146.694188, "o", "I"]
+[146.723306, "o", "n"]
+[146.759782, "o", " "]
+[146.783684, "o", "a"]
+[146.792936, "o", "n"]
+[146.804129, "o", "y"]
+[146.823545, "o", " "]
+[146.857728, "o", "c"]
+[146.886975, "o", "a"]
+[147.023183, "o", "s"]
+[147.033452, "o", "e"]
+[147.149777, "o", ","]
+[147.196063, "o", " "]
+[147.269303, "o", "e"]
+[147.341648, "o", "n"]
+[147.373811, "o", "j"]
+[147.454018, "o", "o"]
+[147.537271, "o", "y"]
+[147.667678, "o", " "]
+[147.676723, "o", "u"]
+[147.687193, "o", "s"]
+[147.887402, "o", "i"]
+[147.911655, "o", "n"]
+[147.946812, "o", "g"]
+[147.964174, "o", " "]
+[148.017308, "o", "b"]
+[148.15467, "o", "o"]
+[148.269897, "o", "r"]
+[148.331102, "o", "g"]
+[148.458441, "o", "!"]
+[148.576186, "o", "\r\n"]
+[148.583191, "o", "$ \r\n"]

@@ -87,4 +87,6 @@ jobs:
         #sudo -E bash -c "tox -e py"
         #tox --skip-missing-interpreters
         pip install llfuse
+        echo "AllFiles vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        sudo sqlite3 /Library/Application\ Support/com.apple.TCC/TCC.db 'select * from access' | grep AllFiles
         pytest -vk test_fuse

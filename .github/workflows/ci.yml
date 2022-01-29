@@ -72,6 +72,7 @@ jobs:
         #brew install lz4 || brew upgrade lz4
         #brew install openssl@1.1 || brew upgrade openssl@1.1
         brew install --cask macfuse || brew upgrade --cask macfuse  # Required for Python llfuse module
+        brew install tccutil  # needs SIP disabled!
 
     - name: Install Python requirements
       run: |
@@ -91,6 +92,8 @@ jobs:
         sudo sqlite3 /Library/Application\ Support/com.apple.TCC/TCC.db 'select * from access' | grep AllFiles
         # kTCCServiceSystemPolicyAllFiles|/bin/bash|1|2|0|1||||UNUSED||0|1583997993
         which borg
-        sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "INSERT OR IGNORE INTO access \
-          VALUES('kTCCServiceSystemPolicyAllFiles','/bin/sh',1,2,0,1,NULL,NULL,NULL,'UNUSED',NULL,0,1583997993);"
+        sudo tccutil --service kTCCServiceSystemPolicyAllFiles --insert /bin/sh
+        sudo tccutil --enable /bin/sh
+        echo "AllFiles vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        sudo sqlite3 /Library/Application\ Support/com.apple.TCC/TCC.db 'select * from access' | grep AllFiles
         pytest -vvk test_fuse

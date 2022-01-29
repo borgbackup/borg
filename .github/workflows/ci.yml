@@ -86,4 +86,5 @@ jobs:
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
         #tox --skip-missing-interpreters
+        pip install llfuse
         pytest -vk test_fuse

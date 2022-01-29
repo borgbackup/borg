@@ -86,4 +86,4 @@ jobs:
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
         #tox --skip-missing-interpreters
-        pytest -k test_fuse
+        pytest -vk test_fuse

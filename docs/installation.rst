@@ -315,15 +315,10 @@ Cygwin
 
 Use the Cygwin installer to install the dependencies::
 
-    python3 python3-devel libcrypt-devel python3-setuptools
-    binutils gcc-g++
-    libopenssl openssl-devel
-    git make openssh
-
-You can then install ``pip`` and ``virtualenv``::
-
-    easy_install-3.6 pip
-    pip install virtualenv
+    python38 python38-devel python38-pkgconfig
+    python38-setuptools python38-pip python38-wheel python38-virtualenv
+    libssl-devel libxxhash-devel liblz4-devel libzstd-devel
+    binutils gcc-g++ git make openssh
 
 
 .. _pip-installation:

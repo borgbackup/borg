@@ -74,6 +74,7 @@ diff -s Wallpaper/deer.jpg Wallpaper.orig/deer.jpg
 }
 
 foreach line [split [string trimleft $script] \n] {
+  send_user "$ "
   send_user -h $line\n
   spawn -noecho /bin/sh -c $line
   expect {

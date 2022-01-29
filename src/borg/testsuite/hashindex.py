@@ -89,7 +89,7 @@ class HashIndexTestCase(BaseTestCase):
             for x in range(n):
                 idx[H(x)] = x, x
             idx.write(filepath)
-            self.assert_true(initial_size < os.path.getsize(filepath))
+            assert initial_size < os.path.getsize(filepath)
             for x in range(n):
                 del idx[H(x)]
             self.assert_equal(len(idx), 0)

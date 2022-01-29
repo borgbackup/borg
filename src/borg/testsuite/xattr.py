@@ -62,7 +62,7 @@ class XattrTestCase(BaseTestCase):
             setxattr(tmp_fn, key, b'x')
         got_keys = listxattr(tmp_fn)
         self.assert_equal_se(got_keys, keys)
-        self.assert_true(len(buffer) > 64)
+        assert len(buffer) > 64
 
     def test_getxattr_buffer_growth(self):
         tmp_fn = os.fsencode(self.tmpfile.name)

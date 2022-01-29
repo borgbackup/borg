@@ -628,7 +628,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
                 self.assert_equal(fd.read(len(content)), content)
                 self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
-            self.assert_true(is_sparse(filename, total_size, hole_size))
+            assert is_sparse(filename, total_size, hole_size)
 
     def test_unusual_filenames(self):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]
@@ -787,7 +787,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test', '--strip-components', '3')
-            self.assert_true(not os.path.exists('file'))
+            assert not os.path.exists('file')
             with self.assert_creates_file('file'):
                 self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
             with self.assert_creates_file('dir/file'):
@@ -3928,16 +3928,16 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         marker = 'cached responses left in RemoteRepository'
         with changedir('output'):
             res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '3')
-            self.assert_true(marker not in res)
+            assert marker not in res
             with self.assert_creates_file('file'):
                 res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '2')
-                self.assert_true(marker not in res)
+                assert marker not in res
             with self.assert_creates_file('dir/file'):
                 res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '1')
-                self.assert_true(marker not in res)
+                assert marker not in res
             with self.assert_creates_file('input/dir/file'):
                 res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
-                self.assert_true(marker not in res)
+                assert marker not in res
 
 
 class ArchiverCorruptionTestCase(ArchiverTestCaseBase):

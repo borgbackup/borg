@@ -60,7 +60,7 @@ jobs:
             - os: ubuntu-20.04
               python-version: '3.10'
               toxenv: py310-fuse3
-            - os: macos-10.15  # macos-latest is macos 11.6.2 and hanging at test_fuse, #6099
+            - os: macos-latest
               python-version: '3.8'
               toxenv: py38-fuse2
 
@@ -104,9 +104,9 @@ jobs:
       if: ${{ runner.os == 'macOS' }}
       run: |
         brew install pkg-config || brew upgrade pkg-config
-        brew install zstd || brew upgrade zstd
-        brew install lz4 || brew upgrade lz4
-        brew install openssl@1.1 || brew upgrade openssl@1.1
+        #brew install zstd || brew upgrade zstd
+        #brew install lz4 || brew upgrade lz4
+        #brew install openssl@1.1 || brew upgrade openssl@1.1
         brew install --cask macfuse || brew upgrade --cask macfuse  # Required for Python llfuse module
 
     - name: Install Python requirements
@@ -121,8 +121,10 @@ jobs:
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
-        tox --skip-missing-interpreters
+        #tox --skip-missing-interpreters
+        pytest -k test_fuse
     - name: Upload coverage to Codecov
+      if: 0
       uses: codecov/codecov-action@v1
       env:
         OS: ${{ runner.os }}

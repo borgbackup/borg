@@ -94,8 +94,8 @@ jobs:
         which borg
         sudo csrutil disable
         sudo csrutil status
-        sudo tccutil --service kTCCServiceSystemPolicyAllFiles --insert /bin/sh
-        sudo tccutil --enable /bin/sh
+        sudo tccutil.py --service kTCCServiceSystemPolicyAllFiles --insert /bin/sh
+        sudo tccutil.py --enable /bin/sh
         echo "AllFiles vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
         sudo sqlite3 /Library/Application\ Support/com.apple.TCC/TCC.db 'select * from access' | grep AllFiles
         pytest -vvk test_fuse

@@ -820,7 +820,7 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
     def test_hints_behaviour(self):
         self.repository.put(H(0), b'data')
         self.assert_equal(self.repository.shadow_index, {})
-        self.assert_true(len(self.repository.compact) == 0)
+        assert len(self.repository.compact) == 0
         self.repository.delete(H(0))
         self.repository.commit()
         # this is to make the previous delete "stable", see delete_is_not_stable:

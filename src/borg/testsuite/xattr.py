@@ -50,7 +50,7 @@ class XattrTestCase(BaseTestCase):
             setxattr(self.tmpfile.name, key, b'x')
         got_keys = listxattr(self.tmpfile.name)
         self.assert_equal_se(got_keys, keys)
-        self.assert_true(len(buffer) > 64)
+        assert len(buffer) > 64
 
     def test_getxattr_buffer_growth(self):
         # make it work even with ext4, which imposes rather low limits

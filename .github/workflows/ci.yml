@@ -89,4 +89,5 @@ jobs:
         pip install llfuse
         echo "AllFiles vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
         sudo sqlite3 /Library/Application\ Support/com.apple.TCC/TCC.db 'select * from access' | grep AllFiles
-        pytest -vk test_fuse
+        # kTCCServiceSystemPolicyAllFiles|/bin/bash|1|2|0|1||||UNUSED||0|1583997993
+        sudo pytest -vk test_fuse

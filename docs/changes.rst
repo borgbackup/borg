@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.17 (2021-07-12)
----------------------------
+Version 1.1.18 (not released yet)
+---------------------------------
 
 Compatibility notes:
 
@@ -245,6 +245,61 @@ Compatibility notes:
   update them to check for >= 128 (as documented since long).
 - 1.1.15 drops python 3.4 support, minimum requirement is 3.5 now.
 - 1.1.17 install_requires the "packaging" pypi package now.
+
+New features:
+
+- check --repair: significantly speed up search for next valid object in segment, #6022
+- create: add retry_erofs workaround for O_NOATIME issue on volume shadow copies in WSL1, #6024
+- key export: display key if path is '-' or not given, #6092
+- list --format: add command_line to format keys, #6108
+
+Fixes:
+
+- fix hardlinkable file type check, #6037
+- list: remove placeholders for shake_* hashes, #6082
+- do not show archive name in error msgs referring to the repository, #6023
+- prettier error msg (no stacktrace) if exclude file is missing, #5734
+- do not require BORG_CONFIG_DIR if BORG_{SECURITY,KEYS}_DIR are set, #5979
+- atomically create the CACHE_TAG file, #6028
+- deal with the SaveFile/SyncFile race, docs, see #6176 5c5b59bc9
+- avoid expanding path into LHS of formatting operation + tests, #6064 #6063
+- repository: quota / compactable computation fixes, #6119.
+  This is mainly to keep the repo code in sync with borg 1.2. As borg 1.1
+  compacts immediately, there was not really an issue with this in 1.1.
+- info: emit repo info even if repo has 0 archives, #6120
+
+Other changes:
+
+- fix xxh64 related build (setup.py)
+- upgrade bundled xxhash code to 0.8.1
+- msgpack build: remove endianness macro, #6105
+- update and fix shell completions
+- fuse: remove unneeded version check and compat code
+- docs:
+
+  - ~/.config/borg/keys is not used for repokey keys, #6107
+  - excluded parent dir's metadata can't restore, #6062
+  - permissions note rewritten to make it less confusing, #5490
+  - add note about grandfather-father-son backup retention policy / rotation scheme
+  - clarify who starts the remote agent (borg serve)
+  - test/improve pull backup docs, #5903
+  - document the socat pull mode described in #900 #515ß
+  - borg serve: improve ssh forced commands docs, #6083
+  - improve docs for borg list --format, #6080
+  - fix the broken link to .nix file
+  - clarify pattern usage with commands, #5176
+  - clarify user_id vs uid for fuse, #5723
+  - fix binary build freebsd/macOS version, #5942
+  - FAQ: fix manifest-timestamp path, #6016
+  - remove duplicate faq entries, #5926
+  - fix sphinx warnings, #5919
+- vagrant / CI / testing:
+
+  - misc. fixes and updates, new python versions
+  - macOS on github: re-enable fuse2 testing by downgrading to older macOS, #6099
+
+Version 1.1.17 (2021-07-12)
+---------------------------
 
 Fixes:
 

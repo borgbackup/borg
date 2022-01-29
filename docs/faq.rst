@@ -733,7 +733,7 @@ on one machine.
 
 For repositories that are used by multiple users and/or from multiple machines
 it is safest to avoid running *any* commands that modify the repository after
-the nonce is deleted.
+the nonce is deleted or if you suspect it may have been tampered with. See :ref:`attack_model`.
 
 Common issues
 #############

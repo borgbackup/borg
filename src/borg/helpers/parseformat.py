@@ -382,19 +382,21 @@ class Location:
             raise ValueError('Invalid location format: "%s"' % self.orig)
 
     def parse(self, text, overrides={}):
-        self.orig = text
-        text = replace_placeholders(text, overrides)
+        self.raw = text  # as given by user, might contain placeholders
+        self.orig = text = replace_placeholders(text, overrides)  # after placeholder replacement
         valid = self._parse(text)
         if valid:
             return True
         m = self.env_re.match(text)
         if not m:
             return False
-        repo = os.environ.get('BORG_REPO')
-        if repo is None:
+        repo_raw = os.environ.get('BORG_REPO')
+        if repo_raw is None:
             return False
+        repo = replace_placeholders(repo_raw, overrides)
         valid = self._parse(repo)
         self.archive = m.group('archive')
+        self.raw = repo_raw if not self.archive else repo_raw + self.raw
         self.orig = repo if not self.archive else '%s::%s' % (repo, self.archive)
         return valid
 
@@ -488,14 +490,15 @@ class Location:
                                            path)
 
     def with_timestamp(self, timestamp):
-        return Location(self.orig, overrides={
+        return Location(self.raw, overrides={
             'now': DatetimeWrapper(timestamp.astimezone(None)),
             'utcnow': DatetimeWrapper(timestamp),
         })
 
     def omit_archive(self):
-        loc = Location(self.orig)
+        loc = Location(self.raw)
         loc.archive = None
+        loc.raw = loc.raw.split("::")[0]
         loc.orig = loc.orig.split("::")[0]
         return loc
 

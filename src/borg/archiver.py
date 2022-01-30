@@ -1352,6 +1352,7 @@ class Archiver:
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
             msg_delete = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
             msg_not_found = 'Archive {} not found ({}/{}).'
+            delete_count = 0
             for i, archive_name in enumerate(archive_names, 1):
                 try:
                     archive_info = manifest.archives[archive_name]
@@ -1363,7 +1364,9 @@ class Archiver:
                         archive = Archive(repository, key, manifest, archive_name, cache=cache,
                                           consider_part_files=args.consider_part_files)
                         archive.delete(stats, progress=args.progress, forced=args.forced)
-            if not dry_run:
+                        delete_count += 1
+            if delete_count > 0:
+                # only write/commit if we actually changed something, see #6060.
                 manifest.write()
                 repository.commit(save_space=args.save_space)
                 cache.commit()

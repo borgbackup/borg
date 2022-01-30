@@ -240,7 +240,7 @@ class TestLocationWithoutEnv:
         loc_without_archive = loc.omit_archive()
         assert loc_without_archive.archive is None
         assert loc_without_archive.raw == "ssh://user@host:1234/repos/{hostname}"
-        assert loc_without_archive.orig == "ssh://user@host:1234/repos/%s" % hostname
+        assert loc_without_archive.processed == "ssh://user@host:1234/repos/%s" % hostname
 
 
 class TestLocationWithEnv:

@@ -87,10 +87,10 @@ class TestKey:
 
     class MockRepository:
         class _Location:
-            orig = '/some/place'
+            raw = processed = '/some/place'
 
             def canonical_path(self):
-                return self.orig
+                return self.processed
 
         _location = _Location()
         id = bytes(32)

@@ -636,7 +636,7 @@ class Archiver:
         dry_run = args.dry_run
         t0 = datetime.utcnow()
         t0_monotonic = time.monotonic()
-        logger.info('Creating archive at "%s"' % args.location.orig)
+        logger.info('Creating archive at "%s"' % args.location.processed)
         if not dry_run:
             with Cache(repository, key, manifest, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,

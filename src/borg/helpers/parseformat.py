@@ -379,11 +379,11 @@ class Location:
 
     def __init__(self, text='', overrides={}):
         if not self.parse(text, overrides):
-            raise ValueError('Invalid location format: "%s"' % self.orig)
+            raise ValueError('Invalid location format: "%s"' % self.processed)
 
     def parse(self, text, overrides={}):
         self.raw = text  # as given by user, might contain placeholders
-        self.orig = text = replace_placeholders(text, overrides)  # after placeholder replacement
+        self.processed = text = replace_placeholders(text, overrides)  # after placeholder replacement
         valid = self._parse(text)
         if valid:
             return True
@@ -397,7 +397,7 @@ class Location:
         valid = self._parse(repo)
         self.archive = m.group('archive')
         self.raw = repo_raw if not self.archive else repo_raw + self.raw
-        self.orig = repo if not self.archive else '%s::%s' % (repo, self.archive)
+        self.processed = repo if not self.archive else '%s::%s' % (repo, self.archive)
         return valid
 
     def _parse(self, text):
@@ -499,7 +499,7 @@ class Location:
         loc = Location(self.raw)
         loc.archive = None
         loc.raw = loc.raw.split("::")[0]
-        loc.orig = loc.orig.split("::")[0]
+        loc.processed = loc.processed.split("::")[0]
         return loc
 
 

@@ -50,7 +50,7 @@ Fedora/RHEL  `Fedora official repository`_                 ``dnf install borgbac
 FreeBSD      `FreeBSD ports`_                              ``cd /usr/ports/archivers/py-borgbackup && make install clean``
 macOS        `Homebrew`_                                   | ``brew install borgbackup`` (official formula, **no** FUSE support)
                                                            | **or**
-                                                           | ``brew install --cask macfuse`` (`private Tap`_, FUSE support) 
+                                                           | ``brew install --cask macfuse`` (`private Tap`_, FUSE support)
                                                            | ``brew install borgbackup/tap/borgbackup-fuse``
 Mageia       `cauldron`_                                   ``urpmi borgbackup``
 NetBSD       `pkgsrc`_                                     ``pkg_add py-borgbackup``
@@ -90,7 +90,7 @@ github to followup on packaging efforts.
 .. start-badges
 
 |Packaging status|
- 
+
 .. |Packaging status| image:: https://repology.org/badge/vertical-allrepos/borgbackup.svg
         :alt: Packaging status
         :target: https://repology.org/project/borgbackup/versions
@@ -290,15 +290,10 @@ Cygwin
 
 Use the Cygwin installer to install the dependencies::
 
-    python3 python3-devel python3-setuptools
-    binutils gcc-g++
-    libopenssl openssl-devel
-    git make openssh
-
-You can then install ``pip`` and ``virtualenv``::
-
-    easy_install-3.7 pip
-    pip install virtualenv
+    python38 python38-devel python38-pkgconfig
+    python38-setuptools python38-pip python38-wheel python38-virtualenv
+    libssl-devel libxxhash-devel liblz4-devel libzstd-devel
+    binutils gcc-g++ git make openssh
 
 
 .. _pip-installation:

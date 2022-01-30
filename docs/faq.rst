@@ -514,10 +514,12 @@ The Borg config directory has content that you should take care of:
   recovered.
 
 ``keys`` subdirectory
-  All your borg keyfile keys are stored in this directory. Please note that
-  borg repokey keys are stored inside the repository. You MUST make sure to have an
-  independent backup of these keyfiles, otherwise you cannot access your backups anymore if you lose
-  them. You also MUST keep these files secret; everyone who gains access to your repository and has
+  All your borg keyfile keys are stored in this directory. Please note that borg repokey keys are stored inside the repository. 
+  
+  If you use keyfile encryption, you MUST make sure to have an independent backup of these keyfiles, otherwise you cannot access your backups anymore if you lose
+  them. If you use repokey encryption it is also highly recommended that you backup the keyfiles in case the originals (stored within the repository) get damaged. The best way to create a backup is using the ``borg key export`` command. 
+  
+  You also MUST keep these files secret; everyone who gains access to your repository and has
   the corresponding keyfile (and the key passphrase) can extract it.
 
 Make sure that only you have access to the Borg config directory.

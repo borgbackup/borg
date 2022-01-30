@@ -58,7 +58,7 @@ def packages_darwin
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
     brew install pkg-config readline openssl@1.1 zstd lz4 xz fakeroot git
-    brew install --cask osxfuse
+    brew install --cask macfuse
     brew upgrade  # upgrade everything
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
   EOF
@@ -207,6 +207,8 @@ def install_pyenv(boxname)
     . ~/.bash_profile
     curl -s -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
     echo 'eval "$(pyenv init --path)"' >> ~/.bash_profile
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
     echo 'eval "$(pyenv init -)"' >> ~/.bashrc
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
   EOF
@@ -259,6 +261,7 @@ def install_borg(fuse)
     cd borg
     pip install -r requirements.d/development.lock.txt
     python setup.py clean
+    python setup.py clean2
   EOF
   if fuse
     script += <<-EOF
@@ -418,7 +421,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "darwin64" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 2048 + $wmem
+      v.memory = 4096 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']
@@ -489,7 +492,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "openindiana64" do |b|
     b.vm.box = "openindiana"
     b.vm.provider :virtualbox do |v|
-      v.memory = 3072 + $wmem
+      v.memory = 2048 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana

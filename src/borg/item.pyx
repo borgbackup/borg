@@ -536,7 +536,7 @@ class ItemDiff:
         return chunks_contents_equal(chunk_iterator1, chunk_iterator2)
 
 
-def chunks_contents_equal(chunks1, chunks2):
+def chunks_contents_equal(chunks_a, chunks_b):
     """
     Compare chunk content and return True if they are identical.
 

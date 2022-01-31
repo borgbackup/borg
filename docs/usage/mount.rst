@@ -22,7 +22,7 @@ Examples
     root  sbin  srv  tmp  usr  var
     $ borg umount /tmp/mymountpoint
 
-    # The experimental "versions view" merges all archives in the repository
+    # The "versions view" merges all archives in the repository
     # and provides a versioned view on files.
     $ borg mount -o versions /path/to/repo /tmp/mymountpoint
     $ ls -l /tmp/mymountpoint/home/user/doc.txt/

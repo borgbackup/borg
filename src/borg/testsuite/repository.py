@@ -887,19 +887,19 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
             self.repository.call('inject_exception', {'kind': 'DoesNotExist'})
         except Repository.DoesNotExist as e:
             assert len(e.args) == 1
-            assert e.args[0] == self.repository.location.orig
+            assert e.args[0] == self.repository.location.processed
 
         try:
             self.repository.call('inject_exception', {'kind': 'AlreadyExists'})
         except Repository.AlreadyExists as e:
             assert len(e.args) == 1
-            assert e.args[0] == self.repository.location.orig
+            assert e.args[0] == self.repository.location.processed
 
         try:
             self.repository.call('inject_exception', {'kind': 'CheckNeeded'})
         except Repository.CheckNeeded as e:
             assert len(e.args) == 1
-            assert e.args[0] == self.repository.location.orig
+            assert e.args[0] == self.repository.location.processed
 
         try:
             self.repository.call('inject_exception', {'kind': 'IntegrityError'})
@@ -918,7 +918,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         except Repository.ObjectNotFound as e:
             assert len(e.args) == 2
             assert e.args[0] == s1
-            assert e.args[1] == self.repository.location.orig
+            assert e.args[1] == self.repository.location.processed
 
         try:
             self.repository.call('inject_exception', {'kind': 'InvalidRPCMethod'})

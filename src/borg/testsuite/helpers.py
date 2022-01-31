@@ -235,10 +235,12 @@ class TestLocationWithoutEnv:
             Location('ssh://user@host:/path')
 
     def test_omit_archive(self):
-        loc = Location('ssh://user@host:1234/some/path::archive')
+        from borg.platform import hostname
+        loc = Location('ssh://user@host:1234/repos/{hostname}::archive')
         loc_without_archive = loc.omit_archive()
         assert loc_without_archive.archive is None
-        assert loc_without_archive.orig == "ssh://user@host:1234/some/path"
+        assert loc_without_archive.raw == "ssh://user@host:1234/repos/{hostname}"
+        assert loc_without_archive.processed == "ssh://user@host:1234/repos/%s" % hostname
 
 
 class TestLocationWithEnv:
@@ -250,6 +252,16 @@ class TestLocationWithEnv:
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
         assert repr(Location()) == \
                "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
+
+    def test_ssh_placeholder(self, monkeypatch):
+        from borg.platform import hostname
+        monkeypatch.setenv('BORG_REPO', 'ssh://user@host:1234/{hostname}')
+        assert repr(Location('::archive')) == \
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/{}', archive='archive')".format(hostname)
+        assert repr(Location('::')) == \
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/{}', archive=None)".format(hostname)
+        assert repr(Location()) == \
+            "Location(proto='ssh', user='user', host='host', port=1234, path='/{}', archive=None)".format(hostname)
 
     def test_file(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'file:///some/path')

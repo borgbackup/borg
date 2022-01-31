@@ -738,11 +738,11 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             args = unpacked.get(b'exception_args')
 
             if error == 'DoesNotExist':
-                raise Repository.DoesNotExist(self.location.orig)
+                raise Repository.DoesNotExist(self.location.processed)
             elif error == 'AlreadyExists':
-                raise Repository.AlreadyExists(self.location.orig)
+                raise Repository.AlreadyExists(self.location.processed)
             elif error == 'CheckNeeded':
-                raise Repository.CheckNeeded(self.location.orig)
+                raise Repository.CheckNeeded(self.location.processed)
             elif error == 'IntegrityError':
                 if old_server:
                     raise IntegrityError('(not available)')
@@ -762,9 +762,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 raise Repository.ParentPathDoesNotExist(args[0].decode())
             elif error == 'ObjectNotFound':
                 if old_server:
-                    raise Repository.ObjectNotFound('(not available)', self.location.orig)
+                    raise Repository.ObjectNotFound('(not available)', self.location.processed)
                 else:
-                    raise Repository.ObjectNotFound(args[0].decode(), self.location.orig)
+                    raise Repository.ObjectNotFound(args[0].decode(), self.location.processed)
             elif error == 'InvalidRPCMethod':
                 if old_server:
                     raise InvalidRPCMethod('(not available)')

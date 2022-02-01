@@ -36,7 +36,7 @@ def ensure_dir(path, mode=stat.S_IRWXU, pretty_deadly=True):
         os.makedirs(path, mode=mode, exist_ok=True)
     except OSError as e:
         if pretty_deadly:
-            raise Error(e.args[1])
+            raise Error(str(e))
         else:
             raise
 

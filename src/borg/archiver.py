@@ -3990,7 +3990,7 @@ class Archiver:
         2. Generate a random key (3 keys to be more precise. See :ref:`key_files`).
         3. Encrypt the key with your passphrase.
         4. Store the encrypted key alongside the repository in ``/path/to/repo``.
-           This is why it is vital to use a secure passphrase.
+           This is why it is essential to use a secure passphrase.
         5. Encrypt your backups to prevent anyone from reading them unless they
            have the key and know the passphrase. Make sure to keep a backup of
            your key **outside** the repository - do not lock yourself out by

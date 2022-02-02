@@ -3976,12 +3976,16 @@ class Archiver:
         you can neither configure it on a per-archive basis nor change the
         encryption mode of an existing repository.
 
-        Use::
+        Use ``repokey``::
 
             borg init --encryption repokey /path/to/repo
 
+        Or ``repokey-blake2`` depending on which is faster on your client machines (see below)::
+
+            borg init --encryption repokey-blake2 /path/to/repo
+
         Borg will:
-        
+
         1. Ask you to come up with a passphrase.
         2. Generate a random key (3 keys to be more precise. See :ref:`key_files`).
         3. Encrypt the key with your passphrase.

@@ -4032,7 +4032,6 @@ class Archiver:
 
         If you want "passphrase and having-the-key" security, use ``--encryption keyfile``.
         The key will be stored in your home directory (in ``~/.config/borg/keys``).
-        TODO: where is the key stored on Windows?
 
         If you do **not** want to encrypt the contents of your backups, but still
         want to detect malicious tampering use ``--encryption authenticated``.

@@ -1,4 +1,4 @@
-setuptools
+setuptools!=60.6.0
 setuptools_scm
 pip
 virtualenv

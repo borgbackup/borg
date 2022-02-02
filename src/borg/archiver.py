@@ -3987,7 +3987,7 @@ class Archiver:
         Borg will:
 
         1. Ask you to come up with a passphrase.
-        2. Generate a random key (3 keys to be more precise. See :ref:`key_files`).
+        2. Create a borg key (which contains 3 random secrets. See :ref:`key_files`).
         3. Encrypt the key with your passphrase.
         4. Store the encrypted key alongside the repository in ``/path/to/repo``.
            This is why it is essential to use a secure passphrase.

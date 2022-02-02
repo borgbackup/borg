@@ -3989,7 +3989,7 @@ class Archiver:
         1. Ask you to come up with a passphrase.
         2. Create a borg key (which contains 3 random secrets. See :ref:`key_files`).
         3. Encrypt the key with your passphrase.
-        4. Store the encrypted key alongside the repository in ``/path/to/repo``.
+        4. Store the encrypted borg key inside the repository directory (in the repo config).
            This is why it is essential to use a secure passphrase.
         5. Encrypt your backups to prevent anyone from reading them unless they
            have the key and know the passphrase. Make sure to keep a backup of

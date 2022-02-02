@@ -3991,7 +3991,7 @@ class Archiver:
         3. Encrypt the key with your passphrase.
         4. Store the encrypted borg key inside the repository directory (in the repo config).
            This is why it is essential to use a secure passphrase.
-        5. Encrypt your backups to prevent anyone from reading them unless they
+        5. Encrypt sign your backups to prevent anyone from reading or forging them unless they
            have the key and know the passphrase. Make sure to keep a backup of
            your key **outside** the repository - do not lock yourself out by
            "leaving your keys inside your car" (see :ref:`borg_key_export`).

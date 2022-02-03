@@ -4138,6 +4138,7 @@ class Archiver:
             borg key export /path/to/repo --paper > encrypted-key-backup.txt
             borg key export /path/to/repo --qr-html > encrypted-key-backup.html
 
+
         """)
         subparser = key_parsers.add_parser('export', parents=[common_parser], add_help=False,
                                           description=self.do_key_export.__doc__,

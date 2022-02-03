@@ -4204,7 +4204,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
         self.create_regular_file('a_file', size=8)
         test_archive0 = self.repository_location + '::test0'
-        self.cmd('create', test_archive0, "input")#self.input_path)
+        self.cmd('create', test_archive0, "input")
 
         os.unlink('input/a_file')
         self.create_regular_file('a_file', size=33)
@@ -4212,27 +4212,29 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         os.utime('input/a_file', (atime, mtime))
 
         test_archive1 = self.repository_location + '::test1'
-        self.cmd('create', test_archive1, "input")#self.input_path)
+        self.cmd('create', test_archive1, "input")
 
         output_default = self.cmd('diff', test_archive0, "test1")
         output_default_explicit_fmt = self.cmd(
             'diff', '--format',
-            '{newsize:8d} B {oldsize:8d} B {path}{NEWLINE}',
+            '{change} {path}{NL}',
             test_archive0, "test1")
-        expected_default = [
-            "    +33 B      -8 B input/a_file"
-        ]
+        expected_default = ["    +33 B      -8 B input/a_file"]
         self.assert_equal(output_default, output_default_explicit_fmt)
-        self.assert_equal(expected_default, output_default_explicit_fmt.splitlines())
+        self.assert_equal(
+            expected_default,
+            output_default_explicit_fmt.rstrip("\n").splitlines()
+        )
 
         output_nontrivial_fmt1 = self.cmd(
             'diff', '--format',
-            '{change} ({deltasize:8d} B) {mtime:%s} {path}{NL}',
+            '{changetype} ({deltasize:+8d} B) {mtime} {path}{NL}',
             test_archive0, "test1")
-        expected_nontrivial_fmt1 = [
-            "modified (     +33 B) 234900290 input/a_file"
-        ]
-        self.assert_equal(expected_nontrivial_fmt1, output_nontrivial_fmt1.splitlines())
+        expected_nontrivial_fmt1 = ["modified (     +25 B) 234900290000000000 input/a_file"]
+        self.assert_equal(
+            expected_nontrivial_fmt1,
+            output_nontrivial_fmt1.rstrip("\n").splitlines()
+        )
         # need more scenarios?
 
 

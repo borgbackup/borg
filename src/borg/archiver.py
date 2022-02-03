@@ -28,6 +28,7 @@ try:
     from contextlib import contextmanager
     from datetime import datetime, timedelta
     from io import TextIOWrapper
+    from collections import defaultdict
 
     from .logger import create_logger, setup_logging
 
@@ -1101,11 +1102,48 @@ class Archiver:
     def do_diff(self, args, repository, manifest, key, archive):
         """Diff contents of two archives"""
 
-        def print_json_output(diff, path):
+        if args.format is not None:
+            format = args.format
+        else:
+            format = "{change:<19} {path}{NL}"
+        def print_json_output(diff, path, *rest):
             print(json.dumps({"path": path, "changes": [j for j, str in diff]}))
 
-        def print_text_output(diff, path):
-            print("{:<19} {}".format(' '.join([str for j, str in diff]), path))
+        def print_text_output(diff, path, baseitem):
+            diffs_dict = defaultdict(str)
+            diffs_dict.update(
+                {
+                    "NL": os.linesep,
+                    "change": ' '.join([str for j, str in diff]),
+                    "path": path,
+                    "size": 0,
+                    "oldsize": 0,
+                    "newsize": 0,
+                    "deltasize": 0,
+                }
+            )
+            for attr in ("size", "mtime", "ctime", "atime"):
+                try:
+                    value = getattr(baseitem, attr)
+                except AttributeError:
+                    pass
+                else:
+                    diffs_dict[attr] = value
+            for change, _ in diff:
+                if change == "type":
+                    continue
+                diffs_dict.update(change)
+            diffs_dict["changetype"] = diffs_dict["type"]
+            diffs_dict["newsize"] = diffs_dict["size"]
+            if diffs_dict["deltasize"] == 0:
+                if "added" in diffs_dict:
+                    diffs_dict["deltasize"] = diffs_dict["added"]
+                if "removed" in diffs_dict:
+                    diffs_dict["deltasize"] -= diffs_dict["removed"]
+            if diffs_dict["deltasize"] != 0:
+                if diffs_dict["oldsize"] == 0:
+                    diffs_dict["oldsize"] = diffs_dict["size"]-diffs_dict["deltasize"]
+            print(format.format(**diffs_dict))
 
         print_output = print_json_output if args.json_lines else print_text_output
 
@@ -1124,13 +1162,13 @@ class Archiver:
 
         diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids)
         # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs = ((path, diff.changes()) for path, diff in diffs if not diff.equal)
+        diffs = ((path, diff.changes(), diff._item2) for path, diff in diffs if not diff.equal)
 
         if args.sort:
             diffs = sorted(diffs)
 
-        for path, diff in diffs:
-            print_output(diff, path)
+        for path, diff, item2 in diffs:
+            print_output(diff, path, item2)
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)

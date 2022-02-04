@@ -218,6 +218,14 @@ def get_func(args):
     raise Exception('expected func attributes not found')
 
 
+class Highlander(argparse.Action):
+    """make sure some option is only given once"""
+    def __call__(self, parser, namespace, values, option_string=None):
+        if getattr(namespace, self.dest, None) != self.default:
+            raise argparse.ArgumentError(self, 'There can be only one.')
+        setattr(namespace, self.dest, values)
+
+
 class Archiver:
 
     def __init__(self, lock_wait=None, prog=None):
@@ -2841,10 +2849,10 @@ class Archiver:
             filters_group = subparser.add_argument_group('Archive filters',
                                                          'Archive filters can be applied to repository targets.')
             group = filters_group.add_mutually_exclusive_group()
-            group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, default=None,
+            group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, action=Highlander,
                                help='only consider archive names starting with this prefix.')
             group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
-                               type=GlobSpec, default=None,
+                               type=GlobSpec, action=Highlander,
                                help='only consider archive names matching the glob. '
                                     'sh: rules apply, see "borg help patterns". '
                                     '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
@@ -2874,7 +2882,7 @@ class Archiver:
             parser.add_argument('-f', '--foreground', dest='foreground',
                                 action='store_true',
                                 help='stay in foreground, do not daemonize')
-            parser.add_argument('-o', dest='options', type=str,
+            parser.add_argument('-o', dest='options', type=str, action=Highlander,
                                 help='Extra mount options')
             parser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
                                   help='deprecated, use ``--numeric-ids`` instead')
@@ -3423,7 +3431,7 @@ class Archiver:
 
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
+        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter', action=Highlander,
                                help='only display items with the given status characters (see description)')
         subparser.add_argument('--json', action='store_true',
                                help='output stats as JSON. Implies ``--stats``.')
@@ -3479,7 +3487,7 @@ class Archiver:
                               help='do not read and store xattrs into archive')
         fs_group.add_argument('--sparse', dest='sparse', action='store_true',
                                help='detect sparse holes in input (supported only by fixed chunker)')
-        fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
+        fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode', action=Highlander,
                               type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
                               help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
         fs_group.add_argument('--read-special', dest='read_special', action='store_true',
@@ -3497,7 +3505,7 @@ class Archiver:
                                    type=int, default=1800,
                                    help='write checkpoint every SECONDS seconds (Default: 1800)')
         archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
-                                   type=ChunkerParams, default=CHUNKER_PARAMS,
+                                   type=ChunkerParams, default=CHUNKER_PARAMS, action=Highlander,
                                    help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
         archive_group.add_argument('-C', '--compression', metavar='COMPRESSION', dest='compression',
@@ -4478,7 +4486,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_recreate)
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter',
+        subparser.add_argument('--filter', metavar='STATUSCHARS', dest='output_filter', action=Highlander,
                                help='only display items with the given status characters (listed in borg create --help)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change anything')
@@ -4517,7 +4525,7 @@ class Archiver:
                                         'recompression). '
                                         'If no MODE is given, `if-different` will be used. '
                                         'Not passing --recompress is equivalent to "--recompress never".')
-        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params',
+        archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params', action=Highlander,
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
@@ -4768,7 +4776,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help=self.do_import_tar.__doc__)
         subparser.set_defaults(func=self.do_import_tar)
-        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
+        subparser.add_argument('--tar-filter', dest='tar_filter', default='auto', action=Highlander,
                                help='filter program to pipe data through')
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
@@ -4776,7 +4784,7 @@ class Archiver:
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')
-        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS',
+        subparser.add_argument('--filter', dest='output_filter', metavar='STATUSCHARS', action=Highlander,
                                help='only display items with the given status characters')
         subparser.add_argument('--json', action='store_true',
                                help='output stats as JSON (implies --stats)')
@@ -4792,7 +4800,7 @@ class Archiver:
         archive_group.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                    type=int, default=1800, metavar='SECONDS',
                                    help='write checkpoint every SECONDS seconds (Default: 1800)')
-        archive_group.add_argument('--chunker-params', dest='chunker_params',
+        archive_group.add_argument('--chunker-params', dest='chunker_params', action=Highlander,
                                    type=ChunkerParams, default=CHUNKER_PARAMS,
                                    metavar='PARAMS',
                                    help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '

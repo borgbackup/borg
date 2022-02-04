@@ -679,12 +679,12 @@ class KeyfileKeyBase(AESKeyBase):
         key.init_from_random_data()
         key.init_ciphers()
         target = key.get_new_target(args)
-        key.save(target, passphrase)
+        key.save(target, passphrase, create=True)
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key
 
-    def save(self, target, passphrase):
+    def save(self, target, passphrase, create=False):
         raise NotImplementedError
 
     def get_new_target(self, args):
@@ -767,7 +767,12 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             self.target = target
         return success
 
-    def save(self, target, passphrase):
+    def save(self, target, passphrase, create=False):
+        if create and os.path.isfile(target):
+            # if a new keyfile key repository is created, ensure that an existing keyfile of another
+            # keyfile key repo is not accidentally overwritten by careless use of the BORG_KEY_FILE env var.
+            # see issue #6036
+            raise Error('Aborting because key in "%s" already exists.' % target)
         key_data = self._save(passphrase)
         with SaveFile(target) as fd:
             fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
@@ -807,7 +812,7 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             self.target = target
         return success
 
-    def save(self, target, passphrase):
+    def save(self, target, passphrase, create=False):
         self.logically_encrypted = passphrase != ''
         key_data = self._save(passphrase)
         key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
@@ -845,8 +850,8 @@ class AuthenticatedKeyBase(RepoKey):
         self.logically_encrypted = False
         return success
 
-    def save(self, target, passphrase):
-        super().save(target, passphrase)
+    def save(self, target, passphrase, create=False):
+        super().save(target, passphrase, create=create)
         self.logically_encrypted = False
 
     def init_ciphers(self, manifest_data=None):

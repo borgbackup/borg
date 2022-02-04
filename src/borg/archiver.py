@@ -4131,6 +4131,18 @@ class Archiver:
         repository in the config file. A backup is thus not strictly needed,
         but guards against the repository becoming inaccessible if the file
         is damaged for some reason.
+
+        Examples::
+
+            borg key export /path/to/repo > encrypted-key-backup
+            borg key export --paper /path/to/repo > encrypted-key-backup.txt
+            borg key export --qr-html /path/to/repo > encrypted-key-backup.html
+            # Or pass the output file as an argument instead of redirecting stdout:
+            borg key export /path/to/repo encrypted-key-backup
+            borg key export --paper /path/to/repo encrypted-key-backup.txt
+            borg key export --qr-html /path/to/repo encrypted-key-backup.html
+
+
         """)
         subparser = key_parsers.add_parser('export', parents=[common_parser], add_help=False,
                                           description=self.do_key_export.__doc__,

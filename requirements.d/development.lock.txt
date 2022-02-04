@@ -1,0 +1,13 @@
+setuptools==60.7.1
+setuptools-scm==6.4.2
+pip==22.0.3
+virtualenv==20.13.0
+pkgconfig==1.5.5
+tox==3.24.5
+pytest==7.0.0
+pytest-xdist==2.5.0
+pytest-cov==3.0.0
+pytest-benchmark==3.4.1
+Cython==0.29.27
+twine==3.8.0
+python-dateutil==2.8.2

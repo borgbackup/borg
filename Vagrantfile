@@ -189,7 +189,7 @@ def install_borg(fuse)
     . borg-env/bin/activate
     pip install -U wheel  # upgrade wheel, might be too old
     cd borg
-    pip install -r requirements.d/development.txt
+    pip install -r requirements.d/development.lock.txt
     python setup.py clean
     python setup.py clean2
     pip install -e .[#{fuse}]

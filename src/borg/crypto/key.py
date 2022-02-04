@@ -679,7 +679,7 @@ class KeyfileKeyBase(AESKeyBase):
         key.init_from_random_data()
         key.init_ciphers()
         target = key.get_new_target(args)
-        key.save(target, passphrase)
+        key.save(target, passphrase, create=True)
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key

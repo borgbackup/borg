@@ -4135,8 +4135,12 @@ class Archiver:
         Examples::
 
             borg key export /path/to/repo > encrypted-key-backup
-            borg key export /path/to/repo --paper > encrypted-key-backup.txt
-            borg key export /path/to/repo --qr-html > encrypted-key-backup.html
+            borg key export --paper /path/to/repo > encrypted-key-backup.txt
+            borg key export --qr-html /path/to/repo > encrypted-key-backup.html
+            # Or pass the output file as an argument instead of redirecting stdout:
+            borg key export /path/to/repo encrypted-key-backup
+            borg key export --paper /path/to/repo encrypted-key-backup.txt
+            borg key export --qr-html /path/to/repo encrypted-key-backup.html
 
 
         """)

@@ -2874,8 +2874,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('init', '--encryption=keyfile', self.repository_location + '0')
             with open(keyfile) as file:
                 before = file.read()
-            with pytest.raises(borg.helpers.errors.Error):
-                self.cmd('init', '--encryption=keyfile', self.repository_location + '1')
+            arg = ('init', '--encryption=keyfile', self.repository_location + '1')
+            if self.FORK_DEFAULT:
+                self.cmd(*arg, exit_code=2)
+            else:
+                with pytest.raises(borg.helpers.errors.Error):
+                    self.cmd(*arg)
             with open(keyfile) as file:
                 after = file.read()
             assert before == after

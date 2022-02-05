@@ -384,6 +384,10 @@ class ArchiverTestCaseBase(BaseTestCase):
 class ArchiverTestCase(ArchiverTestCaseBase):
     requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
 
+    def get_security_dir(self):
+        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+        return get_security_dir(repository_id)
+
     def test_basic_functionality(self):
         have_root = self.create_test_files()
         # fork required to test show-rc output
@@ -718,8 +722,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('init', '--encryption=repokey', self.repository_location)
             # Delete cache & security database, AKA switch to user perspective
             self.cmd('delete', '--cache-only', self.repository_location)
-            repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
-            shutil.rmtree(get_security_dir(repository_id))
+            shutil.rmtree(self.get_security_dir())
         with environment_variable(BORG_PASSPHRASE=None):
             # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
             # is set, while it isn't. Previously this raised no warning,
@@ -732,11 +735,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_repository_move(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+        security_dir = self.get_security_dir()
         os.rename(self.repository_path, self.repository_path + '_new')
         with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK='yes'):
             self.cmd('info', self.repository_location + '_new')
-        security_dir = get_security_dir(repository_id)
         with open(os.path.join(security_dir, 'location')) as fd:
             location = fd.read()
             assert location == Location(self.repository_location + '_new').canonical_path()
@@ -751,9 +753,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_security_dir_compat(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
-        security_dir = get_security_dir(repository_id)
-        with open(os.path.join(security_dir, 'location'), 'w') as fd:
+        with open(os.path.join(self.get_security_dir(), 'location'), 'w') as fd:
             fd.write('something outdated')
         # This is fine, because the cache still has the correct information. security_dir and cache can disagree
         # if older versions are used to confirm a renamed repository.
@@ -761,8 +761,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_unknown_unencrypted(self):
         self.cmd('init', '--encryption=none', self.repository_location)
-        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
-        security_dir = get_security_dir(repository_id)
         # Ok: repository is known
         self.cmd('info', self.repository_location)
 
@@ -772,7 +770,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # Needs confirmation: cache and security dir both gone (eg. another host or rm -rf ~)
         shutil.rmtree(self.cache_path)
-        shutil.rmtree(security_dir)
+        shutil.rmtree(self.get_security_dir())
         if self.FORK_DEFAULT:
             self.cmd('info', self.repository_location, exit_code=EXIT_ERROR)
         else:
@@ -3505,6 +3503,53 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         output = self.cmd('info', archive, exit_code=2, fork=True)
         self.assert_in('this-repository-does-not-exist', output)
         self.assert_not_in('this-repository-does-not-exist::test', output)
+
+    def test_can_read_repo_even_if_nonce_is_deleted(self):
+        """Nonce is only used for encrypting new data.
+
+        It should be possible to retrieve the data from an archive even if
+        both the client and the server forget the nonce"""
+        self.create_regular_file('file1', contents=b'Hello, borg')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # Oops! We have removed the repo-side memory of the nonce!
+        # See https://github.com/borgbackup/borg/issues/5858
+        os.remove(os.path.join(self.repository_path, 'nonce'))
+        # Oops! The client has lost the nonce too!
+        os.remove(os.path.join(self.get_security_dir(), 'nonce'))
+
+        # The repo should still be readable
+        repo_info = self.cmd('info', self.repository_location)
+        assert 'All archives:' in repo_info
+        repo_list = self.cmd('list', self.repository_location)
+        assert 'test' in repo_list
+        # The archive should still be readable
+        archive_info = self.cmd('info', self.repository_location + '::test')
+        assert 'Archive name: test\n' in archive_info
+        archive_list = self.cmd('list', self.repository_location + '::test')
+        assert 'file1' in archive_list
+        # Extracting the archive should work
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        self.assert_dirs_equal('input', 'output/input')
+
+    def test_recovery_from_deleted_repo_nonce(self):
+        """We should be able to recover if path/to/repo/nonce is deleted.
+
+        The nonce is stored in two places: in the repo and in $HOME.
+        The nonce in the repo is only needed when multiple clients use the same
+        repo. Otherwise we can just use our own copy of the nonce.
+        """
+        self.create_regular_file('file1', contents=b'Hello, borg')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # Oops! We have removed the repo-side memory of the nonce!
+        # See https://github.com/borgbackup/borg/issues/5858
+        nonce = os.path.join(self.repository_path, 'nonce')
+        os.remove(nonce)
+
+        self.cmd('create', self.repository_location + '::test2', 'input')
+        assert os.path.exists(nonce)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

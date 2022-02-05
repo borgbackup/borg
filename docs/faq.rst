@@ -710,6 +710,32 @@ Send a private email to the :ref:`security contact <security-contact>`
 if you think you have discovered a security issue.
 Please disclose security issues responsibly.
 
+How important are the nonce files?
+------------------------------------
+
+Borg uses :ref:`AES-CTR encryption <borg_security_critique>`. An
+essential part of AES-CTR is a sequential counter that must **never**
+repeat. If the same value of the counter is used twice in the same repository,
+an attacker can decrypt the data. The counter is stored in the home directory
+of each user ($HOME/.config/borg/security/$REPO_ID/nonce) as well as
+in the repository (/path/to/repo/nonce). When creating a new archive borg uses
+the highest of the two values. The value of the counter in the repository may be
+higher than your local value if another user has created an archive more recently
+than you did.
+
+Since the nonce is not necessary to read the data that is already encrypted,
+``borg info``, ``borg list``, ``borg extract`` and ``borg mount`` should work
+just fine without it.
+
+If the the nonce file stored in the repo is lost, but you still have your local copy,
+borg will recreate the repository nonce file the next time you run ``borg create``.
+This should be safe for repositories that are only used from one user account
+on one machine.
+
+For repositories that are used by multiple users and/or from multiple machines
+it is safest to avoid running *any* commands that modify the repository after
+the nonce is deleted or if you suspect it may have been tampered with. See :ref:`attack_model`.
+
 Common issues
 #############
 

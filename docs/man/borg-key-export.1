@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-EXPORT" 1 "2022-01-23" "" "borg backup tool"
+.TH "BORG-KEY-EXPORT" 1 "2022-02-05" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .SH SYNOPSIS
@@ -56,6 +56,24 @@ For repositories using the repokey encryption the key is saved in the
 repository in the config file. A backup is thus not strictly needed,
 but guards against the repository becoming inaccessible if the file
 is damaged for some reason.
+.sp
+Examples:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg key export /path/to/repo > encrypted\-key\-backup
+borg key export \-\-paper /path/to/repo > encrypted\-key\-backup.txt
+borg key export \-\-qr\-html /path/to/repo > encrypted\-key\-backup.html
+# Or pass the output file as an argument instead of redirecting stdout:
+borg key export /path/to/repo encrypted\-key\-backup
+borg key export \-\-paper /path/to/repo encrypted\-key\-backup.txt
+borg key export \-\-qr\-html /path/to/repo encrypted\-key\-backup.html
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

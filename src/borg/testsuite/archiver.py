@@ -28,6 +28,7 @@ from unittest.mock import patch
 import pytest
 
 import borg
+import borg.helpers.errors
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
@@ -2863,6 +2864,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         else:
             with pytest.raises(Repository.AlreadyExists):
                 self.cmd('init', '--encryption=repokey', self.repository_location + '/nested')
+
+    def test_init_refuse_to_overwrite_keyfile(self):
+        """BORG_KEY_FILE=something borg init should quit if "something" already exists.
+
+        See https://github.com/borgbackup/borg/pull/6046"""
+        keyfile = os.path.join(self.tmpdir, 'keyfile')
+        with environment_variable(BORG_KEY_FILE=keyfile):
+            self.cmd('init', '--encryption=keyfile', self.repository_location + '0')
+            with open(keyfile) as file:
+                before = file.read()
+            with pytest.raises(borg.helpers.errors.Error):
+                self.cmd('init', '--encryption=keyfile', self.repository_location + '1')
+            with open(keyfile) as file:
+                after = file.read()
+            assert before == after
 
     def check_cache(self):
         # First run a regular borg check

@@ -307,6 +307,7 @@ class build_man(Command):
         'key_migrate-to-repokey': 'key',
 
         'export-tar': 'tar',
+        'import-tar': 'tar',
 
         'benchmark_crud': 'benchmark',
 

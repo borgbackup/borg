@@ -32,7 +32,7 @@ except ImportError:
     pass
 
 import borg
-import borg.helpers.errors
+import borg.helpers
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer, flags_noatime, flags_normal
 from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
@@ -2582,7 +2582,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('init', '--encryption=keyfile', self.repository_location + '0')
             with open(keyfile) as file:
                 before = file.read()
-            with pytest.raises(borg.helpers.errors.Error):
+            with pytest.raises(borg.helpers.Error):
                 self.cmd('init', '--encryption=keyfile', self.repository_location + '1')
             with open(keyfile) as file:
                 after = file.read()

@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.0b4 (2022-01-23)
-----------------------------
+Version 1.2.0rc1 (2022-02-05)
+-----------------------------
 
 Please note:
 
@@ -270,6 +270,41 @@ Compatibility notes:
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
 
+Fixes:
+
+- repo::archive location placeholder expansion fixes, #5826, #5998
+- repository: fix intermediate commits, shall be at end of current segment
+- delete: don't commit if nothing was deleted, avoid cache sync, #6060
+- argument parsing: accept some options only once, #6026
+- disallow overwriting of existing keyfiles on init, #6036
+- if ensure_dir() fails, give more informative error message, #5952
+
+New features:
+
+- delete --force: do not ask when deleting a repo, #5941
+
+Other changes:
+
+- requirements: exclude broken or incompatible-with-pyinstaller setuptools
+- add a requirements.d/development.lock.txt and use it for vagrant
+- tests:
+
+  - added nonce-related tests
+  - refactor: remove assert_true
+  - vagrant: macos box tuning, netbsd box fixes, #5370, #5922
+- docs:
+
+  - update install docs / requirements docs, #6180
+  - borg mount / FUSE "versions" view is not experimental any more
+  - --pattern* is not experimental any more, #6134
+  - impact of deleting path/to/repo/nonce, #5858
+  - key export: add examples, #6204
+  - ~/.config/borg/keys is not used for repokey keys, #6107
+  - excluded parent dir's metadata can't restore
+
+
+Version 1.2.0b4 (2022-01-23)
+----------------------------
 
 Fixes:
 

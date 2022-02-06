@@ -2419,7 +2419,7 @@ class Archiver:
                 # don't even look in /proc
                 ! /proc
 
-            As another example, you could do the same thing in either of these ways::
+            You can specify recursion roots either on the command line or in a patternfile::
 
                 # specified on command line
                 borg create --exclude /home/bobby/junk repo::arch /home/bobby /home/susan
@@ -2436,7 +2436,8 @@ class Archiver:
 
                 - /home/bobby/junk
 
-            This allows you to share the same patterns between multiple repositories without needing to specify them on the command line.\n\n''')
+            This allows you to share the same patterns between multiple repositories
+            without needing to specify them on the command line.\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
         and ``--remote-path`` values support these placeholders:

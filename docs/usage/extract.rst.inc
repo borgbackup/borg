@@ -51,9 +51,9 @@ borg extract
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-from EXCLUDEFILE``        | read exclude patterns from EXCLUDEFILE, one per line                                                      |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--pattern PATTERN``                 | experimental: include/exclude paths matching PATTERN                                                      |
+    |                                                       | ``--pattern PATTERN``                 | include/exclude paths matching PATTERN                                                                    |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--patterns-from PATTERNFILE``       | experimental: read include/exclude patterns from PATTERNFILE, one per line                                |
+    |                                                       | ``--patterns-from PATTERNFILE``       | read include/exclude patterns from PATTERNFILE, one per line                                              |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--strip-components NUMBER``         | Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped. |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
@@ -93,8 +93,8 @@ borg extract
     Exclusion options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
-        --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
-        --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+        --pattern PATTERN                 include/exclude paths matching PATTERN
+        --patterns-from PATTERNFILE       read include/exclude patterns from PATTERNFILE, one per line
         --strip-components NUMBER         Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.
 
 
@@ -119,3 +119,7 @@ pass over the archive metadata.
 
     Currently, extract always writes into the current working directory ("."),
     so make sure you ``cd`` to the right place before calling ``borg extract``.
+
+    When parent directories are not extracted (because of using file/directory selection
+    or any other reason), borg can not restore parent directories' metadata, e.g. owner,
+    group, permission, etc.

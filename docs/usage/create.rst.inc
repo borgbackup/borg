@@ -59,9 +59,9 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-from EXCLUDEFILE``                    | read exclude patterns from EXCLUDEFILE, one per line                                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--pattern PATTERN``                             | experimental: include/exclude paths matching PATTERN                                                                                                 |
+    |                                                       | ``--pattern PATTERN``                             | include/exclude paths matching PATTERN                                                                                                               |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--patterns-from PATTERNFILE``                   | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                           |
+    |                                                       | ``--patterns-from PATTERNFILE``                   | read include/exclude patterns from PATTERNFILE, one per line                                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-caches``                              | exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)                                                      |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -153,8 +153,8 @@ borg create
     Exclusion options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
-        --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
-        --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+        --pattern PATTERN                 include/exclude paths matching PATTERN
+        --patterns-from PATTERNFILE       read include/exclude patterns from PATTERNFILE, one per line
         --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive

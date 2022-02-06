@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PATTERNS" 1 "2022-01-23" "" "borg backup tool"
+.TH "BORG-PATTERNS" 1 "2022-02-05" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -48,10 +48,18 @@ store all files as \fIsome/path/.../file.ext\fP and \fBborg create
 .sp
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full\-matches. By default, fnmatch is used for
-\fB\-\-exclude\fP patterns and shell\-style is used for the experimental
-\fB\-\-pattern\fP option. For commands that support patterns in their
-\fBPATH\fP argument like (\fBborg list\fP), the default pattern is path
-prefix.
+\fB\-\-exclude\fP patterns and shell\-style is used for the \fB\-\-pattern\fP
+.IP "System Message: ERROR/3 (docs/borg-patterns.rst:, line 43)"
+Unexpected indentation.
+.INDENT 0.0
+.INDENT 3.5
+option. For commands that support patterns in their \fBPATH\fP argument
+.UNINDENT
+.UNINDENT
+.IP "System Message: WARNING/2 (docs/borg-patterns.rst:, line 44)"
+Block quote ends without a blank line; unexpected unindent.
+.sp
+like (\fBborg list\fP), the default pattern is path prefix.
 .sp
 Starting with Borg 1.2, for all but regular expression pattern matching
 styles, all paths are treated as relative, meaning that a leading path
@@ -179,77 +187,65 @@ sh:/home/*/.thumbnails
 some file with spaces.txt
 EOF
 $ borg create \-\-exclude\-from exclude.txt backup /
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
+
 A more general and easier to use way to define filename matching patterns exists
-with the experimental \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP options. Using these, you
-may specify the backup roots (starting points) and patterns for inclusion/exclusion.
-A root path starts with the prefix \fIR\fP, followed by a path (a plain path, not a
+with the \(ga\(ga\-\-pattern\(ga\(ga and \(ga\(ga\-\-patterns\-from\(ga\(ga options. Using these, you may
+specify the backup roots (starting points) and patterns for inclusion/exclusion.
+A root path starts with the prefix \(gaR\(ga, followed by a path (a plain path, not a
 file pattern). An include rule starts with the prefix +, an exclude rule starts
 with the prefix \-, an exclude\-norecurse rule starts with !, all followed by a pattern.
-.sp
-\fBNOTE:\fP
-.INDENT 0.0
-.INDENT 3.5
-Via \fB\-\-pattern\fP or \fB\-\-patterns\-from\fP you can define BOTH inclusion and exclusion
-of files using pattern prefixes \fB+\fP and \fB\-\fP\&. With \fB\-\-exclude\fP and
-\fB\-\-exclude\-from\fP ONLY excludes are defined.
-.UNINDENT
-.UNINDENT
-.sp
+
+\&.. note::
+
+    Via \(ga\(ga\-\-pattern\(ga\(ga or \(ga\(ga\-\-patterns\-from\(ga\(ga you can define BOTH inclusion and exclusion
+    of files using pattern prefixes \(ga\(ga+\(ga\(ga and \(ga\(ga\-\(ga\(ga. With \(ga\(ga\-\-exclude\(ga\(ga and
+    \(ga\(ga\-\-exclude\-from\(ga\(ga ONLY excludes are defined.
+
 Inclusion patterns are useful to include paths that are contained in an excluded
 path. The first matching pattern is used so if an include pattern matches before
 an exclude pattern, the file is backed up. If an exclude\-norecurse pattern matches
 a directory, it won\(aqt recurse into it and won\(aqt discover any potential matches for
 include rules below that directory.
-.sp
-Note that the default pattern style for \fB\-\-pattern\fP and \fB\-\-patterns\-from\fP is
-shell style (\fIsh:\fP), so those patterns behave similar to rsync include/exclude
-patterns. The pattern style can be set via the \fIP\fP prefix.
-.sp
-Patterns (\fB\-\-pattern\fP) and excludes (\fB\-\-exclude\fP) from the command line are
-considered first (in the order of appearance). Then patterns from \fB\-\-patterns\-from\fP
-are added. Exclusion patterns from \fB\-\-exclude\-from\fP files are appended last.
-.sp
-Examples:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-# backup pics, but not the ones from 2018, except the good ones:
-# note: using = is essential to avoid cmdline argument parsing issues.
-borg create \-\-pattern=+pics/2018/good \-\-pattern=\-pics/2018 repo::arch pics
 
-# use a file with patterns:
-borg create \-\-patterns\-from patterns.lst repo::arch
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
-The patterns.lst file could look like that:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-# "sh:" pattern style is the default, so the following line is not needed:
-P sh
-R /
-# can be rebuild
-\- /home/*/.cache
-# they\(aqre downloads for a reason
-\- /home/*/Downloads
-# susan is a nice person
-# include susans home
-+ /home/susan
-# don\(aqt backup the other home directories
-\- /home/*
-# don\(aqt even look in /proc
-! /proc
+\&.. note::
+
+    It\(aqs possible that a sub\-directory/file is matched while parent directories are not.
+    In that case, parent directories are not backed up thus their user, group, permission,
+    etc. can not be restored.
+
+Note that the default pattern style for \(ga\(ga\-\-pattern\(ga\(ga and \(ga\(ga\-\-patterns\-from\(ga\(ga is
+shell style (\(gash:\(ga), so those patterns behave similar to rsync include/exclude
+patterns. The pattern style can be set via the \(gaP\(ga prefix.
+
+Patterns (\(ga\(ga\-\-pattern\(ga\(ga) and excludes (\(ga\(ga\-\-exclude\(ga\(ga) from the command line are
+considered first (in the order of appearance). Then patterns from \(ga\(ga\-\-patterns\-from\(ga\(ga
+are added. Exclusion patterns from \(ga\(ga\-\-exclude\-from\(ga\(ga files are appended last.
+
+Examples::
+
+    # backup pics, but not the ones from 2018, except the good ones:
+    # note: using = is essential to avoid cmdline argument parsing issues.
+    borg create \-\-pattern=+pics/2018/good \-\-pattern=\-pics/2018 repo::arch pics
+
+    # use a file with patterns:
+    borg create \-\-patterns\-from patterns.lst repo::arch
+
+The patterns.lst file could look like that::
+
+    # "sh:" pattern style is the default, so the following line is not needed:
+    P sh
+    R /
+    # can be rebuild
+    \- /home/*/.cache
+    # they\(aqre downloads for a reason
+    \- /home/*/Downloads
+    # susan is a nice person
+    # include susans home
+    + /home/susan
+    # don\(aqt backup the other home directories
+    \- /home/*
+    # don\(aqt even look in /proc
+    ! /proc
 .ft P
 .fi
 .UNINDENT

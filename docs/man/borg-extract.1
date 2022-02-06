@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXTRACT" 1 "2022-01-23" "" "borg backup tool"
+.TH "BORG-EXTRACT" 1 "2022-02-05" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .SH SYNOPSIS
@@ -54,6 +54,10 @@ pass over the archive metadata.
 .INDENT 3.5
 Currently, extract always writes into the current working directory ("."),
 so make sure you \fBcd\fP to the right place before calling \fBborg extract\fP\&.
+.sp
+When parent directories are not extracted (because of using file/directory selection
+or any other reason), borg can not restore parent directories\(aq metadata, e.g. owner,
+group, permission, etc.
 .UNINDENT
 .UNINDENT
 .SH OPTIONS
@@ -111,10 +115,10 @@ exclude paths matching PATTERN
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
 .BI \-\-pattern \ PATTERN
-experimental: include/exclude paths matching PATTERN
+include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-experimental: read include/exclude patterns from PATTERNFILE, one per line
+read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .BI \-\-strip\-components \ NUMBER
 Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.

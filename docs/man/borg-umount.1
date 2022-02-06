@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UMOUNT" 1 "2022-01-23" "" "borg backup tool"
+.TH "BORG-UMOUNT" 1 "2022-02-05" "" "borg backup tool"
 .SH NAME
 borg-umount \- un-mount the FUSE filesystem
 .SH SYNOPSIS
@@ -69,7 +69,7 @@ bin  boot  etc      home  lib  lib64  lost+found  media  mnt  opt
 root  sbin  srv  tmp  usr  var
 $ borg umount /tmp/mymountpoint
 
-# The experimental "versions view" merges all archives in the repository
+# The "versions view" merges all archives in the repository
 # and provides a versioned view on files.
 $ borg mount \-o versions /path/to/repo /tmp/mymountpoint
 $ ls \-l /tmp/mymountpoint/home/user/doc.txt/

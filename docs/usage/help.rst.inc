@@ -22,10 +22,9 @@ store all files as `some/path/.../file.ext` and ``borg create
 
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full-matches. By default, fnmatch is used for
-``--exclude`` patterns and shell-style is used for the experimental
-``--pattern`` option. For commands that support patterns in their
-``PATH`` argument like (``borg list``), the default pattern is path
-prefix.
+``--exclude`` patterns and shell-style is used for the ``--pattern``
+ option. For commands that support patterns in their ``PATH`` argument
+like (``borg list``), the default pattern is path prefix.
 
 Starting with Borg 1.2, for all but regular expression pattern matching
 styles, all paths are treated as relative, meaning that a leading path
@@ -145,11 +144,9 @@ Examples::
     EOF
     $ borg create --exclude-from exclude.txt backup /
 
-.. container:: experimental
-
     A more general and easier to use way to define filename matching patterns exists
-    with the experimental ``--pattern`` and ``--patterns-from`` options. Using these, you
-    may specify the backup roots (starting points) and patterns for inclusion/exclusion.
+    with the ``--pattern`` and ``--patterns-from`` options. Using these, you may
+    specify the backup roots (starting points) and patterns for inclusion/exclusion.
     A root path starts with the prefix `R`, followed by a path (a plain path, not a
     file pattern). An include rule starts with the prefix +, an exclude rule starts
     with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
@@ -165,6 +162,12 @@ Examples::
     an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
     a directory, it won't recurse into it and won't discover any potential matches for
     include rules below that directory.
+
+    .. note::
+
+        It's possible that a sub-directory/file is matched while parent directories are not.
+        In that case, parent directories are not backed up thus their user, group, permission,
+        etc. can not be restored.
 
     Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
     shell style (`sh:`), so those patterns behave similar to rsync include/exclude

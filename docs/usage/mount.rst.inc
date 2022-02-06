@@ -55,9 +55,9 @@ borg mount
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--exclude-from EXCLUDEFILE``        | read exclude patterns from EXCLUDEFILE, one per line                                                                                                   |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--pattern PATTERN``                 | experimental: include/exclude paths matching PATTERN                                                                                                   |
+    |                                                                             | ``--pattern PATTERN``                 | include/exclude paths matching PATTERN                                                                                                                 |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--patterns-from PATTERNFILE``       | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                             |
+    |                                                                             | ``--patterns-from PATTERNFILE``       | read include/exclude patterns from PATTERNFILE, one per line                                                                                           |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--strip-components NUMBER``         | Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.                                              |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -102,8 +102,8 @@ borg mount
     Exclusion options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
-        --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
-        --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+        --pattern PATTERN                 include/exclude paths matching PATTERN
+        --patterns-from PATTERNFILE       read include/exclude patterns from PATTERNFILE, one per line
         --strip-components NUMBER         Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.
 
 

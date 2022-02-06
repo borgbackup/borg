@@ -2421,9 +2421,8 @@ class Archiver:
 
             You can specify recursion roots either on the command line or in a patternfile::
 
-                # specified on command line
+                # these two commands do the same thing
                 borg create --exclude /home/bobby/junk repo::arch /home/bobby /home/susan
-                # specified in patternfile
                 borg create --patterns-from patternfile.lst repo::arch
 
             The patternfile::

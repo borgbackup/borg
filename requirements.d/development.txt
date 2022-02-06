@@ -1,13 +1,11 @@
-setuptools==50.3.0
-setuptools-scm==4.1.2
-pip==20.2.3
-virtualenv==20.0.33
-importlib-metadata==1.7.0
-pluggy==0.13.1
-tox==3.20.0
-pytest==6.1.1
-pytest-xdist==2.1.0
-pytest-cov==2.10.1
-pytest-benchmark==3.2.3
-Cython==0.29.23
+setuptools==50.3.2
+setuptools-scm==5.0.2
+pip==20.3.4
+virtualenv==20.13.1
+tox==3.24.5
+pytest==6.1.2; python_version < '3.10'
+pytest-xdist==2.2.1
+pytest-cov==2.12.1
+pytest-benchmark==3.4.1
+Cython==0.29.27
 twine==1.15.0

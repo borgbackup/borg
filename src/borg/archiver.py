@@ -2763,6 +2763,7 @@ class Archiver:
             'separate_compaction': '"Separate compaction"',
             'list_item_flags': '"Item flags"',
             'borg_patterns': '"borg help patterns"',
+            'borg_placeholders': '"borg help placeholders"',
         }
 
         def process_epilog(epilog):
@@ -3331,7 +3332,7 @@ class Archiver:
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
-        For more help on placeholders, see the ``borg help placeholders`` command output.
+        For more help on placeholders, see the :ref:`borg_placeholders` command output.
 
         .. man NOTES
 

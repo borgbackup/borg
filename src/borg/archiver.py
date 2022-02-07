@@ -2733,7 +2733,7 @@ class Archiver:
             'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
             'separate_compaction': '"Separate compaction"',
             'list_item_flags': '"Item flags"',
-            'key_files': 'Internals -> Data structures and file formats -> Key files in the online documentation',
+            'key_files': 'Internals -> Data structures and file formats -> Key files',
             'borg_key_export': 'borg key export --help'
         }
 

@@ -2412,10 +2412,31 @@ class Archiver:
             # susan is a nice person
             # include susans home
             + /home/susan
+            # also back up this exact file
+            + pf:/home/bobby/specialfile.txt
             # don't backup the other home directories
             - /home/*
             # don't even look in /proc
-            ! /proc\n\n''')
+            ! /proc
+
+        You can specify recursion roots either on the command line or in a patternfile::
+
+            # these two commands do the same thing
+            borg create --exclude /home/bobby/junk repo::arch /home/bobby /home/susan
+            borg create --patterns-from patternfile.lst repo::arch
+
+        The patternfile::
+
+            # note that excludes use fm: by default and patternfiles use sh: by default.
+            # therefore, we need to specify fm: to have the same exact behavior.
+            P fm
+            R /home/bobby
+            R /home/susan
+
+            - /home/bobby/junk
+
+        This allows you to share the same patterns between multiple repositories
+        without needing to specify them on the command line.\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
         Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
         and ``--remote-path`` values support these placeholders:

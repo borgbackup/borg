@@ -217,19 +217,42 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.0rc1 (2022-02-05)
------------------------------
+Version 1.2.0 (not released yet)
+--------------------------------
 
 Please note:
 
-This is code released for testing (== helping us find bugs).
+This is the first borg 1.2 release, so be careful and read the notes below.
 
-It is not suitable to run against your production backup repositories!
+Upgrade notes:
 
-So, if you want to help testing, please run this code additionally to your
-normal backup and use a separate, fresh repository for it.
+Strictly taken, nothing special is required for upgrading to 1.2, but some
+things can be recommended:
 
-See there for feedback: https://github.com/borgbackup/borg/issues/4360
+- do you already want to upgrade? 1.1.x also will get fixes for a while.
+- be careful, first upgrade your less critical / smaller repos.
+- first upgrade to a recent 1.1.x release - especially if you run some older
+  1.1.* or even 1.0.* borg release.
+- using that, run at least one `borg create` (your normal backup), `prune`
+  and especially a `check` to see everything is in a good state.
+- check the output of `borg check` - if there is anything special, consider
+  a `borg check --repair` followed by another `borg check`.
+- if everything is fine so far (borg check reports no issues), you can consider
+  upgrading to 1.2.0. if not, please first fix any already existing issue.
+- if you want to play safer, first **create a backup of your borg repository**.
+- upgrade to latest borg 1.2.x release (you could use the fat binary from
+  github releases page)
+- run `borg compact --cleanup-commits` to clean up a ton of 17 bytes long files
+  in your repo caused by a borg 1.1 bug
+- run `borg check` again (now with borg 1.2.x) and check if there is anything
+  special.
+- check the compatibility notes (see below) and adapt your scripts, if needed.
+- if you run into any issues, please check the github issue tracker before
+  posting new issues there or elsewhere.
+
+If you follow this procedure, you can help avoiding that we get a lot of
+"borg 1.2" issue reports that are not really 1.2 issues, but existed before
+and maybe just were not noticed.
 
 Compatibility notes:
 
@@ -269,6 +292,9 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+Version 1.2.0rc1 (2022-02-05)
+-----------------------------
 
 Fixes:
 

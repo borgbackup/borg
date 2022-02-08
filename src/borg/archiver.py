@@ -2734,7 +2734,7 @@ class Archiver:
             'separate_compaction': '"Separate compaction"',
             'list_item_flags': '"Item flags"',
             'key_files': 'Internals -> Data structures and file formats -> Key files',
-            'borg_key_export': 'borg key export --help'
+            'borg_key_export': 'borg key export --help',
         }
 
         def process_epilog(epilog):

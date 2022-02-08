@@ -3998,7 +3998,7 @@ class Archiver:
            For remote backups the encryption is done locally - the remote machine
            never sees your passphrase, your unencrypted key or your unencrypted files.
            Chunking and id generation are also based on your key to improve
-           your privacy (See https://github.com/borgbackup/borg/pull/6184#issuecomment-1028105848).
+           your privacy.
         6. Use the key when extracting files to decrypt them and to verify that the contents of
            the backups have not been accidentally or maliciously altered.
 

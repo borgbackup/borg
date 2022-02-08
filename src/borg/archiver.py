@@ -2452,11 +2452,11 @@ class Archiver:
 
         {now}
             The current local date and time, by default in ISO-8601 format.
-            You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
+            You can also supply your own `format string <https://docs.python.org/3.8/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
         {utcnow}
             The current UTC date and time, by default in ISO-8601 format.
-            You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
+            You can also supply your own `format string <https://docs.python.org/3.8/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
         {user}
             The user name (or UID, if no name is available) of the user running borg.
@@ -2762,6 +2762,8 @@ class Archiver:
             'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
             'separate_compaction': '"Separate compaction"',
             'list_item_flags': '"Item flags"',
+            'borg_patterns': '"borg help patterns"',
+            'borg_placeholders': '"borg help placeholders"',
             'key_files': 'Internals -> Data structures and file formats -> Key files',
             'borg_key_export': 'borg key export --help',
         }
@@ -3330,16 +3332,15 @@ class Archiver:
         the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
         exclusive because the data is not actually compressed and deduplicated during a dry run.
 
-        See the output of the "borg help patterns" command for more help on exclude patterns.
+        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
-        See the output of the "borg help placeholders" command for more help on placeholders.
+        For more help on placeholders, see the :ref:`borg_placeholders` command output.
 
         .. man NOTES
 
         The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
         exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
-        '\\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
-        more information.
+        '\\*/.bundler/gems' to get the same effect.
 
         In addition to using ``--exclude`` patterns, it is possible to use
         ``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file
@@ -3758,7 +3759,7 @@ class Archiver:
         You can delete multiple archives by specifying their common prefix, if they
         have one, using the ``--prefix PREFIX`` option. You can also specify a shell
         pattern to match multiple archives using the ``--glob-archives GLOB`` option
-        (for more info on these patterns, see ``borg help patterns``). Note that these
+        (for more info on these patterns, see :ref:`borg_patterns`). Note that these
         two options are mutually exclusive.
 
         To avoid accidentally deleting archives, especially when using glob patterns,
@@ -3810,7 +3811,7 @@ class Archiver:
             pass ``--same-chunker-params``.
             Note that the chunker params changed from Borg 0.xx to 1.0.
 
-            See the output of the "borg help patterns" command for more help on exclude patterns.
+            For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
             """)
         subparser = subparsers.add_parser('diff', parents=[common_parser], add_help=False,
                                           description=self.do_diff.__doc__,
@@ -3871,7 +3872,7 @@ class Archiver:
         can be selected by passing a list of ``PATHs`` as arguments.
         The file selection can further be restricted by using the ``--exclude`` option.
 
-        See the output of the "borg help patterns" command for more help on exclude patterns.
+        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
@@ -3902,7 +3903,7 @@ class Archiver:
         by passing a list of ``PATHs`` as arguments. The file selection can further
         be restricted by using the ``--exclude`` option.
 
-        See the output of the "borg help patterns" command for more help on exclude patterns.
+        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
         By using ``--dry-run``, you can do all extraction steps except actually writing the
         output data: reading metadata and data chunks from the repo, checking the hash/hmac,
@@ -4286,7 +4287,7 @@ class Archiver:
         list_epilog = process_epilog("""
         This command lists the contents of a repository or an archive.
 
-        See the "borg help patterns" command for more help on exclude patterns.
+        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
         .. man NOTES
 

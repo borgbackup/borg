@@ -164,7 +164,7 @@ class RepositoryServer:  # pragma: no cover
         'inject_exception',
     )
 
-    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota):
+    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, pull_command=None):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
@@ -175,6 +175,7 @@ class RepositoryServer:  # pragma: no cover
         self.append_only = append_only
         self.storage_quota = storage_quota
         self.client_version = parse_version('1.0.8')  # fallback version if client is too old to send version information
+        self.pull_command = pull_command
 
     def positional_to_named(self, method, argv):
         """Translate from positional protocol to named protocol."""
@@ -194,13 +195,27 @@ class RepositoryServer:  # pragma: no cover
         return {name: kwargs[name] for name in kwargs if name in known}
 
     def serve(self):
-        stdin_fd = sys.stdin.fileno()
-        stdout_fd = sys.stdout.fileno()
-        stderr_fd = sys.stdout.fileno()
-        os.set_blocking(stdin_fd, False)
-        os.set_blocking(stdout_fd, True)
-        os.set_blocking(stderr_fd, True)
+
+        if self.pull_command:
+            self.p = Popen(shlex.split(self.pull_command), bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+
+            stdin_fd = self.p.stdout.fileno()
+            stdout_fd = self.p.stdin.fileno()
+            stderr_fd = sys.stderr.fileno()
+            os.set_blocking(stdin_fd, False)
+            os.set_blocking(stdout_fd, False)
+            os.set_blocking(stderr_fd, False)
+
+        else:
+            stdin_fd = sys.stdin.fileno()
+            stdout_fd = sys.stdout.fileno()
+            stderr_fd = sys.stdout.fileno()
+            os.set_blocking(stdin_fd, False)
+            os.set_blocking(stdout_fd, True)
+            os.set_blocking(stderr_fd, True)
+
         unpacker = get_limited_unpacker('server')
+
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
             if r:
@@ -530,7 +545,7 @@ class RemoteRepository:
     dictFormat = False  # outside of __init__ for testing of legacy free protocol
 
     def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False,
-                 make_parent_dirs=False, args=None):
+                 make_parent_dirs=False, args=None, serve=False):
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
@@ -552,18 +567,28 @@ class RemoteRepository:
         testing = location.host == '__testsuite__'
         # when testing, we invoke and talk to a borg process directly (no ssh).
         # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
-        env = prepare_subprocess_env(system=not testing)
-        borg_cmd = self.borg_cmd(args, testing)
-        if not testing:
-            borg_cmd = self.ssh_cmd(location) + borg_cmd
-        logger.debug('SSH command line: %s', borg_cmd)
-        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
-        self.stdin_fd = self.p.stdin.fileno()
-        self.stdout_fd = self.p.stdout.fileno()
-        self.stderr_fd = self.p.stderr.fileno()
-        os.set_blocking(self.stdin_fd, False)
-        os.set_blocking(self.stdout_fd, False)
-        os.set_blocking(self.stderr_fd, False)
+        if serve:
+            self.stdin_fd = sys.stdout.fileno()
+            self.stdout_fd = sys.stdin.fileno()
+            self.stderr_fd = sys.stderr.fileno()
+
+            os.set_blocking(self.stdin_fd, True)
+            os.set_blocking(self.stdout_fd, False)
+
+        else:
+            env = prepare_subprocess_env(system=not testing)
+            borg_cmd = self.borg_cmd(args, testing)
+            if not testing:
+                borg_cmd = self.ssh_cmd(location) + borg_cmd
+            logger.debug('SSH command line: %s', borg_cmd)
+            self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
+            self.stdin_fd = self.p.stdin.fileno()
+            self.stdout_fd = self.p.stdout.fileno()
+            self.stderr_fd = self.p.stderr.fileno()
+            os.set_blocking(self.stdin_fd, False)
+            os.set_blocking(self.stdout_fd, False)
+            os.set_blocking(self.stderr_fd, False)
+
         self.r_fds = [self.stdout_fd, self.stderr_fd]
         self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
 

@@ -157,10 +157,11 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
             make_parent_dirs = getattr(args, 'make_parent_dirs', False)
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
-            elif location.proto == 'ssh':
+
+            elif location.proto == 'ssh' or location.proto == 'serve':
                 repository = RemoteRepository(location.omit_archive(), create=create, exclusive=argument(args, exclusive),
                                               lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                              make_parent_dirs=make_parent_dirs, args=args)
+                                              make_parent_dirs=make_parent_dirs, args=args, serve=(location.proto == 'serve'))
             else:
                 repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
                                         lock_wait=self.lock_wait, lock=lock, append_only=append_only,
@@ -269,6 +270,7 @@ class Archiver:
             restrict_to_repositories=args.restrict_to_repositories,
             append_only=args.append_only,
             storage_quota=args.storage_quota,
+            pull_command=args.pull_command
         ).serve()
         return EXIT_SUCCESS
 
@@ -4629,6 +4631,9 @@ class Archiver:
                                help='Override storage quota of the repository (e.g. 5G, 1.5T). '
                                     'When a new repository is initialized, sets the storage quota on the new '
                                     'repository as well. Default: no quota.')
+
+        subparser.add_argument('--pull-command', metavar='cmd', dest='pull_command',
+                               help='command to use for pulling from a borg server started in serve:// mode')
 
         # borg umount
         umount_epilog = process_epilog("""

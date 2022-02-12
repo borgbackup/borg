@@ -725,6 +725,7 @@ class Repository:
         """
         if not self.compact:
             return
+        quota_use_before = self.storage_quota_use
         index_transaction_id = self.get_index_transaction_id()
         segments = self.segments
         unused = []  # list of segments, that are not used anymore
@@ -847,6 +848,8 @@ class Repository:
             pi.show()
         pi.finish()
         complete_xfer(intermediate=False)
+        quota_use_after = self.storage_quota_use
+        logger.info('compaction freed about %s repository space.', format_file_size(quota_use_before - quota_use_after))
         logger.debug('compaction completed.')
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):

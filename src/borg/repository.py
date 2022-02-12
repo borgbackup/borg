@@ -774,12 +774,12 @@ class Repository:
             # we want to compact if:
             # - we can free a considerable relative amount of space (freeable_ratio over some threshold)
             if not (freeable_ratio > threshold):
-                logger.debug('not compacting segment %d (freeable: %2.2f%% [%d bytes])',
+                logger.debug('not compacting segment %d (maybe freeable: %2.2f%% [%d bytes])',
                              segment, freeable_ratio * 100.0, freeable_space)
                 pi.show()
                 continue
             segments.setdefault(segment, 0)
-            logger.debug('compacting segment %d with usage count %d (freeable: %2.2f%% [%d bytes])',
+            logger.debug('compacting segment %d with usage count %d (maybe freeable: %2.2f%% [%d bytes])',
                          segment, segments[segment], freeable_ratio * 100.0, freeable_space)
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_COMMIT:

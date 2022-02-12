@@ -756,13 +756,15 @@ class Repository:
                 pi.show()
                 continue
             segment_size = self.io.segment_size(segment)
+            freeable_ratio = 1.0 * freeable_space / segment_size
             if segment_size > 0.2 * self.max_segment_size and freeable_space < 0.15 * segment_size:
-                logger.debug('not compacting segment %d (only %d bytes are sparse)', segment, freeable_space)
+                logger.debug('not compacting segment %d (maybe freeable: %2.2f%% [%d bytes])',
+                             segment, freeable_ratio * 100.0, freeable_space)
                 pi.show()
                 continue
             segments.setdefault(segment, 0)
-            logger.debug('compacting segment %d with usage count %d and %d freeable bytes',
-                         segment, segments[segment], freeable_space)
+            logger.debug('compacting segment %d with usage count %d (maybe freeable: %2.2f%% [%d bytes])',
+                         segment, segments[segment], freeable_ratio * 100.0, freeable_space)
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_COMMIT:
                     continue

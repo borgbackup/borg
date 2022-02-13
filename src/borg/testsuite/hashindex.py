@@ -71,6 +71,22 @@ class HashIndexTestCase(BaseTestCase):
         del idx
         self.assert_equal(len(cls.read(idx_name.name)), 0)
 
+        idx = cls()
+        # Test setdefault - set non-existing key
+        idx.setdefault(H(0), make_value(42))
+        assert H(0) in idx
+        assert idx[H(0)] == make_value(42)
+        # Test setdefault - do not set existing key
+        idx.setdefault(H(0), make_value(23))
+        assert H(0) in idx
+        assert idx[H(0)] == make_value(42)
+        # Test setdefault - get-like return value, key not present
+        assert idx.setdefault(H(1), make_value(23)) == make_value(23)
+        # Test setdefault - get-like return value, key present
+        assert idx.setdefault(H(0), make_value(23)) == make_value(42)
+        # clean up setdefault test
+        del idx
+
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),
                            '85f72b036c692c8266e4f51ccf0cff2147204282b5e316ae508d30a448d88fef')

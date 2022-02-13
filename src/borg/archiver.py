@@ -1478,10 +1478,14 @@ class Archiver:
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
-                    args.weekly, args.monthly, args.yearly, args.within)):
-            self.print_error('At least one of the "keep-within", "keep-last", '
+                    args.weekly, args.monthly, args.yearly, args.within, args.filter_stdio)):
+            self.print_error('At least one of the "keep-within", "keep-last", "keep-stdio",'
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
+            return self.exit_code
+        if args.filter_stdio and any((args.secondly, args.minutely, args.hourly, args.daily,
+                    args.weekly, args.monthly, args.yearly, args.within)):
+            self.print_error('"keep-stdio" is mutually exclusive with other keep options')
             return self.exit_code
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
@@ -1516,6 +1520,53 @@ class Archiver:
             num = getattr(args, rule, None)
             if num is not None:
                 keep += prune_split(archives, rule, num, kept_because)
+
+        if args.filter_stdio:
+            format = "{archive:<36} {time} [{id}]{NL}"
+            formatter = ArchiveFormatter(format, repository, manifest, key, json=True, iec=args.iec)
+            output_data = []
+            for archive in archives:
+                output_data.append(formatter.get_item_data(archive))
+            json_print(basic_json_data(manifest, extra={'archives': output_data}))
+
+            def hex_to_bin(d):
+                bin_id = None
+                try:
+                    bin_id = unhexlify(d)
+                except:
+                    raise ValueError('Invalid value, must be 64 hex digits') from None
+                if len(bin_id) != 32:
+                    raise ValueError('Invalid value, must be 64 hex digits')
+                return bin_id
+
+            archives_by_id = {archive.id: archive for archive in archives}
+            archives_by_name = {archive.name: archive for archive in archives}
+
+            kept_counter = 0
+            try:
+                input = sys.stdin.read()
+                input_data = []
+                if input:
+                    input_data = json.loads(input)
+                for keep_item in input_data:
+                    archive = None
+                    if 'id' in keep_item:
+                        bin_id = hex_to_bin(keep_item['id'])
+                        if bin_id in archives_by_id:
+                            archive = archives_by_id[bin_id]
+                    elif 'barchive' in keep_item:
+                        if keep_item['barchive'] in archives_by_name:
+                            archive = archives_by_name[keep_item['barchive']]
+                    if archive is None:
+                        self.print_error(f'Could not identify archive from json list element: {json.dumps(keep_item)}')
+                        return self.exit_code
+
+                    kept_counter += 1
+                    keep.append(archive)
+                    kept_because[archive.id] = ("stdio", kept_counter)
+            except json.decoder.JSONDecodeError as e:
+                self.print_error(f'Could not decode json input: {str(e)}')
+                return self.exit_code
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
@@ -4424,6 +4475,14 @@ class Archiver:
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
 
+        When using ``--keep-stdio`` borg will produce a listing of all
+        non-checkpoint archives on stdout (similiar to the behaviour of
+        ``borg list``) and expect a json list of archives to keep on stdin.
+        Each element of the list is expected to be an object containing at least
+        one of the keys ``id`` or ``barchive``, as in the output.
+        Only archives given on stdin will be kept.
+        Empty stdin will be treated like ``[]``.
+
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
         that is how much your repository will shrink.
@@ -4460,6 +4519,8 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
+        subparser.add_argument('--keep-stdio', dest='filter_stdio', action='store_true',
+                               help='filter archives to keep by json interaction on stdin/stdout instead')
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')

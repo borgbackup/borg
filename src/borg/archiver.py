@@ -1544,11 +1544,7 @@ class Archiver:
 
             kept_counter = 0
             try:
-                input = sys.stdin.read()
-                input_data = []
-                if input:
-                    input_data = json.loads(input)
-                for keep_item in input_data:
+                for keep_item in json.load(sys.stdin):
                     archive = None
                     if 'id' in keep_item:
                         bin_id = hex_to_bin(keep_item['id'])
@@ -4481,7 +4477,6 @@ class Archiver:
         Each element of the list is expected to be an object containing at least
         one of the keys ``id`` or ``barchive``, as in the output.
         Only archives given on stdin will be kept.
-        Empty stdin will be treated like ``[]``.
 
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as

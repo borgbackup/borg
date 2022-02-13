@@ -2270,7 +2270,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::2015-08-12-20:00-foo', src_dir)
         self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
         self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
-        output = self.cmd('prune', '--dry-run', '--keep-stdio', self.repository_location)
+        output = self.cmd('prune', '--dry-run', '--keep-stdio', self.repository_location, input=b'[]')
         self.assert_not_in('2015-08-12-10:00-foo.checkpoint', output)
         list_data = json.loads(output)
         input_data = []

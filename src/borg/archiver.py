@@ -1478,12 +1478,12 @@ class Archiver:
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
-                    args.weekly, args.monthly, args.yearly, args.within, args.filter_stdio)):
+                    args.weekly, args.monthly, args.yearly, args.within, args.keep_stdio)):
             self.print_error('At least one of the "keep-within", "keep-last", "keep-stdio",'
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        if args.filter_stdio and any((args.secondly, args.minutely, args.hourly, args.daily,
+        if args.keep_stdio and any((args.secondly, args.minutely, args.hourly, args.daily,
                     args.weekly, args.monthly, args.yearly, args.within)):
             self.print_error('"keep-stdio" is mutually exclusive with other keep options')
             return self.exit_code
@@ -1521,7 +1521,7 @@ class Archiver:
             if num is not None:
                 keep += prune_split(archives, rule, num, kept_because)
 
-        if args.filter_stdio:
+        if args.keep_stdio:
             format = "{archive:<36} {time} [{id}]{NL}"
             formatter = ArchiveFormatter(format, repository, manifest, key, json=True, iec=args.iec)
             output_data = []
@@ -4519,7 +4519,7 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('--keep-stdio', dest='filter_stdio', action='store_true',
+        subparser.add_argument('--keep-stdio', action='store_true',
                                help='filter archives to keep by json interaction on stdin/stdout instead')
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument('--save-space', dest='save_space', action='store_true',

@@ -1544,11 +1544,10 @@ class Archiver:
                 archive = None
                 if 'id' in keep_item:
                     bin_id = hex_to_bin(keep_item['id'], blen=32)
-                    if bin_id in archives_by_id:
-                        archive = archives_by_id[bin_id]
+                    archive = archives_by_id.get(bin_id)
                 elif 'barchive' in keep_item:
-                    if keep_item['barchive'] in archives_by_name:
-                        archive = archives_by_name[keep_item['barchive']]
+                    bname = keep_item['barchive']
+                    archive = archives_by_name.get(bname)
                 if archive is None:
                     self.print_error(f'Could not identify archive from json list element: {json.dumps(keep_item)}')
                     return self.exit_code

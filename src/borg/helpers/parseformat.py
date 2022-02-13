@@ -30,6 +30,7 @@ from ..platformflags import is_win32
 def bin_to_hex(binary):
     return hexlify(binary).decode('ascii')
 
+
 def hex_to_bin(hexadecimal, blen=None):
     binary = None
     try:

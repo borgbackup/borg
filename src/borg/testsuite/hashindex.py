@@ -70,6 +70,21 @@ class HashIndexTestCase(BaseTestCase):
             idx.write(filepath)
             del idx
             self.assert_equal(len(cls.read(filepath)), 0)
+        idx = cls()
+        # Test setdefault - set non-existing key
+        idx.setdefault(H(0), make_value(42))
+        assert H(0) in idx
+        assert idx[H(0)] == make_value(42)
+        # Test setdefault - do not set existing key
+        idx.setdefault(H(0), make_value(23))
+        assert H(0) in idx
+        assert idx[H(0)] == make_value(42)
+        # Test setdefault - get-like return value, key not present
+        assert idx.setdefault(H(1), make_value(23)) == make_value(23)
+        # Test setdefault - get-like return value, key present
+        assert idx.setdefault(H(0), make_value(23)) == make_value(42)
+        # clean up setdefault test
+        del idx
 
     def test_nsindex(self):
         self._generic_test(NSIndex, lambda x: (x, x),

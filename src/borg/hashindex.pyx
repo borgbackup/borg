@@ -129,6 +129,7 @@ cdef class IndexBase:
     def setdefault(self, key, value):
         if not key in self:
             self[key] = value
+        return self[key]
 
     def __delitem__(self, key):
         assert len(key) == self.key_size

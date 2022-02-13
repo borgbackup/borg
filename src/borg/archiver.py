@@ -1529,30 +1529,33 @@ class Archiver:
                 output_data.append(formatter.get_item_data(archive))
             json_print(basic_json_data(manifest, extra={'archives': output_data}))
 
+            keep_input = None
+            try:
+                keep_input = json.load(sys.stdin)
+            except json.decoder.JSONDecodeError as e:
+                self.print_error(f'Could not decode json input: {str(e)}')
+                return self.exit_code
+
             archives_by_id = {archive.id: archive for archive in archives}
             archives_by_name = {archive.name: archive for archive in archives}
 
             kept_counter = 0
-            try:
-                for keep_item in json.load(sys.stdin):
-                    archive = None
-                    if 'id' in keep_item:
-                        bin_id = hex_to_bin(keep_item['id'], blen=32)
-                        if bin_id in archives_by_id:
-                            archive = archives_by_id[bin_id]
-                    elif 'barchive' in keep_item:
-                        if keep_item['barchive'] in archives_by_name:
-                            archive = archives_by_name[keep_item['barchive']]
-                    if archive is None:
-                        self.print_error(f'Could not identify archive from json list element: {json.dumps(keep_item)}')
-                        return self.exit_code
+            for keep_item in keep_input:
+                archive = None
+                if 'id' in keep_item:
+                    bin_id = hex_to_bin(keep_item['id'], blen=32)
+                    if bin_id in archives_by_id:
+                        archive = archives_by_id[bin_id]
+                elif 'barchive' in keep_item:
+                    if keep_item['barchive'] in archives_by_name:
+                        archive = archives_by_name[keep_item['barchive']]
+                if archive is None:
+                    self.print_error(f'Could not identify archive from json list element: {json.dumps(keep_item)}')
+                    return self.exit_code
 
-                    kept_counter += 1
-                    keep.append(archive)
-                    kept_because[archive.id] = ("stdio", kept_counter)
-            except json.decoder.JSONDecodeError as e:
-                self.print_error(f'Could not decode json input: {str(e)}')
-                return self.exit_code
+                kept_counter += 1
+                keep.append(archive)
+                kept_because[archive.id] = ("stdio", kept_counter)
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()

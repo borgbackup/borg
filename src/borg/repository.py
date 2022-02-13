@@ -738,7 +738,7 @@ class Repository:
         if not self.compact:
             logger.debug('nothing to do: compact empty')
             return
-        freed_space = 0
+        quota_use_before = self.storage_quota_use
         index_transaction_id = self.get_index_transaction_id()
         segments = self.segments
         unused = []  # list of segments, that are not used anymore
@@ -774,13 +774,12 @@ class Repository:
             # we want to compact if:
             # - we can free a considerable relative amount of space (freeable_ratio over some threshold)
             if not (freeable_ratio > threshold):
-                logger.debug('not compacting segment %d (freeable: %2.2f%% [%d bytes])',
+                logger.debug('not compacting segment %d (maybe freeable: %2.2f%% [%d bytes])',
                              segment, freeable_ratio * 100.0, freeable_space)
                 pi.show()
                 continue
-            freed_space += freeable_space  # this is what we THINK we can free
             segments.setdefault(segment, 0)
-            logger.debug('compacting segment %d with usage count %d (freeable: %2.2f%% [%d bytes])',
+            logger.debug('compacting segment %d with usage count %d (maybe freeable: %2.2f%% [%d bytes])',
                          segment, segments[segment], freeable_ratio * 100.0, freeable_space)
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_COMMIT:
@@ -867,7 +866,8 @@ class Repository:
             pi.show()
         pi.finish()
         complete_xfer(intermediate=False)
-        logger.info('compaction freed about %s repository space.', format_file_size(freed_space))
+        quota_use_after = self.storage_quota_use
+        logger.info('compaction freed about %s repository space.', format_file_size(quota_use_before - quota_use_after))
         logger.debug('compaction completed.')
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):

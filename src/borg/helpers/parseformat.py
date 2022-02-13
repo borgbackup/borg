@@ -8,7 +8,8 @@ import shlex
 import socket
 import stat
 import uuid
-from binascii import hexlify
+from binascii import hexlify, unhexlify
+import binascii
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from functools import partial
@@ -28,6 +29,16 @@ from ..platformflags import is_win32
 
 def bin_to_hex(binary):
     return hexlify(binary).decode('ascii')
+
+def hex_to_bin(hexadecimal, blen=None):
+    binary = None
+    try:
+        binary = unhexlify(hexadecimal)
+    except binascii.Error as e:
+        raise ValueError(f'Invalid hexadecimal value "{hexadecimal}": {str(e)}')
+    if blen is not None and len(binary) != blen:
+        raise ValueError(f'Invalid hexadecimal value "{hexadecimal}", expected value of length {blen} ({blen * 2} hex digits)')
+    return binary
 
 
 def safe_decode(s, coding='utf-8', errors='surrogateescape'):

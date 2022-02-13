@@ -52,7 +52,7 @@ try:
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
+    from .helpers import safe_encode, remove_surrogates, bin_to_hex, hex_to_bin, prepare_dump_dict, eval_escapes
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from .helpers import timestamp
     from .helpers import get_cache_dir, os_stat
@@ -1529,16 +1529,6 @@ class Archiver:
                 output_data.append(formatter.get_item_data(archive))
             json_print(basic_json_data(manifest, extra={'archives': output_data}))
 
-            def hex_to_bin(d):
-                bin_id = None
-                try:
-                    bin_id = unhexlify(d)
-                except:
-                    raise ValueError('Invalid value, must be 64 hex digits') from None
-                if len(bin_id) != 32:
-                    raise ValueError('Invalid value, must be 64 hex digits')
-                return bin_id
-
             archives_by_id = {archive.id: archive for archive in archives}
             archives_by_name = {archive.name: archive for archive in archives}
 
@@ -1547,7 +1537,7 @@ class Archiver:
                 for keep_item in json.load(sys.stdin):
                     archive = None
                     if 'id' in keep_item:
-                        bin_id = hex_to_bin(keep_item['id'])
+                        bin_id = hex_to_bin(keep_item['id'], blen=32)
                         if bin_id in archives_by_id:
                             archive = archives_by_id[bin_id]
                     elif 'barchive' in keep_item:

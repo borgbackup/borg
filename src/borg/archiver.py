@@ -1361,7 +1361,7 @@ class Archiver:
 
         return self.exit_code
 
-    def _list_repository(self, args, repository, manifest, key):
+    def _list_repository(self, args, repository, manifest, key, archives=None):
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -1372,7 +1372,9 @@ class Archiver:
 
         output_data = []
 
-        for archive_info in manifest.archives.list_considering(args):
+        if archives is None:
+            archives = manifest.archives.list_considering(args)
+        for archive_info in archives:
             if args.json:
                 output_data.append(formatter.get_item_data(archive_info))
             else:
@@ -1478,15 +1480,101 @@ class Archiver:
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
-                    args.weekly, args.monthly, args.yearly, args.within, args.keep_stdio)):
-            self.print_error('At least one of the "keep-within", "keep-last", "keep-stdio",'
+                    args.weekly, args.monthly, args.yearly, args.within)):
+            self.print_error('At least one of the "keep-within", "keep-last",'
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        if args.keep_stdio and any((args.secondly, args.minutely, args.hourly, args.daily,
-                    args.weekly, args.monthly, args.yearly, args.within)):
-            self.print_error('"keep-stdio" is mutually exclusive with other keep options')
-            return self.exit_code
+
+        def determine_keep(archives):
+            keep = []
+            # collect the rule responsible for the keeping of each archive in this dict
+            # keys are archive ids, values are a tuple
+            #   (<rulename>, <how many archives were kept by this rule so far>)
+            kept_because = {}
+
+            # find archives which need to be kept because of the keep-within rule
+            if args.within:
+                keep += prune_within(archives, args.within, kept_because)
+
+            # find archives which need to be kept because of the various time period rules
+            for rule in PRUNING_PATTERNS.keys():
+                num = getattr(args, rule, None)
+                if num is not None:
+                    keep += prune_split(archives, rule, num, kept_because)
+
+            return (keep, kept_because)
+
+        return self._do_prune(args, repository, manifest, key, determine_keep)
+
+    @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
+    def do_prune_stdio(self, args, repository, manifest, key):
+        """Prune repository archives according to interaction on stdio"""
+
+        def determine_keep(archives):
+            keep = []
+            kept_because = {}
+
+            list_exit = self._list_repository(args, repository, manifest, key, archives)
+            if list_exit != 0:
+                return list_exit
+
+            archives_by_id = {archive.id: archive for archive in archives}
+            archives_by_name = {archive.name: archive for archive in archives}
+
+            kept_counter = 0
+            if args.json:
+                keep_input = None
+                try:
+                    keep_input = json.load(sys.stdin)
+                except json.decoder.JSONDecodeError as e:
+                    self.print_error(f'Could not decode json input: {str(e)}')
+                    return self.exit_code
+
+                for keep_item in keep_input:
+                    archive = None
+                    if 'id' in keep_item:
+                        bin_id = hex_to_bin(keep_item['id'], blen=32)
+                        archive = archives_by_id.get(bin_id)
+                    elif 'barchive' in keep_item:
+                        bname = keep_item['barchive']
+                        archive = archives_by_name.get(bname)
+                    if archive is None:
+                        self.print_error(f'Could not identify archive from json list element: {json.dumps(keep_item)}')
+                        return self.exit_code
+
+                    kept_counter += 1
+                    keep.append(archive)
+                    kept_because[archive.id] = ("stdio", kept_counter)
+            else:
+                archives_sep = eval_escapes(args.delimiter) if args.delimiter is not None else '\n'
+
+                kept_counter = 0
+                pipe = TextIOWrapper(sys.stdin.buffer, errors='surrogateescape')
+                for archive_desc in iter_separated(pipe, archives_sep):
+                    archive = None
+                    bin_id = None
+                    try:
+                        bin_id = hex_to_bin(archive_desc)
+                    except ValueError:
+                        pass
+                    if bin_id is None:
+                        archive = archives_by_name.get(archive_desc)
+                    else:
+                        archive = archives_by_id.get(bin_id)
+                    if archive is None:
+                        self.print_error(f'Could not identify archive from list element: {archive_desc}')
+                        return self.exit_code
+
+                    kept_counter += 1
+                    keep.append(archive)
+                    kept_because[archive.id] = ("stdio", kept_counter)
+
+            return (keep, kept_because)
+
+        return self._do_prune(args, repository, manifest, key, determine_keep)
+
+    def _do_prune(self, args, repository, manifest, key, determine_keep):
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         checkpoint_re = r'\.checkpoint(\.\d+)?'
@@ -1505,56 +1593,7 @@ class Archiver:
         # ignore all checkpoint archives to avoid keeping one (which is an incomplete backup)
         # that is newer than a successfully completed backup - and killing the successful backup.
         archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
-        keep = []
-        # collect the rule responsible for the keeping of each archive in this dict
-        # keys are archive ids, values are a tuple
-        #   (<rulename>, <how many archives were kept by this rule so far >)
-        kept_because = {}
-
-        # find archives which need to be kept because of the keep-within rule
-        if args.within:
-            keep += prune_within(archives, args.within, kept_because)
-
-        # find archives which need to be kept because of the various time period rules
-        for rule in PRUNING_PATTERNS.keys():
-            num = getattr(args, rule, None)
-            if num is not None:
-                keep += prune_split(archives, rule, num, kept_because)
-
-        if args.keep_stdio:
-            format = "{archive:<36} {time} [{id}]{NL}"
-            formatter = ArchiveFormatter(format, repository, manifest, key, json=True, iec=args.iec)
-            output_data = []
-            for archive in archives:
-                output_data.append(formatter.get_item_data(archive))
-            json_print(basic_json_data(manifest, extra={'archives': output_data}))
-
-            keep_input = None
-            try:
-                keep_input = json.load(sys.stdin)
-            except json.decoder.JSONDecodeError as e:
-                self.print_error(f'Could not decode json input: {str(e)}')
-                return self.exit_code
-
-            archives_by_id = {archive.id: archive for archive in archives}
-            archives_by_name = {archive.name: archive for archive in archives}
-
-            kept_counter = 0
-            for keep_item in keep_input:
-                archive = None
-                if 'id' in keep_item:
-                    bin_id = hex_to_bin(keep_item['id'], blen=32)
-                    archive = archives_by_id.get(bin_id)
-                elif 'barchive' in keep_item:
-                    bname = keep_item['barchive']
-                    archive = archives_by_name.get(bname)
-                if archive is None:
-                    self.print_error(f'Could not identify archive from json list element: {json.dumps(keep_item)}')
-                    return self.exit_code
-
-                kept_counter += 1
-                keep.append(archive)
-                kept_because[archive.id] = ("stdio", kept_counter)
+        keep, kept_because = determine_keep(archives)
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics()
@@ -2934,6 +2973,19 @@ class Archiver:
                                    help='consider first N archives after other filters were applied')
                 group.add_argument('--last', metavar='N', dest='last', default=0, type=positive_int_validator,
                                    help='consider last N archives after other filters were applied')
+
+        def define_prune_group(subparser):
+            subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                                   help='do not change repository')
+            subparser.add_argument('--force', dest='forced', action='store_true',
+                                   help='force pruning of corrupted archives, '
+                                        'use ``--force --force`` in case ``--force`` does not work.')
+            subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
+                                   help='print statistics for the deleted archive')
+            subparser.add_argument('--list', dest='output_list', action='store_true',
+                                   help='output verbose list of archives it keeps/prunes')
+            subparser.add_argument('--save-space', dest='save_space', action='store_true',
+                                   help='work slower, but using less space')
 
         def define_borg_mount(parser):
             parser.set_defaults(func=self.do_mount)
@@ -4463,13 +4515,6 @@ class Archiver:
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
 
-        When using ``--keep-stdio`` borg will produce a listing of all
-        non-checkpoint archives on stdout (similiar to the behaviour of
-        ``borg list``) and expect a json list of archives to keep on stdin.
-        Each element of the list is expected to be an object containing at least
-        one of the keys ``id`` or ``barchive``, as in the output.
-        Only archives given on stdin will be kept.
-
         When using ``--stats``, you will get some statistics about how much data was
         deleted - the "Deleted data" deduplicated size there is most interesting as
         that is how much your repository will shrink.
@@ -4481,15 +4526,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='prune archives')
         subparser.set_defaults(func=self.do_prune)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change repository')
-        subparser.add_argument('--force', dest='forced', action='store_true',
-                               help='force pruning of corrupted archives, '
-                                    'use ``--force --force`` in case ``--force`` does not work.')
-        subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
-                               help='print statistics for the deleted archive')
-        subparser.add_argument('--list', dest='output_list', action='store_true',
-                               help='output verbose list of archives it keeps/prunes')
+        define_prune_group(subparser)
         subparser.add_argument('--keep-within', metavar='INTERVAL', dest='within', type=interval,
                                help='keep all archives within this time interval')
         subparser.add_argument('--keep-last', '--keep-secondly', dest='secondly', type=int, default=0,
@@ -4506,11 +4543,53 @@ class Archiver:
                                help='number of monthly archives to keep')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
-        subparser.add_argument('--keep-stdio', action='store_true',
-                               help='filter archives to keep by json interaction on stdin/stdout instead')
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
-        subparser.add_argument('--save-space', dest='save_space', action='store_true',
-                               help='work slower, but using less space')
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False),
+                               help='repository to prune')
+
+        prune_stdio_epilog = process_epilog("""
+        The ``prune-stdio`` command is a variant of the ``prune`` command that interacts
+        with an external process over stdin and stdout, deleting all archives not
+        explitily marked for retention by the external process.
+
+        When using ``prune-stdio`` borg will produce a listing of all non-checkpoint
+        archives on stdout (similiar to the behaviour of ``borg list``) and expect a
+        list of archives to keep on stdin.
+        Only archives given on stdin will be kept.
+
+        ``borg prune-stdio`` behaves identically to ``borg prune`` with regard to
+        ``--dry-run``, ``--force``, ``--stats``, ``--list``, ``--save-space``,
+        ``--prefix``, and ``--glob-archives``.
+
+        If ``--json`` is specified both the output produced and the input expected will
+        be encoded as json.
+        Input is then expected to be a top-level json list of archives to keep.
+        Each element of the list is expected to be an object containing at least one of
+        the keys ``id`` or ``barchive``, as in the output.
+
+        If ``--json`` is not specified, output is produced as defined in ``--format``
+        (see ``borg list``) and input is expected to be a list of archive names and/or
+        archive ids, delimited as per ``--delimiter``
+        """)
+        subparser = subparsers.add_parser('prune-stdio', parents=[common_parser], add_help=False,
+                                          description=self.do_prune_stdio.__doc__,
+                                          epilog=prune_stdio_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='prune archives via stdio')
+        subparser.set_defaults(func=self.do_prune_stdio)
+        define_prune_group(subparser)
+        subparser.add_argument('--short', dest='short', action='store_true',
+                               help='only print archive names, nothing else')
+        subparser.add_argument('--format', metavar='FORMAT', dest='format',
+                               default='{archive:<36} {time} [{id}]{NL}',
+                               help='specify format for file or archive listing '
+                                    '(default: "{archive:<36} {time} [{id}]{NL}")')
+        subparser.add_argument('--delimiter', metavar='DELIM', default='\\n',
+                               help='set archive delimiter for reading from stdin (default: \\n)')
+        subparser.add_argument('--json', action='store_true',
+                               help='interact with stdio encoded as json')
+        define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to prune')

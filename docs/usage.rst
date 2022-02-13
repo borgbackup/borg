@@ -45,6 +45,7 @@ Usage
    usage/diff
    usage/delete
    usage/prune
+   usage/prune-stdio
    usage/compact
    usage/info
    usage/mount

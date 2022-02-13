@@ -2263,6 +2263,34 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('2015-08-12-10:00-bar', output)
         self.assert_in('2015-08-12-20:00-bar', output)
 
+    def test_prune_repository_stdio_json(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::2015-08-12-10:00-foo', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-10:00-foo.checkpoint', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-20:00-foo', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
+        output = self.cmd('prune-stdio', '--json', '--dry-run', self.repository_location, input=b'[]')
+        self.assert_not_in('2015-08-12-10:00-foo.checkpoint', output)
+        list_data = json.loads(output)
+        input_data = []
+        for archive in list_data['archives']:
+            if archive['barchive'] in set(['2015-08-12-20:00-foo', '2015-08-12-10:00-bar']):
+                input_data.append(archive)
+        output = self.cmd('prune-stdio', '--json', '--list', '--dry-run', self.repository_location, input=json.dumps(input_data).encode())
+        assert re.search(r'Would prune:\s+2015-08-12-10:00-foo', output)
+        assert re.search(r'Would prune:\s+2015-08-12-10:00-foo.checkpoint', output)
+        assert re.search(r'Keeping archive \(rule: stdio #\d+\):\s+2015-08-12-20:00-foo', output)
+        assert re.search(r'Keeping archive \(rule: stdio #\d+\):\s+2015-08-12-10:00-bar', output)
+        assert re.search(r'Would prune:\s+2015-08-12-20:00-bar', output)
+        output = self.cmd('prune-stdio', '--json', self.repository_location, input=json.dumps(input_data).encode())
+        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
+        self.assert_not_in('2015-08-12-10:00-foo', output)
+        self.assert_not_in('2015-08-12-10:00-foo.checkpoint', output)
+        self.assert_in('2015-08-12-20:00-foo', output)
+        self.assert_in('2015-08-12-10:00-bar', output)
+        self.assert_not_in('2015-08-12-20:00-bar', output)
+
     def test_prune_repository_stdio(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::2015-08-12-10:00-foo', src_dir)
@@ -2270,20 +2298,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::2015-08-12-20:00-foo', src_dir)
         self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
         self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
-        output = self.cmd('prune', '--dry-run', '--keep-stdio', self.repository_location, input=b'[]')
+        output = self.cmd('prune-stdio', '--dry-run', self.repository_location, input=b'')
+        self.assert_in('2015-08-12-10:00-foo', output)
         self.assert_not_in('2015-08-12-10:00-foo.checkpoint', output)
+        self.assert_in('2015-08-12-20:00-foo', output)
+        self.assert_in('2015-08-12-10:00-bar', output)
+        self.assert_in('2015-08-12-20:00-bar', output)
+        output = self.cmd('list', '--json', self.repository_location)
         list_data = json.loads(output)
-        input_data = []
+        input_data = ''
         for archive in list_data['archives']:
-            if archive['barchive'] in set(['2015-08-12-20:00-foo', '2015-08-12-10:00-bar']):
-                input_data.append(archive)
-        output = self.cmd('prune', '--list', '--dry-run', '--keep-stdio', self.repository_location, input=json.dumps(input_data).encode())
+            if archive['barchive'] in set(['2015-08-12-10:00-bar']):
+                input_data += archive['barchive'] + '\n'
+            if archive['barchive'] in set(['2015-08-12-20:00-foo']):
+                input_data += archive['id'] + '\n'
+        output = self.cmd('prune-stdio', '--list', '--dry-run', self.repository_location, input=input_data.encode())
         assert re.search(r'Would prune:\s+2015-08-12-10:00-foo', output)
         assert re.search(r'Would prune:\s+2015-08-12-10:00-foo.checkpoint', output)
         assert re.search(r'Keeping archive \(rule: stdio #\d+\):\s+2015-08-12-20:00-foo', output)
         assert re.search(r'Keeping archive \(rule: stdio #\d+\):\s+2015-08-12-10:00-bar', output)
         assert re.search(r'Would prune:\s+2015-08-12-20:00-bar', output)
-        output = self.cmd('prune', '--keep-stdio', self.repository_location, input=json.dumps(input_data).encode())
+        output = self.cmd('prune-stdio', self.repository_location, input=input_data.encode())
         output = self.cmd('list', '--consider-checkpoints', self.repository_location)
         self.assert_not_in('2015-08-12-10:00-foo', output)
         self.assert_not_in('2015-08-12-10:00-foo.checkpoint', output)

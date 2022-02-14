@@ -105,6 +105,27 @@ class Statistics:
             'nfiles': self.nfiles,
         }
 
+    def as_raw_dict(self):
+        return {
+            'size': self.osize,
+            'csize': self.csize,
+            'nfiles': self.nfiles,
+            'size_parts': self.osize_parts,
+            'csize_parts': self.csize_parts,
+            'nfiles_parts': self.nfiles_parts,
+        }
+
+    @classmethod
+    def from_raw_dict(cls, **kw):
+        self = cls()
+        self.osize = kw['size']
+        self.csize = kw['csize']
+        self.nfiles = kw['nfiles']
+        self.osize_parts = kw['size_parts']
+        self.csize_parts = kw['csize_parts']
+        self.nfiles_parts = kw['nfiles_parts']
+        return self
+
     @property
     def osize_fmt(self):
         return format_file_size(self.osize, iec=self.iec)
@@ -627,6 +648,17 @@ Utilization of max. archive size: {csize_max:.0%}
         self.cache.commit()
 
     def calc_stats(self, cache, want_unique=True):
+        # caching wrapper around _calc_stats which is rather slow for archives made with borg < 1.2
+        have_borg12_meta = self.metadata.get('nfiles') is not None
+        try:
+            stats = Statistics.from_raw_dict(**cache.pre12_meta[self.fpr])
+        except KeyError:  # not in pre12_meta cache
+            stats = self._calc_stats(cache, want_unique=want_unique)
+            if not have_borg12_meta:
+                cache.pre12_meta[self.fpr] = stats.as_raw_dict()
+        return stats
+
+    def _calc_stats(self, cache, want_unique=True):
         have_borg12_meta = self.metadata.get('nfiles') is not None
 
         if have_borg12_meta and not want_unique:
@@ -639,7 +671,8 @@ Utilization of max. archive size: {csize_max:.0%}
             archive_index = ChunkIndex()
             sync = CacheSynchronizer(archive_index)
             add(self.id)
-            pi = ProgressIndicatorPercent(total=len(self.metadata.items), msg='Calculating statistics... %3d%%',
+            pi = ProgressIndicatorPercent(total=len(self.metadata.items),
+                                          msg='Calculating statistics for archive %s ... %%3d%%%%' % self.name,
                                           msgid='archive.calc_stats')
             for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
                 pi.show(increase=1)

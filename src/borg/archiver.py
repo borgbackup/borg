@@ -1481,7 +1481,7 @@ class Archiver:
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
                     args.weekly, args.monthly, args.yearly, args.within)):
-            self.print_error('At least one of the "keep-within", "keep-last",'
+            self.print_error('At least one of the "keep-within", "keep-last", '
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code

@@ -205,7 +205,7 @@ def secure_erase(path):
     os.unlink(path)
 
 
-def truncate_and_unlink(path):
+def safe_unlink(path):
     """
     Safely unlink (delete) *path*.
 

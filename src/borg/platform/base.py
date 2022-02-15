@@ -3,7 +3,7 @@ import os
 import socket
 import uuid
 
-from borg.helpers import truncate_and_unlink
+from borg.helpers import safe_unlink
 from borg.platformflags import is_win32
 
 """
@@ -212,7 +212,7 @@ class SaveFile:
     def __enter__(self):
         from .. import platform
         try:
-            truncate_and_unlink(self.tmppath)
+            safe_unlink(self.tmppath)
         except FileNotFoundError:
             pass
         self.fd = platform.SyncFile(self.tmppath, self.binary)
@@ -222,7 +222,7 @@ class SaveFile:
         from .. import platform
         self.fd.close()
         if exc_type is not None:
-            truncate_and_unlink(self.tmppath)
+            safe_unlink(self.tmppath)
             return
         os.replace(self.tmppath, self.path)
         platform.sync_dir(os.path.dirname(self.path))

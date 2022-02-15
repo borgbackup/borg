@@ -19,7 +19,7 @@ from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import hostname_is_unique
-from .helpers import secure_erase, truncate_and_unlink
+from .helpers import secure_erase, safe_unlink
 from .helpers import msgpack
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
@@ -1294,7 +1294,7 @@ class LoggedIO:
             if segment > transaction_id:
                 if segment in self.fds:
                     del self.fds[segment]
-                truncate_and_unlink(filename)
+                safe_unlink(filename)
                 count += 1
             else:
                 break
@@ -1402,7 +1402,7 @@ class LoggedIO:
         if segment in self.fds:
             del self.fds[segment]
         try:
-            truncate_and_unlink(self.segment_filename(segment))
+            safe_unlink(self.segment_filename(segment))
         except FileNotFoundError:
             pass
 

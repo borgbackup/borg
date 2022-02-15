@@ -207,10 +207,10 @@ def secure_erase(path):
 
 def truncate_and_unlink(path):
     """
-    Truncate and then unlink *path*.
+    Safely unlink (delete) *path*.
 
-    Do not create *path* if it does not exist.
-    Open *path* for truncation in r+b mode (=O_RDWR|O_BINARY).
+    If we run out of space while deleting the file, we try truncating it first.
+    BUT we truncate only if path is the only hardlink referring to this content.
 
     Use this when deleting potentially large files when recovering
     from a VFS error such as ENOSPC. It can help a full file system
@@ -218,13 +218,27 @@ def truncate_and_unlink(path):
     in repository.py for further explanations.
     """
     try:
-        with open(path, 'r+b') as fd:
-            fd.truncate()
-    except OSError as err:
-        if err.errno != errno.ENOTSUP:
+        os.unlink(path)
+    except OSError as unlink_err:
+        if unlink_err.errno != errno.ENOSPC:
+            # not free space related, give up here.
             raise
-        # don't crash if the above ops are not supported.
-    os.unlink(path)
+        # we ran out of space while trying to delete the file.
+        st = os.stat(path)
+        if st.st_nlink > 1:
+            # rather give up here than cause collateral damage to the other hardlink.
+            raise
+        # no other hardlink! try to recover free space by truncating this file.
+        try:
+            # Do not create *path* if it does not exist, open for truncation in r+b mode (=O_RDWR|O_BINARY).
+            with open(path, 'r+b') as fd:
+                fd.truncate()
+        except OSError:
+            # truncate didn't work, so we still have the original unlink issue - give up:
+            raise unlink_err
+        else:
+            # successfully truncated the file, try again deleting it:
+            os.unlink(path)
 
 
 def dash_open(path, mode):

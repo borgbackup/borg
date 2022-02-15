@@ -1200,7 +1200,7 @@ class Archiver:
                 return 'source' not in item or not hardlinkable(item.mode) or item.source in hardlink_masters
 
             def is_hardlink_master(item):
-                return item.get('hardlink_master', True) and 'source' not in item
+                return item.get('hardlink_master', True) and 'source' not in item and hardlinkable(item.mode)
 
             def update_hardlink_masters(item1, item2):
                 if is_hardlink_master(item1) or is_hardlink_master(item2):

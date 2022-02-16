@@ -25,7 +25,7 @@ from .helpers import get_limited_unpacker
 from .helpers import replace_placeholders
 from .helpers import sysinfo
 from .helpers import format_file_size
-from .helpers import truncate_and_unlink
+from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env
 from .logger import create_logger, setup_logging
 from .helpers import msgpack
@@ -1150,7 +1150,7 @@ class RepositoryCache(RepositoryNoCache):
                 fd.write(packed)
         except OSError as os_error:
             try:
-                truncate_and_unlink(file)
+                safe_unlink(file)
             except FileNotFoundError:
                 pass  # open() could have failed as well
             if os_error.errno == errno.ENOSPC:

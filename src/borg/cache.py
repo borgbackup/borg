@@ -26,7 +26,7 @@ from .helpers import yes
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .helpers import set_ec, EXIT_WARNING
-from .helpers import truncate_and_unlink
+from .helpers import safe_unlink
 from .helpers import msgpack
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
@@ -774,7 +774,7 @@ class LocalCache(CacheStatsMixin):
                                                   filename=bin_to_hex(archive_id) + '.compact') as fd:
                     chunk_idx.write(fd)
             except Exception:
-                truncate_and_unlink(fn_tmp)
+                safe_unlink(fn_tmp)
             else:
                 os.rename(fn_tmp, fn)
 

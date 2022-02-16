@@ -1,6 +1,7 @@
 import errno
 import os
 import socket
+import tempfile
 import uuid
 
 from borg.helpers import safe_unlink
@@ -147,10 +148,22 @@ class SyncFile:
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
-    def __init__(self, path, binary=False):
+    def __init__(self, path, *, fd=None, binary=False):
+        """
+        Open a SyncFile.
+
+        :param path: full path/filename
+        :param fd: additionally to path, it is possible to give an already open OS-level fd
+               that corresponds to path (like from os.open(path, ...) or os.mkstemp(...))
+        :param binary: whether to open in binary mode, default is False.
+        """
         mode = 'xb' if binary else 'x'  # x -> raise FileExists exception in open() if file exists already
-        self.fd = open(path, mode)
-        self.fileno = self.fd.fileno()
+        self.path = path
+        if fd is None:
+            self.f = open(path, mode=mode)  # python file object
+        else:
+            self.f = os.fdopen(fd, mode=mode)
+        self.fd = self.f.fileno()  # OS-level fd
 
     def __enter__(self):
         return self
@@ -159,7 +172,7 @@ class SyncFile:
         self.close()
 
     def write(self, data):
-        self.fd.write(data)
+        self.f.write(data)
 
     def sync(self):
         """
@@ -167,21 +180,21 @@ class SyncFile:
         after sync().
         """
         from .. import platform
-        self.fd.flush()
-        platform.fdatasync(self.fileno)
+        self.f.flush()
+        platform.fdatasync(self.fd)
         # tell the OS that it does not need to cache what we just wrote,
         # avoids spoiling the cache for the OS and other processes.
-        safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
+        safe_fadvise(self.fd, 0, 0, 'DONTNEED')
 
     def close(self):
         """sync() and close."""
         from .. import platform
         dirname = None
         try:
-            dirname = os.path.dirname(self.fd.name)
+            dirname = os.path.dirname(self.path)
             self.sync()
         finally:
-            self.fd.close()
+            self.f.close()
             if dirname:
                 platform.sync_dir(dirname)
 
@@ -196,36 +209,41 @@ class SaveFile:
     atomically and won't become corrupted, even on power failures or
     crashes (for caveats see SyncFile).
 
-    Calling SaveFile(path) in parallel for same path is safe (even when using the same SUFFIX), but the
-    caller needs to catch potential FileExistsError exceptions that may happen in this racy situation.
-    The caller executing SaveFile->SyncFile->open() first will win.
-    All other callers will raise a FileExistsError in open(), at least until the os.replace is executed.
+    SaveFile can safely by used in parallel (e.g. by multiple processes) to write
+    to the same target path. Whatever writer finishes last (executes the os.replace
+    last) "wins" and has successfully written its content to the target path.
+    Internally used temporary files are created in the target directory and are
+    named <BASENAME>-<RANDOMCHARS>.tmp and cleaned up in normal and error conditions.
     """
-
-    SUFFIX = '.tmp'
-
     def __init__(self, path, binary=False):
         self.binary = binary
         self.path = path
-        self.tmppath = self.path + self.SUFFIX
+        self.dir = os.path.dirname(path)
+        self.tmp_prefix = os.path.basename(path) + '-'
+        self.tmp_fd = None  # OS-level fd
+        self.tmp_fname = None  # full path/filename corresponding to self.tmp_fd
+        self.f = None  # python-file-like SyncFile
 
     def __enter__(self):
         from .. import platform
-        try:
-            safe_unlink(self.tmppath)
-        except FileNotFoundError:
-            pass
-        self.fd = platform.SyncFile(self.tmppath, self.binary)
-        return self.fd
+        self.tmp_fd, self.tmp_fname = tempfile.mkstemp(prefix=self.tmp_prefix, suffix='.tmp', dir=self.dir)
+        self.f = platform.SyncFile(self.tmp_fname, fd=self.tmp_fd, binary=self.binary)
+        return self.f
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         from .. import platform
-        self.fd.close()
+        self.f.close()  # this indirectly also closes self.tmp_fd
+        self.tmp_fd = None
         if exc_type is not None:
-            safe_unlink(self.tmppath)
-            return
-        os.replace(self.tmppath, self.path)
-        platform.sync_dir(os.path.dirname(self.path))
+            safe_unlink(self.tmp_fname)  # with-body has failed, clean up tmp file
+            return  # continue processing the exception normally
+        try:
+            os.replace(self.tmp_fname, self.path)  # POSIX: atomic rename
+        except OSError:
+            safe_unlink(self.tmp_fname)  # rename has failed, clean up tmp file
+            raise
+        finally:
+            platform.sync_dir(self.dir)
 
 
 def swidth(s):

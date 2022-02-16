@@ -2234,6 +2234,11 @@ class Archiver:
         /path/to/repo /home/user`` will store all files as
         `home/user/.../file.ext`.
 
+        A directory exclusion pattern can end either with or without a slash ('/').
+        If it ends with a slash, such as `some/path/`, the directory will be
+        included but not its content. If it does not end with a slash, such as
+        `some/path`, both the directory and content will be excluded.
+
         File patterns support these styles: fnmatch, shell, regular expressions,
         path prefixes and path full-matches. By default, fnmatch is used for
         ``--exclude`` patterns and shell-style is used for the ``--pattern``

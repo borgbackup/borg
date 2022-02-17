@@ -332,28 +332,28 @@ else:
         disk in the immediate future.
         """
 
-        def __init__(self, path, binary=False):
-            super().__init__(path, binary)
+        def __init__(self, path, *, fd=None, binary=False):
+            super().__init__(path, fd=fd, binary=binary)
             self.offset = 0
             self.write_window = (16 * 1024 ** 2) & ~PAGE_MASK
             self.last_sync = 0
             self.pending_sync = None
 
         def write(self, data):
-            self.offset += self.fd.write(data)
+            self.offset += self.f.write(data)
             offset = self.offset & ~PAGE_MASK
             if offset >= self.last_sync + self.write_window:
-                self.fd.flush()
-                _sync_file_range(self.fileno, self.last_sync, offset - self.last_sync, SYNC_FILE_RANGE_WRITE)
+                self.f.flush()
+                _sync_file_range(self.fd, self.last_sync, offset - self.last_sync, SYNC_FILE_RANGE_WRITE)
                 if self.pending_sync is not None:
-                    _sync_file_range(self.fileno, self.pending_sync, self.last_sync - self.pending_sync,
+                    _sync_file_range(self.fd, self.pending_sync, self.last_sync - self.pending_sync,
                                      SYNC_FILE_RANGE_WRITE | SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WAIT_AFTER)
                 self.pending_sync = self.last_sync
                 self.last_sync = offset
 
         def sync(self):
-            self.fd.flush()
-            os.fdatasync(self.fileno)
+            self.f.flush()
+            os.fdatasync(self.fd)
             # tell the OS that it does not need to cache what we just wrote,
             # avoids spoiling the cache for the OS and other processes.
-            safe_fadvise(self.fileno, 0, 0, 'DONTNEED')
+            safe_fadvise(self.fd, 0, 0, 'DONTNEED')

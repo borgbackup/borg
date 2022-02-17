@@ -100,14 +100,8 @@ def get_cache_dir():
         #       http://www.bford.info/cachedir/spec.html
         """).encode('ascii')
         from ..platform import SaveFile
-        try:
-            with SaveFile(cache_tag_fn, binary=True) as fd:
-                fd.write(cache_tag_contents)
-        except FileExistsError:
-            # if we have multiple SaveFile calls running in parallel for same cache_tag_fn,
-            # it is fine if just one (usually first/quicker one) of them run gets through
-            # and all others raise FileExistsError.
-            pass
+        with SaveFile(cache_tag_fn, binary=True) as fd:
+            fd.write(cache_tag_contents)
     return cache_dir
 
 

@@ -163,6 +163,41 @@ virtual env and run::
 
   pip install -r requirements.d/development.txt
 
+Building on Windows
++++++++++++++++++++
+
+Install scoop: https://scoop.sh/
+
+install MSYS2: ``scoop install msys2``
+
+Use `Mingw64-w64 64bit Shell`.
+In Windows shell activate mingw in the repo root folder: ``mingw``
+
+Then install dependencies
+
+  pacman -S \
+    git \
+    mingw-w64-x86_64-python3 \
+    mingw-w64-x86_64-lz4 \
+    mingw-w64-x86_64-python3-pip \
+    mingw-w64-x86_64-cython \
+    mingw-w64-x86_64-gcc \
+    mingw-w64-x86_64-ntldd-git \
+    mingw-w64-x86_64-pkg-config \
+    mingw-w64-x86_64-openssl \
+    openssl-devel
+
+(and wait ...)
+
+Use git to get the source and checkout `windows-1.2` branch then::
+
+  pip install -r requirements.d/development.txt
+  pip install pyinstaller
+  ./scripts/win-build.sh
+
+Your PyInstaller-made ``borg.exe`` with dependencies is in the dist folder of the repo root.
+Switch to dist folder in your Windows shell and start execute ``borg.exe``.
+
 
 Running the tests
 -----------------

@@ -1,8 +1,5 @@
 # Build a wheel and single file executable
 
-# Configure the build environment
-& $PSScriptRoot\win-setup-build-env.ps1
-
 # Clean the old build
 python setup.py clean
 
@@ -15,4 +12,4 @@ pip install -v -e .
 # Build the wheel
 python setup.py bdist_wheel
 
-pyinstaller -y scripts/borg.exe.spec
+pyinstaller -y scripts/win-borg.exe.spec

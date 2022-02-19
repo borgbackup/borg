@@ -217,6 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
+
 Version 1.2.0 (not released yet)
 --------------------------------
 
@@ -303,6 +304,11 @@ Fixes:
 
   - derive really freed space from quota use before/after, #5679
   - do not say "freeable", but "maybe freeable" (based on hint, unsure)
+- fix race conditions in internal SaveFile function, #6306 #6028
+- implement internal safe_unlink (was: truncate_and_unlink) function more safely:
+  usually it does not truncate any more, only under "disk full" circumstances
+  and only if there is only one hardlink.
+  see: https://github.com/borgbackup/borg/discussions/6286
 
 Other changes:
 
@@ -320,6 +326,8 @@ Other changes:
   - init: explain the encryption modes better
   - clarify usage of patternfile roots
   - put import-tar docs into same file as export-tar docs
+  - explain the difference between a path that ends with or without a slash,
+    #6297
 
 
 Version 1.2.0rc1 (2022-02-05)

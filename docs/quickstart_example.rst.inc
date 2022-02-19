@@ -50,9 +50,13 @@
 
     $ borg extract /path/to/repo::Monday
 
-7. Recover disk space by manually deleting the *Monday* archive::
+7. Delete the *Monday* archive (please note that this does **not** free repo disk space)::
 
     $ borg delete /path/to/repo::Monday
+
+8. Recover disk space by compacting the segment files in the repo::
+
+    $ borg compact /path/to/repo
 
 .. Note::
     Borg is quiet by default (it works on WARNING log level).

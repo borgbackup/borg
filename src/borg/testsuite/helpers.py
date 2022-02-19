@@ -587,7 +587,7 @@ def test_get_cache_dir(monkeypatch):
     monkeypatch.setenv('XDG_CACHE_HOME', '/var/tmp/.cache')
     assert get_cache_dir() == os.path.join('/var/tmp/.cache', 'borg')
     monkeypatch.setenv('BORG_CACHE_DIR', '/var/tmp')
-    assert get_cache_dir() == '/var//'
+    assert get_cache_dir() == '/var/tmp'
 
 
 def test_get_keys_dir(monkeypatch):

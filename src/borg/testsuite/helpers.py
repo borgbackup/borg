@@ -30,7 +30,7 @@ from ..helpers import popen_with_error_handling
 from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
-from ..helpers import truncate_and_unlink
+from ..helpers import safe_unlink
 
 from . import BaseTestCase, FakeInputs
 
@@ -1143,8 +1143,6 @@ def test_safe_unlink_is_safe(tmpdir):
     hard_link = tmpdir / 'hardlink'
     hard_link.mklinkto(victim)
 
-    truncate_and_unlink(hard_link)
+    safe_unlink(hard_link)
 
-    # pytest.raises is more precide than xfail
-    with pytest.raises(AssertionError):
-        assert victim.read_binary() == contents
+    assert victim.read_binary() == contents

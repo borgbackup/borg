@@ -102,4 +102,4 @@ If you did not create the archives with different chunker params,
 pass ``--same-chunker-params``.
 Note that the chunker params changed from Borg 0.xx to 1.0.
 
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.

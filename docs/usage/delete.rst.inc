@@ -112,7 +112,7 @@ Please note that the "All archives" stats refer to the state after deletion.
 You can delete multiple archives by specifying their common prefix, if they
 have one, using the ``--prefix PREFIX`` option. You can also specify a shell
 pattern to match multiple archives using the ``--glob-archives GLOB`` option
-(for more info on these patterns, see ``borg help patterns``). Note that these
+(for more info on these patterns, see :ref:`borg_patterns`). Note that these
 two options are mutually exclusive.
 
 To avoid accidentally deleting archives, especially when using glob patterns,

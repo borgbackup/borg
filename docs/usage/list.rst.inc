@@ -105,7 +105,7 @@ Description
 
 This command lists the contents of a repository or an archive.
 
-See the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
 .. man NOTES
 

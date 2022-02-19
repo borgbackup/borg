@@ -112,7 +112,7 @@ By default the entire archive is extracted but a subset of files and directories
 can be selected by passing a list of ``PATHs`` as arguments.
 The file selection can further be restricted by using the ``--exclude`` option.
 
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
 ``--progress`` can be slower than no progress display, since it makes one additional
 pass over the archive metadata.

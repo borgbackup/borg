@@ -1,10 +1,3 @@
-#!/usr/bin/env expect
-
-if {[file isdirectory /media/backup/borgdemo] == 0} {
-  send_user "Please, run basic-prepare.sh first\n"
-  exit 1
-}
-
 # Configuration for send -h
 # Tries to emulate a human typing
 # Tweak this if typing is too fast or too slow

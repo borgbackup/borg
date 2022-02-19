@@ -30,6 +30,7 @@ from ..helpers import popen_with_error_handling
 from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
+from ..helpers import truncate_and_unlink
 
 from . import BaseTestCase, FakeInputs
 
@@ -586,7 +587,7 @@ def test_get_cache_dir(monkeypatch):
     monkeypatch.setenv('XDG_CACHE_HOME', '/var/tmp/.cache')
     assert get_cache_dir() == os.path.join('/var/tmp/.cache', 'borg')
     monkeypatch.setenv('BORG_CACHE_DIR', '/var/tmp')
-    assert get_cache_dir() == '/var/tmp'
+    assert get_cache_dir() == '/var//'
 
 
 def test_get_keys_dir(monkeypatch):
@@ -1133,3 +1134,17 @@ def test_iter_separated():
 def test_eval_escapes():
     assert eval_escapes('\\n\\0\\x23') == '\n\0#'
     assert eval_escapes('äç\\n') == 'äç\n'
+
+
+def test_safe_unlink_is_safe(tmpdir):
+    contents = b"Hello, world\n"
+    victim = tmpdir / 'victim'
+    victim.write_binary(contents)
+    hard_link = tmpdir / 'hardlink'
+    hard_link.mklinkto(victim)
+
+    truncate_and_unlink(hard_link)
+
+    # pytest.raises is more precide than xfail
+    with pytest.raises(AssertionError):
+        assert victim.read_binary() == contents

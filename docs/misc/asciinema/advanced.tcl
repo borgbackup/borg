@@ -75,7 +75,7 @@ set script [string map [list __BORG_VERSION__ [exec borg -V]] $script]
 set script [split $script \n]
 
 set ::env(PS1) "$ "
-spawn /bin/sh
+spawn -noecho /bin/sh
 foreach line $script {
 	expect "$ "
 	send $line\n

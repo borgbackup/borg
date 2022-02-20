@@ -17,8 +17,10 @@ Vagrant.configure("2") do |config|
     deluser --remove-home borgdemo || true
 
     # In case we have skipped "record install"
-    wget https://github.com/borgbackup/borg/releases/download/1.1.0b6/borg-linux64
-    install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
+    if [ ! -e /usr/local/bin/borg ] ; then
+      wget https://github.com/borgbackup/borg/releases/download/1.1.0b6/borg-linux64
+      install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
+    fi
 
     mkdir -p /media/backup/borgdemo
 
@@ -35,8 +37,10 @@ Vagrant.configure("2") do |config|
     rm -r /media/backup/borgdemo || true
 
     # In case we have skipped "record install"
-    wget https://github.com/borgbackup/borg/releases/download/1.1.0b6/borg-linux64
-    install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
+    if [ ! -e /usr/local/bin/borg ] ; then
+      wget https://github.com/borgbackup/borg/releases/download/1.1.0b6/borg-linux64
+      install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
+    fi
 
     mkdir -p /media/backup/borgdemo
     mkdir -p Wallpaper

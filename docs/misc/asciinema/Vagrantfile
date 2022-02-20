@@ -6,7 +6,7 @@ Vagrant.configure("2") do |config|
   SHELL
   config.vm.provision "record install", type: "shell", inline: <<-SHELL
   	gpg --recv-keys "6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393"
-    asciinema rec -c 'expect /vagrant/install.tcl' --overwrite /vagrant/install.json
+    asciinema rec -c 'expect /vagrant/install.tcl' --overwrite /vagrant/install.json < /dev/null
   SHELL
   config.vm.provision "record basic usage", type: "shell", inline: <<-SHELL
     # `rm` below allows quick re-exec via:
@@ -31,7 +31,7 @@ Vagrant.configure("2") do |config|
     runuser -u borgdemo mkdir ~borgdemo/.ssh
     runuser -u borgdemo tee ~borgdemo/.ssh/authorized_keys < ~/.ssh/id_rsa.pub
 
-    asciinema rec -c 'expect /vagrant/basic.tcl' --overwrite /vagrant/basic.json
+    asciinema rec -c 'expect /vagrant/basic.tcl' --overwrite /vagrant/basic.json < /dev/null
   SHELL
   config.vm.provision "record advanced usage", type: "shell", inline: <<-SHELL
     rm -r /media/backup/borgdemo || true
@@ -53,6 +53,6 @@ Vagrant.configure("2") do |config|
     borg init --encryption=repokey /media/backup/borgdemo
     unset BORG_PASSPHRASE
 
-    asciinema rec -c 'expect /vagrant/advanced.tcl' --overwrite /vagrant/advanced.json
+    asciinema rec -c 'expect /vagrant/advanced.tcl' --overwrite /vagrant/advanced.json < /dev/null
   SHELL
 end

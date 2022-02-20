@@ -75,9 +75,11 @@ set script [string map [list __BORG_VERSION__ [exec borg -V]] $script]
 set script [split $script \n]
 
 set ::env(PS1) "$ "
+set stty_init -echo
 spawn -noecho /bin/sh
 foreach line $script {
 	expect "$ "
+	send_user -h $line\n
 	send $line\n
 }
 expect "$ "

@@ -27,6 +27,9 @@ borg -V
 # That's it! Check out the other screencasts to see how to actually use borgbackup.
 }]
 
+# wget may be slow
+set timeout -1
+
 foreach line [split $script \n] {
 	send_user "$ "
 	send_user -h $line\n

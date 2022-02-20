@@ -1,3 +1,4 @@
+import errno
 import hashlib
 import io
 import os
@@ -27,6 +28,7 @@ from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
 from ..helpers import popen_with_error_handling
 from ..helpers import dash_open
+from ..helpers import safe_unlink
 
 from . import BaseTestCase, FakeInputs
 
@@ -999,3 +1001,32 @@ def test_dash_open():
     assert dash_open('-', 'w') is sys.stdout
     assert dash_open('-', 'rb') is sys.stdin.buffer
     assert dash_open('-', 'wb') is sys.stdout.buffer
+
+
+def test_safe_unlink_is_safe(tmpdir):
+    contents = b"Hello, world\n"
+    victim = tmpdir / 'victim'
+    victim.write_binary(contents)
+    hard_link = tmpdir / 'hardlink'
+    hard_link.mklinkto(victim)
+
+    safe_unlink(str(hard_link))
+
+    assert victim.read_binary() == contents
+
+
+def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
+    contents = b"Hello, world\n"
+    victim = tmpdir / 'victim'
+    victim.write_binary(contents)
+    hard_link = tmpdir / 'hardlink'
+    hard_link.mklinkto(victim)
+
+    def os_unlink(_):
+        raise OSError(errno.ENOSPC, "Pretend that we ran out of space")
+    monkeypatch.setattr(os, "unlink", os_unlink)
+
+    with pytest.raises(OSError):
+        safe_unlink(str(hard_link))
+
+    assert victim.read_binary() == contents

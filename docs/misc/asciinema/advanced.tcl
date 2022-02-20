@@ -37,8 +37,8 @@ borg rename ::specialbackup backup-block-device
 borg info :: --last 1
 
 # A very important step if you choose keyfile mode (where the keyfile is only saved locally) is to export your keyfile and possibly print it, etc.
-borg key export :: --qr-html file.html  # this creates a nice HTML, but when you want something simpler…
-borg key export :: --paper  # this is a "manual input"-only backup (but it is also included in the --qr-code option)
+borg key export --qr-html :: file.html  # this creates a nice HTML, but when you want something simpler…
+borg key export --paper ::  # this is a "manual input"-only backup (but it is also included in the --qr-code option)
 
 ## MAINTENANCE ##
 # Sometimes backups get broken or we want a regular "checkup" that everything is okay…

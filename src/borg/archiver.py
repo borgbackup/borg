@@ -2754,6 +2754,7 @@ class Archiver:
             'a_status_oddity': '"I am seeing ‘A’ (added) status for a unchanged file!?"',
             'list_item_flags': '"Item flags"',
             'borg_patterns': '"borg help patterns"',
+            'borg_placeholders': '"borg help placeholders"',
             'key_files': 'Internals -> Data structures and file formats -> Key files',
             'borg_key_export': 'borg key export --help',
         }
@@ -3447,7 +3448,7 @@ class Archiver:
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
-        For more help on placeholders, see the ``borg help placeholders`` command output.
+        For more help on placeholders, see the :ref:`borg_placeholders` command output.
 
         .. man NOTES
 

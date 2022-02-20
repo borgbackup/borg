@@ -58,8 +58,7 @@ borg extract /media/backup/borgdemo::backup3 Wallpaper/deer.jpg
 diff -s Wallpaper/deer.jpg Wallpaper.orig/deer.jpg
 
 # And, of course, we can also create remote repos via ssh when borg is setup there. This command creates a new remote repo in a subdirectory called "demo":
-# TODO: remote repo
-# borg init --encryption=repokey borgdemo@remoteserver.example:./demo
+borg init --encryption=repokey borgdemo@remoteserver.example:./demo
 
 # Easy, isn't it? That's all you need to know for basic usage.
 # If you want to see more, have a look at the screencast showing the "advanced usage".

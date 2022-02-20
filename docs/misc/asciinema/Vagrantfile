@@ -2,15 +2,29 @@ Vagrant.configure("2") do |config|
   config.vm.box = "debian/bullseye64"
   config.vm.provision "install dependencies", type: "shell", inline: <<-SHELL
     apt-get update
-    apt-get install -y wget expect gpg asciinema
+    apt-get install -y wget expect gpg asciinema ssh adduser
   SHELL
   config.vm.provision "record install", type: "shell", inline: <<-SHELL
   	gpg --recv-keys "6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393"
     asciinema rec -c 'expect /vagrant/install.tcl' --overwrite /vagrant/install.json
   SHELL
   config.vm.provision "record basic usage", type: "shell", inline: <<-SHELL
-  	rm -r /media/backup/borgdemo || true
+    # `rm` below allows quick re-exec via:
+    # vagrant vagrant provision --provision-with "record basic usage"
+    # this is useful when testing changes
+    rm -r /media/backup/borgdemo || true
+    rm -r ~/.ssh/ || true
+    deluser --remove-home borgdemo || true
+
     mkdir -p /media/backup/borgdemo
+
+    adduser borgdemo
+    echo '127.0.0.1 remoteserver.example' >> /etc/hosts
+    ssh-keygen -f ~/.ssh/id_rsa -N ''
+    ssh-keyscan remoteserver.example > ~/.ssh/known_hosts
+    runuser -u borgdemo mkdir ~borgdemo/.ssh
+    runuser -u borgdemo tee ~borgdemo/.ssh/authorized_keys < ~/.ssh/id_rsa.pub
+
     asciinema rec -c 'expect /vagrant/basic.tcl' --overwrite /vagrant/basic.json
   SHELL
 end

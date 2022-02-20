@@ -11,7 +11,7 @@ exec touch Wallpaper/deer.jpg
 
 set script {
 # Here you'll see some basic commands to start working with borg.
-# Note: This teaser screencast was made with borg version TODO: put version number here – older or newer borg versions may behave differently.
+# Note: This teaser screencast was made with __BORG_VERSION__ – older or newer borg versions may behave differently.
 # But let's start.
 
 # First of all, you can always get help:
@@ -66,7 +66,11 @@ diff -s Wallpaper/deer.jpg Wallpaper.orig/deer.jpg
 # In any case, enjoy using borg!
 }
 
-foreach line [split [string trimleft $script] \n] {
+set script [string trim $script]
+set script [string map [list __BORG_VERSION__ [exec borg -V]] $script]
+set script [split $script \n]
+
+foreach line $script {
   send_user "$ "
   send_user -h $line\n
   spawn -noecho /bin/sh -c $line

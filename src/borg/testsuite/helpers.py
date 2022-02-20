@@ -1,3 +1,4 @@
+import errno
 import hashlib
 import os
 import shutil
@@ -1144,5 +1145,22 @@ def test_safe_unlink_is_safe(tmpdir):
     hard_link.mklinkto(victim)
 
     safe_unlink(hard_link)
+
+    assert victim.read_binary() == contents
+
+
+def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
+    contents = b"Hello, world\n"
+    victim = tmpdir / 'victim'
+    victim.write_binary(contents)
+    hard_link = tmpdir / 'hardlink'
+    hard_link.mklinkto(victim)
+
+    def os_unlink(_):
+        raise OSError(errno.ENOSPC, "Pretend that we ran out of space")
+    monkeypatch.setattr(os, "unlink", os_unlink)
+
+    with pytest.raises(OSError):
+        safe_unlink(hard_link)
 
     assert victim.read_binary() == contents

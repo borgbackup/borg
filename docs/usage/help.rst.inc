@@ -20,10 +20,15 @@ store all files as `some/path/.../file.ext` and ``borg create
 /path/to/repo /home/user`` will store all files as
 `home/user/.../file.ext`.
 
+A directory exclusion pattern can end either with or without a slash ('/').
+If it ends with a slash, such as `some/path/`, the directory will be
+included but not its content. If it does not end with a slash, such as
+`some/path`, both the directory and content will be excluded.
+
 File patterns support these styles: fnmatch, shell, regular expressions,
 path prefixes and path full-matches. By default, fnmatch is used for
 ``--exclude`` patterns and shell-style is used for the ``--pattern``
- option. For commands that support patterns in their ``PATH`` argument
+option. For commands that support patterns in their ``PATH`` argument
 like (``borg list``), the default pattern is path prefix.
 
 Starting with Borg 1.2, for all but regular expression pattern matching
@@ -144,64 +149,85 @@ Examples::
     EOF
     $ borg create --exclude-from exclude.txt backup /
 
-    A more general and easier to use way to define filename matching patterns exists
-    with the ``--pattern`` and ``--patterns-from`` options. Using these, you may
-    specify the backup roots (starting points) and patterns for inclusion/exclusion.
-    A root path starts with the prefix `R`, followed by a path (a plain path, not a
-    file pattern). An include rule starts with the prefix +, an exclude rule starts
-    with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
+A more general and easier to use way to define filename matching patterns exists
+with the ``--pattern`` and ``--patterns-from`` options. Using these, you may
+specify the backup roots (starting points) and patterns for inclusion/exclusion.
+A root path starts with the prefix `R`, followed by a path (a plain path, not a
+file pattern). An include rule starts with the prefix +, an exclude rule starts
+with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
 
-    .. note::
+.. note::
 
-        Via ``--pattern`` or ``--patterns-from`` you can define BOTH inclusion and exclusion
-        of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
-        ``--exclude-from`` ONLY excludes are defined.
+    Via ``--pattern`` or ``--patterns-from`` you can define BOTH inclusion and exclusion
+    of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
+    ``--exclude-from`` ONLY excludes are defined.
 
-    Inclusion patterns are useful to include paths that are contained in an excluded
-    path. The first matching pattern is used so if an include pattern matches before
-    an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
-    a directory, it won't recurse into it and won't discover any potential matches for
-    include rules below that directory.
+Inclusion patterns are useful to include paths that are contained in an excluded
+path. The first matching pattern is used so if an include pattern matches before
+an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
+a directory, it won't recurse into it and won't discover any potential matches for
+include rules below that directory.
 
-    .. note::
+.. note::
 
-        It's possible that a sub-directory/file is matched while parent directories are not.
-        In that case, parent directories are not backed up thus their user, group, permission,
-        etc. can not be restored.
+    It's possible that a sub-directory/file is matched while parent directories are not.
+    In that case, parent directories are not backed up thus their user, group, permission,
+    etc. can not be restored.
 
-    Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
-    shell style (`sh:`), so those patterns behave similar to rsync include/exclude
-    patterns. The pattern style can be set via the `P` prefix.
+Note that the default pattern style for ``--pattern`` and ``--patterns-from`` is
+shell style (`sh:`), so those patterns behave similar to rsync include/exclude
+patterns. The pattern style can be set via the `P` prefix.
 
-    Patterns (``--pattern``) and excludes (``--exclude``) from the command line are
-    considered first (in the order of appearance). Then patterns from ``--patterns-from``
-    are added. Exclusion patterns from ``--exclude-from`` files are appended last.
+Patterns (``--pattern``) and excludes (``--exclude``) from the command line are
+considered first (in the order of appearance). Then patterns from ``--patterns-from``
+are added. Exclusion patterns from ``--exclude-from`` files are appended last.
 
-    Examples::
+Examples::
 
-        # backup pics, but not the ones from 2018, except the good ones:
-        # note: using = is essential to avoid cmdline argument parsing issues.
-        borg create --pattern=+pics/2018/good --pattern=-pics/2018 repo::arch pics
+    # backup pics, but not the ones from 2018, except the good ones:
+    # note: using = is essential to avoid cmdline argument parsing issues.
+    borg create --pattern=+pics/2018/good --pattern=-pics/2018 repo::arch pics
 
-        # use a file with patterns:
-        borg create --patterns-from patterns.lst repo::arch
+    # use a file with patterns:
+    borg create --patterns-from patterns.lst repo::arch
 
-    The patterns.lst file could look like that::
+The patterns.lst file could look like that::
 
-        # "sh:" pattern style is the default, so the following line is not needed:
-        P sh
-        R /
-        # can be rebuild
-        - /home/*/.cache
-        # they're downloads for a reason
-        - /home/*/Downloads
-        # susan is a nice person
-        # include susans home
-        + /home/susan
-        # don't backup the other home directories
-        - /home/*
-        # don't even look in /proc
-        ! /proc
+    # "sh:" pattern style is the default, so the following line is not needed:
+    P sh
+    R /
+    # can be rebuild
+    - /home/*/.cache
+    # they're downloads for a reason
+    - /home/*/Downloads
+    # susan is a nice person
+    # include susans home
+    + /home/susan
+    # also back up this exact file
+    + pf:/home/bobby/specialfile.txt
+    # don't backup the other home directories
+    - /home/*
+    # don't even look in /proc
+    ! /proc
+
+You can specify recursion roots either on the command line or in a patternfile::
+
+    # these two commands do the same thing
+    borg create --exclude /home/bobby/junk repo::arch /home/bobby /home/susan
+    borg create --patterns-from patternfile.lst repo::arch
+
+The patternfile::
+
+    # note that excludes use fm: by default and patternfiles use sh: by default.
+    # therefore, we need to specify fm: to have the same exact behavior.
+    P fm
+    R /home/bobby
+    R /home/susan
+
+    - /home/bobby/junk
+
+This allows you to share the same patterns between multiple repositories
+without needing to specify them on the command line.
 
 .. _borg_placeholders:
 
@@ -223,11 +249,11 @@ and ``--remote-path`` values support these placeholders:
 
 {now}
     The current local date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.8/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
 {utcnow}
     The current UTC date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.5/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.8/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
 {user}
     The user name (or UID, if no name is available) of the user running borg.

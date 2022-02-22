@@ -260,16 +260,15 @@ how much your repository will grow. Please note that the "All archives" stats re
 the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
-See the output of the "borg help placeholders" command for more help on placeholders.
+For more help on placeholders, see the :ref:`borg_placeholders` command output.
 
 .. man NOTES
 
 The ``--exclude`` patterns are not like tar. In tar ``--exclude`` .bundler/gems will
 exclude foo/.bundler/gems. In borg it will not, you need to use ``--exclude``
-'\*/.bundler/gems' to get the same effect. See ``borg help patterns`` for
-more information.
+'\*/.bundler/gems' to get the same effect.
 
 In addition to using ``--exclude`` patterns, it is possible to use
 ``--exclude-if-present`` to specify the name of a filesystem object (e.g. a file

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2022-02-05" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2022-02-19" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -117,9 +117,9 @@ how much your repository will grow. Please note that the "All archives" stats re
 the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 .sp
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .sp
-See the output of the "borg help placeholders" command for more help on placeholders.
+For more help on placeholders, see the \fIborg_placeholders\fP command output.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -362,8 +362,7 @@ $ find ~ \-size \-1000k \-print0 | borg create \e
 .sp
 The \fB\-\-exclude\fP patterns are not like tar. In tar \fB\-\-exclude\fP .bundler/gems will
 exclude foo/.bundler/gems. In borg it will not, you need to use \fB\-\-exclude\fP
-\(aq*/.bundler/gems\(aq to get the same effect. See \fBborg help patterns\fP for
-more information.
+\(aq*/.bundler/gems\(aq to get the same effect.
 .sp
 In addition to using \fB\-\-exclude\fP patterns, it is possible to use
 \fB\-\-exclude\-if\-present\fP to specify the name of a filesystem object (e.g. a file

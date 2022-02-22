@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXPORT-TAR" 1 "2022-02-05" "" "borg backup tool"
+.TH "BORG-EXPORT-TAR" 1 "2022-02-19" "" "borg backup tool"
 .SH NAME
 borg-export-tar \- Export archive contents as a tarball
 .SH SYNOPSIS
@@ -72,7 +72,7 @@ By default the entire archive is extracted but a subset of files and directories
 can be selected by passing a list of \fBPATHs\fP as arguments.
 The file selection can further be restricted by using the \fB\-\-exclude\fP option.
 .sp
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .sp
 \fB\-\-progress\fP can be slower than no progress display, since it makes one additional
 pass over the archive metadata.

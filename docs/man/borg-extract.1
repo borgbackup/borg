@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXTRACT" 1 "2022-02-05" "" "borg backup tool"
+.TH "BORG-EXTRACT" 1 "2022-02-19" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .SH SYNOPSIS
@@ -40,7 +40,7 @@ archive is extracted but a subset of files and directories can be selected
 by passing a list of \fBPATHs\fP as arguments. The file selection can further
 be restricted by using the \fB\-\-exclude\fP option.
 .sp
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .sp
 By using \fB\-\-dry\-run\fP, you can do all extraction steps except actually writing the
 output data: reading metadata and data chunks from the repo, checking the hash/hmac,

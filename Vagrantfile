@@ -365,6 +365,18 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("centos7_64")
   end
 
+  config.vm.define "jammy64" do |b|
+    b.vm.box = "ubuntu/jammy64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jammy64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(true)
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jammy64")
+  end
+
   config.vm.define "focal64" do |b|
     b.vm.box = "ubuntu/focal64"
     b.vm.provider :virtualbox do |v|

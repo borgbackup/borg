@@ -109,17 +109,10 @@ cdef extern from "_crypto_helpers.h":
     long OPENSSL_VERSION_NUMBER
     long LIBRESSL_VERSION_NUMBER
 
-    ctypedef struct HMAC_CTX:
-        pass
-
-    HMAC_CTX *HMAC_CTX_new()
-    void HMAC_CTX_free(HMAC_CTX *a)
-
     const EVP_CIPHER *EVP_aes_256_ocb()  # dummy
-    const EVP_CIPHER *EVP_chacha20_poly1305()  # dummy
 
 
-openssl10 = OPENSSL_VERSION_NUMBER < 0x10100000 or LIBRESSL_VERSION_NUMBER
+is_libressl = bool(LIBRESSL_VERSION_NUMBER)
 
 
 import struct
@@ -217,8 +210,7 @@ cdef class AES256_CTR_BASE:
 
     @classmethod
     def requirements_check(cls):
-        if OPENSSL_VERSION_NUMBER < 0x10000000:
-            raise ValueError('AES CTR requires OpenSSL >= 1.0.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+        pass
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.requirements_check()
@@ -654,8 +646,8 @@ cdef class _CHACHA_BASE(_AEAD_BASE):
 cdef class AES256_OCB(_AES_BASE):
     @classmethod
     def requirements_check(cls):
-        if openssl10:
-            raise ValueError('AES OCB requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+        if is_libressl:
+            raise ValueError('AES OCB is not implemented by LibreSSL (yet?).')
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.requirements_check()
@@ -666,8 +658,7 @@ cdef class AES256_OCB(_AES_BASE):
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
     @classmethod
     def requirements_check(cls):
-        if openssl10:
-            raise ValueError('CHACHA20-POLY1305 requires OpenSSL >= 1.1.0. Detected: OpenSSL %08x' % OPENSSL_VERSION_NUMBER)
+        pass
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.requirements_check()

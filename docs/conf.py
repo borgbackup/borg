@@ -154,6 +154,7 @@ html_last_updated_fmt = '%Y-%m-%d'
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
 html_use_smartypants = True
+smartquotes_action = 'qe'  # no D in there means "do not transform -- and ---"
 
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {

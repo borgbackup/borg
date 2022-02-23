@@ -520,6 +520,19 @@ To summarize, this is making size-based fingerprinting difficult:
 - optional ``obfuscate`` pseudo compressor with different choices
   of algorithm and parameters
 
+Secret  Key
+------------
+
+Borg uses the secret key for Chunking and ID generation. This key is used to enhance privacy and 
+to protect from an attacker who has access to a borg setup and encrypted chunks. The chunk's cutting 
+positions are determined by using the secret key and thereby the length of the chunks cut. Because 
+the attacker would use a different chunker secret than the borg setup being attacked, they would not 
+be able to determine the set of chunk lengths for a known set of files. For the chunk ID generation, 
+simply using the hashed values of these files is insecure. The secret key is combined with the chunk's 
+hashed value to generate chunk ID. So, the attacker can't use known small files' hashes to get chunk IDs 
+and thereby the contents of the borg setup. Thus, using SHA256 and a random MAC key makes fingerprinting 
+attacks impossible.
+
 Stored chunk proximity
 ----------------------
 

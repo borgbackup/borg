@@ -3,12 +3,6 @@
 # Tweak this if typing is too fast or too slow
 set send_human {.05 .1 1 .01 .2}
 
-# The screencast uses relative paths "Wallpaper"
-# We should not mess with the contents of whatever cwd happened to be
-cd [exec mktemp -d]
-file mkdir Wallpaper/bigcollection
-exec touch Wallpaper/deer.jpg
-
 set script {
 # Here you'll see some basic commands to start working with borg.
 # Note: This teaser screencast was made with __BORG_VERSION__ – older or newer borg versions may behave differently.

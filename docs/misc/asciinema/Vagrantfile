@@ -3,6 +3,11 @@ Vagrant.configure("2") do |config|
   config.vm.provision "install dependencies", type: "shell", inline: <<-SHELL
     apt-get update
     apt-get install -y wget expect gpg asciinema ssh adduser fuse
+    mkdir -p /wallpaper
+    wget \
+        --user-agent="borgbackup demo screencast" \
+        --input-file=/vagrant/sample-wallpapers.txt \
+        --directory-prefix=/wallpaper
   SHELL
   config.vm.provision "record install", type: "shell", inline: <<-SHELL
   	gpg --recv-keys "6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393"
@@ -14,6 +19,7 @@ Vagrant.configure("2") do |config|
     # this is useful when testing changes
     rm -r /media/backup/borgdemo || true
     rm -r ~/.ssh/ || true
+    rm -r Wallpaper || true
     deluser --remove-home borgdemo || true
 
     # In case we have skipped "record install"
@@ -23,6 +29,9 @@ Vagrant.configure("2") do |config|
     fi
 
     mkdir -p /media/backup/borgdemo
+    mkdir Wallpaper
+    cp -r /wallpaper Wallpaper/bigcollection
+    cp /wallpaper/Trapper_cabin.jpg Wallpaper/deer.jpg
 
     adduser --disabled-password borgdemo
     echo '127.0.0.1 remoteserver.example' >> /etc/hosts

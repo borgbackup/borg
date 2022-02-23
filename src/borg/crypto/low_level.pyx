@@ -87,19 +87,6 @@ cdef extern from "openssl/evp.h":
     void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
 
 cdef extern from "openssl/hmac.h":
-    ctypedef struct HMAC_CTX:
-        pass
-
-    void HMAC_CTX_init(HMAC_CTX *ctx)
-    void HMAC_CTX_cleanup(HMAC_CTX *ctx)
-
-    HMAC_CTX *HMAC_CTX_new()
-    void HMAC_CTX_free(HMAC_CTX *a)
-
-    int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int key_len, const EVP_MD *md, ENGINE *impl)
-    int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, int len)
-    int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
-
     unsigned char *HMAC(const EVP_MD *evp_md,
                     const void *key, int key_len,
                     const unsigned char *data, int data_len,
@@ -372,7 +359,6 @@ cdef class AES256_CTR_BASE:
 
 
 cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
-    cdef HMAC_CTX *hmac_ctx
     cdef unsigned char *mac_key
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
@@ -381,22 +367,18 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
         super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
     def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
-        self.hmac_ctx = HMAC_CTX_new()
+        pass
 
     def __dealloc__(self):
-        HMAC_CTX_free(self.hmac_ctx)
+        pass
 
     cdef mac_compute(self, const unsigned char *data1, int data1_len,
                      const unsigned char *data2, int data2_len,
                      unsigned char *mac_buf):
-        if not HMAC_Init_ex(self.hmac_ctx, self.mac_key, self.mac_len, EVP_sha256(), NULL):
-            raise CryptoError('HMAC_Init_ex failed')
-        if not HMAC_Update(self.hmac_ctx, data1, data1_len):
-            raise CryptoError('HMAC_Update failed')
-        if not HMAC_Update(self.hmac_ctx, data2, data2_len):
-            raise CryptoError('HMAC_Update failed')
-        if not HMAC_Final(self.hmac_ctx, mac_buf, NULL):
-            raise CryptoError('HMAC_Final failed')
+        data = data1[:data1_len] + data2[:data2_len]
+        mac = hmac.HMAC(self.mac_key, data, hashlib.sha256).digest()
+        for i in range(self.mac_len):
+            mac_buf[i] = mac[i]
 
     cdef mac_verify(self, const unsigned char *data1, int data1_len,
                     const unsigned char *data2, int data2_len,

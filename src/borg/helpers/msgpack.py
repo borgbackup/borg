@@ -71,33 +71,18 @@ def pack(o, stream, *, use_bin_type=False, unicode_errors=None, **kwargs):
         raise PackException(e)
 
 
-# Note: after requiring msgpack >= 0.6.1 we can remove the max_*_len args and
-#       rely on msgpack auto-computing DoS-safe max values from len(data) for
-#       unpack(data) or from max_buffer_len for Unpacker(max_buffer_len=N).
-#       maybe we can also use that to simplify get_limited_unpacker().
-
 class Unpacker(mp_Unpacker):
     def __init__(self, file_like=None, *, read_size=0, use_list=True, raw=True,
                  object_hook=None, object_pairs_hook=None, list_hook=None,
                  unicode_errors=None, max_buffer_size=0,
                  ext_hook=ExtType,
-                 strict_map_key=False,
-                 max_str_len=2147483647,  # 2**32-1
-                 max_bin_len=2147483647,
-                 max_array_len=2147483647,
-                 max_map_len=2147483647,
-                 max_ext_len=2147483647):
+                 strict_map_key=False):
         assert raw is True
         assert unicode_errors is None
         kw = dict(file_like=file_like, read_size=read_size, use_list=use_list, raw=raw,
                   object_hook=object_hook, object_pairs_hook=object_pairs_hook, list_hook=list_hook,
                   unicode_errors=unicode_errors, max_buffer_size=max_buffer_size,
                   ext_hook=ext_hook,
-                  max_str_len=max_str_len,
-                  max_bin_len=max_bin_len,
-                  max_array_len=max_array_len,
-                  max_map_len=max_map_len,
-                  max_ext_len=max_ext_len,
                   strict_map_key=strict_map_key)
         super().__init__(**kw)
 
@@ -122,20 +107,10 @@ class Unpacker(mp_Unpacker):
 
 def unpackb(packed, *, raw=True, unicode_errors=None,
             strict_map_key=False,
-            max_str_len=2147483647,  # 2**32-1
-            max_bin_len=2147483647,
-            max_array_len=2147483647,
-            max_map_len=2147483647,
-            max_ext_len=2147483647,
             **kwargs):
     assert unicode_errors is None
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors,
-                  max_str_len=max_str_len,
-                  max_bin_len=max_bin_len,
-                  max_array_len=max_array_len,
-                  max_map_len=max_map_len,
-                  max_ext_len=max_ext_len,
                   strict_map_key=strict_map_key)
         kw.update(kwargs)
         return mp_unpackb(packed, **kw)
@@ -145,20 +120,10 @@ def unpackb(packed, *, raw=True, unicode_errors=None,
 
 def unpack(stream, *, raw=True, unicode_errors=None,
            strict_map_key=False,
-           max_str_len=2147483647,  # 2**32-1
-           max_bin_len=2147483647,
-           max_array_len=2147483647,
-           max_map_len=2147483647,
-           max_ext_len=2147483647,
            **kwargs):
     assert unicode_errors is None
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors,
-                  max_str_len=max_str_len,
-                  max_bin_len=max_bin_len,
-                  max_array_len=max_array_len,
-                  max_map_len=max_map_len,
-                  max_ext_len=max_ext_len,
                   strict_map_key=strict_map_key)
         kw.update(kwargs)
         return mp_unpack(stream, **kw)
@@ -183,32 +148,15 @@ def is_supported_msgpack():
 
 def get_limited_unpacker(kind):
     """return a limited Unpacker because we should not trust msgpack data received from remote"""
+    # Note: msgpack >= 0.6.1 auto-computes DoS-safe max values from len(data) for
+    #       unpack(data) or from max_buffer_size for Unpacker(max_buffer_size=N).
     args = dict(use_list=False,  # return tuples, not lists
-                max_bin_len=0,  # not used
-                max_ext_len=0,  # not used
                 max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE),
-                max_str_len=MAX_OBJECT_SIZE,  # a chunk or other repo object
                 )
-    if kind == 'server':
-        args.update(dict(max_array_len=100,  # misc. cmd tuples
-                         max_map_len=100,  # misc. cmd dicts
-                         ))
-    elif kind == 'client':
-        args.update(dict(max_array_len=LIST_SCAN_LIMIT,  # result list from repo.list() / .scan()
-                         max_map_len=100,  # misc. result dicts
-                         ))
-    elif kind == 'manifest':
+    if kind in ('server', 'client'):
+        pass  # nothing special
+    elif kind in ('manifest', 'key'):
         args.update(dict(use_list=True,  # default value
-                         max_array_len=100,  # ITEM_KEYS ~= 22
-                         max_map_len=MAX_ARCHIVES,  # list of archives
-                         max_str_len=255,  # archive name
-                         object_hook=StableDict,
-                         ))
-    elif kind == 'key':
-        args.update(dict(use_list=True,  # default value
-                         max_array_len=0,  # not used
-                         max_map_len=10,  # EncryptedKey dict
-                         max_str_len=4000,  # inner key data
                          object_hook=StableDict,
                          ))
     else:

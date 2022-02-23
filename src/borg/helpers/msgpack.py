@@ -30,8 +30,6 @@ from msgpack import OutOfData
 
 version = mp_version
 
-_post_100 = version >= (1, 0, 0)
-
 
 class PackException(Exception):
     """Exception while msgpack packing"""
@@ -99,9 +97,8 @@ class Unpacker(mp_Unpacker):
                   max_bin_len=max_bin_len,
                   max_array_len=max_array_len,
                   max_map_len=max_map_len,
-                  max_ext_len=max_ext_len)
-        if _post_100:
-            kw['strict_map_key'] = strict_map_key
+                  max_ext_len=max_ext_len,
+                  strict_map_key=strict_map_key)
         super().__init__(**kw)
 
     def unpack(self):
@@ -138,10 +135,9 @@ def unpackb(packed, *, raw=True, unicode_errors=None,
                   max_bin_len=max_bin_len,
                   max_array_len=max_array_len,
                   max_map_len=max_map_len,
-                  max_ext_len=max_ext_len)
+                  max_ext_len=max_ext_len,
+                  strict_map_key=strict_map_key)
         kw.update(kwargs)
-        if _post_100:
-            kw['strict_map_key'] = strict_map_key
         return mp_unpackb(packed, **kw)
     except Exception as e:
         raise UnpackException(e)
@@ -162,10 +158,9 @@ def unpack(stream, *, raw=True, unicode_errors=None,
                   max_bin_len=max_bin_len,
                   max_array_len=max_array_len,
                   max_map_len=max_map_len,
-                  max_ext_len=max_ext_len)
+                  max_ext_len=max_ext_len,
+                  strict_map_key=strict_map_key)
         kw.update(kwargs)
-        if _post_100:
-            kw['strict_map_key'] = strict_map_key
         return mp_unpack(stream, **kw)
     except Exception as e:
         raise UnpackException(e)
@@ -182,8 +177,8 @@ def is_slow_msgpack():
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
     import msgpack
-    return (0, 5, 6) <= msgpack.version <= (1, 0, 3) and \
-           msgpack.version not in [(1, 0, 1), ]  # < add bad releases here to deny list
+    return (1, 0, 3) <= msgpack.version <= (1, 0, 3) and \
+           msgpack.version not in []  # < add bad releases here to deny list
 
 
 def get_limited_unpacker(kind):

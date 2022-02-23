@@ -44,6 +44,7 @@ Vagrant.configure("2") do |config|
   SHELL
   config.vm.provision "record advanced usage", type: "shell", inline: <<-SHELL
     rm -r /media/backup/borgdemo || true
+    rm -r Wallpaper || true
 
     # In case we have skipped "record install"
     if [ ! -e /usr/local/bin/borg ] ; then
@@ -52,14 +53,21 @@ Vagrant.configure("2") do |config|
     fi
 
     mkdir -p /media/backup/borgdemo
-    mkdir -p Wallpaper
+    mkdir Wallpaper
+    cp -r /wallpaper Wallpaper/bigcollection
+    cp /wallpaper/Trapper_cabin.jpg Wallpaper/deer.jpg
     mkdir -p ~/Downloads/big
     dd if=/dev/zero of=loopbackfile.img bs=100M count=4
     losetup /dev/loop0 loopbackfile.img
 
-    # TODO: emulate basic.tcl
+	# Make it look as if the adv. usage screencast was recorded after basic usage
     export BORG_PASSPHRASE='1234'
     borg init --encryption=repokey /media/backup/borgdemo
+    borg create --compression lz4 /media/backup/borgdemo::backup1 Wallpaper
+    echo "new nice file" > Wallpaper/newfile.txt
+    borg create --compression lz4 /media/backup/borgdemo::backup2 Wallpaper
+    mv Wallpaper/bigcollection Wallpaper/bigcollection_NEW
+    borg create --compression lz4 /media/backup/borgdemo::backup3 Wallpaper
     unset BORG_PASSPHRASE
 
     asciinema rec -c 'expect /vagrant/advanced.tcl' --overwrite /vagrant/advanced.json < /dev/null

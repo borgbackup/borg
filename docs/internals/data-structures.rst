@@ -100,7 +100,7 @@ followed by a number of log entries. Each log entry consists of: (in this order)
 * Second, unsigned 32-bit size of the entry (including the whole header)
 * Thrird, unsigned 8-bit entry tag: PUT(1), DELETE(2) or COMMIT(3)
 * Fourth, on PUT or DELETE, 32 byte key
-* Fifth, PUT only, (size - 41) bytes of data, only on PUT entries (size - sizeof(CRC32) - sizeof(size) - sizeof(entry key) - sizeof(key))
+* Fifth, PUT only, (size - 41) bytes of data (length = size - sizeof(CRC32) - sizeof(size) - sizeof(entry key) - sizeof(key))
 
 Those files are strictly append-only and modified only once.
 

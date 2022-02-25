@@ -58,7 +58,8 @@ jobs:
 
     - name: Install requirements, build and install Borg
       run: |
-       sudo apt install libacl1-dev
+       sudo apt-get update
+       sudo apt-get install libacl1-dev
        pip3 install -r requirements.d/development.txt
        pip3 install -e .
 

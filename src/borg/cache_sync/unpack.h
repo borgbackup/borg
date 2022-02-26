@@ -102,7 +102,7 @@ typedef struct unpack_user {
 
     /* collect values here for current chunklist entry */
     struct {
-        char key[32];
+        unsigned char key[32];
         uint32_t csize;
         uint32_t size;
     } current;

@@ -118,7 +118,7 @@ static void hashindex_write(HashIndex *index, PyObject *file_py);
 static uint64_t hashindex_compact(HashIndex *index);
 static HashIndex *hashindex_init(int capacity, int key_size, int value_size);
 static const unsigned char *hashindex_get(HashIndex *index, const unsigned char *key);
-static int hashindex_set(HashIndex *index, const unsigned char *key, const unsigned char *value);
+static int hashindex_set(HashIndex *index, const unsigned char *key, const void *value);
 static int hashindex_delete(HashIndex *index, const unsigned char *key);
 static unsigned char *hashindex_next_key(HashIndex *index, const unsigned char *key);
 
@@ -559,7 +559,7 @@ hashindex_get(HashIndex *index, const unsigned char *key)
 }
 
 static int
-hashindex_set(HashIndex *index, const unsigned char *key, const unsigned char *value)
+hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
 {
     int start_idx;
     int idx = hashindex_lookup(index, key, &start_idx);

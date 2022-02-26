@@ -160,7 +160,7 @@ To install Borg from a source package (including pip), you have to install the
 following dependencies first:
 
 * `Python 3`_ >= 3.8.0, plus development headers.
-* OpenSSL_ >= 1.0.0, plus development headers.
+* OpenSSL_ >= 1.1.1, plus development headers.
 * libacl_ (which depends on libattr_), both plus development headers.
 * We have bundled code of the following packages, but borg by default (see
   setup.py if you want to change that) prefers a shared library if it can

@@ -97,6 +97,7 @@ cdef extern from "_crypto_helpers.h":
     long LIBRESSL_VERSION_NUMBER
 
     const EVP_CIPHER *EVP_aes_256_ocb()  # dummy
+    const EVP_CIPHER *EVP_chacha20_poly1305()  # dummy
 
 
 is_libressl = bool(LIBRESSL_VERSION_NUMBER)
@@ -640,7 +641,8 @@ cdef class AES256_OCB(_AES_BASE):
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
     @classmethod
     def requirements_check(cls):
-        pass
+        if is_libressl:
+            raise ValueError('CHACHA20-POLY1305 is not implemented by LibreSSL (yet?).')
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         self.requirements_check()

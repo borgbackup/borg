@@ -26,35 +26,25 @@ import setup_docs
 
 is_win32 = sys.platform.startswith('win32')
 
-# How the build process finds the system libs / uses the bundled code:
+# How the build process finds the system libs:
 #
-# 1. it will try to use (system) libs (see 1.1. and 1.2.),
-#    except if you use these env vars to force using the bundled code:
-#    BORG_USE_BUNDLED_XXX undefined  -->  try using system lib
-#    BORG_USE_BUNDLED_XXX=YES        -->  use the bundled code
-#    Note: do not use =NO, that is not supported!
-# 1.1. if BORG_LIBXXX_PREFIX is set, it will use headers and libs from there.
-# 1.2. if not and pkg-config can locate the lib, the lib located by
-#      pkg-config will be used. We use the pkg-config tool via the pkgconfig
-#      python package, which must be installed before invoking setup.py.
-#      if pkgconfig is not installed, this step is skipped.
-# 2. if no system lib could be located via 1.1. or 1.2., it will fall back
-#    to using the bundled code.
+# 1. if BORG_LIBXXX_PREFIX is set, it will use headers and libs from there.
+# 2. if not and pkg-config can locate the lib, the lib located by
+#    pkg-config will be used. We use the pkg-config tool via the pkgconfig
+#    python package, which must be installed before invoking setup.py.
+#    if pkgconfig is not installed, this step is skipped.
+# 3. otherwise raise a fatal error.
 
-# OpenSSL is required as a (system) lib in any case as we do not bundle it.
-# Thus, only step 1.1. and 1.2. apply to openssl (but not 1. and 2.).
-# needed: openssl >=1.0.2 or >=1.1.0 (or compatible)
+# needed: >=1.1.1 (or compatible)
 system_prefix_openssl = os.environ.get('BORG_OPENSSL_PREFIX')
 
 # needed: lz4 (>= 1.7.0 / r129)
-prefer_system_liblz4 = not bool(os.environ.get('BORG_USE_BUNDLED_LZ4'))
 system_prefix_liblz4 = os.environ.get('BORG_LIBLZ4_PREFIX')
 
 # needed: zstd (>= 1.3.0)
-prefer_system_libzstd = not bool(os.environ.get('BORG_USE_BUNDLED_ZSTD'))
 system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
 
-prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
+# needed: xxhash (>= 0.8.1)
 system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
 
 # Number of threads to use for cythonize, not used on windows
@@ -187,14 +177,13 @@ if not on_rtd:
 
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
-        setup_compress.lz4_ext_kwargs(pc, prefer_system_liblz4, system_prefix_liblz4),
-        setup_compress.zstd_ext_kwargs(pc, prefer_system_libzstd, system_prefix_libzstd,
-                                       multithreaded=False, legacy=False),
+        setup_compress.lz4_ext_kwargs(pc, system_prefix_liblz4),
+        setup_compress.zstd_ext_kwargs(pc, system_prefix_libzstd),
     )
 
     checksums_ext_kwargs = members_appended(
         dict(sources=[checksums_source]),
-        setup_checksums.xxhash_ext_kwargs(pc, prefer_system_libxxhash, system_prefix_libxxhash),
+        setup_checksums.xxhash_ext_kwargs(pc, system_prefix_libxxhash),
     )
 
     ext_modules += [

@@ -286,7 +286,7 @@ class ZSTD(DecidingCompressor):
         if not isinstance(idata, bytes):
             idata = bytes(idata)  # code below does not work with memoryview
         cdef int isize = len(idata)
-        cdef size_t osize
+        cdef int osize
         cdef char *source = idata
         cdef char *dest
         cdef int level = self.level

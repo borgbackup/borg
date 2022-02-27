@@ -37,7 +37,7 @@ class TestNonceManager:
         self.repository = None
 
     def cache_nonce(self):
-        with open(os.path.join(get_security_dir(self.repository.id_str), 'nonce'), "r") as fd:
+        with open(os.path.join(get_security_dir(self.repository.id_str), 'nonce')) as fd:
             return fd.read()
 
     def set_cache_nonce(self, nonce):

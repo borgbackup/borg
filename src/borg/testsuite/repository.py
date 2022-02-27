@@ -528,14 +528,14 @@ class NonceReservation(RepositoryTestCaseBase):
                 self.repository.commit_nonce_reservation(0x200, 15)
 
             self.repository.commit_nonce_reservation(0x200, None)
-            with open(os.path.join(self.repository.path, "nonce"), "r") as fd:
+            with open(os.path.join(self.repository.path, "nonce")) as fd:
                 assert fd.read() == "0000000000000200"
 
             with pytest.raises(Exception):
                 self.repository.commit_nonce_reservation(0x200, 15)
 
             self.repository.commit_nonce_reservation(0x400, 0x200)
-            with open(os.path.join(self.repository.path, "nonce"), "r") as fd:
+            with open(os.path.join(self.repository.path, "nonce")) as fd:
                 assert fd.read() == "0000000000000400"
 
 
@@ -710,7 +710,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')) if n.isdigit())[-1]
 
     def open_index(self):
-        return NSIndex.read(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+        return NSIndex.read(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'))
 
     def corrupt_object(self, id_):
         idx = self.open_index()
@@ -723,18 +723,18 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         os.unlink(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)))
 
     def delete_index(self):
-        os.unlink(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+        os.unlink(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'))
 
     def rename_index(self, new_name):
-        os.rename(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())),
+        os.rename(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'),
                   os.path.join(self.tmppath, 'repository', new_name))
 
     def list_objects(self):
-        return set(int(key) for key in self.repository.list())
+        return {int(key) for key in self.repository.list()}
 
     def test_repair_corrupted_segment(self):
         self.add_objects([[1, 2, 3], [4, 5], [6]])
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
         self.check(status=True)
         self.corrupt_object(5)
         self.assert_raises(IntegrityError, lambda: self.get_objects(5))
@@ -746,22 +746,22 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.check(repair=True, status=True)
         self.get_objects(4)
         self.check(status=True)
-        self.assert_equal(set([1, 2, 3, 4, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 6}, self.list_objects())
 
     def test_repair_missing_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
         self.check(status=True)
         self.delete_segment(2)
         self.repository.rollback()
         self.check(repair=True, status=True)
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_missing_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_segment(3)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_corrupted_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
@@ -771,7 +771,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
         self.check(status=True)
         self.get_objects(3)
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_no_commits(self):
         self.add_objects([[1, 2, 3]])
@@ -786,14 +786,14 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_equal(self.list_indices(), ['index.2'])
         self.check(status=True)
         self.get_objects(3)
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_missing_index(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_index()
         self.check(status=True)
         self.get_objects(4)
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
 
     def test_repair_index_too_new(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
@@ -802,7 +802,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.check(status=True)
         self.assert_equal(self.list_indices(), ['index.3'])
         self.get_objects(4)
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
 
     def test_crash_before_compact(self):
         self.repository.put(H(0), b'data')

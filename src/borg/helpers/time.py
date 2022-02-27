@@ -131,7 +131,7 @@ class OutputTimestamp:
         return format_time(self.ts, format_spec=format_spec)
 
     def __str__(self):
-        return '{}'.format(self)
+        return f'{self}'
 
     def isoformat(self):
         return isoformat_time(self.ts)

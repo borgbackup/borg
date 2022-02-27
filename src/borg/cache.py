@@ -83,7 +83,7 @@ class SecurityManager:
         if not self.known():
             return False
         try:
-            with open(self.key_type_file, 'r') as fd:
+            with open(self.key_type_file) as fd:
                 type = fd.read()
                 return type == str(key.TYPE)
         except OSError as exc:
@@ -687,13 +687,13 @@ class LocalCache(CacheStatsMixin):
                 fns = os.listdir(archive_path)
                 # filenames with 64 hex digits == 256bit,
                 # or compact indices which are 64 hex digits + ".compact"
-                return set(unhexlify(fn) for fn in fns if len(fn) == 64) | \
-                       set(unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith('.compact'))
+                return {unhexlify(fn) for fn in fns if len(fn) == 64} | \
+                       {unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith('.compact')}
             else:
                 return set()
 
         def repo_archives():
-            return set(info.id for info in self.manifest.archives.list())
+            return {info.id for info in self.manifest.archives.list()}
 
         def cleanup_outdated(ids):
             for id in ids:

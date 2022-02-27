@@ -379,7 +379,7 @@ class AESKeyBase(KeyBase):
         try:
             payload = self.cipher.decrypt(data)
         except IntegrityError as e:
-            raise IntegrityError("Chunk %s: Could not decrypt [%s]" % (bin_to_hex(id), str(e)))
+            raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
         if not decompress:
             return payload
         data = self.decompress(payload)
@@ -469,7 +469,7 @@ class Passphrase(str):
             msg = []
             for env_var in 'BORG_PASSPHRASE', 'BORG_PASSCOMMAND':
                 env_var_set = os.environ.get(env_var) is not None
-                msg.append('%s is %s.' % (env_var, 'set' if env_var_set else 'not set'))
+                msg.append('{} is {}.'.format(env_var, 'set' if env_var_set else 'not set'))
             msg.append('Interactive password query failed.')
             raise NoPassphraseFailure(' '.join(msg)) from None
         else:
@@ -760,7 +760,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         return path
 
     def load(self, target, passphrase):
-        with open(target, 'r') as fd:
+        with open(target) as fd:
             key_data = ''.join(fd.readlines()[1:])
         success = self._load(key_data, passphrase)
         if success:
@@ -775,7 +775,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             raise Error('Aborting because key in "%s" already exists.' % target)
         key_data = self._save(passphrase)
         with SaveFile(target) as fd:
-            fd.write('%s %s\n' % (self.FILE_ID, bin_to_hex(self.repository_id)))
+            fd.write(f'{self.FILE_ID} {bin_to_hex(self.repository_id)}\n')
             fd.write(key_data)
             fd.write('\n')
         self.target = target

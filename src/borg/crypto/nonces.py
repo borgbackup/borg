@@ -22,7 +22,7 @@ class NonceManager:
 
     def get_local_free_nonce(self):
         try:
-            with open(self.nonce_file, 'r') as fd:
+            with open(self.nonce_file) as fd:
                 return bytes_to_long(unhexlify(fd.read()))
         except FileNotFoundError:
             return None

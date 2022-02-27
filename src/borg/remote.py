@@ -286,7 +286,7 @@ class RepositoryServer:  # pragma: no cover
                                 else:
                                     tb_log_level = logging.ERROR
                                     msg = '%s Exception in RPC call' % e.__class__.__name__
-                                tb = '%s\n%s' % (traceback.format_exc(), sysinfo())
+                                tb = f'{traceback.format_exc()}\n{sysinfo()}'
                                 logging.error(msg)
                                 logging.log(tb_log_level, tb)
                             exc = 'Remote Exception (see remote log for the traceback)'
@@ -470,7 +470,7 @@ def api(*, since, **kwargs_decorator):
                 if restriction.get('dontcare', False):
                     continue
 
-                raise self.RPCServerOutdated("{0} {1}={2!s}".format(f.__name__, name, named[name]),
+                raise self.RPCServerOutdated(f"{f.__name__} {name}={named[name]!s}",
                                              format_version(restriction['since']))
 
             return self.call(f.__name__, named, **extra)
@@ -622,7 +622,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             assert False, 'cleanup happened in Repository.__del__'
 
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.location.canonical_path())
+        return f'<{self.__class__.__name__} {self.location.canonical_path()}>'
 
     def __enter__(self):
         return self
@@ -697,7 +697,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         if location.port:
             args += ['-p', str(location.port)]
         if location.user:
-            args.append('%s@%s' % (location.user, location.host))
+            args.append(f'{location.user}@{location.host}')
         else:
             args.append('%s' % location.host)
         return args
@@ -941,8 +941,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             return resp
 
     def get_many(self, ids, is_preloaded=False):
-        for resp in self.call_many('get', [{'id': id} for id in ids], is_preloaded=is_preloaded):
-            yield resp
+        yield from self.call_many('get', [{'id': id} for id in ids], is_preloaded=is_preloaded)
 
     @api(since=parse_version('1.0.0'))
     def put(self, id, data, wait=True):

@@ -58,7 +58,7 @@ def unopened_tempfile():
         yield os.path.join(tempdir, "file")
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def are_symlinks_supported():
     with unopened_tempfile() as filepath:
         try:
@@ -70,7 +70,7 @@ def are_symlinks_supported():
     return False
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def are_hardlinks_supported():
     if not hasattr(os, 'link'):
         # some pythons do not have os.link
@@ -89,7 +89,7 @@ def are_hardlinks_supported():
     return False
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def are_fifos_supported():
     with unopened_tempfile() as filepath:
         try:
@@ -104,7 +104,7 @@ def are_fifos_supported():
         return False
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def is_utime_fully_supported():
     with unopened_tempfile() as filepath:
         # Some filesystems (such as SSHFS) don't support utime on symlinks
@@ -124,7 +124,7 @@ def is_utime_fully_supported():
         return False
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def is_birthtime_fully_supported():
     if not hasattr(os.stat_result, 'st_birthtime'):
         return False
@@ -172,9 +172,9 @@ class BaseTestCase(unittest.TestCase):
 
     @contextmanager
     def assert_creates_file(self, path):
-        assert not os.path.exists(path), '{} should not exist'.format(path)
+        assert not os.path.exists(path), f'{path} should not exist'
         yield
-        assert os.path.exists(path), '{} should exist'.format(path)
+        assert os.path.exists(path), f'{path} should exist'
 
     def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)
@@ -293,7 +293,7 @@ class BaseTestCase(unittest.TestCase):
             if os.path.ismount(mountpoint) == mounted:
                 return
             time.sleep(0.1)
-        message = 'Waiting for %s of %s' % ('mount' if mounted else 'umount', mountpoint)
+        message = 'Waiting for {} of {}'.format('mount' if mounted else 'umount', mountpoint)
         raise TimeoutError(message)
 
     @contextmanager

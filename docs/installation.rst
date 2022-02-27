@@ -159,20 +159,18 @@ Dependencies
 To install Borg from a source package (including pip), you have to install the
 following dependencies first:
 
-* `Python 3`_ >= 3.8.0, plus development headers.
-* OpenSSL_ >= 1.1.1, plus development headers.
-* libacl_ (which depends on libattr_), both plus development headers.
-* We have bundled code of the following packages, but borg by default (see
-  setup.py if you want to change that) prefers a shared library if it can
-  be found on the system (lib + dev headers) at build time:
+* `Python 3`_ >= 3.8.0 (interpreter plus development headers)
+* Libraries (library plus development headers):
 
+  - OpenSSL_ >= 1.1.1
+  - libacl_ (which depends on libattr_)
   - liblz4_ >= 1.7.0 (r129)
   - libzstd_ >= 1.3.0
   - libxxhash >= 0.8.1 (0.8.0 might work also)
 * pkg-config (cli tool) and pkgconfig python package (borg uses these to
   discover header and library location - if it can't import pkgconfig and
   is not pointed to header/library locations via env vars [see setup.py],
-  it will fall back to using the bundled code, see above).
+  it will raise a fatal error).
   **These must be present before invoking setup.py!**
 * some other Python dependencies, pip will automatically install them for you.
 * optionally, if you wish to mount an archive as a FUSE filesystem, you need

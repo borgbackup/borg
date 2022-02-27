@@ -6,11 +6,6 @@ import sys
 is_win32 = sys.platform.startswith('win32')
 
 
-def multi_join(paths, *path_segments):
-    """apply os.path.join on a list of paths"""
-    return [os.path.join(*(path_segments + (path,))) for path in paths]
-
-
 def crypto_ext_kwargs(pc, system_prefix):
     if system_prefix:
         print('Detected OpenSSL [via BORG_OPENSSL_PREFIX]')

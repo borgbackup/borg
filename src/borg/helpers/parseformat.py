@@ -948,7 +948,7 @@ def ellipsis_truncate(msg, space):
         return '...' + ' ' * (space - ellipsis_width)
     if space < ellipsis_width + msg_width:
         return '{}...{}'.format(swidth_slice(msg, space // 2 - ellipsis_width),
-                            swidth_slice(msg, -space // 2))
+                                swidth_slice(msg, -space // 2))
     return msg + ' ' * (space - msg_width)
 
 

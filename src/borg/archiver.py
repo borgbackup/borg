@@ -2060,7 +2060,7 @@ class Archiver:
             before = data[offset - context:offset]
             after = data[offset + len(wanted):offset + len(wanted) + context]
             print('{}: {} {} {} == {!r} {!r} {!r}'.format(info, before.hex(), wanted.hex(), after.hex(),
-                                                before, wanted, after))
+                                                          before, wanted, after))
 
         wanted = args.wanted
         try:

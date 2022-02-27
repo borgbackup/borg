@@ -320,7 +320,7 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
             proc = popen_with_error_handling(cmd, stdin=subprocess.PIPE, stdout=filter_stream,
                                              log_prefix='filter-process: ', env=env)
         if not proc:
-            raise Error('filter %s: process creation failed' % (cmd, ))
+            raise Error(f'filter {cmd}: process creation failed')
         stream = proc.stdout if inbound else proc.stdin
         # inbound: do not close the pipe (this is the task of the filter process [== writer])
         # outbound: close the pipe, otherwise the filter process would not notice when we are done.

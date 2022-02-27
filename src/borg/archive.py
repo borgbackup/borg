@@ -198,7 +198,7 @@ class BackupOSError(Exception):
 
     def __str__(self):
         if self.op:
-            return '%s: %s' % (self.op, self.os_error)
+            return f'{self.op}: {self.os_error}'
         else:
             return str(self.os_error)
 
@@ -464,7 +464,7 @@ class Archive:
                 raise self.AlreadyExists(name)
             i = 0
             while True:
-                self.checkpoint_name = '%s.checkpoint%s' % (name, i and ('.%d' % i) or '')
+                self.checkpoint_name = '{}.checkpoint{}'.format(name, i and ('.%d' % i) or '')
                 if self.checkpoint_name not in manifest.archives:
                     break
                 i += 1
@@ -1823,7 +1823,7 @@ class ArchiveChecker:
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
             if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
                 # should never happen, but there was issue #3218.
-                logger.warning('{}: {}: Invalid chunks_healthy metadata removed!'.format(archive_name, item.path))
+                logger.warning(f'{archive_name}: {item.path}: Invalid chunks_healthy metadata removed!')
                 del item.chunks_healthy
                 has_chunks_healthy = False
                 chunks_healthy = chunks_current
@@ -1867,7 +1867,7 @@ class ArchiveChecker:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
                 item.chunks_healthy = item.chunks
             if has_chunks_healthy and chunk_list == chunks_healthy:
-                logger.info('{}: {}: Completely healed previously damaged file!'.format(archive_name, item.path))
+                logger.info(f'{archive_name}: {item.path}: Completely healed previously damaged file!')
                 del item.chunks_healthy
             item.chunks = chunk_list
             if 'size' in item:
@@ -1902,7 +1902,7 @@ class ArchiveChecker:
                 logger.error(msg)
 
             def list_keys_safe(keys):
-                return ', '.join((k.decode(errors='replace') if isinstance(k, bytes) else str(k) for k in keys))
+                return ', '.join(k.decode(errors='replace') if isinstance(k, bytes) else str(k) for k in keys)
 
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
@@ -1972,7 +1972,7 @@ class ArchiveChecker:
         with cache_if_remote(self.repository) as repository:
             for i, info in enumerate(archive_infos):
                 pi.show(i)
-                logger.info('Analyzing archive {} ({}/{})'.format(info.name, i + 1, num_archives))
+                logger.info(f'Analyzing archive {info.name} ({i + 1}/{num_archives})')
                 archive_id = info.id
                 if archive_id not in self.chunks:
                     logger.error('Archive metadata block is missing!')
@@ -2008,7 +2008,7 @@ class ArchiveChecker:
             unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
             orphaned = unused - self.possibly_superseded
             if orphaned:
-                logger.error('{} orphaned objects found!'.format(len(orphaned)))
+                logger.error(f'{len(orphaned)} orphaned objects found!')
                 self.error_found = True
             if self.repair and unused:
                 logger.info('Deleting %d orphaned and %d superseded objects...' % (

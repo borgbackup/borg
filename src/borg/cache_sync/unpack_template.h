@@ -196,7 +196,7 @@ static inline int unpack_execute(unpack_context* ctx, const char* data, size_t l
 
 
         _fixed_trail_again:
-            ++p;
+            ++p; // fallthrough (suppresses -Wimplicit-fallthrough)
 
         default:
             if((size_t)(pe - p) < trail) { goto _out; }

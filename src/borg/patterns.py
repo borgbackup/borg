@@ -201,7 +201,7 @@ class PatternBase:
         return matches
 
     def __repr__(self):
-        return '%s(%s)' % (type(self), self.pattern)
+        return f'{type(self)}({self.pattern})'
 
     def __str__(self):
         return self.pattern_orig
@@ -315,7 +315,7 @@ _PATTERN_CLASSES = {
     ShellPattern,
 }
 
-_PATTERN_CLASS_BY_PREFIX = dict((i.PREFIX, i) for i in _PATTERN_CLASSES)
+_PATTERN_CLASS_BY_PREFIX = {i.PREFIX: i for i in _PATTERN_CLASSES}
 
 CmdTuple = namedtuple('CmdTuple', 'val cmd')
 
@@ -339,7 +339,7 @@ def get_pattern_class(prefix):
     try:
         return _PATTERN_CLASS_BY_PREFIX[prefix]
     except KeyError:
-        raise ValueError("Unknown pattern style: {}".format(prefix)) from None
+        raise ValueError(f"Unknown pattern style: {prefix}") from None
 
 
 def parse_pattern(pattern, fallback=FnmatchPattern, recurse_dir=True):
@@ -394,7 +394,7 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
         try:
             val = get_pattern_class(remainder_str)
         except ValueError:
-            raise argparse.ArgumentTypeError("Invalid pattern style: {}".format(remainder_str))
+            raise argparse.ArgumentTypeError(f"Invalid pattern style: {remainder_str}")
     else:
         # determine recurse_dir based on command type
         recurse_dir = command_recurses_dir(cmd)

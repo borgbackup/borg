@@ -1867,7 +1867,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
                 cache.begin_txn()
-                cache.cache_config.mandatory_features = set(['unknown-feature'])
+                cache.cache_config.mandatory_features = {'unknown-feature'}
                 cache.commit()
 
         if self.FORK_DEFAULT:
@@ -1891,7 +1891,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 repository._location = Location(self.repository_location)
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
-                assert cache.cache_config.mandatory_features == set([])
+                assert cache.cache_config.mandatory_features == set()
 
     def test_progress_on(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -2748,7 +2748,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 pass
             with open(assert_data_file, 'rb') as _in:
                 assert_data = pickle.load(_in)
-            print('\nLock.migrate_lock(): assert_data = %r.' % (assert_data, ), file=sys.stderr, flush=True)
+            print(f'\nLock.migrate_lock(): assert_data = {assert_data!r}.', file=sys.stderr, flush=True)
             exception = assert_data['exception']
             if exception is not None:
                 extracted_tb = assert_data['exception.extr_tb']
@@ -3089,14 +3089,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo_id = self._extract_repository_id(self.repository_path)
         self.cmd('key', 'export', self.repository_location, export_file)
 
-        with open(export_file, 'r') as fd:
+        with open(export_file) as fd:
             export_contents = fd.read()
 
         assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
 
-        with open(key_file, 'r') as fd:
+        with open(key_file) as fd:
             key_contents = fd.read()
 
         assert key_contents == export_contents
@@ -3105,7 +3105,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd('key', 'import', self.repository_location, export_file)
 
-        with open(key_file, 'r') as fd:
+        with open(key_file) as fd:
             key_contents2 = fd.read()
 
         assert key_contents2 == key_contents
@@ -3117,7 +3117,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('key', 'export', self.repository_location, exported_key_file)
 
         key_file = os.path.join(self.keys_path, os.listdir(self.keys_path)[0])
-        with open(key_file, 'r') as fd:
+        with open(key_file) as fd:
             key_contents = fd.read()
         os.unlink(key_file)
 
@@ -3126,7 +3126,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('key', 'import', self.repository_location, exported_key_file)
         assert not os.path.isfile(key_file), '"borg key import" should respect BORG_KEY_FILE'
 
-        with open(imported_key_file, 'r') as fd:
+        with open(imported_key_file) as fd:
             imported_key_contents = fd.read()
         assert imported_key_contents == key_contents
 
@@ -3136,7 +3136,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo_id = self._extract_repository_id(self.repository_path)
         self.cmd('key', 'export', self.repository_location, export_file)
 
-        with open(export_file, 'r') as fd:
+        with open(export_file) as fd:
             export_contents = fd.read()
 
         assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
@@ -3167,7 +3167,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo_id = self._extract_repository_id(self.repository_path)
         self.cmd('key', 'export', '--qr-html', self.repository_location, export_file)
 
-        with open(export_file, 'r', encoding='utf-8') as fd:
+        with open(export_file, encoding='utf-8') as fd:
             export_contents = fd.read()
 
         assert bin_to_hex(repo_id) in export_contents
@@ -3221,7 +3221,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd('key', 'export', '--paper', self.repository_location, export_file)
 
-        with open(export_file, 'r') as fd:
+        with open(export_file) as fd:
             export_contents = fd.read()
 
         assert export_contents == """To restore key use borg key import --paper /path/to/repo
@@ -3284,7 +3284,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         dump_file = self.output_path + '/dump'
         output = self.cmd('debug', 'dump-manifest', self.repository_location, dump_file)
         assert output == ""
-        with open(dump_file, "r") as f:
+        with open(dump_file) as f:
             result = json.load(f)
         assert 'archives' in result
         assert 'config' in result
@@ -3299,7 +3299,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         dump_file = self.output_path + '/dump'
         output = self.cmd('debug', 'dump-archive', self.repository_location + "::test", dump_file)
         assert output == ""
-        with open(dump_file, "r") as f:
+        with open(dump_file) as f:
             result = json.load(f)
         assert '_name' in result
         assert '_manifest_entry' in result
@@ -4144,7 +4144,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # File contents changed (deleted and replaced with a new file)
             change = 'B' if can_compare_ids else '{:<19}'.format('modified')
             assert 'file_replaced' in output  # added to debug #3494
-            assert '{} input/file_replaced'.format(change) in output
+            assert f'{change} input/file_replaced' in output
 
             # File unchanged
             assert 'input/file_unchanged' not in output
@@ -4174,9 +4174,9 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
             change = '0 B' if can_compare_ids else '{:<19}'.format('modified')
-            assert '{} input/empty'.format(change) in output
+            assert f'{change} input/empty' in output
             if are_hardlinks_supported():
-                assert '{} input/hardlink_contents_changed'.format(change) in output
+                assert f'{change} input/hardlink_contents_changed' in output
             if are_symlinks_supported():
                 assert 'input/link_target_contents_changed' not in output
 

@@ -225,7 +225,7 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv('BORG_REPO', raising=False)
         test_pid = os.getpid()
         assert repr(Location('/some/path::archive{pid}')) == \
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{}')".format(test_pid)
+            f"Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{test_pid}')"
         location_time1 = Location('/some/path::archive{now:%s}')
         sleep(1.1)
         location_time2 = Location('/some/path::archive{now:%s}')
@@ -259,11 +259,11 @@ class TestLocationWithEnv:
         from borg.platform import hostname
         monkeypatch.setenv('BORG_REPO', 'ssh://user@host:1234/{hostname}')
         assert repr(Location('::archive')) == \
-            "Location(proto='ssh', user='user', host='host', port=1234, path='/{}', archive='archive')".format(hostname)
+            f"Location(proto='ssh', user='user', host='host', port=1234, path='/{hostname}', archive='archive')"
         assert repr(Location('::')) == \
-            "Location(proto='ssh', user='user', host='host', port=1234, path='/{}', archive=None)".format(hostname)
+            f"Location(proto='ssh', user='user', host='host', port=1234, path='/{hostname}', archive=None)"
         assert repr(Location()) == \
-            "Location(proto='ssh', user='user', host='host', port=1234, path='/{}', archive=None)".format(hostname)
+            f"Location(proto='ssh', user='user', host='host', port=1234, path='/{hostname}', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'file:///some/path')
@@ -380,7 +380,7 @@ class MockArchive:
         self.id = id
 
     def __repr__(self):
-        return "{0}: {1}".format(self.id, self.ts.isoformat())
+        return f"{self.id}: {self.ts.isoformat()}"
 
 
 @pytest.mark.parametrize(

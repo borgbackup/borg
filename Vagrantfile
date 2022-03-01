@@ -15,7 +15,7 @@ def packages_debianoid(user)
     apt-get -y -qq update
     apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
-    apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config
+    apt install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev pkg-config
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true
@@ -37,14 +37,16 @@ def packages_freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
-    pkg install -y liblz4 zstd pkgconf
+    pkg install -y xxhash liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
-    pkg install -y python38 py38-sqlite3 py38-virtualenv py38-pip
+    pkg install -y python39 py39-sqlite3
     # make sure there is a python3 command
-    ln -sf /usr/local/bin/python3.8 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3
+    python3 -m ensurepip
+    pip3 install virtualenv
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd
@@ -68,6 +70,7 @@ def packages_openbsd
   return <<-EOF
     pkg_add bash
     chsh -s bash vagrant
+    pkg_add xxhash
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
@@ -90,8 +93,6 @@ def packages_netbsd
     pkg_add pkg-config
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python38 py38-sqlite3 py38-pip py38-virtualenv py38-expat
-    ln -s /usr/pkg/lib/python3.8/_sysconfigdata_netbsd9.py /usr/pkg/lib/python3.8/_sysconfigdata__netbsd9_.py  # bug in netbsd 9.2, expected filename not there.
     pkg_add python39 py39-sqlite3 py39-pip py39-virtualenv py39-expat
     ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python
     ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python3
@@ -113,7 +114,7 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline openssl@1.1 zstd lz4 xz fakeroot
+    brew install pkg-config readline openssl@1.1 xxhash zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
@@ -158,7 +159,6 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.10.0  # tests, version supporting openssl 1.1
     pyenv install 3.9.10  # tests, version supporting openssl 1.1, binary build
-    pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv rehash
   EOF
 end
@@ -227,8 +227,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.8.0 3.9.10 3.10.0
-      pyenv local 3.8.0 3.9.10 3.10.0
+      pyenv global 3.9.10 3.10.0
+      pyenv local 3.9.10 3.10.0
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -422,6 +422,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
   end
 
-  # TODO: create more VMs with python 3.8+ and openssl 1.1 or 3.0.
+  # TODO: create more VMs with python 3.9+ and openssl 1.1 or 3.0.
   # See branch 1.1-maint for a better equipped Vagrantfile (but still on py35 and openssl 1.0).
 end

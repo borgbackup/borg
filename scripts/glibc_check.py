@@ -35,12 +35,12 @@ def main():
             output = subprocess.check_output(objdump % filename, shell=True,
                                              stderr=subprocess.STDOUT)
             output = output.decode()
-            versions = set(parse_version(match.group(1))
-                           for match in glibc_re.finditer(output))
+            versions = {parse_version(match.group(1))
+                        for match in glibc_re.finditer(output)}
             requires_glibc = max(versions)
             overall_versions.add(requires_glibc)
             if verbose:
-                print("%s %s" % (filename, format_version(requires_glibc)))
+                print(f"{filename} {format_version(requires_glibc)}")
         except subprocess.CalledProcessError:
             if verbose:
                 print("%s errored." % filename)

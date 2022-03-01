@@ -30,13 +30,13 @@ from .helpers import Buffer, DecompressionError
 
 API_VERSION = '1.2_02'
 
-cdef extern from "algorithms/lz4-libselect.h":
+cdef extern from "lz4.h":
     int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_compressBound(int inputSize) nogil
 
 
-cdef extern from "algorithms/zstd-libselect.h":
+cdef extern from "zstd.h":
     size_t ZSTD_compress(void* dst, size_t dstCapacity, const void* src, size_t srcSize, int  compressionLevel) nogil
     size_t ZSTD_decompress(void* dst, size_t dstCapacity, const void* src, size_t compressedSize) nogil
     size_t ZSTD_compressBound(size_t srcSize) nogil
@@ -286,7 +286,7 @@ class ZSTD(DecidingCompressor):
         if not isinstance(idata, bytes):
             idata = bytes(idata)  # code below does not work with memoryview
         cdef int isize = len(idata)
-        cdef size_t osize
+        cdef int osize
         cdef char *source = idata
         cdef char *dest
         cdef int level = self.level

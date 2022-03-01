@@ -224,7 +224,7 @@ class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
     @classmethod
     def read_integrity_file(cls, path):
         try:
-            with open(cls.integrity_file_path(path), 'r') as fd:
+            with open(cls.integrity_file_path(path)) as fd:
                 return cls.parse_integrity_data(path, fd.read())
         except FileNotFoundError:
             logger.info('No integrity file found for %s', path)

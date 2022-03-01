@@ -1,7 +1,7 @@
 from binascii import hexlify, unhexlify
 
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
-                               IntegrityError, blake2b_128, blake2b_256, hmac_sha256, openssl10
+                               IntegrityError, blake2b_128, blake2b_256, hmac_sha256, is_libressl
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 
@@ -99,7 +99,7 @@ class CryptoTestCase(BaseTestCase):
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
         ]
-        if not openssl10:
+        if not is_libressl:
             tests += [
                 (AES256_OCB,
                  b'b6909c23c9aaebd9abbe1ff42097652d',
@@ -143,7 +143,7 @@ class CryptoTestCase(BaseTestCase):
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
         ]
-        if not openssl10:
+        if not is_libressl:
             tests += [
                 (AES256_OCB,
                  b'f2748c412af1c7ead81863a18c2c1893',

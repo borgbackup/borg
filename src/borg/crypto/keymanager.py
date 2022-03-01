@@ -52,7 +52,7 @@ class KeyManager:
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:
             k = KeyfileKey(self.repository)
             target = k.find_key()
-            with open(target, 'r') as fd:
+            with open(target) as fd:
                 self.keyblob = ''.join(fd.readlines()[1:])
 
         elif self.keyblob_storage == KeyBlobStorage.REPO:
@@ -68,7 +68,7 @@ class KeyManager:
             self.repository.save_key(self.keyblob.encode('utf-8'))
 
     def get_keyfile_data(self):
-        data = '%s %s\n' % (KeyfileKey.FILE_ID, bin_to_hex(self.repository.id))
+        data = f'{KeyfileKey.FILE_ID} {bin_to_hex(self.repository.id)}\n'
         data += self.keyblob
         if not self.keyblob.endswith('\n'):
             data += '\n'
@@ -115,7 +115,7 @@ class KeyManager:
         lines = (len(binary) + 17) // 18
         repoid = bin_to_hex(self.repository.id)[:18]
         complete_checksum = sha256_truncated(binary, 12)
-        export += 'id: {0:d} / {1} / {2} - {3}\n'.format(lines,
+        export += 'id: {:d} / {} / {} - {}\n'.format(lines,
                                        grouped(repoid),
                                        grouped(complete_checksum),
                                        sha256_truncated((str(lines) + '/' + repoid + '/' + complete_checksum).encode('ascii'), 2))
@@ -124,7 +124,7 @@ class KeyManager:
             idx += 1
             binline = binary[:18]
             checksum = sha256_truncated(idx.to_bytes(2, byteorder='big') + binline, 2)
-            export += '{0:2d}: {1} - {2}\n'.format(idx, grouped(bin_to_hex(binline)), checksum)
+            export += f'{idx:2d}: {grouped(bin_to_hex(binline))} - {checksum}\n'
             binary = binary[18:]
 
         with dash_open(path, 'w') as fd:
@@ -188,7 +188,7 @@ class KeyManager:
                 idx = 1
                 # body line input
                 while True:
-                    inline = input('{0:2d}: '.format(idx))
+                    inline = input(f'{idx:2d}: ')
                     inline = inline.replace(' ', '')
                     if inline == '':
                         if yes('Abort import? [yN]:'):
@@ -204,7 +204,7 @@ class KeyManager:
                         print("only characters 0-9 and a-f and '-' are valid, try again")
                         continue
                     if sha256_truncated(idx.to_bytes(2, byteorder='big') + part, 2) != checksum:
-                        print('line checksum did not match, try line {0} again'.format(idx))
+                        print(f'line checksum did not match, try line {idx} again')
                         continue
                     result += part
                     if idx == lines:

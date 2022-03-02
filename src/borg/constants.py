@@ -1,18 +1,23 @@
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
+
+# fmt: off
 ITEM_KEYS = frozenset(['path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'hardlink_master',
                        'mode', 'user', 'group', 'uid', 'gid', 'mtime', 'atime', 'ctime', 'birthtime', 'size',
                        'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended',
                        'part'])
+# fmt: on
 
 # this is the set of keys that are always present in items:
 REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
+# fmt: off
 ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
                           'comment', 'chunker_params',
                           'recreate_cmdline',
                           'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',  # used in 1.1.0b1 .. b2
                           'size', 'csize', 'nfiles', 'size_parts', 'csize_parts', 'nfiles_parts', ])
+# fmt: on
 
 # this is the set of keys that are always present in archives:
 REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])

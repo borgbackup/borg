@@ -27,6 +27,9 @@ jobs:
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
         # Learn more about CodeQL language support at https://git.io/codeql-language-support
 
+    env:
+      BORG_LIBDEFLATE_PREFIX: /usr  # on ubuntu 20.04 pkgconfig does not find libdeflate
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -49,7 +52,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
-        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev libdeflate-dev liblz4-dev libzstd-dev
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v1

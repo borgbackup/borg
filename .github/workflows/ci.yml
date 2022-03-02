@@ -64,6 +64,7 @@ jobs:
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
       PKG_CONFIG_PATH: /usr/local/opt/openssl@1.1/lib/pkgconfig
+      BORG_LIBDEFLATE_PREFIX: /usr  # on ubuntu 20.04 pkgconfig does not find libdeflate
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
@@ -92,7 +93,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
-        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev libdeflate-dev liblz4-dev libzstd-dev
         sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
         sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
 
@@ -102,6 +103,7 @@ jobs:
         brew install pkg-config || brew upgrade pkg-config
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
+        brew install libdeflate || brew upgrade libdeflate
         brew install xxhash || brew upgrade xxhash
         brew install openssl@1.1 || brew upgrade openssl@1.1
         brew install --cask macfuse || brew upgrade --cask macfuse  # Required for Python llfuse module

@@ -1,15 +1,11 @@
+import zlib
+
+from ..platformflags import is_darwin
 from ..helpers import bin_to_hex
 
 from libc.stdint cimport uint32_t
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize
-
-
-cdef extern from "crc32_dispatch.c":
-    uint32_t _crc32_slice_by_8 "crc32_slice_by_8"(const void* data, size_t length, uint32_t initial_crc)
-    uint32_t _crc32_clmul "crc32_clmul"(const void* data, size_t length, uint32_t initial_crc)
-
-    int _have_clmul "have_clmul"()
 
 
 cdef extern from "xxhash.h":
@@ -37,35 +33,31 @@ cdef extern from "xxhash.h":
     XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src)
 
 
+cdef extern from "libdeflate.h":
+    uint32_t libdeflate_crc32(uint32_t crc, const void *buffer, size_t len)
+
+
 cdef Py_buffer ro_buffer(object data) except *:
     cdef Py_buffer view
     PyObject_GetBuffer(data, &view, PyBUF_SIMPLE)
     return view
 
 
-def crc32_slice_by_8(data, value=0):
+def deflate_crc32(data, value=0):
     cdef Py_buffer data_buf = ro_buffer(data)
     cdef uint32_t val = value
     try:
-        return _crc32_slice_by_8(data_buf.buf, data_buf.len, val)
+        return libdeflate_crc32(val, data_buf.buf, data_buf.len)
     finally:
         PyBuffer_Release(&data_buf)
 
 
-def crc32_clmul(data, value=0):
-    cdef Py_buffer data_buf = ro_buffer(data)
-    cdef uint32_t val = value
-    try:
-        return _crc32_clmul(data_buf.buf, data_buf.len, val)
-    finally:
-        PyBuffer_Release(&data_buf)
-
-
-have_clmul = _have_clmul()
-if have_clmul:
-    crc32 = crc32_clmul
+if is_darwin:
+    # macOS (darwin) has a highly optimized zlib.crc32 (Intel as well as Apple Silicon M1)
+    crc32 = zlib.crc32
 else:
-    crc32 = crc32_slice_by_8
+    # on Linux x64 (and maybe others), libdeflate_crc32 is faster than zlib.crc32
+    crc32 = deflate_crc32
 
 
 def xxh64(data, seed=0):

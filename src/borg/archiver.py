@@ -590,26 +590,31 @@ class Archiver:
                     path = os.path.normpath(path)
                     parent_dir = os.path.dirname(path) or '.'
                     name = os.path.basename(path)
-                    # note: for path == '/':  name == '' and parent_dir == '/'.
-                    # the empty name will trigger a fall-back to path-based processing in os_stat and os_open.
-                    with OsOpen(path=parent_dir, flags=flags_root, noatime=True, op='open_root') as parent_fd:
-                        try:
-                            st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
-                        except OSError as e:
-                            self.print_warning('%s: %s', path, e)
-                            continue
-                        if args.one_file_system:
-                            restrict_dev = st.st_dev
-                        else:
-                            restrict_dev = None
-                        self._rec_walk(path=path, parent_fd=parent_fd, name=name,
-                                       fso=fso, cache=cache, matcher=matcher,
-                                       exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
-                                       keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
-                                       restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
-                        # if we get back here, we've finished recursing into <path>,
-                        # we do not ever want to get back in there (even if path is given twice as recursion root)
-                        skip_inodes.add((st.st_ino, st.st_dev))
+                    try:
+                        # note: for path == '/':  name == '' and parent_dir == '/'.
+                        # the empty name will trigger a fall-back to path-based processing in os_stat and os_open.
+                        with OsOpen(path=parent_dir, flags=flags_root, noatime=True, op='open_root') as parent_fd:
+                            try:
+                                st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
+                            except OSError as e:
+                                self.print_warning('%s: %s', path, e)
+                                continue
+                            if args.one_file_system:
+                                restrict_dev = st.st_dev
+                            else:
+                                restrict_dev = None
+                            self._rec_walk(path=path, parent_fd=parent_fd, name=name,
+                                           fso=fso, cache=cache, matcher=matcher,
+                                           exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
+                                           keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
+                                           restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
+                            # if we get back here, we've finished recursing into <path>,
+                            # we do not ever want to get back in there (even if path is given twice as recursion root)
+                            skip_inodes.add((st.st_ino, st.st_dev))
+                    except (BackupOSError, BackupError) as e:
+                        # this comes from OsOpen, self._rec_walk has own exception handler
+                        self.print_warning('%s: %s', path, e)
+                        continue
             if not dry_run:
                 if args.progress:
                     archive.stats.show_progress(final=True)

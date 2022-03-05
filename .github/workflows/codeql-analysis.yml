@@ -37,6 +37,19 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.9
+    - name: Cache pip
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
+        restore-keys: |
+            ${{ runner.os }}-pip-
+            ${{ runner.os }}-
+    - name: Install requirements
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v1
@@ -46,28 +59,11 @@ jobs:
         # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.
         # queries: ./path/to/local/query, your-org/your-repo/queries@main
-
-    - name: Cache pip
-      uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
-        restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
-
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 https://git.io/JvXDl
-
-    - name: Install requirements, build and install Borg
+    - name: Build and install Borg
       run: |
-        sudo apt-get update
-        sudo apt-get install -y pkg-config build-essential
-        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
         python3 -m venv ../borg-env
         source ../borg-env/bin/activate
         pip3 install -r requirements.d/development.txt
         pip3 install -e .
-
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1

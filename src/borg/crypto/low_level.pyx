@@ -754,18 +754,7 @@ cdef class AES:
 
 
 def hmac_sha256(key, data):
-    cdef Py_buffer data_buf = ro_buffer(data)
-    cdef const unsigned char *key_ptr = key
-    cdef int key_len = len(key)
-    cdef unsigned char md[32]
-    try:
-        with nogil:
-            rc = HMAC(EVP_sha256(), key_ptr, key_len, <const unsigned char*> data_buf.buf, data_buf.len, md, NULL)
-        if rc != md:
-            raise CryptoError('HMAC(EVP_sha256) failed')
-    finally:
-        PyBuffer_Release(&data_buf)
-    return PyBytes_FromStringAndSize(<char*> &md[0], 32)
+    return hmac.digest(key, data, 'sha256')
 
 
 def blake2b_256(key, data):

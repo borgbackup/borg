@@ -1,5 +1,6 @@
 import configparser
 import getpass
+import hmac
 import os
 import shlex
 import sys
@@ -7,7 +8,6 @@ import textwrap
 import subprocess
 from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, sha512, pbkdf2_hmac
-from hmac import HMAC, compare_digest
 
 from ..logger import create_logger
 
@@ -193,7 +193,7 @@ class KeyBase:
     def assert_id(self, id, data):
         if id:
             id_computed = self.id_hash(data)
-            if not compare_digest(id_computed, id):
+            if not hmac.compare_digest(id_computed, id):
                 raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))
 
     def _tam_key(self, salt, context):
@@ -213,7 +213,7 @@ class KeyBase:
         })
         packed = msgpack.packb(metadata_dict)
         tam_key = self._tam_key(tam['salt'], context)
-        tam['hmac'] = HMAC(tam_key, packed, sha512).digest()
+        tam['hmac'] = hmac.digest(tam_key, packed, 'sha512')
         return msgpack.packb(metadata_dict)
 
     def unpack_and_verify_manifest(self, data, force_tam_not_required=False):
@@ -252,8 +252,8 @@ class KeyBase:
         offset = data.index(tam_hmac)
         data[offset:offset + 64] = bytes(64)
         tam_key = self._tam_key(tam_salt, context=b'manifest')
-        calculated_hmac = HMAC(tam_key, data, sha512).digest()
-        if not compare_digest(calculated_hmac, tam_hmac):
+        calculated_hmac = hmac.digest(tam_key, data, 'sha512')
+        if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise TAMInvalid()
         logger.debug('TAM-verified manifest')
         return unpacked, True

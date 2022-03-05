@@ -1447,7 +1447,7 @@ class TarfileObjectProcessors:
     def create_helper(self, tarinfo, status=None, type=None):
         item = Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
                     uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname or None, group=tarinfo.gname or None,
-                    mtime=tarinfo.mtime * 1000**3)
+                    mtime=safe_ns(int(tarinfo.mtime * 1000**3)))
         yield item, status
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
         self.add_item(item, stats=self.stats)

@@ -329,6 +329,14 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
     try:
         yield stream
 
+    except Exception:
+        # something went wrong with processing the stream by borg
+        logger.debug('Exception, killing the filter...')
+        proc.kill()
+        borg_succeeded = False
+        raise
+    else:
+        borg_succeeded = True
     finally:
         if stream_close:
             stream.close()
@@ -339,5 +347,6 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
             logger.debug('filter cmd exited with code %d', rc)
             if filter_stream_close:
                 filter_stream.close()
-            if rc:
+            if borg_succeeded and rc:
+                # if borg did not succeed, we know that we killed the filter process
                 raise Error('filter %s failed, rc=%d' % (cmd, rc))

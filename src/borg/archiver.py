@@ -44,7 +44,7 @@ try:
     from .cache import Cache, assert_secure, SecurityManager
     from .constants import *  # NOQA
     from .compress import CompressionSpec
-    from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
+    from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
@@ -398,22 +398,6 @@ class Archiver:
                 self.print_error("input file does not exist: " + args.path)
                 return EXIT_ERROR
             manager.import_keyfile(args)
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False)
-    def do_migrate_to_repokey(self, args, repository):
-        """Migrate passphrase -> repokey"""
-        manifest_data = repository.get(Manifest.MANIFEST_ID)
-        key_old = PassphraseKey.detect(repository, manifest_data)
-        key_new = RepoKey(repository)
-        key_new.target = repository
-        key_new.repository_id = repository.id
-        key_new.enc_key = key_old.enc_key
-        key_new.enc_hmac_key = key_old.enc_hmac_key
-        key_new.id_key = key_old.id_key
-        key_new.chunk_seed = key_old.chunk_seed
-        key_new.change_passphrase()  # option to change key protection passphrase, save
-        logger.info('Key updated')
         return EXIT_SUCCESS
 
     def do_benchmark_crud(self, args):
@@ -4263,33 +4247,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='change repository passphrase')
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
-                               type=location_validator(archive=False))
-
-        migrate_to_repokey_epilog = process_epilog("""
-        This command migrates a repository from passphrase mode (removed in Borg 1.0)
-        to repokey mode.
-
-        You will be first asked for the repository passphrase (to open it in passphrase
-        mode). This is the same passphrase as you used to use for this repo before 1.0.
-
-        It will then derive the different secrets from this passphrase.
-
-        Then you will be asked for a new passphrase (twice, for safety). This
-        passphrase will be used to protect the repokey (which contains these same
-        secrets in encrypted form). You may use the same passphrase as you used to
-        use, but you may also use a different one.
-
-        After migrating to repokey mode, you can change the passphrase at any time.
-        But please note: the secrets will always stay the same and they could always
-        be derived from your (old) passphrase-mode passphrase.
-        """)
-        subparser = key_parsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
-                                          description=self.do_migrate_to_repokey.__doc__,
-                                          epilog=migrate_to_repokey_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='migrate passphrase-mode repository to repokey')
-        subparser.set_defaults(func=self.do_migrate_to_repokey)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
 

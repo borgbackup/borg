@@ -7,7 +7,7 @@ from binascii import hexlify, unhexlify
 import pytest
 
 from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
-from ..crypto.key import PlaintextKey, PassphraseKey, AuthenticatedKey, RepoKey, KeyfileKey, \
+from ..crypto.key import PlaintextKey, AuthenticatedKey, RepoKey, KeyfileKey, \
     Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
 from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError
@@ -181,31 +181,6 @@ class TestKey:
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
         key = Blake2KeyfileKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
         assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata) == b'payload'
-
-    def test_passphrase(self, keys_dir, monkeypatch):
-        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
-        key = PassphraseKey.create(self.MockRepository(), None)
-        assert key.cipher.next_iv() == 0
-        assert hexlify(key.id_key) == b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6'
-        assert hexlify(key.enc_hmac_key) == b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
-        assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
-        assert key.chunk_seed == -775740477
-        manifest = key.encrypt(b'ABC')
-        assert key.cipher.extract_iv(manifest) == 0
-        manifest2 = key.encrypt(b'ABC')
-        assert manifest != manifest2
-        assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
-        assert key.cipher.extract_iv(manifest2) == 1
-        iv = key.cipher.extract_iv(manifest)
-        key2 = PassphraseKey.detect(self.MockRepository(), manifest)
-        assert key2.cipher.next_iv() == iv + key2.cipher.block_count(len(manifest))
-        assert key.id_key == key2.id_key
-        assert key.enc_hmac_key == key2.enc_hmac_key
-        assert key.enc_key == key2.enc_key
-        assert key.chunk_seed == key2.chunk_seed
-        chunk = b'foo'
-        assert hexlify(key.id_hash(chunk)) == b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
-        assert chunk == key2.decrypt(key2.id_hash(chunk), key.encrypt(chunk))
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)

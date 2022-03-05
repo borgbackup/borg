@@ -1289,8 +1289,8 @@ There are some caveats:
   This means that data added by Borg won't deduplicate with the existing data
   stored by Attic. The effect is lessened if the files cache is used with Borg.
 - Repositories in "passphrase" mode *must* be migrated to "repokey" mode using
-  :ref:`borg_key_migrate-to-repokey`. Borg does not support the "passphrase" mode
-  any other way.
+  "borg key migrate-to-repokey" (only available in borg <= 1.2.x). Borg does not
+  support the "passphrase" mode in any other way.
 
 Why is my backup bigger than with attic?
 ----------------------------------------

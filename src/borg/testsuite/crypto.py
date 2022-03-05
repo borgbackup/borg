@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify
+from binascii import hexlify
 
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
                                IntegrityError, is_libressl

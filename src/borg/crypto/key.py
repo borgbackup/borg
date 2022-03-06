@@ -527,7 +527,7 @@ class PassphraseKey:
     NAME = 'passphrase'
 
 
-class KeyfileKeyBase(AESKeyBase):
+class FlexiKeyBase(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         key = cls(repository)
@@ -640,7 +640,7 @@ class KeyfileKeyBase(AESKeyBase):
         raise NotImplementedError
 
 
-class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
+class KeyfileKey(ID_HMAC_SHA_256, FlexiKeyBase):
     TYPE = 0x00
     TYPES_ACCEPTABLE = {TYPE}
     NAME = 'key file'
@@ -731,7 +731,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         self.target = target
 
 
-class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
+class RepoKey(ID_HMAC_SHA_256, FlexiKeyBase):
     TYPE = 0x03
     TYPES_ACCEPTABLE = {TYPE, PassphraseKey.TYPE}
     NAME = 'repokey'

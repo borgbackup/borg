@@ -36,7 +36,7 @@ from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_cipher_blocks
-from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
+from ..crypto.key import FlexiKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
@@ -2850,7 +2850,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         def raise_eof(*args):
             raise EOFError
 
-        with patch.object(KeyfileKeyBase, 'create', raise_eof):
+        with patch.object(FlexiKeyBase, 'create', raise_eof):
             self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=1)
         assert not os.path.exists(self.repository_location)
 

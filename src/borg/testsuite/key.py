@@ -184,7 +184,9 @@ class TestKey:
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
-        data[offset] ^= 1
+        # note: we corrupt in a way so that even corruption of the unauthenticated encryption type byte
+        # will trigger an IntegrityError (does not happen while we stay within TYPES_ACCEPTABLE).
+        data[offset] ^= 64
         with pytest.raises(IntegrityErrorBase):
             key.decrypt(b'', data)
 

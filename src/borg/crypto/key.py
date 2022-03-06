@@ -145,6 +145,8 @@ def tam_required(repository):
 class KeyBase:
     # Numeric key type ID, must fit in one byte.
     TYPE = None  # override in subclasses
+    # set of key type IDs the class can handle as input
+    TYPES_ACCEPTABLE = None  # override in subclasses
 
     # Human-readable name
     NAME = 'UNDEFINED'
@@ -259,6 +261,7 @@ class KeyBase:
 
 class PlaintextKey(KeyBase):
     TYPE = 0x02
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'plaintext'
     ARG_NAME = 'none'
     STORAGE = KeyBlobStorage.NO_STORAGE
@@ -287,7 +290,7 @@ class PlaintextKey(KeyBase):
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
-        if data[0] != self.TYPE:
+        if data[0] not in self.TYPES_ACCEPTABLE:
             id_str = bin_to_hex(id) if id is not None else '(unknown)'
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         payload = memoryview(data)[1:]
@@ -367,8 +370,7 @@ class AESKeyBase(KeyBase):
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
     def decrypt(self, id, data, decompress=True):
-        if not (data[0] == self.TYPE or
-            data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+        if data[0] not in self.TYPES_ACCEPTABLE:
             id_str = bin_to_hex(id) if id is not None else '(unknown)'
             raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
         try:
@@ -396,8 +398,7 @@ class AESKeyBase(KeyBase):
         if manifest_data is None:
             nonce = 0
         else:
-            if not (manifest_data[0] == self.TYPE or
-                    manifest_data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
+            if manifest_data[0] not in self.TYPES_ACCEPTABLE:
                 raise IntegrityError('Manifest: Invalid encryption envelope')
             # manifest_blocks is a safe upper bound on the amount of cipher blocks needed
             # to encrypt the manifest. depending on the ciphersuite and overhead, it might
@@ -641,6 +642,7 @@ class KeyfileKeyBase(AESKeyBase):
 
 class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     TYPE = 0x00
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'key file'
     ARG_NAME = 'keyfile'
     STORAGE = KeyBlobStorage.KEYFILE
@@ -731,6 +733,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
 
 class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
     TYPE = 0x03
+    TYPES_ACCEPTABLE = {TYPE, PassphraseKey.TYPE}
     NAME = 'repokey'
     ARG_NAME = 'repokey'
     STORAGE = KeyBlobStorage.REPO
@@ -770,6 +773,7 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
 
 class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
     TYPE = 0x04
+    TYPES_ACCEPTABLE = {0x04}
     NAME = 'key file BLAKE2b'
     ARG_NAME = 'keyfile-blake2'
     STORAGE = KeyBlobStorage.KEYFILE
@@ -780,6 +784,7 @@ class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
 
 class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
     TYPE = 0x05
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'repokey BLAKE2b'
     ARG_NAME = 'repokey-blake2'
     STORAGE = KeyBlobStorage.REPO
@@ -824,12 +829,14 @@ class AuthenticatedKeyBase(RepoKey):
 
 class AuthenticatedKey(AuthenticatedKeyBase):
     TYPE = 0x07
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'authenticated'
     ARG_NAME = 'authenticated'
 
 
 class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
     TYPE = 0x06
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'authenticated BLAKE2b'
     ARG_NAME = 'authenticated-blake2'
 

@@ -19,7 +19,6 @@ try:
 except ImportError:
     cythonize = None
 
-sys.path += [os.path.dirname(__file__)]
 import setup_checksums
 import setup_compress
 import setup_crypto

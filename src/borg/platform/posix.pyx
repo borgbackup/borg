@@ -4,17 +4,28 @@ import errno
 import os
 
 
+from cpython.mem cimport PyMem_Free
+from libc.stddef cimport wchar_t
+
 cdef extern from "wchar.h":
-    cdef int wcswidth(const Py_UNICODE *str, size_t n)
+    # https://www.man7.org/linux/man-pages/man3/wcswidth.3.html
+    cdef int wcswidth(const wchar_t *s, size_t n)
+
+
+cdef extern from "Python.h":
+    # https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsWideCharString
+    wchar_t* PyUnicode_AsWideCharString(object, Py_ssize_t*) except NULL
 
 
 def swidth(s):
-    str_len = len(s)
-    terminal_width = wcswidth(s, str_len)
+    cdef Py_ssize_t size
+    cdef wchar_t *as_wchar = PyUnicode_AsWideCharString(s, &size)
+    terminal_width = wcswidth(as_wchar, <size_t>size)
+    PyMem_Free(as_wchar)
     if terminal_width >= 0:
         return terminal_width
     else:
-        return str_len
+        return len(s)
 
 
 def process_alive(host, pid, thread):

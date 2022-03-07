@@ -2490,6 +2490,38 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
         self.cmd('list', self.repository_location)
 
+    def test_change_location_to_keyfile(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'keyfile')
+        log = self.cmd('info', self.repository_location)
+        assert '(key file)' in log
+
+    def test_change_location_to_b2keyfile(self):
+        self.cmd('init', '--encryption=repokey-blake2', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey BLAKE2b)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'keyfile')
+        log = self.cmd('info', self.repository_location)
+        assert '(key file BLAKE2b)' in log
+
+    def test_change_location_to_repokey(self):
+        self.cmd('init', '--encryption=keyfile', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(key file)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'repokey')
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey)' in log
+
+    def test_change_location_to_b2repokey(self):
+        self.cmd('init', '--encryption=keyfile-blake2', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(key file BLAKE2b)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'repokey')
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey BLAKE2b)' in log
+
     def test_break_lock(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('break-lock', self.repository_location)

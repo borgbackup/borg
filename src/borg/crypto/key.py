@@ -634,6 +634,13 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
             target.save_key(key_data)
             self.target = target
 
+    def remove(self, target):
+        if self.STORAGE == KeyBlobStorage.KEYFILE:
+            os.remove(target)
+
+        if self.STORAGE == KeyBlobStorage.REPO:
+            target.save_key(b'')  # save empty key (no new api at remote repo necessary)
+
 
 class PassphraseKey:
     # this is only a stub, repos with this mode could not be created any more since borg 1.0, see #97.

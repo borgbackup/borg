@@ -109,9 +109,6 @@ cdef extern from "_crypto_helpers.h":
     long OPENSSL_VERSION_NUMBER
     long LIBRESSL_VERSION_NUMBER
 
-    ctypedef struct HMAC_CTX:
-        pass
-
     HMAC_CTX *HMAC_CTX_new()
     void HMAC_CTX_free(HMAC_CTX *a)
 

@@ -78,6 +78,13 @@ extras_require = {
     'nofuse': [],
 }
 
+# Extra cflags for all extensions, usually just warnings we want to explicitly enable
+cflags = [
+    '-Wall',
+    '-Wextra',
+    '-Wpointer-arith',
+]
+
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
 crypto_helpers = 'src/borg/crypto/_crypto_helpers.c'
@@ -174,34 +181,37 @@ if not on_rtd:
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source, crypto_helpers]),
         setup_crypto.crypto_ext_kwargs(pc, system_prefix_openssl),
+        dict(extra_compile_args=cflags),
     )
 
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
         setup_compress.lz4_ext_kwargs(pc, system_prefix_liblz4),
         setup_compress.zstd_ext_kwargs(pc, system_prefix_libzstd),
+        dict(extra_compile_args=cflags),
     )
 
     checksums_ext_kwargs = members_appended(
         dict(sources=[checksums_source]),
         setup_checksums.xxhash_ext_kwargs(pc, system_prefix_libxxhash),
+        dict(extra_compile_args=cflags),
     )
 
     ext_modules += [
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),
         Extension('borg.compress', **compress_ext_kwargs),
-        Extension('borg.hashindex', [hashindex_source]),
-        Extension('borg.item', [item_source]),
-        Extension('borg.chunker', [chunker_source]),
+        Extension('borg.hashindex', [hashindex_source], extra_compile_args=cflags),
+        Extension('borg.item', [item_source], extra_compile_args=cflags),
+        Extension('borg.chunker', [chunker_source], extra_compile_args=cflags),
         Extension('borg.algorithms.checksums', **checksums_ext_kwargs),
     ]
 
-    posix_ext = Extension('borg.platform.posix', [platform_posix_source])
-    linux_ext = Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'])
-    syncfilerange_ext = Extension('borg.platform.syncfilerange', [platform_syncfilerange_source])
-    freebsd_ext = Extension('borg.platform.freebsd', [platform_freebsd_source])
-    darwin_ext = Extension('borg.platform.darwin', [platform_darwin_source])
-    windows_ext = Extension('borg.platform.windows', [platform_windows_source])
+    posix_ext = Extension('borg.platform.posix', [platform_posix_source], extra_compile_args=cflags)
+    linux_ext = Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'], extra_compile_args=cflags)
+    syncfilerange_ext = Extension('borg.platform.syncfilerange', [platform_syncfilerange_source], extra_compile_args=cflags)
+    freebsd_ext = Extension('borg.platform.freebsd', [platform_freebsd_source], extra_compile_args=cflags)
+    darwin_ext = Extension('borg.platform.darwin', [platform_darwin_source], extra_compile_args=cflags)
+    windows_ext = Extension('borg.platform.windows', [platform_windows_source], extra_compile_args=cflags)
 
     if not is_win32:
         ext_modules.append(posix_ext)

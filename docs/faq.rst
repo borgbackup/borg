@@ -890,12 +890,12 @@ and disk space on subsequent runs. Here what Borg does when you run ``borg creat
 - Then it checks whether this chunk is already in the repo (local hashtable lookup, 
   fast). If so, the processing of the chunk is completed here. Otherwise it needs to 
   process the chunk:
-- Compresses the chunks (the default lz4 is super fast)
+- Compresses (the default lz4 is super fast)
 - Encrypts (AES, usually fast if your CPU has AES acceleration as usual
   since about 10y)
 - Authenticates ("signs") using hmac-sha256 or blake2b (see above),
-- Transmits to repo (remote repo), usually involving an SSH connection 
-  (does its own encryption)
+- Transmits to repo. If the repo is remote, this usually involves an SSH connection
+  (does its own encryption / authentication).
 - Stores the chunk into a key/value store (the key is the chunk id, the value 
   is the data). While doing that, it computes a CRC32 of the data (repo low-level
   checksum, used by borg check --repository) and also updates the repo index 

@@ -58,7 +58,7 @@ completely in every aspect from such a backup.
     mappings, assuming they only come from files (/etc/passwd and group).
     This assumption might be wrong, e.g. if users/groups also come from
     ldap or other providers.
-    Thus, it might be better to use ``--numeric-owner`` and not archive any
+    Thus, it might be better to use ``--numeric-ids`` and not archive any
     user or group names (but just the numeric IDs) and not use chroot.
 
 Creating a backup
@@ -181,13 +181,13 @@ When doing a full restore, we restore all files (including the ones containing
 the ID-to-name mapping, ``/etc/passwd`` and ``/etc/group``). Everything will be
 consistent automatically if we restore the numeric IDs stored in the archive. So
 there is no need for a chroot environment; we just mount the client file system
-and extract a backup, utilizing the ``--numeric-owner`` option:
+and extract a backup, utilizing the ``--numeric-ids`` option:
 
 ::
 
     sshfs root@host:/ /mnt/sshfs
     cd /mnt/sshfs
-    borg extract --numeric-owner /path/to/repo::archive
+    borg extract --numeric-ids /path/to/repo::archive
     cd ~
     umount /mnt/sshfs
 

@@ -21,12 +21,12 @@ logger = create_logger()
 py_37_plus = sys.version_info >= (3, 7)
 
 
-def ensure_dir(path, mode=stat.S_IRWXU, pretty_deadly=True):
+def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_deadly=True):
     """
     Ensures that the dir exists with the right permissions.
     1) Make sure the directory exists in a race-free operation
     2) If mode is not None and the directory has been created, give the right
-    permissions to the leaf directory
+    permissions to the leaf directory. The current umask value is masked out first.
     3) If pretty_deadly is True, catch exceptions, reraise them with a pretty
     message.
     Returns if the directory has been created and has the right permissions,

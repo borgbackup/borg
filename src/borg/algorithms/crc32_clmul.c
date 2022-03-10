@@ -363,8 +363,8 @@ crc32_clmul(const uint8_t *src, long len, uint32_t initial_crc)
              */
             uint32_t crc = ~initial_crc;
             switch (len) {
-                case 3: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++];
-                case 2: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++];
+                case 3: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++]; // fallthrough
+                case 2: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++]; // fallthrough
                 case 1: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++];
             }
             return ~crc;

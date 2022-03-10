@@ -57,6 +57,13 @@ extras_require = {
 from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.sdist import sdist
 
+# Extra cflags for all extensions, usually just warnings we want to explicitly enable
+cflags = [
+    '-Wall',
+    '-Wextra',
+    '-Wpointer-arith',
+]
+
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
 chunker_source = 'src/borg/chunker.pyx'
@@ -801,7 +808,7 @@ cmdclass = {
 ext_modules = []
 if not on_rtd:
     compress_ext_kwargs = dict(sources=[compress_source], include_dirs=include_dirs, library_dirs=library_dirs,
-                               define_macros=define_macros)
+                               define_macros=define_macros, extra_compile_args=cflags)
     compress_ext_kwargs = setup_lz4.lz4_ext_kwargs(bundled_path='src/borg/algorithms/lz4',
                                                    system_prefix=liblz4_prefix, system=liblz4_system,
                                                    **compress_ext_kwargs)
@@ -809,12 +816,13 @@ if not on_rtd:
                                                      system_prefix=libzstd_prefix, system=libzstd_system,
                                                      multithreaded=False, legacy=False, **compress_ext_kwargs)
     crypto_ext_kwargs = dict(sources=[crypto_ll_source], libraries=['crypto'],
-                             include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros)
+                             include_dirs=include_dirs, library_dirs=library_dirs, define_macros=define_macros,
+                             extra_compile_args=cflags)
     crypto_ext_kwargs = setup_b2.b2_ext_kwargs(bundled_path='src/borg/algorithms/blake2',
                                                system_prefix=libb2_prefix, system=libb2_system,
                                                **crypto_ext_kwargs)
     checksums_ext_kwargs = dict(sources=[checksums_source], include_dirs=include_dirs, library_dirs=library_dirs,
-                                define_macros=define_macros)
+                                define_macros=define_macros, extra_compile_args=cflags)
     checksums_ext_kwargs = setup_xxhash.xxhash_ext_kwargs(bundled_path='src/borg/algorithms/xxh64',
                                                system_prefix=libxxhash_prefix, system=libxxhash_system,
                                                **checksums_ext_kwargs)
@@ -830,6 +838,7 @@ if not on_rtd:
         library_dirs=library_dirs,
         define_macros=msgpack_macros,
         language='c++',
+        extra_compile_args=cflags,
     )
     msgpack_unpacker_ext_kwargs = dict(
         sources=[msgpack_unpacker_source],
@@ -837,6 +846,7 @@ if not on_rtd:
         library_dirs=library_dirs,
         define_macros=msgpack_macros,
         language='c++',
+        extra_compile_args=cflags,
     )
 
     ext_modules += [
@@ -844,20 +854,20 @@ if not on_rtd:
         Extension('borg.algorithms.msgpack._unpacker', **msgpack_unpacker_ext_kwargs),
         Extension('borg.compress', **compress_ext_kwargs),
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),
-        Extension('borg.hashindex', [hashindex_source]),
-        Extension('borg.item', [item_source]),
-        Extension('borg.chunker', [chunker_source]),
+        Extension('borg.hashindex', [hashindex_source], extra_compile_args=cflags),
+        Extension('borg.item', [item_source], extra_compile_args=cflags),
+        Extension('borg.chunker', [chunker_source], extra_compile_args=cflags),
         Extension('borg.algorithms.checksums', **checksums_ext_kwargs),
     ]
     if not sys.platform.startswith(('win32', )):
-        ext_modules.append(Extension('borg.platform.posix', [platform_posix_source]))
+        ext_modules.append(Extension('borg.platform.posix', [platform_posix_source], extra_compile_args=cflags))
     if sys.platform == 'linux':
-        ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl']))
-        ext_modules.append(Extension('borg.platform.syncfilerange', [platform_syncfilerange_source]))
+        ext_modules.append(Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'], extra_compile_args=cflags))
+        ext_modules.append(Extension('borg.platform.syncfilerange', [platform_syncfilerange_source], extra_compile_args=cflags))
     elif sys.platform.startswith('freebsd'):
-        ext_modules.append(Extension('borg.platform.freebsd', [platform_freebsd_source]))
+        ext_modules.append(Extension('borg.platform.freebsd', [platform_freebsd_source], extra_compile_args=cflags))
     elif sys.platform == 'darwin':
-        ext_modules.append(Extension('borg.platform.darwin', [platform_darwin_source]))
+        ext_modules.append(Extension('borg.platform.darwin', [platform_darwin_source], extra_compile_args=cflags))
 
 setup(
     name='borgbackup',

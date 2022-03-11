@@ -521,14 +521,15 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
             if keyfile is not None:
                 return keyfile
             raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
-
-        if self.STORAGE == KeyBlobStorage.REPO:
+        elif self.STORAGE == KeyBlobStorage.REPO:
             loc = self.repository._location.canonical_path()
             try:
                 self.repository.load_key()
                 return loc
             except configparser.NoOptionError:
                 raise RepoKeyNotFoundError(loc) from None
+        else:
+            raise TypeError('Unsupported borg key storage type')
 
     def get_existing_or_new_target(self, args):
         keyfile = self._find_key_file_from_environment()
@@ -555,9 +556,10 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
             if keyfile is not None:
                 return keyfile
             return self._get_new_target_in_keys_dir(args)
-
-        if self.STORAGE == KeyBlobStorage.REPO:
+        elif self.STORAGE == KeyBlobStorage.REPO:
             return self.repository
+        else:
+            raise TypeError('Unsupported borg key storage type')
 
     def _find_key_file_from_environment(self):
         keyfile = os.environ.get('BORG_KEY_FILE')
@@ -577,12 +579,7 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             with open(target) as fd:
                 key_data = ''.join(fd.readlines()[1:])
-            success = self._load(key_data, passphrase)
-            if success:
-                self.target = target
-            return success
-
-        if self.STORAGE == KeyBlobStorage.REPO:
+        elif self.STORAGE == KeyBlobStorage.REPO:
             # While the repository is encrypted, we consider a repokey repository with a blank
             # passphrase an unencrypted repository.
             self.logically_encrypted = passphrase != ''
@@ -591,38 +588,40 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
             target = self.repository
             key_data = target.load_key()
             key_data = key_data.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
-            success = self._load(key_data, passphrase)
-            if success:
-                self.target = target
-            return success
+        else:
+            raise TypeError('Unsupported borg key storage type')
+        success = self._load(key_data, passphrase)
+        if success:
+            self.target = target
+        return success
 
     def save(self, target, passphrase, create=False):
+        key_data = self._save(passphrase)
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             if create and os.path.isfile(target):
                 # if a new keyfile key repository is created, ensure that an existing keyfile of another
                 # keyfile key repo is not accidentally overwritten by careless use of the BORG_KEY_FILE env var.
                 # see issue #6036
                 raise Error('Aborting because key in "%s" already exists.' % target)
-            key_data = self._save(passphrase)
             with SaveFile(target) as fd:
                 fd.write(f'{self.FILE_ID} {bin_to_hex(self.repository_id)}\n')
                 fd.write(key_data)
                 fd.write('\n')
-            self.target = target
-
-        if self.STORAGE == KeyBlobStorage.REPO:
+        elif self.STORAGE == KeyBlobStorage.REPO:
             self.logically_encrypted = passphrase != ''
-            key_data = self._save(passphrase)
             key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
             target.save_key(key_data)
-            self.target = target
+        else:
+            raise TypeError('Unsupported borg key storage type')
+        self.target = target
 
     def remove(self, target):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             os.remove(target)
-
-        if self.STORAGE == KeyBlobStorage.REPO:
+        elif self.STORAGE == KeyBlobStorage.REPO:
             target.save_key(b'')  # save empty key (no new api at remote repo necessary)
+        else:
+            raise TypeError('Unsupported borg key storage type')
 
 
 class KeyfileKey(FlexiKey):

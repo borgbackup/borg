@@ -104,6 +104,27 @@ DASHES = '-' * 78
 PBKDF2_ITERATIONS = 100000
 
 
+class KeyBlobStorage:
+    NO_STORAGE = 'no_storage'
+    KEYFILE = 'keyfile'
+    REPO = 'repository'
+
+
+class KeyType:
+    KEYFILE = 0x00
+    # repos with PASSPHRASE mode could not be created any more since borg 1.0, see #97.
+    # in borg 1.3 all of its code and also the "borg key migrate-to-repokey" command was removed.
+    # if you still need to, you can use "borg key migrate-to-repokey" with borg 1.0, 1.1 and 1.2.
+    # Nowadays, we just dispatch this to RepoKey and assume the passphrase was migrated to a repokey.
+    PASSPHRASE = 0x01  # legacy, attic and borg < 1.0
+    PLAINTEXT = 0x02
+    REPO = 0x03
+    BLAKE2KEYFILE = 0x04
+    BLAKE2REPO = 0x05
+    BLAKE2AUTHENTICATED = 0x06
+    AUTHENTICATED = 0x07
+
+
 REPOSITORY_README = """This is a Borg Backup repository.
 See https://borgbackup.readthedocs.io/
 """

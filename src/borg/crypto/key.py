@@ -76,23 +76,6 @@ class TAMUnsupportedSuiteError(IntegrityError):
     traceback = False
 
 
-class KeyBlobStorage:
-    NO_STORAGE = 'no_storage'
-    KEYFILE = 'keyfile'
-    REPO = 'repository'
-
-
-class KeyType:
-    KEYFILE = 0x00
-    PASSPHRASE = 0x01  # legacy, attic and borg < 1.0
-    PLAINTEXT = 0x02
-    REPO = 0x03
-    BLAKE2KEYFILE = 0x04
-    BLAKE2REPO = 0x05
-    BLAKE2AUTHENTICATED = 0x06
-    AUTHENTICATED = 0x07
-
-
 def key_creator(repository, args):
     for key in AVAILABLE_KEY_TYPES:
         if key.ARG_NAME == args.encryption:
@@ -108,8 +91,8 @@ def key_argument_names():
 
 def identify_key(manifest_data):
     key_type = manifest_data[0]
-    if key_type == PassphraseKey.TYPE:
-        return RepoKey  # see comment in PassphraseKey class.
+    if key_type == KeyType.PASSPHRASE:  # legacy, see comment in KeyType class.
+        return RepoKey
 
     for key in AVAILABLE_KEY_TYPES:
         if key.TYPE == key_type:
@@ -640,15 +623,6 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
 
         if self.STORAGE == KeyBlobStorage.REPO:
             target.save_key(b'')  # save empty key (no new api at remote repo necessary)
-
-
-class PassphraseKey:
-    # this is only a stub, repos with this mode could not be created any more since borg 1.0, see #97.
-    # in borg 1.3 all of its code and also the "borg key migrate-to-repokey" command was removed.
-    # if you still need to, you can use "borg key migrate-to-repokey" with borg 1.0, 1.1 and 1.2.
-    # Nowadays, we just dispatch this to RepoKey and assume the passphrase was migrated to a repokey.
-    TYPE = KeyType.PASSPHRASE
-    NAME = 'passphrase'
 
 
 class KeyfileKey(FlexiKey):

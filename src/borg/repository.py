@@ -334,11 +334,13 @@ class Repository:
     def save_key(self, keydata):
         assert self.config
         keydata = keydata.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
+        # note: saving an empty key means that there is no repokey any more
         self.config.set('repository', 'key', keydata)
         self.save_config(self.path, self.config)
 
     def load_key(self):
         keydata = self.config.get('repository', 'key')
+        # note: if we return an empty string, it means there is no repo key
         return keydata.encode('utf-8')  # remote repo: msgpack issue #99, returning bytes
 
     def get_free_nonce(self):

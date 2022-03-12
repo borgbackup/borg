@@ -1,4 +1,5 @@
 import errno
+import getpass
 import hashlib
 import os
 import shutil
@@ -32,6 +33,7 @@ from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
 from ..helpers import safe_unlink
+from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 
 from . import BaseTestCase, FakeInputs
 
@@ -1164,3 +1166,44 @@ def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
         safe_unlink(hard_link)
 
     assert victim.read_binary() == contents
+
+
+class TestPassphrase:
+    def test_passphrase_new_verification(self, capsys, monkeypatch):
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "12aöäü")
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "12" not in out
+        assert "12" not in err
+
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'yes')
+        passphrase = Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "313261c3b6c3a4c3bc" not in out
+        assert "313261c3b6c3a4c3bc" in err
+        assert passphrase == "12aöäü"
+
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "1234/@=")
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "1234/@=" not in out
+        assert "1234/@=" in err
+
+    def test_passphrase_new_empty(self, capsys, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "")
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new(allow_empty=False)
+        out, err = capsys.readouterr()
+        assert "must not be blank" in err
+
+    def test_passphrase_new_retries(self, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        ascending_numbers = iter(range(20))
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: str(next(ascending_numbers)))
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new()
+
+    def test_passphrase_repr(self):
+        assert "secret" not in repr(Passphrase("secret"))

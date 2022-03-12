@@ -1,13 +1,9 @@
 import configparser
-import getpass
 import hmac
 import os
-import shlex
-import sys
 import textwrap
-import subprocess
 from binascii import a2b_base64, b2a_base64, hexlify
-from hashlib import sha256, sha512, pbkdf2_hmac
+from hashlib import sha256
 
 from ..logger import create_logger
 
@@ -17,11 +13,10 @@ from ..constants import *  # NOQA
 from ..compress import Compressor
 from ..helpers import StableDict
 from ..helpers import Error, IntegrityError
-from ..helpers import yes
 from ..helpers import get_keys_dir, get_security_dir
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
-from ..helpers import prepare_subprocess_env
+from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
 from ..helpers import msgpack
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
@@ -29,22 +24,6 @@ from ..platform import SaveFile
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
-
-
-class NoPassphraseFailure(Error):
-    """can not acquire a passphrase: {}"""
-
-
-class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
-
-
-class PasscommandFailure(Error):
-    """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
-
-
-class PasswordRetriesExceeded(Error):
-    """exceeded the maximum password retries"""
 
 
 class UnsupportedPayloadError(Error):
@@ -97,12 +76,6 @@ class TAMUnsupportedSuiteError(IntegrityError):
     traceback = False
 
 
-class KeyBlobStorage:
-    NO_STORAGE = 'no_storage'
-    KEYFILE = 'keyfile'
-    REPO = 'repository'
-
-
 def key_creator(repository, args):
     for key in AVAILABLE_KEY_TYPES:
         if key.ARG_NAME == args.encryption:
@@ -118,8 +91,8 @@ def key_argument_names():
 
 def identify_key(manifest_data):
     key_type = manifest_data[0]
-    if key_type == PassphraseKey.TYPE:
-        return RepoKey  # see comment in PassphraseKey class.
+    if key_type == KeyType.PASSPHRASE:  # legacy, see comment in KeyType class.
+        return RepoKey
 
     for key in AVAILABLE_KEY_TYPES:
         if key.TYPE == key_type:
@@ -145,6 +118,8 @@ def tam_required(repository):
 class KeyBase:
     # Numeric key type ID, must fit in one byte.
     TYPE = None  # override in subclasses
+    # set of key type IDs the class can handle as input
+    TYPES_ACCEPTABLE = None  # override in subclasses
 
     # Human-readable name
     NAME = 'UNDEFINED'
@@ -193,6 +168,11 @@ class KeyBase:
             id_computed = self.id_hash(data)
             if not hmac.compare_digest(id_computed, id):
                 raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))
+
+    def assert_type(self, type_byte, id=None):
+        if type_byte not in self.TYPES_ACCEPTABLE:
+            id_str = bin_to_hex(id) if id is not None else '(unknown)'
+            raise IntegrityError(f'Chunk {id_str}: Invalid encryption envelope')
 
     def _tam_key(self, salt, context):
         return hkdf_hmac_sha512(
@@ -258,7 +238,8 @@ class KeyBase:
 
 
 class PlaintextKey(KeyBase):
-    TYPE = 0x02
+    TYPE = KeyType.PLAINTEXT
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'plaintext'
     ARG_NAME = 'none'
     STORAGE = KeyBlobStorage.NO_STORAGE
@@ -287,9 +268,7 @@ class PlaintextKey(KeyBase):
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
-        if data[0] != self.TYPE:
-            id_str = bin_to_hex(id) if id is not None else '(unknown)'
-            raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
+        self.assert_type(data[0], id)
         payload = memoryview(data)[1:]
         if not decompress:
             return payload
@@ -367,10 +346,7 @@ class AESKeyBase(KeyBase):
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
     def decrypt(self, id, data, decompress=True):
-        if not (data[0] == self.TYPE or
-            data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-            id_str = bin_to_hex(id) if id is not None else '(unknown)'
-            raise IntegrityError('Chunk %s: Invalid encryption envelope' % id_str)
+        self.assert_type(data[0], id)
         try:
             payload = self.cipher.decrypt(data)
         except IntegrityError as e:
@@ -396,9 +372,7 @@ class AESKeyBase(KeyBase):
         if manifest_data is None:
             nonce = 0
         else:
-            if not (manifest_data[0] == self.TYPE or
-                    manifest_data[0] == PassphraseKey.TYPE and isinstance(self, RepoKey)):
-                raise IntegrityError('Manifest: Invalid encryption envelope')
+            self.assert_type(manifest_data[0])
             # manifest_blocks is a safe upper bound on the amount of cipher blocks needed
             # to encrypt the manifest. depending on the ciphersuite and overhead, it might
             # be a bit too high, but that does not matter.
@@ -408,125 +382,7 @@ class AESKeyBase(KeyBase):
         self.nonce_manager = NonceManager(self.repository, nonce)
 
 
-class Passphrase(str):
-    @classmethod
-    def _env_passphrase(cls, env_var, default=None):
-        passphrase = os.environ.get(env_var, default)
-        if passphrase is not None:
-            return cls(passphrase)
-
-    @classmethod
-    def env_passphrase(cls, default=None):
-        passphrase = cls._env_passphrase('BORG_PASSPHRASE', default)
-        if passphrase is not None:
-            return passphrase
-        passphrase = cls.env_passcommand()
-        if passphrase is not None:
-            return passphrase
-        passphrase = cls.fd_passphrase()
-        if passphrase is not None:
-            return passphrase
-
-    @classmethod
-    def env_passcommand(cls, default=None):
-        passcommand = os.environ.get('BORG_PASSCOMMAND', None)
-        if passcommand is not None:
-            # passcommand is a system command (not inside pyinstaller env)
-            env = prepare_subprocess_env(system=True)
-            try:
-                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True, env=env)
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                raise PasscommandFailure(e)
-            return cls(passphrase.rstrip('\n'))
-
-    @classmethod
-    def fd_passphrase(cls):
-        try:
-            fd = int(os.environ.get('BORG_PASSPHRASE_FD'))
-        except (ValueError, TypeError):
-            return None
-        with os.fdopen(fd, mode='r') as f:
-            passphrase = f.read()
-        return cls(passphrase.rstrip('\n'))
-
-    @classmethod
-    def env_new_passphrase(cls, default=None):
-        return cls._env_passphrase('BORG_NEW_PASSPHRASE', default)
-
-    @classmethod
-    def getpass(cls, prompt):
-        try:
-            pw = getpass.getpass(prompt)
-        except EOFError:
-            if prompt:
-                print()  # avoid err msg appearing right of prompt
-            msg = []
-            for env_var in 'BORG_PASSPHRASE', 'BORG_PASSCOMMAND':
-                env_var_set = os.environ.get(env_var) is not None
-                msg.append('{} is {}.'.format(env_var, 'set' if env_var_set else 'not set'))
-            msg.append('Interactive password query failed.')
-            raise NoPassphraseFailure(' '.join(msg)) from None
-        else:
-            return cls(pw)
-
-    @classmethod
-    def verification(cls, passphrase):
-        msg = 'Do you want your passphrase to be displayed for verification? [yN]: '
-        if yes(msg, retry_msg=msg, invalid_msg='Invalid answer, try again.',
-               retry=True, env_var_override='BORG_DISPLAY_PASSPHRASE'):
-            print('Your passphrase (between double-quotes): "%s"' % passphrase,
-                  file=sys.stderr)
-            print('Make sure the passphrase displayed above is exactly what you wanted.',
-                  file=sys.stderr)
-            try:
-                passphrase.encode('ascii')
-            except UnicodeEncodeError:
-                print('Your passphrase (UTF-8 encoding in hex): %s' %
-                      bin_to_hex(passphrase.encode('utf-8')),
-                      file=sys.stderr)
-                print('As you have a non-ASCII passphrase, it is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.',
-                      file=sys.stderr)
-
-    @classmethod
-    def new(cls, allow_empty=False):
-        passphrase = cls.env_new_passphrase()
-        if passphrase is not None:
-            return passphrase
-        passphrase = cls.env_passphrase()
-        if passphrase is not None:
-            return passphrase
-        for retry in range(1, 11):
-            passphrase = cls.getpass('Enter new passphrase: ')
-            if allow_empty or passphrase:
-                passphrase2 = cls.getpass('Enter same passphrase again: ')
-                if passphrase == passphrase2:
-                    cls.verification(passphrase)
-                    logger.info('Remember your passphrase. Your data will be inaccessible without it.')
-                    return passphrase
-                else:
-                    print('Passphrases do not match', file=sys.stderr)
-            else:
-                print('Passphrase must not be blank', file=sys.stderr)
-        else:
-            raise PasswordRetriesExceeded
-
-    def __repr__(self):
-        return '<Passphrase "***hidden***">'
-
-    def kdf(self, salt, iterations, length):
-        return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
-
-
-class PassphraseKey:
-    # this is only a stub, repos with this mode could not be created any more since borg 1.0, see #97.
-    # in borg 1.3 all of its code and also the "borg key migrate-to-repokey" command was removed.
-    # if you still need to, you can use "borg key migrate-to-repokey" with borg 1.0, 1.1 and 1.2.
-    # Nowadays, we just dispatch this to RepoKey and assume the passphrase was migrated to a repokey.
-    TYPE = 0x01
-    NAME = 'passphrase'
-
-
-class KeyfileKeyBase(AESKeyBase):
+class FlexiKeyBase(AESKeyBase):
     @classmethod
     def detect(cls, repository, manifest_data):
         key = cls(repository)
@@ -639,11 +495,8 @@ class KeyfileKeyBase(AESKeyBase):
         raise NotImplementedError
 
 
-class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
-    TYPE = 0x00
-    NAME = 'key file'
-    ARG_NAME = 'keyfile'
-    STORAGE = KeyBlobStorage.KEYFILE
+class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
+    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
 
     FILE_ID = 'BORG_KEY'
 
@@ -660,13 +513,23 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             return filename
 
     def find_key(self):
-        keyfile = self._find_key_file_from_environment()
-        if keyfile is not None:
-            return self.sanity_check(keyfile, self.repository.id)
-        keyfile = self._find_key_in_keys_dir()
-        if keyfile is not None:
-            return keyfile
-        raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
+        if self.STORAGE == KeyBlobStorage.KEYFILE:
+            keyfile = self._find_key_file_from_environment()
+            if keyfile is not None:
+                return self.sanity_check(keyfile, self.repository.id)
+            keyfile = self._find_key_in_keys_dir()
+            if keyfile is not None:
+                return keyfile
+            raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
+        elif self.STORAGE == KeyBlobStorage.REPO:
+            loc = self.repository._location.canonical_path()
+            try:
+                self.repository.load_key()
+                return loc
+            except configparser.NoOptionError:
+                raise RepoKeyNotFoundError(loc) from None
+        else:
+            raise TypeError('Unsupported borg key storage type')
 
     def get_existing_or_new_target(self, args):
         keyfile = self._find_key_file_from_environment()
@@ -688,10 +551,15 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
                 pass
 
     def get_new_target(self, args):
-        keyfile = self._find_key_file_from_environment()
-        if keyfile is not None:
-            return keyfile
-        return self._get_new_target_in_keys_dir(args)
+        if self.STORAGE == KeyBlobStorage.KEYFILE:
+            keyfile = self._find_key_file_from_environment()
+            if keyfile is not None:
+                return keyfile
+            return self._get_new_target_in_keys_dir(args)
+        elif self.STORAGE == KeyBlobStorage.REPO:
+            return self.repository
+        else:
+            raise TypeError('Unsupported borg key storage type')
 
     def _find_key_file_from_environment(self):
         keyfile = os.environ.get('BORG_KEY_FILE')
@@ -708,86 +576,88 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         return path
 
     def load(self, target, passphrase):
-        with open(target) as fd:
-            key_data = ''.join(fd.readlines()[1:])
+        if self.STORAGE == KeyBlobStorage.KEYFILE:
+            with open(target) as fd:
+                key_data = ''.join(fd.readlines()[1:])
+        elif self.STORAGE == KeyBlobStorage.REPO:
+            # While the repository is encrypted, we consider a repokey repository with a blank
+            # passphrase an unencrypted repository.
+            self.logically_encrypted = passphrase != ''
+
+            # what we get in target is just a repo location, but we already have the repo obj:
+            target = self.repository
+            key_data = target.load_key()
+            key_data = key_data.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
+        else:
+            raise TypeError('Unsupported borg key storage type')
         success = self._load(key_data, passphrase)
         if success:
             self.target = target
         return success
 
     def save(self, target, passphrase, create=False):
-        if create and os.path.isfile(target):
-            # if a new keyfile key repository is created, ensure that an existing keyfile of another
-            # keyfile key repo is not accidentally overwritten by careless use of the BORG_KEY_FILE env var.
-            # see issue #6036
-            raise Error('Aborting because key in "%s" already exists.' % target)
         key_data = self._save(passphrase)
-        with SaveFile(target) as fd:
-            fd.write(f'{self.FILE_ID} {bin_to_hex(self.repository_id)}\n')
-            fd.write(key_data)
-            fd.write('\n')
+        if self.STORAGE == KeyBlobStorage.KEYFILE:
+            if create and os.path.isfile(target):
+                # if a new keyfile key repository is created, ensure that an existing keyfile of another
+                # keyfile key repo is not accidentally overwritten by careless use of the BORG_KEY_FILE env var.
+                # see issue #6036
+                raise Error('Aborting because key in "%s" already exists.' % target)
+            with SaveFile(target) as fd:
+                fd.write(f'{self.FILE_ID} {bin_to_hex(self.repository_id)}\n')
+                fd.write(key_data)
+                fd.write('\n')
+        elif self.STORAGE == KeyBlobStorage.REPO:
+            self.logically_encrypted = passphrase != ''
+            key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
+            target.save_key(key_data)
+        else:
+            raise TypeError('Unsupported borg key storage type')
         self.target = target
 
+    def remove(self, target):
+        if self.STORAGE == KeyBlobStorage.KEYFILE:
+            os.remove(target)
+        elif self.STORAGE == KeyBlobStorage.REPO:
+            target.save_key(b'')  # save empty key (no new api at remote repo necessary)
+        else:
+            raise TypeError('Unsupported borg key storage type')
 
-class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
-    TYPE = 0x03
+
+class KeyfileKey(FlexiKey):
+    TYPE = KeyType.KEYFILE
+    NAME = 'key file'
+    ARG_NAME = 'keyfile'
+    STORAGE = KeyBlobStorage.KEYFILE
+
+
+class RepoKey(FlexiKey):
+    TYPE = KeyType.REPO
     NAME = 'repokey'
     ARG_NAME = 'repokey'
     STORAGE = KeyBlobStorage.REPO
 
-    def find_key(self):
-        loc = self.repository._location.canonical_path()
-        try:
-            self.repository.load_key()
-            return loc
-        except configparser.NoOptionError:
-            raise RepoKeyNotFoundError(loc) from None
 
-    def get_new_target(self, args):
-        return self.repository
-
-    def load(self, target, passphrase):
-        # While the repository is encrypted, we consider a repokey repository with a blank
-        # passphrase an unencrypted repository.
-        self.logically_encrypted = passphrase != ''
-
-        # what we get in target is just a repo location, but we already have the repo obj:
-        target = self.repository
-        key_data = target.load_key()
-        key_data = key_data.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
-        success = self._load(key_data, passphrase)
-        if success:
-            self.target = target
-        return success
-
-    def save(self, target, passphrase, create=False):
-        self.logically_encrypted = passphrase != ''
-        key_data = self._save(passphrase)
-        key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
-        target.save_key(key_data)
-        self.target = target
+class Blake2FlexiKey(ID_BLAKE2b_256, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-class Blake2KeyfileKey(ID_BLAKE2b_256, KeyfileKey):
-    TYPE = 0x04
+class Blake2KeyfileKey(Blake2FlexiKey):
+    TYPE = KeyType.BLAKE2KEYFILE
     NAME = 'key file BLAKE2b'
     ARG_NAME = 'keyfile-blake2'
     STORAGE = KeyBlobStorage.KEYFILE
 
-    FILE_ID = 'BORG_KEY'
-    CIPHERSUITE = AES256_CTR_BLAKE2b
 
-
-class Blake2RepoKey(ID_BLAKE2b_256, RepoKey):
-    TYPE = 0x05
+class Blake2RepoKey(Blake2FlexiKey):
+    TYPE = KeyType.BLAKE2REPO
     NAME = 'repokey BLAKE2b'
     ARG_NAME = 'repokey-blake2'
     STORAGE = KeyBlobStorage.REPO
 
-    CIPHERSUITE = AES256_CTR_BLAKE2b
 
-
-class AuthenticatedKeyBase(RepoKey):
+class AuthenticatedKeyBase(FlexiKey):
     STORAGE = KeyBlobStorage.REPO
 
     # It's only authenticated, not encrypted.
@@ -803,17 +673,15 @@ class AuthenticatedKeyBase(RepoKey):
         self.logically_encrypted = False
 
     def init_ciphers(self, manifest_data=None):
-        if manifest_data is not None and manifest_data[0] != self.TYPE:
-            raise IntegrityError('Manifest: Invalid encryption envelope')
+        if manifest_data is not None:
+            self.assert_type(manifest_data[0])
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
-        if data[0] != self.TYPE:
-            id_str = bin_to_hex(id) if id is not None else '(unknown)'
-            raise IntegrityError('Chunk %s: Invalid envelope' % id_str)
+        self.assert_type(data[0], id)
         payload = memoryview(data)[1:]
         if not decompress:
             return payload
@@ -823,13 +691,15 @@ class AuthenticatedKeyBase(RepoKey):
 
 
 class AuthenticatedKey(AuthenticatedKeyBase):
-    TYPE = 0x07
+    TYPE = KeyType.AUTHENTICATED
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'authenticated'
     ARG_NAME = 'authenticated'
 
 
 class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
-    TYPE = 0x06
+    TYPE = KeyType.BLAKE2AUTHENTICATED
+    TYPES_ACCEPTABLE = {TYPE}
     NAME = 'authenticated BLAKE2b'
     ARG_NAME = 'authenticated-blake2'
 

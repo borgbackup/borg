@@ -44,7 +44,8 @@ try:
     from .cache import Cache, assert_secure, SecurityManager
     from .constants import *  # NOQA
     from .compress import CompressionSpec
-    from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey
+    from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
+    from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
@@ -361,6 +362,62 @@ class Archiver:
         if hasattr(key, 'find_key'):
             # print key location to make backing it up easier
             logger.info('Key location: %s', key.find_key())
+        return EXIT_SUCCESS
+
+    @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
+    def do_change_location(self, args, repository, manifest, key, cache):
+        """Change repository key location"""
+        if not hasattr(key, 'change_passphrase'):
+            print('This repository is not encrypted, cannot change the key location.')
+            return EXIT_ERROR
+
+        if args.key_mode == 'keyfile':
+            if isinstance(key, RepoKey):
+                key_new = KeyfileKey(repository)
+            elif isinstance(key, Blake2RepoKey):
+                key_new = Blake2KeyfileKey(repository)
+            elif isinstance(key, (KeyfileKey, Blake2KeyfileKey)):
+                print(f"Location already is {args.key_mode}")
+                return EXIT_SUCCESS
+            else:
+                raise Error("Unsupported key type")
+        if args.key_mode == 'repokey':
+            if isinstance(key, KeyfileKey):
+                key_new = RepoKey(repository)
+            elif isinstance(key, Blake2KeyfileKey):
+                key_new = Blake2RepoKey(repository)
+            elif isinstance(key, (RepoKey, Blake2RepoKey)):
+                print(f"Location already is {args.key_mode}")
+                return EXIT_SUCCESS
+            else:
+                raise Error("Unsupported key type")
+
+        for name in ('repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed',
+                     'tam_required', 'nonce_manager', 'cipher'):
+            value = getattr(key, name)
+            setattr(key_new, name, value)
+
+        key_new.target = key_new.get_new_target(args)
+        key_new.save(key_new.target, key._passphrase, create=True)  # save with same passphrase
+
+        # rewrite the manifest with the new key, so that the key-type byte of the manifest changes
+        manifest.key = key_new
+        manifest.write()
+        repository.commit(compact=False)
+
+        # we need to rewrite cache config and security key-type info,
+        # so that the cached key-type will match the repo key-type.
+        cache.begin_txn()  # need to start a cache transaction, otherwise commit() does nothing.
+        cache.key = key_new
+        cache.commit()
+
+        loc = key_new.find_key() if hasattr(key_new, 'find_key') else None
+        if args.keep:
+            logger.info(f'Key copied to {loc}')
+        else:
+            key.remove(key.target)  # remove key from current location
+            logger.info(f'Key moved to {loc}')
+
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
@@ -4249,6 +4306,28 @@ class Archiver:
         subparser.set_defaults(func=self.do_change_passphrase)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
+
+        change_location_epilog = process_epilog("""
+        Change the location of a borg key. The key can be stored at different locations:
+
+        keyfile: locally, usually in the home directory
+        repokey: inside the repo (in the repo config)
+
+        Note: this command does NOT change the crypto algorithms, just the key location,
+              thus you must ONLY give the key location (keyfile or repokey).
+        """)
+        subparser = key_parsers.add_parser('change-location', parents=[common_parser], add_help=False,
+                                          description=self.do_change_location.__doc__,
+                                          epilog=change_location_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='change key location')
+        subparser.set_defaults(func=self.do_change_location)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+        subparser.add_argument('key_mode', metavar='KEY_LOCATION', choices=('repokey', 'keyfile'),
+                               help='select key location')
+        subparser.add_argument('--keep', dest='keep', action='store_true',
+                               help='keep the key also at the current location (default: remove it)')
 
         # borg list
         list_epilog = process_epilog("""

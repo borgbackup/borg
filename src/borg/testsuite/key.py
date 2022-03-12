@@ -6,7 +6,7 @@ from binascii import hexlify, unhexlify
 
 import pytest
 
-from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
+from ..crypto.key import bin_to_hex
 from ..crypto.key import PlaintextKey, AuthenticatedKey, RepoKey, KeyfileKey, \
     Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
@@ -184,7 +184,9 @@ class TestKey:
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
-        data[offset] ^= 1
+        # note: we corrupt in a way so that even corruption of the unauthenticated encryption type byte
+        # will trigger an IntegrityError (does not happen while we stay within TYPES_ACCEPTABLE).
+        data[offset] ^= 64
         with pytest.raises(IntegrityErrorBase):
             key.decrypt(b'', data)
 
@@ -251,47 +253,6 @@ class TestKey:
         authenticated = key.encrypt(plaintext)
         # 0x06 is the key TYPE, 0x0000 identifies no compression.
         assert authenticated == b'\x06\x00\x00' + plaintext
-
-
-class TestPassphrase:
-    def test_passphrase_new_verification(self, capsys, monkeypatch):
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "12aöäü")
-        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
-        Passphrase.new()
-        out, err = capsys.readouterr()
-        assert "12" not in out
-        assert "12" not in err
-
-        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'yes')
-        passphrase = Passphrase.new()
-        out, err = capsys.readouterr()
-        assert "313261c3b6c3a4c3bc" not in out
-        assert "313261c3b6c3a4c3bc" in err
-        assert passphrase == "12aöäü"
-
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "1234/@=")
-        Passphrase.new()
-        out, err = capsys.readouterr()
-        assert "1234/@=" not in out
-        assert "1234/@=" in err
-
-    def test_passphrase_new_empty(self, capsys, monkeypatch):
-        monkeypatch.delenv('BORG_PASSPHRASE', False)
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "")
-        with pytest.raises(PasswordRetriesExceeded):
-            Passphrase.new(allow_empty=False)
-        out, err = capsys.readouterr()
-        assert "must not be blank" in err
-
-    def test_passphrase_new_retries(self, monkeypatch):
-        monkeypatch.delenv('BORG_PASSPHRASE', False)
-        ascending_numbers = iter(range(20))
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: str(next(ascending_numbers)))
-        with pytest.raises(PasswordRetriesExceeded):
-            Passphrase.new()
-
-    def test_passphrase_repr(self):
-        assert "secret" not in repr(Passphrase("secret"))
 
 
 class TestTAM:

@@ -537,6 +537,102 @@ class Archiver:
 
         return 0
 
+    def do_benchmark_cpu(self, args):
+        """Benchmark CPU bound operations."""
+        from timeit import timeit
+        random_10M = os.urandom(10*1000*1000)
+        key_256 = os.urandom(32)
+        key_128 = os.urandom(16)
+        key_96 = os.urandom(12)
+
+        import io
+        from borg.chunker import get_chunker
+        print("Chunkers =======================================================")
+        size = "1GB"
+
+        def chunkit(chunker_name, *args, **kwargs):
+            with io.BytesIO(random_10M) as data_file:
+                ch = get_chunker(chunker_name, *args, **kwargs)
+                for _ in ch.chunkify(fd=data_file):
+                    pass
+
+        for spec, func in [
+            ("buzhash,19,23,21,4095", lambda: chunkit("buzhash", 19, 23, 21, 4095, seed=0)),
+            ("fixed,1048576", lambda: chunkit("fixed", 1048576, sparse=False)),
+        ]:
+            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+
+        import zlib
+        from borg.algorithms.checksums import crc32, deflate_crc32, xxh64
+        print("Non-cryptographic checksums / hashes ===========================")
+        size = "1GB"
+        tests = [
+            ("xxh64", lambda: xxh64(random_10M)),
+        ]
+        if crc32 is zlib.crc32:
+            tests.insert(0, ("crc32 (zlib, used)", lambda: crc32(random_10M)))
+            tests.insert(1, ("crc32 (libdeflate)", lambda: deflate_crc32(random_10M)))
+        elif crc32 is deflate_crc32:
+            tests.insert(0, ("crc32 (libdeflate, used)", lambda: crc32(random_10M)))
+            tests.insert(1, ("crc32 (zlib)", lambda: zlib.crc32(random_10M)))
+        else:
+            raise Error("crc32 benchmarking code missing")
+        for spec, func in tests:
+            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+
+        from borg.crypto.low_level import hmac_sha256, blake2b_256
+        print("Cryptographic hashes / MACs ====================================")
+        size = "1GB"
+        for spec, func in [
+            ("hmac-sha256", lambda: hmac_sha256(key_256, random_10M)),
+            ("blake2b-256", lambda: blake2b_256(key_256, random_10M)),
+        ]:
+            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+
+        from borg.crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
+        from borg.crypto.low_level import AES256_OCB, CHACHA20_POLY1305
+        print("Encryption =====================================================")
+        size = "1GB"
+
+        for spec, func in [
+            ("aes-256-ctr-hmac-sha256", lambda: AES256_CTR_HMAC_SHA256(
+                key_256, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+            ("aes-256-ctr-blake2b", lambda: AES256_CTR_BLAKE2b(
+                key_256*4, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+            ("aes-256-ocb", lambda: AES256_OCB(
+                None, key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+            ("chacha20-poly1305", lambda: CHACHA20_POLY1305(
+                None, key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+        ]:
+            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+
+        from borg.compress import CompressionSpec
+        print("Compression ====================================================")
+        for spec in [
+            'lz4',
+            'zstd,1',
+            'zstd,3',
+            'zstd,22',
+            'zlib,0',
+            'zlib,6',
+            'zlib,9',
+            'lzma,0',
+            'lzma,6',
+            'lzma,9',
+        ]:
+            compressor = CompressionSpec(spec).compressor
+            size = "0.1GB"
+            print(f"{spec:<12} {size:<10} {timeit(lambda: compressor.compress(random_10M), number=10):.3f}s")
+
+        print("msgpack ========================================================")
+        item = Item(path="/foo/bar/baz", mode=660, mtime=1234567)
+        items = [item.as_dict(), ] * 1000
+        size = "100k Items"
+        spec = "msgpack"
+        print(f"{spec:<12} {size:<10} {timeit(lambda: msgpack.packb(items), number=100):.3f}s")
+
+        return 0
+
     @with_repository(fake='dry_run', exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
@@ -3118,6 +3214,21 @@ class Archiver:
                                help='repository to use for benchmark (must exist)')
 
         subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
+
+        bench_cpu_epilog = process_epilog("""
+        This command benchmarks misc. CPU bound borg operations.
+
+        It creates input data in memory, runs the operation and then displays throughput.
+        To reduce outside influence on the timings, please make sure to run this with:
+        - an otherwise as idle as possible machine
+        - enough free memory so there will be no slow down due to paging activity
+        """)
+        subparser = benchmark_parsers.add_parser('cpu', parents=[common_parser], add_help=False,
+                                                 description=self.do_benchmark_cpu.__doc__,
+                                                 epilog=bench_cpu_epilog,
+                                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                                 help='benchmarks borg CPU bound operations.')
+        subparser.set_defaults(func=self.do_benchmark_cpu)
 
         # borg break-lock
         break_lock_epilog = process_epilog("""

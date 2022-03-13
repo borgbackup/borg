@@ -48,6 +48,9 @@ system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
 # needed: xxhash (>= 0.8.1)
 system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
 
+# needed: deflate (>= 1.5)
+system_prefix_libdeflate = os.environ.get('BORG_LIBDEFLATE_PREFIX')
+
 # Number of threads to use for cythonize, not used on windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != 'spawn' else None
 
@@ -194,6 +197,7 @@ if not on_rtd:
     checksums_ext_kwargs = members_appended(
         dict(sources=[checksums_source]),
         setup_checksums.xxhash_ext_kwargs(pc, system_prefix_libxxhash),
+        setup_checksums.deflate_ext_kwargs(pc, system_prefix_libdeflate),
         dict(extra_compile_args=cflags),
     )
 

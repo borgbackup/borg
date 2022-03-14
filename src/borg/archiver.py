@@ -1392,23 +1392,38 @@ class Archiver:
 
         if not args.cache_only:
             if args.forced == 0:  # without --force, we let the user see the archives list and confirm.
+                id = bin_to_hex(repository.id)
+                location = repository._location.canonical_path()
                 msg = []
                 try:
                     manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+                    n_archives = len(manifest.archives)
+                    msg.append(f"You requested to completely DELETE the following repository "
+                               f"*including* {n_archives} archives it contains:")
                 except NoManifestError:
-                    msg.append("You requested to completely DELETE the repository *including* all archives it may "
-                               "contain.")
-                    msg.append("This repository seems to have no manifest, so we can't tell anything about its "
-                               "contents.")
-                else:
-                    if self.output_list:
-                        msg.append("You requested to completely DELETE the repository *including* all archives it "
-                                   "contains:")
-                        for archive_info in manifest.archives.list(sort_by=['ts']):
-                            msg.append(format_archive(archive_info))
+                    n_archives = None
+                    msg.append("You requested to completely DELETE the following repository "
+                               "*including* all archives it may contain:")
+
+                msg.append(DASHES)
+                msg.append(f"Repository ID: {id}")
+                msg.append(f"Location: {location}")
+
+                if self.output_list:
+                    msg.append("")
+                    msg.append("Archives:")
+
+                    if n_archives is not None:
+                        if n_archives > 0:
+                            for archive_info in manifest.archives.list(sort_by=['ts']):
+                                msg.append(format_archive(archive_info))
+                        else:
+                            msg.append("This repository seems to not have any archives.")
                     else:
-                        msg.append("You requested to completely DELETE the repository *including* %d archives it contains."
-                                   % len(manifest.archives))
+                        msg.append("This repository seems to have no manifest, so we can't "
+                                   "tell anything about its contents.")
+
+                msg.append(DASHES)
                 msg.append("Type 'YES' if you understand this and want to continue: ")
                 msg = '\n'.join(msg)
                 if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),

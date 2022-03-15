@@ -337,7 +337,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "generic/openbsd6"
+    b.vm.box = "openbsd71-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

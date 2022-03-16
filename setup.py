@@ -94,7 +94,7 @@ crypto_helpers = 'src/borg/crypto/_crypto_helpers.c'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
-checksums_source = 'src/borg/algorithms/checksums.pyx'
+checksums_source = 'src/borg/checksums.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_syncfilerange_source = 'src/borg/platform/syncfilerange.pyx'
@@ -207,7 +207,7 @@ if not on_rtd:
         Extension('borg.hashindex', [hashindex_source], extra_compile_args=cflags),
         Extension('borg.item', [item_source], extra_compile_args=cflags),
         Extension('borg.chunker', [chunker_source], extra_compile_args=cflags),
-        Extension('borg.algorithms.checksums', **checksums_ext_kwargs),
+        Extension('borg.checksums', **checksums_ext_kwargs),
     ]
 
     posix_ext = Extension('borg.platform.posix', [platform_posix_source], extra_compile_args=cflags)

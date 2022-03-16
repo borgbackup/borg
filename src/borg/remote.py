@@ -31,7 +31,7 @@ from .logger import create_logger, setup_logging
 from .helpers import msgpack
 from .repository import Repository
 from .version import parse_version, format_version
-from .algorithms.checksums import xxh64
+from .checksums import xxh64
 from .helpers.datastruct import EfficientCollectionQueue
 
 logger = create_logger(__name__)

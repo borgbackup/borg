@@ -428,7 +428,7 @@ cdef class _AEAD_BASE:
 
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef unsigned char *key
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int aad_offset
@@ -442,30 +442,28 @@ cdef class _AEAD_BASE:
         """check whether library requirements for this ciphersuite are satisfied"""
         raise NotImplemented  # override / implement in child class
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
+    def __init__(self, key, iv=None, header_len=1, aad_offset=0):
         """
         init AEAD crypto
 
-        :param mac_key: must be None
-        :param enc_key: 256bit encrypt-then-mac key
+        :param key: 256bit encrypt-then-mac key
         :param iv: 96bit initialisation vector / nonce
-        :param header_len: length of header *without* IV
+        :param header_len: expected length of header *without* IV
         :param aad_offset: where in the header the authenticated data starts
         """
-        assert mac_key is None
-        assert isinstance(enc_key, bytes) and len(enc_key) == 32
+        assert isinstance(key, bytes) and len(key) == 32
         self.iv_len = sizeof(self.iv)
         self.header_len_expected = header_len + self.iv_len
         assert aad_offset <= header_len
         self.aad_offset = aad_offset
         self.mac_len = 16
-        self.enc_key = enc_key
+        self.key = key
         if iv is not None:
             self.set_iv(iv)
         else:
             self.blocks = -1  # make sure set_iv is called before encrypt
 
-    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
+    def __cinit__(self, key, iv=None, header_len=1, aad_offset=0):
         self.ctx = EVP_CIPHER_CTX_new()
 
     def __dealloc__(self):
@@ -511,7 +509,7 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_EncryptInit_ex failed')
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
-            rc = EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.enc_key, self.iv)
+            rc = EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv)
             if not rc:
                 raise CryptoError('EVP_EncryptInit_ex failed')
             rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen)
@@ -561,7 +559,7 @@ cdef class _AEAD_BASE:
             self.set_iv(iv)
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
-            if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.enc_key, iv):
+            if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
@@ -637,10 +635,10 @@ cdef class AES256_OCB(_AES_BASE):
         if is_libressl:
             raise ValueError('AES OCB is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
+    def __init__(self, key, iv=None, header_len=1, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_aes_256_ocb
-        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
+        super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class CHACHA20_POLY1305(_CHACHA_BASE):
@@ -649,10 +647,10 @@ cdef class CHACHA20_POLY1305(_CHACHA_BASE):
         if is_libressl:
             raise ValueError('CHACHA20-POLY1305 is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
+    def __init__(self, key, iv=None, header_len=1, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_chacha20_poly1305
-        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
+        super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class AES:

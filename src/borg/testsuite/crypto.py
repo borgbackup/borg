@@ -111,11 +111,11 @@ class CryptoTestCase(BaseTestCase):
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv, header_len=1, aad_offset=1)
+            cs = cs_cls(mac_key, enc_key, iv, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:1]
-            mac = hdr_mac_iv_cdata[1:17]
-            iv = hdr_mac_iv_cdata[17:29]
+            iv = hdr_mac_iv_cdata[1:13]
+            mac = hdr_mac_iv_cdata[13:29]
             cdata = hdr_mac_iv_cdata[29:]
             self.assert_equal(hexlify(hdr), b'23')
             self.assert_equal(hexlify(mac), exp_mac)
@@ -155,11 +155,11 @@ class CryptoTestCase(BaseTestCase):
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv, header_len=3, aad_offset=1)
+            cs = cs_cls(mac_key, enc_key, iv, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:3]
-            mac = hdr_mac_iv_cdata[3:19]
-            iv = hdr_mac_iv_cdata[19:31]
+            iv = hdr_mac_iv_cdata[3:15]
+            mac = hdr_mac_iv_cdata[15:31]
             cdata = hdr_mac_iv_cdata[31:]
             self.assert_equal(hexlify(hdr), b'123456')
             self.assert_equal(hexlify(mac), exp_mac)

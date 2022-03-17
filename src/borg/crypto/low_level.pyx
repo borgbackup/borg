@@ -424,7 +424,7 @@ ctypedef const EVP_CIPHER * (* CIPHER)()
 
 cdef class _AEAD_BASE:
     # new crypto used in borg >= 1.3
-    # Layout: HEADER + MAC 16 + IV 12 + CT
+    # Layout: HEADER + MAC 16 + CT (IV will be put into the header, at the end)
 
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
@@ -432,7 +432,7 @@ cdef class _AEAD_BASE:
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int aad_offset
-    cdef int header_len
+    cdef int header_len  # includes the IV at the end
     cdef int mac_len
     cdef unsigned char iv[12]
     cdef long long blocks
@@ -442,14 +442,22 @@ cdef class _AEAD_BASE:
         """check whether library requirements for this ciphersuite are satisfied"""
         raise NotImplemented  # override / implement in child class
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
+        """
+        init AEAD crypto
+
+        :param mac_key: must be None
+        :param enc_key: 256bit encrypt-then-mac key
+        :param iv: 96bit initialisation vector / nonce
+        :param header_len: length of header *without* IV
+        :param aad_offset: where in the header the authenticated data starts
+        """
         assert mac_key is None
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.iv_len = sizeof(self.iv)
-        self.header_len = 1
+        self.header_len = header_len + self.iv_len
         assert aad_offset <= header_len
         self.aad_offset = aad_offset
-        self.header_len = header_len
         self.mac_len = 16
         self.enc_key = enc_key
         if iv is not None:
@@ -457,7 +465,7 @@ cdef class _AEAD_BASE:
         else:
             self.blocks = -1  # make sure set_iv is called before encrypt
 
-    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
         self.ctx = EVP_CIPHER_CTX_new()
 
     def __dealloc__(self):
@@ -465,7 +473,7 @@ cdef class _AEAD_BASE:
 
     def encrypt(self, data, header=b'', iv=None):
         """
-        encrypt data, compute mac over aad + iv + cdata, prepend header.
+        encrypt data, compute mac over aad + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
         """
         if iv is not None:
@@ -477,11 +485,12 @@ cdef class _AEAD_BASE:
         if block_count > 2**32:
             raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(data)
-        cdef int hlen = len(header)
+        cdef int hl = len(header)
+        cdef int hlen = hl + self.iv_len
         assert hlen == self.header_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len +
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
                                                                   ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
@@ -491,11 +500,12 @@ cdef class _AEAD_BASE:
         cdef Py_buffer hdata = ro_buffer(header)
         try:
             offset = 0
-            for i in range(hlen):
+            for i in range(hl):
                 odata[offset+i] = header[i]
-            offset += hlen
-            offset += self.mac_len
+            offset = hl
             self.store_iv(odata+offset, self.iv)
+            offset = hlen
+            offset += self.mac_len
             rc = EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL)
             if not rc:
                 raise CryptoError('EVP_EncryptInit_ex failed')
@@ -507,9 +517,6 @@ cdef class _AEAD_BASE:
             rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen)
             if not rc:
                 raise CryptoError('EVP_EncryptUpdate failed')
-            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, odata+offset, self.iv_len):
-                raise CryptoError('EVP_EncryptUpdate failed')
-            offset += self.iv_len
             rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
             if not rc:
                 raise CryptoError('EVP_EncryptUpdate failed')
@@ -529,7 +536,7 @@ cdef class _AEAD_BASE:
 
     def decrypt(self, envelope):
         """
-        authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
+        authenticate aad + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
         # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
         # IV we provide, thus we must not decrypt more than 2^32 cipher blocks with same IV):
@@ -538,7 +545,7 @@ cdef class _AEAD_BASE:
             raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
-        assert hlen == self.header_len
+        cdef int hl = hlen - self.iv_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
@@ -550,7 +557,7 @@ cdef class _AEAD_BASE:
         try:
             if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+self.mac_len)
+            iv = self.fetch_iv(<unsigned char *> idata.buf+hl)
             self.set_iv(iv)
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
@@ -561,13 +568,10 @@ cdef class _AEAD_BASE:
             rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
-            if not EVP_DecryptUpdate(self.ctx, NULL, &olen,
-                                     <const unsigned char*> idata.buf+hlen+self.mac_len, self.iv_len):
-                raise CryptoError('EVP_DecryptUpdate failed')
             offset = 0
             rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                   <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len,
-                                   ilen-hlen-self.mac_len-self.iv_len)
+                                   <const unsigned char*> idata.buf+hlen+self.mac_len,
+                                   ilen-hlen-self.mac_len)
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
@@ -611,7 +615,7 @@ cdef class _AEAD_BASE:
             iv_out[i] = iv[i]
 
     def extract_iv(self, envelope):
-        offset = self.header_len + self.mac_len
+        offset = self.header_len - self.iv_len
         return bytes_to_long(envelope[offset:offset+self.iv_len])
 
 
@@ -633,7 +637,7 @@ cdef class AES256_OCB(_AES_BASE):
         if is_libressl:
             raise ValueError('AES OCB is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_aes_256_ocb
         super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
@@ -645,7 +649,7 @@ cdef class CHACHA20_POLY1305(_CHACHA_BASE):
         if is_libressl:
             raise ValueError('CHACHA20-POLY1305 is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_chacha20_poly1305
         super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)

@@ -10,7 +10,7 @@ src/borg/crypto/low_level.c
 src/borg/hashindex.c
 src/borg/item.c
 src/borg/chunker.c
-src/borg/algorithms/checksums.c
+src/borg/checksums.c
 src/borg/platform/darwin.c
 src/borg/platform/freebsd.c
 src/borg/platform/linux.c

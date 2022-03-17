@@ -77,9 +77,9 @@ cdef extern from "openssl/evp.h":
     int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 
     int EVP_CIPHER_CTX_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
-    int EVP_CTRL_GCM_GET_TAG
-    int EVP_CTRL_GCM_SET_TAG
-    int EVP_CTRL_GCM_SET_IVLEN
+    int EVP_CTRL_AEAD_GET_TAG
+    int EVP_CTRL_AEAD_SET_TAG
+    int EVP_CTRL_AEAD_SET_IVLEN
 
     const EVP_MD *EVP_sha256() nogil
 
@@ -471,7 +471,7 @@ cdef class _AEAD_BASE:
         if iv is not None:
             self.set_iv(iv)
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
-        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
+        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
         # IV we provide, thus we must not encrypt more than 2^32 cipher blocks with same IV).
         block_count = self.block_count(len(data))
         if block_count > 2**32:
@@ -499,7 +499,7 @@ cdef class _AEAD_BASE:
             rc = EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL)
             if not rc:
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, self.iv_len, NULL):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             rc = EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.enc_key, self.iv)
             if not rc:
@@ -518,7 +518,7 @@ cdef class _AEAD_BASE:
             if not rc:
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_GET_TAG, self.mac_len, odata+hlen):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_GET_TAG, self.mac_len, odata + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl GET TAG failed')
             self.blocks = block_count
             return odata[:offset]
@@ -531,7 +531,7 @@ cdef class _AEAD_BASE:
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
-        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
+        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
         # IV we provide, thus we must not decrypt more than 2^32 cipher blocks with same IV):
         approx_block_count = self.block_count(len(envelope))  # sloppy, but good enough for borg
         if approx_block_count > 2**32:
@@ -552,11 +552,11 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_DecryptInit_ex failed')
             iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+self.mac_len)
             self.set_iv(iv)
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, self.iv_len, NULL):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.enc_key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_TAG, self.mac_len, <unsigned char *> idata.buf+hlen):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
             rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
             if not rc:
@@ -597,7 +597,7 @@ cdef class _AEAD_BASE:
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
-        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
+        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
         # (12 byte) IV we provide, thus we only need to increment the IV by 1.
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + 1

@@ -36,7 +36,7 @@ try:
     import borg
     from . import __version__
     from . import helpers
-    from .algorithms.checksums import crc32
+    from .checksums import crc32
     from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
     from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
     from .archive import FilesystemObjectProcessors, TarfileObjectProcessors, MetadataCollector, ChunksProcessor
@@ -563,7 +563,7 @@ class Archiver:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
         import zlib
-        from borg.algorithms.checksums import crc32, deflate_crc32, xxh64
+        from borg.checksums import crc32, deflate_crc32, xxh64
         print("Non-cryptographic checksums / hashes ===========================")
         size = "1GB"
         tests = [

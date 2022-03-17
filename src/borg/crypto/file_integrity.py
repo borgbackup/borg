@@ -6,7 +6,7 @@ from hmac import compare_digest
 
 from ..helpers import IntegrityError
 from ..logger import create_logger
-from ..algorithms.checksums import StreamingXXH64
+from ..checksums import StreamingXXH64
 
 logger = create_logger()
 

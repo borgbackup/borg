@@ -1,7 +1,7 @@
 import zlib
 
-from ..platformflags import is_darwin
-from ..helpers import bin_to_hex
+from .platformflags import is_darwin
+from .helpers import bin_to_hex
 
 from libc.stdint cimport uint32_t
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release

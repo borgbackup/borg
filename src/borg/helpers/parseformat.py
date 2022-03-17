@@ -751,7 +751,7 @@ class ItemFormatter(BaseFormatter):
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format, *, json_lines=False):
-        from ..algorithms.checksums import StreamingXXH64
+        from ..checksums import StreamingXXH64
         self.xxh64 = StreamingXXH64
         self.archive = archive
         self.json_lines = json_lines

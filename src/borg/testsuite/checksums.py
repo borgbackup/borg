@@ -4,7 +4,7 @@ from binascii import unhexlify
 
 import pytest
 
-from ..algorithms import checksums
+from .. import checksums
 from ..helpers import bin_to_hex
 
 crc32_implementations = [checksums.deflate_crc32]

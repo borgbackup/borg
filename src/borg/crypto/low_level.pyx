@@ -432,7 +432,7 @@ cdef class _AEAD_BASE:
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int aad_offset
-    cdef int header_len  # includes the IV at the end
+    cdef int header_len_expected  # includes the IV at the end
     cdef int mac_len
     cdef unsigned char iv[12]
     cdef long long blocks
@@ -455,7 +455,7 @@ cdef class _AEAD_BASE:
         assert mac_key is None
         assert isinstance(enc_key, bytes) and len(enc_key) == 32
         self.iv_len = sizeof(self.iv)
-        self.header_len = header_len + self.iv_len
+        self.header_len_expected = header_len + self.iv_len
         assert aad_offset <= header_len
         self.aad_offset = aad_offset
         self.mac_len = 16
@@ -487,7 +487,7 @@ cdef class _AEAD_BASE:
         cdef int ilen = len(data)
         cdef int hl = len(header)
         cdef int hlen = hl + self.iv_len
-        assert hlen == self.header_len
+        assert hlen == self.header_len_expected
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
@@ -544,7 +544,7 @@ cdef class _AEAD_BASE:
         if approx_block_count > 2**32:
             raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(envelope)
-        cdef int hlen = self.header_len
+        cdef int hlen = self.header_len_expected
         cdef int hl = hlen - self.iv_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
@@ -615,7 +615,7 @@ cdef class _AEAD_BASE:
             iv_out[i] = iv[i]
 
     def extract_iv(self, envelope):
-        offset = self.header_len - self.iv_len
+        offset = self.header_len_expected - self.iv_len
         return bytes_to_long(envelope[offset:offset+self.iv_len])
 
 

@@ -568,7 +568,7 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
             rc = EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen)
-            if rc <= 0:
+            if not rc:
                 # a failure here means corrupted or tampered tag (mac) or data.
                 raise IntegrityError('Authentication / EVP_DecryptFinal_ex failed')
             offset += olen

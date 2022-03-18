@@ -92,9 +92,9 @@ class CryptoTestCase(BaseTestCase):
     def test_AE(self):
         # used in legacy-like layout (1 type byte, no aad)
         key = b'X' * 32
-        iv = 0
+        iv_int = 0
         data = b'foo' * 10
-        header = b'\x23' + iv.to_bytes(12, 'big')
+        header = b'\x23' + iv_int.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
         ]
@@ -110,7 +110,7 @@ class CryptoTestCase(BaseTestCase):
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
-            cs = cs_cls(key, iv, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:1]
             iv = hdr_mac_iv_cdata[1:13]
@@ -122,12 +122,12 @@ class CryptoTestCase(BaseTestCase):
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth/decrypt
-            cs = cs_cls(key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             pdata = cs.decrypt(hdr_mac_iv_cdata)
             self.assert_equal(data, pdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth-failure due to corruption (corrupted data)
-            cs = cs_cls(key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:29] + b'\0' + hdr_mac_iv_cdata[30:]
             self.assert_raises(IntegrityError,
                                lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
@@ -135,9 +135,9 @@ class CryptoTestCase(BaseTestCase):
     def test_AEAD(self):
         # test with aad
         key = b'X' * 32
-        iv = 0
+        iv_int = 0
         data = b'foo' * 10
-        header = b'\x12\x34\x56' + iv.to_bytes(12, 'big')
+        header = b'\x12\x34\x56' + iv_int.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
         ]
@@ -153,7 +153,7 @@ class CryptoTestCase(BaseTestCase):
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
-            cs = cs_cls(key, iv, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:3]
             iv = hdr_mac_iv_cdata[3:15]
@@ -165,12 +165,12 @@ class CryptoTestCase(BaseTestCase):
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth/decrypt
-            cs = cs_cls(key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             pdata = cs.decrypt(hdr_mac_iv_cdata)
             self.assert_equal(data, pdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth-failure due to corruption (corrupted aad)
-            cs = cs_cls(key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
             self.assert_raises(IntegrityError,
                                lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))

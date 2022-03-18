@@ -2,12 +2,7 @@
 # note: put developer specific settings into ~/.coarc (e.g. editor = ...)
 max_line_length = 255
 use_spaces = True
-ignore = src/borg/(chunker.c|compress.c|hashindex.c|item.c),
-         src/borg/algorithms/(checksums.c|crc32*.c),
-         src/borg/algorithms/blake2/**,
-         src/borg/algorithms/lz4/**,
-         src/borg/algorithms/xxh64/**,
-         src/borg/algorithms/zstd/**,
+ignore = src/borg/(checksums.c|chunker.c|compress.c|hashindex.c|item.c),
          src/borg/crypto/low_level.c,
          src/borg/platform/*.c
 

@@ -555,8 +555,6 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
-                raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
             rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
@@ -567,6 +565,8 @@ cdef class _AEAD_BASE:
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
+                raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
             rc = EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen)
             if not rc:
                 # a failure here means corrupted or tampered tag (mac) or data.

@@ -713,28 +713,43 @@ class AEADKeyBase(KeyBase):
     """
     Chunks are encrypted and authenticated using some AEAD ciphersuite
 
-    Payload layout: TYPE(1) + SESSIONID(24) + NONCE(12) + MAC(16) + CIPHERTEXT
-                    ^------------- AAD ---------------^
+    Layout: suite:4 keytype:4 reserved:8 messageIV:48 sessionID:192 auth_tag:128 payload:... [bits]
+            ^-------------------- AAD ----------------------------^
+    Offsets:0                 1          2            8             32           48 [bytes]
+
+    suite: 1010b for new AEAD crypto, 0000b is old crypto
+    keytype: see constants.KeyType (suite+keytype)
+    reserved: all-zero, for future use
+    messageIV: a counter starting from 0 for all new encrypted messages of one session
+    sessionID: 192bit random, computed once per session (the session key is derived from this)
+    auth_tag: authentication tag output of the AEAD cipher (computed over payload and AAD)
+    payload: encrypted chunk data
     """
 
-    PAYLOAD_OVERHEAD = 1 + 24 + 12 + 16  # TYPE + SESSIONID + NONCE + MAC
+    PAYLOAD_OVERHEAD = 1 + 1 + 6 + 24 + 16  # [bytes], see Layout
 
     CIPHERSUITE = None  # override in subclass
 
     logically_encrypted = True
 
     def encrypt(self, chunk):
+        # to encrypt new data in this session we use always self.cipher and self.sessionid
         data = self.compressor.compress(chunk)
-        header = self.TYPE_STR + self.sessionid
+        reserved = b'\0'
         iv = self.cipher.next_iv()
+        iv_48bit = iv.to_bytes(6, 'big')
+        header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
         return self.cipher.encrypt(data, header=header, iv=iv)
 
     def decrypt(self, id, data, decompress=True):
+        # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
         self.assert_type(data[0], id)
-        sessionid = data[1:13]  # XXX
-        self.init_ciphers(salt=salt, context=context, iv=iv)  # XXX
+        iv_48bit = data[2:8]
+        sessionid = data[8:32]
+        iv = int.from_bytes(iv_48bit, 'big')
+        cipher = self._get_cipher(sessionid, iv)
         try:
-            payload = self.cipher.decrypt(data)
+            payload = cipher.decrypt(data)
         except IntegrityError as e:
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
         if not decompress:
@@ -753,15 +768,26 @@ class AEADKeyBase(KeyBase):
         if self.chunk_seed & 0x80000000:
             self.chunk_seed = self.chunk_seed - 0xffffffff - 1
 
-    def init_ciphers(self, salt=b'', context=b'', iv=0):
+    def _get_session_key(self, sessionid):
+        assert len(sessionid) == 24  # 192bit
         key = hkdf_hmac_sha512(
             ikm=self.enc_key + self.enc_hmac_key,
-            salt=salt,
-            info=b'borg-crypto-' + context,  # XXX
+            salt=sessionid,
+            info=b'borg-session-key-' + self.CIPHERSUITE.__name__.encode(),
             output_length=32
         )
-        self.cipher = self.CIPHERSUITE(key=key, header_len=1+24, aad_offset=0)  # XXX
-        self.cipher.set_iv(iv)
+        return key
+
+    def _get_cipher(self, sessionid, iv):
+        assert isinstance(iv, int)
+        key = self._get_session_key(sessionid)
+        cipher = self.CIPHERSUITE(key=key, iv=iv, header_len=1+1+6+24, aad_offset=0)
+        return cipher
+
+    def init_ciphers(self, manifest_data=None, iv=0):
+        # in every new session we start with a fresh sessionid and at iv == 0, manifest_data and iv params are ignored
+        self.sessionid = os.urandom(24)
+        self.cipher = self._get_cipher(self.sessionid, iv=0)
 
 
 class AESOCBKeyfileKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):

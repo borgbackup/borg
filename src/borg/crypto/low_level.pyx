@@ -424,7 +424,7 @@ ctypedef const EVP_CIPHER * (* CIPHER)()
 
 cdef class _AEAD_BASE:
     # new crypto used in borg >= 1.3
-    # Layout: HEADER + MAC 16 + CT (IV will be put into the header, at the end)
+    # Layout: HEADER + MAC 16 + CT
 
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
@@ -432,7 +432,7 @@ cdef class _AEAD_BASE:
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int aad_offset
-    cdef int header_len_expected  # includes the IV at the end
+    cdef int header_len_expected
     cdef int mac_len
     cdef unsigned char iv[12]
     cdef long long blocks
@@ -448,12 +448,12 @@ cdef class _AEAD_BASE:
 
         :param key: 256bit encrypt-then-mac key
         :param iv: 96bit initialisation vector / nonce
-        :param header_len: expected length of header *without* IV
+        :param header_len: expected length of header
         :param aad_offset: where in the header the authenticated data starts
         """
         assert isinstance(key, bytes) and len(key) == 32
         self.iv_len = sizeof(self.iv)
-        self.header_len_expected = header_len + self.iv_len
+        self.header_len_expected = header_len
         assert aad_offset <= header_len
         self.aad_offset = aad_offset
         self.mac_len = 16
@@ -483,8 +483,7 @@ cdef class _AEAD_BASE:
         if block_count > 2**32:
             raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(data)
-        cdef int hl = len(header)
-        cdef int hlen = hl + self.iv_len
+        cdef int hlen = len(header)
         assert hlen == self.header_len_expected
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
@@ -498,11 +497,9 @@ cdef class _AEAD_BASE:
         cdef Py_buffer hdata = ro_buffer(header)
         try:
             offset = 0
-            for i in range(hl):
+            for i in range(hlen):
                 odata[offset+i] = header[i]
-            offset = hl
-            self.store_iv(odata+offset, self.iv)
-            offset = hlen
+            offset += hlen
             offset += self.mac_len
             rc = EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL)
             if not rc:
@@ -543,7 +540,6 @@ cdef class _AEAD_BASE:
             raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len_expected
-        cdef int hl = hlen - self.iv_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
@@ -555,11 +551,9 @@ cdef class _AEAD_BASE:
         try:
             if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            iv = self.fetch_iv(<unsigned char *> idata.buf+hl)
-            self.set_iv(iv)
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
-            if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, iv):
+            if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
@@ -603,18 +597,6 @@ cdef class _AEAD_BASE:
         # (12 byte) IV we provide, thus we only need to increment the IV by 1.
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + 1
-
-    cdef fetch_iv(self, unsigned char * iv_in):
-        return iv_in[0:self.iv_len]
-
-    cdef store_iv(self, unsigned char * iv_out, unsigned char * iv):
-        cdef int i
-        for i in range(self.iv_len):
-            iv_out[i] = iv[i]
-
-    def extract_iv(self, envelope):
-        offset = self.header_len_expected - self.iv_len
-        return bytes_to_long(envelope[offset:offset+self.iv_len])
 
 
 cdef class _AES_BASE(_AEAD_BASE):

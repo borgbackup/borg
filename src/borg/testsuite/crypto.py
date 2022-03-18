@@ -94,7 +94,7 @@ class CryptoTestCase(BaseTestCase):
         key = b'X' * 32
         iv = 0
         data = b'foo' * 10
-        header = b'\x23'
+        header = b'\x23' + iv.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
         ]
@@ -137,7 +137,7 @@ class CryptoTestCase(BaseTestCase):
         key = b'X' * 32
         iv = 0
         data = b'foo' * 10
-        header = b'\x12\x34\x56'
+        header = b'\x12\x34\x56' + iv.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
         ]

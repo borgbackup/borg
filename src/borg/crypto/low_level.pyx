@@ -442,7 +442,7 @@ cdef class _AEAD_BASE:
         """check whether library requirements for this ciphersuite are satisfied"""
         raise NotImplemented  # override / implement in child class
 
-    def __init__(self, key, iv=None, header_len=1, aad_offset=0):
+    def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         """
         init AEAD crypto
 
@@ -463,7 +463,7 @@ cdef class _AEAD_BASE:
         else:
             self.blocks = -1  # make sure set_iv is called before encrypt
 
-    def __cinit__(self, key, iv=None, header_len=1, aad_offset=0):
+    def __cinit__(self, key, iv=None, header_len=0, aad_offset=0):
         self.ctx = EVP_CIPHER_CTX_new()
 
     def __dealloc__(self):
@@ -617,7 +617,7 @@ cdef class AES256_OCB(_AES_BASE):
         if is_libressl:
             raise ValueError('AES OCB is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, key, iv=None, header_len=1, aad_offset=0):
+    def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_aes_256_ocb
         super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
@@ -629,7 +629,7 @@ cdef class CHACHA20_POLY1305(_CHACHA_BASE):
         if is_libressl:
             raise ValueError('CHACHA20-POLY1305 is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, key, iv=None, header_len=1, aad_offset=0):
+    def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_chacha20_poly1305
         super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)

@@ -156,6 +156,7 @@ class KeyBase:
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
+        raise NotImplementedError
 
     def encrypt(self, chunk):
         pass

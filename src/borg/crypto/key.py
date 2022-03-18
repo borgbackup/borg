@@ -23,7 +23,7 @@ from ..platform import SaveFile
 
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
-from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
+from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
 
 
 class UnsupportedPayloadError(Error):
@@ -336,7 +336,7 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
-    CIPHERSUITE = AES256_CTR_HMAC_SHA256
+    CIPHERSUITE = None  # override in derived class
 
     logically_encrypted = True
 
@@ -383,7 +383,7 @@ class AESKeyBase(KeyBase):
         self.nonce_manager = NonceManager(self.repository, nonce)
 
 
-class FlexiKeyBase(AESKeyBase):
+class FlexiKeyBase:
     @classmethod
     def detect(cls, repository, manifest_data):
         key = cls(repository)
@@ -496,9 +496,7 @@ class FlexiKeyBase(AESKeyBase):
         raise NotImplementedError
 
 
-class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
-    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
-
+class FlexiKey(FlexiKeyBase):
     FILE_ID = 'BORG_KEY'
 
     def sanity_check(self, filename, id):
@@ -625,40 +623,43 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
             raise TypeError('Unsupported borg key storage type')
 
 
-class KeyfileKey(FlexiKey):
+class KeyfileKey(ID_HMAC_SHA_256, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.KEYFILE
     NAME = 'key file'
     ARG_NAME = 'keyfile'
     STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
 
-class RepoKey(FlexiKey):
+class RepoKey(ID_HMAC_SHA_256, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.REPO
     NAME = 'repokey'
     ARG_NAME = 'repokey'
     STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
 
-class Blake2FlexiKey(ID_BLAKE2b_256, FlexiKey):
+class Blake2KeyfileKey(ID_BLAKE2b_256, AESKeyBase, FlexiKey):
     TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
-    CIPHERSUITE = AES256_CTR_BLAKE2b
-
-
-class Blake2KeyfileKey(Blake2FlexiKey):
     TYPE = KeyType.BLAKE2KEYFILE
     NAME = 'key file BLAKE2b'
     ARG_NAME = 'keyfile-blake2'
     STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-class Blake2RepoKey(Blake2FlexiKey):
+class Blake2RepoKey(ID_BLAKE2b_256, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
     TYPE = KeyType.BLAKE2REPO
     NAME = 'repokey BLAKE2b'
     ARG_NAME = 'repokey-blake2'
     STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-class AuthenticatedKeyBase(FlexiKey):
+class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
     STORAGE = KeyBlobStorage.REPO
 
     # It's only authenticated, not encrypted.
@@ -691,7 +692,7 @@ class AuthenticatedKeyBase(FlexiKey):
         return data
 
 
-class AuthenticatedKey(AuthenticatedKeyBase):
+class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
     TYPE = KeyType.AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
     NAME = 'authenticated'
@@ -705,8 +706,143 @@ class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
     ARG_NAME = 'authenticated-blake2'
 
 
+# ------------ new crypto ------------
+
+
+class AEADKeyBase(KeyBase):
+    """
+    Chunks are encrypted and authenticated using some AEAD ciphersuite
+
+    Payload layout: TYPE(1) + SESSIONID(24) + NONCE(12) + MAC(16) + CIPHERTEXT
+                    ^------------- AAD ---------------^
+    """
+
+    PAYLOAD_OVERHEAD = 1 + 24 + 12 + 16  # TYPE + SESSIONID + NONCE + MAC
+
+    CIPHERSUITE = None  # override in subclass
+
+    logically_encrypted = True
+
+    def encrypt(self, chunk):
+        data = self.compressor.compress(chunk)
+        header = self.TYPE_STR + self.sessionid
+        iv = self.cipher.next_iv()
+        return self.cipher.encrypt(data, header=header, iv=iv)
+
+    def decrypt(self, id, data, decompress=True):
+        self.assert_type(data[0], id)
+        sessionid = data[1:13]  # XXX
+        self.init_ciphers(salt=salt, context=context, iv=iv)  # XXX
+        try:
+            payload = self.cipher.decrypt(data)
+        except IntegrityError as e:
+            raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
+        if not decompress:
+            return payload
+        data = self.decompress(payload)
+        self.assert_id(id, data)
+        return data
+
+    def init_from_random_data(self):
+        data = os.urandom(100)
+        self.enc_key = data[0:32]
+        self.enc_hmac_key = data[32:64]
+        self.id_key = data[64:96]
+        self.chunk_seed = bytes_to_int(data[96:100])
+        # Convert to signed int32
+        if self.chunk_seed & 0x80000000:
+            self.chunk_seed = self.chunk_seed - 0xffffffff - 1
+
+    def init_ciphers(self, salt=b'', context=b'', iv=0):
+        key = hkdf_hmac_sha512(
+            ikm=self.enc_key + self.enc_hmac_key,
+            salt=salt,
+            info=b'borg-crypto-' + context,  # XXX
+            output_length=32
+        )
+        self.cipher = self.CIPHERSUITE(key=key, header_len=1+24, aad_offset=0)  # XXX
+        self.cipher.set_iv(iv)
+
+
+class AESOCBKeyfileKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.AESOCBKEYFILE, KeyType.AESOCBREPO}
+    TYPE = KeyType.AESOCBKEYFILE
+    NAME = 'key file AES-OCB'
+    ARG_NAME = 'keyfile-aes-ocb'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_OCB
+
+
+class AESOCBRepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.AESOCBKEYFILE, KeyType.AESOCBREPO}
+    TYPE = KeyType.AESOCBREPO
+    NAME = 'repokey AES-OCB'
+    ARG_NAME = 'repokey-aes-ocb'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_OCB
+
+
+class CHPOKeyfileKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.CHPOKEYFILE, KeyType.CHPOREPO}
+    TYPE = KeyType.CHPOKEYFILE
+    NAME = 'key file ChaCha20-Poly1305'
+    ARG_NAME = 'keyfile-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
+class CHPORepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.CHPOKEYFILE, KeyType.CHPOREPO}
+    TYPE = KeyType.CHPOREPO
+    NAME = 'repokey ChaCha20-Poly1305'
+    ARG_NAME = 'repokey-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
+class Blake2AESOCBKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
+    TYPE = KeyType.BLAKE2AESOCBKEYFILE
+    NAME = 'key file Blake2b AES-OCB'
+    ARG_NAME = 'keyfile-blake2-aes-ocb'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_OCB
+
+
+class Blake2AESOCBRepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
+    TYPE = KeyType.BLAKE2AESOCBREPO
+    NAME = 'repokey Blake2b AES-OCB'
+    ARG_NAME = 'repokey-blake2-aes-ocb'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_OCB
+
+
+class Blake2CHPOKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
+    TYPE = KeyType.BLAKE2CHPOKEYFILE
+    NAME = 'key file Blake2b ChaCha20-Poly1305'
+    ARG_NAME = 'keyfile-blake2-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
+class Blake2CHPORepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
+    TYPE = KeyType.BLAKE2CHPOREPO
+    NAME = 'repokey Blake2b ChaCha20-Poly1305'
+    ARG_NAME = 'repokey-blake2-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
 AVAILABLE_KEY_TYPES = (
     PlaintextKey,
     KeyfileKey, RepoKey, AuthenticatedKey,
     Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey,
+    # new crypto
+    AESOCBKeyfileKey, AESOCBRepoKey,
+    CHPOKeyfileKey, CHPORepoKey,
+    Blake2AESOCBKeyfileKey, Blake2AESOCBRepoKey,
+    Blake2CHPOKeyfileKey, Blake2CHPORepoKey,
 )

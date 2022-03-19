@@ -38,6 +38,7 @@ from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from . import BaseTestCase, FakeInputs
 
 import argon2.low_level
+from base64 import b16decode
 
 
 class BigIntTestCase(BaseTestCase):
@@ -1213,13 +1214,21 @@ class TestPassphrase:
     def test_argon2(self, monkeypatch):
         # Arrange
         monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-        Passphrase.new()
+        p = Passphrase.new()
 
         # Act
-        enc_key, mac_key = Passphrase.argon2(
+        enc_key, mac_key = p.argon2(
             salt=b'salt'*16,
             time_cost=1,
-            memory_cost=2**10,
+            memory_cost=4096,
             parallelism=1,
             type=argon2.low_level.Type.I
         )
+
+        # Assert
+        assert len(enc_key)*8 == 256
+        assert len(mac_key)*8 == 256
+        # echo -n "hello, pass phrase" | argon2 saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt -i -t 1 -k 4096 -p 1 -l 64 -r
+        expected = 'b668a71dded9a9772686ab4c2da2a06c491087e9e27c14f9e798ad8b929506b43ef3878e4bb03055b6efbecddcdbfc58bfc1617a0e1790a46c1a9991c3269b34'
+        expected = b16decode(expected.upper())
+        enc_key + mac_key == expected

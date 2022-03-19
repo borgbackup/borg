@@ -12,6 +12,8 @@ from . import prepare_subprocess_env
 
 from ..logger import create_logger
 
+import argon2.low_level
+
 logger = create_logger()
 
 
@@ -140,5 +142,22 @@ class Passphrase(str):
     def kdf(self, salt, iterations, length):
         return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
 
-    def argon2(*, salt, time_cost, memory_cost, parallelism, type):
-        return b'', b''
+    def argon2(
+        self,
+        *,
+        salt: bytes,
+        time_cost,
+        memory_cost,
+        parallelism,
+        type: argon2.low_level.Type
+    ) -> (bytes, bytes):
+        key = argon2.low_level.hash_secret_raw(
+            secret=self.encode("utf-8"),
+            hash_len=64,  # hash_len is in bytes
+            salt=salt,
+            time_cost=time_cost,
+            memory_cost=memory_cost,
+            parallelism=parallelism,
+            type=type,
+        )
+        return key[:32], key[32:]

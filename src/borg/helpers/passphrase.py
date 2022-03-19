@@ -139,3 +139,6 @@ class Passphrase(str):
 
     def kdf(self, salt, iterations, length):
         return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
+
+    def argon2(*, salt, time_cost, memory_cost, parallelism, type):
+        return b'', b''

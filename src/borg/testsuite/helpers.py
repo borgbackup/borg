@@ -1216,14 +1216,10 @@ class TestPassphrase:
         Passphrase.new()
 
         # Act
-        with pytest.raises(AttributeError):
-            Passphrase.argon2
-            '''
-            enc_key, mac_key = Passphrase.argon2(
-                salt=b'salt'*16,
-                time_cost=1,
-                memory_cost=2**10,
-                parallelism=1,
-                type=argon2.low_level.Type.I
-            )
-            '''
+        enc_key, mac_key = Passphrase.argon2(
+            salt=b'salt'*16,
+            time_cost=1,
+            memory_cost=2**10,
+            parallelism=1,
+            type=argon2.low_level.Type.I
+        )

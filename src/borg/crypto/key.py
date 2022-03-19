@@ -51,6 +51,10 @@ class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
 
 
+class UnsupportedKeyFormatError(Error):
+    """Your borg key is stored in an unsupported format. Try using a newer version of borg."""
+
+
 class TAMRequiredError(IntegrityError):
     __doc__ = textwrap.dedent("""
     Manifest is unauthenticated, but it is required for this repository.
@@ -430,13 +434,40 @@ class FlexiKey:
         unpacker = get_limited_unpacker('key')
         unpacker.feed(data)
         data = unpacker.unpack()
-        enc_key = EncryptedKey(internal_dict=data)
-        assert enc_key.version == 1
-        assert enc_key.algorithm == 'sha256'
-        key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
-        data = AES(key, b'\0'*16).decrypt(enc_key.data)
-        if hmac.compare_digest(hmac_sha256(key, data), enc_key.hash):
+        encrypted_key = EncryptedKey(internal_dict=data)
+        if encrypted_key.version != 1:
+            raise UnsupportedKeyFormatError()
+        else:
+            if encrypted_key.algorithm == 'sha256':
+                return self.decrypt_key_file_pbkdf2(encrypted_key, passphrase)
+            elif encrypted_key.algorithm == 'argon2 aes256-ctr hmac-sha256':
+                return self.decrypt_key_file_argon2(encrypted_key, passphrase)
+            else:
+                raise UnsupportedKeyFormatError()
+
+    def decrypt_key_file_pbkdf2(self, encrypted_key, passphrase):
+        key = passphrase.kdf(encrypted_key.salt, encrypted_key.iterations, 32)
+        data = AES(key, b'\0'*16).decrypt(encrypted_key.data)
+        if hmac.compare_digest(hmac_sha256(key, data), encrypted_key.hash):
             return data
+        return None
+
+    def decrypt_key_file_argon2(self, encrypted_key, passphrase):
+        key = passphrase.argon2(
+            output_len_in_bytes=64,
+            salt=encrypted_key.salt,
+            time_cost=encrypted_key.argon2_time_cost,
+            memory_cost=encrypted_key.argon2_memory_cost,
+            parallelism=encrypted_key.argon2_parallelism,
+            type=encrypted_key.argon2_type,
+        )
+        enc_key, mac_key = key[:32], key[32:]
+        ae_cipher = AES256_CTR_HMAC_SHA256(
+            iv=0, header_len=0, aad_offset=0,
+            enc_key=enc_key,
+            mac_key=mac_key,
+        )
+        return ae_cipher.decrypt(encrypted_key.data)
 
     def encrypt_key_file(self, data, passphrase):
         salt = os.urandom(32)

@@ -37,6 +37,8 @@ from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 
 from . import BaseTestCase, FakeInputs
 
+import argon2.low_level
+
 
 class BigIntTestCase(BaseTestCase):
 
@@ -1207,3 +1209,21 @@ class TestPassphrase:
 
     def test_passphrase_repr(self):
         assert "secret" not in repr(Passphrase("secret"))
+
+    def test_argon2(self, monkeypatch):
+        # Arrange
+        monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
+        Passphrase.new()
+
+        # Act
+        with pytest.raises(AttributeError):
+            Passphrase.argon2
+            '''
+            enc_key, mac_key = Passphrase.argon2(
+                salt=b'salt'*16,
+                time_cost=1,
+                memory_cost=2**10,
+                parallelism=1,
+                type=argon2.low_level.Type.I
+            )
+            '''

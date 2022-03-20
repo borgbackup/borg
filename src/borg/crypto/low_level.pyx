@@ -428,7 +428,7 @@ cdef class _AEAD_BASE:
 
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *key
+    cdef unsigned char key[32]
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int aad_offset
@@ -587,8 +587,7 @@ cdef class _AEAD_BASE:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        for i in range(self.iv_len):
-            self.iv[i] = iv[i]
+        self.iv = iv
         self.blocks = 0  # number of cipher blocks encrypted with this IV
 
     def next_iv(self):

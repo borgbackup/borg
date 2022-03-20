@@ -23,14 +23,3 @@ void HMAC_CTX_free(HMAC_CTX *ctx)
     }
 }
 #endif
-
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
-const EVP_CIPHER *EVP_aes_256_ocb(void){  /* dummy, so that code compiles */
-    return NULL;
-}
-
-const EVP_CIPHER *EVP_chacha20_poly1305(void){  /* dummy, so that code compiles */
-    return NULL;
-}
-#endif

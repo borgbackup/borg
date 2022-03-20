@@ -1,7 +1,6 @@
 from binascii import hexlify
 
-from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
-                               IntegrityError, openssl10
+from ..crypto.low_level import AES256_CTR_HMAC_SHA256, UNENCRYPTED, IntegrityError
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 
@@ -88,94 +87,6 @@ class CryptoTestCase(BaseTestCase):
         hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
         self.assert_raises(IntegrityError,
                            lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
-
-    def test_AE(self):
-        # used in legacy-like layout (1 type byte, no aad)
-        mac_key = None
-        enc_key = b'X' * 32
-        iv = 0
-        data = b'foo' * 10
-        header = b'\x23'
-        tests = [
-            # (ciphersuite class, exp_mac, exp_cdata)
-        ]
-        if not openssl10:
-            tests += [
-                (AES256_OCB,
-                 b'b6909c23c9aaebd9abbe1ff42097652d',
-                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
-                (CHACHA20_POLY1305,
-                 b'fd08594796e0706cde1e8b461e3e0555',
-                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
-            ]
-        for cs_cls, exp_mac, exp_cdata in tests:
-            # print(repr(cs_cls))
-            # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv, header_len=1, aad_offset=1)
-            hdr_mac_iv_cdata = cs.encrypt(data, header=header)
-            hdr = hdr_mac_iv_cdata[0:1]
-            mac = hdr_mac_iv_cdata[1:17]
-            iv = hdr_mac_iv_cdata[17:29]
-            cdata = hdr_mac_iv_cdata[29:]
-            self.assert_equal(hexlify(hdr), b'23')
-            self.assert_equal(hexlify(mac), exp_mac)
-            self.assert_equal(hexlify(iv), b'000000000000000000000000')
-            self.assert_equal(hexlify(cdata), exp_cdata)
-            self.assert_equal(cs.next_iv(), 1)
-            # auth/decrypt
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
-            pdata = cs.decrypt(hdr_mac_iv_cdata)
-            self.assert_equal(data, pdata)
-            self.assert_equal(cs.next_iv(), 1)
-            # auth-failure due to corruption (corrupted data)
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
-            hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:29] + b'\0' + hdr_mac_iv_cdata[30:]
-            self.assert_raises(IntegrityError,
-                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
-
-    def test_AEAD(self):
-        # test with aad
-        mac_key = None
-        enc_key = b'X' * 32
-        iv = 0
-        data = b'foo' * 10
-        header = b'\x12\x34\x56'
-        tests = [
-            # (ciphersuite class, exp_mac, exp_cdata)
-        ]
-        if not openssl10:
-            tests += [
-                (AES256_OCB,
-                 b'f2748c412af1c7ead81863a18c2c1893',
-                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
-                (CHACHA20_POLY1305,
-                 b'b7e7c9a79f2404e14f9aad156bf091dd',
-                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
-            ]
-        for cs_cls, exp_mac, exp_cdata in tests:
-            # print(repr(cs_cls))
-            # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv, header_len=3, aad_offset=1)
-            hdr_mac_iv_cdata = cs.encrypt(data, header=header)
-            hdr = hdr_mac_iv_cdata[0:3]
-            mac = hdr_mac_iv_cdata[3:19]
-            iv = hdr_mac_iv_cdata[19:31]
-            cdata = hdr_mac_iv_cdata[31:]
-            self.assert_equal(hexlify(hdr), b'123456')
-            self.assert_equal(hexlify(mac), exp_mac)
-            self.assert_equal(hexlify(iv), b'000000000000000000000000')
-            self.assert_equal(hexlify(cdata), exp_cdata)
-            self.assert_equal(cs.next_iv(), 1)
-            # auth/decrypt
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
-            pdata = cs.decrypt(hdr_mac_iv_cdata)
-            self.assert_equal(data, pdata)
-            self.assert_equal(cs.next_iv(), 1)
-            # auth-failure due to corruption (corrupted aad)
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
-            hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
-            self.assert_raises(IntegrityError,
-                               lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
     # These test vectors come from https://www.kullo.net/blog/hkdf-sha-512-test-vectors/
     # who claims to have verified these against independent Python and C++ implementations.

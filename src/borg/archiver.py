@@ -604,9 +604,9 @@ class Archiver:
         if not is_libressl:
             tests.extend([
                 ("aes-256-ocb", lambda: AES256_OCB(
-                    None, key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+                    key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
                 ("chacha20-poly1305", lambda: CHACHA20_POLY1305(
-                    None, key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+                    key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
             ])
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")

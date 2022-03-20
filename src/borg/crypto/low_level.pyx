@@ -187,7 +187,7 @@ cdef class AES256_CTR_BASE:
     # Layout: HEADER + MAC 32 + IV 8 + CT (same as attic / borg < 1.3 IF HEADER = TYPE_BYTE, no AAD)
 
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef unsigned char enc_key[32]
     cdef int cipher_blk_len
     cdef int iv_len, iv_len_short
     cdef int aad_offset
@@ -335,8 +335,7 @@ cdef class AES256_CTR_BASE:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        for i in range(self.iv_len):
-            self.iv[i] = iv[i]
+        self.iv = iv
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
 
     def next_iv(self):
@@ -360,7 +359,7 @@ cdef class AES256_CTR_BASE:
 
 
 cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
-    cdef unsigned char *mac_key
+    cdef unsigned char mac_key[32]
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
@@ -377,7 +376,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
                      const unsigned char *data2, int data2_len,
                      unsigned char *mac_buf):
         data = data1[:data1_len] + data2[:data2_len]
-        mac = hmac.HMAC(self.mac_key, data, hashlib.sha256).digest()
+        mac = hmac.HMAC(self.mac_key[:self.mac_len], data, hashlib.sha256).digest()
         for i in range(self.mac_len):
             mac_buf[i] = mac[i]
 
@@ -390,7 +389,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
 
 
 cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
-    cdef unsigned char *mac_key
+    cdef unsigned char mac_key[128]
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert isinstance(mac_key, bytes) and len(mac_key) == 128
@@ -638,7 +637,7 @@ cdef class AES:
     """A thin wrapper around the OpenSSL EVP cipher API - for legacy code, like key file encryption"""
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef unsigned char enc_key[32]
     cdef int cipher_blk_len
     cdef int iv_len
     cdef unsigned char iv[16]
@@ -726,8 +725,7 @@ cdef class AES:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        for i in range(self.iv_len):
-            self.iv[i] = iv[i]
+        self.iv = iv
         self.blocks = 0  # number of cipher blocks encrypted with this IV
 
     def next_iv(self):

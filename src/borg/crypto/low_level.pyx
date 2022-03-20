@@ -376,7 +376,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
                      const unsigned char *data2, int data2_len,
                      unsigned char *mac_buf):
         data = data1[:data1_len] + data2[:data2_len]
-        mac = hmac.HMAC(self.mac_key[:self.mac_len], data, hashlib.sha256).digest()
+        mac = hmac.digest(self.mac_key[:self.mac_len], data, 'sha256')
         for i in range(self.mac_len):
             mac_buf[i] = mac[i]
 
@@ -761,7 +761,7 @@ def hkdf_hmac_sha512(ikm, salt, info, output_length):
     # Step 1. HKDF-Extract (ikm, salt) -> prk
     if salt is None:
         salt = bytes(64)
-    prk = hmac.HMAC(salt, ikm, hashlib.sha512).digest()
+    prk = hmac.digest(salt, ikm, 'sha512')
 
     # Step 2. HKDF-Expand (prk, info, output_length) -> output key
     n = ceil(output_length / digest_length)
@@ -769,6 +769,6 @@ def hkdf_hmac_sha512(ikm, salt, info, output_length):
     output = b''
     for i in range(n):
         msg = t_n + info + (i + 1).to_bytes(1, 'little')
-        t_n = hmac.HMAC(prk, msg, hashlib.sha512).digest()
+        t_n = hmac.digest(prk, msg, 'sha512')
         output += t_n
     return output[:output_length]

@@ -8,7 +8,8 @@ import pytest
 
 from ..crypto.key import bin_to_hex
 from ..crypto.key import PlaintextKey, AuthenticatedKey, RepoKey, KeyfileKey, \
-    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey
+    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey, \
+    AESOCBKeyfileKey, AESOCBRepoKey, CHPOKeyfileKey, CHPORepoKey
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
 from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError
 from ..crypto.key import identify_key
@@ -80,6 +81,8 @@ class TestKey:
         Blake2KeyfileKey,
         Blake2RepoKey,
         Blake2AuthenticatedKey,
+        AESOCBKeyfileKey, AESOCBRepoKey,
+        CHPOKeyfileKey, CHPORepoKey,
     ))
     def key(self, request, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')

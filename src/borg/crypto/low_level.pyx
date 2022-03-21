@@ -313,7 +313,7 @@ cdef class AES256_CTR_BASE:
                                      ilen-hlen-self.mac_len-self.iv_len_short):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
-            if EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen) <= 0:
+            if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
                 raise CryptoError('EVP_DecryptFinal_ex failed')
             offset += olen
             self.blocks += self.block_count(offset)
@@ -705,7 +705,7 @@ cdef class AES:
             if not EVP_DecryptUpdate(self.ctx, odata, &olen, <const unsigned char*> idata.buf, ilen):
                 raise Exception('EVP_DecryptUpdate failed')
             offset += olen
-            if EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen) <= 0:
+            if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
                 # this error check is very important for modes with padding or
                 # authentication. for them, a failure here means corrupted data.
                 # CTR mode does not use padding nor authentication.

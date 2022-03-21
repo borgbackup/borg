@@ -102,13 +102,9 @@ cdef extern from "openssl/hmac.h":
 
 cdef extern from "_crypto_helpers.h":
     long OPENSSL_VERSION_NUMBER
-    long LIBRESSL_VERSION_NUMBER
 
     HMAC_CTX *HMAC_CTX_new()
     void HMAC_CTX_free(HMAC_CTX *a)
-
-
-openssl10 = OPENSSL_VERSION_NUMBER < 0x10100000 or LIBRESSL_VERSION_NUMBER
 
 
 import struct

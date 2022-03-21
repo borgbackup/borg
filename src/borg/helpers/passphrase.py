@@ -144,7 +144,7 @@ class Passphrase(str):
 
     def argon2(
         self,
-        *,
+        output_len_in_bytes: int,
         salt: bytes,
         time_cost,
         memory_cost,
@@ -153,11 +153,11 @@ class Passphrase(str):
     ) -> (bytes, bytes):
         key = argon2.low_level.hash_secret_raw(
             secret=self.encode("utf-8"),
-            hash_len=64,  # hash_len is in bytes
+            hash_len=output_len_in_bytes,
             salt=salt,
             time_cost=time_cost,
             memory_cost=memory_cost,
             parallelism=parallelism,
             type=type,
         )
-        return key[:32], key[32:]
+        return key

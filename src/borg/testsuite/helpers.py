@@ -37,9 +37,6 @@ from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 
 from . import BaseTestCase, FakeInputs
 
-import argon2.low_level
-from base64 import b16decode
-
 
 class BigIntTestCase(BaseTestCase):
 

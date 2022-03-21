@@ -65,6 +65,7 @@ install_requires = [
     # using any other version is not supported by borg development and
     # any feedback related to issues caused by this will be ignored.
     'packaging',
+    'argon2-cffi',
 ]
 
 # note for package maintainers: if you package borgbackup for distribution,

@@ -4,6 +4,7 @@ import shlex
 import subprocess
 import sys
 from hashlib import pbkdf2_hmac
+from typing import Literal
 
 from . import bin_to_hex
 from . import Error
@@ -11,6 +12,8 @@ from . import yes
 from . import prepare_subprocess_env
 
 from ..logger import create_logger
+
+import argon2.low_level
 
 logger = create_logger()
 
@@ -139,3 +142,28 @@ class Passphrase(str):
 
     def kdf(self, salt, iterations, length):
         return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
+
+    def argon2(
+        self,
+        output_len_in_bytes: int,
+        salt: bytes,
+        time_cost,
+        memory_cost,
+        parallelism,
+        type: Literal['i', 'd', 'id']
+    ) -> bytes:
+        type_map = {
+            'i': argon2.low_level.Type.I,
+            'd': argon2.low_level.Type.D,
+            'id': argon2.low_level.Type.ID,
+        }
+        key = argon2.low_level.hash_secret_raw(
+            secret=self.encode("utf-8"),
+            hash_len=output_len_in_bytes,
+            salt=salt,
+            time_cost=time_cost,
+            memory_cost=memory_cost,
+            parallelism=parallelism,
+            type=type_map[type],
+        )
+        return key

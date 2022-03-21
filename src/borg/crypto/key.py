@@ -739,7 +739,7 @@ class AEADKeyBase(KeyBase):
         iv = self.cipher.next_iv()
         iv_48bit = iv.to_bytes(6, 'big')
         header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
-        return self.cipher.encrypt(data, header=header, iv=iv)
+        return self.cipher.encrypt(data, header=header, iv=iv, aad=id)
 
     def decrypt(self, id, data, decompress=True):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
@@ -749,7 +749,7 @@ class AEADKeyBase(KeyBase):
         iv = int.from_bytes(iv_48bit, 'big')
         cipher = self._get_cipher(sessionid, iv)
         try:
-            payload = cipher.decrypt(data)
+            payload = cipher.decrypt(data, aad=id)
         except IntegrityError as e:
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
         if not decompress:

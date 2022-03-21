@@ -152,7 +152,7 @@ class UNENCRYPTED:
         self.header_len = header_len
         self.set_iv(iv)
 
-    def encrypt(self, data, header=b'', iv=None):
+    def encrypt(self, data, header=b'', iv=None, aad=None):
         """
         IMPORTANT: it is called encrypt to satisfy the crypto api naming convention,
         but this does NOT encrypt and it does NOT compute and store a MAC either.
@@ -162,7 +162,7 @@ class UNENCRYPTED:
         assert self.iv is not None, 'iv needs to be set before encrypt is called'
         return header + data
 
-    def decrypt(self, envelope):
+    def decrypt(self, envelope, aad=None):
         """
         IMPORTANT: it is called decrypt to satisfy the crypto api naming convention,
         but this does NOT decrypt and it does NOT verify a MAC either, because data
@@ -235,7 +235,7 @@ cdef class AES256_CTR_BASE:
         """
         raise NotImplementedError
 
-    def encrypt(self, data, header=b'', iv=None):
+    def encrypt(self, data, header=b'', iv=None, aad=None):
         """
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
@@ -285,7 +285,7 @@ cdef class AES256_CTR_BASE:
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
 
-    def decrypt(self, envelope):
+    def decrypt(self, envelope, aad=None):
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
@@ -468,10 +468,13 @@ cdef class _AEAD_BASE:
     def __dealloc__(self):
         EVP_CIPHER_CTX_free(self.ctx)
 
-    def encrypt(self, data, header=b'', iv=None):
+    def encrypt(self, data, header=b'', iv=None, aad=b''):
         """
-        encrypt data, compute mac over aad + cdata, prepend header.
-        aad_offset is the offset into the header where aad starts.
+        encrypt data, compute auth tag over aad + header + cdata.
+        return header + auth tag + cdata.
+        aad_offset is the offset into the header where the authenticated header part starts.
+        aad is additional authenticated data, which won't be included in the returned data,
+        but only used for the auth tag computation.
         """
         if iv is not None:
             self.set_iv(iv)
@@ -486,6 +489,7 @@ cdef class _AEAD_BASE:
         assert hlen == self.header_len_expected
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
+        cdef int aadlen = len(aad)
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
                                                                   ilen + self.cipher_blk_len)
         if not odata:
@@ -494,6 +498,7 @@ cdef class _AEAD_BASE:
         cdef int offset
         cdef Py_buffer idata = ro_buffer(data)
         cdef Py_buffer hdata = ro_buffer(header)
+        cdef Py_buffer aadata = ro_buffer(aad)
         try:
             offset = 0
             for i in range(hlen):
@@ -508,6 +513,9 @@ cdef class _AEAD_BASE:
             rc = EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv)
             if not rc:
                 raise CryptoError('EVP_EncryptInit_ex failed')
+            rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen)
+            if not rc:
+                raise CryptoError('EVP_EncryptUpdate failed')
             rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen)
             if not rc:
                 raise CryptoError('EVP_EncryptUpdate failed')
@@ -527,10 +535,12 @@ cdef class _AEAD_BASE:
             PyMem_Free(odata)
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
+            PyBuffer_Release(&aadata)
 
-    def decrypt(self, envelope):
+    def decrypt(self, envelope, aad=b''):
         """
-        authenticate aad + cdata, decrypt cdata, ignore header bytes up to aad_offset.
+        authenticate aad + header + cdata (from envelope), ignore header bytes up to aad_offset.,
+        return decrypted cdata.
         """
         # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
         # IV we provide, thus we must not decrypt more than 2^32 cipher blocks with same IV):
@@ -541,12 +551,14 @@ cdef class _AEAD_BASE:
         cdef int hlen = self.header_len_expected
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
+        cdef int aadlen = len(aad)
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
         cdef int olen
         cdef int offset
         cdef Py_buffer idata = ro_buffer(envelope)
+        cdef Py_buffer aadata = ro_buffer(aad)
         try:
             if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_DecryptInit_ex failed')
@@ -554,6 +566,9 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
+            rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen)
+            if not rc:
+                raise CryptoError('EVP_DecryptUpdate failed')
             rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
             if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
@@ -576,6 +591,7 @@ cdef class _AEAD_BASE:
         finally:
             PyMem_Free(odata)
             PyBuffer_Release(&idata)
+            PyBuffer_Release(&aadata)
 
     def block_count(self, length):
         return num_cipher_blocks(length, self.cipher_blk_len)

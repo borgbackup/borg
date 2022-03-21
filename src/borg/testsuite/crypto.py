@@ -175,6 +175,28 @@ class CryptoTestCase(BaseTestCase):
             self.assert_raises(IntegrityError,
                                lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
+    def test_AEAD_with_more_AAD(self):
+        # test giving extra aad to the .encrypt() and .decrypt() calls
+        key = b'X' * 32
+        iv_int = 0
+        data = b'foo' * 10
+        header = b'\x12\x34'
+        tests = []
+        if not is_libressl:
+            tests += [AES256_OCB, CHACHA20_POLY1305]
+        for cs_cls in tests:
+            # encrypt/mac
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)
+            hdr_mac_iv_cdata = cs.encrypt(data, header=header, aad=b'correct_chunkid')
+            # successful auth/decrypt (correct aad)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)
+            pdata = cs.decrypt(hdr_mac_iv_cdata, aad=b'correct_chunkid')
+            self.assert_equal(data, pdata)
+            # unsuccessful auth (incorrect aad)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)
+            self.assert_raises(IntegrityError,
+                               lambda: cs.decrypt(hdr_mac_iv_cdata, aad=b'incorrect_chunkid'))
+
     # These test vectors come from https://www.kullo.net/blog/hkdf-sha-512-test-vectors/
     # who claims to have verified these against independent Python and C++ implementations.
 

@@ -264,15 +264,12 @@ cdef class AES256_CTR_BASE:
             offset += self.mac_len
             self.store_iv(odata+offset, self.iv)
             offset += self.iv_len_short
-            rc = EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, self.iv)
-            if not rc:
+            if not EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, self.iv):
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
-            if not rc:
+            if not EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen):
                 raise CryptoError('EVP_EncryptUpdate failed')
             offset += olen
-            rc = EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen)
-            if not rc:
+            if not EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen):
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
             self.mac_compute(<const unsigned char *> hdata.buf+aoffset, alen,
@@ -311,14 +308,12 @@ cdef class AES256_CTR_BASE:
             if not EVP_DecryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             offset = 0
-            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                   <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len_short,
-                                   ilen-hlen-self.mac_len-self.iv_len_short)
-            if not rc:
+            if not EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                     <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len_short,
+                                     ilen-hlen-self.mac_len-self.iv_len_short):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
-            rc = EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen)
-            if rc <= 0:
+            if EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen) <= 0:
                 raise CryptoError('EVP_DecryptFinal_ex failed')
             offset += olen
             self.blocks += self.block_count(offset)

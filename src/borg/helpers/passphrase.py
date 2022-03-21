@@ -150,12 +150,12 @@ class Passphrase(str):
         time_cost,
         memory_cost,
         parallelism,
-        type: Literal[b'argon2i', b'argon2d', b'argon2id']
+        type: Literal['i', 'd', 'id']
     ) -> bytes:
         type_map = {
-            b'argon2i': argon2.low_level.Type.I,
-            b'argon2d': argon2.low_level.Type.D,
-            b'argon2id': argon2.low_level.Type.ID,
+            'i': argon2.low_level.Type.I,
+            'd': argon2.low_level.Type.D,
+            'id': argon2.low_level.Type.ID,
         }
         key = argon2.low_level.hash_secret_raw(
             secret=self.encode("utf-8"),

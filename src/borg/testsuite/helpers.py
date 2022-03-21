@@ -1210,22 +1210,3 @@ class TestPassphrase:
 
     def test_passphrase_repr(self):
         assert "secret" not in repr(Passphrase("secret"))
-
-    def test_argon2(self, monkeypatch):
-        monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-        p = Passphrase.new()
-
-        key = p.argon2(
-            output_len_in_bytes=64,
-            salt=b'salt'*16,
-            time_cost=1,
-            memory_cost=4096,
-            parallelism=1,
-            type=b'argon2i'
-        )
-
-        assert len(key)*8 == 256*2
-        # echo -n "hello, pass phrase" | argon2 saltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsaltsalt -i -t 1 -k 4096 -p 1 -l 64 -r
-        expected = 'b668a71dded9a9772686ab4c2da2a06c491087e9e27c14f9e798ad8b929506b43ef3878e4bb03055b6efbecddcdbfc58bfc1617a0e1790a46c1a9991c3269b34'
-        expected = b16decode(expected.upper())
-        key == expected

@@ -158,7 +158,7 @@ class KeyBase:
         """
         raise NotImplementedError
 
-    def encrypt(self, chunk):
+    def encrypt(self, id, data):
         pass
 
     def decrypt(self, id, data, decompress=True):
@@ -264,8 +264,8 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, id, data):
+        data = self.compressor.compress(data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -340,8 +340,8 @@ class AESKeyBase(KeyBase):
 
     logically_encrypted = True
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, id, data):
+        data = self.compressor.compress(data)
         next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(),
                                                         self.cipher.block_count(len(data)))
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
@@ -678,8 +678,8 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         if manifest_data is not None:
             self.assert_type(manifest_data[0])
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, id, data):
+        data = self.compressor.compress(data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -732,9 +732,9 @@ class AEADKeyBase(KeyBase):
 
     logically_encrypted = True
 
-    def encrypt(self, chunk):
+    def encrypt(self, id, data):
         # to encrypt new data in this session we use always self.cipher and self.sessionid
-        data = self.compressor.compress(chunk)
+        data = self.compressor.compress(data)
         reserved = b'\0'
         iv = self.cipher.next_iv()
         iv_48bit = iv.to_bytes(6, 'big')

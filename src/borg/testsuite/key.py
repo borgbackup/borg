@@ -114,18 +114,21 @@ class TestKey:
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
         chunk = b'foo'
-        assert hexlify(key.id_hash(chunk)) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
-        assert chunk == key.decrypt(key.id_hash(chunk), key.encrypt(chunk))
+        id = key.id_hash(chunk)
+        assert hexlify(id) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
+        assert chunk == key.decrypt(id, key.encrypt(id, chunk))
 
     def test_keyfile(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert key.cipher.next_iv() == 0
-        manifest = key.encrypt(b'ABC')
+        chunk = b'ABC'
+        id = key.id_hash(chunk)
+        manifest = key.encrypt(id, chunk)
         assert key.cipher.extract_iv(manifest) == 0
-        manifest2 = key.encrypt(b'ABC')
+        manifest2 = key.encrypt(id, chunk)
         assert manifest != manifest2
-        assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
+        assert key.decrypt(id, manifest) == key.decrypt(id, manifest2)
         assert key.cipher.extract_iv(manifest2) == 1
         iv = key.cipher.extract_iv(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
@@ -134,7 +137,8 @@ class TestKey:
         assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
         assert key2.chunk_seed != 0
         chunk = b'foo'
-        assert chunk == key2.decrypt(key.id_hash(chunk), key.encrypt(chunk))
+        id = key.id_hash(chunk)
+        assert chunk == key2.decrypt(id, key.encrypt(id, chunk))
 
     def test_keyfile_nonce_rollback_protection(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -142,9 +146,11 @@ class TestKey:
         with open(os.path.join(get_security_dir(repository.id_str), 'nonce'), "w") as fd:
             fd.write("0000000000002000")
         key = KeyfileKey.create(repository, self.MockArgs())
-        data = key.encrypt(b'ABC')
+        chunk = b'ABC'
+        id = key.id_hash(chunk)
+        data = key.encrypt(id, chunk)
         assert key.cipher.extract_iv(data) == 0x2000
-        assert key.decrypt(None, data) == b'ABC'
+        assert key.decrypt(id, data) == chunk
 
     def test_keyfile_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')
@@ -155,7 +161,7 @@ class TestKey:
         assert keyfile.exists()
         chunk = b'ABC'
         chunk_id = key.id_hash(chunk)
-        chunk_cdata = key.encrypt(chunk)
+        chunk_cdata = key.encrypt(chunk_id, chunk)
         key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
         assert chunk == key.decrypt(chunk_id, chunk_cdata)
         keyfile.remove()
@@ -212,18 +218,20 @@ class TestKey:
     def test_roundtrip(self, key):
         repository = key.repository
         plaintext = b'foo'
-        encrypted = key.encrypt(plaintext)
+        id = key.id_hash(plaintext)
+        encrypted = key.encrypt(id, plaintext)
         identified_key_class = identify_key(encrypted)
         assert identified_key_class == key.__class__
         loaded_key = identified_key_class.detect(repository, encrypted)
-        decrypted = loaded_key.decrypt(None, encrypted)
+        decrypted = loaded_key.decrypt(id, encrypted)
         assert decrypted == plaintext
 
     def test_decrypt_decompress(self, key):
         plaintext = b'123456789'
-        encrypted = key.encrypt(plaintext)
-        assert key.decrypt(None, encrypted, decompress=False) != plaintext
-        assert key.decrypt(None, encrypted) == plaintext
+        id = key.id_hash(plaintext)
+        encrypted = key.encrypt(id, plaintext)
+        assert key.decrypt(id, encrypted, decompress=False) != plaintext
+        assert key.decrypt(id, encrypted) == plaintext
 
     def test_assert_id(self, key):
         plaintext = b'123456789'
@@ -243,7 +251,8 @@ class TestKey:
         assert AuthenticatedKey.id_hash is ID_HMAC_SHA_256.id_hash
         assert len(key.id_key) == 32
         plaintext = b'123456789'
-        authenticated = key.encrypt(plaintext)
+        id = key.id_hash(plaintext)
+        authenticated = key.encrypt(id, plaintext)
         # 0x07 is the key TYPE, \x0000 identifies no compression.
         assert authenticated == b'\x07\x00\x00' + plaintext
 
@@ -253,7 +262,8 @@ class TestKey:
         assert Blake2AuthenticatedKey.id_hash is ID_BLAKE2b_256.id_hash
         assert len(key.id_key) == 128
         plaintext = b'123456789'
-        authenticated = key.encrypt(plaintext)
+        id = key.id_hash(plaintext)
+        authenticated = key.encrypt(id, plaintext)
         # 0x06 is the key TYPE, 0x0000 identifies no compression.
         assert authenticated == b'\x06\x00\x00' + plaintext
 

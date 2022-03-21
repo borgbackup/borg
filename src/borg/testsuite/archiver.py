@@ -3806,7 +3806,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 'version': 1,
             })
             archive_id = key.id_hash(archive)
-            repository.put(archive_id, key.encrypt(archive))
+            repository.put(archive_id, key.encrypt(archive_id, archive))
             repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -3894,7 +3894,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
     def spoof_manifest(self, repository):
         with repository:
             _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'config': {},
@@ -3907,7 +3907,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
@@ -3929,7 +3929,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
 
             manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
             del manifest[b'tam']
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest)))
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb(manifest)))
             repository.commit(compact=False)
         output = self.cmd('list', '--debug', self.repository_location)
         assert 'archive1234' in output

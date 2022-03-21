@@ -261,4 +261,4 @@ class Manifest:
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(self.MANIFEST_ID, data))

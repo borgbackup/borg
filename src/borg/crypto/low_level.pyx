@@ -505,26 +505,20 @@ cdef class _AEAD_BASE:
                 odata[offset+i] = header[i]
             offset += hlen
             offset += self.mac_len
-            rc = EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL)
-            if not rc:
+            if not EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_EncryptInit_ex failed')
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
-            rc = EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv)
-            if not rc:
+            if not EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen)
-            if not rc:
+            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen):
                 raise CryptoError('EVP_EncryptUpdate failed')
-            rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen)
-            if not rc:
+            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen):
                 raise CryptoError('EVP_EncryptUpdate failed')
-            rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
-            if not rc:
+            if not EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen):
                 raise CryptoError('EVP_EncryptUpdate failed')
             offset += olen
-            rc = EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen)
-            if not rc:
+            if not EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen):
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_GET_TAG, self.mac_len, odata + hlen):
@@ -566,23 +560,19 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen)
-            if not rc:
+            if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen):
                 raise CryptoError('EVP_DecryptUpdate failed')
-            rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
-            if not rc:
+            if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset = 0
-            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                   <const unsigned char*> idata.buf+hlen+self.mac_len,
-                                   ilen-hlen-self.mac_len)
-            if not rc:
+            if not EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                     <const unsigned char*> idata.buf+hlen+self.mac_len,
+                                     ilen-hlen-self.mac_len):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
-            rc = EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen)
-            if not rc:
+            if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
                 # a failure here means corrupted or tampered tag (mac) or data.
                 raise IntegrityError('Authentication / EVP_DecryptFinal_ex failed')
             offset += olen

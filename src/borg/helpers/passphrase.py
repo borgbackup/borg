@@ -151,7 +151,7 @@ class Passphrase(str):
         memory_cost,
         parallelism,
         type: Literal[b'argon2i', b'argon2d', b'argon2id']
-    ) -> (bytes, bytes):
+    ) -> bytes:
         type_map = {
             b'argon2i': argon2.low_level.Type.I,
             b'argon2d': argon2.low_level.Type.D,

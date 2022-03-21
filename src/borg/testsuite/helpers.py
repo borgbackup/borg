@@ -1221,7 +1221,7 @@ class TestPassphrase:
             time_cost=1,
             memory_cost=4096,
             parallelism=1,
-            type=argon2.low_level.Type.I
+            type=b'argon2i'
         )
 
         assert len(key)*8 == 256*2

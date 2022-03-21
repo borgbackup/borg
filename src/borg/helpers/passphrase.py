@@ -4,6 +4,7 @@ import shlex
 import subprocess
 import sys
 from hashlib import pbkdf2_hmac
+from typing import Literal
 
 from . import bin_to_hex
 from . import Error
@@ -149,8 +150,13 @@ class Passphrase(str):
         time_cost,
         memory_cost,
         parallelism,
-        type: argon2.low_level.Type
+        type: Literal[b'argon2i', b'argon2d', b'argon2id']
     ) -> (bytes, bytes):
+        type_map = {
+            b'argon2i': argon2.low_level.Type.I,
+            b'argon2d': argon2.low_level.Type.D,
+            b'argon2id': argon2.low_level.Type.ID,
+        }
         key = argon2.low_level.hash_secret_raw(
             secret=self.encode("utf-8"),
             hash_len=output_len_in_bytes,
@@ -158,6 +164,6 @@ class Passphrase(str):
             time_cost=time_cost,
             memory_cost=memory_cost,
             parallelism=parallelism,
-            type=type,
+            type=type_map[type],
         )
         return key

@@ -1,6 +1,5 @@
 /* some helpers, so our code also works with OpenSSL 1.0.x */
 
-#include <string.h>
 #include <openssl/opensslv.h>
 #include <openssl/hmac.h>
 

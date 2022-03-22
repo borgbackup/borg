@@ -218,7 +218,7 @@ in the future.
 
 Depending on the chosen mode (see :ref:`borg_init`) different primitives are used:
 
-- The actual encryption is currently always AES-256 in CTR mode. The
+- Legacy encryption modes use AES-256 in CTR mode. The
   counter is added in plaintext, since it is needed for decryption,
   and is also tracked locally on the client to avoid counter reuse.
 

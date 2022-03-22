@@ -89,7 +89,7 @@ Also, you must not run borg against multiple instances of the same repo
   (which is an issue if they happen to be not the same).
   See :issue:`4272` for an example.
 - Encryption security issues if you would update repo and copy-of-repo
-  independently, due to AES counter reuse.
+  independently, due to AES counter reuse (when using legacy encryption modes).
 
 See also: :ref:`faq_corrupt_repo`
 
@@ -245,6 +245,8 @@ then use ``tar`` to perform the comparison:
 
 My repository is corrupt, how can I restore from an older copy of it?
 ---------------------------------------------------------------------
+
+Note: this is only required for repos using legacy encryption modes.
 
 If your repositories are encrypted and have the same ID, the recommended method
 is to delete the corrupted repository, but keep its security info, and then copy
@@ -473,8 +475,11 @@ Security
 
 .. _borg_security_critique:
 
-Isn't BorgBackup's AES-CTR crypto broken?
------------------------------------------
+Isn't BorgBackup's legacy AES-CTR-based crypto broken?
+------------------------------------------------------
+
+Note: in borg 1.3 new AEAD cipher based modes with session keys were added,
+solving the issues of the legacy modes.
 
 If a nonce (counter) value is reused, AES-CTR mode crypto is broken.
 
@@ -713,6 +718,8 @@ Please disclose security issues responsibly.
 How important are the nonce files?
 ------------------------------------
 
+This only applies to repositories using legacy encryption modes.
+
 Borg uses :ref:`AES-CTR encryption <borg_security_critique>`. An
 essential part of AES-CTR is a sequential counter that must **never**
 repeat. If the same value of the counter is used twice in the same repository,
@@ -881,14 +888,14 @@ What's the expected backup performance?
 ---------------------------------------
 
 Compared to simply copying files (e.g. with ``rsync``), Borg has more work to do.
-This can make creation of the first archive slower, but saves time 
+This can make creation of the first archive slower, but saves time
 and disk space on subsequent runs. Here what Borg does when you run ``borg create``:
 
 - Borg chunks the file (using the relatively expensive buzhash algorithm)
-- It then computes the "id" of the chunk (hmac-sha256 (often slow, except 
+- It then computes the "id" of the chunk (hmac-sha256 (often slow, except
   if your CPU has sha256 acceleration) or blake2b (fast, in software))
-- Then it checks whether this chunk is already in the repo (local hashtable lookup, 
-  fast). If so, the processing of the chunk is completed here. Otherwise it needs to 
+- Then it checks whether this chunk is already in the repo (local hashtable lookup,
+  fast). If so, the processing of the chunk is completed here. Otherwise it needs to
   process the chunk:
 - Compresses (the default lz4 is super fast)
 - Encrypts (AES, usually fast if your CPU has AES acceleration as usual
@@ -896,9 +903,9 @@ and disk space on subsequent runs. Here what Borg does when you run ``borg creat
 - Authenticates ("signs") using hmac-sha256 or blake2b (see above),
 - Transmits to repo. If the repo is remote, this usually involves an SSH connection
   (does its own encryption / authentication).
-- Stores the chunk into a key/value store (the key is the chunk id, the value 
+- Stores the chunk into a key/value store (the key is the chunk id, the value
   is the data). While doing that, it computes a CRC32 of the data (repo low-level
-  checksum, used by borg check --repository) and also updates the repo index 
+  checksum, used by borg check --repository) and also updates the repo index
   (another hashtable).
 
 Subsequent backups are usually very fast if most files are unchanged and only
@@ -928,14 +935,14 @@ If you feel your Borg backup is too slow somehow, here is what you can do:
 
 - Make sure Borg has enough RAM (depends on how big your repo is / how many
   files you have)
-- Use one of the blake2 modes for --encryption except if you positively know 
+- Use one of the blake2 modes for --encryption except if you positively know
   your CPU (and openssl) accelerates sha256 (then stay with hmac-sha256).
 - Don't use any expensive compression. The default is lz4 and super fast.
   Uncompressed is often slower than lz4.
 - Just wait. You can also interrupt it and start it again as often as you like,
   it will converge against a valid "completed" state (see ``--checkpoint-interval``,
   maybe use the default, but in any case don't make it too short). It is starting
-  from the beginning each time, but it is still faster then as it does not store 
+  from the beginning each time, but it is still faster then as it does not store
   data into the repo which it already has there from last checkpoint.
 - If you don’t need additional file attributes, you can disable them with ``--noflags``,
   ``--noacls``, ``--noxattrs``. This can lead to noticable performance improvements
@@ -945,12 +952,12 @@ If you feel that Borg "freezes" on a file, it could be in the middle of processi
 large file (like ISOs or VM images). Borg < 1.2 announces file names *after* finishing
 with the file. This can lead to displaying the name of a small file, while processing the
 next (larger) file. For very big files this can lead to the progress display show some
-previous short file for a long time while it processes the big one. With Borg 1.2 this 
+previous short file for a long time while it processes the big one. With Borg 1.2 this
 was changed to announcing the filename before starting to process it.
 
 To see what files have changed and take more time processing, you can also add
-``--list --filter=AME --stats`` to your ``borg create`` call to produce more log output, 
-including a file list (with file status characters) and also some statistics at 
+``--list --filter=AME --stats`` to your ``borg create`` call to produce more log output,
+including a file list (with file status characters) and also some statistics at
 the end of the backup.
 
 Then you do the backup and look at the log output:

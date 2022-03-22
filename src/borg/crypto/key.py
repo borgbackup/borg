@@ -732,11 +732,15 @@ class AEADKeyBase(KeyBase):
 
     logically_encrypted = True
 
+    MAX_IV = 2 ** 48 - 1
+
     def encrypt(self, id, data):
         # to encrypt new data in this session we use always self.cipher and self.sessionid
         data = self.compressor.compress(data)
         reserved = b'\0'
         iv = self.cipher.next_iv()
+        if iv > self.MAX_IV:  # see the data-structures docs about why the IV range is enough
+            raise IntegrityError("IV overflow, should never happen.")
         iv_48bit = iv.to_bytes(6, 'big')
         header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
         return self.cipher.encrypt(data, header=header, iv=iv, aad=id)

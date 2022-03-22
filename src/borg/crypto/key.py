@@ -383,7 +383,9 @@ class AESKeyBase(KeyBase):
         self.nonce_manager = NonceManager(self.repository, nonce)
 
 
-class FlexiKeyBase:
+class FlexiKey:
+    FILE_ID = 'BORG_KEY'
+
     @classmethod
     def detect(cls, repository, manifest_data):
         key = cls(repository)
@@ -405,12 +407,6 @@ class FlexiKeyBase:
         key.init_ciphers(manifest_data)
         key._passphrase = passphrase
         return key
-
-    def find_key(self):
-        raise NotImplementedError
-
-    def load(self, target, passphrase):
-        raise NotImplementedError
 
     def _load(self, key_data, passphrase):
         cdata = a2b_base64(key_data)
@@ -488,16 +484,6 @@ class FlexiKeyBase:
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key
-
-    def save(self, target, passphrase, create=False):
-        raise NotImplementedError
-
-    def get_new_target(self, args):
-        raise NotImplementedError
-
-
-class FlexiKey(FlexiKeyBase):
-    FILE_ID = 'BORG_KEY'
 
     def sanity_check(self, filename, id):
         file_id = self.FILE_ID.encode() + b' '

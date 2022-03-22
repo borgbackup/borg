@@ -252,7 +252,7 @@ cdef class AES256_CTR_BASE:
                                                                   ilen + self.cipher_blk_len)  # play safe, 1 extra blk
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef Py_buffer idata = ro_buffer(data)
         cdef Py_buffer hdata = ro_buffer(header)
@@ -293,7 +293,7 @@ cdef class AES256_CTR_BASE:
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)  # play safe, 1 extra blk
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef unsigned char mac_buf[32]
         assert sizeof(mac_buf) == self.mac_len
@@ -488,7 +488,7 @@ cdef class _AEAD_BASE:
                                                                   ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef Py_buffer idata = ro_buffer(data)
         cdef Py_buffer hdata = ro_buffer(header)
@@ -543,7 +543,7 @@ cdef class _AEAD_BASE:
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef Py_buffer idata = ro_buffer(envelope)
         cdef Py_buffer aadata = ro_buffer(aad)

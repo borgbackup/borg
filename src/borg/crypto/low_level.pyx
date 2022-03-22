@@ -42,7 +42,7 @@ from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
-API_VERSION = '1.2_01'
+API_VERSION = '1.3_01'
 
 cdef extern from "openssl/crypto.h":
     int CRYPTO_memcmp(const void *a, const void *b, size_t len)

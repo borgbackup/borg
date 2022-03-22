@@ -22,7 +22,16 @@ from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 
 from .nonces import NonceManager
-from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
+from .low_level import (
+    AES,
+    bytes_to_long,
+    long_to_bytes,
+    bytes_to_int,
+    num_cipher_blocks,
+    hmac_sha256,
+    blake2b_256,
+    hkdf_hmac_sha512,
+)
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
 
 
@@ -51,14 +60,16 @@ class RepoKeyNotFoundError(Error):
 
 
 class TAMRequiredError(IntegrityError):
-    __doc__ = textwrap.dedent("""
+    __doc__ = textwrap.dedent(
+        """
     Manifest is unauthenticated, but it is required for this repository.
 
     This either means that you are under attack, or that you modified this repository
     with a Borg version older than 1.0.9 after TAM authentication was enabled.
 
     In the latter case, use "borg upgrade --tam --force '{}'" to re-authenticate the manifest.
-    """).strip()
+    """
+    ).strip()
     traceback = False
 
 
@@ -68,11 +79,12 @@ class TAMInvalid(IntegrityError):
 
     def __init__(self):
         # Error message becomes: "Data integrity error: Manifest authentication did not verify"
-        super().__init__('Manifest authentication did not verify')
+        super().__init__("Manifest authentication did not verify")
 
 
 class TAMUnsupportedSuiteError(IntegrityError):
     """Could not verify manifest: Unsupported suite {!r}; a newer version is needed."""
+
     traceback = False
 
 
@@ -107,7 +119,7 @@ def key_factory(repository, manifest_data):
 
 def tam_required_file(repository):
     security_dir = get_security_dir(bin_to_hex(repository.id))
-    return os.path.join(security_dir, 'tam_required')
+    return os.path.join(security_dir, "tam_required")
 
 
 def tam_required(repository):
@@ -122,10 +134,10 @@ class KeyBase:
     TYPES_ACCEPTABLE = None  # override in subclasses
 
     # Human-readable name
-    NAME = 'UNDEFINED'
+    NAME = "UNDEFINED"
 
     # Name used in command line / API (e.g. borg init --encryption=...)
-    ARG_NAME = 'UNDEFINED'
+    ARG_NAME = "UNDEFINED"
 
     # Storage type (no key blob storage / keyfile / repo)
     STORAGE = KeyBlobStorage.NO_STORAGE
@@ -149,13 +161,12 @@ class KeyBase:
         self.target = None  # key location file path / repo obj
         # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates
         # the default used by those commands who do take a --compression argument.
-        self.compressor = Compressor('lz4')
+        self.compressor = Compressor("lz4")
         self.decompress = self.compressor.decompress
         self.tam_required = True
 
     def id_hash(self, data):
-        """Return HMAC hash using the "id" HMAC key
-        """
+        """Return HMAC hash using the "id" HMAC key"""
 
     def encrypt(self, chunk):
         pass
@@ -167,81 +178,77 @@ class KeyBase:
         if id:
             id_computed = self.id_hash(data)
             if not hmac.compare_digest(id_computed, id):
-                raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))
+                raise IntegrityError("Chunk %s: id verification failed" % bin_to_hex(id))
 
     def assert_type(self, type_byte, id=None):
         if type_byte not in self.TYPES_ACCEPTABLE:
-            id_str = bin_to_hex(id) if id is not None else '(unknown)'
-            raise IntegrityError(f'Chunk {id_str}: Invalid encryption envelope')
+            id_str = bin_to_hex(id) if id is not None else "(unknown)"
+            raise IntegrityError(f"Chunk {id_str}: Invalid encryption envelope")
 
     def _tam_key(self, salt, context):
         return hkdf_hmac_sha512(
             ikm=self.id_key + self.enc_key + self.enc_hmac_key,
             salt=salt,
-            info=b'borg-metadata-authentication-' + context,
-            output_length=64
+            info=b"borg-metadata-authentication-" + context,
+            output_length=64,
         )
 
-    def pack_and_authenticate_metadata(self, metadata_dict, context=b'manifest'):
+    def pack_and_authenticate_metadata(self, metadata_dict, context=b"manifest"):
         metadata_dict = StableDict(metadata_dict)
-        tam = metadata_dict['tam'] = StableDict({
-            'type': 'HKDF_HMAC_SHA512',
-            'hmac': bytes(64),
-            'salt': os.urandom(64),
-        })
+        tam = metadata_dict["tam"] = StableDict({"type": "HKDF_HMAC_SHA512", "hmac": bytes(64), "salt": os.urandom(64)})
         packed = msgpack.packb(metadata_dict)
-        tam_key = self._tam_key(tam['salt'], context)
-        tam['hmac'] = hmac.digest(tam_key, packed, 'sha512')
+        tam_key = self._tam_key(tam["salt"], context)
+        tam["hmac"] = hmac.digest(tam_key, packed, "sha512")
         return msgpack.packb(metadata_dict)
 
     def unpack_and_verify_manifest(self, data, force_tam_not_required=False):
         """Unpack msgpacked *data* and return (object, did_verify)."""
-        if data.startswith(b'\xc1' * 4):
+        if data.startswith(b"\xc1" * 4):
             # This is a manifest from the future, we can't read it.
             raise UnsupportedManifestError()
         tam_required = self.tam_required
         if force_tam_not_required and tam_required:
-            logger.warning('Manifest authentication DISABLED.')
+            logger.warning("Manifest authentication DISABLED.")
             tam_required = False
         data = bytearray(data)
-        unpacker = get_limited_unpacker('manifest')
+        unpacker = get_limited_unpacker("manifest")
         unpacker.feed(data)
         unpacked = unpacker.unpack()
-        if b'tam' not in unpacked:
+        if b"tam" not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
             else:
-                logger.debug('TAM not found and not required')
+                logger.debug("TAM not found and not required")
                 return unpacked, False
-        tam = unpacked.pop(b'tam', None)
+        tam = unpacked.pop(b"tam", None)
         if not isinstance(tam, dict):
             raise TAMInvalid()
-        tam_type = tam.get(b'type', b'<none>').decode('ascii', 'replace')
-        if tam_type != 'HKDF_HMAC_SHA512':
+        tam_type = tam.get(b"type", b"<none>").decode("ascii", "replace")
+        if tam_type != "HKDF_HMAC_SHA512":
             if tam_required:
                 raise TAMUnsupportedSuiteError(repr(tam_type))
             else:
-                logger.debug('Ignoring TAM made with unsupported suite, since TAM is not required: %r', tam_type)
+                logger.debug("Ignoring TAM made with unsupported suite, since TAM is not required: %r", tam_type)
                 return unpacked, False
-        tam_hmac = tam.get(b'hmac')
-        tam_salt = tam.get(b'salt')
+        tam_hmac = tam.get(b"hmac")
+        tam_salt = tam.get(b"salt")
         if not isinstance(tam_salt, bytes) or not isinstance(tam_hmac, bytes):
             raise TAMInvalid()
         offset = data.index(tam_hmac)
-        data[offset:offset + 64] = bytes(64)
-        tam_key = self._tam_key(tam_salt, context=b'manifest')
-        calculated_hmac = hmac.digest(tam_key, data, 'sha512')
+        data[offset : offset + 64] = bytes(64)
+        tam_key = self._tam_key(tam_salt, context=b"manifest")
+        calculated_hmac = hmac.digest(tam_key, data, "sha512")
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise TAMInvalid()
-        logger.debug('TAM-verified manifest')
+        logger.debug("TAM-verified manifest")
         return unpacked, True
 
 
 class PlaintextKey(KeyBase):
     TYPE = KeyType.PLAINTEXT
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = 'plaintext'
-    ARG_NAME = 'none'
+    NAME = "plaintext"
+    ARG_NAME = "none"
     STORAGE = KeyBlobStorage.NO_STORAGE
 
     chunk_seed = 0
@@ -265,7 +272,7 @@ class PlaintextKey(KeyBase):
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
-        return b''.join([self.TYPE_STR, data])
+        return b"".join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
         self.assert_type(data[0], id)
@@ -341,8 +348,7 @@ class AESKeyBase(KeyBase):
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
-        next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(),
-                                                        self.cipher.block_count(len(data)))
+        next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(), self.cipher.block_count(len(data)))
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
     def decrypt(self, id, data, decompress=True):
@@ -365,7 +371,7 @@ class AESKeyBase(KeyBase):
         self.chunk_seed = bytes_to_int(data[96:100])
         # Convert to signed int32
         if self.chunk_seed & 0x80000000:
-            self.chunk_seed = self.chunk_seed - 0xffffffff - 1
+            self.chunk_seed = self.chunk_seed - 0xFFFFFFFF - 1
 
     def init_ciphers(self, manifest_data=None):
         self.cipher = self.CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
@@ -387,7 +393,7 @@ class FlexiKeyBase(AESKeyBase):
     def detect(cls, repository, manifest_data):
         key = cls(repository)
         target = key.find_key()
-        prompt = 'Enter passphrase for key %s: ' % target
+        prompt = "Enter passphrase for key %s: " % target
         passphrase = Passphrase.env_passphrase()
         if passphrase is None:
             passphrase = Passphrase()
@@ -418,25 +424,25 @@ class FlexiKeyBase(AESKeyBase):
             data = msgpack.unpackb(data)
             key = Key(internal_dict=data)
             if key.version != 1:
-                raise IntegrityError('Invalid key file header')
+                raise IntegrityError("Invalid key file header")
             self.repository_id = key.repository_id
             self.enc_key = key.enc_key
             self.enc_hmac_key = key.enc_hmac_key
             self.id_key = key.id_key
             self.chunk_seed = key.chunk_seed
-            self.tam_required = key.get('tam_required', tam_required(self.repository))
+            self.tam_required = key.get("tam_required", tam_required(self.repository))
             return True
         return False
 
     def decrypt_key_file(self, data, passphrase):
-        unpacker = get_limited_unpacker('key')
+        unpacker = get_limited_unpacker("key")
         unpacker.feed(data)
         data = unpacker.unpack()
         enc_key = EncryptedKey(internal_dict=data)
         assert enc_key.version == 1
-        assert enc_key.algorithm == 'sha256'
+        assert enc_key.algorithm == "sha256"
         key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
-        data = AES(key, b'\0'*16).decrypt(enc_key.data)
+        data = AES(key, b"\0" * 16).decrypt(enc_key.data)
         if hmac_sha256(key, data) == enc_key.hash:
             return data
 
@@ -445,15 +451,8 @@ class FlexiKeyBase(AESKeyBase):
         iterations = PBKDF2_ITERATIONS
         key = passphrase.kdf(salt, iterations, 32)
         hash = hmac_sha256(key, data)
-        cdata = AES(key, b'\0'*16).encrypt(data)
-        enc_key = EncryptedKey(
-            version=1,
-            salt=salt,
-            iterations=iterations,
-            algorithm='sha256',
-            hash=hash,
-            data=cdata,
-        )
+        cdata = AES(key, b"\0" * 16).encrypt(data)
+        enc_key = EncryptedKey(version=1, salt=salt, iterations=iterations, algorithm="sha256", hash=hash, data=cdata)
         return msgpack.packb(enc_key.as_dict())
 
     def _save(self, passphrase):
@@ -467,7 +466,7 @@ class FlexiKeyBase(AESKeyBase):
             tam_required=self.tam_required,
         )
         data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)
-        key_data = '\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii')))
+        key_data = "\n".join(textwrap.wrap(b2a_base64(data).decode("ascii")))
         return key_data
 
     def change_passphrase(self, passphrase=None):
@@ -485,7 +484,7 @@ class FlexiKeyBase(AESKeyBase):
         target = key.get_new_target(args)
         key.save(target, passphrase, create=True)
         logger.info('Key in "%s" created.' % target)
-        logger.info('Keep this key safe. Your data will be inaccessible without it.')
+        logger.info("Keep this key safe. Your data will be inaccessible without it.")
         return key
 
     def save(self, target, passphrase, create=False):
@@ -498,12 +497,12 @@ class FlexiKeyBase(AESKeyBase):
 class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
     TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
 
-    FILE_ID = 'BORG_KEY'
+    FILE_ID = "BORG_KEY"
 
     def sanity_check(self, filename, id):
-        file_id = self.FILE_ID.encode() + b' '
+        file_id = self.FILE_ID.encode() + b" "
         repo_id = hexlify(id)
-        with open(filename, 'rb') as fd:
+        with open(filename, "rb") as fd:
             # we do the magic / id check in binary mode to avoid stumbling over
             # decoding errors if somebody has binary files in the keys dir for some reason.
             if fd.read(len(file_id)) != file_id:
@@ -529,7 +528,7 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
             except configparser.NoOptionError:
                 raise RepoKeyNotFoundError(loc) from None
         else:
-            raise TypeError('Unsupported borg key storage type')
+            raise TypeError("Unsupported borg key storage type")
 
     def get_existing_or_new_target(self, args):
         keyfile = self._find_key_file_from_environment()
@@ -559,10 +558,10 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
         elif self.STORAGE == KeyBlobStorage.REPO:
             return self.repository
         else:
-            raise TypeError('Unsupported borg key storage type')
+            raise TypeError("Unsupported borg key storage type")
 
     def _find_key_file_from_environment(self):
-        keyfile = os.environ.get('BORG_KEY_FILE')
+        keyfile = os.environ.get("BORG_KEY_FILE")
         if keyfile:
             return os.path.abspath(keyfile)
 
@@ -572,24 +571,24 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
         i = 1
         while os.path.exists(path):
             i += 1
-            path = filename + '.%d' % i
+            path = filename + ".%d" % i
         return path
 
     def load(self, target, passphrase):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             with open(target) as fd:
-                key_data = ''.join(fd.readlines()[1:])
+                key_data = "".join(fd.readlines()[1:])
         elif self.STORAGE == KeyBlobStorage.REPO:
             # While the repository is encrypted, we consider a repokey repository with a blank
             # passphrase an unencrypted repository.
-            self.logically_encrypted = passphrase != ''
+            self.logically_encrypted = passphrase != ""
 
             # what we get in target is just a repo location, but we already have the repo obj:
             target = self.repository
             key_data = target.load_key()
-            key_data = key_data.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
+            key_data = key_data.decode("utf-8")  # remote repo: msgpack issue #99, getting bytes
         else:
-            raise TypeError('Unsupported borg key storage type')
+            raise TypeError("Unsupported borg key storage type")
         success = self._load(key_data, passphrase)
         if success:
             self.target = target
@@ -604,37 +603,37 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
                 # see issue #6036
                 raise Error('Aborting because key in "%s" already exists.' % target)
             with SaveFile(target) as fd:
-                fd.write(f'{self.FILE_ID} {bin_to_hex(self.repository_id)}\n')
+                fd.write(f"{self.FILE_ID} {bin_to_hex(self.repository_id)}\n")
                 fd.write(key_data)
-                fd.write('\n')
+                fd.write("\n")
         elif self.STORAGE == KeyBlobStorage.REPO:
-            self.logically_encrypted = passphrase != ''
-            key_data = key_data.encode('utf-8')  # remote repo: msgpack issue #99, giving bytes
+            self.logically_encrypted = passphrase != ""
+            key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes
             target.save_key(key_data)
         else:
-            raise TypeError('Unsupported borg key storage type')
+            raise TypeError("Unsupported borg key storage type")
         self.target = target
 
     def remove(self, target):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             os.remove(target)
         elif self.STORAGE == KeyBlobStorage.REPO:
-            target.save_key(b'')  # save empty key (no new api at remote repo necessary)
+            target.save_key(b"")  # save empty key (no new api at remote repo necessary)
         else:
-            raise TypeError('Unsupported borg key storage type')
+            raise TypeError("Unsupported borg key storage type")
 
 
 class KeyfileKey(FlexiKey):
     TYPE = KeyType.KEYFILE
-    NAME = 'key file'
-    ARG_NAME = 'keyfile'
+    NAME = "key file"
+    ARG_NAME = "keyfile"
     STORAGE = KeyBlobStorage.KEYFILE
 
 
 class RepoKey(FlexiKey):
     TYPE = KeyType.REPO
-    NAME = 'repokey'
-    ARG_NAME = 'repokey'
+    NAME = "repokey"
+    ARG_NAME = "repokey"
     STORAGE = KeyBlobStorage.REPO
 
 
@@ -645,15 +644,15 @@ class Blake2FlexiKey(ID_BLAKE2b_256, FlexiKey):
 
 class Blake2KeyfileKey(Blake2FlexiKey):
     TYPE = KeyType.BLAKE2KEYFILE
-    NAME = 'key file BLAKE2b'
-    ARG_NAME = 'keyfile-blake2'
+    NAME = "key file BLAKE2b"
+    ARG_NAME = "keyfile-blake2"
     STORAGE = KeyBlobStorage.KEYFILE
 
 
 class Blake2RepoKey(Blake2FlexiKey):
     TYPE = KeyType.BLAKE2REPO
-    NAME = 'repokey BLAKE2b'
-    ARG_NAME = 'repokey-blake2'
+    NAME = "repokey BLAKE2b"
+    ARG_NAME = "repokey-blake2"
     STORAGE = KeyBlobStorage.REPO
 
 
@@ -678,7 +677,7 @@ class AuthenticatedKeyBase(FlexiKey):
 
     def encrypt(self, chunk):
         data = self.compressor.compress(chunk)
-        return b''.join([self.TYPE_STR, data])
+        return b"".join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
         self.assert_type(data[0], id)
@@ -693,19 +692,23 @@ class AuthenticatedKeyBase(FlexiKey):
 class AuthenticatedKey(AuthenticatedKeyBase):
     TYPE = KeyType.AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = 'authenticated'
-    ARG_NAME = 'authenticated'
+    NAME = "authenticated"
+    ARG_NAME = "authenticated"
 
 
 class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
     TYPE = KeyType.BLAKE2AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = 'authenticated BLAKE2b'
-    ARG_NAME = 'authenticated-blake2'
+    NAME = "authenticated BLAKE2b"
+    ARG_NAME = "authenticated-blake2"
 
 
 AVAILABLE_KEY_TYPES = (
     PlaintextKey,
-    KeyfileKey, RepoKey, AuthenticatedKey,
-    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey,
+    KeyfileKey,
+    RepoKey,
+    AuthenticatedKey,
+    Blake2KeyfileKey,
+    Blake2RepoKey,
+    Blake2AuthenticatedKey,
 )

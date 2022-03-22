@@ -13,13 +13,13 @@ from .repository import Repository, MAGIC
 
 logger = create_logger(__name__)
 
-ATTIC_MAGIC = b'ATTICSEG'
+ATTIC_MAGIC = b"ATTICSEG"
 
 
 class AtticRepositoryUpgrader(Repository):
     def __init__(self, *args, **kw):
-        kw['lock'] = False  # do not create borg lock files (now) in attic repo
-        kw['check_segment_magic'] = False  # skip the Attic check when upgrading
+        kw["lock"] = False  # do not create borg lock files (now) in attic repo
+        kw["check_segment_magic"] = False  # skip the Attic check when upgrading
         super().__init__(*args, **kw)
 
     def upgrade(self, dryrun=True, inplace=False, progress=False):
@@ -36,13 +36,13 @@ class AtticRepositoryUpgrader(Repository):
         with self:
             backup = None
             if not inplace:
-                backup = f'{self.path}.before-upgrade-{datetime.datetime.now():%Y-%m-%d-%H:%M:%S}'
-                logger.info('making a hardlink copy in %s', backup)
+                backup = f"{self.path}.before-upgrade-{datetime.datetime.now():%Y-%m-%d-%H:%M:%S}"
+                logger.info("making a hardlink copy in %s", backup)
                 if not dryrun:
                     shutil.copytree(self.path, backup, copy_function=os.link)
             logger.info("opening attic repository with borg and converting")
             # now lock the repo, after we have made the copy
-            self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=1.0).acquire()
+            self.lock = Lock(os.path.join(self.path, "lock"), exclusive=True, timeout=1.0).acquire()
             segments = [filename for i, filename in self.io.segment_iterator()]
             try:
                 keyfile = self.find_attic_keyfile()
@@ -51,7 +51,7 @@ class AtticRepositoryUpgrader(Repository):
             else:
                 self.convert_keyfiles(keyfile, dryrun)
         # partial open: just hold on to the lock
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True).acquire()
+        self.lock = Lock(os.path.join(self.path, "lock"), exclusive=True).acquire()
         try:
             self.convert_cache(dryrun)
             self.convert_repo_index(dryrun=dryrun, inplace=inplace)
@@ -63,9 +63,9 @@ class AtticRepositoryUpgrader(Repository):
         return backup
 
     def borg_readme(self):
-        readme = os.path.join(self.path, 'README')
+        readme = os.path.join(self.path, "README")
         os.remove(readme)
-        with open(readme, 'w') as fd:
+        with open(readme, "w") as fd:
             fd.write(REPOSITORY_README)
 
     @staticmethod
@@ -79,7 +79,9 @@ class AtticRepositoryUpgrader(Repository):
         replace the 8 first bytes of all regular files in there."""
         logger.info("converting %d segments..." % len(segments))
         segment_count = len(segments)
-        pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%", msgid='upgrade.convert_segments')
+        pi = ProgressIndicatorPercent(
+            total=segment_count, msg="Converting segments %3.0f%%", msgid="upgrade.convert_segments"
+        )
         for i, filename in enumerate(segments):
             if progress:
                 pi.show(i)
@@ -92,7 +94,7 @@ class AtticRepositoryUpgrader(Repository):
 
     @staticmethod
     def header_replace(filename, old_magic, new_magic, inplace=True):
-        with open(filename, 'r+b') as segment:
+        with open(filename, "r+b") as segment:
             segment.seek(0)
             # only write if necessary
             if segment.read(len(old_magic)) == old_magic:
@@ -103,13 +105,13 @@ class AtticRepositoryUpgrader(Repository):
                     # rename the hardlink and rewrite the file. this works
                     # because the file is still open. so even though the file
                     # is renamed, we can still read it until it is closed.
-                    os.rename(filename, filename + '.tmp')
-                    with open(filename, 'wb') as new_segment:
+                    os.rename(filename, filename + ".tmp")
+                    with open(filename, "wb") as new_segment:
                         new_segment.write(new_magic)
                         new_segment.write(segment.read())
                     # the little dance with the .tmp file is necessary
                     # because Windows won't allow overwriting an open file.
-                    os.unlink(filename + '.tmp')
+                    os.unlink(filename + ".tmp")
 
     def find_attic_keyfile(self):
         """find the attic keyfiles
@@ -150,7 +152,7 @@ class AtticRepositoryUpgrader(Repository):
         keyfile = os.path.join(get_keys_dir(), os.path.basename(keyfile))
         logger.info("writing borg keyfile to %s" % keyfile)
         if not dryrun:
-            with open(keyfile, 'w') as f:
+            with open(keyfile, "w") as f:
                 f.write(data)
 
     def convert_repo_index(self, dryrun, inplace):
@@ -167,12 +169,12 @@ class AtticRepositoryUpgrader(Repository):
         """
         transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
-            logger.warning('no index file found for repository %s' % self.path)
+            logger.warning("no index file found for repository %s" % self.path)
         else:
-            index = os.path.join(self.path, 'index.%d' % transaction_id)
+            index = os.path.join(self.path, "index.%d" % transaction_id)
             logger.info("converting repo index %s" % index)
             if not dryrun:
-                AtticRepositoryUpgrader.header_replace(index, b'ATTICIDX', b'BORG_IDX', inplace=inplace)
+                AtticRepositoryUpgrader.header_replace(index, b"ATTICIDX", b"BORG_IDX", inplace=inplace)
 
     def convert_cache(self, dryrun):
         """convert caches from attic to borg
@@ -187,9 +189,7 @@ class AtticRepositoryUpgrader(Repository):
           make sure we have locking right
         """
         # copy of attic's get_cache_dir()
-        attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
-                                         os.path.join(get_base_dir(),
-                                                      '.cache', 'attic'))
+        attic_cache_dir = os.environ.get("ATTIC_CACHE_DIR", os.path.join(get_base_dir(), ".cache", "attic"))
         attic_cache_dir = os.path.join(attic_cache_dir, self.id_str)
         borg_cache_dir = os.path.join(get_cache_dir(), self.id_str)
 
@@ -229,27 +229,27 @@ class AtticRepositoryUpgrader(Repository):
                 os.makedirs(borg_cache_dir)
 
             # file that we don't have a header to convert, just copy
-            for cache in ['config', 'files']:
+            for cache in ["config", "files"]:
                 copy_cache_file(cache)
 
             # we need to convert the headers of those files, copy first
-            for cache in ['chunks']:
+            for cache in ["chunks"]:
                 cache = copy_cache_file(cache)
                 logger.info("converting cache %s" % cache)
                 if not dryrun:
-                    AtticRepositoryUpgrader.header_replace(cache, b'ATTICIDX', b'BORG_IDX')
+                    AtticRepositoryUpgrader.header_replace(cache, b"ATTICIDX", b"BORG_IDX")
 
 
 class AtticKeyfileKey(KeyfileKey):
     """backwards compatible Attic key file parser"""
-    FILE_ID = 'ATTIC KEY'
+
+    FILE_ID = "ATTIC KEY"
 
     # verbatim copy from attic
     @staticmethod
     def get_keys_dir():
         """Determine where to repository keys and cache"""
-        return os.environ.get('ATTIC_KEYS_DIR',
-                              os.path.join(get_base_dir(), '.attic', 'keys'))
+        return os.environ.get("ATTIC_KEYS_DIR", os.path.join(get_base_dir(), ".attic", "keys"))
 
     @classmethod
     def find_key_file(cls, repository):
@@ -279,8 +279,7 @@ class AtticKeyfileKey(KeyfileKey):
 
 class BorgRepositoryUpgrader(Repository):
     def upgrade(self, dryrun=True, inplace=False, progress=False):
-        """convert an old borg repository to a current borg repository
-        """
+        """convert an old borg repository to a current borg repository"""
         logger.info("converting borg 0.xx to borg current")
         with self:
             try:
@@ -308,8 +307,7 @@ class Borg0xxKeyfileKey(KeyfileKey):
 
     @staticmethod
     def get_keys_dir():
-        return os.environ.get('BORG_KEYS_DIR',
-                              os.path.join(get_base_dir(), '.borg', 'keys'))
+        return os.environ.get("BORG_KEYS_DIR", os.path.join(get_base_dir(), ".borg", "keys"))
 
     @classmethod
     def find_key_file(cls, repository):
@@ -321,6 +319,6 @@ class Borg0xxKeyfileKey(KeyfileKey):
             filename = os.path.join(keys_dir, name)
             with open(filename) as fd:
                 line = fd.readline().strip()
-                if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID) + 1:] == repository.id_str:
+                if line and line.startswith(cls.FILE_ID) and line[len(cls.FILE_ID) + 1 :] == repository.id_str:
                     return filename
         raise KeyfileNotFoundError(repository.path, keys_dir)

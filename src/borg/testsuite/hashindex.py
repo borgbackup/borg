@@ -16,7 +16,7 @@ from . import BaseTestCase, unopened_tempfile
 
 def H(x):
     # make some 32byte long thing that depends on x
-    return bytes('%-0.32d' % x, 'ascii')
+    return bytes("%-0.32d" % x, "ascii")
 
 
 def H2(x):
@@ -25,7 +25,6 @@ def H2(x):
 
 
 class HashIndexTestCase(BaseTestCase):
-
     def _generic_test(self, cls, make_value, sha):
         idx = cls()
         self.assert_equal(len(idx), 0)
@@ -58,7 +57,7 @@ class HashIndexTestCase(BaseTestCase):
             idx.write(filepath)
             del idx
             # Verify file contents
-            with open(filepath, 'rb') as fd:
+            with open(filepath, "rb") as fd:
                 self.assert_equal(hashlib.sha256(fd.read()).hexdigest(), sha)
             # Make sure we can open the file
             idx = cls.read(filepath)
@@ -87,12 +86,14 @@ class HashIndexTestCase(BaseTestCase):
         del idx
 
     def test_nsindex(self):
-        self._generic_test(NSIndex, lambda x: (x, x),
-                           '85f72b036c692c8266e4f51ccf0cff2147204282b5e316ae508d30a448d88fef')
+        self._generic_test(
+            NSIndex, lambda x: (x, x), "85f72b036c692c8266e4f51ccf0cff2147204282b5e316ae508d30a448d88fef"
+        )
 
     def test_chunkindex(self):
-        self._generic_test(ChunkIndex, lambda x: (x, x, x),
-                           'c83fdf33755fc37879285f2ecfc5d1f63b97577494902126b6fb6f3e4d852488')
+        self._generic_test(
+            ChunkIndex, lambda x: (x, x, x), "c83fdf33755fc37879285f2ecfc5d1f63b97577494902126b6fb6f3e4d852488"
+        )
 
     def test_resize(self):
         n = 2000  # Must be >= MIN_BUCKETS
@@ -157,8 +158,8 @@ class HashIndexTestCase(BaseTestCase):
 
 
 class HashIndexExtraTestCase(BaseTestCase):
-    """These tests are separate because they should not become part of the selftest.
-    """
+    """These tests are separate because they should not become part of the selftest."""
+
     def test_chunk_indexer(self):
         # see _hashindex.c hash_sizes, we want to be close to the max. load
         # because interesting errors happen there.
@@ -166,7 +167,7 @@ class HashIndexExtraTestCase(BaseTestCase):
         index = ChunkIndex(key_count)
         all_keys = [hashlib.sha256(H(k)).digest() for k in range(key_count)]
         # we're gonna delete 1/3 of all_keys, so let's split them 2/3 and 1/3:
-        keys, to_delete_keys = all_keys[0:(2*key_count//3)], all_keys[(2*key_count//3):]
+        keys, to_delete_keys = all_keys[0 : (2 * key_count // 3)], all_keys[(2 * key_count // 3) :]
 
         for i, key in enumerate(keys):
             index[key] = (i, i, i)
@@ -225,6 +226,7 @@ class HashIndexRefcountingTestCase(BaseTestCase):
             idx1.merge(idx2)
             refcount, *_ = idx1[H(1)]
             return refcount
+
         result = merge(refcounta, refcountb)
         # check for commutativity
         assert result == merge(refcountb, refcounta)
@@ -306,21 +308,23 @@ class HashIndexRefcountingTestCase(BaseTestCase):
 
 class HashIndexDataTestCase(BaseTestCase):
     # This bytestring was created with 1.0-maint at c2f9533
-    HASHINDEX = b'eJzt0L0NgmAUhtHLT0LDEI6AuAEhMVYmVnSuYefC7AB3Aj9KNedJbnfyFne6P67P27w0EdG1Eac+Cm1ZybAsy7Isy7Isy7Isy7I' \
-                b'sy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7LsL9nhc+cqTZ' \
-                b'3XlO2Ys++Du5fX+l1/YFmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVn2/+0O2rYccw=='
+    HASHINDEX = (
+        b"eJzt0L0NgmAUhtHLT0LDEI6AuAEhMVYmVnSuYefC7AB3Aj9KNedJbnfyFne6P67P27w0EdG1Eac+Cm1ZybAsy7Isy7Isy7Isy7I"
+        b"sy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7Isy7LsL9nhc+cqTZ"
+        b"3XlO2Ys++Du5fX+l1/YFmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVmWZVn2/+0O2rYccw=="
+    )
 
     def _serialize_hashindex(self, idx):
         with tempfile.TemporaryDirectory() as tempdir:
-            file = os.path.join(tempdir, 'idx')
+            file = os.path.join(tempdir, "idx")
             idx.write(file)
-            with open(file, 'rb') as f:
+            with open(file, "rb") as f:
                 return self._pack(f.read())
 
     def _deserialize_hashindex(self, bytestring):
         with tempfile.TemporaryDirectory() as tempdir:
-            file = os.path.join(tempdir, 'idx')
-            with open(file, 'wb') as f:
+            file = os.path.join(tempdir, "idx")
+            with open(file, "wb") as f:
                 f.write(self._unpack(bytestring))
             return ChunkIndex.read(file)
 
@@ -354,19 +358,19 @@ class HashIndexDataTestCase(BaseTestCase):
 class HashIndexIntegrityTestCase(HashIndexDataTestCase):
     def write_integrity_checked_index(self, tempdir):
         idx = self._deserialize_hashindex(self.HASHINDEX)
-        file = os.path.join(tempdir, 'idx')
+        file = os.path.join(tempdir, "idx")
         with IntegrityCheckedFile(path=file, write=True) as fd:
             idx.write(fd)
         integrity_data = fd.integrity_data
-        assert 'final' in integrity_data
-        assert 'HashHeader' in integrity_data
+        assert "final" in integrity_data
+        assert "HashHeader" in integrity_data
         return file, integrity_data
 
     def test_integrity_checked_file(self):
         with tempfile.TemporaryDirectory() as tempdir:
             file, integrity_data = self.write_integrity_checked_index(tempdir)
-            with open(file, 'r+b') as fd:
-                fd.write(b'Foo')
+            with open(file, "r+b") as fd:
+                fd.write(b"Foo")
             with self.assert_raises(FileIntegrityError):
                 with IntegrityCheckedFile(path=file, write=False, integrity_data=integrity_data) as fd:
                     ChunkIndex.read(fd)
@@ -375,15 +379,15 @@ class HashIndexIntegrityTestCase(HashIndexDataTestCase):
 class HashIndexCompactTestCase(HashIndexDataTestCase):
     def index(self, num_entries, num_buckets):
         index_data = io.BytesIO()
-        index_data.write(b'BORG_IDX')
+        index_data.write(b"BORG_IDX")
         # num_entries
-        index_data.write(num_entries.to_bytes(4, 'little'))
+        index_data.write(num_entries.to_bytes(4, "little"))
         # num_buckets
-        index_data.write(num_buckets.to_bytes(4, 'little'))
+        index_data.write(num_buckets.to_bytes(4, "little"))
         # key_size
-        index_data.write((32).to_bytes(1, 'little'))
+        index_data.write((32).to_bytes(1, "little"))
         # value_size
-        index_data.write((3 * 4).to_bytes(1, 'little'))
+        index_data.write((3 * 4).to_bytes(1, "little"))
 
         self.index_data = index_data
 
@@ -406,13 +410,13 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
     def write_entry(self, key, *values):
         self.index_data.write(key)
         for value in values:
-            self.index_data.write(value.to_bytes(4, 'little'))
+            self.index_data.write(value.to_bytes(4, "little"))
 
     def write_empty(self, key):
-        self.write_entry(key, 0xffffffff, 0, 0)
+        self.write_entry(key, 0xFFFFFFFF, 0, 0)
 
     def write_deleted(self, key):
-        self.write_entry(key, 0xfffffffe, 0, 0)
+        self.write_entry(key, 0xFFFFFFFE, 0, 0)
 
     def test_simple(self):
         self.index(num_entries=3, num_buckets=6)
@@ -538,7 +542,7 @@ class IndexCorruptionTestCase(BaseTestCase):
             # first 4 bytes. giving a specific x targets bucket index x.
             # y is to create different keys and does not go into the bucket index calculation.
             # so, same x + different y --> collision
-            return pack('<IIQQQ', x, y, 0, 0, 0)  # 2 * 4 + 3 * 8 == 32
+            return pack("<IIQQQ", x, y, 0, 0, 0)  # 2 * 4 + 3 * 8 == 32
 
         idx = NSIndex()
 

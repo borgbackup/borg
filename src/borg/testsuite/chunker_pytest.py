@@ -12,37 +12,27 @@ BS = 4096  # fs block size
 
 # some sparse files. X = content blocks, _ = sparse blocks.
 # X__XXX____
-map_sparse1 = [
-    (0 * BS, 1 * BS, True),
-    (1 * BS, 2 * BS, False),
-    (3 * BS, 3 * BS, True),
-    (6 * BS, 4 * BS, False),
-]
+map_sparse1 = [(0 * BS, 1 * BS, True), (1 * BS, 2 * BS, False), (3 * BS, 3 * BS, True), (6 * BS, 4 * BS, False)]
 
 # _XX___XXXX
-map_sparse2 = [
-    (0 * BS, 1 * BS, False),
-    (1 * BS, 2 * BS, True),
-    (3 * BS, 3 * BS, False),
-    (6 * BS, 4 * BS, True),
-]
+map_sparse2 = [(0 * BS, 1 * BS, False), (1 * BS, 2 * BS, True), (3 * BS, 3 * BS, False), (6 * BS, 4 * BS, True)]
 
 # XXX
-map_notsparse = [(0 * BS, 3 * BS, True), ]
+map_notsparse = [(0 * BS, 3 * BS, True)]
 
 # ___
-map_onlysparse = [(0 * BS, 3 * BS, False), ]
+map_onlysparse = [(0 * BS, 3 * BS, False)]
 
 
 def make_sparsefile(fname, sparsemap, header_size=0):
-    with open(fname, 'wb') as fd:
+    with open(fname, "wb") as fd:
         total = 0
         if header_size:
-            fd.write(b'H' * header_size)
+            fd.write(b"H" * header_size)
             total += header_size
         for offset, size, is_data in sparsemap:
             if is_data:
-                fd.write(b'X' * size)
+                fd.write(b"X" * size)
             else:
                 fd.seek(size, os.SEEK_CUR)
             total += size
@@ -54,11 +44,11 @@ def make_content(sparsemap, header_size=0):
     result = []
     total = 0
     if header_size:
-        result.append(b'H' * header_size)
+        result.append(b"H" * header_size)
         total += header_size
     for offset, size, is_data in sparsemap:
         if is_data:
-            result.append(b'X' * size)  # bytes!
+            result.append(b"X" * size)  # bytes!
         else:
             result.append(size)  # int!
         total += size
@@ -69,9 +59,9 @@ def fs_supports_sparse():
     if not has_seek_hole:
         return False
     with tempfile.TemporaryDirectory() as tmpdir:
-        fn = os.path.join(tmpdir, 'test_sparse')
+        fn = os.path.join(tmpdir, "test_sparse")
         make_sparsefile(fn, [(0, BS, False), (BS, BS, True)])
-        with open(fn, 'rb') as f:
+        with open(fn, "rb") as f:
             try:
                 offset_hole = f.seek(0, os.SEEK_HOLE)
                 offset_data = f.seek(0, os.SEEK_DATA)
@@ -81,15 +71,12 @@ def fs_supports_sparse():
         return offset_hole == 0 and offset_data == BS
 
 
-@pytest.mark.skipif(not fs_supports_sparse(), reason='fs does not support sparse files')
-@pytest.mark.parametrize("fname, sparse_map", [
-    ('sparse1', map_sparse1),
-    ('sparse2', map_sparse2),
-    ('onlysparse', map_onlysparse),
-    ('notsparse', map_notsparse),
-])
+@pytest.mark.skipif(not fs_supports_sparse(), reason="fs does not support sparse files")
+@pytest.mark.parametrize(
+    "fname, sparse_map",
+    [("sparse1", map_sparse1), ("sparse2", map_sparse2), ("onlysparse", map_onlysparse), ("notsparse", map_notsparse)],
+)
 def test_sparsemap(tmpdir, fname, sparse_map):
-
     def get_sparsemap_fh(fname):
         fh = os.open(fname, flags=os.O_RDONLY)
         try:
@@ -98,7 +85,7 @@ def test_sparsemap(tmpdir, fname, sparse_map):
             os.close(fh)
 
     def get_sparsemap_fd(fname):
-        with open(fname, 'rb') as fd:
+        with open(fname, "rb") as fd:
             return list(sparsemap(fd=fd))
 
     fn = str(tmpdir / fname)
@@ -107,30 +94,32 @@ def test_sparsemap(tmpdir, fname, sparse_map):
     assert get_sparsemap_fd(fn) == sparse_map
 
 
-@pytest.mark.skipif(not fs_supports_sparse(), reason='fs does not support sparse files')
-@pytest.mark.parametrize("fname, sparse_map, header_size, sparse", [
-    ('sparse1', map_sparse1, 0, False),
-    ('sparse1', map_sparse1, 0, True),
-    ('sparse1', map_sparse1, BS, False),
-    ('sparse1', map_sparse1, BS, True),
-    ('sparse2', map_sparse2, 0, False),
-    ('sparse2', map_sparse2, 0, True),
-    ('sparse2', map_sparse2, BS, False),
-    ('sparse2', map_sparse2, BS, True),
-    ('onlysparse', map_onlysparse, 0, False),
-    ('onlysparse', map_onlysparse, 0, True),
-    ('onlysparse', map_onlysparse, BS, False),
-    ('onlysparse', map_onlysparse, BS, True),
-    ('notsparse', map_notsparse, 0, False),
-    ('notsparse', map_notsparse, 0, True),
-    ('notsparse', map_notsparse, BS, False),
-    ('notsparse', map_notsparse, BS, True),
-])
+@pytest.mark.skipif(not fs_supports_sparse(), reason="fs does not support sparse files")
+@pytest.mark.parametrize(
+    "fname, sparse_map, header_size, sparse",
+    [
+        ("sparse1", map_sparse1, 0, False),
+        ("sparse1", map_sparse1, 0, True),
+        ("sparse1", map_sparse1, BS, False),
+        ("sparse1", map_sparse1, BS, True),
+        ("sparse2", map_sparse2, 0, False),
+        ("sparse2", map_sparse2, 0, True),
+        ("sparse2", map_sparse2, BS, False),
+        ("sparse2", map_sparse2, BS, True),
+        ("onlysparse", map_onlysparse, 0, False),
+        ("onlysparse", map_onlysparse, 0, True),
+        ("onlysparse", map_onlysparse, BS, False),
+        ("onlysparse", map_onlysparse, BS, True),
+        ("notsparse", map_notsparse, 0, False),
+        ("notsparse", map_notsparse, 0, True),
+        ("notsparse", map_notsparse, BS, False),
+        ("notsparse", map_notsparse, BS, True),
+    ],
+)
 def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
-
     def get_chunks(fname, sparse, header_size):
         chunker = ChunkerFixed(4096, header_size=header_size, sparse=sparse)
-        with open(fname, 'rb') as fd:
+        with open(fname, "rb") as fd:
             return cf(chunker.chunkify(fd))
 
     fn = str(tmpdir / fname)

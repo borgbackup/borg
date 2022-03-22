@@ -25,15 +25,16 @@ class ExtensionModuleError(Error):
 def check_extension_modules():
     import borg.crypto.low_level
     from .. import platform, compress, item, chunker, hashindex
-    if hashindex.API_VERSION != '1.2_01':
+
+    if hashindex.API_VERSION != "1.2_01":
         raise ExtensionModuleError
-    if chunker.API_VERSION != '1.2_01':
+    if chunker.API_VERSION != "1.2_01":
         raise ExtensionModuleError
-    if compress.API_VERSION != '1.2_02':
+    if compress.API_VERSION != "1.2_02":
         raise ExtensionModuleError
-    if borg.crypto.low_level.API_VERSION != '1.2_01':
+    if borg.crypto.low_level.API_VERSION != "1.2_01":
         raise ExtensionModuleError
-    if item.API_VERSION != '1.2_01':
+    if item.API_VERSION != "1.2_01":
         raise ExtensionModuleError
-    if platform.API_VERSION != platform.OS_API_VERSION or platform.API_VERSION != '1.2_05':
+    if platform.API_VERSION != platform.OS_API_VERSION or platform.API_VERSION != "1.2_05":
         raise ExtensionModuleError

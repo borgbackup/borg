@@ -12,7 +12,7 @@ from . import are_hardlinks_supported
 
 
 # tar with a repo and repo keyfile from attic
-ATTIC_TAR = os.path.join(os.path.dirname(__file__), 'attic.tar.gz')
+ATTIC_TAR = os.path.join(os.path.dirname(__file__), "attic.tar.gz")
 
 
 def untar(tarfname, path, what):
@@ -27,7 +27,7 @@ def untar(tarfname, path, what):
             if tarinfo.name.startswith(what):
                 yield tarinfo
 
-    with tarfile.open(tarfname, 'r') as tf:
+    with tarfile.open(tarfname, "r") as tf:
         tf.extractall(path, members=files(tf))
 
     return os.path.join(path, what)
@@ -52,8 +52,7 @@ def key_valid(path):
     :param path: the path to the key file
     :returns: if the file starts with the borg magic string
     """
-    keyfile = os.path.join(get_keys_dir(),
-                           os.path.basename(path))
+    keyfile = os.path.join(get_keys_dir(), os.path.basename(path))
     with open(keyfile) as f:
         return f.read().startswith(KeyfileKey.FILE_ID)
 
@@ -66,7 +65,7 @@ def make_attic_repo(dir):
     :returns: path to attic repository
     """
     # there is some stuff in that repo, copied from `RepositoryTestCase.test1`
-    return untar(ATTIC_TAR, str(dir), 'repo')
+    return untar(ATTIC_TAR, str(dir), "repo")
 
 
 @pytest.fixture()
@@ -108,19 +107,19 @@ def attic_key_file(tmpdir, monkeypatch):
     :param tmpdir: a temporary directory (a builtin fixture)
     :returns: path to key file
     """
-    keys_dir = untar(ATTIC_TAR, str(tmpdir), 'keys')
+    keys_dir = untar(ATTIC_TAR, str(tmpdir), "keys")
 
     # we use the repo dir for the created keyfile, because we do
     # not want to clutter existing keyfiles
-    monkeypatch.setenv('ATTIC_KEYS_DIR', keys_dir)
+    monkeypatch.setenv("ATTIC_KEYS_DIR", keys_dir)
 
     # we use the same directory for the converted files, which
     # will clutter the previously created one, which we don't care
     # about anyways. in real runs, the original key will be retained.
-    monkeypatch.setenv('BORG_KEYS_DIR', keys_dir)
-    monkeypatch.setenv('ATTIC_PASSPHRASE', 'test')
+    monkeypatch.setenv("BORG_KEYS_DIR", keys_dir)
+    monkeypatch.setenv("ATTIC_PASSPHRASE", "test")
 
-    return os.path.join(keys_dir, 'repo')
+    return os.path.join(keys_dir, "repo")
 
 
 def test_keys(attic_repo, attic_key_file):
@@ -141,7 +140,7 @@ def test_keys(attic_repo, attic_key_file):
     assert key_valid(keyfile_path)
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_convert_all(attic_repo, attic_key_file, inplace):
     """test all conversion steps
 
@@ -158,7 +157,7 @@ def test_convert_all(attic_repo, attic_key_file, inplace):
         repo_valid(repo_path)
 
     def stat_segment(path):
-        return os.stat(os.path.join(path, 'data', '0', '0'))
+        return os.stat(os.path.join(path, "data", "0", "0"))
 
     def first_inode(path):
         return stat_segment(path).st_ino
@@ -176,14 +175,14 @@ def test_convert_all(attic_repo, attic_key_file, inplace):
             assert first_inode(repository.path) != first_inode(backup)
             # i have seen cases where the copied tree has world-readable
             # permissions, which is wrong
-            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
+            if "BORG_TESTS_IGNORE_MODES" not in os.environ:
                 assert stat_segment(backup).st_mode & UMASK_DEFAULT == 0
 
     assert key_valid(attic_key_file)
     assert repo_valid(repo_path)
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_hardlink(tmpdir, inplace):
     """test that we handle hard links properly
 
@@ -193,15 +192,15 @@ def test_hardlink(tmpdir, inplace):
 
     if we are *not* in inplace mode, then the inode should change, as
     we are supposed to leave the original inode alone."""
-    a = str(tmpdir.join('a'))
-    with open(a, 'wb') as tmp:
-        tmp.write(b'aXXX')
-    b = str(tmpdir.join('b'))
+    a = str(tmpdir.join("a"))
+    with open(a, "wb") as tmp:
+        tmp.write(b"aXXX")
+    b = str(tmpdir.join("b"))
     os.link(a, b)
-    AtticRepositoryUpgrader.header_replace(b, b'a', b'b', inplace=inplace)
+    AtticRepositoryUpgrader.header_replace(b, b"a", b"b", inplace=inplace)
     if not inplace:
         assert os.stat(a).st_ino != os.stat(b).st_ino
     else:
         assert os.stat(a).st_ino == os.stat(b).st_ino
-    with open(b, 'rb') as tmp:
-        assert tmp.read() == b'bXXX'
+    with open(b, "rb") as tmp:
+        assert tmp.read() == b"bXXX"

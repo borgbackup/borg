@@ -21,12 +21,12 @@ def parse_version(version):
     """
     m = re.match(version_re, version, re.VERBOSE)
     if m is None:
-        raise ValueError('Invalid version string %s' % version)
+        raise ValueError("Invalid version string %s" % version)
     gd = m.groupdict()
-    version = [int(gd['major']), int(gd['minor']), int(gd['patch'])]
-    if m.lastgroup == 'prerelease':
-        p_type = {'a': -4, 'b': -3, 'rc': -2}[gd['ptype']]
-        p_num = int(gd['pnum'])
+    version = [int(gd["major"]), int(gd["minor"]), int(gd["patch"])]
+    if m.lastgroup == "prerelease":
+        p_type = {"a": -4, "b": -3, "rc": -2}[gd["ptype"]]
+        p_num = int(gd["pnum"])
         version += [p_type, p_num]
     else:
         version += [-1]
@@ -44,6 +44,6 @@ def format_version(version):
         elif part == -1:
             break
         else:
-            f[-1] = f[-1] + {-2: 'rc', -3: 'b', -4: 'a'}[part] + str(next(it))
+            f[-1] = f[-1] + {-2: "rc", -3: "b", -4: "a"}[part] + str(next(it))
             break
-    return '.'.join(f)
+    return ".".join(f)

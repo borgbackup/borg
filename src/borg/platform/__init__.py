@@ -17,6 +17,7 @@ OS_API_VERSION = API_VERSION
 
 if not is_win32:
     from .posix import process_alive, local_pid_alive
+
     # posix swidth implementation works for: linux, freebsd, darwin, openindiana, cygwin
     from .posix import swidth
     from .posix import get_errno

@@ -6,33 +6,32 @@ from ..lrucache import LRUCache
 
 
 class TestLRUCache:
-
     def test_lrucache(self):
         c = LRUCache(2, dispose=lambda _: None)
         assert len(c) == 0
         assert c.items() == set()
-        for i, x in enumerate('abc'):
+        for i, x in enumerate("abc"):
             c[x] = i
         assert len(c) == 2
-        assert c.items() == {('b', 1), ('c', 2)}
-        assert 'a' not in c
-        assert 'b' in c
+        assert c.items() == {("b", 1), ("c", 2)}
+        assert "a" not in c
+        assert "b" in c
         with pytest.raises(KeyError):
-            c['a']
-        assert c.get('a') is None
-        assert c.get('a', 'foo') == 'foo'
-        assert c['b'] == 1
-        assert c.get('b') == 1
-        assert c['c'] == 2
-        c['d'] = 3
+            c["a"]
+        assert c.get("a") is None
+        assert c.get("a", "foo") == "foo"
+        assert c["b"] == 1
+        assert c.get("b") == 1
+        assert c["c"] == 2
+        c["d"] = 3
         assert len(c) == 2
-        assert c['c'] == 2
-        assert c['d'] == 3
-        del c['c']
+        assert c["c"] == 2
+        assert c["d"] == 3
+        del c["c"]
         assert len(c) == 1
         with pytest.raises(KeyError):
-            c['c']
-        assert c['d'] == 3
+            c["c"]
+        assert c["d"] == 3
         c.clear()
         assert c.items() == set()
 

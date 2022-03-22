@@ -288,7 +288,6 @@ cdef class AES256_CTR_BASE:
         """
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
-        assert hlen == self.header_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)  # play safe, 1 extra blk

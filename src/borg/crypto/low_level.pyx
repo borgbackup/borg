@@ -598,19 +598,7 @@ cdef class _AEAD_BASE:
         return iv + 1
 
 
-cdef class _AES_BASE(_AEAD_BASE):
-    def __init__(self, *args, **kwargs):
-        self.cipher_blk_len = 16
-        super().__init__(*args, **kwargs)
-
-
-cdef class _CHACHA_BASE(_AEAD_BASE):
-    def __init__(self, *args, **kwargs):
-        self.cipher_blk_len = 64
-        super().__init__(*args, **kwargs)
-
-
-cdef class AES256_OCB(_AES_BASE):
+cdef class AES256_OCB(_AEAD_BASE):
     @classmethod
     def requirements_check(cls):
         if is_libressl:
@@ -619,10 +607,11 @@ cdef class AES256_OCB(_AES_BASE):
     def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_aes_256_ocb
+        self.cipher_blk_len = 16
         super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
-cdef class CHACHA20_POLY1305(_CHACHA_BASE):
+cdef class CHACHA20_POLY1305(_AEAD_BASE):
     @classmethod
     def requirements_check(cls):
         if is_libressl:
@@ -631,6 +620,7 @@ cdef class CHACHA20_POLY1305(_CHACHA_BASE):
     def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_chacha20_poly1305
+        self.cipher_blk_len = 64
         super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
@@ -733,7 +723,6 @@ cdef class AES:
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + self.blocks
-
 
 
 def hmac_sha256(key, data):

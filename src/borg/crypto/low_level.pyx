@@ -245,7 +245,6 @@ cdef class AES256_CTR_BASE:
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
         cdef int ilen = len(data)
         cdef int hlen = len(header)
-        assert hlen == self.header_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len_short +

@@ -169,7 +169,7 @@ if not on_rtd:
 
     checksums_ext_kwargs = members_appended(
         dict(sources=[checksums_source]),
-        lib_ext_kwargs(pc, 'BORG_LIBXXHASH_PREFIX', 'xxhash', 'libxxhash', '>= 0.8.1'),
+        lib_ext_kwargs(pc, 'BORG_LIBXXHASH_PREFIX', 'xxhash', 'libxxhash', '>= 0.7.3'),
         lib_ext_kwargs(pc, 'BORG_LIBDEFLATE_PREFIX', 'deflate', 'libdeflate', '>= 1.5'),
         dict(extra_compile_args=cflags),
     )

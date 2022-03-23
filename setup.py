@@ -153,13 +153,15 @@ if not on_rtd:
             return pc.parse(lib_pkg_name)
         raise Exception(f'Could not find {lib_name} lib/headers, please set {prefix_env_var}')
 
+    if is_win32:
+        crypto_ext_lib = lib_ext_kwargs(
+            pc, 'BORG_OPENSSL_PREFIX', 'libcrypto', 'libcrypto', '>=1.1.1', lib_subdir='')
+    else:
+        crypto_ext_lib = lib_ext_kwargs(pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=1.1.1')
 
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source, crypto_helpers]),
-        if is_win32:
-            lib_ext_kwargs(pc, 'BORG_OPENSSL_PREFIX', 'libcrypto', 'libcrypto', '>=0', lib_subdir=''),
-        else:
-            lib_ext_kwargs(pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=0'),
+        crypto_ext_lib,
         dict(extra_compile_args=cflags),
     )
 

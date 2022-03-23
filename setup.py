@@ -116,7 +116,7 @@ cmdclass = {
 
 # How the build process finds the system libs:
 #
-# 1. if BORG_LIBXXX_PREFIX is set, it will use headers and libs from there.
+# 1. if BORG_{LIBXXX,OPENSSL}_PREFIX is set, it will use headers and libs from there.
 # 2. if not and pkg-config can locate the lib, the lib located by
 #    pkg-config will be used. We use the pkg-config tool via the pkgconfig
 #    python package, which must be installed before invoking setup.py.
@@ -140,12 +140,12 @@ if not on_rtd:
         print('Warning: can not import pkgconfig python package.')
         pc = None
 
-    def lib_ext_kwargs(pc, prefix_env_var, lib_name, lib_pkg_name, pc_version):
+    def lib_ext_kwargs(pc, prefix_env_var, lib_name, lib_pkg_name, pc_version, lib_subdir='lib'):
         system_prefix = os.environ.get(prefix_env_var)
         if system_prefix:
             print(f'Detected and preferring {lib_pkg_name} [via {prefix_env_var}]')
             return dict(include_dirs=[os.path.join(system_prefix, 'include')],
-                        library_dirs=[os.path.join(system_prefix, 'lib')],
+                        library_dirs=[os.path.join(system_prefix, lib_subdir)],
                         libraries=[lib_name])
 
         if pc and pc.installed(lib_pkg_name, pc_version):
@@ -156,7 +156,10 @@ if not on_rtd:
 
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source, crypto_helpers]),
-        lib_ext_kwargs(pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=1.1.1'),
+        if is_win32:
+            lib_ext_kwargs(pc, 'BORG_OPENSSL_PREFIX', 'libcrypto', 'libcrypto', '>=0', lib_subdir=''),
+        else:
+            lib_ext_kwargs(pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=0'),
         dict(extra_compile_args=cflags),
     )
 
@@ -169,7 +172,7 @@ if not on_rtd:
 
     checksums_ext_kwargs = members_appended(
         dict(sources=[checksums_source]),
-        lib_ext_kwargs(pc, 'BORG_LIBXXHASH_PREFIX', 'xxhash', 'libxxhash', '>= 0.7.3'),
+        lib_ext_kwargs(pc, 'BORG_LIBXXHASH_PREFIX', 'xxhash', 'libxxhash', '>= 0.8.1'),
         lib_ext_kwargs(pc, 'BORG_LIBDEFLATE_PREFIX', 'deflate', 'libdeflate', '>= 1.5'),
         dict(extra_compile_args=cflags),
     )
@@ -230,4 +233,5 @@ setup(
     },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
+    long_description=setup_docs.long_desc_from_readme()
 )

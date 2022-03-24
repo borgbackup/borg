@@ -27,6 +27,15 @@ is_win32 = sys.platform.startswith('win32')
 # Number of threads to use for cythonize, not used on windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != 'spawn' else None
 
+# How the build process finds the system libs:
+#
+# 1. if BORG_{LIBXXX,OPENSSL}_PREFIX is set, it will use headers and libs from there.
+# 2. if not and pkg-config can locate the lib, the lib located by
+#    pkg-config will be used. We use the pkg-config tool via the pkgconfig
+#    python package, which must be installed before invoking setup.py.
+#    if pkgconfig is not installed, this step is skipped.
+# 3. otherwise raise a fatal error.
+
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
@@ -114,15 +123,6 @@ cmdclass = {
 }
 
 
-# How the build process finds the system libs:
-#
-# 1. if BORG_{LIBXXX,OPENSSL}_PREFIX is set, it will use headers and libs from there.
-# 2. if not and pkg-config can locate the lib, the lib located by
-#    pkg-config will be used. We use the pkg-config tool via the pkgconfig
-#    python package, which must be installed before invoking setup.py.
-#    if pkgconfig is not installed, this step is skipped.
-# 3. otherwise raise a fatal error.
-
 ext_modules = []
 if not on_rtd:
 
@@ -143,21 +143,25 @@ if not on_rtd:
     def lib_ext_kwargs(pc, prefix_env_var, lib_name, lib_pkg_name, pc_version, lib_subdir='lib'):
         system_prefix = os.environ.get(prefix_env_var)
         if system_prefix:
-            print(f'Detected and preferring {lib_pkg_name} [via {prefix_env_var}]')
+            print(f"Detected and preferring {lib_pkg_name} [via {prefix_env_var}]")
             return dict(include_dirs=[os.path.join(system_prefix, 'include')],
                         library_dirs=[os.path.join(system_prefix, lib_subdir)],
                         libraries=[lib_name])
 
         if pc and pc.installed(lib_pkg_name, pc_version):
-            print(f'Detected and preferring {lib_pkg_name} [via pkg-config]')
+            print(f"Detected and preferring {lib_pkg_name} [via pkg-config]")
             return pc.parse(lib_pkg_name)
-        raise Exception(f'Could not find {lib_name} lib/headers, please set {prefix_env_var}')
+        raise Exception(
+            f"Could not find {lib_name} lib/headers, please set {prefix_env_var} "
+            f"or ensure {lib_pkg_name}.pc is in PKG_CONFIG_PATH."
+        )
 
     if is_win32:
         crypto_ext_lib = lib_ext_kwargs(
             pc, 'BORG_OPENSSL_PREFIX', 'libcrypto', 'libcrypto', '>=1.1.1', lib_subdir='')
     else:
-        crypto_ext_lib = lib_ext_kwargs(pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=1.1.1')
+        crypto_ext_lib = lib_ext_kwargs(
+            pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=1.1.1')
 
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source, crypto_helpers]),

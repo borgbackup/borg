@@ -187,7 +187,7 @@ cdef class AES256_CTR_BASE:
     # Layout: HEADER + MAC 32 + IV 8 + CT (same as attic / borg < 1.2 IF HEADER = TYPE_BYTE, no AAD)
 
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef bytes enc_key
     cdef int cipher_blk_len
     cdef int iv_len, iv_len_short
     cdef int aad_offset
@@ -360,7 +360,7 @@ cdef class AES256_CTR_BASE:
 
 
 cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
-    cdef unsigned char *mac_key
+    cdef bytes mac_key
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
@@ -390,7 +390,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
 
 
 cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
-    cdef unsigned char *mac_key
+    cdef bytes mac_key
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert isinstance(mac_key, bytes) and len(mac_key) == 128
@@ -427,7 +427,7 @@ cdef class _AEAD_BASE:
 
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef bytes enc_key
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int aad_offset
@@ -654,7 +654,7 @@ cdef class AES:
     """A thin wrapper around the OpenSSL EVP cipher API - for legacy code, like key file encryption"""
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef bytes enc_key
     cdef int cipher_blk_len
     cdef int iv_len
     cdef unsigned char iv[16]

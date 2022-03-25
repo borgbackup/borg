@@ -15,7 +15,7 @@ def packages_debianoid(user)
     apt-get -y -qq update
     apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
-    apt install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev pkg-config
+    apt install -y libssl-dev libacl1-dev libxxhash-dev libdeflate-dev liblz4-dev libzstd-dev pkg-config
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true
@@ -27,6 +27,9 @@ def packages_debianoid(user)
     apt install -y python3-dev python3-setuptools virtualenv
     # for building python:
     apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
+    # older debian / ubuntu have no .pc file for these, so we need to point at the lib/header location:
+    echo 'export BORG_LIBXXHASH_PREFIX=/usr' >> ~vagrant/.bash_profile
+    echo 'export BORG_LIBDEFLATE_PREFIX=/usr' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -37,7 +40,7 @@ def packages_freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
-    pkg install -y xxhash liblz4 zstd pkgconf
+    pkg install -y xxhash libdeflate liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
@@ -63,6 +66,8 @@ def packages_freebsd
     pkg update
     yes | pkg upgrade
     echo 'export BORG_OPENSSL_PREFIX=/usr' >> ~vagrant/.bash_profile
+    echo 'export BORG_LIBXXHASH_PREFIX=/usr/local' >> ~vagrant/.bash_profile
+    echo 'export BORG_LIBDEFLATE_PREFIX=/usr/local' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -71,6 +76,7 @@ def packages_openbsd
     pkg_add bash
     chsh -s bash vagrant
     pkg_add xxhash
+    pkg_add libdeflate
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
@@ -114,7 +120,7 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline openssl@1.1 xxhash zstd lz4 xz
+    brew install pkg-config readline openssl@1.1 xxhash libdeflate zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
@@ -281,18 +287,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jammy64", ".*none.*")
   end
 
-  config.vm.define "focal64" do |b|
-    b.vm.box = "ubuntu/focal64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("focal64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("focal64", ".*none.*")
-  end
-
   config.vm.define "bullseye64" do |b|
     b.vm.box = "debian/bullseye64"
     b.vm.provider :virtualbox do |v|
@@ -343,7 +337,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "generic/openbsd6"
+    b.vm.box = "openbsd71-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

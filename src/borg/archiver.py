@@ -611,6 +611,15 @@ class Archiver:
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
+        from borg.helpers.passphrase import Passphrase
+        print("KDFs (slow is GOOD, use argon2!) ===============================")
+        count = 5
+        for spec, func in [
+            ("pbkdf2", lambda: Passphrase('mypassphrase').kdf(b'salt'*8, PBKDF2_ITERATIONS, 32)),
+            ("argon2", lambda: Passphrase('mypassphrase').argon2(32, b'salt'*8, 3, 65536, 1, 'id')),
+        ]:
+            print(f"{spec:<24} {count:<10} {timeit(func, number=count):.3f}s")
+
         from borg.compress import CompressionSpec
         print("Compression ====================================================")
         for spec in [

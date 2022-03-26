@@ -434,7 +434,7 @@ class FlexiKey:
         assert enc_key.algorithm == 'sha256'
         key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
         data = AES(key, b'\0'*16).decrypt(enc_key.data)
-        if hmac_sha256(key, data) == enc_key.hash:
+        if hmac.compare_digest(hmac_sha256(key, data), enc_key.hash):
             return data
 
     def encrypt_key_file(self, data, passphrase):

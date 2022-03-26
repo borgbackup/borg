@@ -314,8 +314,8 @@ Cygwin
 
 Use the Cygwin installer to install the dependencies::
 
-    python38 python38-devel python38-pkgconfig
-    python38-setuptools python38-pip python38-wheel python38-virtualenv
+    python39 python39-devel python39-pkgconfig
+    python39-setuptools python39-pip python39-wheel python39-virtualenv
     libssl-devel libxxhash-devel libdeflate-devel liblz4-devel libzstd-devel
     binutils gcc-g++ git make openssh
 

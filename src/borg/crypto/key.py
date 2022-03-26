@@ -18,6 +18,7 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
 from ..helpers import msgpack
+from ..helpers.manifest import Manifest
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 
@@ -165,7 +166,7 @@ class KeyBase:
         pass
 
     def assert_id(self, id, data):
-        if id:
+        if id and id != Manifest.MANIFEST_ID:
             id_computed = self.id_hash(data)
             if not hmac.compare_digest(id_computed, id):
                 raise IntegrityError('Chunk %s: id verification failed' % bin_to_hex(id))

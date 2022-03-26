@@ -186,7 +186,7 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
-        data = key.decrypt(None, cdata)
+        data = key.decrypt(cls.MANIFEST_ID, cdata)
         manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = key.id_hash(data)

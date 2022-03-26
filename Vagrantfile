@@ -57,7 +57,7 @@ def packages_freebsd
     # make FUSE work
     echo 'fuse_load="YES"' >> /boot/loader.conf
     echo 'vfs.usermount=1' >> /etc/sysctl.conf
-    kldload fuse
+    kldload fusefs
     sysctl vfs.usermount=1
     pw groupmod operator -M vagrant
     # /dev/fuse has group operator
@@ -66,8 +66,6 @@ def packages_freebsd
     pkg update
     yes | pkg upgrade
     echo 'export BORG_OPENSSL_PREFIX=/usr' >> ~vagrant/.bash_profile
-    echo 'export BORG_LIBXXHASH_PREFIX=/usr/local' >> ~vagrant/.bash_profile
-    echo 'export BORG_LIBDEFLATE_PREFIX=/usr/local' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -320,7 +318,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "freebsd121-64"
+    b.vm.box = "generic/freebsd13"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

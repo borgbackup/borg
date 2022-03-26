@@ -78,7 +78,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _Homebrew: https://formulae.brew.sh/formula/borgbackup
 .. _private Tap: https://github.com/borgbackup/homebrew-tap
 .. _Raspbian testing: https://archive.raspbian.org/raspbian/pool/main/b/borgbackup/
-.. _Ubuntu packages: https://packages.ubuntu.com/xenial/borgbackup
+.. _Ubuntu packages: https://launchpad.net/ubuntu/+source/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 
 Please ask package maintainers to build a package or, if you can package /

@@ -167,6 +167,7 @@ following dependencies first:
   - liblz4_ >= 1.7.0 (r129)
   - libzstd_ >= 1.3.0
   - libxxhash >= 0.8.1 (0.8.0 might work also)
+  - libdeflate >= 1.5
 * pkg-config (cli tool) and pkgconfig python package (borg uses these to
   discover header and library location - if it can't import pkgconfig and
   is not pointed to header/library locations via env vars [see setup.py],
@@ -201,7 +202,7 @@ Install the dependencies with development headers::
     sudo apt-get install python3 python3-dev python3-pip python3-virtualenv \
     libacl1-dev libacl1 \
     libssl-dev \
-    liblz4-dev libzstd-dev libxxhash-dev \
+    liblz4-dev libzstd-dev libxxhash-dev libdeflate-dev \
     build-essential \
     pkg-config python3-pkgconfig
     sudo apt-get install libfuse-dev fuse    # needed for llfuse
@@ -219,7 +220,7 @@ Install the dependencies with development headers::
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv \
     libacl-devel libacl \
     openssl-devel \
-    lz4-devel libzstd-devel xxhash-devel \
+    lz4-devel libzstd-devel xxhash-devel libdeflate-devel \
     pkgconf python3-pkgconfig
     sudo dnf install gcc gcc-c++ redhat-rpm-config
     sudo dnf install fuse-devel fuse         # needed for llfuse
@@ -236,7 +237,7 @@ Alternatively, you can enumerate all build dependencies in the command line::
 
     sudo zypper install python3 python3-devel \
     libacl-devel openssl-devel \
-    libxxhash-devel \
+    libxxhash-devel libdeflate-devel \
     python3-Cython python3-Sphinx python3-msgpack-python python3-pkgconfig pkgconf \
     python3-pytest python3-setuptools python3-setuptools_scm \
     python3-sphinx_rtd_theme gcc gcc-c++
@@ -248,7 +249,7 @@ macOS
 When installing via Homebrew_, dependencies are installed automatically. To install
 dependencies manually::
 
-    brew install python3 openssl zstd lz4 xxhash
+    brew install python3 openssl zstd lz4 xxhash libdeflate
     brew install pkg-config
     pip3 install virtualenv pkgconfig
 
@@ -285,7 +286,7 @@ and commands to make FUSE work for using the mount command.
 
      pkg install -y python3 pkgconf
      pkg install openssl
-     pkg install liblz4 zstd xxhash
+     pkg install liblz4 zstd xxhash libdeflate
      pkg install fusefs-libs  # needed for llfuse
      pkg install -y git
      python3 -m ensurepip # to install pip for Python3
@@ -315,7 +316,7 @@ Use the Cygwin installer to install the dependencies::
 
     python38 python38-devel python38-pkgconfig
     python38-setuptools python38-pip python38-wheel python38-virtualenv
-    libssl-devel libxxhash-devel liblz4-devel libzstd-devel
+    libssl-devel libxxhash-devel libdeflate-devel liblz4-devel libzstd-devel
     binutils gcc-g++ git make openssh
 
 

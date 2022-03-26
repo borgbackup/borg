@@ -23,7 +23,7 @@ from ..platform import SaveFile
 
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
-from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
+from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
 
 
 class UnsupportedPayloadError(Error):
@@ -156,8 +156,9 @@ class KeyBase:
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key
         """
+        raise NotImplementedError
 
-    def encrypt(self, chunk):
+    def encrypt(self, id, data):
         pass
 
     def decrypt(self, id, data, decompress=True):
@@ -263,8 +264,8 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, id, data):
+        data = self.compressor.compress(data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -335,12 +336,12 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
-    CIPHERSUITE = AES256_CTR_HMAC_SHA256
+    CIPHERSUITE = None  # override in derived class
 
     logically_encrypted = True
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, id, data):
+        data = self.compressor.compress(data)
         next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(),
                                                         self.cipher.block_count(len(data)))
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
@@ -382,7 +383,9 @@ class AESKeyBase(KeyBase):
         self.nonce_manager = NonceManager(self.repository, nonce)
 
 
-class FlexiKeyBase(AESKeyBase):
+class FlexiKey:
+    FILE_ID = 'BORG_KEY'
+
     @classmethod
     def detect(cls, repository, manifest_data):
         key = cls(repository)
@@ -404,12 +407,6 @@ class FlexiKeyBase(AESKeyBase):
         key.init_ciphers(manifest_data)
         key._passphrase = passphrase
         return key
-
-    def find_key(self):
-        raise NotImplementedError
-
-    def load(self, target, passphrase):
-        raise NotImplementedError
 
     def _load(self, key_data, passphrase):
         cdata = a2b_base64(key_data)
@@ -487,18 +484,6 @@ class FlexiKeyBase(AESKeyBase):
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key
-
-    def save(self, target, passphrase, create=False):
-        raise NotImplementedError
-
-    def get_new_target(self, args):
-        raise NotImplementedError
-
-
-class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
-    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
-
-    FILE_ID = 'BORG_KEY'
 
     def sanity_check(self, filename, id):
         file_id = self.FILE_ID.encode() + b' '
@@ -624,40 +609,43 @@ class FlexiKey(ID_HMAC_SHA_256, FlexiKeyBase):
             raise TypeError('Unsupported borg key storage type')
 
 
-class KeyfileKey(FlexiKey):
+class KeyfileKey(ID_HMAC_SHA_256, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.KEYFILE
     NAME = 'key file'
     ARG_NAME = 'keyfile'
     STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
 
-class RepoKey(FlexiKey):
+class RepoKey(ID_HMAC_SHA_256, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.REPO
     NAME = 'repokey'
     ARG_NAME = 'repokey'
     STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
 
-class Blake2FlexiKey(ID_BLAKE2b_256, FlexiKey):
+class Blake2KeyfileKey(ID_BLAKE2b_256, AESKeyBase, FlexiKey):
     TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
-    CIPHERSUITE = AES256_CTR_BLAKE2b
-
-
-class Blake2KeyfileKey(Blake2FlexiKey):
     TYPE = KeyType.BLAKE2KEYFILE
     NAME = 'key file BLAKE2b'
     ARG_NAME = 'keyfile-blake2'
     STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-class Blake2RepoKey(Blake2FlexiKey):
+class Blake2RepoKey(ID_BLAKE2b_256, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
     TYPE = KeyType.BLAKE2REPO
     NAME = 'repokey BLAKE2b'
     ARG_NAME = 'repokey-blake2'
     STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-class AuthenticatedKeyBase(FlexiKey):
+class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
     STORAGE = KeyBlobStorage.REPO
 
     # It's only authenticated, not encrypted.
@@ -676,8 +664,8 @@ class AuthenticatedKeyBase(FlexiKey):
         if manifest_data is not None:
             self.assert_type(manifest_data[0])
 
-    def encrypt(self, chunk):
-        data = self.compressor.compress(chunk)
+    def encrypt(self, id, data):
+        data = self.compressor.compress(data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -690,7 +678,7 @@ class AuthenticatedKeyBase(FlexiKey):
         return data
 
 
-class AuthenticatedKey(AuthenticatedKeyBase):
+class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
     TYPE = KeyType.AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
     NAME = 'authenticated'
@@ -704,8 +692,173 @@ class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
     ARG_NAME = 'authenticated-blake2'
 
 
+# ------------ new crypto ------------
+
+
+class AEADKeyBase(KeyBase):
+    """
+    Chunks are encrypted and authenticated using some AEAD ciphersuite
+
+    Layout: suite:4 keytype:4 reserved:8 messageIV:48 sessionID:192 auth_tag:128 payload:... [bits]
+            ^-------------------- AAD ----------------------------^
+    Offsets:0                 1          2            8             32           48 [bytes]
+
+    suite: 1010b for new AEAD crypto, 0000b is old crypto
+    keytype: see constants.KeyType (suite+keytype)
+    reserved: all-zero, for future use
+    messageIV: a counter starting from 0 for all new encrypted messages of one session
+    sessionID: 192bit random, computed once per session (the session key is derived from this)
+    auth_tag: authentication tag output of the AEAD cipher (computed over payload and AAD)
+    payload: encrypted chunk data
+    """
+
+    PAYLOAD_OVERHEAD = 1 + 1 + 6 + 24 + 16  # [bytes], see Layout
+
+    CIPHERSUITE = None  # override in subclass
+
+    logically_encrypted = True
+
+    MAX_IV = 2 ** 48 - 1
+
+    def encrypt(self, id, data):
+        # to encrypt new data in this session we use always self.cipher and self.sessionid
+        data = self.compressor.compress(data)
+        reserved = b'\0'
+        iv = self.cipher.next_iv()
+        if iv > self.MAX_IV:  # see the data-structures docs about why the IV range is enough
+            raise IntegrityError("IV overflow, should never happen.")
+        iv_48bit = iv.to_bytes(6, 'big')
+        header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
+        return self.cipher.encrypt(data, header=header, iv=iv, aad=id)
+
+    def decrypt(self, id, data, decompress=True):
+        # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
+        self.assert_type(data[0], id)
+        iv_48bit = data[2:8]
+        sessionid = data[8:32]
+        iv = int.from_bytes(iv_48bit, 'big')
+        cipher = self._get_cipher(sessionid, iv)
+        try:
+            payload = cipher.decrypt(data, aad=id)
+        except IntegrityError as e:
+            raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
+        if not decompress:
+            return payload
+        data = self.decompress(payload)
+        self.assert_id(id, data)
+        return data
+
+    def init_from_random_data(self):
+        data = os.urandom(100)
+        self.enc_key = data[0:32]
+        self.enc_hmac_key = data[32:64]
+        self.id_key = data[64:96]
+        self.chunk_seed = bytes_to_int(data[96:100])
+        # Convert to signed int32
+        if self.chunk_seed & 0x80000000:
+            self.chunk_seed = self.chunk_seed - 0xffffffff - 1
+
+    def _get_session_key(self, sessionid):
+        assert len(sessionid) == 24  # 192bit
+        key = hkdf_hmac_sha512(
+            ikm=self.enc_key + self.enc_hmac_key,
+            salt=sessionid,
+            info=b'borg-session-key-' + self.CIPHERSUITE.__name__.encode(),
+            output_length=32
+        )
+        return key
+
+    def _get_cipher(self, sessionid, iv):
+        assert isinstance(iv, int)
+        key = self._get_session_key(sessionid)
+        cipher = self.CIPHERSUITE(key=key, iv=iv, header_len=1+1+6+24, aad_offset=0)
+        return cipher
+
+    def init_ciphers(self, manifest_data=None, iv=0):
+        # in every new session we start with a fresh sessionid and at iv == 0, manifest_data and iv params are ignored
+        self.sessionid = os.urandom(24)
+        self.cipher = self._get_cipher(self.sessionid, iv=0)
+
+
+class AESOCBKeyfileKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.AESOCBKEYFILE, KeyType.AESOCBREPO}
+    TYPE = KeyType.AESOCBKEYFILE
+    NAME = 'key file AES-OCB'
+    ARG_NAME = 'keyfile-aes-ocb'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_OCB
+
+
+class AESOCBRepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.AESOCBKEYFILE, KeyType.AESOCBREPO}
+    TYPE = KeyType.AESOCBREPO
+    NAME = 'repokey AES-OCB'
+    ARG_NAME = 'repokey-aes-ocb'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_OCB
+
+
+class CHPOKeyfileKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.CHPOKEYFILE, KeyType.CHPOREPO}
+    TYPE = KeyType.CHPOKEYFILE
+    NAME = 'key file ChaCha20-Poly1305'
+    ARG_NAME = 'keyfile-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
+class CHPORepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.CHPOKEYFILE, KeyType.CHPOREPO}
+    TYPE = KeyType.CHPOREPO
+    NAME = 'repokey ChaCha20-Poly1305'
+    ARG_NAME = 'repokey-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
+class Blake2AESOCBKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
+    TYPE = KeyType.BLAKE2AESOCBKEYFILE
+    NAME = 'key file Blake2b AES-OCB'
+    ARG_NAME = 'keyfile-blake2-aes-ocb'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = AES256_OCB
+
+
+class Blake2AESOCBRepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
+    TYPE = KeyType.BLAKE2AESOCBREPO
+    NAME = 'repokey Blake2b AES-OCB'
+    ARG_NAME = 'repokey-blake2-aes-ocb'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = AES256_OCB
+
+
+class Blake2CHPOKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
+    TYPE = KeyType.BLAKE2CHPOKEYFILE
+    NAME = 'key file Blake2b ChaCha20-Poly1305'
+    ARG_NAME = 'keyfile-blake2-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.KEYFILE
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
+class Blake2CHPORepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
+    TYPE = KeyType.BLAKE2CHPOREPO
+    NAME = 'repokey Blake2b ChaCha20-Poly1305'
+    ARG_NAME = 'repokey-blake2-chacha20-poly1305'
+    STORAGE = KeyBlobStorage.REPO
+    CIPHERSUITE = CHACHA20_POLY1305
+
+
 AVAILABLE_KEY_TYPES = (
     PlaintextKey,
     KeyfileKey, RepoKey, AuthenticatedKey,
     Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey,
+    # new crypto
+    AESOCBKeyfileKey, AESOCBRepoKey,
+    CHPOKeyfileKey, CHPORepoKey,
+    Blake2AESOCBKeyfileKey, Blake2AESOCBRepoKey,
+    Blake2CHPOKeyfileKey, Blake2CHPORepoKey,
 )

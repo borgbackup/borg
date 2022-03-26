@@ -604,9 +604,9 @@ class Archiver:
         if not is_libressl:
             tests.extend([
                 ("aes-256-ocb", lambda: AES256_OCB(
-                    None, key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+                    key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
                 ("chacha20-poly1305", lambda: CHACHA20_POLY1305(
-                    None, key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+                    key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
             ])
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
@@ -4184,22 +4184,19 @@ class Archiver:
         Encryption mode TLDR
         ++++++++++++++++++++
 
-        The encryption mode can only be configured when creating a new repository -
-        you can neither configure it on a per-archive basis nor change the
-        encryption mode of an existing repository.
+        The encryption mode can only be configured when creating a new repository - you can
+        neither configure it on a per-archive basis nor change the mode of an existing repository.
+        This example will likely NOT give optimum performance on your machine (performance
+        tips will come below):
 
-        Use ``repokey``::
+        ::
 
             borg init --encryption repokey /path/to/repo
-
-        Or ``repokey-blake2`` depending on which is faster on your client machines (see below)::
-
-            borg init --encryption repokey-blake2 /path/to/repo
 
         Borg will:
 
         1. Ask you to come up with a passphrase.
-        2. Create a borg key (which contains 3 random secrets. See :ref:`key_files`).
+        2. Create a borg key (which contains some random secrets. See :ref:`key_files`).
         3. Encrypt the key with your passphrase.
         4. Store the encrypted borg key inside the repository directory (in the repo config).
            This is why it is essential to use a secure passphrase.
@@ -4235,79 +4232,53 @@ class Archiver:
         You can change your passphrase for existing repos at any time, it won't affect
         the encryption/decryption key or other secrets.
 
-        More encryption modes
-        +++++++++++++++++++++
+        Choosing an encryption mode
+        +++++++++++++++++++++++++++
 
-        Only use ``--encryption none`` if you are OK with anyone who has access to
-        your repository being able to read your backups and tamper with their
-        contents without you noticing.
+        Depending on your hardware, hashing and crypto performance may vary widely.
+        The easiest way to find out about what's fastest is to run ``borg benchmark cpu``.
 
-        If you want "passphrase and having-the-key" security, use ``--encryption keyfile``.
-        The key will be stored in your home directory (in ``~/.config/borg/keys``).
+        `repokey` modes: if you want ease-of-use and "passphrase" security is good enough -
+        the key will be stored in the repository (in ``repo_dir/config``).
 
-        If you do **not** want to encrypt the contents of your backups, but still
-        want to detect malicious tampering use ``--encryption authenticated``.
+        `keyfile` modes: if you rather want "passphrase and having-the-key" security -
+        the key will be stored in your home directory (in ``~/.config/borg/keys``).
 
-        If ``BLAKE2b`` is faster than ``SHA-256`` on your hardware, use ``--encryption authenticated-blake2``,
-        ``--encryption repokey-blake2`` or ``--encryption keyfile-blake2``. Note: for remote backups
-        the hashing is done on your local machine.
+        The following table is roughly sorted in order of preference, the better ones are
+        in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
 
         .. nanorst: inline-fill
 
-        +----------+---------------+------------------------+--------------------------+
-        | Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
-        |          | no auth       | but authenticated      | and authenticated        |
-        +----------+---------------+------------------------+--------------------------+
-        | SHA-256  | none          | `authenticated`        | repokey                  |
-        |          |               |                        | keyfile                  |
-        +----------+---------------+------------------------+--------------------------+
-        | BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`         |
-        |          |               |                        | `keyfile-blake2`         |
-        +----------+---------------+------------------------+--------------------------+
+        +---------------------------------+---------------+---------------+------------------+-------+
+        |**mode (* = keyfile or repokey)**|**ID-Hash**    |**Encryption** |**Authentication**|**V>=**|
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | ``*-blake2-chacha20-poly1305``  | BLAKE2b       | CHACHA20      | POLY1305         | 1.3   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | ``*-chacha20-poly1305``         | HMAC-SHA-256  | CHACHA20      | POLY1305         | 1.3   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | ``*-blake2-aes-ocb``            | BLAKE2b       | AES256-OCB    | AES256-OCB       | 1.3   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | ``*-aes-ocb``                   | HMAC-SHA-256  | AES256-OCB    | AES256-OCB       | 1.3   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | ``*-blake2``                    | BLAKE2b       | AES256-CTR    | BLAKE2b          | 1.1   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | ``*``                           | HMAC-SHA-256  | AES256-CTR    | HMAC-SHA256      | any   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | authenticated-blake2            | BLAKE2b       | none          | BLAKE2b          | 1.1   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | authenticated                   | HMAC-SHA-256  | none          | HMAC-SHA256      | 1.1   |
+        +---------------------------------+---------------+---------------+------------------+-------+
+        | none                            | SHA-256       | none          | none             | any   |
+        +---------------------------------+---------------+---------------+------------------+-------+
 
         .. nanorst: inline-replace
 
-        Modes `marked like this` in the above table are new in Borg 1.1 and are not
-        backwards-compatible with Borg 1.0.x.
+        `none` mode uses no encryption and no authentication. You're advised to NOT use this mode
+        as it would expose you to all sorts of issues (DoS, confidentiality, tampering, ...) in
+        case of malicious activity in the repository.
 
-        On modern Intel/AMD CPUs (except very cheap ones), AES is usually
-        hardware-accelerated.
-        BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs
-        (except AMD Ryzen and future CPUs with SHA extensions),
-        which makes `authenticated-blake2` faster than `none` and `authenticated`.
-
-        On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
-        than BLAKE2b-256 there. NEON accelerates AES as well.
-
-        Hardware acceleration is always used automatically when available.
-
-        `repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
-        authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
-        is HMAC-SHA256 as well (with a separate key).
-        These modes are compatible with Borg 1.0.x.
-
-        `repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
-        but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
-        hash is a keyed BLAKE2b-256 hash.
-        These modes are new and *not* compatible with Borg 1.0.x.
-
-        `authenticated` mode uses no encryption, but authenticates repository contents
-        through the same HMAC-SHA256 hash as the `repokey` and `keyfile` modes (it uses it
-        as the chunk ID hash). The key is stored like `repokey`.
-        This mode is new and *not* compatible with Borg 1.0.x.
-
-        `authenticated-blake2` is like `authenticated`, but uses the keyed BLAKE2b-256 hash
-        from the other blake2 modes.
-        This mode is new and *not* compatible with Borg 1.0.x.
-
-        `none` mode uses no encryption and no authentication. It uses SHA256 as chunk
-        ID hash. This mode is not recommended, you should rather consider using an authenticated
-        or authenticated/encrypted mode. This mode has possible denial-of-service issues
-        when running ``borg create`` on contents controlled by an attacker.
-        Use it only for new repositories where no encryption is wanted **and** when compatibility
-        with 1.0.x is important. If compatibility with 1.0.x is not important, use
-        `authenticated-blake2` or `authenticated` instead.
-        This mode is compatible with Borg 1.0.x.
+        If you do **not** want to encrypt the contents of your backups, but still want to detect
+        malicious tampering use an `authenticated` mode. It's like `repokey` minus encryption.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,

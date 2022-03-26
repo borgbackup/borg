@@ -865,6 +865,31 @@ Encryption
 
 .. seealso:: The :ref:`borgcrypto` section for an in-depth review.
 
+AEAD modes
+~~~~~~~~~~
+
+Uses modern AEAD ciphers: AES-OCB or CHACHA20-POLY1305.
+For each borg invocation, a new sessionkey is derived from the borg key material
+and the 48bit IV starts from 0 again (both ciphers internally add a 32bit counter
+to our IV, so we'll just count up by 1 per chunk).
+
+The chunk layout is best seen at the bottom of this diagram:
+
+.. figure:: encryption-aead.png
+    :figwidth: 100%
+    :width: 100%
+
+No special IV/counter management is needed here due to the use of session keys.
+
+A 48 bit IV is way more than needed: If you only backed up 4kiB chunks (2^12B),
+the IV would "limit" the data encrypted in one session to 2^(12+48)B == 2.3 exabytes,
+meaning you would run against other limitations (RAM, storage, time) way before that.
+In practice, chunks are usually bigger, for big files even much bigger, giving an
+even higher limit.
+
+Legacy modes
+~~~~~~~~~~~~
+
 AES_-256 is used in CTR mode (so no need for padding). A 64 bit initialization
 vector is used, a MAC is computed on the encrypted chunk
 and both are stored in the chunk. Encryption and MAC use two different keys.
@@ -883,6 +908,9 @@ higher than any previously used counter value before encrypting new data.
 To reduce payload size, only 8 bytes of the 16 bytes nonce is saved in the
 payload, the first 8 bytes are always zeros. This does not affect security but
 limits the maximum repository capacity to only 295 exabytes (2**64 * 16 bytes).
+
+Both modes
+~~~~~~~~~~
 
 Encryption keys (and other secrets) are kept either in a key file on the client
 ('keyfile' mode) or in the repository config on the server ('repokey' mode).

@@ -111,6 +111,8 @@ class KeyBlobStorage:
 
 
 class KeyType:
+    # legacy crypto
+    # upper 4 bits are ciphersuite, 0 == legacy AES-CTR
     KEYFILE = 0x00
     # repos with PASSPHRASE mode could not be created any more since borg 1.0, see #97.
     # in borg 1.3 all of its code and also the "borg key migrate-to-repokey" command was removed.
@@ -123,6 +125,16 @@ class KeyType:
     BLAKE2REPO = 0x05
     BLAKE2AUTHENTICATED = 0x06
     AUTHENTICATED = 0x07
+    # new crypto
+    # upper 4 bits are ciphersuite, lower 4 bits are keytype
+    AESOCBKEYFILE = 0x10
+    AESOCBREPO = 0x11
+    CHPOKEYFILE = 0x20
+    CHPOREPO = 0x21
+    BLAKE2AESOCBKEYFILE = 0x30
+    BLAKE2AESOCBREPO = 0x31
+    BLAKE2CHPOKEYFILE = 0x40
+    BLAKE2CHPOREPO = 0x41
 
 
 REPOSITORY_README = """This is a Borg Backup repository.

@@ -1789,7 +1789,7 @@ class ArchiveChecker:
 
         def add_callback(chunk):
             id_ = self.key.id_hash(chunk)
-            cdata = self.key.encrypt(chunk)
+            cdata = self.key.encrypt(id_, chunk)
             add_reference(id_, len(chunk), len(cdata), cdata)
             return id_
 
@@ -1811,7 +1811,7 @@ class ArchiveChecker:
             def replacement_chunk(size):
                 chunk = Chunk(None, allocation=CH_ALLOC, size=size)
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
-                cdata = self.key.encrypt(data)
+                cdata = self.key.encrypt(chunk_id, data)
                 csize = len(cdata)
                 return chunk_id, size, csize, cdata
 
@@ -1998,7 +1998,7 @@ class ArchiveChecker:
                 archive.items = items_buffer.chunks
                 data = msgpack.packb(archive.as_dict())
                 new_archive_id = self.key.id_hash(data)
-                cdata = self.key.encrypt(data)
+                cdata = self.key.encrypt(new_archive_id, data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)
                 self.manifest.archives[info.name] = (new_archive_id, info.ts)
             pi.finish()

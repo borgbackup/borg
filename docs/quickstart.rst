@@ -387,6 +387,7 @@ For automated backups the passphrase can be specified using the
     A backup inside of the backup that is encrypted with that key/passphrase
     won't help you with that, of course.
 
+    Only applies to repos using legacy encryption modes:
     In case you lose your repository and the security information, but have an
     older copy of it to restore from, don't use that later for creating new
     backups – you would run into security issues (reuse of nonce counter

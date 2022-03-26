@@ -942,7 +942,7 @@ class LocalCache(CacheStatsMixin):
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)
-        data = self.key.encrypt(chunk)
+        data = self.key.encrypt(id, chunk)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
@@ -1107,7 +1107,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         refcount = self.seen_chunk(id, size)
         if refcount:
             return self.chunk_incref(id, stats, size=size)
-        data = self.key.encrypt(chunk)
+        data = self.key.encrypt(id, chunk)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)

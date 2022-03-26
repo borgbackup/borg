@@ -42,7 +42,7 @@ from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
-API_VERSION = '1.2_01'
+API_VERSION = '1.3_01'
 
 cdef extern from "openssl/crypto.h":
     int CRYPTO_memcmp(const void *a, const void *b, size_t len)
@@ -77,9 +77,9 @@ cdef extern from "openssl/evp.h":
     int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 
     int EVP_CIPHER_CTX_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
-    int EVP_CTRL_GCM_GET_TAG
-    int EVP_CTRL_GCM_SET_TAG
-    int EVP_CTRL_GCM_SET_IVLEN
+    int EVP_CTRL_AEAD_GET_TAG
+    int EVP_CTRL_AEAD_SET_TAG
+    int EVP_CTRL_AEAD_SET_IVLEN
 
     const EVP_MD *EVP_sha256() nogil
 
@@ -152,7 +152,7 @@ class UNENCRYPTED:
         self.header_len = header_len
         self.set_iv(iv)
 
-    def encrypt(self, data, header=b'', iv=None):
+    def encrypt(self, data, header=b'', iv=None, aad=None):
         """
         IMPORTANT: it is called encrypt to satisfy the crypto api naming convention,
         but this does NOT encrypt and it does NOT compute and store a MAC either.
@@ -162,7 +162,7 @@ class UNENCRYPTED:
         assert self.iv is not None, 'iv needs to be set before encrypt is called'
         return header + data
 
-    def decrypt(self, envelope):
+    def decrypt(self, envelope, aad=None):
         """
         IMPORTANT: it is called decrypt to satisfy the crypto api naming convention,
         but this does NOT decrypt and it does NOT verify a MAC either, because data
@@ -184,10 +184,10 @@ class UNENCRYPTED:
 
 
 cdef class AES256_CTR_BASE:
-    # Layout: HEADER + MAC 32 + IV 8 + CT (same as attic / borg < 1.2 IF HEADER = TYPE_BYTE, no AAD)
+    # Layout: HEADER + MAC 32 + IV 8 + CT (same as attic / borg < 1.3 IF HEADER = TYPE_BYTE, no AAD)
 
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef unsigned char enc_key[32]
     cdef int cipher_blk_len
     cdef int iv_len, iv_len_short
     cdef int aad_offset
@@ -235,7 +235,7 @@ cdef class AES256_CTR_BASE:
         """
         raise NotImplementedError
 
-    def encrypt(self, data, header=b'', iv=None):
+    def encrypt(self, data, header=b'', iv=None, aad=None):
         """
         encrypt data, compute mac over aad + iv + cdata, prepend header.
         aad_offset is the offset into the header where aad starts.
@@ -252,7 +252,7 @@ cdef class AES256_CTR_BASE:
                                                                   ilen + self.cipher_blk_len)  # play safe, 1 extra blk
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef Py_buffer idata = ro_buffer(data)
         cdef Py_buffer hdata = ro_buffer(header)
@@ -264,15 +264,12 @@ cdef class AES256_CTR_BASE:
             offset += self.mac_len
             self.store_iv(odata+offset, self.iv)
             offset += self.iv_len_short
-            rc = EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, self.iv)
-            if not rc:
+            if not EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, self.iv):
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
-            if not rc:
+            if not EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen):
                 raise CryptoError('EVP_EncryptUpdate failed')
             offset += olen
-            rc = EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen)
-            if not rc:
+            if not EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen):
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
             self.mac_compute(<const unsigned char *> hdata.buf+aoffset, alen,
@@ -285,19 +282,18 @@ cdef class AES256_CTR_BASE:
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
 
-    def decrypt(self, envelope):
+    def decrypt(self, envelope, aad=None):
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
-        assert hlen == self.header_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)  # play safe, 1 extra blk
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef unsigned char mac_buf[32]
         assert sizeof(mac_buf) == self.mac_len
@@ -311,14 +307,12 @@ cdef class AES256_CTR_BASE:
             if not EVP_DecryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             offset = 0
-            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                   <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len_short,
-                                   ilen-hlen-self.mac_len-self.iv_len_short)
-            if not rc:
+            if not EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                     <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len_short,
+                                     ilen-hlen-self.mac_len-self.iv_len_short):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
-            rc = EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen)
-            if rc <= 0:
+            if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
                 raise CryptoError('EVP_DecryptFinal_ex failed')
             offset += olen
             self.blocks += self.block_count(offset)
@@ -335,8 +329,7 @@ cdef class AES256_CTR_BASE:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        for i in range(self.iv_len):
-            self.iv[i] = iv[i]
+        self.iv = iv
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
 
     def next_iv(self):
@@ -360,7 +353,7 @@ cdef class AES256_CTR_BASE:
 
 
 cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
-    cdef unsigned char *mac_key
+    cdef unsigned char mac_key[32]
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert isinstance(mac_key, bytes) and len(mac_key) == 32
@@ -377,7 +370,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
                      const unsigned char *data2, int data2_len,
                      unsigned char *mac_buf):
         data = data1[:data1_len] + data2[:data2_len]
-        mac = hmac.HMAC(self.mac_key, data, hashlib.sha256).digest()
+        mac = hmac.digest(self.mac_key[:self.mac_len], data, 'sha256')
         for i in range(self.mac_len):
             mac_buf[i] = mac[i]
 
@@ -390,7 +383,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
 
 
 cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
-    cdef unsigned char *mac_key
+    cdef unsigned char mac_key[128]
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
         assert isinstance(mac_key, bytes) and len(mac_key) == 128
@@ -423,15 +416,16 @@ ctypedef const EVP_CIPHER * (* CIPHER)()
 
 
 cdef class _AEAD_BASE:
-    # Layout: HEADER + MAC 16 + IV 12 + CT
+    # new crypto used in borg >= 1.3
+    # Layout: HEADER + MAC 16 + CT
 
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef unsigned char key[32]
     cdef int cipher_blk_len
     cdef int iv_len
     cdef int aad_offset
-    cdef int header_len
+    cdef int header_len_expected
     cdef int mac_len
     cdef unsigned char iv[12]
     cdef long long blocks
@@ -441,83 +435,87 @@ cdef class _AEAD_BASE:
         """check whether library requirements for this ciphersuite are satisfied"""
         raise NotImplemented  # override / implement in child class
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
-        assert mac_key is None
-        assert isinstance(enc_key, bytes) and len(enc_key) == 32
+    def __init__(self, key, iv=None, header_len=0, aad_offset=0):
+        """
+        init AEAD crypto
+
+        :param key: 256bit encrypt-then-mac key
+        :param iv: 96bit initialisation vector / nonce
+        :param header_len: expected length of header
+        :param aad_offset: where in the header the authenticated data starts
+        """
+        assert isinstance(key, bytes) and len(key) == 32
         self.iv_len = sizeof(self.iv)
-        self.header_len = 1
+        self.header_len_expected = header_len
         assert aad_offset <= header_len
         self.aad_offset = aad_offset
-        self.header_len = header_len
         self.mac_len = 16
-        self.enc_key = enc_key
+        self.key = key
         if iv is not None:
             self.set_iv(iv)
         else:
             self.blocks = -1  # make sure set_iv is called before encrypt
 
-    def __cinit__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    def __cinit__(self, key, iv=None, header_len=0, aad_offset=0):
         self.ctx = EVP_CIPHER_CTX_new()
 
     def __dealloc__(self):
         EVP_CIPHER_CTX_free(self.ctx)
 
-    def encrypt(self, data, header=b'', iv=None):
+    def encrypt(self, data, header=b'', iv=None, aad=b''):
         """
-        encrypt data, compute mac over aad + iv + cdata, prepend header.
-        aad_offset is the offset into the header where aad starts.
+        encrypt data, compute auth tag over aad + header + cdata.
+        return header + auth tag + cdata.
+        aad_offset is the offset into the header where the authenticated header part starts.
+        aad is additional authenticated data, which won't be included in the returned data,
+        but only used for the auth tag computation.
         """
         if iv is not None:
             self.set_iv(iv)
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
-        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
+        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
         # IV we provide, thus we must not encrypt more than 2^32 cipher blocks with same IV).
         block_count = self.block_count(len(data))
         if block_count > 2**32:
             raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(data)
         cdef int hlen = len(header)
-        assert hlen == self.header_len
+        assert hlen == self.header_len_expected
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len +
+        cdef int aadlen = len(aad)
+        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
                                                                   ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef Py_buffer idata = ro_buffer(data)
         cdef Py_buffer hdata = ro_buffer(header)
+        cdef Py_buffer aadata = ro_buffer(aad)
         try:
             offset = 0
             for i in range(hlen):
                 odata[offset+i] = header[i]
             offset += hlen
             offset += self.mac_len
-            self.store_iv(odata+offset, self.iv)
-            rc = EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL)
-            if not rc:
+            if not EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, self.iv_len, NULL):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
-            rc = EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.enc_key, self.iv)
-            if not rc:
+            if not EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            rc = EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen)
-            if not rc:
+            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen):
                 raise CryptoError('EVP_EncryptUpdate failed')
-            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, odata+offset, self.iv_len):
+            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen):
                 raise CryptoError('EVP_EncryptUpdate failed')
-            offset += self.iv_len
-            rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
-            if not rc:
+            if not EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen):
                 raise CryptoError('EVP_EncryptUpdate failed')
             offset += olen
-            rc = EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen)
-            if not rc:
+            if not EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen):
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_GET_TAG, self.mac_len, odata+hlen):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_GET_TAG, self.mac_len, odata + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl GET TAG failed')
             self.blocks = block_count
             return odata[:offset]
@@ -525,53 +523,50 @@ cdef class _AEAD_BASE:
             PyMem_Free(odata)
             PyBuffer_Release(&hdata)
             PyBuffer_Release(&idata)
+            PyBuffer_Release(&aadata)
 
-    def decrypt(self, envelope):
+    def decrypt(self, envelope, aad=b''):
         """
-        authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
+        authenticate aad + header + cdata (from envelope), ignore header bytes up to aad_offset.,
+        return decrypted cdata.
         """
-        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
+        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
         # IV we provide, thus we must not decrypt more than 2^32 cipher blocks with same IV):
         approx_block_count = self.block_count(len(envelope))  # sloppy, but good enough for borg
         if approx_block_count > 2**32:
             raise ValueError('too much data, would overflow internal 32bit counter')
         cdef int ilen = len(envelope)
-        cdef int hlen = self.header_len
-        assert hlen == self.header_len
+        cdef int hlen = self.header_len_expected
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
+        cdef int aadlen = len(aad)
         cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
         if not odata:
             raise MemoryError
-        cdef int olen
+        cdef int olen = 0
         cdef int offset
         cdef Py_buffer idata = ro_buffer(envelope)
+        cdef Py_buffer aadata = ro_buffer(aad)
         try:
             if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            iv = self.fetch_iv(<unsigned char *> idata.buf+hlen+self.mac_len)
-            self.set_iv(iv)
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_IVLEN, self.iv_len, NULL):
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
-            if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.enc_key, iv):
+            if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_GCM_SET_TAG, self.mac_len, <unsigned char *> idata.buf+hlen):
-                raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
-            rc = EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen)
-            if not rc:
+            if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen):
                 raise CryptoError('EVP_DecryptUpdate failed')
-            if not EVP_DecryptUpdate(self.ctx, NULL, &olen,
-                                     <const unsigned char*> idata.buf+hlen+self.mac_len, self.iv_len):
+            if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset = 0
-            rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                   <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len,
-                                   ilen-hlen-self.mac_len-self.iv_len)
-            if not rc:
+            if not EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                     <const unsigned char*> idata.buf+hlen+self.mac_len,
+                                     ilen-hlen-self.mac_len):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
-            rc = EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen)
-            if rc <= 0:
+            if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
+                raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
+            if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
                 # a failure here means corrupted or tampered tag (mac) or data.
                 raise IntegrityError('Authentication / EVP_DecryptFinal_ex failed')
             offset += olen
@@ -580,6 +575,7 @@ cdef class _AEAD_BASE:
         finally:
             PyMem_Free(odata)
             PyBuffer_Release(&idata)
+            PyBuffer_Release(&aadata)
 
     def block_count(self, length):
         return num_cipher_blocks(length, self.cipher_blk_len)
@@ -590,71 +586,48 @@ cdef class _AEAD_BASE:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        for i in range(self.iv_len):
-            self.iv[i] = iv[i]
+        self.iv = iv
         self.blocks = 0  # number of cipher blocks encrypted with this IV
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
-        # AES-GCM, AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
+        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
         # (12 byte) IV we provide, thus we only need to increment the IV by 1.
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + 1
 
-    cdef fetch_iv(self, unsigned char * iv_in):
-        return iv_in[0:self.iv_len]
 
-    cdef store_iv(self, unsigned char * iv_out, unsigned char * iv):
-        cdef int i
-        for i in range(self.iv_len):
-            iv_out[i] = iv[i]
-
-    def extract_iv(self, envelope):
-        offset = self.header_len + self.mac_len
-        return bytes_to_long(envelope[offset:offset+self.iv_len])
-
-
-cdef class _AES_BASE(_AEAD_BASE):
-    def __init__(self, *args, **kwargs):
-        self.cipher_blk_len = 16
-        super().__init__(*args, **kwargs)
-
-
-cdef class _CHACHA_BASE(_AEAD_BASE):
-    def __init__(self, *args, **kwargs):
-        self.cipher_blk_len = 64
-        super().__init__(*args, **kwargs)
-
-
-cdef class AES256_OCB(_AES_BASE):
+cdef class AES256_OCB(_AEAD_BASE):
     @classmethod
     def requirements_check(cls):
         if is_libressl:
             raise ValueError('AES OCB is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_aes_256_ocb
-        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
+        self.cipher_blk_len = 16
+        super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
-cdef class CHACHA20_POLY1305(_CHACHA_BASE):
+cdef class CHACHA20_POLY1305(_AEAD_BASE):
     @classmethod
     def requirements_check(cls):
         if is_libressl:
             raise ValueError('CHACHA20-POLY1305 is not implemented by LibreSSL (yet?).')
 
-    def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
+    def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()
         self.cipher = EVP_chacha20_poly1305
-        super().__init__(mac_key, enc_key, iv=iv, header_len=header_len, aad_offset=aad_offset)
+        self.cipher_blk_len = 64
+        super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
 cdef class AES:
     """A thin wrapper around the OpenSSL EVP cipher API - for legacy code, like key file encryption"""
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char *enc_key
+    cdef unsigned char enc_key[32]
     cdef int cipher_blk_len
     cdef int iv_len
     cdef unsigned char iv[16]
@@ -721,7 +694,7 @@ cdef class AES:
             if not EVP_DecryptUpdate(self.ctx, odata, &olen, <const unsigned char*> idata.buf, ilen):
                 raise Exception('EVP_DecryptUpdate failed')
             offset += olen
-            if EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen) <= 0:
+            if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
                 # this error check is very important for modes with padding or
                 # authentication. for them, a failure here means corrupted data.
                 # CTR mode does not use padding nor authentication.
@@ -742,15 +715,13 @@ cdef class AES:
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        for i in range(self.iv_len):
-            self.iv[i] = iv[i]
+        self.iv = iv
         self.blocks = 0  # number of cipher blocks encrypted with this IV
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + self.blocks
-
 
 
 def hmac_sha256(key, data):
@@ -779,7 +750,7 @@ def hkdf_hmac_sha512(ikm, salt, info, output_length):
     # Step 1. HKDF-Extract (ikm, salt) -> prk
     if salt is None:
         salt = bytes(64)
-    prk = hmac.HMAC(salt, ikm, hashlib.sha512).digest()
+    prk = hmac.digest(salt, ikm, 'sha512')
 
     # Step 2. HKDF-Expand (prk, info, output_length) -> output key
     n = ceil(output_length / digest_length)
@@ -787,6 +758,6 @@ def hkdf_hmac_sha512(ikm, salt, info, output_length):
     output = b''
     for i in range(n):
         msg = t_n + info + (i + 1).to_bytes(1, 'little')
-        t_n = hmac.HMAC(prk, msg, hashlib.sha512).digest()
+        t_n = hmac.digest(prk, msg, 'sha512')
         output += t_n
     return output[:output_length]

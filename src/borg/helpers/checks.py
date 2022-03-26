@@ -31,7 +31,7 @@ def check_extension_modules():
         raise ExtensionModuleError
     if compress.API_VERSION != '1.2_02':
         raise ExtensionModuleError
-    if borg.crypto.low_level.API_VERSION != '1.2_01':
+    if borg.crypto.low_level.API_VERSION != '1.3_01':
         raise ExtensionModuleError
     if item.API_VERSION != '1.2_01':
         raise ExtensionModuleError

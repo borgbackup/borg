@@ -469,7 +469,15 @@ class FlexiKey:
         )
         return ae_cipher.decrypt(encrypted_key.data)
 
-    def encrypt_key_file(self, data, passphrase):
+    def encrypt_key_file(self, data, passphrase, algorithm):
+        if algorithm == 'sha256':
+            return self.encrypt_key_file_pbkdf2(data, passphrase)
+        elif algorithm == 'argon2 aes256_ctr hmac_sha256':
+            return self.encrypt_key_file_argon2(data, passphrase)
+        else:
+            raise ValueError(f'Unexpected algorithm: {algorithm}')
+
+    def encrypt_key_file_pbkdf2(self, data, passphrase):
         salt = os.urandom(32)
         iterations = PBKDF2_ITERATIONS
         key = passphrase.kdf(salt, iterations, 32)
@@ -485,7 +493,41 @@ class FlexiKey:
         )
         return msgpack.packb(enc_key.as_dict())
 
-    def _save(self, passphrase):
+    def encrypt_key_file_argon2(self, data, passphrase):
+        # https://www.rfc-editor.org/rfc/rfc9106.html#section-4-6.2
+        time_cost = 3
+        memory_cost = 2**16
+        parallelism = 4
+        type_ = 'id'
+
+        salt = os.urandom(16)
+        key = passphrase.argon2(
+            output_len_in_bytes=64,
+            salt=salt,
+            time_cost=time_cost,
+            memory_cost=memory_cost,
+            parallelism=parallelism,
+            type=type_,
+        )
+        enc_key, mac_key = key[:32], key[32:]
+        ae_cipher = AES256_CTR_HMAC_SHA256(
+            iv=0, header_len=0, aad_offset=0,
+            enc_key=enc_key,
+            mac_key=mac_key,
+        )
+        encrypted_key = EncryptedKey(
+            version=1,
+            algorithm='argon2 aes256-ctr hmac-sha256',
+            salt=salt,
+            argon2_time_cost=time_cost,
+            argon2_memory_cost=memory_cost,
+            argon2_parallelism=parallelism,
+            argon2_type=type_,
+            data=ae_cipher.encrypt(data),
+        )
+        return msgpack.packb(encrypted_key.as_dict())
+
+    def _save(self, passphrase, algorithm):
         key = Key(
             version=1,
             repository_id=self.repository_id,
@@ -495,7 +537,7 @@ class FlexiKey:
             chunk_seed=self.chunk_seed,
             tam_required=self.tam_required,
         )
-        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)
+        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm)
         key_data = '\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii')))
         return key_data
 
@@ -615,7 +657,7 @@ class FlexiKey:
         return success
 
     def save(self, target, passphrase, algorithm, create=False):
-        key_data = self._save(passphrase)
+        key_data = self._save(passphrase, algorithm)
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             if create and os.path.isfile(target):
                 # if a new keyfile key repository is created, ensure that an existing keyfile of another

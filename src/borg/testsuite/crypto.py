@@ -355,7 +355,7 @@ def test_key_file_save_argon2_aes256_ctr_hmac_sha256():
     save_me.id_key = b'id_key'
     save_me.chunk_seed = 42
     passphrase = MagicMock()
-    passphrase.kdf.return_value = b'derived key'.rjust(32)
+    passphrase.argon2.return_value = b'derived key'.rjust(64)
 
     save_me.save(algorithm='argon2 aes256_ctr hmac_sha256', target=repository, passphrase=passphrase)
     saved = repository.save_key.call_args.args[0]
@@ -364,5 +364,4 @@ def test_key_file_save_argon2_aes256_ctr_hmac_sha256():
     load_me.load(target=repository, passphrase=passphrase)
 
     assert to_dict(load_me) == to_dict(save_me)
-    with pytest.raises(AssertionError):
-        assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == b'argon2 aes256_ctr hmac_sha256'
+    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == b'argon2 aes256-ctr hmac-sha256'

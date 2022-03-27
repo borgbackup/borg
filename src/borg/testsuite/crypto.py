@@ -1,4 +1,6 @@
 from binascii import hexlify
+from unittest.mock import MagicMock
+from binascii import a2b_base64
 
 import pytest
 
@@ -7,7 +9,7 @@ from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 from ..crypto.low_level import AES, hmac_sha256
-from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError
+from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey
 from ..helpers.passphrase import Passphrase
 from ..helpers import msgpack
 
@@ -337,3 +339,30 @@ def test_decrypt_key_file_v2_is_unsupported(monkeypatch):
 
     with pytest.raises(UnsupportedKeyFormatError):
         key.decrypt_key_file(encrypted, passphrase)
+
+
+def test_key_file_save_argon2_aes256_ctr_hmac_sha256():
+    def to_dict(key):
+        extract = 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'
+        return {a: getattr(key, a) for a in extract}
+
+    repository = MagicMock()
+    repository.id = b'repository_id'
+    save_me = RepoKey(repository)
+    save_me.repository_id = b'repository_id'
+    save_me.enc_key = b'enc_key'
+    save_me.enc_hmac_key = b'enc_hmac_key'
+    save_me.id_key = b'id_key'
+    save_me.chunk_seed = 42
+    passphrase = MagicMock()
+    passphrase.kdf.return_value = b'derived key'.rjust(32)
+
+    save_me.save(algorithm='argon2 aes256_ctr hmac_sha256', target=repository, passphrase=passphrase)
+    saved = repository.save_key.call_args.args[0]
+    repository.load_key.return_value = saved
+    load_me = RepoKey(repository)
+    load_me.load(target=repository, passphrase=passphrase)
+
+    assert to_dict(load_me) == to_dict(save_me)
+    with pytest.raises(AssertionError):
+        assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == b'argon2 aes256_ctr hmac_sha256'

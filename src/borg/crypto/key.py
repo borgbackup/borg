@@ -612,7 +612,7 @@ class FlexiKey:
             self.target = target
         return success
 
-    def save(self, target, passphrase, create=False):
+    def save(self, target, passphrase, algorithm='TODO', create=False):
         key_data = self._save(passphrase)
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             if create and os.path.isfile(target):

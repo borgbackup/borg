@@ -502,7 +502,8 @@ class FlexiKey:
     def change_passphrase(self, passphrase=None):
         if passphrase is None:
             passphrase = Passphrase.new(allow_empty=True)
-        self.save(self.target, passphrase)
+        algorithm = 'sha256'  # TODO: copy from `self`
+        self.save(self.target, passphrase, algorithm=algorithm)
 
     @classmethod
     def create(cls, repository, args):
@@ -512,7 +513,8 @@ class FlexiKey:
         key.init_from_random_data()
         key.init_ciphers()
         target = key.get_new_target(args)
-        key.save(target, passphrase, create=True)
+        algorithm = 'sha256'  # TODO: initialize based on `args`
+        key.save(target, passphrase, create=True, algorithm=algorithm)
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key
@@ -612,7 +614,7 @@ class FlexiKey:
             self.target = target
         return success
 
-    def save(self, target, passphrase, algorithm='TODO', create=False):
+    def save(self, target, passphrase, algorithm, create=False):
         key_data = self._save(passphrase)
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             if create and os.path.isfile(target):
@@ -688,8 +690,8 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         self.logically_encrypted = False
         return success
 
-    def save(self, target, passphrase, create=False):
-        super().save(target, passphrase, create=create)
+    def save(self, target, passphrase, algorithm, create=False):
+        super().save(target, passphrase, algorithm, create=create)
         self.logically_encrypted = False
 
     def init_ciphers(self, manifest_data=None):

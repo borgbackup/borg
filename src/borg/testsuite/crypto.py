@@ -1,5 +1,6 @@
 from binascii import hexlify
 from unittest.mock import MagicMock
+import unittest
 from binascii import a2b_base64
 
 import pytest
@@ -365,3 +366,17 @@ def test_key_file_save_argon2_aes256_ctr_hmac_sha256():
 
     assert to_dict(load_me) == to_dict(save_me)
     assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == b'argon2 aes256-ctr hmac-sha256'
+
+
+@unittest.mock.patch('getpass.getpass')
+def test_passphrase_retry(getpass, monkeypatch):
+    repository = MagicMock(id=b'repository_id')
+    getpass.return_value = "hello, pass phrase"
+    monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
+    RepoKey.create(repository, args=MagicMock(key_algorithm='argon2 aes256-ctr hmac-sha256'))
+    repository.load_key.return_value = repository.save_key.call_args.args[0]
+
+    # BUG: raises borg.crypto.low_level.IntegrityError
+    import borg.crypto.low_level
+    with pytest.raises(borg.crypto.low_level.IntegrityError):
+        RepoKey.detect(repository, manifest_data=MagicMock())

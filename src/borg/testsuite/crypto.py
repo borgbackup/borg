@@ -357,7 +357,7 @@ def test_key_file_save_argon2_aes256_ctr_hmac_sha256():
     passphrase = MagicMock()
     passphrase.argon2.return_value = b'derived key'.rjust(64)
 
-    save_me.save(algorithm='argon2 aes256_ctr hmac_sha256', target=repository, passphrase=passphrase)
+    save_me.save(algorithm='argon2 aes256-ctr hmac-sha256', target=repository, passphrase=passphrase)
     saved = repository.save_key.call_args.args[0]
     repository.load_key.return_value = saved
     load_me = RepoKey(repository)

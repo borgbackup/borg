@@ -472,7 +472,7 @@ class FlexiKey:
     def encrypt_key_file(self, data, passphrase, algorithm):
         if algorithm == 'sha256':
             return self.encrypt_key_file_pbkdf2(data, passphrase)
-        elif algorithm == 'argon2 aes256_ctr hmac_sha256':
+        elif algorithm == 'argon2 aes256-ctr hmac-sha256':
             return self.encrypt_key_file_argon2(data, passphrase)
         else:
             raise ValueError(f'Unexpected algorithm: {algorithm}')
@@ -555,7 +555,7 @@ class FlexiKey:
         key.init_from_random_data()
         key.init_ciphers()
         target = key.get_new_target(args)
-        algorithm = 'sha256'  # TODO: initialize based on `args`
+        algorithm = 'sha256' if args.key_algorithm == 'pbkdf2-sha256 aes256-ctr hmac-sha256' else args.key_algorithm
         key.save(target, passphrase, create=True, algorithm=algorithm)
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')

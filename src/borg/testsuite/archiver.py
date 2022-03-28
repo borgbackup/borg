@@ -3627,6 +3627,15 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
             assert key[b'algorithm'] == b'argon2 aes256-ctr hmac-sha256'
 
+    def test_change_location_does_not_change_algorithm(self):
+        self.cmd('init', '--encryption=keyfile', '--key-algorithm', 'argon2 aes256-ctr hmac-sha256', self.repository_location)
+
+        self.cmd('key', 'change-location', self.repository_location, 'repokey')
+
+        with Repository(self.repository_path) as repository:
+            key = msgpack.unpackb(a2b_base64(repository.load_key()))
+            assert key[b'algorithm'] == b'argon2 aes256-ctr hmac-sha256'
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

@@ -398,8 +398,8 @@ class Archiver:
             setattr(key_new, name, value)
 
         key_new.target = key_new.get_new_target(args)
-        algorithm = 'sha256'  # TODO: copy from `key`
-        key_new.save(key_new.target, key._passphrase, create=True, algorithm=algorithm)  # save with same passphrase
+        # save with same passphrase and algorithm
+        key_new.save(key_new.target, key._passphrase, create=True, algorithm=key._encrypted_key_algorithm)
 
         # rewrite the manifest with the new key, so that the key-type byte of the manifest changes
         manifest.key = key_new

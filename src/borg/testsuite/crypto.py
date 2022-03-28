@@ -370,6 +370,7 @@ def test_key_file_save_argon2_aes256_ctr_hmac_sha256():
 
 @unittest.mock.patch('getpass.getpass')
 def test_passphrase_retry(getpass, monkeypatch):
+    """https://github.com/borgbackup/borg/pull/6469#discussion_r832670411"""
     repository = MagicMock(id=b'repository_id')
     getpass.return_value = "hello, pass phrase"
     monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')

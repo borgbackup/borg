@@ -369,7 +369,7 @@ def test_key_file_save_argon2_aes256_ctr_hmac_sha256():
 
 
 @unittest.mock.patch('getpass.getpass')
-def test_passphrase_retry(getpass, monkeypatch):
+def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     """https://github.com/borgbackup/borg/pull/6469#discussion_r832670411"""
     repository = MagicMock(id=b'repository_id')
     getpass.return_value = "hello, pass phrase"
@@ -377,7 +377,5 @@ def test_passphrase_retry(getpass, monkeypatch):
     RepoKey.create(repository, args=MagicMock(key_algorithm='argon2 aes256-ctr hmac-sha256'))
     repository.load_key.return_value = repository.save_key.call_args.args[0]
 
-    # BUG: raises borg.crypto.low_level.IntegrityError
-    import borg.crypto.low_level
-    with pytest.raises(borg.crypto.low_level.IntegrityError):
-        RepoKey.detect(repository, manifest_data=MagicMock())
+    # This used to raise integrity errors due to a bug
+    RepoKey.detect(repository, manifest_data=None)

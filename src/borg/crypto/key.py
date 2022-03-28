@@ -25,6 +25,7 @@ from ..platform import SaveFile
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
+from . import low_level
 
 
 class UnsupportedPayloadError(Error):
@@ -467,7 +468,10 @@ class FlexiKey:
             enc_key=enc_key,
             mac_key=mac_key,
         )
-        return ae_cipher.decrypt(encrypted_key.data)
+        try:
+            return ae_cipher.decrypt(encrypted_key.data)
+        except low_level.IntegrityError:
+            return None
 
     def encrypt_key_file(self, data, passphrase, algorithm):
         if algorithm == 'sha256':

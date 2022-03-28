@@ -439,6 +439,7 @@ class FlexiKey:
         if encrypted_key.version != 1:
             raise UnsupportedKeyFormatError()
         else:
+            self._encrypted_key_algorithm = encrypted_key.algorithm
             if encrypted_key.algorithm == 'sha256':
                 return self.decrypt_key_file_pbkdf2(encrypted_key, passphrase)
             elif encrypted_key.algorithm == 'argon2 aes256-ctr hmac-sha256':
@@ -548,8 +549,7 @@ class FlexiKey:
     def change_passphrase(self, passphrase=None):
         if passphrase is None:
             passphrase = Passphrase.new(allow_empty=True)
-        algorithm = 'sha256'  # TODO: copy from `self`
-        self.save(self.target, passphrase, algorithm=algorithm)
+        self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm)
 
     @classmethod
     def create(cls, repository, args):

@@ -5,7 +5,7 @@ import shutil
 import stat
 import struct
 import time
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
 from datetime import datetime
@@ -1584,7 +1584,15 @@ class LoggedIO:
                 size, segment, offset))
         length = size - fmt.size
         if read_data:
-            data = fd.read(length)
+            try:
+                data = fd.read(length)
+            except OSError as err:
+                if err.errno == errno.EIO:
+                    raise IntegrityError(
+                        'I/O error while reading segment file [segment {}, offset {}] : {}'
+                        .format(segment, offset, fd.name)
+                    )
+                raise err
             if len(data) != length:
                 raise IntegrityError('Segment entry data short read [segment {}, offset {}]: expected {}, got {} bytes'.format(
                     segment, offset, length, len(data)))

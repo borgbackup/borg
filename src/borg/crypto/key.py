@@ -499,20 +499,11 @@ class FlexiKey:
         return msgpack.packb(enc_key.as_dict())
 
     def encrypt_key_file_argon2(self, data, passphrase):
-        # https://www.rfc-editor.org/rfc/rfc9106.html#section-4-6.2
-        time_cost = 3
-        memory_cost = 2**16
-        parallelism = 4
-        type_ = 'id'
-
-        salt = os.urandom(16)
+        salt = os.urandom(ARGON2_SALT_BYTES)
         key = passphrase.argon2(
             output_len_in_bytes=64,
             salt=salt,
-            time_cost=time_cost,
-            memory_cost=memory_cost,
-            parallelism=parallelism,
-            type=type_,
+            **ARGON2_ARGS,
         )
         enc_key, mac_key = key[:32], key[32:]
         ae_cipher = AES256_CTR_HMAC_SHA256(
@@ -524,11 +515,8 @@ class FlexiKey:
             version=1,
             algorithm='argon2 aes256-ctr hmac-sha256',
             salt=salt,
-            argon2_time_cost=time_cost,
-            argon2_memory_cost=memory_cost,
-            argon2_parallelism=parallelism,
-            argon2_type=type_,
             data=ae_cipher.encrypt(data),
+            **{'argon2_' + k: v for k, v in ARGON2_ARGS.items()},
         )
         return msgpack.packb(encrypted_key.as_dict())
 

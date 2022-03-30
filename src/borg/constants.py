@@ -103,6 +103,10 @@ DASHES = '-' * 78
 
 PBKDF2_ITERATIONS = 100000
 
+# https://www.rfc-editor.org/rfc/rfc9106.html#section-4-6.2
+ARGON2_ARGS = {'time_cost': 3, 'memory_cost': 2**16, 'parallelism': 4, 'type': 'id'}
+ARGON2_SALT_BYTES = 16
+
 
 class KeyBlobStorage:
     NO_STORAGE = 'no_storage'

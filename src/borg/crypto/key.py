@@ -547,8 +547,7 @@ class FlexiKey:
         key.init_from_random_data()
         key.init_ciphers()
         target = key.get_new_target(args)
-        algorithm = 'sha256' if args.key_algorithm == 'pbkdf2-sha256 aes256-ctr hmac-sha256' else args.key_algorithm
-        key.save(target, passphrase, create=True, algorithm=algorithm)
+        key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS[args.key_algorithm])
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key

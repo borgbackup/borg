@@ -370,5 +370,5 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     repository.load_key.return_value = repository.save_key.call_args.args[0]
 
     # 1. detect() tries an empty passphrase first before prompting the user
-    # 2. load() was thorwing integrity errors instead of returning None due to a bug
+    # 2. load() was throwing integrity errors instead of returning None due to a bug
     RepoKey.detect(repository, manifest_data=None)

@@ -316,7 +316,7 @@ def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
 
 
 def test_decrypt_key_file_unsupported_algorithm(monkeypatch):
-    '''We will add more algorithms in the future. We should raise a helpful error.'''
+    """We will add more algorithms in the future. We should raise a helpful error."""
     monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
     passphrase = Passphrase.new()
     key = KeyfileKey(None)
@@ -330,7 +330,7 @@ def test_decrypt_key_file_unsupported_algorithm(monkeypatch):
 
 
 def test_decrypt_key_file_v2_is_unsupported(monkeypatch):
-    '''There may eventually be a version 2 of the format. For now we should raise a helpful error.'''
+    """There may eventually be a version 2 of the format. For now we should raise a helpful error."""
     monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
     passphrase = Passphrase.new()
     key = KeyfileKey(None)

@@ -59,7 +59,7 @@ Each repository has a ``config`` file which is a ``INI``-style file
 and looks like this::
 
     [repository]
-    version = 1
+    version = 2
     segments_per_dir = 1000
     max_segment_size = 524288000
     id = 57d6c1d52ce76a836b532b0e42e677dec6af9fca3673db511279358828a21ed6
@@ -94,17 +94,26 @@ this value in a non-empty repository, you may also need to relocate the segment
 files manually.
 
 A segment starts with a magic number (``BORG_SEG`` as an eight byte ASCII string),
-followed by a number of log entries. Each log entry consists of: (in this order)
+followed by a number of log entries. Each log entry consists of (in this order):
 
-* First, unsigned 32-bit number, the CRC32 of the entire entry (for a PUT including the DATA) excluding the CRC32 field
-* Second, unsigned 32-bit size of the entry (including the whole header)
-* Third, unsigned 8-bit entry tag: PUT(1), DELETE(2) or COMMIT(3)
-* Fourth, on PUT or DELETE, 32 byte key
-* Fifth, PUT only, (size - 41) bytes of data (length = size - sizeof(CRC32) - sizeof(size) - sizeof(entry tag) - sizeof(key))
+* crc32 checksum (uint32):
+  - for PUT2: CRC32(size + tag + key + digest)
+  - for PUT: CRC32(size + tag + key + data)
+  - for DELETE: CRC32(size + tag + key)
+  - for COMMIT: CRC32(size + tag)
+* size (uint32) of the entry (including the whole header)
+* tag (uint8): PUT(0), DELETE(1), COMMIT(2) or PUT2(3)
+* key (256 bit) - only for PUT/PUT2/DELETE
+* data (size - 41 bytes) - only for PUT
+* xxh64 digest (64 bit) = XXH64(size + tag + key + data) - only for PUT2
+* data (size - 41 - 8 bytes) - only for PUT2
+
+PUT2 is new since repository version 2. For new log entries PUT2 is used.
+PUT is still supported to read version 1 repositories, but not generated any more.
+If we talk about ``PUT`` in general, it shall usually mean PUT2 for repository
+version 2+.
 
 Those files are strictly append-only and modified only once.
-
-Tag is either ``PUT``, ``DELETE``, or ``COMMIT``.
 
 When an object is written to the repository a ``PUT`` entry is written
 to the file containing the object id and data. If an object is deleted

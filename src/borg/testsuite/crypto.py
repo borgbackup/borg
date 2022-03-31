@@ -342,11 +342,11 @@ def test_decrypt_key_file_v2_is_unsupported(monkeypatch):
         key.decrypt_key_file(encrypted, passphrase)
 
 
-@pytest.mark.parametrize('CLI_argument, expect_algorithm', (
+@pytest.mark.parametrize('cli_argument, expected_algorithm', (
     ('argon2', b'argon2 aes256-ctr hmac-sha256'),
     ('pbkdf2', b'sha256'),
 ))
-def test_key_file_roundtrip(monkeypatch, CLI_argument, expect_algorithm):
+def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
     def to_dict(key):
         extract = 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'
         return {a: getattr(key, a) for a in extract}
@@ -354,13 +354,13 @@ def test_key_file_roundtrip(monkeypatch, CLI_argument, expect_algorithm):
     repository = MagicMock(id=b'repository_id')
     monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
 
-    save_me = RepoKey.create(repository, args=MagicMock(key_algorithm=CLI_argument))
+    save_me = RepoKey.create(repository, args=MagicMock(key_algorithm=cli_argument))
     saved = repository.save_key.call_args.args[0]
     repository.load_key.return_value = saved
     load_me = RepoKey.detect(repository, manifest_data=None)
 
     assert to_dict(load_me) == to_dict(save_me)
-    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expect_algorithm
+    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expected_algorithm
 
 
 @unittest.mock.patch('getpass.getpass')

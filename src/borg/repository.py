@@ -165,6 +165,7 @@ class Repository:
                  make_parent_dirs=False):
         self.path = os.path.abspath(path)
         self._location = Location('file://%s' % self.path)
+        self.version = None
         self.io = None  # type: LoggedIO
         self.lock = None
         self.index = None
@@ -286,7 +287,8 @@ class Repository:
         os.mkdir(os.path.join(path, 'data'))
         config = ConfigParser(interpolation=None)
         config.add_section('repository')
-        config.set('repository', 'version', '1')
+        self.version = 2
+        config.set('repository', 'version', str(self.version))
         config.set('repository', 'segments_per_dir', str(DEFAULT_SEGMENTS_PER_DIR))
         config.set('repository', 'max_segment_size', str(DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'append_only', str(int(self.append_only)))
@@ -442,7 +444,11 @@ class Repository:
         except FileNotFoundError:
             self.close()
             raise self.InvalidRepository(self.path)
-        if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
+        if 'repository' not in self.config.sections():
+            self.close()
+            raise self.InvalidRepository(path)
+        self.version = self.config.getint('repository', 'version')
+        if self.version not in (2, ):  # for now, only work on new repos
             self.close()
             raise self.InvalidRepository(path)
         self.max_segment_size = parse_file_size(self.config.get('repository', 'max_segment_size'))

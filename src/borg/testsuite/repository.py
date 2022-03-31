@@ -14,7 +14,7 @@ from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, ConnectionClosedWithHint, handle_remote_line
-from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
+from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from . import BaseTestCase
 from .hashindex import H
 
@@ -58,7 +58,7 @@ class RepositoryTestCaseBase(BaseTestCase):
         label = label + ': ' if label is not None else ''
         H_trans = {H(i): i for i in range(10)}
         H_trans[None] = -1  # key == None appears in commits
-        tag_trans = {TAG_PUT: 'put', TAG_DELETE: 'del', TAG_COMMIT: 'comm'}
+        tag_trans = {TAG_PUT2: 'put2', TAG_PUT: 'put', TAG_DELETE: 'del', TAG_COMMIT: 'comm'}
         for segment, fn in self.repository.io.segment_iterator():
             for tag, key, offset, size in self.repository.io.iter_objects(segment):
                 print("%s%s H(%d) -> %s[%d..+%d]" % (label, tag_trans[tag], H_trans[key], fn, offset, size))
@@ -185,13 +185,13 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
 
     def _assert_sparse(self):
         # The superseded 123456... PUT
-        assert self.repository.compact[0] == 41 + 9
+        assert self.repository.compact[0] == 41 + 8 + 9
         # a COMMIT
         assert self.repository.compact[1] == 9
         # The DELETE issued by the superseding PUT (or issued directly)
         assert self.repository.compact[2] == 41
         self.repository._rebuild_sparse(0)
-        assert self.repository.compact[0] == 41 + 9
+        assert self.repository.compact[0] == 41 + 8 + 9
 
     def test_sparse1(self):
         self.repository.put(H(0), b'foo')
@@ -213,10 +213,10 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         self.repository.io._write_fd.sync()
 
         # The on-line tracking works on a per-object basis...
-        assert self.repository.compact[0] == 41 + 41 + 4
+        assert self.repository.compact[0] == 41 + 8 + 41 + 4
         self.repository._rebuild_sparse(0)
         # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
-        assert self.repository.compact[0] == 41 + 41 + 4 + len(MAGIC)
+        assert self.repository.compact[0] == 41 + 8 + 41 + 4 + len(MAGIC)
 
         self.repository.commit(compact=True)
         assert 0 not in [segment for segment, _ in self.repository.io.segment_iterator()]
@@ -459,42 +459,42 @@ class QuotaTestCase(RepositoryTestCaseBase):
     def test_tracking(self):
         assert self.repository.storage_quota_use == 0
         self.repository.put(H(1), bytes(1234))
-        assert self.repository.storage_quota_use == 1234 + 41
+        assert self.repository.storage_quota_use == 1234 + 41 + 8
         self.repository.put(H(2), bytes(5678))
-        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * (41 + 8)
         self.repository.delete(H(1))
-        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41  # we have not compacted yet
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * (41 + 8)  # we have not compacted yet
         self.repository.commit(compact=False)
-        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41  # we have not compacted yet
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * (41 + 8)  # we have not compacted yet
         self.reopen()
         with self.repository:
             # Open new transaction; hints and thus quota data is not loaded unless needed.
             self.repository.put(H(3), b'')
             self.repository.delete(H(3))
-            assert self.repository.storage_quota_use == 1234 + 5678 + 3 * 41  # we have not compacted yet
+            assert self.repository.storage_quota_use == 1234 + 5678 + 3 * (41 + 8)  # we have not compacted yet
             self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == 5678 + 41
+            assert self.repository.storage_quota_use == 5678 + 41 + 8
 
     def test_exceed_quota(self):
         assert self.repository.storage_quota_use == 0
-        self.repository.storage_quota = 50
+        self.repository.storage_quota = 80
         self.repository.put(H(1), b'')
-        assert self.repository.storage_quota_use == 41
+        assert self.repository.storage_quota_use == 41 + 8
         self.repository.commit(compact=False)
         with pytest.raises(Repository.StorageQuotaExceeded):
             self.repository.put(H(2), b'')
-        assert self.repository.storage_quota_use == 82
+        assert self.repository.storage_quota_use == (41 + 8) * 2
         with pytest.raises(Repository.StorageQuotaExceeded):
             self.repository.commit(compact=False)
-        assert self.repository.storage_quota_use == 82
+        assert self.repository.storage_quota_use == (41 + 8) * 2
         self.reopen()
         with self.repository:
-            self.repository.storage_quota = 100
+            self.repository.storage_quota = 150
             # Open new transaction; hints and thus quota data is not loaded unless needed.
             self.repository.put(H(1), b'')
-            assert self.repository.storage_quota_use == 82  # we have 2 puts for H(1) here and not yet compacted.
+            assert self.repository.storage_quota_use == (41 + 8) * 2  # we have 2 puts for H(1) here and not yet compacted.
             self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == 41  # now we have compacted.
+            assert self.repository.storage_quota_use == 41 + 8  # now we have compacted.
 
 
 class NonceReservation(RepositoryTestCaseBase):

@@ -13,6 +13,7 @@ from ..crypto.low_level import AES, hmac_sha256
 from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey
 from ..helpers.passphrase import Passphrase
 from ..helpers import msgpack
+from ..constants import KEY_ALGORITHMS
 
 from . import BaseTestCase
 
@@ -342,10 +343,7 @@ def test_decrypt_key_file_v2_is_unsupported(monkeypatch):
         key.decrypt_key_file(encrypted, passphrase)
 
 
-@pytest.mark.parametrize('cli_argument, expected_algorithm', (
-    ('argon2', b'argon2 aes256-ctr hmac-sha256'),
-    ('pbkdf2', b'sha256'),
-))
+@pytest.mark.parametrize('cli_argument, expected_algorithm', KEY_ALGORITHMS.items())
 def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
     def to_dict(key):
         extract = 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'
@@ -360,7 +358,7 @@ def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
     load_me = RepoKey.detect(repository, manifest_data=None)
 
     assert to_dict(load_me) == to_dict(save_me)
-    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expected_algorithm
+    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expected_algorithm.encode()
 
 
 @unittest.mock.patch('getpass.getpass')

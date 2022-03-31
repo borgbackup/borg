@@ -25,7 +25,7 @@ from ..helpers import msgpack
 class TestKey:
     class MockArgs:
         location = Location(tempfile.mkstemp()[1])
-        key_algorithm = "argon2 aes256-ctr hmac-sha256"
+        key_algorithm = "argon2"
 
     keyfile2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000

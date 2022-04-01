@@ -86,7 +86,7 @@ try:
     from .remote import RepositoryServer, RemoteRepository, cache_if_remote
     from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
     from .selftest import selftest
-    from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
+    from .upgrader import BorgRepositoryUpgrader
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
     # default behavior, see issue #4424.
@@ -1773,14 +1773,7 @@ class Archiver:
             manifest.write()
             repository.commit(compact=False)
         else:
-            # mainly for upgrades from Attic repositories,
-            # but also supports borg 0.xx -> 1.0 upgrade.
-
-            repo = AtticRepositoryUpgrader(args.location.path, create=False)
-            try:
-                repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
-            except NotImplementedError as e:
-                print("warning: %s" % e)
+            # mainly for upgrades from borg 0.xx -> 1.0.
             repo = BorgRepositoryUpgrader(args.location.path, create=False)
             try:
                 repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
@@ -4842,50 +4835,17 @@ class Archiver:
         https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability
         for details.
 
-        Attic and Borg 0.xx to Borg 1.x
-        +++++++++++++++++++++++++++++++
+        Borg 0.xx to Borg 1.x
+        +++++++++++++++++++++
 
-        This currently supports converting an Attic repository to Borg and also
-        helps with converting Borg 0.xx to 1.0.
+        This currently supports converting Borg 0.xx to 1.0.
 
         Currently, only LOCAL repositories can be upgraded (issue #465).
 
         Please note that ``borg create`` (since 1.0.0) uses bigger chunks by
-        default than old borg or attic did, so the new chunks won't deduplicate
+        default than old borg did, so the new chunks won't deduplicate
         with the old chunks in the upgraded repository.
-        See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.
-
-        ``borg upgrade`` will change the magic strings in the repository's
-        segments to match the new Borg magic strings. The keyfiles found in
-        $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
-        copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
-
-        The cache files are converted, from $ATTIC_CACHE_DIR or
-        ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
-        cache layout between Borg and Attic changed, so it is possible
-        the first backup after the conversion takes longer than expected
-        due to the cache resync.
-
-        Upgrade should be able to resume if interrupted, although it
-        will still iterate over all segments. If you want to start
-        from scratch, use `borg delete` over the copied repository to
-        make sure the cache files are also removed::
-
-            borg delete borg
-
-        Unless ``--inplace`` is specified, the upgrade process first creates a backup
-        copy of the repository, in REPOSITORY.before-upgrade-DATETIME, using hardlinks.
-        This requires that the repository and its parent directory reside on same
-        filesystem so the hardlink copy can work.
-        This takes longer than in place upgrades, but is much safer and gives
-        progress information (as opposed to ``cp -al``). Once you are satisfied
-        with the conversion, you can safely destroy the backup copy.
-
-        WARNING: Running the upgrade in place will make the current
-        copy unusable with older version, with no way of going back
-        to previous versions. This can PERMANENTLY DAMAGE YOUR
-        REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
-        magic strings have changed. You have been warned.""")
+        See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.""")
         subparser = subparsers.add_parser('upgrade', parents=[common_parser], add_help=False,
                                           description=self.do_upgrade.__doc__,
                                           epilog=upgrade_epilog,

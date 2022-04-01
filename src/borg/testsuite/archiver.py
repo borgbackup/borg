@@ -57,7 +57,6 @@ from . import has_lchflags, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
-from .upgrader import make_attic_repo
 from . import key
 
 
@@ -3496,26 +3495,6 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
-
-    def test_detect_attic_repo(self):
-        path = make_attic_repo(self.repository_path)
-        cmds = [
-            ['create', path + '::test', self.tmpdir],
-            ['extract', path + '::test'],
-            ['check', path],
-            ['rename', path + '::test', 'newname'],
-            ['list', path],
-            ['delete', path],
-            ['prune', path],
-            ['info', path + '::test'],
-            ['key', 'export', path, 'exported'],
-            ['key', 'import', path, 'import'],
-            ['key', 'change-passphrase', path],
-            ['break-lock', path],
-        ]
-        for args in cmds:
-            output = self.cmd(*args, fork=True, exit_code=2)
-            assert 'Attic repository detected.' in output
 
     # derived from test_extract_xattrs_errors()
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'

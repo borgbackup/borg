@@ -202,9 +202,9 @@ class LZ4(DecidingCompressor):
             return NONE_COMPRESSOR, None
 
     def decompress(self, idata):
+        idata = super().decompress(idata)
         if not isinstance(idata, bytes):
             idata = bytes(idata)  # code below does not work with memoryview
-        idata = super().decompress(idata)
         cdef int isize = len(idata)
         cdef int osize
         cdef int rsize
@@ -304,9 +304,9 @@ class ZSTD(DecidingCompressor):
             return NONE_COMPRESSOR, None
 
     def decompress(self, idata):
+        idata = super().decompress(idata)
         if not isinstance(idata, bytes):
             idata = bytes(idata)  # code below does not work with memoryview
-        idata = super().decompress(idata)
         cdef int isize = len(idata)
         cdef unsigned long long osize
         cdef unsigned long long rsize

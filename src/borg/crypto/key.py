@@ -355,7 +355,7 @@ class AESKeyBase(KeyBase):
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
         if not decompress:
             return payload
-        data = self.decompress(payload)
+        data = self.decompress(memoryview(payload))
         self.assert_id(id, data)
         return data
 
@@ -745,7 +745,7 @@ class AEADKeyBase(KeyBase):
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
         if not decompress:
             return payload
-        data = self.decompress(payload)
+        data = self.decompress(memoryview(payload))
         self.assert_id(id, data)
         return data
 

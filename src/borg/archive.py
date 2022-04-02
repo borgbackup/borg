@@ -1445,9 +1445,20 @@ class TarfileObjectProcessors:
 
     @contextmanager
     def create_helper(self, tarinfo, status=None, type=None):
+        def s_to_ns(s):
+            return safe_ns(int(float(s) * 1e9))
+
         item = Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
                     uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname or None, group=tarinfo.gname or None,
-                    mtime=safe_ns(int(tarinfo.mtime * 1000**3)))
+                    mtime=s_to_ns(tarinfo.mtime))
+        if tarinfo.pax_headers:
+            ph = tarinfo.pax_headers
+            # note: for mtime this is a bit redundant as it is already done by tarfile module,
+            #       but we just do it in our way to be consistent for sure.
+            for name in 'atime', 'ctime', 'mtime':
+                if name in ph:
+                    ns = s_to_ns(ph[name])
+                    setattr(item, name, ns)
         yield item, status
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
         self.add_item(item, stats=self.stats)

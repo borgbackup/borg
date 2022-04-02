@@ -3409,7 +3409,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--progress')
+        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--progress', '--tar-format=GNU')
         with changedir('output'):
             # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
             subprocess.check_call(['tar', 'xpf', '../simple.tar', '--warning=no-timestamp'])
@@ -3424,7 +3424,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz', '--list')
+        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz',
+                        '--list', '--tar-format=GNU')
         assert 'input/file1\n' in list
         assert 'input/dir2\n' in list
         with changedir('output'):
@@ -3439,7 +3440,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--strip-components=1', '--list')
+        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar',
+                        '--strip-components=1', '--list', '--tar-format=GNU')
         # --list's path are those before processing with --strip-components
         assert 'input/file1\n' in list
         assert 'input/dir2\n' in list
@@ -3451,7 +3453,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     @requires_gnutar
     def test_export_tar_strip_components_links(self):
         self._extract_hardlinks_setup()
-        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', '--strip-components=2')
+        self.cmd('export-tar', self.repository_location + '::test', 'output.tar',
+                 '--strip-components=2', '--tar-format=GNU')
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
             assert os.stat('hardlink').st_nlink == 2
@@ -3463,7 +3466,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     @requires_gnutar
     def test_extract_hardlinks_tar(self):
         self._extract_hardlinks_setup()
-        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1')
+        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1', '--tar-format=GNU')
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
             assert os.stat('input/dir1/hardlink').st_nlink == 2
@@ -3471,26 +3474,26 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
 
-    def test_import_tar(self):
+    def test_import_tar(self, tar_format='PAX'):
         self.create_test_files()
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar', f'--tar-format={tar_format}')
         self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
     @requires_gzip
-    def test_import_tar_gz(self):
+    def test_import_tar_gz(self, tar_format='GNU'):
         if not shutil.which('gzip'):
             pytest.skip('gzip is not installed')
         self.create_test_files()
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', self.repository_location + '::src', 'simple.tgz')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tgz', f'--tar-format={tar_format}')
         self.cmd('import-tar', self.repository_location + '::dst', 'simple.tgz')
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')

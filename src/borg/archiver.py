@@ -5,6 +5,7 @@ import traceback
 
 try:
     import argparse
+    import base64
     import collections
     import configparser
     import faulthandler
@@ -1137,7 +1138,7 @@ class Archiver:
 
         # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
         # where it never seeks on the passed fileobj.
-        tar_format = dict(GNU=tarfile.GNU_FORMAT, PAX=tarfile.PAX_FORMAT)[args.tar_format]
+        tar_format = dict(GNU=tarfile.GNU_FORMAT, PAX=tarfile.PAX_FORMAT, BORG=tarfile.PAX_FORMAT)[args.tar_format]
         tar = tarfile.open(fileobj=tarstream, mode='w|', format=tar_format)
 
         if progress:
@@ -1230,15 +1231,24 @@ class Archiver:
                 return None, stream
             return tarinfo, stream
 
-        def item_to_paxheaders(item):
+        def item_to_paxheaders(format, item):
             """
             Transform (parts of) a Borg *item* into a pax_headers dict.
             """
+            # PAX format
+            # ----------
             # When using the PAX (POSIX) format, we can support some things that aren't possible
             # with classic tar formats, including GNU tar, such as:
             # - atime, ctime (DONE)
             # - possibly Linux capabilities, security.* xattrs (TODO)
             # - various additions supported by GNU tar in POSIX mode (TODO)
+            #
+            # BORG format
+            # -----------
+            # This is based on PAX, but additionally adds BORG.* pax headers.
+            # Additionally to the standard tar / PAX metadata and data, it transfers
+            # ALL borg item metadata in a BORG specific way.
+            #
             ph = {}
             # note: for mtime this is a bit redundant as it is already done by tarfile module,
             #       but we just do it in our way to be consistent for sure.
@@ -1246,6 +1256,12 @@ class Archiver:
                 if hasattr(item, name):
                     ns = getattr(item, name)
                     ph[name] = str(ns / 1e9)
+            if format == 'BORG':  # BORG format additions
+                ph['BORG.item.version'] = '1'
+                # BORG.item.meta - just serialize all metadata we have:
+                meta_bin = msgpack.packb(item.as_dict())
+                meta_text = base64.b64encode(meta_bin).decode()
+                ph['BORG.item.meta'] = meta_text
             return ph
 
         for item in archive.iter_items(filter, partial_extract=partial_extract,
@@ -1255,8 +1271,8 @@ class Archiver:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
             tarinfo, stream = item_to_tarinfo(item, orig_path)
             if tarinfo:
-                if args.tar_format == 'PAX':
-                    tarinfo.pax_headers = item_to_paxheaders(item)
+                if args.tar_format in ('BORG', 'PAX'):
+                    tarinfo.pax_headers = item_to_paxheaders(args.tar_format, item)
                 if output_list:
                     logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
                 tar.addfile(tarinfo, stream)
@@ -4057,15 +4073,18 @@ class Archiver:
         read the uncompressed tar stream from stdin and write a compressed/filtered
         tar stream to stdout.
 
-        Depending on the ```-tar-format``option, the generated tarball uses this format:
+        Depending on the ``-tar-format`` option, these formats are created:
 
-        - PAX: POSIX.1-2001 (pax) format
-        - GNU: GNU tar format
-
-        export-tar is a lossy conversion:
-        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-        otherwise supported by Borg.
+        +--------------+---------------------------+----------------------------+
+        | --tar-format | Specification             | Metadata                   |
+        +--------------+---------------------------+----------------------------+
+        | BORG         | BORG specific, like PAX   | all as supported by borg   |
+        +--------------+---------------------------+----------------------------+
+        | PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
+        +--------------+---------------------------+----------------------------+
+        | GNU          | GNU tar format            | mtime s, no atime/ctime,   |
+        |              |                           | no ACLs/xattrs/bsdflags    |
+        +--------------+---------------------------+----------------------------+
 
         A ``--sparse`` option (as found in borg extract) is not supported.
 
@@ -4089,8 +4108,8 @@ class Archiver:
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--tar-format', metavar='FMT', dest='tar_format', default='GNU',
-                               choices=('PAX', 'GNU'),
-                               help='select tar format: PAX or GNU')
+                               choices=('BORG', 'PAX', 'GNU'),
+                               help='select tar format: BORG, PAX or GNU')
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to export')
@@ -4939,15 +4958,19 @@ class Archiver:
         Most documentation of borg create applies. Note that this command does not
         support excluding files.
 
-        import-tar is a lossy conversion:
-        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-        otherwise supported by Borg.
-
         A ``--sparse`` option (as found in borg create) is not supported.
 
-        import-tar reads POSIX.1-1988 (ustar), POSIX.1-2001 (pax), GNU tar, UNIX V7 tar
-        and SunOS tar with extended attributes.
+        About tar formats and metadata conservation or loss, please see ``borg export-tar``.
+
+        import-tar reads these tar formats:
+
+        - BORG: borg specific (PAX-based)
+        - PAX: POSIX.1-2001
+        - GNU: GNU tar
+        - POSIX.1-1988 (ustar)
+        - UNIX V7 tar
+        - SunOS tar with extended attributes
+
         """)
         subparser = subparsers.add_parser('import-tar', parents=[common_parser], add_help=False,
                                           description=self.do_import_tar.__doc__,

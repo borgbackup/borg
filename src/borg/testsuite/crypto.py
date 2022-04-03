@@ -261,6 +261,7 @@ class CryptoTestCase(BaseTestCase):
 
 
 def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
+    monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
     plain = b'hello'
     # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 3 -m 16 -p 4 -l 64 -r
     enc_key = bytes.fromhex('3dd855b778ba292eda7bf708a9ea111ee99c5c45d2e9a2773d126de46d344410')
@@ -293,6 +294,7 @@ def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
 
 
 def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
+    monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
     plain = b'hello'
     salt = b'salt'*4
     iterations = 100000

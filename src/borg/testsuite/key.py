@@ -170,6 +170,7 @@ class TestKey:
             KeyfileKey.detect(self.MockRepository(), chunk_cdata)
 
     def test_keyfile2(self, monkeypatch, keys_dir):
+        monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
         with keys_dir.join('keyfile').open('w') as fd:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
@@ -177,6 +178,7 @@ class TestKey:
         assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata) == b'payload'
 
     def test_keyfile2_kfenv(self, tmpdir, monkeypatch):
+        monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
         keyfile = tmpdir.join('keyfile')
         with keyfile.open('w') as fd:
             fd.write(self.keyfile2_key_file)
@@ -186,6 +188,7 @@ class TestKey:
         assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata) == b'payload'
 
     def test_keyfile_blake2(self, monkeypatch, keys_dir):
+        monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
         with keys_dir.join('keyfile').open('w') as fd:
             fd.write(self.keyfile_blake2_key_file)
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')
@@ -201,6 +204,7 @@ class TestKey:
             key.decrypt(b'', data)
 
     def test_decrypt_integrity(self, monkeypatch, keys_dir):
+        monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
         with keys_dir.join('keyfile').open('w') as fd:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv('BORG_PASSPHRASE', 'passphrase')

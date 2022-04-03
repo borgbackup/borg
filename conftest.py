@@ -36,6 +36,8 @@ def clean_env(tmpdir_factory, monkeypatch):
             if key.startswith('BORG_') and key not in ('BORG_FUSE_IMPL', )]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
+    # Speed up tests: skip key derivation
+    monkeypatch.setenv("BORG_TESTONLY_MOCK_KDF", "1")
 
 
 def pytest_report_header(config, startdir):

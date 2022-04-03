@@ -49,7 +49,6 @@ from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
-has_lchmod = hasattr(os, 'lchmod')
 has_link = hasattr(os, 'link')
 
 
@@ -877,10 +876,10 @@ Utilization of max. archive size: {csize_max:.0%}
                 pass
             if fd:
                 os.fchmod(fd, item.mode)
+            elif os.chmod in os.supports_follow_symlinks:
+                os.chmod(path, item.mode, follow_symlinks=False)
             elif not symlink:
                 os.chmod(path, item.mode)
-            elif has_lchmod:  # Not available on Linux
-                os.lchmod(path, item.mode)
             mtime = item.mtime
             if 'atime' in item:
                 atime = item.atime

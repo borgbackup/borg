@@ -49,7 +49,6 @@ from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
-has_lchmod = hasattr(os, 'lchmod')
 has_link = hasattr(os, 'link')
 
 
@@ -877,10 +876,18 @@ Utilization of max. archive size: {csize_max:.0%}
                 pass
             if fd:
                 os.fchmod(fd, item.mode)
-            elif not symlink:
-                os.chmod(path, item.mode)
-            elif has_lchmod:  # Not available on Linux
-                os.lchmod(path, item.mode)
+            else:
+                # To check whether a particular function in the os module accepts False for its
+                # follow_symlinks parameter, the in operator on supports_follow_symlinks should be
+                # used. However, os.chmod is special as some platforms without a working lchmod() do
+                # have fchmodat(), which has a flag that makes it behave like lchmod(). fchmodat()
+                # is ignored when deciding whether or not os.chmod should be set in
+                # os.supports_follow_symlinks. Work around this by using try/except.
+                try:
+                    os.chmod(path, item.mode, follow_symlinks=False)
+                except NotImplementedError:
+                    if not symlink:
+                        os.chmod(path, item.mode)
             mtime = item.mtime
             if 'atime' in item:
                 atime = item.atime

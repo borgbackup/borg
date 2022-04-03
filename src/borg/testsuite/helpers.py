@@ -95,6 +95,10 @@ class TestLocationWithoutEnv:
         assert repr(Location('ssh://user@[2001:db8::192.0.2.1]/some/path')) == \
             "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
         assert Location('ssh://user@[2001:db8::192.0.2.1]/some/path').to_key_filename() == keys_dir + '2001_db8__192_0_2_1__some_path'
+        assert repr(Location('ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -127,6 +131,8 @@ class TestLocationWithoutEnv:
         assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path')) == \
             "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
         assert Location('user@[2001:db8::192.0.2.1]:/some/path').to_key_filename() == keys_dir + '2001_db8__192_0_2_1__some_path'
+        assert repr(Location('user@[2a02:0001:0002:0003:0004:0005:0006:0007]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='/some/path', archive=None)"
 
     def test_smb(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)

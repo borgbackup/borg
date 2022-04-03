@@ -569,8 +569,7 @@ Using ``BORG_PASSCOMMAND`` with a properly permissioned file
   directory and use permissions to keep anyone else from reading it. For
   example, first create a key::
 
-    head -c 32 /dev/urandom | base64 -w 0 > ~/.borg-passphrase
-    chmod 400 ~/.borg-passphrase
+    (umask 0077; head -c 32 /dev/urandom | base64 -w 0 > ~/.borg-passphrase)
 
   Then in an automated script one can put::
 

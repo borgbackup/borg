@@ -341,28 +341,33 @@ class Location:
             (?P<archive>[^/]+)                              # archive name must not contain "/"
         )?$"""                                              # must match until the end
 
+    # host NAME, or host IP ADDRESS (v4 or v6, v6 must be in square brackets)
+    host_re = r"""
+        (?P<host>(
+            (?!\[)[^:/]+(?<!\])     # hostname or v4 addr, not containing : or / (does not match v6 addr: no brackets!)
+            |
+            \[[0-9a-fA-F:.]+\])     # ipv6 address in brackets
+        )
+    """
+
     # regexes for misc. kinds of supported location specifiers:
     ssh_re = re.compile(r"""
-        (?P<proto>ssh)://                                   # ssh://
-        """ + optional_user_re + r"""                       # user@  (optional)
-        (?P<host>([^:/]+|\[[0-9a-fA-F:.]+\]))(?::(?P<port>\d+))?  # host or host:port or [ipv6] or [ipv6]:port
-        """ + abs_path_re + optional_archive_re, re.VERBOSE)  # path or path::archive
+        (?P<proto>ssh)://                                       # ssh://
+        """ + optional_user_re + host_re + r"""                 # user@  (optional), host name or address
+        (?::(?P<port>\d+))?                                     # :port (optional)
+        """ + abs_path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
 
     file_re = re.compile(r"""
-        (?P<proto>file)://                                  # file://
-        """ + file_path_re + optional_archive_re, re.VERBOSE)  # servername/path, path or path::archive
+        (?P<proto>file)://                                      # file://
+        """ + file_path_re + optional_archive_re, re.VERBOSE)   # servername/path, path or path::archive
 
-    # note: scp_re is also use for local paths
+    # note: scp_re is also used for local paths
     scp_re = re.compile(r"""
         (
-            """ + optional_user_re + r"""                           # user@  (optional)
-            (?P<host>(                  # host can be ipv6 addr in brackets or something else
-                (?!\[)[^:/]+(?<!\])     # host: hostname, not containing : or /, also not ipv6: not in brackets
-                |
-                \[[0-9a-fA-F:.]+\])     # host: ipv6 addr in brackets
-            ):
-        )?                                                          # user@host: part is optional
-        """ + scp_path_re + optional_archive_re, re.VERBOSE)        # path with optional archive
+            """ + optional_user_re + host_re + r"""             # user@  (optional), host name or address
+            :                                                   # : (required!)
+        )?                                                      # user@host: part is optional
+        """ + scp_path_re + optional_archive_re, re.VERBOSE)    # path with optional archive
 
     # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),

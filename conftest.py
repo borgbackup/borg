@@ -6,9 +6,6 @@ import pytest
 # for `from borg.constants import PBKDF2_ITERATIONS` (or star import) usages before
 # this is executed
 from borg import constants
-# no fixture-based monkey-patching since star-imports are used for the constants module
-constants.PBKDF2_ITERATIONS = 1
-
 
 # needed to get pretty assertion failures in unit tests:
 if hasattr(pytest, 'register_assert_rewrite'):

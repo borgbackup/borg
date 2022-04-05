@@ -261,15 +261,13 @@ class CryptoTestCase(BaseTestCase):
 
 
 def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
-    monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
     plain = b'hello'
-    # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 3 -m 16 -p 4 -l 64 -r
-    enc_key = bytes.fromhex('3dd855b778ba292eda7bf708a9ea111ee99c5c45d2e9a2773d126de46d344410')
-    mac_key = bytes.fromhex('0b0b65fdccaea7cf5b9a6214cd867983e2326abeccedf1dceb1feee0ae74075b')
+    # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 1 -k 8 -p 1 -l 64 -r
+    key = bytes.fromhex('d07cc7f9cfb483303e0b9fec176b2a9c559bb70c3a9fb0d5f9c0c23527cd09570212449f09f8cd28c1a41b73fa0098e889c3f2642e87c392e51f95d70d248d9d')
     ae_cipher = AES256_CTR_HMAC_SHA256(
         iv=0, header_len=0, aad_offset=0,
-        enc_key=enc_key,
-        mac_key=mac_key,
+        enc_key=key[:32],
+        mac_key=key[32:],
     )
 
     envelope = ae_cipher.encrypt(plain)
@@ -294,19 +292,17 @@ def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
 
 
 def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
-    monkeypatch.delenv('BORG_TESTONLY_MOCK_KDF')
     plain = b'hello'
     salt = b'salt'*4
-    iterations = 100000
     monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
     passphrase = Passphrase.new()
-    key = passphrase.kdf(salt, iterations, 32)
+    key = passphrase.kdf(salt, iterations=1, length=32)
     hash = hmac_sha256(key, plain)
     data = AES(key, b'\0'*16).encrypt(plain)
     encrypted = msgpack.packb({
         'version': 1,
         'algorithm': 'sha256',
-        'iterations': iterations,
+        'iterations': 1,
         'salt': salt,
         'data': data,
         'hash': hash,

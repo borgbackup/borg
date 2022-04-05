@@ -141,8 +141,8 @@ class Passphrase(str):
         return '<Passphrase "***hidden***">'
 
     def kdf(self, salt, iterations, length):
-        if os.environ.get("BORG_TESTONLY_MOCK_KDF") is not None:
-            return b'X' * length
+        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") is not None:
+            iterations = 1
         return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
 
     def argon2(
@@ -154,8 +154,11 @@ class Passphrase(str):
         parallelism,
         type: Literal['i', 'd', 'id']
     ) -> bytes:
-        if os.environ.get("BORG_TESTONLY_MOCK_KDF") is not None:
-            return b'X' * output_len_in_bytes
+        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") is not None:
+            time_cost = 1
+            parallelism = 1
+            # 8 is the smallest value that aviods the "Memory cost is too small" exception
+            memory_cost = 8
         type_map = {
             'i': argon2.low_level.Type.I,
             'd': argon2.low_level.Type.D,

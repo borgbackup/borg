@@ -1955,20 +1955,25 @@ class ArchiveChecker:
                 if state > 0:
                     unpacker.resync()
                 for chunk_id, cdata in zip(items, repository.get_many(items)):
-                    data = self.key.decrypt(chunk_id, cdata)
-                    unpacker.feed(data)
                     try:
+                        data = self.key.decrypt(chunk_id, cdata)
+                        unpacker.feed(data)
                         for item in unpacker:
                             valid, reason = valid_item(item)
                             if valid:
                                 yield Item(internal_dict=item)
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata (%s)' % reason, chunk_id, i)
+                    except IntegrityError as integrity_error:
+                        # key.decrypt() detected integrity issues.
+                        # maybe the repo gave us a valid cdata, but not for the chunk_id we wanted.
+                        # or the authentication of cdata failed, meaning the encrypted data was corrupted.
+                        report(str(integrity_error), chunk_id, i)
                     except msgpack.UnpackException:
                         report('Unpacker crashed while unpacking item metadata, trying to resync...', chunk_id, i)
                         unpacker.resync()
                     except Exception:
-                        report('Exception while unpacking item metadata', chunk_id, i)
+                        report('Exception while decrypting or unpacking item metadata', chunk_id, i)
                         raise
                     i += 1
 

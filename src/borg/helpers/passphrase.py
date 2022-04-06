@@ -157,7 +157,7 @@ class Passphrase(str):
         if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") is not None:
             time_cost = 1
             parallelism = 1
-            # 8 is the smallest value that aviods the "Memory cost is too small" exception
+            # 8 is the smallest value that avoids the "Memory cost is too small" exception
             memory_cost = 8
         type_map = {
             'i': argon2.low_level.Type.I,

@@ -141,7 +141,7 @@ class Passphrase(str):
         return '<Passphrase "***hidden***">'
 
     def kdf(self, salt, iterations, length):
-        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") is not None:
+        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":
             iterations = 1
         return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
 
@@ -154,7 +154,7 @@ class Passphrase(str):
         parallelism,
         type: Literal['i', 'd', 'id']
     ) -> bytes:
-        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") is not None:
+        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":
             time_cost = 1
             parallelism = 1
             # 8 is the smallest value that avoids the "Memory cost is too small" exception

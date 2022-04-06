@@ -2007,13 +2007,19 @@ class ArchiveChecker:
                 logger.info(f'Analyzing archive {info.name} ({i + 1}/{num_archives})')
                 archive_id = info.id
                 if archive_id not in self.chunks:
-                    logger.error('Archive metadata block is missing!')
+                    logger.error('Archive metadata block %s is missing!', bin_to_hex(archive_id))
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue
                 mark_as_possibly_superseded(archive_id)
                 cdata = self.repository.get(archive_id)
-                data = self.key.decrypt(archive_id, cdata)
+                try:
+                    data = self.key.decrypt(archive_id, cdata)
+                except IntegrityError as integrity_error:
+                    logger.error('Archive metadata block %s is corrupted: %s', bin_to_hex(archive_id), integrity_error)
+                    self.error_found = True
+                    del self.manifest.archives[info.name]
+                    continue
                 archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
                 if archive.version != 1:
                     raise Exception('Unknown archive metadata version')

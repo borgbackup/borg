@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "pkgconfig", "Cython!=0.27", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools", "pkgconfig", "Cython", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]

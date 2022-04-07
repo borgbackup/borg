@@ -671,8 +671,10 @@ Utilization of max. archive size: {csize_max:.0%}
             archive_index = ChunkIndex()
             sync = CacheSynchronizer(archive_index)
             add(self.id)
+            # we must escape any % char in the archive name, because we use it in a format string, see #6500
+            arch_name_escd = self.name.replace('%', '%%')
             pi = ProgressIndicatorPercent(total=len(self.metadata.items),
-                                          msg='Calculating statistics for archive %s ... %%3d%%%%' % self.name,
+                                          msg='Calculating statistics for archive %s ... %%3.0f%%%%' % arch_name_escd,
                                           msgid='archive.calc_stats')
             for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
                 pi.show(increase=1)

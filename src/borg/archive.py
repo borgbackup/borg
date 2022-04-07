@@ -868,26 +868,20 @@ Utilization of max. archive size: {csize_max:.0%}
         # This code is a bit of a mess due to os specific differences
         if not is_win32:
             try:
-                if fd:
-                    os.fchown(fd, uid, gid)
-                else:
-                    os.chown(path, uid, gid, follow_symlinks=False)
+                os.chown(fd or path, uid, gid, follow_symlinks=False)
             except OSError:
                 pass
-            if fd:
-                os.fchmod(fd, item.mode)
-            else:
-                # To check whether a particular function in the os module accepts False for its
-                # follow_symlinks parameter, the in operator on supports_follow_symlinks should be
-                # used. However, os.chmod is special as some platforms without a working lchmod() do
-                # have fchmodat(), which has a flag that makes it behave like lchmod(). fchmodat()
-                # is ignored when deciding whether or not os.chmod should be set in
-                # os.supports_follow_symlinks. Work around this by using try/except.
-                try:
-                    os.chmod(path, item.mode, follow_symlinks=False)
-                except NotImplementedError:
-                    if not symlink:
-                        os.chmod(path, item.mode)
+            # To check whether a particular function in the os module accepts False for its
+            # follow_symlinks parameter, the in operator on supports_follow_symlinks should be
+            # used. However, os.chmod is special as some platforms without a working lchmod() do
+            # have fchmodat(), which has a flag that makes it behave like lchmod(). fchmodat()
+            # is ignored when deciding whether or not os.chmod should be set in
+            # os.supports_follow_symlinks. Work around this by using try/except.
+            try:
+                os.chmod(fd or path, item.mode, follow_symlinks=False)
+            except NotImplementedError:
+                if not symlink:
+                    os.chmod(fd or path, item.mode)
             mtime = item.mtime
             if 'atime' in item:
                 atime = item.atime
@@ -899,18 +893,12 @@ Utilization of max. archive size: {csize_max:.0%}
                 try:
                     # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
                     # See utimes(2) on either of the BSDs for details.
-                    if fd:
-                        os.utime(fd, None, ns=(atime, birthtime))
-                    else:
-                        os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
+                    os.utime(fd or path, None, ns=(atime, birthtime), follow_symlinks=False)
                 except OSError:
                     # some systems don't support calling utime on a symlink
                     pass
             try:
-                if fd:
-                    os.utime(fd, None, ns=(atime, mtime))
-                else:
-                    os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
+                os.utime(fd or path, None, ns=(atime, mtime), follow_symlinks=False)
             except OSError:
                 # some systems don't support calling utime on a symlink
                 pass

@@ -3601,9 +3601,9 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     def verify_change_passphrase_does_not_change_algorithm(self, given_algorithm, expected_algorithm):
         self.cmd('init', '--encryption=repokey', '--key-algorithm', given_algorithm, self.repository_location)
-        os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
 
-        self.cmd('key', 'change-passphrase', self.repository_location)
+        with environment_variable(BORG_NEW_PASSPHRASE='newpassphrase'):
+            self.cmd('key', 'change-passphrase', self.repository_location)
 
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))

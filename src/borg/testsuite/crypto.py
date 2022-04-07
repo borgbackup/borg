@@ -1,9 +1,19 @@
 from binascii import hexlify
+from unittest.mock import MagicMock
+import unittest
+from binascii import a2b_base64
+
+import pytest
 
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
                                IntegrityError, is_libressl
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
+from ..crypto.low_level import AES, hmac_sha256
+from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey
+from ..helpers.passphrase import Passphrase
+from ..helpers import msgpack
+from ..constants import KEY_ALGORITHMS
 
 from . import BaseTestCase
 
@@ -248,3 +258,140 @@ class CryptoTestCase(BaseTestCase):
 
         okm = hkdf_hmac_sha512(ikm, salt, info, l)
         assert okm == bytes.fromhex('1407d46013d98bc6decefcfee55f0f90b0c7f63d68eb1a80eaf07e953cfc0a3a5240a155d6e4daa965bb')
+
+
+def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
+    plain = b'hello'
+    # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 1 -k 8 -p 1 -l 64 -r
+    key = bytes.fromhex('d07cc7f9cfb483303e0b9fec176b2a9c559bb70c3a9fb0d5f9c0c23527cd09570212449f09f8cd28c1a41b73fa0098e889c3f2642e87c392e51f95d70d248d9d')
+    ae_cipher = AES256_CTR_HMAC_SHA256(
+        iv=0, header_len=0, aad_offset=0,
+        enc_key=key[:32],
+        mac_key=key[32:],
+    )
+
+    envelope = ae_cipher.encrypt(plain)
+
+    encrypted = msgpack.packb({
+        'version': 1,
+        'salt': b'salt'*4,
+        'argon2_time_cost': 1,
+        'argon2_memory_cost': 8,
+        'argon2_parallelism': 1,
+        'argon2_type': b'id',
+        'algorithm': 'argon2 aes256-ctr hmac-sha256',
+        'data': envelope,
+    })
+    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
+    passphrase = Passphrase.new()
+    key = KeyfileKey(None)
+
+    decrypted = key.decrypt_key_file(encrypted, passphrase)
+
+    assert decrypted == plain
+
+
+def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
+    plain = b'hello'
+    salt = b'salt'*4
+    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
+    passphrase = Passphrase.new()
+    key = passphrase.kdf(salt, iterations=1, length=32)
+    hash = hmac_sha256(key, plain)
+    data = AES(key, b'\0'*16).encrypt(plain)
+    encrypted = msgpack.packb({
+        'version': 1,
+        'algorithm': 'sha256',
+        'iterations': 1,
+        'salt': salt,
+        'data': data,
+        'hash': hash,
+    })
+    key = KeyfileKey(None)
+
+    decrypted = key.decrypt_key_file(encrypted, passphrase)
+
+    assert decrypted == plain
+
+
+def test_decrypt_key_file_unsupported_algorithm(monkeypatch):
+    """We will add more algorithms in the future. We should raise a helpful error."""
+    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
+    passphrase = Passphrase.new()
+    key = KeyfileKey(None)
+    encrypted = msgpack.packb({
+        'algorithm': 'THIS ALGORITHM IS NOT SUPPORTED',
+        'version': 1,
+    })
+
+    with pytest.raises(UnsupportedKeyFormatError):
+        key.decrypt_key_file(encrypted, passphrase)
+
+
+def test_decrypt_key_file_v2_is_unsupported(monkeypatch):
+    """There may eventually be a version 2 of the format. For now we should raise a helpful error."""
+    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
+    passphrase = Passphrase.new()
+    key = KeyfileKey(None)
+    encrypted = msgpack.packb({
+        'version': 2,
+    })
+
+    with pytest.raises(UnsupportedKeyFormatError):
+        key.decrypt_key_file(encrypted, passphrase)
+
+
+@pytest.mark.parametrize('cli_argument, expected_algorithm', KEY_ALGORITHMS.items())
+def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
+    def to_dict(key):
+        extract = 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'
+        return {a: getattr(key, a) for a in extract}
+
+    repository = MagicMock(id=b'repository_id')
+    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
+
+    save_me = RepoKey.create(repository, args=MagicMock(key_algorithm=cli_argument))
+    saved = repository.save_key.call_args.args[0]
+    repository.load_key.return_value = saved
+    load_me = RepoKey.detect(repository, manifest_data=None)
+
+    assert to_dict(load_me) == to_dict(save_me)
+    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expected_algorithm.encode()
+
+
+@unittest.mock.patch('getpass.getpass')
+def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
+    """https://github.com/borgbackup/borg/pull/6469#discussion_r832670411
+
+    This is a regression test for a bug I introduced and fixed:
+
+    Traceback (most recent call last):
+      File "/home/user/borg-master/src/borg/testsuite/crypto.py", line 384, in test_repo_key_detect_does_not_raise_integrity_error
+        RepoKey.detect(repository, manifest_data=None)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 402, in detect
+        if not key.load(target, passphrase):
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 654, in load
+        success = self._load(key_data, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 418, in _load
+        data = self.decrypt_key_file(cdata, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 444, in decrypt_key_file
+        return self.decrypt_key_file_argon2(encrypted_key, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 470, in decrypt_key_file_argon2
+        return ae_cipher.decrypt(encrypted_key.data)
+      File "src/borg/crypto/low_level.pyx", line 302, in borg.crypto.low_level.AES256_CTR_BASE.decrypt
+        self.mac_verify(<const unsigned char *> idata.buf+aoffset, alen,
+      File "src/borg/crypto/low_level.pyx", line 382, in borg.crypto.low_level.AES256_CTR_HMAC_SHA256.mac_verify
+        raise IntegrityError('MAC Authentication failed')
+    borg.crypto.low_level.IntegrityError: MAC Authentication failed
+
+    1. FlexiKey.decrypt_key_file() is supposed to signal the decryption failure by returning None
+    2. FlexiKey.detect() relies on that interface - it tries an empty passphrase before prompting the user
+    3. my initial implementation of decrypt_key_file_argon2() was simply passing through the IntegrityError() from AES256_CTR_BASE.decrypt()
+    """
+    repository = MagicMock(id=b'repository_id')
+    getpass.return_value = "hello, pass phrase"
+    monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
+    RepoKey.create(repository, args=MagicMock(key_algorithm='argon2'))
+    repository.load_key.return_value = repository.save_key.call_args.args[0]
+
+    RepoKey.detect(repository, manifest_data=None)

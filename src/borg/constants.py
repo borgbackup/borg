@@ -103,6 +103,18 @@ DASHES = '-' * 78
 
 PBKDF2_ITERATIONS = 100000
 
+# https://www.rfc-editor.org/rfc/rfc9106.html#section-4-6.2
+ARGON2_ARGS = {'time_cost': 3, 'memory_cost': 2**16, 'parallelism': 4, 'type': 'id'}
+ARGON2_SALT_BYTES = 16
+
+# Maps the CLI argument to our internal identifier for the format
+KEY_ALGORITHMS = {
+    # encrypt-and-MAC, kdf: PBKDF2(HMAC−SHA256), encryption: AES256-CTR, authentication: HMAC-SHA256
+    'pbkdf2': 'sha256',
+    # encrypt-then-MAC, kdf: argon2, encryption: AES256-CTR, authentication: HMAC-SHA256
+    'argon2': 'argon2 aes256-ctr hmac-sha256',
+}
+
 
 class KeyBlobStorage:
     NO_STORAGE = 'no_storage'

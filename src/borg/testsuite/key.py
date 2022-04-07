@@ -25,16 +25,17 @@ from ..helpers import msgpack
 class TestKey:
     class MockArgs:
         location = Location(tempfile.mkstemp()[1])
+        key_algorithm = "argon2"
 
     keyfile2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
-        hqppdGVyYXRpb25zzgABhqCkaGFzaNoAIMyonNI+7Cjv0qHi0AOBM6bLGxACJhfgzVD2oq
-        bIS9SFqWFsZ29yaXRobaZzaGEyNTakc2FsdNoAINNK5qqJc1JWSUjACwFEWGTdM7Nd0a5l
-        1uBGPEb+9XM9p3ZlcnNpb24BpGRhdGHaANAYDT5yfPpU099oBJwMomsxouKyx/OG4QIXK2
-        hQCG2L2L/9PUu4WIuKvGrsXoP7syemujNfcZws5jLp2UPva4PkQhQsrF1RYDEMLh2eF9Ol
-        rwtkThq1tnh7KjWMG9Ijt7/aoQtq0zDYP/xaFF8XXSJxiyP5zjH5+spB6RL0oQHvbsliSh
-        /cXJq7jrqmrJ1phd6dg4SHAM/i+hubadZoS6m25OQzYAW09wZD/phG8OVa698Z5ed3HTaT
-        SmrtgJL3EoOKgUI9d6BLE4dJdBqntifo""".strip()
+        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAN4u2SiN7hqISe3OA8raBWNuvHn1R50ZU7HVCn
+        11vTJNEaj9soxUaIGcW+pAB2N5yYoKMg/sGCMuZa286iJ008DvN99rf/ORfcKrK2GmzslO
+        N3uv9Tk9HtqV/Sq5zgM9xuY9rEeQGDQVQ+AOsFamJqSUrAemGJbJqw9IerXC/jN4XPnX6J
+        pi1cXCFxHfDaEhmWrkdPNoZdirCv/eP/dOVOLmwU58YsS+MvkZNfEa16el/fSb/ENdrwJ/
+        2aYMQrDdk1d5MYzkjotv/KpofNwPXZchu2EwH7OIHWQjEVL1DZWkaGFzaNoAIO/7qn1hr3
+        F84MsMMiqpbz4KVICeBZhfAaTPs4W7BC63qml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgLENQ
+        2uVCoR7EnAoiRzn8J+orbojKtJlNCnQ31SSC8rendmVyc2lvbgE=""".strip()
 
     keyfile2_cdata = unhexlify(re.sub(r'\W', '', """
         0055f161493fcfc16276e8c31493c4641e1eb19a79d0326fad0291e5a9c98e5933
@@ -44,17 +45,17 @@ class TestKey:
 
     keyfile_blake2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
-        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAZBu680Do3CmfWzeMCwe48KJi3Vps9mEDy7MKF
-        TastsEhiAd1RQMuxfZpklkLeddMMWk+aPtFiURRFb02JLXV5cKRC1o2ZDdiNa0nao+o6+i
-        gUjjsea9TAu25t3vxh8uQWs5BuKRLBRr0nUgrSd0IYMUgn+iVbLJRzCCssvxsklkwQxN3F
-        Y+MvBnn8kUXSeoSoQ2l0fBHzq94Y7LMOm/owMam5URnE8/UEc6ZXBrbyX4EXxDtUqJcs+D
-        i451thtlGdigDLpvf9nyK66mjiCpPCTCgtlzq0Pe1jcdhnsUYLg+qWzXZ7e2opEZoC6XxS
-        3DIuBOxG3Odqj9IKB+6/kl94vz98awPWFSpYcLZVWu7sIP38ZkUK+ad5MHTo/LvTuZdFnd
-        iqKzZIDUJl3Zl1WGmP/0xVOmfIlznkCZy4d3SMuujwIcqQ5kDvwDRPpdhBBk+UWQY5vFXk
-        kR1NBNLSTyhAzu3fiUmFl0qZ+UWPRkGAEBy/NuoEibrWwab8BX97cATyvnmOqYkU9PT0C6
-        l2l9E4bPpGhhc2jaACDnIa8KgKv84/b5sjaMgSZeIVkuKSLJy2NN8zoH8lnd36ppdGVyYX
-        Rpb25zzgABhqCkc2FsdNoAIEJLlLh7q74j3q53856H5GgzA1HH+aW5bA/as544+PGkp3Zl
-        cnNpb24B""".strip()
+        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAZ7VCsTjbLhC1ipXOyhcGn7YnROEhP24UQvOCi
+        Oar1G+JpwgO9BIYaiCODUpzPuDQEm6WxyTwEneJ3wsuyeqyh7ru2xo9FAUKRf6jcqqZnan
+        ycTfktkUC+CPhKR7W6MTu5fPvy99chyL09/RGdD15aswR5PjNoFu4626sfMrBReyPdlxqt
+        F80m+fbNE/vln2Trqoz9EMHQ3IxjIK4q0m4Aj7TwCu7ZankFtwt898+tYsWE7lb2Ps/gXB
+        F8PM/5wHpYps2AKhDCpwKp5HyqIqlF5IzR2ydL9QP20QBjp/rSi6b+xwrfxNJZfw78f8ef
+        A2Yj7xIsxNQ0kmVmTL/UF6d7+Mw1JfurWrySiDU7QQ+RiZpWUZ0DdReB+e4zn6/KNKC884
+        34SGywADuLIQe2FKU+5jBCbutEyEGILQbAR/cgeLy5+V2XwXMJh4ytwXVIeT6Lk+qhYAdz
+        Klx4ub7XijKcOxJyBE+4k33DAhcfIT2r4/sxgMhXrIOEQPKsMAixzdcqVYkpou+6c4PZeL
+        nr+UjfJwOqK1BlWk1NgwE4GXYIKkaGFzaNoAIAzjUtpBPPh6kItZtHQZvnQG6FpucZNfBC
+        UTHFJg343jqml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgz3YaUZZ/s+UWywj97EY5b4KhtJYi
+        qkPqtDDxs2j/T7+ndmVyc2lvbgE=""".strip()
 
     keyfile_blake2_cdata = bytes.fromhex('04fdf9475cf2323c0ba7a99ddc011064f2e7d039f539f2e448'
                                          '0e6f5fc6ff9993d604040404040404098c8cee1c6db8c28947')

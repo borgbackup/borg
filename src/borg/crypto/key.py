@@ -25,6 +25,7 @@ from ..platform import SaveFile
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
+from . import low_level
 
 
 class UnsupportedPayloadError(Error):
@@ -49,6 +50,10 @@ class KeyfileMismatchError(Error):
 
 class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
+
+
+class UnsupportedKeyFormatError(Error):
+    """Your borg key is stored in an unsupported format. Try using a newer version of borg."""
 
 
 class TAMRequiredError(IntegrityError):
@@ -430,15 +435,54 @@ class FlexiKey:
         unpacker = get_limited_unpacker('key')
         unpacker.feed(data)
         data = unpacker.unpack()
-        enc_key = EncryptedKey(internal_dict=data)
-        assert enc_key.version == 1
-        assert enc_key.algorithm == 'sha256'
-        key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
-        data = AES(key, b'\0'*16).decrypt(enc_key.data)
-        if hmac.compare_digest(hmac_sha256(key, data), enc_key.hash):
-            return data
+        encrypted_key = EncryptedKey(internal_dict=data)
+        if encrypted_key.version != 1:
+            raise UnsupportedKeyFormatError()
+        else:
+            self._encrypted_key_algorithm = encrypted_key.algorithm
+            if encrypted_key.algorithm == 'sha256':
+                return self.decrypt_key_file_pbkdf2(encrypted_key, passphrase)
+            elif encrypted_key.algorithm == 'argon2 aes256-ctr hmac-sha256':
+                return self.decrypt_key_file_argon2(encrypted_key, passphrase)
+            else:
+                raise UnsupportedKeyFormatError()
 
-    def encrypt_key_file(self, data, passphrase):
+    def decrypt_key_file_pbkdf2(self, encrypted_key, passphrase):
+        key = passphrase.kdf(encrypted_key.salt, encrypted_key.iterations, 32)
+        data = AES(key, b'\0'*16).decrypt(encrypted_key.data)
+        if hmac.compare_digest(hmac_sha256(key, data), encrypted_key.hash):
+            return data
+        return None
+
+    def decrypt_key_file_argon2(self, encrypted_key, passphrase):
+        key = passphrase.argon2(
+            output_len_in_bytes=64,
+            salt=encrypted_key.salt,
+            time_cost=encrypted_key.argon2_time_cost,
+            memory_cost=encrypted_key.argon2_memory_cost,
+            parallelism=encrypted_key.argon2_parallelism,
+            type=encrypted_key.argon2_type,
+        )
+        enc_key, mac_key = key[:32], key[32:]
+        ae_cipher = AES256_CTR_HMAC_SHA256(
+            iv=0, header_len=0, aad_offset=0,
+            enc_key=enc_key,
+            mac_key=mac_key,
+        )
+        try:
+            return ae_cipher.decrypt(encrypted_key.data)
+        except low_level.IntegrityError:
+            return None
+
+    def encrypt_key_file(self, data, passphrase, algorithm):
+        if algorithm == 'sha256':
+            return self.encrypt_key_file_pbkdf2(data, passphrase)
+        elif algorithm == 'argon2 aes256-ctr hmac-sha256':
+            return self.encrypt_key_file_argon2(data, passphrase)
+        else:
+            raise ValueError(f'Unexpected algorithm: {algorithm}')
+
+    def encrypt_key_file_pbkdf2(self, data, passphrase):
         salt = os.urandom(32)
         iterations = PBKDF2_ITERATIONS
         key = passphrase.kdf(salt, iterations, 32)
@@ -454,7 +498,29 @@ class FlexiKey:
         )
         return msgpack.packb(enc_key.as_dict())
 
-    def _save(self, passphrase):
+    def encrypt_key_file_argon2(self, data, passphrase):
+        salt = os.urandom(ARGON2_SALT_BYTES)
+        key = passphrase.argon2(
+            output_len_in_bytes=64,
+            salt=salt,
+            **ARGON2_ARGS,
+        )
+        enc_key, mac_key = key[:32], key[32:]
+        ae_cipher = AES256_CTR_HMAC_SHA256(
+            iv=0, header_len=0, aad_offset=0,
+            enc_key=enc_key,
+            mac_key=mac_key,
+        )
+        encrypted_key = EncryptedKey(
+            version=1,
+            algorithm='argon2 aes256-ctr hmac-sha256',
+            salt=salt,
+            data=ae_cipher.encrypt(data),
+            **{'argon2_' + k: v for k, v in ARGON2_ARGS.items()},
+        )
+        return msgpack.packb(encrypted_key.as_dict())
+
+    def _save(self, passphrase, algorithm):
         key = Key(
             version=1,
             repository_id=self.repository_id,
@@ -464,14 +530,14 @@ class FlexiKey:
             chunk_seed=self.chunk_seed,
             tam_required=self.tam_required,
         )
-        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)
+        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm)
         key_data = '\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii')))
         return key_data
 
     def change_passphrase(self, passphrase=None):
         if passphrase is None:
             passphrase = Passphrase.new(allow_empty=True)
-        self.save(self.target, passphrase)
+        self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm)
 
     @classmethod
     def create(cls, repository, args):
@@ -481,7 +547,7 @@ class FlexiKey:
         key.init_from_random_data()
         key.init_ciphers()
         target = key.get_new_target(args)
-        key.save(target, passphrase, create=True)
+        key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS[args.key_algorithm])
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key
@@ -581,8 +647,8 @@ class FlexiKey:
             self.target = target
         return success
 
-    def save(self, target, passphrase, create=False):
-        key_data = self._save(passphrase)
+    def save(self, target, passphrase, algorithm, create=False):
+        key_data = self._save(passphrase, algorithm)
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             if create and os.path.isfile(target):
                 # if a new keyfile key repository is created, ensure that an existing keyfile of another
@@ -657,8 +723,8 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         self.logically_encrypted = False
         return success
 
-    def save(self, target, passphrase, create=False):
-        super().save(target, passphrase, create=create)
+    def save(self, target, passphrase, algorithm, create=False):
+        super().save(target, passphrase, algorithm, create=create)
         self.logically_encrypted = False
 
     def init_ciphers(self, manifest_data=None):

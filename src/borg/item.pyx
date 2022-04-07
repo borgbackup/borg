@@ -7,6 +7,7 @@ from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 from .helpers import format_file_size
 
+
 cdef extern from "_item.c":
     object _object_to_optr(object obj)
     object _optr_to_object(object bytes)
@@ -294,7 +295,8 @@ class EncryptedKey(PropDict):
     If a EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data'}  # str-typed keys
+    VALID_KEYS = { 'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
+                   'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type' }
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
@@ -304,6 +306,10 @@ class EncryptedKey(PropDict):
     salt = PropDict._make_property('salt', bytes)
     hash = PropDict._make_property('hash', bytes)
     data = PropDict._make_property('data', bytes)
+    argon2_time_cost = PropDict._make_property('argon2_time_cost', int)
+    argon2_memory_cost = PropDict._make_property('argon2_memory_cost', int)
+    argon2_parallelism = PropDict._make_property('argon2_parallelism', int)
+    argon2_type = PropDict._make_property('argon2_type', str, encode=str.encode, decode=bytes.decode)
 
 
 class Key(PropDict):

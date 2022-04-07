@@ -398,7 +398,8 @@ class Archiver:
             setattr(key_new, name, value)
 
         key_new.target = key_new.get_new_target(args)
-        key_new.save(key_new.target, key._passphrase, create=True)  # save with same passphrase
+        # save with same passphrase and algorithm
+        key_new.save(key_new.target, key._passphrase, create=True, algorithm=key._encrypted_key_algorithm)
 
         # rewrite the manifest with the new key, so that the key-type byte of the manifest changes
         manifest.key = key_new
@@ -4323,6 +4324,7 @@ class Archiver:
                                help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
         subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
                                help='create the parent directories of the repository directory, if they are missing.')
+        subparser.add_argument('--key-algorithm', dest='key_algorithm', default='argon2', choices=list(KEY_ALGORITHMS))
 
         # borg key
         subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,

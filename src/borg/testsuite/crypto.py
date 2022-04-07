@@ -275,9 +275,9 @@ def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
     encrypted = msgpack.packb({
         'version': 1,
         'salt': b'salt'*4,
-        'argon2_time_cost': 3,
-        'argon2_memory_cost': 2**16,
-        'argon2_parallelism': 4,
+        'argon2_time_cost': 1,
+        'argon2_memory_cost': 8,
+        'argon2_parallelism': 1,
         'argon2_type': b'id',
         'algorithm': 'argon2 aes256-ctr hmac-sha256',
         'data': envelope,

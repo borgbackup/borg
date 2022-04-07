@@ -234,9 +234,6 @@ if not on_rtd:
 
 
 setup(
-    use_scm_version={
-        'write_to': 'src/borg/_version.py',
-    },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     long_description=setup_docs.long_desc_from_readme()

@@ -361,13 +361,37 @@ def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
 
 @unittest.mock.patch('getpass.getpass')
 def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
-    """https://github.com/borgbackup/borg/pull/6469#discussion_r832670411"""
+    """https://github.com/borgbackup/borg/pull/6469#discussion_r832670411
+
+    This is a regression test for a bug I introduced and fixed:
+
+    Traceback (most recent call last):
+      File "/home/user/borg-master/src/borg/testsuite/crypto.py", line 384, in test_repo_key_detect_does_not_raise_integrity_error
+        RepoKey.detect(repository, manifest_data=None)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 402, in detect
+        if not key.load(target, passphrase):
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 654, in load
+        success = self._load(key_data, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 418, in _load
+        data = self.decrypt_key_file(cdata, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 444, in decrypt_key_file
+        return self.decrypt_key_file_argon2(encrypted_key, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 470, in decrypt_key_file_argon2
+        return ae_cipher.decrypt(encrypted_key.data)
+      File "src/borg/crypto/low_level.pyx", line 302, in borg.crypto.low_level.AES256_CTR_BASE.decrypt
+        self.mac_verify(<const unsigned char *> idata.buf+aoffset, alen,
+      File "src/borg/crypto/low_level.pyx", line 382, in borg.crypto.low_level.AES256_CTR_HMAC_SHA256.mac_verify
+        raise IntegrityError('MAC Authentication failed')
+    borg.crypto.low_level.IntegrityError: MAC Authentication failed
+
+    1. FlexiKey.decrypt_key_file() is supposed to signal the decryption failure by returning None
+    2. FlexiKey.detect() relies on that interface - it tries an empty passphrase before prompting the user
+    3. my initial implementation of decrypt_key_file_argon2() was simply passing through the IntegrityError() from AES256_CTR_BASE.decrypt()
+    """
     repository = MagicMock(id=b'repository_id')
     getpass.return_value = "hello, pass phrase"
     monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
     RepoKey.create(repository, args=MagicMock(key_algorithm='argon2'))
     repository.load_key.return_value = repository.save_key.call_args.args[0]
 
-    # 1. detect() tries an empty passphrase first before prompting the user
-    # 2. load() was throwing integrity errors instead of returning None due to a bug
     RepoKey.detect(repository, manifest_data=None)

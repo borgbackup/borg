@@ -217,6 +217,41 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
+Version 1.3.0a1 (not released yet)
+----------------------------------
+
+Please note:
+
+This is an alpha release, only for testing - do not use this with production repos.
+
+New features:
+
+- init: new --encryption=(repokey|keyfile)-[blake2-](aes-ocb|chacha20-poly1305)
+  New, better, faster crypto (see encryption-aead diagram in the docs), #6463.
+  New AEAD cipher suites: AES-OCB and CHACHA20-POLY1305.
+  Session keys are derived via HKDF from random session id and master key.
+  Nonces/MessageIVs are counters starting from 0 for each session.
+  AAD: chunk id, key type, messageIV, sessionID are now authenticated also.
+  Solves the potential AES-CTR mode counter management issues of the legacy crypto.
+- init: --key-algorithm=argon2 (new default KDF, older pbkdf2 also still available)
+  borg key change-passphrase / change-location keeps the key algorithm unchanged.
+- key change-location: usable for repokey <-> keyfile location change
+- benchmark cpu: display benchmarks of cpu bound stuff
+- export-tar: new --tar-format=PAX (default: GNU)
+- import-tar/export-tar: can use PAX format for ctime and atime support
+
+Other changes:
+
+- require python >= 3.9, #6315
+- simplify libs setup, #6482
+- unbundle most bundled 3rd party code, use libs, #6316
+- use libdeflate.crc32 (Linux and all others) or zlib.crc32 (macOS)
+- repository: code cleanups / simplifications
+- internal crypto api: speedups / cleanups / refactorings / modernisation
+- remove "borg upgrade" support for "attic backup" repos
+- remove PassphraseKey code and borg key migrate-to-repokey command
+- remove support for: OpenSSL < 1.1.1, LibreSSL < 2.7.0
+
 
 Version 1.2.0 (2022-02-22 22:02:22 :-)
 --------------------------------------

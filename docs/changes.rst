@@ -239,6 +239,9 @@ New features:
 - benchmark cpu: display benchmarks of cpu bound stuff
 - export-tar: new --tar-format=PAX (default: GNU)
 - import-tar/export-tar: can use PAX format for ctime and atime support
+- import-tar/export-tar: --tar-format=BORG: roundtrip ALL item metadata, #5830
+- repository: create and use version 2 repos only for now
+- repository: implement PUT2: header crc32, overall xxh64, #1704
 
 Other changes:
 

@@ -626,7 +626,7 @@ class Archiver:
         count = 5
         for spec, func in [
             ("pbkdf2", lambda: Passphrase('mypassphrase').kdf(b'salt'*8, PBKDF2_ITERATIONS, 32)),
-            ("argon2", lambda: Passphrase('mypassphrase').argon2(32, b'salt'*8, 3, 65536, 1, 'id')),
+            ("argon2", lambda: Passphrase('mypassphrase').argon2(64, b'S' * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
         ]:
             print(f"{spec:<24} {count:<10} {timeit(func, number=count):.3f}s")
 

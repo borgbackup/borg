@@ -3630,6 +3630,16 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_change_location_does_not_change_algorithm_pbkdf2(self):
         self.verify_change_location_does_not_change_algorithm('pbkdf2', b'sha256')
 
+    def test_key_change_algorithm(self):
+        self.cmd('init', '--encryption=repokey', '--key-algorithm=pbkdf2', self.repository_location)
+
+        self.cmd('key', 'change-algorithm', self.repository_location, 'argon2')
+
+        with Repository(self.repository_path) as repository:
+            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        assert key._encrypted_key_algorithm == 'argon2 aes256-ctr hmac-sha256'
+        self.cmd('info', self.repository_location)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

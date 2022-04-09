@@ -33,14 +33,15 @@ CACHE_TAG_CONTENTS = b'Signature: 8a477f597d28d172789f06886806bc55'
 # bytes. That's why it's 500 MiB instead of 512 MiB.
 DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 
-# 20 MiB minus 41 bytes for a Repository header (because the "size" field in the Repository includes
-# the header, and the total size was set to 20 MiB).
+# in borg < 1.3, this has been defined like this:
+# 20 MiB minus 41 bytes for a PUT header (because the "size" field in the Repository includes
+# the header, and the total size was set to precisely 20 MiB for borg < 1.3).
 MAX_DATA_SIZE = 20971479
 
-# MAX_OBJECT_SIZE = <20 MiB (MAX_DATA_SIZE) + 41 bytes for a Repository PUT header, which consists of
-# a 1 byte tag ID, 4 byte CRC, 4 byte size and 32 bytes for the ID.
-MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see LoggedIO.put_header_fmt.size assertion in repository module
-assert MAX_OBJECT_SIZE == 20 * 1024 * 1024
+# MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT2 header)
+# note: for borg >= 1.3, this makes the MAX_OBJECT_SIZE grow slightly over the precise 20MiB used by
+# borg < 1.3, but this is not expected to cause any issues.
+MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
 
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
 MAX_SEGMENT_SIZE_LIMIT = 2 ** 32 - MAX_OBJECT_SIZE

@@ -3499,6 +3499,16 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
+    def test_roundtrip_pax_borg(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar', '--tar-format=BORG')
+        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+        self.assert_dirs_equal('input', 'output/input')
+
     # derived from test_extract_xattrs_errors()
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
                                                          'fakeroot')

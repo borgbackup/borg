@@ -3638,6 +3638,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with Repository(self.repository_path) as repository:
             _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         assert key._encrypted_key_algorithm == 'argon2 aes256-ctr hmac-sha256'
+        self.cmd('info', self.repository_location)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

@@ -4490,6 +4490,7 @@ class Archiver:
         The key is encrypted and authenticated with your passphrase.
 
         We currently support two choices:
+
         1. argon2 - recommended. This algorithm is used by default when initialising a new repository.
            The key encryption key is derived from your passphrase via argon2-id.
            Argon2 is considered more modern and secure than pbkdf2.

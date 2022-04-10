@@ -458,12 +458,12 @@ class FlexiKey:
 
     @staticmethod
     def argon2(
-        passphrase,
+        passphrase: str,
         output_len_in_bytes: int,
         salt: bytes,
-        time_cost,
-        memory_cost,
-        parallelism,
+        time_cost: int,
+        memory_cost: int,
+        parallelism: int,
         type: Literal['i', 'd', 'id']
     ) -> bytes:
         if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":

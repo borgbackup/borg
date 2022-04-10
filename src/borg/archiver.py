@@ -622,12 +622,11 @@ class Archiver:
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
-        from borg.helpers.passphrase import Passphrase
         print("KDFs (slow is GOOD, use argon2!) ===============================")
         count = 5
         for spec, func in [
-            ("pbkdf2", lambda: FlexiKey.pbkdf2(Passphrase('mypassphrase'), b'salt'*8, PBKDF2_ITERATIONS, 32)),
-            ("argon2", lambda: Passphrase('mypassphrase').argon2(64, b'S' * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
+            ("pbkdf2", lambda: FlexiKey.pbkdf2('mypassphrase', b'salt'*8, PBKDF2_ITERATIONS, 32)),
+            ("argon2", lambda: FlexiKey.argon2('mypassphrase', 64, b'S' * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
         ]:
             print(f"{spec:<24} {count:<10} {timeit(func, number=count):.3f}s")
 

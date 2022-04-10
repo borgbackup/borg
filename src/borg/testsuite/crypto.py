@@ -294,7 +294,7 @@ def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
 def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
     plain = b'hello'
     salt = b'salt'*4
-    passphrase = Passphrase("hello, pass phrase")
+    passphrase = "hello, pass phrase"
     key = FlexiKey.pbkdf2(passphrase, salt, 1, 32)
     hash = hmac_sha256(key, plain)
     data = AES(key, b'\0'*16).encrypt(plain)

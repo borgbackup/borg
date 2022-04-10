@@ -4,10 +4,13 @@ import os
 import textwrap
 from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, pbkdf2_hmac
+from typing import Literal
 
 from ..logger import create_logger
 
 logger = create_logger()
+
+import argon2.low_level
 
 from ..constants import *  # NOQA
 from ..compress import Compressor
@@ -453,6 +456,37 @@ class FlexiKey:
             iterations = 1
         return pbkdf2_hmac('sha256', passphrase.encode('utf-8'), salt, iterations, output_len_in_bytes)
 
+    @staticmethod
+    def argon2(
+        passphrase,
+        output_len_in_bytes: int,
+        salt: bytes,
+        time_cost,
+        memory_cost,
+        parallelism,
+        type: Literal['i', 'd', 'id']
+    ) -> bytes:
+        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":
+            time_cost = 1
+            parallelism = 1
+            # 8 is the smallest value that avoids the "Memory cost is too small" exception
+            memory_cost = 8
+        type_map = {
+            'i': argon2.low_level.Type.I,
+            'd': argon2.low_level.Type.D,
+            'id': argon2.low_level.Type.ID,
+        }
+        key = argon2.low_level.hash_secret_raw(
+            secret=passphrase.encode("utf-8"),
+            hash_len=output_len_in_bytes,
+            salt=salt,
+            time_cost=time_cost,
+            memory_cost=memory_cost,
+            parallelism=parallelism,
+            type=type_map[type],
+        )
+        return key
+
     def decrypt_key_file_pbkdf2(self, encrypted_key, passphrase):
         key = self.pbkdf2(passphrase, encrypted_key.salt, encrypted_key.iterations, 32)
         data = AES(key, b'\0'*16).decrypt(encrypted_key.data)
@@ -461,7 +495,8 @@ class FlexiKey:
         return None
 
     def decrypt_key_file_argon2(self, encrypted_key, passphrase):
-        key = passphrase.argon2(
+        key = self.argon2(
+            passphrase,
             output_len_in_bytes=64,
             salt=encrypted_key.salt,
             time_cost=encrypted_key.argon2_time_cost,
@@ -506,7 +541,8 @@ class FlexiKey:
 
     def encrypt_key_file_argon2(self, data, passphrase):
         salt = os.urandom(ARGON2_SALT_BYTES)
-        key = passphrase.argon2(
+        key = self.argon2(
+            passphrase,
             output_len_in_bytes=64,
             salt=salt,
             **ARGON2_ARGS,

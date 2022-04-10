@@ -4501,7 +4501,7 @@ class Archiver:
         In this mode upgrading to `argon2` will make it impossible to access the repo for users who use an old version of borg.
         We recommend upgrading to the latest stable version.
 
-        Important: In a `keyfile` mode (e.g. keyfile-blake2) each user has her own key (in ``~/.config/borg/keys``).
+        Important: In a `keyfile` mode (e.g. keyfile-blake2) each user has their own key (in ``~/.config/borg/keys``).
         In this mode this command will only change the key used by the current user.
         If you want to upgrade to `argon2` to strengthen security, you will have to upgrate each user's key individually.
 

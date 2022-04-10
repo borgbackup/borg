@@ -4,6 +4,8 @@
 
 .. include:: key_change-location.rst.inc
 
+.. include:: key_change-algorithm.rst.inc
+
 Examples
 ~~~~~~~~
 ::

@@ -10,7 +10,7 @@ from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 from ..crypto.low_level import AES, hmac_sha256
-from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey
+from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey, FlexiKey
 from ..helpers.passphrase import Passphrase
 from ..helpers import msgpack
 from ..constants import KEY_ALGORITHMS
@@ -294,9 +294,8 @@ def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
 def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
     plain = b'hello'
     salt = b'salt'*4
-    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-    passphrase = Passphrase.new()
-    key = passphrase.kdf(salt, iterations=1, length=32)
+    passphrase = Passphrase("hello, pass phrase")
+    key = FlexiKey.pbkdf2(passphrase, salt, 1, 32)
     hash = hmac_sha256(key, plain)
     data = AES(key, b'\0'*16).encrypt(plain)
     encrypted = msgpack.packb({

@@ -3,7 +3,6 @@ import os
 import shlex
 import subprocess
 import sys
-from hashlib import pbkdf2_hmac
 from typing import Literal
 
 from . import bin_to_hex
@@ -139,11 +138,6 @@ class Passphrase(str):
 
     def __repr__(self):
         return '<Passphrase "***hidden***">'
-
-    def kdf(self, salt, iterations, length):
-        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":
-            iterations = 1
-        return pbkdf2_hmac('sha256', self.encode('utf-8'), salt, iterations, length)
 
     def argon2(
         self,

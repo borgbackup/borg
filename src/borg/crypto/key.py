@@ -3,7 +3,7 @@ import hmac
 import os
 import textwrap
 from binascii import a2b_base64, b2a_base64, hexlify
-from hashlib import sha256
+from hashlib import sha256, pbkdf2_hmac
 
 from ..logger import create_logger
 
@@ -447,8 +447,14 @@ class FlexiKey:
             else:
                 raise UnsupportedKeyFormatError()
 
+    @staticmethod
+    def pbkdf2(passphrase, salt, iterations, output_len_in_bytes):
+        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":
+            iterations = 1
+        return pbkdf2_hmac('sha256', passphrase.encode('utf-8'), salt, iterations, output_len_in_bytes)
+
     def decrypt_key_file_pbkdf2(self, encrypted_key, passphrase):
-        key = passphrase.kdf(encrypted_key.salt, encrypted_key.iterations, 32)
+        key = self.pbkdf2(passphrase, encrypted_key.salt, encrypted_key.iterations, 32)
         data = AES(key, b'\0'*16).decrypt(encrypted_key.data)
         if hmac.compare_digest(hmac_sha256(key, data), encrypted_key.hash):
             return data
@@ -485,7 +491,7 @@ class FlexiKey:
     def encrypt_key_file_pbkdf2(self, data, passphrase):
         salt = os.urandom(32)
         iterations = PBKDF2_ITERATIONS
-        key = passphrase.kdf(salt, iterations, 32)
+        key = self.pbkdf2(passphrase, salt, iterations, 32)
         hash = hmac_sha256(key, data)
         cdata = AES(key, b'\0'*16).encrypt(data)
         enc_key = EncryptedKey(

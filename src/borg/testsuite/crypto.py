@@ -10,8 +10,7 @@ from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 from ..crypto.low_level import AES, hmac_sha256
-from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey
-from ..helpers.passphrase import Passphrase
+from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey, FlexiKey
 from ..helpers import msgpack
 from ..constants import KEY_ALGORITHMS
 
@@ -260,7 +259,7 @@ class CryptoTestCase(BaseTestCase):
         assert okm == bytes.fromhex('1407d46013d98bc6decefcfee55f0f90b0c7f63d68eb1a80eaf07e953cfc0a3a5240a155d6e4daa965bb')
 
 
-def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
+def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256():
     plain = b'hello'
     # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 1 -k 8 -p 1 -l 64 -r
     key = bytes.fromhex('d07cc7f9cfb483303e0b9fec176b2a9c559bb70c3a9fb0d5f9c0c23527cd09570212449f09f8cd28c1a41b73fa0098e889c3f2642e87c392e51f95d70d248d9d')
@@ -282,21 +281,18 @@ def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256(monkeypatch):
         'algorithm': 'argon2 aes256-ctr hmac-sha256',
         'data': envelope,
     })
-    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-    passphrase = Passphrase.new()
     key = KeyfileKey(None)
 
-    decrypted = key.decrypt_key_file(encrypted, passphrase)
+    decrypted = key.decrypt_key_file(encrypted, "hello, pass phrase")
 
     assert decrypted == plain
 
 
-def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
+def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256():
     plain = b'hello'
     salt = b'salt'*4
-    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-    passphrase = Passphrase.new()
-    key = passphrase.kdf(salt, iterations=1, length=32)
+    passphrase = "hello, pass phrase"
+    key = FlexiKey.pbkdf2(passphrase, salt, 1, 32)
     hash = hmac_sha256(key, plain)
     data = AES(key, b'\0'*16).encrypt(plain)
     encrypted = msgpack.packb({
@@ -314,10 +310,8 @@ def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256(monkeypatch):
     assert decrypted == plain
 
 
-def test_decrypt_key_file_unsupported_algorithm(monkeypatch):
+def test_decrypt_key_file_unsupported_algorithm():
     """We will add more algorithms in the future. We should raise a helpful error."""
-    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-    passphrase = Passphrase.new()
     key = KeyfileKey(None)
     encrypted = msgpack.packb({
         'algorithm': 'THIS ALGORITHM IS NOT SUPPORTED',
@@ -325,20 +319,18 @@ def test_decrypt_key_file_unsupported_algorithm(monkeypatch):
     })
 
     with pytest.raises(UnsupportedKeyFormatError):
-        key.decrypt_key_file(encrypted, passphrase)
+        key.decrypt_key_file(encrypted, "hello, pass phrase")
 
 
-def test_decrypt_key_file_v2_is_unsupported(monkeypatch):
+def test_decrypt_key_file_v2_is_unsupported():
     """There may eventually be a version 2 of the format. For now we should raise a helpful error."""
-    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-    passphrase = Passphrase.new()
     key = KeyfileKey(None)
     encrypted = msgpack.packb({
         'version': 2,
     })
 
     with pytest.raises(UnsupportedKeyFormatError):
-        key.decrypt_key_file(encrypted, passphrase)
+        key.decrypt_key_file(encrypted, "hello, pass phrase")
 
 
 @pytest.mark.parametrize('cli_argument, expected_algorithm', KEY_ALGORITHMS.items())

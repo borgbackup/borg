@@ -46,7 +46,7 @@ try:
     from .constants import *  # NOQA
     from .compress import CompressionSpec
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
-    from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
+    from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
@@ -622,12 +622,11 @@ class Archiver:
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
-        from borg.helpers.passphrase import Passphrase
         print("KDFs (slow is GOOD, use argon2!) ===============================")
         count = 5
         for spec, func in [
-            ("pbkdf2", lambda: Passphrase('mypassphrase').kdf(b'salt'*8, PBKDF2_ITERATIONS, 32)),
-            ("argon2", lambda: Passphrase('mypassphrase').argon2(64, b'S' * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
+            ("pbkdf2", lambda: FlexiKey.pbkdf2('mypassphrase', b'salt'*8, PBKDF2_ITERATIONS, 32)),
+            ("argon2", lambda: FlexiKey.argon2('mypassphrase', 64, b'S' * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
         ]:
             print(f"{spec:<24} {count:<10} {timeit(func, number=count):.3f}s")
 

@@ -1,10 +1,10 @@
-.. _borg-change-passphrase:
-
-.. include:: key_change-passphrase.rst.inc
-
 .. include:: key_change-location.rst.inc
 
 .. include:: key_change-algorithm.rst.inc
+
+.. _borg-change-passphrase:
+
+.. include:: key_change-passphrase.rst.inc
 
 Examples
 ~~~~~~~~

@@ -4493,7 +4493,7 @@ class Archiver:
         1. argon2 - recommended. This algorithm is used by default when initialising a new repository.
            The key encryption key is derived from your passphrase via argon2-id.
            Argon2 is considered more modern and secure than pbkdf2.
-        1. pbkdf2 - the legacy algorithm. Use this if you want to access your repo via old versions of borg.
+        2. pbkdf2 - the legacy algorithm. Use this if you want to access your repo via old versions of borg.
            The key encryption key is derived from your passphrase via PBKDF2-HMAC-SHA256.
         """)
         subparser = key_parsers.add_parser('change-algorithm', parents=[common_parser], add_help=False,

@@ -4340,6 +4340,16 @@ class Archiver:
           Argon2 is considered more modern and secure than pbkdf2.
 
         - You can use ``--key-algorithm pbkdf2`` you want to access your repo via old versions of borg.
+
+        Our implementation of argon2-based key algorithm follows the cryptographic best practices:
+
+        - It derives two separate keys from your passphrase: one to encrypt your key and another one
+          to sign it. ``--key-algorithm pbkdf2`` uses the same key for both.
+
+        - It uses encrypt-then-mac instead of encrypt-and-mac used by ``--key-algorithm pbkdf2``
+
+        Neither is inherently linked to the key derivation function, but since we were going
+        to break backwards compatibility anyway we took the opportunity to fix all 3 issues at once.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,

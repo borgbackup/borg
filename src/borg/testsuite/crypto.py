@@ -1,18 +1,15 @@
 from binascii import hexlify
 from unittest.mock import MagicMock
 import unittest
-from binascii import a2b_base64
 
-import pytest
 
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
                                IntegrityError, is_libressl
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 from ..crypto.low_level import AES, hmac_sha256
-from ..crypto.key import KeyfileKey, UnsupportedKeyFormatError, RepoKey, FlexiKey
+from ..crypto.key import KeyfileKey, RepoKey, FlexiKey
 from ..helpers import msgpack
-from ..constants import KEY_ALGORITHMS
 
 from . import BaseTestCase
 
@@ -308,47 +305,6 @@ def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256():
     decrypted = key.decrypt_key_file(encrypted, passphrase)
 
     assert decrypted == plain
-
-
-def test_decrypt_key_file_unsupported_algorithm():
-    """We will add more algorithms in the future. We should raise a helpful error."""
-    key = KeyfileKey(None)
-    encrypted = msgpack.packb({
-        'algorithm': 'THIS ALGORITHM IS NOT SUPPORTED',
-        'version': 1,
-    })
-
-    with pytest.raises(UnsupportedKeyFormatError):
-        key.decrypt_key_file(encrypted, "hello, pass phrase")
-
-
-def test_decrypt_key_file_v2_is_unsupported():
-    """There may eventually be a version 2 of the format. For now we should raise a helpful error."""
-    key = KeyfileKey(None)
-    encrypted = msgpack.packb({
-        'version': 2,
-    })
-
-    with pytest.raises(UnsupportedKeyFormatError):
-        key.decrypt_key_file(encrypted, "hello, pass phrase")
-
-
-@pytest.mark.parametrize('cli_argument, expected_algorithm', KEY_ALGORITHMS.items())
-def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
-    def to_dict(key):
-        extract = 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'
-        return {a: getattr(key, a) for a in extract}
-
-    repository = MagicMock(id=b'repository_id')
-    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
-
-    save_me = RepoKey.create(repository, args=MagicMock(key_algorithm=cli_argument))
-    saved = repository.save_key.call_args.args[0]
-    repository.load_key.return_value = saved
-    load_me = RepoKey.detect(repository, manifest_data=None)
-
-    assert to_dict(load_me) == to_dict(save_me)
-    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expected_algorithm.encode()
 
 
 @unittest.mock.patch('getpass.getpass')

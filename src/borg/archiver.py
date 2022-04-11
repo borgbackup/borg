@@ -4339,7 +4339,7 @@ class Archiver:
           The key encryption key is derived from your passphrase via argon2-id.
           Argon2 is considered more modern and secure than pbkdf2.
 
-        - You can use ``--key-algorithm pbkdf2`` you want to access your repo via old versions of borg.
+        - You can use ``--key-algorithm pbkdf2`` if you want to access your repo via old versions of borg.
 
         Our implementation of argon2-based key algorithm follows the cryptographic best practices:
 

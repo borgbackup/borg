@@ -309,7 +309,7 @@ class Repository:
             secure_erase(old_config_path)
 
         if os.path.isfile(config_path):
-            link_error_msg = ("Failed to securely erase old repository config file (hardlinks not supported>). "
+            link_error_msg = ("Failed to securely erase old repository config file (hardlinks not supported). "
                               "Old repokey data, if any, might persist on physical storage.")
             try:
                 os.link(config_path, old_config_path)

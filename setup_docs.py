@@ -302,6 +302,8 @@ class build_man(Command):
         'with-lock': 'lock',
 
         'key_change-passphrase': 'key',
+        'key_change-location': 'key',
+        'key_change-algorithm': 'key',
         'key_export': 'key',
         'key_import': 'key',
         'key_migrate-to-repokey': 'key',
@@ -310,6 +312,7 @@ class build_man(Command):
         'import-tar': 'tar',
 
         'benchmark_crud': 'benchmark',
+        'benchmark_cpu': 'benchmark',
 
         'umount': 'mount',
     }

@@ -235,6 +235,8 @@ New features:
   Solves the potential AES-CTR mode counter management issues of the legacy crypto.
 - init: --key-algorithm=argon2 (new default KDF, older pbkdf2 also still available)
   borg key change-passphrase / change-location keeps the key algorithm unchanged.
+- key change-algorithm: to upgrade existing keys to argon2 or downgrade to pbkdf2.
+  We recommend you to upgrade unless you have to keep the key compatible with older versions of borg.
 - key change-location: usable for repokey <-> keyfile location change
 - benchmark cpu: display benchmarks of cpu bound stuff
 - export-tar: new --tar-format=PAX (default: GNU)

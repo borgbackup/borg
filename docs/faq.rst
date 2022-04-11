@@ -745,6 +745,15 @@ the nonce is deleted or if you suspect it may have been tampered with. See :ref:
 Common issues
 #############
 
+/path/to/repo is not a valid repository. Check repo config.
+-----------------------------------------------------------
+
+There can be many causes of this error. E.g. you have incorrectly specified the repository path.
+
+You will also get this error if you try to access a repository with a key that uses the argon2 key algorithm using an old version of borg.
+We recommend upgrading to the latest stable version and trying again. We are sorry. We should have thought about forward
+compatibility and implemented a more helpful error message.
+
 Why does Borg extract hang after some time?
 -------------------------------------------
 

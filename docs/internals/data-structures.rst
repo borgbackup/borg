@@ -98,7 +98,7 @@ followed by a number of log entries. Each log entry consists of: (in this order)
 
 * First, unsigned 32-bit number, the CRC32 of the entire entry (for a PUT including the DATA) excluding the CRC32 field
 * Second, unsigned 32-bit size of the entry (including the whole header)
-* Third, unsigned 8-bit entry tag: PUT(1), DELETE(2) or COMMIT(3)
+* Third, unsigned 8-bit entry tag: PUT(0), DELETE(1) or COMMIT(2)
 * Fourth, on PUT or DELETE, 32 byte key
 * Fifth, PUT only, (size - 41) bytes of data (length = size - sizeof(CRC32) - sizeof(size) - sizeof(entry tag) - sizeof(key))
 

@@ -343,7 +343,7 @@ class Repository:
         self.save_config(self.path, self.config)
 
     def load_key(self):
-        keydata = self.config.get('repository', 'key')
+        keydata = self.config.get('repository', 'key', fallback='').strip()
         # note: if we return an empty string, it means there is no repo key
         return keydata.encode('utf-8')  # remote repo: msgpack issue #99, returning bytes
 

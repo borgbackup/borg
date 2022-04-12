@@ -7,7 +7,7 @@ from hashlib import sha256
 from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, dash_open
 from ..repository import Repository
 
-from .key import KeyfileKey, KeyfileNotFoundError, KeyBlobStorage, identify_key
+from .key import KeyfileKey, KeyfileNotFoundError, RepoKeyNotFoundError, KeyBlobStorage, identify_key
 
 
 class UnencryptedRepo(Error):
@@ -56,7 +56,12 @@ class KeyManager:
                 self.keyblob = ''.join(fd.readlines()[1:])
 
         elif self.keyblob_storage == KeyBlobStorage.REPO:
-            self.keyblob = self.repository.load_key().decode()
+            key_data = self.repository.load_key().decode()
+            if not key_data:
+                # if we got an empty key, it means there is no key.
+                loc = self.repository._location.canonical_path()
+                raise RepoKeyNotFoundError(loc) from None
+            self.keyblob = key_data
 
     def store_keyblob(self, args):
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:

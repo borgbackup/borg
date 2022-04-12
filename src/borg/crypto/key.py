@@ -1,4 +1,3 @@
-import configparser
 import getpass
 import os
 import shlex
@@ -775,11 +774,11 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
 
     def find_key(self):
         loc = self.repository._location.canonical_path()
-        try:
-            self.repository.load_key()
-            return loc
-        except configparser.NoOptionError:
+        key = self.repository.load_key()
+        if not key:
+            # if we got an empty key, it means there is no key.
             raise RepoKeyNotFoundError(loc) from None
+        return loc
 
     def get_new_target(self, args):
         return self.repository
@@ -792,6 +791,10 @@ class RepoKey(ID_HMAC_SHA_256, KeyfileKeyBase):
         # what we get in target is just a repo location, but we already have the repo obj:
         target = self.repository
         key_data = target.load_key()
+        if not key_data:
+            # if we got an empty key, it means there is no key.
+            loc = target._location.canonical_path()
+            raise RepoKeyNotFoundError(loc) from None
         key_data = key_data.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
         success = self._load(key_data, passphrase)
         if success:

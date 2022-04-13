@@ -1,4 +1,4 @@
-# borgbackup - main setup code (see also other setup_*.py files)
+# borgbackup - main setup code (see also setup.cfg and other setup_*.py files)
 
 import os
 import sys

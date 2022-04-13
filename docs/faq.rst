@@ -989,6 +989,22 @@ Then you do the backup and look at the log output:
   You can use the ``stat`` command on files to manually look at fs metadata to debug if
   there is any unexpected change triggering the ``M`` status.
 
+When borg runs inside a virtual machine, there are some more things to look at:
+
+Some hypervisors (e.g. kvm on proxmox) give some broadly compatible CPU type to the
+VM (usually to ease migration between VM hosts of potentially different hardware CPUs).
+
+It is broadly compatible because they leave away modern CPU features that could be
+not present in older or other CPUs, e.g. hardware acceleration for AES crypto, for
+sha2 hashes, for (P)CLMUL(QDQ) computations useful for crc32.
+
+So, basically you pay for compatibility with bad performance. If you prefer better
+performance, you should try to expose the host CPU's misc. hw acceleration features
+to the VM which runs borg.
+
+On Linux, check ``/proc/cpuinfo`` for the CPU flags inside the VM.
+For kvm check the docs about "Host model" and "Host passthrough".
+
 See also the next few FAQ entries for more details.
 
 .. _a_status_oddity:

@@ -362,10 +362,18 @@ class ChunkBuffer:
         self.buffer.seek(0)
         # The chunker returns a memoryview to its internal buffer,
         # thus a copy is needed before resuming the chunker iterator.
-        # note: this is the items metadata stream chunker, we only will get CH_DATA allocation here (because there are,
-        #       no all-zero chunks in a metadata stream), thus chunk.data will always be bytes/memoryview and allocation
-        #       is always CH_DATA and never CH_ALLOC/CH_HOLE).
-        chunks = list(bytes(chunk.data) for chunk in self.chunker.chunkify(self.buffer))
+        # the metadata stream may produce all-zero chunks, so deal
+        # with CH_ALLOC (and CH_HOLE, for completeness) here.
+        chunks = []
+        for chunk in self.chunker.chunkify(self.buffer):
+            alloc = chunk.meta['allocation']
+            if alloc == CH_DATA:
+                data = bytes(chunk.data)
+            elif alloc in (CH_ALLOC, CH_HOLE):
+                data = zeros[:chunk.meta['size']]
+            else:
+                raise ValueError("chunk allocation has unsupported value of %r" % alloc)
+            chunks.append(data)
         self.buffer.seek(0)
         self.buffer.truncate(0)
         # Leave the last partial chunk in the buffer unless flush is True

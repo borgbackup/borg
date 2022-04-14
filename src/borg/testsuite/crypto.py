@@ -3,8 +3,7 @@ from unittest.mock import MagicMock
 import unittest
 
 
-from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
-                               IntegrityError, is_libressl
+from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 from ..crypto.low_level import AES, hmac_sha256
@@ -103,16 +102,13 @@ class CryptoTestCase(BaseTestCase):
         header = b'\x23' + iv_int.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
+            (AES256_OCB,
+             b'b6909c23c9aaebd9abbe1ff42097652d',
+             b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
+            (CHACHA20_POLY1305,
+             b'fd08594796e0706cde1e8b461e3e0555',
+             b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
         ]
-        if not is_libressl:
-            tests += [
-                (AES256_OCB,
-                 b'b6909c23c9aaebd9abbe1ff42097652d',
-                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
-                (CHACHA20_POLY1305,
-                 b'fd08594796e0706cde1e8b461e3e0555',
-                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
-            ]
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
@@ -146,16 +142,13 @@ class CryptoTestCase(BaseTestCase):
         header = b'\x12\x34\x56' + iv_int.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
+            (AES256_OCB,
+             b'f2748c412af1c7ead81863a18c2c1893',
+             b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
+            (CHACHA20_POLY1305,
+             b'b7e7c9a79f2404e14f9aad156bf091dd',
+             b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
         ]
-        if not is_libressl:
-            tests += [
-                (AES256_OCB,
-                 b'f2748c412af1c7ead81863a18c2c1893',
-                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
-                (CHACHA20_POLY1305,
-                 b'b7e7c9a79f2404e14f9aad156bf091dd',
-                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
-            ]
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
@@ -187,9 +180,7 @@ class CryptoTestCase(BaseTestCase):
         iv_int = 0
         data = b'foo' * 10
         header = b'\x12\x34'
-        tests = []
-        if not is_libressl:
-            tests += [AES256_OCB, CHACHA20_POLY1305]
+        tests = [AES256_OCB, CHACHA20_POLY1305]
         for cs_cls in tests:
             # encrypt/mac
             cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)

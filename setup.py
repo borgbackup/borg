@@ -49,7 +49,6 @@ cflags = [
 
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
-crypto_helpers = 'src/borg/crypto/_crypto_helpers.c'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
@@ -171,7 +170,7 @@ if not on_rtd:
             pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=1.1.1')
 
     crypto_ext_kwargs = members_appended(
-        dict(sources=[crypto_ll_source, crypto_helpers]),
+        dict(sources=[crypto_ll_source]),
         crypto_ext_lib,
         dict(extra_compile_args=cflags),
         dict(extra_link_args=crypto_ldflags),

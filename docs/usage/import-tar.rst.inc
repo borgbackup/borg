@@ -106,12 +106,15 @@ stdout.
 Most documentation of borg create applies. Note that this command does not
 support excluding files.
 
-import-tar is a lossy conversion:
-BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-otherwise supported by Borg.
-
 A ``--sparse`` option (as found in borg create) is not supported.
 
-import-tar reads POSIX.1-1988 (ustar), POSIX.1-2001 (pax), GNU tar, UNIX V7 tar
-and SunOS tar with extended attributes.
+About tar formats and metadata conservation or loss, please see ``borg export-tar``.
+
+import-tar reads these tar formats:
+
+- BORG: borg specific (PAX-based)
+- PAX: POSIX.1-2001
+- GNU: GNU tar
+- POSIX.1-1988 (ustar)
+- UNIX V7 tar
+- SunOS tar with extended attributes

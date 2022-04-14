@@ -255,7 +255,9 @@ Other changes:
 - internal crypto api: speedups / cleanups / refactorings / modernisation
 - remove "borg upgrade" support for "attic backup" repos
 - remove PassphraseKey code and borg key migrate-to-repokey command
-- remove support for: OpenSSL < 1.1.1, LibreSSL < 2.7.0
+- OpenBSD: build borg with OpenSSL (not: LibreSSL), #6474
+- remove support for LibreSSL, #6474
+- remove support for OpenSSL < 1.1.1
 
 
 Version 1.2.0 (2022-02-22 22:02:22 :-)

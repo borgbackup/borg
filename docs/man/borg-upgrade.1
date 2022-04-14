@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-UPGRADE 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-upgrade \- upgrade a repository from a previous version
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UPGRADE" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-upgrade \- upgrade a repository from a previous version
 .SH SYNOPSIS
 .sp
 borg [common options] upgrade [options] [REPOSITORY]
@@ -71,57 +71,16 @@ reverse the upgrade by issuing \fBborg upgrade \-\-disable\-tam REPO\fP\&.
 See
 \fI\%https://borgbackup.readthedocs.io/en/stable/changes.html#pre\-1\-0\-9\-manifest\-spoofing\-vulnerability\fP
 for details.
-.SS Attic and Borg 0.xx to Borg 1.x
+.SS Borg 0.xx to Borg 1.x
 .sp
-This currently supports converting an Attic repository to Borg and also
-helps with converting Borg 0.xx to 1.0.
+This currently supports converting Borg 0.xx to 1.0.
 .sp
 Currently, only LOCAL repositories can be upgraded (issue #465).
 .sp
 Please note that \fBborg create\fP (since 1.0.0) uses bigger chunks by
-default than old borg or attic did, so the new chunks won\(aqt deduplicate
+default than old borg did, so the new chunks won\(aqt deduplicate
 with the old chunks in the upgraded repository.
 See \fB\-\-chunker\-params\fP option of \fBborg create\fP and \fBborg recreate\fP\&.
-.sp
-\fBborg upgrade\fP will change the magic strings in the repository\(aqs
-segments to match the new Borg magic strings. The keyfiles found in
-$ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
-copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
-.sp
-The cache files are converted, from $ATTIC_CACHE_DIR or
-~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
-cache layout between Borg and Attic changed, so it is possible
-the first backup after the conversion takes longer than expected
-due to the cache resync.
-.sp
-Upgrade should be able to resume if interrupted, although it
-will still iterate over all segments. If you want to start
-from scratch, use \fIborg delete\fP over the copied repository to
-make sure the cache files are also removed:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-borg delete borg
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
-Unless \fB\-\-inplace\fP is specified, the upgrade process first creates a backup
-copy of the repository, in REPOSITORY.before\-upgrade\-DATETIME, using hardlinks.
-This requires that the repository and its parent directory reside on same
-filesystem so the hardlink copy can work.
-This takes longer than in place upgrades, but is much safer and gives
-progress information (as opposed to \fBcp \-al\fP). Once you are satisfied
-with the conversion, you can safely destroy the backup copy.
-.sp
-WARNING: Running the upgrade in place will make the current
-copy unusable with older version, with no way of going back
-to previous versions. This can PERMANENTLY DAMAGE YOUR
-REPOSITORY!  Attic CAN NOT READ BORG REPOSITORIES, as the
-magic strings have changed. You have been warned.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -134,19 +93,19 @@ path to the repository to be upgraded
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-n\fP,\fB  \-\-dry\-run
+.B \-n\fP,\fB  \-\-dry\-run
 do not change repository
 .TP
-.B  \-\-inplace
+.B \-\-inplace
 rewrite repository in place, with no chance of going back to older versions of the repository.
 .TP
-.B  \-\-force
+.B \-\-force
 Force upgrade
 .TP
-.B  \-\-tam
+.B \-\-tam
 Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).
 .TP
-.B  \-\-disable\-tam
+.B \-\-disable\-tam
 Disable manifest authentication (in key and cache).
 .UNINDENT
 .SH EXAMPLES
@@ -167,20 +126,6 @@ no key file found for repository
 .ft P
 .fi
 .UNINDENT
-.UNINDENT
-.SS Upgrading a passphrase encrypted attic repo
-.sp
-attic offered a "passphrase" encryption mode, but this was removed in borg 1.0
-and replaced by the "repokey" mode (which stores the passphrase\-protected
-encryption key into the repository config).
-.sp
-Thus, to upgrade a "passphrase" attic repo to a "repokey" borg repo, 2 steps
-are needed, in this order:
-.INDENT 0.0
-.IP \(bu 2
-borg upgrade repo
-.IP \(bu 2
-borg key migrate\-to\-repokey repo
 .UNINDENT
 .SH SEE ALSO
 .sp

@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-PRUNE 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-prune \- Prune repository archives according to specified rules
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
 .sp
 borg [common options] prune [options] [REPOSITORY]
@@ -100,43 +100,43 @@ repository to prune
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-n\fP,\fB  \-\-dry\-run
+.B \-n\fP,\fB  \-\-dry\-run
 do not change repository
 .TP
-.B  \-\-force
+.B \-\-force
 force pruning of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
 .TP
-.B  \-s\fP,\fB  \-\-stats
+.B \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
 .TP
-.B  \-\-list
+.B \-\-list
 output verbose list of archives it keeps/prunes
 .TP
 .BI \-\-keep\-within \ INTERVAL
 keep all archives within this time interval
 .TP
-.B  \-\-keep\-last\fP,\fB  \-\-keep\-secondly
+.B \-\-keep\-last\fP,\fB  \-\-keep\-secondly
 number of secondly archives to keep
 .TP
-.B  \-\-keep\-minutely
+.B \-\-keep\-minutely
 number of minutely archives to keep
 .TP
-.B  \-H\fP,\fB  \-\-keep\-hourly
+.B \-H\fP,\fB  \-\-keep\-hourly
 number of hourly archives to keep
 .TP
-.B  \-d\fP,\fB  \-\-keep\-daily
+.B \-d\fP,\fB  \-\-keep\-daily
 number of daily archives to keep
 .TP
-.B  \-w\fP,\fB  \-\-keep\-weekly
+.B \-w\fP,\fB  \-\-keep\-weekly
 number of weekly archives to keep
 .TP
-.B  \-m\fP,\fB  \-\-keep\-monthly
+.B \-m\fP,\fB  \-\-keep\-monthly
 number of monthly archives to keep
 .TP
-.B  \-y\fP,\fB  \-\-keep\-yearly
+.B \-y\fP,\fB  \-\-keep\-yearly
 number of yearly archives to keep
 .TP
-.B  \-\-save\-space
+.B \-\-save\-space
 work slower, but using less space
 .UNINDENT
 .SS Archive filters

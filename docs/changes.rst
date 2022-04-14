@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.3.0a1 (not released yet)
-----------------------------------
+Version 1.3.0a1 (2022-04-15)
+----------------------------
 
 Please note:
 
@@ -227,15 +227,18 @@ This is an alpha release, only for testing - do not use this with production rep
 New features:
 
 - init: new --encryption=(repokey|keyfile)-[blake2-](aes-ocb|chacha20-poly1305)
-  New, better, faster crypto (see encryption-aead diagram in the docs), #6463.
-  New AEAD cipher suites: AES-OCB and CHACHA20-POLY1305.
-  Session keys are derived via HKDF from random session id and master key.
-  Nonces/MessageIVs are counters starting from 0 for each session.
-  AAD: chunk id, key type, messageIV, sessionID are now authenticated also.
-  Solves the potential AES-CTR mode counter management issues of the legacy crypto.
+
+  - New, better, faster crypto (see encryption-aead diagram in the docs), #6463.
+  - New AEAD cipher suites: AES-OCB and CHACHA20-POLY1305.
+  - Session keys are derived via HKDF from random session id and master key.
+  - Nonces/MessageIVs are counters starting from 0 for each session.
+  - AAD: chunk id, key type, messageIV, sessionID are now authenticated also.
+  - Solves the potential AES-CTR mode counter management issues of the legacy crypto.
 - init: --key-algorithm=argon2 (new default KDF, older pbkdf2 also still available)
+
   borg key change-passphrase / change-location keeps the key algorithm unchanged.
 - key change-algorithm: to upgrade existing keys to argon2 or downgrade to pbkdf2.
+
   We recommend you to upgrade unless you have to keep the key compatible with older versions of borg.
 - key change-location: usable for repokey <-> keyfile location change
 - benchmark cpu: display benchmarks of cpu bound stuff

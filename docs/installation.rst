@@ -162,7 +162,7 @@ following dependencies first:
 * `Python 3`_ >= 3.9.0, plus development headers.
 * Libraries (library plus development headers):
 
-  - OpenSSL_ >= 1.1.1
+  - OpenSSL_ >= 1.1.1 (LibreSSL will not work)
   - libacl_ (which depends on libattr_)
   - liblz4_ >= 1.7.0 (r129)
   - libzstd_ >= 1.3.0

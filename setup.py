@@ -23,6 +23,7 @@ sys.path += [os.path.dirname(__file__)]
 import setup_docs
 
 is_win32 = sys.platform.startswith('win32')
+is_openbsd = sys.platform.startswith('openbsd')
 
 # Number of threads to use for cythonize, not used on windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != 'spawn' else None
@@ -156,9 +157,15 @@ if not on_rtd:
             f"or ensure {lib_pkg_name}.pc is in PKG_CONFIG_PATH."
         )
 
+    crypto_ldflags = []
     if is_win32:
         crypto_ext_lib = lib_ext_kwargs(
             pc, 'BORG_OPENSSL_PREFIX', 'libcrypto', 'libcrypto', '>=1.1.1', lib_subdir='')
+    elif is_openbsd:
+        # use openssl (not libressl) because we need AES-OCB and CHACHA20-POLY1305 via EVP api
+        crypto_ext_lib = lib_ext_kwargs(
+            pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libecrypto11', '>=1.1.1')
+        crypto_ldflags += ['-Wl,-rpath=/usr/local/lib/eopenssl11']
     else:
         crypto_ext_lib = lib_ext_kwargs(
             pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=1.1.1')
@@ -167,6 +174,7 @@ if not on_rtd:
         dict(sources=[crypto_ll_source, crypto_helpers]),
         crypto_ext_lib,
         dict(extra_compile_args=cflags),
+        dict(extra_link_args=crypto_ldflags),
     )
 
     compress_ext_kwargs = members_appended(

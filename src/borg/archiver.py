@@ -602,7 +602,6 @@ class Archiver:
 
         from borg.crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
         from borg.crypto.low_level import AES256_OCB, CHACHA20_POLY1305
-        from borg.crypto.low_level import is_libressl
         print("Encryption =====================================================")
         size = "1GB"
 
@@ -611,14 +610,11 @@ class Archiver:
                 key_256, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
             ("aes-256-ctr-blake2b", lambda: AES256_CTR_BLAKE2b(
                 key_256*4, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+            ("aes-256-ocb", lambda: AES256_OCB(
+                key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
+            ("chacha20-poly1305", lambda: CHACHA20_POLY1305(
+                key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
         ]
-        if not is_libressl:
-            tests.extend([
-                ("aes-256-ocb", lambda: AES256_OCB(
-                    key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
-                ("chacha20-poly1305", lambda: CHACHA20_POLY1305(
-                    key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b'X')),
-            ])
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 

@@ -78,6 +78,7 @@ def packages_openbsd
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
+    pkg_add openssl%1.1
     pkg_add py3-pip
     pkg_add py3-virtualenv
   EOF

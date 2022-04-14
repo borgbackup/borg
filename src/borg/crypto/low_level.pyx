@@ -47,6 +47,8 @@ API_VERSION = '1.3_01'
 cdef extern from "openssl/crypto.h":
     int CRYPTO_memcmp(const void *a, const void *b, size_t len)
 
+cdef extern from "openssl/opensslv.h":
+    long OPENSSL_VERSION_NUMBER
 
 cdef extern from "openssl/evp.h":
     ctypedef struct EVP_MD:
@@ -91,16 +93,6 @@ cdef extern from "openssl/hmac.h":
                     const void *key, int key_len,
                     const unsigned char *data, int data_len,
                     unsigned char *md, unsigned int *md_len) nogil
-
-cdef extern from "_crypto_helpers.h":
-    long OPENSSL_VERSION_NUMBER
-    long LIBRESSL_VERSION_NUMBER
-
-    const EVP_CIPHER *EVP_aes_256_ocb()  # dummy
-    const EVP_CIPHER *EVP_chacha20_poly1305()  # dummy
-
-
-is_libressl = bool(LIBRESSL_VERSION_NUMBER)
 
 
 import struct
@@ -600,8 +592,7 @@ cdef class _AEAD_BASE:
 cdef class AES256_OCB(_AEAD_BASE):
     @classmethod
     def requirements_check(cls):
-        if is_libressl:
-            raise ValueError('AES OCB is not implemented by LibreSSL (yet?).')
+        pass
 
     def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()
@@ -613,8 +604,7 @@ cdef class AES256_OCB(_AEAD_BASE):
 cdef class CHACHA20_POLY1305(_AEAD_BASE):
     @classmethod
     def requirements_check(cls):
-        if is_libressl:
-            raise ValueError('CHACHA20-POLY1305 is not implemented by LibreSSL (yet?).')
+        pass
 
     def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         self.requirements_check()

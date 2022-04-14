@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-EXPORT-TAR 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-export-tar \- Export archive contents as a tarball
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXPORT-TAR" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-export-tar \- Export archive contents as a tarball
 .SH SYNOPSIS
 .sp
 borg [common options] export\-tar [options] ARCHIVE FILE [PATH...]
@@ -59,12 +59,45 @@ Alternatively, a \fB\-\-tar\-filter\fP program may be explicitly specified. It s
 read the uncompressed tar stream from stdin and write a compressed/filtered
 tar stream to stdout.
 .sp
-The generated tarball uses the GNU tar format.
-.sp
-export\-tar is a lossy conversion:
-BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-otherwise supported by Borg.
+Depending on the \fB\-tar\-format\fP option, these formats are created:
+.TS
+center;
+|l|l|l|.
+_
+T{
+\-\-tar\-format
+T}	T{
+Specification
+T}	T{
+Metadata
+T}
+_
+T{
+BORG
+T}	T{
+BORG specific, like PAX
+T}	T{
+all as supported by borg
+T}
+_
+T{
+PAX
+T}	T{
+POSIX.1\-2001 (pax) format
+T}	T{
+GNU + atime/ctime/mtime ns
+T}
+_
+T{
+GNU
+T}	T{
+GNU tar format
+T}	T{
+mtime s, no atime/ctime,
+no ACLs/xattrs/bsdflags
+T}
+_
+.TE
 .sp
 A \fB\-\-sparse\fP option (as found in borg extract) is not supported.
 .sp
@@ -94,11 +127,14 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-\-tar\-filter
+.B \-\-tar\-filter
 filter program to pipe data through
 .TP
-.B  \-\-list
+.B \-\-list
 output verbose list of items (files, dirs, ...)
+.TP
+.BI \-\-tar\-format \ FMT
+select tar format: BORG, PAX or GNU
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -117,31 +153,6 @@ read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .BI \-\-strip\-components \ NUMBER
 Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.
-.UNINDENT
-.SH EXAMPLES
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-# export as uncompressed tar
-$ borg export\-tar /path/to/repo::Monday Monday.tar
-
-# exclude some types, compress using gzip
-$ borg export\-tar /path/to/repo::Monday Monday.tar.gz \-\-exclude \(aq*.so\(aq
-
-# use higher compression level with gzip
-$ borg export\-tar \-\-tar\-filter="gzip \-9" testrepo::linux Monday.tar.gz
-
-# export a tar, but instead of storing it on disk,
-# upload it to a remote site using curl.
-$ borg export\-tar /path/to/repo::Monday \- | curl \-\-data\-binary @\- https://somewhere/to/POST
-
-# remote extraction via "tarpipe"
-$ borg export\-tar /path/to/repo::Monday \- | ssh somewhere "cd extracted; tar x"
-.ft P
-.fi
-.UNINDENT
 .UNINDENT
 .SH SEE ALSO
 .sp

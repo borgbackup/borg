@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg \- deduplicating and encrypting backup tool
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
 .sp
 borg [common options] <command> [options] [arguments]
@@ -162,13 +162,25 @@ $ borg extract /path/to/repo::Monday
 .UNINDENT
 .UNINDENT
 .IP 7. 3
-Recover disk space by manually deleting the \fIMonday\fP archive:
+Delete the \fIMonday\fP archive (please note that this does \fBnot\fP free repo disk space):
 .INDENT 3.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
 $ borg delete /path/to/repo::Monday
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP 8. 3
+Recover disk space by compacting the segment files in the repo:
+.INDENT 3.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ borg compact /path/to/repo
 .ft P
 .fi
 .UNINDENT
@@ -602,8 +614,7 @@ know a list of affected hardware.
 If you are suspicious whether your Borg repository is still consistent
 and readable after one of the failures mentioned above occurred, run
 \fBborg check \-\-verify\-data\fP to make sure it is consistent.
-Requirements for Borg repository file systems
-.INDENT 0.0
+Requirements for Borg repository file systems.INDENT 0.0
 .IP \(bu 2
 Long file names
 .IP \(bu 2

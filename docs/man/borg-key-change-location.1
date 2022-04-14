@@ -1,8 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RENAME 1 "2022-04-14" "" "borg backup tool"
+.TH BORG-KEY-CHANGE-LOCATION 1 "2022-04-14" "" "borg backup tool"
 .SH NAME
-borg-rename \- Rename an existing archive
+borg-key-change-location \- Change repository key location
 .
 .nr rst2man-indent-level 0
 .
@@ -32,40 +32,34 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 ..
 .SH SYNOPSIS
 .sp
-borg [common options] rename [options] ARCHIVE NEWNAME
+borg [common options] key change\-location [options] [REPOSITORY] KEY_LOCATION
 .SH DESCRIPTION
 .sp
-This command renames an archive in the repository.
+Change the location of a borg key. The key can be stored at different locations:
 .sp
-This results in a different archive ID.
+keyfile: locally, usually in the home directory
+repokey: inside the repo (in the repo config)
+.INDENT 0.0
+.TP
+.B Note: this command does NOT change the crypto algorithms, just the key location,
+thus you must ONLY give the key location (keyfile or repokey).
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
-.INDENT 0.0
-.TP
-.B ARCHIVE
-archive to rename
-.TP
-.B NEWNAME
-the new archive name to use
-.UNINDENT
-.SH EXAMPLES
-.INDENT 0.0
-.INDENT 3.5
 .sp
-.nf
-.ft C
-$ borg create /path/to/repo::archivename ~
-$ borg list /path/to/repo
-archivename                          Mon, 2016\-02\-15 19:50:19
-
-$ borg rename /path/to/repo::archivename newname
-$ borg list /path/to/repo
-newname                              Mon, 2016\-02\-15 19:50:19
-.ft P
-.fi
+REPOSITORY
+.INDENT 0.0
+.TP
+.B KEY_LOCATION
+select key location
 .UNINDENT
+.SS optional arguments
+.INDENT 0.0
+.TP
+.B \-\-keep
+keep the key also at the current location (default: remove it)
 .UNINDENT
 .SH SEE ALSO
 .sp

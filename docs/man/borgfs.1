@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORGFS 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORGFS" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
 .sp
 borgfs [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT [PATH...]
@@ -110,22 +110,22 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-V\fP,\fB  \-\-version
+.B \-V\fP,\fB  \-\-version
 show version number and exit
 .TP
-.B  \-\-consider\-checkpoints
+.B \-\-consider\-checkpoints
 Show checkpoint archives in the repository contents list (default: hidden).
 .TP
-.B  \-f\fP,\fB  \-\-foreground
+.B \-f\fP,\fB  \-\-foreground
 stay in foreground, do not daemonize
 .TP
-.B  \-o
+.B \-o
 Extra mount options
 .TP
-.B  \-\-numeric\-owner
+.B \-\-numeric\-owner
 deprecated, use \fB\-\-numeric\-ids\fP instead
 .TP
-.B  \-\-numeric\-ids
+.B \-\-numeric\-ids
 use numeric user and group identifiers from archive(s)
 .UNINDENT
 .SS Archive filters

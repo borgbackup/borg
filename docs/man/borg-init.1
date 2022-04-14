@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-INIT 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-init \- Initialize an empty repository
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INIT" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-init \- Initialize an empty repository
 .SH SYNOPSIS
 .sp
 borg [common options] init [options] [REPOSITORY]
@@ -39,11 +39,10 @@ This command initializes an empty repository. A repository is a filesystem
 directory containing the deduplicated data from zero or more archives.
 .SS Encryption mode TLDR
 .sp
-The encryption mode can only be configured when creating a new repository \-
-you can neither configure it on a per\-archive basis nor change the
-encryption mode of an existing repository.
-.sp
-Use \fBrepokey\fP:
+The encryption mode can only be configured when creating a new repository \- you can
+neither configure it on a per\-archive basis nor change the mode of an existing repository.
+This example will likely NOT give optimum performance on your machine (performance
+tips will come below):
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -55,30 +54,20 @@ borg init \-\-encryption repokey /path/to/repo
 .UNINDENT
 .UNINDENT
 .sp
-Or \fBrepokey\-blake2\fP depending on which is faster on your client machines (see below):
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-borg init \-\-encryption repokey\-blake2 /path/to/repo
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
 Borg will:
 .INDENT 0.0
 .IP 1. 3
 Ask you to come up with a passphrase.
 .IP 2. 3
-Create a borg key (which contains 3 random secrets. See \fIkey_files\fP).
+Create a borg key (which contains some random secrets. See \fIkey_files\fP).
 .IP 3. 3
-Encrypt the key with your passphrase.
+Derive a "key encryption key" from your passphrase
 .IP 4. 3
+Encrypt and sign the key with the key encryption key
+.IP 5. 3
 Store the encrypted borg key inside the repository directory (in the repo config).
 This is why it is essential to use a secure passphrase.
-.IP 5. 3
+.IP 6. 3
 Encrypt and sign your backups to prevent anyone from reading or forging them unless they
 have the key and know the passphrase. Make sure to keep a backup of
 your key \fBoutside\fP the repository \- do not lock yourself out by
@@ -87,7 +76,7 @@ For remote backups the encryption is done locally \- the remote machine
 never sees your passphrase, your unencrypted key or your unencrypted files.
 Chunking and id generation are also based on your key to improve
 your privacy.
-.IP 6. 3
+.IP 7. 3
 Use the key when extracting files to decrypt them and to verify that the contents of
 the backups have not been accidentally or maliciously altered.
 .UNINDENT
@@ -113,107 +102,176 @@ a different keyboard layout.
 .sp
 You can change your passphrase for existing repos at any time, it won\(aqt affect
 the encryption/decryption key or other secrets.
-.SS More encryption modes
+.SS Choosing an encryption mode
 .sp
-Only use \fB\-\-encryption none\fP if you are OK with anyone who has access to
-your repository being able to read your backups and tamper with their
-contents without you noticing.
+Depending on your hardware, hashing and crypto performance may vary widely.
+The easiest way to find out about what\(aqs fastest is to run \fBborg benchmark cpu\fP\&.
 .sp
-If you want "passphrase and having\-the\-key" security, use \fB\-\-encryption keyfile\fP\&.
-The key will be stored in your home directory (in \fB~/.config/borg/keys\fP).
+\fIrepokey\fP modes: if you want ease\-of\-use and "passphrase" security is good enough \-
+the key will be stored in the repository (in \fBrepo_dir/config\fP).
 .sp
-If you do \fBnot\fP want to encrypt the contents of your backups, but still
-want to detect malicious tampering use \fB\-\-encryption authenticated\fP\&.
+\fIkeyfile\fP modes: if you rather want "passphrase and having\-the\-key" security \-
+the key will be stored in your home directory (in \fB~/.config/borg/keys\fP).
 .sp
-If \fBBLAKE2b\fP is faster than \fBSHA\-256\fP on your hardware, use \fB\-\-encryption authenticated\-blake2\fP,
-\fB\-\-encryption repokey\-blake2\fP or \fB\-\-encryption keyfile\-blake2\fP\&. Note: for remote backups
-the hashing is done on your local machine.
+The following table is roughly sorted in order of preference, the better ones are
+in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
 .\" nanorst: inline-fill
 .
 .TS
 center;
-|l|l|l|l|.
+|l|l|l|l|l|.
 _
 T{
-Hash/MAC
+\fBmode (* = keyfile or repokey)\fP
 T}	T{
-Not encrypted
-no auth
+\fBID\-Hash\fP
 T}	T{
-Not encrypted,
-but authenticated
+\fBEncryption\fP
 T}	T{
-Encrypted (AEAD w/ AES)
-and authenticated
+\fBAuthentication\fP
+T}	T{
+\fBV>=\fP
 T}
 _
 T{
+\fB*\-blake2\-chacha20\-poly1305\fP
+T}	T{
+BLAKE2b
+T}	T{
+CHACHA20
+T}	T{
+POLY1305
+T}	T{
+1.3
+T}
+_
+T{
+\fB*\-chacha20\-poly1305\fP
+T}	T{
+HMAC\-SHA\-256
+T}	T{
+CHACHA20
+T}	T{
+POLY1305
+T}	T{
+1.3
+T}
+_
+T{
+\fB*\-blake2\-aes\-ocb\fP
+T}	T{
+BLAKE2b
+T}	T{
+AES256\-OCB
+T}	T{
+AES256\-OCB
+T}	T{
+1.3
+T}
+_
+T{
+\fB*\-aes\-ocb\fP
+T}	T{
+HMAC\-SHA\-256
+T}	T{
+AES256\-OCB
+T}	T{
+AES256\-OCB
+T}	T{
+1.3
+T}
+_
+T{
+\fB*\-blake2\fP
+T}	T{
+BLAKE2b
+T}	T{
+AES256\-CTR
+T}	T{
+BLAKE2b
+T}	T{
+1.1
+T}
+_
+T{
+\fB*\fP
+T}	T{
+HMAC\-SHA\-256
+T}	T{
+AES256\-CTR
+T}	T{
+HMAC\-SHA256
+T}	T{
+any
+T}
+_
+T{
+authenticated\-blake2
+T}	T{
+BLAKE2b
+T}	T{
+none
+T}	T{
+BLAKE2b
+T}	T{
+1.1
+T}
+_
+T{
+authenticated
+T}	T{
+HMAC\-SHA\-256
+T}	T{
+none
+T}	T{
+HMAC\-SHA256
+T}	T{
+1.1
+T}
+_
+T{
+none
+T}	T{
 SHA\-256
 T}	T{
 none
 T}	T{
-\fIauthenticated\fP
+none
 T}	T{
-repokey
-keyfile
-T}
-_
-T{
-BLAKE2b
-T}	T{
-n/a
-T}	T{
-\fIauthenticated\-blake2\fP
-T}	T{
-\fIrepokey\-blake2\fP
-\fIkeyfile\-blake2\fP
+any
 T}
 _
 .TE
 .\" nanorst: inline-replace
 .
 .sp
-Modes \fImarked like this\fP in the above table are new in Borg 1.1 and are not
-backwards\-compatible with Borg 1.0.x.
+\fInone\fP mode uses no encryption and no authentication. You\(aqre advised to NOT use this mode
+as it would expose you to all sorts of issues (DoS, confidentiality, tampering, ...) in
+case of malicious activity in the repository.
 .sp
-On modern Intel/AMD CPUs (except very cheap ones), AES is usually
-hardware\-accelerated.
-BLAKE2b is faster than SHA256 on Intel/AMD 64\-bit CPUs
-(except AMD Ryzen and future CPUs with SHA extensions),
-which makes \fIauthenticated\-blake2\fP faster than \fInone\fP and \fIauthenticated\fP\&.
+If you do \fBnot\fP want to encrypt the contents of your backups, but still want to detect
+malicious tampering use an \fIauthenticated\fP mode. It\(aqs like \fIrepokey\fP minus encryption.
+.SS Key derivation functions
+.INDENT 0.0
+.IP \(bu 2
+\fB\-\-key\-algorithm argon2\fP is the default and is recommended.
+The key encryption key is derived from your passphrase via argon2\-id.
+Argon2 is considered more modern and secure than pbkdf2.
+.IP \(bu 2
+You can use \fB\-\-key\-algorithm pbkdf2\fP if you want to access your repo via old versions of borg.
+.UNINDENT
 .sp
-On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
-than BLAKE2b\-256 there. NEON accelerates AES as well.
+Our implementation of argon2\-based key algorithm follows the cryptographic best practices:
+.INDENT 0.0
+.IP \(bu 2
+It derives two separate keys from your passphrase: one to encrypt your key and another one
+to sign it. \fB\-\-key\-algorithm pbkdf2\fP uses the same key for both.
+.IP \(bu 2
+It uses encrypt\-then\-mac instead of encrypt\-and\-mac used by \fB\-\-key\-algorithm pbkdf2\fP
+.UNINDENT
 .sp
-Hardware acceleration is always used automatically when available.
-.sp
-\fIrepokey\fP and \fIkeyfile\fP use AES\-CTR\-256 for encryption and HMAC\-SHA256 for
-authentication in an encrypt\-then\-MAC (EtM) construction. The chunk ID hash
-is HMAC\-SHA256 as well (with a separate key).
-These modes are compatible with Borg 1.0.x.
-.sp
-\fIrepokey\-blake2\fP and \fIkeyfile\-blake2\fP are also authenticated encryption modes,
-but use BLAKE2b\-256 instead of HMAC\-SHA256 for authentication. The chunk ID
-hash is a keyed BLAKE2b\-256 hash.
-These modes are new and \fInot\fP compatible with Borg 1.0.x.
-.sp
-\fIauthenticated\fP mode uses no encryption, but authenticates repository contents
-through the same HMAC\-SHA256 hash as the \fIrepokey\fP and \fIkeyfile\fP modes (it uses it
-as the chunk ID hash). The key is stored like \fIrepokey\fP\&.
-This mode is new and \fInot\fP compatible with Borg 1.0.x.
-.sp
-\fIauthenticated\-blake2\fP is like \fIauthenticated\fP, but uses the keyed BLAKE2b\-256 hash
-from the other blake2 modes.
-This mode is new and \fInot\fP compatible with Borg 1.0.x.
-.sp
-\fInone\fP mode uses no encryption and no authentication. It uses SHA256 as chunk
-ID hash. This mode is not recommended, you should rather consider using an authenticated
-or authenticated/encrypted mode. This mode has possible denial\-of\-service issues
-when running \fBborg create\fP on contents controlled by an attacker.
-Use it only for new repositories where no encryption is wanted \fBand\fP when compatibility
-with 1.0.x is important. If compatibility with 1.0.x is not important, use
-\fIauthenticated\-blake2\fP or \fIauthenticated\fP instead.
-This mode is compatible with Borg 1.0.x.
+Neither is inherently linked to the key derivation function, but since we were going
+to break backwards compatibility anyway we took the opportunity to fix all 3 issues at once.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -229,14 +287,17 @@ repository to create
 .BI \-e \ MODE\fR,\fB \ \-\-encryption \ MODE
 select encryption key mode \fB(required)\fP
 .TP
-.B  \-\-append\-only
+.B \-\-append\-only
 create an append\-only mode repository. Note that this only affects the low level structure of the repository, and running \fIdelete\fP or \fIprune\fP will still be allowed. See \fIappend_only_mode\fP in Additional Notes for more details.
 .TP
 .BI \-\-storage\-quota \ QUOTA
 Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .TP
-.B  \-\-make\-parent\-dirs
+.B \-\-make\-parent\-dirs
 create the parent directories of the repository directory, if they are missing.
+.TP
+.B \-\-key\-algorithm
+the algorithm we use to derive a key encryption key from your passphrase. Default: argon2
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -244,19 +305,22 @@ create the parent directories of the repository directory, if they are missing.
 .sp
 .nf
 .ft C
-# Local repository, repokey encryption, BLAKE2b (often faster, since Borg 1.1)
-$ borg init \-\-encryption=repokey\-blake2 /path/to/repo
+# Local repository, recommended repokey AEAD crypto modes
+$ borg init \-\-encryption=repokey\-aes\-ocb /path/to/repo
+$ borg init \-\-encryption=repokey\-chacha20\-poly1305 /path/to/repo
+$ borg init \-\-encryption=repokey\-blake2\-aes\-ocb /path/to/repo
+$ borg init \-\-encryption=repokey\-blake2\-chacha20\-poly1305 /path/to/repo
 
-# Local repository (no encryption)
+# Local repository (no encryption), not recommended
 $ borg init \-\-encryption=none /path/to/repo
 
 # Remote repository (accesses a remote borg via ssh)
 # repokey: stores the (encrypted) key into <REPO_DIR>/config
-$ borg init \-\-encryption=repokey\-blake2 user@hostname:backup
+$ borg init \-\-encryption=repokey\-aes\-ocb user@hostname:backup
 
 # Remote repository (accesses a remote borg via ssh)
 # keyfile: stores the (encrypted) key into ~/.config/borg/keys/
-$ borg init \-\-encryption=keyfile user@hostname:backup
+$ borg init \-\-encryption=keyfile\-aes\-ocb user@hostname:backup
 .ft P
 .fi
 .UNINDENT

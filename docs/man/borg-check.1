@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-CHECK 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-check \- Check repository consistency
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CHECK" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-check \- Check repository consistency
 .SH SYNOPSIS
 .sp
 borg [common options] check [options] [REPOSITORY_OR_ARCHIVE]
@@ -104,15 +104,18 @@ The archive checks can be time consuming; they can be skipped using the
 The \fB\-\-max\-duration\fP option can be used to split a long\-running repository check
 into multiple partial checks. After the given number of seconds the check is
 interrupted. The next partial check will continue where the previous one stopped,
-until the complete repository has been checked. Example: Assuming a full check took 7
+until the complete repository has been checked. Example: Assuming a complete check took 7
 hours, then running a daily check with \-\-max\-duration=3600 (1 hour) resulted in one
-full check per week.
+completed check per week.
 .sp
-Attention: Partial checks can only do way less checking than a full check (only the
-CRC32 checks on segment file entries are done), and cannot be combined with the
-\fB\-\-repair\fP option. Partial checks may therefore be useful only with very large
-repositories where a full check took too long. Doing a full repository check aborts a
-partial check; the next partial check will restart from the beginning.
+Attention: A partial \-\-repository\-only check can only do way less checking than a full
+\-\-repository\-only check: only the non\-cryptographic checksum checks on segment file
+entries are done, while a full \-\-repository\-only check would also do a repo index check.
+A partial check cannot be combined with the \fB\-\-repair\fP option. Partial checks
+may therefore be useful only with very large repositories where a full check would take
+too long.
+Doing a full repository check aborts a partial check; the next partial check will restart
+from the beginning.
 .sp
 The \fB\-\-verify\-data\fP option will perform a full integrity verification (as opposed to
 checking the CRC32 of the segment) of data, which means reading the data from the
@@ -132,19 +135,19 @@ repository or archive to check consistency of
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-\-repository\-only
+.B \-\-repository\-only
 only perform repository checks
 .TP
-.B  \-\-archives\-only
+.B \-\-archives\-only
 only perform archives checks
 .TP
-.B  \-\-verify\-data
+.B \-\-verify\-data
 perform cryptographic archive data integrity verification (conflicts with \fB\-\-repository\-only\fP)
 .TP
-.B  \-\-repair
+.B \-\-repair
 attempt to repair any inconsistencies found
 .TP
-.B  \-\-save\-space
+.B \-\-save\-space
 work slower, but using less space
 .TP
 .BI \-\-max\-duration \ SECONDS

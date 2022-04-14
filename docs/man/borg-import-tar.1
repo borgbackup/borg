@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-IMPORT-TAR 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-import-tar \- Create a backup archive from a tarball
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
 .sp
 borg [common options] import\-tar [options] ARCHIVE TARFILE
@@ -61,15 +61,25 @@ stdout.
 Most documentation of borg create applies. Note that this command does not
 support excluding files.
 .sp
-import\-tar is a lossy conversion:
-BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-otherwise supported by Borg.
-.sp
 A \fB\-\-sparse\fP option (as found in borg create) is not supported.
 .sp
-import\-tar reads POSIX.1\-1988 (ustar), POSIX.1\-2001 (pax), GNU tar, UNIX V7 tar
-and SunOS tar with extended attributes.
+About tar formats and metadata conservation or loss, please see \fBborg export\-tar\fP\&.
+.sp
+import\-tar reads these tar formats:
+.INDENT 0.0
+.IP \(bu 2
+BORG: borg specific (PAX\-based)
+.IP \(bu 2
+PAX: POSIX.1\-2001
+.IP \(bu 2
+GNU: GNU tar
+.IP \(bu 2
+POSIX.1\-1988 (ustar)
+.IP \(bu 2
+UNIX V7 tar
+.IP \(bu 2
+SunOS tar with extended attributes
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -85,19 +95,19 @@ input tar file. "\-" to read from stdin instead.
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-\-tar\-filter
+.B \-\-tar\-filter
 filter program to pipe data through
 .TP
-.B  \-s\fP,\fB  \-\-stats
+.B \-s\fP,\fB  \-\-stats
 print statistics for the created archive
 .TP
-.B  \-\-list
+.B \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters
 .TP
-.B  \-\-json
+.B \-\-json
 output stats as JSON (implies \-\-stats)
 .UNINDENT
 .SS Archive options
@@ -117,6 +127,80 @@ specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BI
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the "borg help compression" command for details.
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+# export as uncompressed tar
+$ borg export\-tar /path/to/repo::Monday Monday.tar
+
+# import an uncompressed tar
+$ borg import\-tar /path/to/repo::Monday Monday.tar
+
+# exclude some file types, compress using gzip
+$ borg export\-tar /path/to/repo::Monday Monday.tar.gz \-\-exclude \(aq*.so\(aq
+
+# use higher compression level with gzip
+$ borg export\-tar \-\-tar\-filter="gzip \-9" repo::Monday Monday.tar.gz
+
+# copy an archive from repoA to repoB
+$ borg export\-tar \-\-tar\-format=BORG repoA::archive \- | borg import\-tar repoB::archive \-
+
+# export a tar, but instead of storing it on disk, upload it to remote site using curl
+$ borg export\-tar /path/to/repo::Monday \- | curl \-\-data\-binary @\- https://somewhere/to/POST
+
+# remote extraction via "tarpipe"
+$ borg export\-tar /path/to/repo::Monday \- | ssh somewhere "cd extracted; tar x"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Archives transfer script
+.sp
+Outputs a script that copies all archives from repo1 to repo2:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+for A T in \(gaborg list \-\-format=\(aq{archive} {time:%Y\-%m\-%dT%H:%M:%S}{LF}\(aq repo1\(ga
+do
+  echo "borg export\-tar \-\-tar\-format=BORG repo1::$A \- | borg import\-tar \-\-timestamp=$T repo2::$A \-"
+done
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Kept:
+.INDENT 0.0
+.IP \(bu 2
+archive name, archive timestamp
+.IP \(bu 2
+archive contents (all items with metadata and data)
+.UNINDENT
+.sp
+Lost:
+.INDENT 0.0
+.IP \(bu 2
+some archive metadata (like the original commandline, execution time, etc.)
+.UNINDENT
+.sp
+Please note:
+.INDENT 0.0
+.IP \(bu 2
+all data goes over that pipe, again and again for every archive
+.IP \(bu 2
+the pipe is dumb, there is no data or transfer time reduction there due to deduplication
+.IP \(bu 2
+maybe add compression
+.IP \(bu 2
+pipe over ssh for remote transfer
+.IP \(bu 2
+no special sparse file support
 .UNINDENT
 .SH SEE ALSO
 .sp

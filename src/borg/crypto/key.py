@@ -445,7 +445,7 @@ class FlexiKey:
             self._encrypted_key_algorithm = encrypted_key.algorithm
             if encrypted_key.algorithm == 'sha256':
                 return self.decrypt_key_file_pbkdf2(encrypted_key, passphrase)
-            elif encrypted_key.algorithm == 'argon2 aes256-ctr hmac-sha256':
+            elif encrypted_key.algorithm == 'argon2 chacha20-poly1305':
                 return self.decrypt_key_file_argon2(encrypted_key, passphrase)
             else:
                 raise UnsupportedKeyFormatError()
@@ -497,19 +497,14 @@ class FlexiKey:
     def decrypt_key_file_argon2(self, encrypted_key, passphrase):
         key = self.argon2(
             passphrase,
-            output_len_in_bytes=64,
+            output_len_in_bytes=32,
             salt=encrypted_key.salt,
             time_cost=encrypted_key.argon2_time_cost,
             memory_cost=encrypted_key.argon2_memory_cost,
             parallelism=encrypted_key.argon2_parallelism,
             type=encrypted_key.argon2_type,
         )
-        enc_key, mac_key = key[:32], key[32:]
-        ae_cipher = AES256_CTR_HMAC_SHA256(
-            iv=0, header_len=0, aad_offset=0,
-            enc_key=enc_key,
-            mac_key=mac_key,
-        )
+        ae_cipher = CHACHA20_POLY1305(key=key, iv=0, header_len=0, aad_offset=0)
         try:
             return ae_cipher.decrypt(encrypted_key.data)
         except low_level.IntegrityError:
@@ -518,7 +513,7 @@ class FlexiKey:
     def encrypt_key_file(self, data, passphrase, algorithm):
         if algorithm == 'sha256':
             return self.encrypt_key_file_pbkdf2(data, passphrase)
-        elif algorithm == 'argon2 aes256-ctr hmac-sha256':
+        elif algorithm == 'argon2 chacha20-poly1305':
             return self.encrypt_key_file_argon2(data, passphrase)
         else:
             raise ValueError(f'Unexpected algorithm: {algorithm}')
@@ -543,19 +538,14 @@ class FlexiKey:
         salt = os.urandom(ARGON2_SALT_BYTES)
         key = self.argon2(
             passphrase,
-            output_len_in_bytes=64,
+            output_len_in_bytes=32,
             salt=salt,
             **ARGON2_ARGS,
         )
-        enc_key, mac_key = key[:32], key[32:]
-        ae_cipher = AES256_CTR_HMAC_SHA256(
-            iv=0, header_len=0, aad_offset=0,
-            enc_key=enc_key,
-            mac_key=mac_key,
-        )
+        ae_cipher = CHACHA20_POLY1305(key=key, iv=0, header_len=0, aad_offset=0)
         encrypted_key = EncryptedKey(
             version=1,
-            algorithm='argon2 aes256-ctr hmac-sha256',
+            algorithm='argon2 chacha20-poly1305',
             salt=salt,
             data=ae_cipher.encrypt(data),
             **{'argon2_' + k: v for k, v in ARGON2_ARGS.items()},

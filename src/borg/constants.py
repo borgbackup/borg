@@ -112,8 +112,8 @@ ARGON2_SALT_BYTES = 16
 KEY_ALGORITHMS = {
     # encrypt-and-MAC, kdf: PBKDF2(HMAC−SHA256), encryption: AES256-CTR, authentication: HMAC-SHA256
     'pbkdf2': 'sha256',
-    # encrypt-then-MAC, kdf: argon2, encryption: AES256-CTR, authentication: HMAC-SHA256
-    'argon2': 'argon2 aes256-ctr hmac-sha256',
+    # encrypt-then-MAC, kdf: argon2, encryption: chacha20, authentication: poly1305
+    'argon2': 'argon2 chacha20-poly1305',
 }
 
 

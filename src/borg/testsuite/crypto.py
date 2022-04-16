@@ -247,15 +247,11 @@ class CryptoTestCase(BaseTestCase):
         assert okm == bytes.fromhex('1407d46013d98bc6decefcfee55f0f90b0c7f63d68eb1a80eaf07e953cfc0a3a5240a155d6e4daa965bb')
 
 
-def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256():
+def test_decrypt_key_file_argon2_chacha20_poly1305():
     plain = b'hello'
-    # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 1 -k 8 -p 1 -l 64 -r
-    key = bytes.fromhex('d07cc7f9cfb483303e0b9fec176b2a9c559bb70c3a9fb0d5f9c0c23527cd09570212449f09f8cd28c1a41b73fa0098e889c3f2642e87c392e51f95d70d248d9d')
-    ae_cipher = AES256_CTR_HMAC_SHA256(
-        iv=0, header_len=0, aad_offset=0,
-        enc_key=key[:32],
-        mac_key=key[32:],
-    )
+    # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 1 -k 8 -p 1 -l 32 -r
+    key = bytes.fromhex('a1b0cba145c154fbd8960996c5ce3428e9920cfe53c84ef08b4102a70832bcec')
+    ae_cipher = CHACHA20_POLY1305(key=key, iv=0, header_len=0, aad_offset=0)
 
     envelope = ae_cipher.encrypt(plain)
 
@@ -266,7 +262,7 @@ def test_decrypt_key_file_argon2_aes256_ctr_hmac_sha256():
         'argon2_memory_cost': 8,
         'argon2_parallelism': 1,
         'argon2_type': b'id',
-        'algorithm': 'argon2 aes256-ctr hmac-sha256',
+        'algorithm': 'argon2 chacha20-poly1305',
         'data': envelope,
     })
     key = KeyfileKey(None)

@@ -427,7 +427,7 @@ class ItemDiff:
             changes.append(self._content_diff())
 
         if self._item1.is_dir() or self._item2.is_dir():
-            changes.append(self._dir_diff())
+            changes.append(self._presence_diff('directory'))
 
         if not (self._item1.get('deleted') or self._item2.get('deleted')):
             changes.append(self._owner_diff())
@@ -492,11 +492,13 @@ class ItemDiff:
             '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
             format_file_size(-removed, precision=1, sign=True)))
 
-    def _dir_diff(self):
+    def _presence_diff(self, item_type):
         if self._item2.get('deleted') and not self._item1.get('deleted'):
-            return ({"type": 'removed directory'}, 'removed directory')
+            chg = 'removed ' + item_type
+            return ({"type": chg}, chg)
         if self._item1.get('deleted') and not self._item2.get('deleted'):
-            return ({"type": 'added directory'}, 'added directory')
+            chg = 'added ' + item_type
+            return ({"type": chg}, chg)
 
     def _owner_diff(self):
         u_attr, g_attr = ('uid', 'gid') if self._numeric_ids else ('user', 'group')

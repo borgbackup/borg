@@ -439,9 +439,16 @@ class Repository:
         except FileNotFoundError:
             self.close()
             raise self.InvalidRepository(self.path)
-        if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
+        if 'repository' not in self.config.sections():
             self.close()
-            raise self.InvalidRepository(path)
+            raise self.InvalidRepositoryConfig(path, 'no repository section found')
+        repo_version = self.config.getint('repository', 'version')
+        if repo_version != 1:
+            self.close()
+            raise self.InvalidRepositoryConfig(
+                path,
+                'repository version %d is not supported by this borg version' % repo_version
+            )
         self.max_segment_size = parse_file_size(self.config.get('repository', 'max_segment_size'))
         if self.max_segment_size >= MAX_SEGMENT_SIZE_LIMIT:
             self.close()

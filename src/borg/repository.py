@@ -446,11 +446,14 @@ class Repository:
             raise self.InvalidRepository(self.path)
         if 'repository' not in self.config.sections():
             self.close()
-            raise self.InvalidRepository(path)
+            raise self.InvalidRepositoryConfig(path, 'no repository section found')
         self.version = self.config.getint('repository', 'version')
         if self.version not in (2, ):  # for now, only work on new repos
             self.close()
-            raise self.InvalidRepository(path)
+            raise self.InvalidRepositoryConfig(
+                path,
+                'repository version %d is not supported by this borg version' % self.version
+            )
         self.max_segment_size = parse_file_size(self.config.get('repository', 'max_segment_size'))
         if self.max_segment_size >= MAX_SEGMENT_SIZE_LIMIT:
             self.close()

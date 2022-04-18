@@ -466,10 +466,9 @@ class ItemDiff:
         return True
 
     def _link_diff(self):
-        if self._item1.get('deleted'):
-            return ({"type": 'added link'}, 'added link')
-        if self._item2.get('deleted'):
-            return ({"type": 'removed link'}, 'removed link')
+        pd = self._presence_diff('link')
+        if pd is not None:
+            return pd
         if 'source' in self._item1 and 'source' in self._item2 and self._item1.source != self._item2.source:
             return ({"type": 'changed link'}, 'changed link')
 

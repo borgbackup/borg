@@ -650,6 +650,12 @@ Utilization of max. archive size: {csize_max:.0%}
         # caching wrapper around _calc_stats which is rather slow for archives made with borg < 1.2
         have_borg12_meta = self.metadata.get('nfiles') is not None
         try:
+            if want_unique:
+                # usize is neither contained in the borg 1.2 archive metadata nor in the
+                # pre12_meta cache entry representing the same information for 1.1 archives.
+                # usize is not a static property of an archive, but must get dynamically calculated,
+                # thus we must trigger a call to self._calc_stats() to get it.
+                raise KeyError
             stats = Statistics.from_raw_dict(**cache.pre12_meta[self.fpr])
         except KeyError:  # not in pre12_meta cache
             stats = self._calc_stats(cache, want_unique=want_unique)

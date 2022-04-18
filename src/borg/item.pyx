@@ -465,6 +465,14 @@ class ItemDiff:
 
         return True
 
+    def _presence_diff(self, item_type):
+        if not self._item1.get('deleted') and self._item2.get('deleted'):
+            chg = 'removed ' + item_type
+            return ({"type": chg}, chg)
+        if self._item1.get('deleted') and not self._item2.get('deleted'):
+            chg = 'added ' + item_type
+            return ({"type": chg}, chg)
+
     def _link_diff(self):
         pd = self._presence_diff('link')
         if pd is not None:
@@ -490,14 +498,6 @@ class ItemDiff:
         return ({"type": "modified", "added": added, "removed": removed},
             '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
             format_file_size(-removed, precision=1, sign=True)))
-
-    def _presence_diff(self, item_type):
-        if self._item2.get('deleted') and not self._item1.get('deleted'):
-            chg = 'removed ' + item_type
-            return ({"type": chg}, chg)
-        if self._item1.get('deleted') and not self._item2.get('deleted'):
-            chg = 'added ' + item_type
-            return ({"type": chg}, chg)
 
     def _owner_diff(self):
         u_attr, g_attr = ('uid', 'gid') if self._numeric_ids else ('user', 'group')

@@ -234,6 +234,10 @@ def files_cache_name():
     return 'files.' + suffix if suffix else 'files'
 
 
+def discover_files_cache_name(path):
+    return [fn for fn in os.listdir(path) if fn == 'files' or fn.startswith('files.')][0]
+
+
 class CacheConfig:
     def __init__(self, repository, path=None, lock_wait=None):
         self.repository = repository
@@ -650,7 +654,7 @@ class LocalCache(CacheStatsMixin):
         if os.path.exists(txn_dir):
             shutil.copy(os.path.join(txn_dir, 'config'), self.path)
             shutil.copy(os.path.join(txn_dir, 'chunks'), self.path)
-            shutil.copy(os.path.join(txn_dir, files_cache_name()), self.path)
+            shutil.copy(os.path.join(txn_dir, discover_files_cache_name(txn_dir)), self.path)
             os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
             if os.path.exists(os.path.join(self.path, 'txn.tmp')):
                 shutil.rmtree(os.path.join(self.path, 'txn.tmp'))

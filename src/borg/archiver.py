@@ -1083,15 +1083,22 @@ class Archiver:
         def has_hardlink_master(item, hardlink_masters):
             return hardlinkable(item.mode) and item.get('source') in hardlink_masters
 
+        def compare_presence(item1, item2, item_type):
+            if item2.get('deleted') and not item1.get('deleted'):
+                chg = 'removed ' + item_type
+                return ({"type": chg}, chg)
+            elif item1.get('deleted') and not item2.get('deleted'):
+                chg = 'added ' + item_type
+                return ({"type": chg}, chg)
+
         def compare_link(item1, item2):
             # These are the simple link cases. For special cases, e.g. if a
             # regular file is replaced with a link or vice versa, it is
             # indicated in compare_mode instead.
-            if item1.get('deleted'):
-                return ({"type": 'added link'}, 'added link')
-            elif item2.get('deleted'):
-                return ({"type": 'removed link'}, 'removed link')
-            elif 'source' in item1 and 'source' in item2 and item1.source != item2.source:
+            pd = compare_presence(item1, item2, 'link')
+            if pd is not None:
+                return pd
+            if 'source' in item1 and 'source' in item2 and item1.source != item2.source:
                 return ({"type": 'changed link'}, 'changed link')
 
         def contents_changed(item1, item2):
@@ -1129,12 +1136,6 @@ class Archiver:
                         '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
                         format_file_size(-removed, precision=1, sign=True)))
 
-        def compare_directory(item1, item2):
-            if item2.get('deleted') and not item1.get('deleted'):
-                return ({"type": 'removed directory'}, 'removed directory')
-            elif item1.get('deleted') and not item2.get('deleted'):
-                return ({"type": 'added directory'}, 'added directory')
-
         def compare_owner(item1, item2):
             user1, group1 = get_owner(item1)
             user2, group2 = get_owner(item2)
@@ -1168,7 +1169,16 @@ class Archiver:
                 changes.append(compare_content(path, item1, item2))
 
             if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
-                changes.append(compare_directory(item1, item2))
+                changes.append(compare_presence(item1, item2, 'directory'))
+
+            if get_mode(item1)[0] == 'b' or get_mode(item2)[0] == 'b':
+                changes.append(compare_presence(item1, item2, 'blkdev'))
+
+            if get_mode(item1)[0] == 'c' or get_mode(item2)[0] == 'c':
+                changes.append(compare_presence(item1, item2, 'chrdev'))
+
+            if get_mode(item1)[0] == 's' or get_mode(item2)[0] == 's':
+                changes.append(compare_presence(item1, item2, 'fifo'))
 
             if not deleted:
                 changes.append(compare_owner(item1, item2))

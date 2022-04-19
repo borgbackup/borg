@@ -1129,11 +1129,13 @@ class Archiver:
                         '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
                         format_file_size(-removed, precision=1, sign=True)))
 
-        def compare_directory(item1, item2):
+        def compare_presence(item1, item2, item_type):
             if item2.get('deleted') and not item1.get('deleted'):
-                return ({"type": 'removed directory'}, 'removed directory')
+                chg = 'removed ' + item_type
+                return ({"type": chg}, chg)
             elif item1.get('deleted') and not item2.get('deleted'):
-                return ({"type": 'added directory'}, 'added directory')
+                chg = 'added ' + item_type
+                return ({"type": chg}, chg)
 
         def compare_owner(item1, item2):
             user1, group1 = get_owner(item1)
@@ -1168,7 +1170,7 @@ class Archiver:
                 changes.append(compare_content(path, item1, item2))
 
             if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
-                changes.append(compare_directory(item1, item2))
+                changes.append(compare_presence(item1, item2, 'directory'))
 
             if not deleted:
                 changes.append(compare_owner(item1, item2))

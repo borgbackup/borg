@@ -1083,6 +1083,14 @@ class Archiver:
         def has_hardlink_master(item, hardlink_masters):
             return hardlinkable(item.mode) and item.get('source') in hardlink_masters
 
+        def compare_presence(item1, item2, item_type):
+            if item2.get('deleted') and not item1.get('deleted'):
+                chg = 'removed ' + item_type
+                return ({"type": chg}, chg)
+            elif item1.get('deleted') and not item2.get('deleted'):
+                chg = 'added ' + item_type
+                return ({"type": chg}, chg)
+
         def compare_link(item1, item2):
             # These are the simple link cases. For special cases, e.g. if a
             # regular file is replaced with a link or vice versa, it is
@@ -1127,14 +1135,6 @@ class Archiver:
                 return ({"type": "modified", "added": added, "removed": removed},
                         '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
                         format_file_size(-removed, precision=1, sign=True)))
-
-        def compare_presence(item1, item2, item_type):
-            if item2.get('deleted') and not item1.get('deleted'):
-                chg = 'removed ' + item_type
-                return ({"type": chg}, chg)
-            elif item1.get('deleted') and not item2.get('deleted'):
-                chg = 'added ' + item_type
-                return ({"type": chg}, chg)
 
         def compare_owner(item1, item2):
             user1, group1 = get_owner(item1)

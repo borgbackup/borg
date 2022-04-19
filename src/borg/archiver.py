@@ -1608,7 +1608,7 @@ class Archiver:
             json_print(info)
         else:
             encryption = 'Encrypted: '
-            if key.NAME == 'plaintext':
+            if key.NAME in ('plaintext', 'authenticated'):
                 encryption += 'No'
             else:
                 encryption += 'Yes (%s)' % key.NAME

@@ -1171,6 +1171,15 @@ class Archiver:
             if get_mode(item1)[0] == 'd' or get_mode(item2)[0] == 'd':
                 changes.append(compare_presence(item1, item2, 'directory'))
 
+            if get_mode(item1)[0] == 'b' or get_mode(item2)[0] == 'b':
+                changes.append(compare_presence(item1, item2, 'blkdev'))
+
+            if get_mode(item1)[0] == 'c' or get_mode(item2)[0] == 'c':
+                changes.append(compare_presence(item1, item2, 'chrdev'))
+
+            if get_mode(item1)[0] == 's' or get_mode(item2)[0] == 's':
+                changes.append(compare_presence(item1, item2, 'fifo'))
+
             if not deleted:
                 changes.append(compare_owner(item1, item2))
                 changes.append(compare_mode(item1, item2))

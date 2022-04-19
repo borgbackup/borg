@@ -1403,8 +1403,8 @@ class Archiver:
                 logger.warning('Aborted.')
             return self.exit_code
 
-        stats = Statistics()
-        with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait) as cache:
+        stats = Statistics(iec=args.iec)
+        with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
             msg_delete = 'Would delete archive: {} ({}/{})' if dry_run else 'Deleting archive: {} ({}/{})'
             msg_not_found = 'Archive {} not found ({}/{}).'
             logger_list = logging.getLogger('borg.output.list')

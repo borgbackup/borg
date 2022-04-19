@@ -255,8 +255,15 @@ New features:
 
 Fixes:
 
-- fix hardlinkable file type check, #6037
+- check: improve error handling for corrupt archive metadata block,
+         make robust_iterator more robust, #4777
+- diff: support presence change for blkdev, chrdev and fifo items, #6483
+- diff: reduce memory consumption, fix is_hardlink_master
+- init: disallow overwriting of existing keyfiles
+- info: fix authenticated mode repo to show "Encrypted: No", #6462
+- info: emit repo info even if repo has 0 archives, #6120
 - list: remove placeholders for shake_* hashes, #6082
+- fix hardlinkable file type check, #6037
 - do not show archive name in error msgs referring to the repository, #6023
 - prettier error msg (no stacktrace) if exclude file is missing, #5734
 - do not require BORG_CONFIG_DIR if BORG_{SECURITY,KEYS}_DIR are set, #5979
@@ -266,7 +273,15 @@ Fixes:
 - repository: quota / compactable computation fixes, #6119.
   This is mainly to keep the repo code in sync with borg 1.2. As borg 1.1
   compacts immediately, there was not really an issue with this in 1.1.
-- info: emit repo info even if repo has 0 archives, #6120
+- fix transaction rollback: use files cache filename as found in txn.active, #6353
+- do not load files cache for commands not using it, fixes #5673
+- fix scp repo url parsing for ip v6 addrs, #6526
+- repo::archive location placeholder expansion fixes, #5826, #5998
+
+  - use expanded location for log output
+  - support placeholder expansion for BORG_REPO env var
+- respect umask for created directory and file modes, #6400
+- safer truncate_and_unlink implementation
 
 Other changes:
 
@@ -275,6 +290,23 @@ Other changes:
 - msgpack build: remove endianness macro, #6105
 - update and fix shell completions
 - fuse: remove unneeded version check and compat code
+- delete --force: do not ask when deleting a repo, #5941
+- delete: don't commit if nothing was deleted, avoid cache sync, #6060
+- delete: add repository id and location to prompt
+- compact segments: improve freeable / freed space log output, #5679
+- if ensure_dir() fails, give more informative error message, #5952
+- load_key: no key is same as empty key, #6441
+- better error msg for defect or unsupported repo configs, #6566
+- use hmac.compare_digest instead of ==, #6470
+- implement more standard hashindex.setdefault behaviour
+- remove stray punctuation from secure-erase message
+- add development.lock.txt, use a real python 3.5 to generate frozen reqs
+- setuptools 60.7.0 breaks pyinstaller, #6246
+- setup.py clean2 was added to work around some setuptools customizability limitation.
+- allow extra compiler flags for every extension build
+- C code: make switch fallthrough explicit
+- Cython code: fix "useless trailing comma" cython warnings
+- fix compilation warnings: ‘PyUnicode_AsUnicode’ is deprecated
 - docs:
 
   - ~/.config/borg/keys is not used for repokey keys, #6107
@@ -293,10 +325,37 @@ Other changes:
   - FAQ: fix manifest-timestamp path, #6016
   - remove duplicate faq entries, #5926
   - fix sphinx warnings, #5919
+  - virtualisation speed tips
+  - fix values of TAG bytes, #6515
+  - recommend umask for passphrase file perms
+  - update link to ubuntu packages, #6485
+  - clarify on-disk order and size of log entry fields, #6357
+  - do not transform --/--- to unicode dashes
+  - improve linking inside docs, link to borg_placeholders, link to borg_patterns
+  - use same phrasing in misc. help texts
+  - borg init: explain the encryption modes better
+  - explain the difference between a path that ends with or without a slash, #6297
+  - clarify usage of patternfile roots, #6242
+  - borg key export: add examples
+  - updates about features not experimental any more: FUSE "versions" view, --pattern*, #6134
+  - fix/update cygwin package requirements
+  - impact of deleting path/to/repo/nonce, #5858
+  - warn about tampered server nonce
+
 - vagrant / CI / testing:
 
   - misc. fixes and updates, new python versions
   - macOS on github: re-enable fuse2 testing by downgrading to older macOS, #6099
+  - fix OpenBSD symlink mode test failure, #2055
+  - strengthen the test: we can read data w/o nonces
+  - add tests for path/to/repo/nonce deletion
+  - darwin64: backport some tunings from master
+  - darwin64: remove fakeroot, #6314
+  - darwin64: fix vagrant scp, #5921
+  - darwin64: use macfuse instead of osxfuse
+  - add ubuntu "jammy" 22.04 LTS VM
+  - adapt memory for openindiana64 and darwin64
+
 
 Version 1.1.17 (2021-07-12)
 ---------------------------

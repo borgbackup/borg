@@ -1087,11 +1087,10 @@ class Archiver:
             # These are the simple link cases. For special cases, e.g. if a
             # regular file is replaced with a link or vice versa, it is
             # indicated in compare_mode instead.
-            if item1.get('deleted'):
-                return ({"type": 'added link'}, 'added link')
-            elif item2.get('deleted'):
-                return ({"type": 'removed link'}, 'removed link')
-            elif 'source' in item1 and 'source' in item2 and item1.source != item2.source:
+            pd = compare_presence(item1, item2, 'link')
+            if pd is not None:
+                return pd
+            if 'source' in item1 and 'source' in item2 and item1.source != item2.source:
                 return ({"type": 'changed link'}, 'changed link')
 
         def contents_changed(item1, item2):

@@ -276,6 +276,15 @@ class Item(PropDict):
     def is_dir(self):
         return self._is_type(stat.S_ISDIR)
 
+    def is_fifo(self):
+        return self._is_type(stat.S_ISFIFO)
+
+    def is_blk(self):
+        return self._is_type(stat.S_ISBLK)
+
+    def is_chr(self):
+        return self._is_type(stat.S_ISCHR)
+
     def _is_type(self, typetest):
         try:
             return typetest(self.mode)
@@ -433,7 +442,16 @@ class ItemDiff:
             changes.append(self._content_diff())
 
         if self._item1.is_dir() or self._item2.is_dir():
-            changes.append(self._dir_diff())
+            changes.append(self._presence_diff('directory'))
+
+        if self._item1.is_blk() or self._item2.is_blk():
+            changes.append(self._presence_diff('blkdev'))
+
+        if self._item1.is_chr() or self._item2.is_chr():
+            changes.append(self._presence_diff('chrdev'))
+
+        if self._item1.is_fifo() or self._item2.is_fifo():
+            changes.append(self._presence_diff('fifo'))
 
         if not (self._item1.get('deleted') or self._item2.get('deleted')):
             changes.append(self._owner_diff())
@@ -471,11 +489,18 @@ class ItemDiff:
 
         return True
 
+    def _presence_diff(self, item_type):
+        if not self._item1.get('deleted') and self._item2.get('deleted'):
+            chg = 'removed ' + item_type
+            return ({"type": chg}, chg)
+        if self._item1.get('deleted') and not self._item2.get('deleted'):
+            chg = 'added ' + item_type
+            return ({"type": chg}, chg)
+
     def _link_diff(self):
-        if self._item1.get('deleted'):
-            return ({"type": 'added link'}, 'added link')
-        if self._item2.get('deleted'):
-            return ({"type": 'removed link'}, 'removed link')
+        pd = self._presence_diff('link')
+        if pd is not None:
+            return pd
         if 'source' in self._item1 and 'source' in self._item2 and self._item1.source != self._item2.source:
             return ({"type": 'changed link'}, 'changed link')
 
@@ -497,12 +522,6 @@ class ItemDiff:
         return ({"type": "modified", "added": added, "removed": removed},
             '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
             format_file_size(-removed, precision=1, sign=True)))
-
-    def _dir_diff(self):
-        if self._item2.get('deleted') and not self._item1.get('deleted'):
-            return ({"type": 'removed directory'}, 'removed directory')
-        if self._item1.get('deleted') and not self._item2.get('deleted'):
-            return ({"type": 'added directory'}, 'added directory')
 
     def _owner_diff(self):
         u_attr, g_attr = ('uid', 'gid') if self._numeric_ids else ('user', 'group')

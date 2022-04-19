@@ -667,9 +667,6 @@ def FilesCacheMode(s):
     return mode
 
 
-assert FilesCacheMode(DEFAULT_FILES_CACHE_MODE_UI) == DEFAULT_FILES_CACHE_MODE  # keep these 2 values in sync!
-
-
 def dir_is_cachedir(path):
     """Determines whether the specified path is a cache directory (and
     therefore should potentially be excluded from the backup) according to

@@ -988,6 +988,8 @@ Then you do the backup and look at the log output:
   details and potential issues).
   You can use the ``stat`` command on files to manually look at fs metadata to debug if
   there is any unexpected change triggering the ``M`` status.
+  Also, the ``--debug-topic=files_cache`` option of ``borg create`` provides a lot of debug
+  output helping to analyse why the files cache does not give its expected high performance.
 
 When borg runs inside a virtual machine, there are some more things to look at:
 

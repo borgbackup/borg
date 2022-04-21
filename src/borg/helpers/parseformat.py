@@ -357,6 +357,10 @@ class Location:
         (?::(?P<port>\d+))?                                     # :port (optional)
         """ + abs_path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
 
+    serve_re = re.compile(r"""
+        (?P<proto>serve)://                                   # serve://
+        """ + abs_path_re + optional_archive_re, re.VERBOSE)  # path or path::archive
+
     file_re = re.compile(r"""
         (?P<proto>file)://                                      # file://
         """ + file_path_re + optional_archive_re, re.VERBOSE)   # servername/path, path or path::archive
@@ -433,6 +437,12 @@ class Location:
             self.user = m.group('user')
             self._host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
+            self.path = normpath_special(m.group('path'))
+            self.archive = m.group('archive')
+            return True
+        m = self.serve_re.match(text)
+        if m:
+            self.proto = m.group('proto')
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             return True

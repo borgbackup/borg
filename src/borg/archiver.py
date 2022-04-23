@@ -12,6 +12,7 @@ try:
     import functools
     import hashlib
     import inspect
+    import io
     import itertools
     import json
     import logging
@@ -21,6 +22,7 @@ try:
     import shutil
     import signal
     import stat
+    import struct
     import subprocess
     import tarfile
     import textwrap
@@ -556,7 +558,6 @@ class Archiver:
         key_128 = os.urandom(16)
         key_96 = os.urandom(12)
 
-        import io
         from borg.chunker import get_chunker
         print("Chunkers =======================================================")
         size = "1GB"
@@ -1146,7 +1147,8 @@ class Archiver:
 
         # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
         # where it never seeks on the passed fileobj.
-        tar_format = dict(GNU=tarfile.GNU_FORMAT, PAX=tarfile.PAX_FORMAT, BORG=tarfile.PAX_FORMAT)[args.tar_format]
+        tar_format = dict(GNU=tarfile.GNU_FORMAT, PAX=tarfile.PAX_FORMAT,
+                          BORG=tarfile.PAX_FORMAT, BORG_C=tarfile.PAX_FORMAT)[args.tar_format]
         tar = tarfile.open(fileobj=tarstream, mode='w|', format=tar_format)
 
         if progress:
@@ -1157,12 +1159,28 @@ class Archiver:
         else:
             pi = None
 
-        def item_content_stream(item):
+        def item_content_stream(item, *, chunked, chunk_ids, missing_ids):
             """
             Return a file-like object that reads from the chunks of *item*.
             """
-            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks],
-                                                         is_preloaded=True)
+            if not chunked:
+                # when chunked is False, we iterate over chunk_ids, this will iterate over all item chunks
+                chunk_iterator = archive.pipeline.fetch_many(chunk_ids, is_preloaded=True)
+            else:
+                def _pack_iterator(chunk_ids, missing_ids):
+                    hdr_fmt = struct.Struct('<i32s')  # int32 data_length + 256bit chunk_id + optional data
+                    for chunk_id in chunk_ids:
+                        if chunk_id in missing_ids:
+                            cdata = archive.repository.get(chunk_id)
+                            chunk = archive.key.decrypt(chunk_id, cdata)
+                            yield hdr_fmt.pack(len(chunk), chunk_id) + chunk
+                            missing_ids.remove(chunk_id)
+                        else:
+                            yield hdr_fmt.pack(-1, chunk_id)
+
+                # iterate over all item chunks, but include data in packs only for missing chunks
+                chunk_iterator = _pack_iterator(chunk_ids, missing_ids)
+
             if pi:
                 info = [remove_surrogates(item.path)]
                 return ChunkIteratorFileWrapper(chunk_iterator,
@@ -1170,13 +1188,17 @@ class Archiver:
             else:
                 return ChunkIteratorFileWrapper(chunk_iterator)
 
-        def item_to_tarinfo(item, original_path):
+        def item_to_tarinfo(item, original_path, *, chunked, have_chunks):
             """
             Transform a Borg *item* into a tarfile.TarInfo object.
 
-            Return a tuple (tarinfo, stream), where stream may be a file-like object that represents
-            the file contents, if any, and is None otherwise. When *tarinfo* is None, the *item*
-            cannot be represented as a TarInfo object and should be skipped.
+            Return a tuple (tarinfo, stream).
+            When *tarinfo* is None, the *item* cannot be represented as a TarInfo object and should be skipped.
+            stream may be a file-like object that somehow represents the file contents, if any, and is None otherwise.
+
+            chunked == False: stream is the plain file contents.
+
+            chunked == True: stream is a sequence of chunk packs.
             """
             stream = None
             tarinfo = tarfile.TarInfo()
@@ -1195,6 +1217,21 @@ class Archiver:
             # whether implementations actually support that is a whole different question...
             tarinfo.linkname = ""
 
+            def mk_stream(item, *, chunked, have_chunks):
+                chunk_ids = [chunk_id for chunk_id, _, _ in item.chunks]
+                if chunked:
+                    missing_ids = set(chunk_ids) - have_chunks
+                    # record format: int32 data_length + 256bit chunk_id + optional data
+                    # we send record headers for ALL chunks. but data only for missing chunks
+                    size = 36 * len(chunk_ids) + item.get_size(consider_once_ids=missing_ids)
+                else:
+                    missing_ids = set(chunk_ids)
+                    size = item.get_size()  # just plain content data
+                stream = item_content_stream(item, chunked=chunked, chunk_ids=chunk_ids, missing_ids=missing_ids)
+                if chunked:
+                    have_chunks.update(missing_ids)  # now we have what was missing
+                return size, stream
+
             modebits = stat.S_IFMT(item.mode)
             if modebits == stat.S_IFREG:
                 tarinfo.type = tarfile.REGTYPE
@@ -1212,12 +1249,12 @@ class Archiver:
                         # The item which has the chunks was not put into the tar, therefore
                         # we do that now and update hardlink_masters to reflect that.
                         item.chunks = chunks
-                        tarinfo.size = item.get_size()
-                        stream = item_content_stream(item)
+                        size, stream = mk_stream(item, chunked=chunked, have_chunks=have_chunks)
+                        tarinfo.size = size
                         hardlink_masters[item.get('source') or original_path] = (None, item.path)
                 else:
-                    tarinfo.size = item.get_size()
-                    stream = item_content_stream(item)
+                    size, stream = mk_stream(item, chunked=chunked, have_chunks=have_chunks)
+                    tarinfo.size = size
             elif modebits == stat.S_IFDIR:
                 tarinfo.type = tarfile.DIRTYPE
             elif modebits == stat.S_IFLNK:
@@ -1257,6 +1294,10 @@ class Archiver:
             # Additionally to the standard tar / PAX metadata and data, it transfers
             # ALL borg item metadata in a BORG specific way.
             #
+            # BORG_C format
+            # -------------
+            # Same as BORG, but transmits (missing) chunks instead of full raw content data.
+            #
             ph = {}
             # note: for mtime this is a bit redundant as it is already done by tarfile module,
             #       but we just do it in our way to be consistent for sure.
@@ -1264,22 +1305,26 @@ class Archiver:
                 if hasattr(item, name):
                     ns = getattr(item, name)
                     ph[name] = str(ns / 1e9)
-            if format == 'BORG':  # BORG format additions
+            if format in ('BORG', 'BORG_C'):  # BORG format additions
                 ph['BORG.item.version'] = '1'
                 # BORG.item.meta - just serialize all metadata we have:
                 meta_bin = msgpack.packb(item.as_dict())
                 meta_text = base64.b64encode(meta_bin).decode()
                 ph['BORG.item.meta'] = meta_text
+                ph['BORG.item.data_format'] = 'raw' if format == 'BORG' else 'chunks'  # BORG_C
             return ph
 
+        have_chunks = set()  # we know we already have these chunks at the target destination
+        chunked = args.tar_format == 'BORG_C'
+
         for item in archive.iter_items(filter, partial_extract=partial_extract,
-                                       preload=True, hardlink_masters=hardlink_masters):
+                                       preload=not chunked, hardlink_masters=hardlink_masters):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
-            tarinfo, stream = item_to_tarinfo(item, orig_path)
+            tarinfo, stream = item_to_tarinfo(item, orig_path, chunked=chunked, have_chunks=have_chunks)
             if tarinfo:
-                if args.tar_format in ('BORG', 'PAX'):
+                if args.tar_format in ('BORG', 'BORG_C', 'PAX'):
                     tarinfo.pax_headers = item_to_paxheaders(args.tar_format, item)
                 if output_list:
                     logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
@@ -4120,7 +4165,7 @@ class Archiver:
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('--tar-format', metavar='FMT', dest='tar_format', default='GNU',
-                               choices=('BORG', 'PAX', 'GNU'),
+                               choices=('BORG', 'BORG_C', 'PAX', 'GNU'),
                                help='select tar format: BORG, PAX or GNU')
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),

@@ -193,7 +193,8 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
+    def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False,
+                 consider_ids=None, consider_once_ids=None):
         """
         Determine the (uncompressed or compressed) size of this item.
 
@@ -203,12 +204,14 @@ class Item(PropDict):
         :param compressed: Whether the compressed or uncompressed size will be returned.
         :param from_chunks: If true, size is computed from chunks even if a precomputed value is available.
         :param consider_ids: Returns the size of the given ids only.
+        :param consider_ids: Returns the size of the given ids only and only considers each chunkid once.
         """
         attr = 'csize' if compressed else 'size'
         assert not (compressed and memorize), 'Item does not have a csize field.'
-        assert not (consider_ids is not None and memorize), "Can't store size when considering only certain ids"
+        assert not ((consider_ids is not None or consider_once_ids is not None)
+                    and memorize), "Can't store size when considering only certain ids"
         try:
-            if from_chunks or consider_ids is not None:
+            if from_chunks or consider_ids is not None or consider_once_ids is not None:
                 raise AttributeError
             size = getattr(self, attr)
         except AttributeError:
@@ -238,7 +241,14 @@ class Item(PropDict):
                         chunks, _ = hardlink_masters.get(master, (None, None))
                 if chunks is None:
                     return 0
-            if consider_ids is not None:
+            if consider_once_ids is not None:
+                size = 0
+                consider_once_ids = set(consider_once_ids)
+                for chunk in chunks:
+                    if chunk.id in consider_once_ids:
+                        size += getattr(ChunkListEntry(*chunk), attr)
+                        consider_once_ids.remove(chunk.id)
+            elif consider_ids is not None:
                 size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks if chunk.id in consider_ids)
             else:
                 size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks)

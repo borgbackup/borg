@@ -942,7 +942,7 @@ class LocalCache(CacheStatsMixin):
     def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
         if not self.txn_active:
             self.begin_txn()
-        size = len(chunk)
+        size = len(chunk) if chunk is not None else None
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)

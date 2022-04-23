@@ -3,6 +3,7 @@ import json
 import os
 import socket
 import stat
+import struct
 import sys
 import time
 from collections import OrderedDict
@@ -1173,16 +1174,17 @@ zero_chunk_ids = LRUCache(10, dispose=lambda _: None)
 
 
 def cached_hash(chunk, id_hash):
+    chunk_id = chunk.meta.get('id')
     allocation = chunk.meta['allocation']
     if allocation == CH_DATA:
         data = chunk.data
-        chunk_id = id_hash(data)
+        chunk_id = chunk_id or id_hash(data)
     elif allocation in (CH_HOLE, CH_ALLOC):
         size = chunk.meta['size']
         assert size <= len(zeros)
         data = memoryview(zeros)[:size]
         try:
-            chunk_id = zero_chunk_ids[(id_hash, size)]
+            chunk_id = chunk_id or zero_chunk_ids[(id_hash, size)]
         except KeyError:
             chunk_id = id_hash(data)
             zero_chunk_ids[(id_hash, size)] = chunk_id
@@ -1466,10 +1468,13 @@ class TarfileObjectProcessors:
         ph = tarinfo.pax_headers
         if ph and 'BORG.item.version' in ph:
             assert ph['BORG.item.version'] == '1'
+            chunked = ph['BORG.item.data_format'] == 'chunks'
             meta_bin = base64.b64decode(ph['BORG.item.meta'])
             meta_dict = msgpack.unpackb(meta_bin, object_hook=StableDict)
             item = Item(internal_dict=meta_dict)
         else:
+            chunked = False
+
             def s_to_ns(s):
                 return safe_ns(int(float(s) * 1e9))
 
@@ -1483,35 +1488,55 @@ class TarfileObjectProcessors:
                     if name in ph:
                         ns = s_to_ns(ph[name])
                         setattr(item, name, ns)
-        yield item, status
+        yield item, status, chunked
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
         self.add_item(item, stats=self.stats)
 
     def process_dir(self, *, tarinfo, status, type):
-        with self.create_helper(tarinfo, status, type) as (item, status):
+        with self.create_helper(tarinfo, status, type) as (item, status, chunked):
             return status
 
     def process_fifo(self, *, tarinfo, status, type):
-        with self.create_helper(tarinfo, status, type) as (item, status):
+        with self.create_helper(tarinfo, status, type) as (item, status, chunked):
             return status
 
     def process_dev(self, *, tarinfo, status, type):
-        with self.create_helper(tarinfo, status, type) as (item, status):
+        with self.create_helper(tarinfo, status, type) as (item, status, chunked):
             item.rdev = os.makedev(tarinfo.devmajor, tarinfo.devminor)
             return status
 
     def process_link(self, *, tarinfo, status, type):
-        with self.create_helper(tarinfo, status, type) as (item, status):
+        with self.create_helper(tarinfo, status, type) as (item, status, chunked):
             item.source = tarinfo.linkname
             return status
 
     def process_file(self, *, tarinfo, status, type, tar):
-        with self.create_helper(tarinfo, status, type) as (item, status):
+        with self.create_helper(tarinfo, status, type) as (item, status, chunked):
             self.print_file_status(status, tarinfo.name)
             status = None  # we already printed the status
             fd = tar.extractfile(tarinfo)
-            self.process_file_chunks(item, self.cache, self.stats, self.show_progress,
-                                     backup_io_iter(self.chunker.chunkify(fd)))
+            if not chunked:
+                chunk_iter = backup_io_iter(self.chunker.chunkify(fd))
+            else:
+                def _chunk_iter(fd):
+                    hdr_fmt = struct.Struct('<i32s')
+                    hdr_length = 4 + 32
+                    hdr = fd.read(hdr_length)
+                    while len(hdr) == hdr_length:
+                        size, chunk_id = hdr_fmt.unpack(hdr)
+                        if size >= 0:
+                            chunk = fd.read(size)
+                            assert len(chunk) == size
+                        else:
+                            # chunk is not streamed, we have its chunk_id and it should be in the repo
+                            chunk = None
+                            size = None
+                        yield Chunk(chunk, id=chunk_id, size=size, allocation=CH_DATA)
+                        hdr = fd.read(hdr_length)
+
+                chunk_iter = _chunk_iter(fd)
+
+            self.process_file_chunks(item, self.cache, self.stats, self.show_progress, chunk_iter)
             item.get_size(memorize=True)
             self.stats.nfiles += 1
             return status

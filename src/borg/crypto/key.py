@@ -621,7 +621,7 @@ class KeyfileKeyBase(AESKeyBase):
             data = msgpack.unpackb(data)
             key = Key(internal_dict=data)
             if key.version != 1:
-                raise IntegrityError('Invalid key file header')
+                raise Error("key version %d is not supported by this borg version.")
             self.repository_id = key.repository_id
             self.enc_key = key.enc_key
             self.enc_hmac_key = key.enc_hmac_key

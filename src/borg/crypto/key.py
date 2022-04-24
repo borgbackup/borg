@@ -629,8 +629,10 @@ class KeyfileKeyBase(AESKeyBase):
         unpacker.feed(data)
         data = unpacker.unpack()
         enc_key = EncryptedKey(internal_dict=data)
-        assert enc_key.version == 1
-        assert enc_key.algorithm == 'sha256'
+        if enc_key.version != 1:
+            raise Error("encrypted key version %d is not supported by this borg version." % enc_key.version)
+        if enc_key.algorithm != 'sha256':
+            raise Error("encrypted key algorithm '%s' is not supported by this borg version." % enc_key.algorithm)
         key = passphrase.kdf(enc_key.salt, enc_key.iterations, 32)
         data = AES(key, b'\0'*16).decrypt(enc_key.data)
         if hmac.compare_digest(hmac_sha256(key, data), enc_key.hash):

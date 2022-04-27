@@ -91,7 +91,7 @@ def get_all(path, follow_symlinks=False):
                     pass
                 elif e.errno == errno.EPERM:
                     # we were not permitted to read this attribute, still can continue trying to read others
-                    logger.warning('%s: Operation not permitted when reading extended attribute %s' % (
+                    logger.warning('{}: Operation not permitted when reading extended attribute {}'.format(
                                    path_str, name_str))
                 else:
                     raise

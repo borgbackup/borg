@@ -186,7 +186,7 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata)
         manifest = cls(key, repository)
-        data = key.decrypt(None, cdata)
+        data = key.decrypt(cls.MANIFEST_ID, cdata)
         manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(data, force_tam_not_required=force_tam_not_required)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = key.id_hash(data)
@@ -233,7 +233,7 @@ class Manifest:
 
         for operation, requirements in feature_flags.items():
             if b'mandatory' in requirements:
-                result[operation.decode()] = set([feature.decode() for feature in requirements[b'mandatory']])
+                result[operation.decode()] = {feature.decode() for feature in requirements[b'mandatory']}
         return result
 
     def write(self):
@@ -261,4 +261,4 @@ class Manifest:
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(data))
+        self.repository.put(self.MANIFEST_ID, self.key.encrypt(self.MANIFEST_ID, data))

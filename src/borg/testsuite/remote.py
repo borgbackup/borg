@@ -165,7 +165,7 @@ class TestRepositoryCache:
 
     def _put_encrypted_object(self, key, repository, data):
         id_ = key.id_hash(data)
-        repository.put(id_, key.encrypt(data))
+        repository.put(id_, key.encrypt(id_, data))
         return id_
 
     @pytest.fixture

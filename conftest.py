@@ -2,14 +2,6 @@ import os
 
 import pytest
 
-# IMPORTANT keep this above all other borg imports to avoid inconsistent values
-# for `from borg.constants import PBKDF2_ITERATIONS` (or star import) usages before
-# this is executed
-from borg import constants
-# no fixture-based monkey-patching since star-imports are used for the constants module
-constants.PBKDF2_ITERATIONS = 1
-
-
 # needed to get pretty assertion failures in unit tests:
 if hasattr(pytest, 'register_assert_rewrite'):
     pytest.register_assert_rewrite('borg.testsuite')
@@ -36,6 +28,8 @@ def clean_env(tmpdir_factory, monkeypatch):
             if key.startswith('BORG_') and key not in ('BORG_FUSE_IMPL', )]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
+    # Speed up tests
+    monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "1")
 
 
 def pytest_report_header(config, startdir):

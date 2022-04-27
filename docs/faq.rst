@@ -89,7 +89,7 @@ Also, you must not run borg against multiple instances of the same repo
   (which is an issue if they happen to be not the same).
   See :issue:`4272` for an example.
 - Encryption security issues if you would update repo and copy-of-repo
-  independently, due to AES counter reuse.
+  independently, due to AES counter reuse (when using legacy encryption modes).
 
 See also: :ref:`faq_corrupt_repo`
 
@@ -245,6 +245,8 @@ then use ``tar`` to perform the comparison:
 
 My repository is corrupt, how can I restore from an older copy of it?
 ---------------------------------------------------------------------
+
+Note: this is only required for repos using legacy encryption modes.
 
 If your repositories are encrypted and have the same ID, the recommended method
 is to delete the corrupted repository, but keep its security info, and then copy
@@ -473,8 +475,11 @@ Security
 
 .. _borg_security_critique:
 
-Isn't BorgBackup's AES-CTR crypto broken?
------------------------------------------
+Isn't BorgBackup's legacy AES-CTR-based crypto broken?
+------------------------------------------------------
+
+Note: in borg 1.3 new AEAD cipher based modes with session keys were added,
+solving the issues of the legacy modes.
 
 If a nonce (counter) value is reused, AES-CTR mode crypto is broken.
 
@@ -564,8 +569,7 @@ Using ``BORG_PASSCOMMAND`` with a properly permissioned file
   directory and use permissions to keep anyone else from reading it. For
   example, first create a key::
 
-    head -c 32 /dev/urandom | base64 -w 0 > ~/.borg-passphrase
-    chmod 400 ~/.borg-passphrase
+    (umask 0077; head -c 32 /dev/urandom | base64 -w 0 > ~/.borg-passphrase)
 
   Then in an automated script one can put::
 
@@ -710,8 +714,45 @@ Send a private email to the :ref:`security contact <security-contact>`
 if you think you have discovered a security issue.
 Please disclose security issues responsibly.
 
+How important are the nonce files?
+------------------------------------
+
+This only applies to repositories using legacy encryption modes.
+
+Borg uses :ref:`AES-CTR encryption <borg_security_critique>`. An
+essential part of AES-CTR is a sequential counter that must **never**
+repeat. If the same value of the counter is used twice in the same repository,
+an attacker can decrypt the data. The counter is stored in the home directory
+of each user ($HOME/.config/borg/security/$REPO_ID/nonce) as well as
+in the repository (/path/to/repo/nonce). When creating a new archive borg uses
+the highest of the two values. The value of the counter in the repository may be
+higher than your local value if another user has created an archive more recently
+than you did.
+
+Since the nonce is not necessary to read the data that is already encrypted,
+``borg info``, ``borg list``, ``borg extract`` and ``borg mount`` should work
+just fine without it.
+
+If the the nonce file stored in the repo is lost, but you still have your local copy,
+borg will recreate the repository nonce file the next time you run ``borg create``.
+This should be safe for repositories that are only used from one user account
+on one machine.
+
+For repositories that are used by multiple users and/or from multiple machines
+it is safest to avoid running *any* commands that modify the repository after
+the nonce is deleted or if you suspect it may have been tampered with. See :ref:`attack_model`.
+
 Common issues
 #############
+
+/path/to/repo is not a valid repository. Check repo config.
+-----------------------------------------------------------
+
+There can be many causes of this error. E.g. you have incorrectly specified the repository path.
+
+You will also get this error if you try to access a repository with a key that uses the argon2 key algorithm using an old version of borg.
+We recommend upgrading to the latest stable version and trying again. We are sorry. We should have thought about forward
+compatibility and implemented a more helpful error message.
 
 Why does Borg extract hang after some time?
 -------------------------------------------
@@ -854,13 +895,30 @@ If you run into that, try this:
 What's the expected backup performance?
 ---------------------------------------
 
-A first backup will usually be somehow "slow" because there is a lot of data
-to process. Performance here depends on a lot of factors, so it is hard to
-give specific numbers.
+Compared to simply copying files (e.g. with ``rsync``), Borg has more work to do.
+This can make creation of the first archive slower, but saves time
+and disk space on subsequent runs. Here what Borg does when you run ``borg create``:
+
+- Borg chunks the file (using the relatively expensive buzhash algorithm)
+- It then computes the "id" of the chunk (hmac-sha256 (often slow, except
+  if your CPU has sha256 acceleration) or blake2b (fast, in software))
+- Then it checks whether this chunk is already in the repo (local hashtable lookup,
+  fast). If so, the processing of the chunk is completed here. Otherwise it needs to
+  process the chunk:
+- Compresses (the default lz4 is super fast)
+- Encrypts (AES, usually fast if your CPU has AES acceleration as usual
+  since about 10y)
+- Authenticates ("signs") using hmac-sha256 or blake2b (see above),
+- Transmits to repo. If the repo is remote, this usually involves an SSH connection
+  (does its own encryption / authentication).
+- Stores the chunk into a key/value store (the key is the chunk id, the value
+  is the data). While doing that, it computes a CRC32 of the data (repo low-level
+  checksum, used by borg check --repository) and also updates the repo index
+  (another hashtable).
 
 Subsequent backups are usually very fast if most files are unchanged and only
 a few are new or modified. The high performance on unchanged files primarily depends
-only on a few factors (like fs recursion + metadata reading performance and the
+only on a few factors (like FS recursion + metadata reading performance and the
 files cache working as expected) and much less on other factors.
 
 E.g., for this setup:
@@ -878,14 +936,37 @@ few FAQ entries below.
 
 .. _slow_backup:
 
-Why is backup slow for me?
+Why is my backup so slow?
 --------------------------
 
-So, if you feel your Borg backup is too slow somehow, you should find out why.
+If you feel your Borg backup is too slow somehow, here is what you can do:
 
-The usual way to approach this is to add ``--list --filter=AME --stats`` to your
-``borg create`` call to produce more log output, including a file list (with file status
-characters) and also some statistics at the end of the backup.
+- Make sure Borg has enough RAM (depends on how big your repo is / how many
+  files you have)
+- Use one of the blake2 modes for --encryption except if you positively know
+  your CPU (and openssl) accelerates sha256 (then stay with hmac-sha256).
+- Don't use any expensive compression. The default is lz4 and super fast.
+  Uncompressed is often slower than lz4.
+- Just wait. You can also interrupt it and start it again as often as you like,
+  it will converge against a valid "completed" state (see ``--checkpoint-interval``,
+  maybe use the default, but in any case don't make it too short). It is starting
+  from the beginning each time, but it is still faster then as it does not store
+  data into the repo which it already has there from last checkpoint.
+- If you don’t need additional file attributes, you can disable them with ``--noflags``,
+  ``--noacls``, ``--noxattrs``. This can lead to noticable performance improvements
+  when your backup consists of many small files.
+
+If you feel that Borg "freezes" on a file, it could be in the middle of processing a
+large file (like ISOs or VM images). Borg < 1.2 announces file names *after* finishing
+with the file. This can lead to displaying the name of a small file, while processing the
+next (larger) file. For very big files this can lead to the progress display show some
+previous short file for a long time while it processes the big one. With Borg 1.2 this
+was changed to announcing the filename before starting to process it.
+
+To see what files have changed and take more time processing, you can also add
+``--list --filter=AME --stats`` to your ``borg create`` call to produce more log output,
+including a file list (with file status characters) and also some statistics at
+the end of the backup.
 
 Then you do the backup and look at the log output:
 
@@ -907,6 +988,24 @@ Then you do the backup and look at the log output:
   details and potential issues).
   You can use the ``stat`` command on files to manually look at fs metadata to debug if
   there is any unexpected change triggering the ``M`` status.
+  Also, the ``--debug-topic=files_cache`` option of ``borg create`` provides a lot of debug
+  output helping to analyse why the files cache does not give its expected high performance.
+
+When borg runs inside a virtual machine, there are some more things to look at:
+
+Some hypervisors (e.g. kvm on proxmox) give some broadly compatible CPU type to the
+VM (usually to ease migration between VM hosts of potentially different hardware CPUs).
+
+It is broadly compatible because they leave away modern CPU features that could be
+not present in older or other CPUs, e.g. hardware acceleration for AES crypto, for
+sha2 hashes, for (P)CLMUL(QDQ) computations useful for crc32.
+
+So, basically you pay for compatibility with bad performance. If you prefer better
+performance, you should try to expose the host CPU's misc. hw acceleration features
+to the VM which runs borg.
+
+On Linux, check ``/proc/cpuinfo`` for the CPU flags inside the VM.
+For kvm check the docs about "Host model" and "Host passthrough".
 
 See also the next few FAQ entries for more details.
 
@@ -1263,8 +1362,8 @@ There are some caveats:
   This means that data added by Borg won't deduplicate with the existing data
   stored by Attic. The effect is lessened if the files cache is used with Borg.
 - Repositories in "passphrase" mode *must* be migrated to "repokey" mode using
-  :ref:`borg_key_migrate-to-repokey`. Borg does not support the "passphrase" mode
-  any other way.
+  "borg key migrate-to-repokey" (only available in borg <= 1.2.x). Borg does not
+  support the "passphrase" mode in any other way.
 
 Why is my backup bigger than with attic?
 ----------------------------------------

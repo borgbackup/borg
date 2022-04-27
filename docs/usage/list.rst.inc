@@ -53,9 +53,9 @@ borg list
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--exclude-from EXCLUDEFILE``        | read exclude patterns from EXCLUDEFILE, one per line                                                                                                                                                                                                                     |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--pattern PATTERN``                 | experimental: include/exclude paths matching PATTERN                                                                                                                                                                                                                     |
+    |                                                                             | ``--pattern PATTERN``                 | include/exclude paths matching PATTERN                                                                                                                                                                                                                                   |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--patterns-from PATTERNFILE``       | experimental: read include/exclude patterns from PATTERNFILE, one per line                                                                                                                                                                                               |
+    |                                                                             | ``--patterns-from PATTERNFILE``       | read include/exclude patterns from PATTERNFILE, one per line                                                                                                                                                                                                             |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
@@ -96,8 +96,8 @@ borg list
     Exclusion options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
-        --pattern PATTERN                 experimental: include/exclude paths matching PATTERN
-        --patterns-from PATTERNFILE       experimental: read include/exclude patterns from PATTERNFILE, one per line
+        --pattern PATTERN                 include/exclude paths matching PATTERN
+        --patterns-from PATTERNFILE       read include/exclude patterns from PATTERNFILE, one per line
 
 
 Description
@@ -105,7 +105,7 @@ Description
 
 This command lists the contents of a repository or an archive.
 
-See the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
 .. man NOTES
 
@@ -113,7 +113,7 @@ The FORMAT specifier syntax
 +++++++++++++++++++++++++++
 
 The ``--format`` option uses python's `format string syntax
-<https://docs.python.org/3.8/library/string.html#formatstrings>`_.
+<https://docs.python.org/3.9/library/string.html#formatstrings>`_.
 
 Examples:
 ::

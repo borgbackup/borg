@@ -1,4 +1,5 @@
 import configparser
+import json
 import os
 import shutil
 import stat
@@ -25,7 +26,7 @@ from .helpers import yes
 from .helpers import remove_surrogates
 from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .helpers import set_ec, EXIT_WARNING
-from .helpers import truncate_and_unlink
+from .helpers import safe_unlink
 from .helpers import msgpack
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
@@ -82,7 +83,7 @@ class SecurityManager:
         if not self.known():
             return False
         try:
-            with open(self.key_type_file, 'r') as fd:
+            with open(self.key_type_file) as fd:
                 type = fd.read()
                 return type == str(key.TYPE)
         except OSError as exc:
@@ -231,6 +232,10 @@ def cache_dir(repository, path=None):
 def files_cache_name():
     suffix = os.environ.get('BORG_FILES_CACHE_SUFFIX', '')
     return 'files.' + suffix if suffix else 'files'
+
+
+def discover_files_cache_name(path):
+    return [fn for fn in os.listdir(path) if fn == 'files' or fn.startswith('files.')][0]
 
 
 class CacheConfig:
@@ -407,6 +412,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def __init__(self, iec=False):
         self.iec = iec
+        self.pre12_meta = {}  # here we cache archive metadata for borg < 1.2
 
     def __str__(self):
         return self.str_format.format(self.format_tuple())
@@ -511,6 +517,8 @@ class LocalCache(CacheStatsMixin):
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
             pass  # empty file
+        with SaveFile(os.path.join(self.path, 'pre12-meta'), binary=False) as fd:
+            json.dump(self.pre12_meta, fd, indent=4)
 
     def _do_open(self):
         self.cache_config.load()
@@ -521,6 +529,11 @@ class LocalCache(CacheStatsMixin):
             self.files = None
         else:
             self._read_files()
+        try:
+            with open(os.path.join(self.path, 'pre12-meta')) as fd:
+                self.pre12_meta = json.load(fd)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
 
     def open(self):
         if not os.path.isdir(self.path):
@@ -529,6 +542,9 @@ class LocalCache(CacheStatsMixin):
         self.rollback()
 
     def close(self):
+        # save the pre12_meta cache in any case
+        with open(os.path.join(self.path, 'pre12-meta'), 'w') as fd:
+            json.dump(self.pre12_meta, fd, indent=4)
         if self.cache_config is not None:
             self.cache_config.close()
             self.cache_config = None
@@ -638,7 +654,7 @@ class LocalCache(CacheStatsMixin):
         if os.path.exists(txn_dir):
             shutil.copy(os.path.join(txn_dir, 'config'), self.path)
             shutil.copy(os.path.join(txn_dir, 'chunks'), self.path)
-            shutil.copy(os.path.join(txn_dir, files_cache_name()), self.path)
+            shutil.copy(os.path.join(txn_dir, discover_files_cache_name(txn_dir)), self.path)
             os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
             if os.path.exists(os.path.join(self.path, 'txn.tmp')):
                 shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
@@ -675,13 +691,13 @@ class LocalCache(CacheStatsMixin):
                 fns = os.listdir(archive_path)
                 # filenames with 64 hex digits == 256bit,
                 # or compact indices which are 64 hex digits + ".compact"
-                return set(unhexlify(fn) for fn in fns if len(fn) == 64) | \
-                       set(unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith('.compact'))
+                return {unhexlify(fn) for fn in fns if len(fn) == 64} | \
+                       {unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith('.compact')}
             else:
                 return set()
 
         def repo_archives():
-            return set(info.id for info in self.manifest.archives.list())
+            return {info.id for info in self.manifest.archives.list()}
 
         def cleanup_outdated(ids):
             for id in ids:
@@ -762,7 +778,7 @@ class LocalCache(CacheStatsMixin):
                                                   filename=bin_to_hex(archive_id) + '.compact') as fd:
                     chunk_idx.write(fd)
             except Exception:
-                truncate_and_unlink(fn_tmp)
+                safe_unlink(fn_tmp)
             else:
                 os.rename(fn_tmp, fn)
 
@@ -930,7 +946,7 @@ class LocalCache(CacheStatsMixin):
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)
-        data = self.key.encrypt(chunk)
+        data = self.key.encrypt(id, chunk)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
@@ -1066,6 +1082,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         self.security_manager = SecurityManager(repository)
         self.security_manager.assert_secure(manifest, key, lock_wait=lock_wait)
 
+        self.pre12_meta = {}
         logger.warning('Note: --no-cache-sync is an experimental feature.')
 
     # Public API
@@ -1094,7 +1111,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         refcount = self.seen_chunk(id, size)
         if refcount:
             return self.chunk_incref(id, stats, size=size)
-        data = self.key.encrypt(chunk)
+        data = self.key.encrypt(id, chunk)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)

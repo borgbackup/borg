@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-EXTRACT 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-extract \- Extract archive contents
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXTRACT" 1 "2022-01-23" "" "borg backup tool"
-.SH NAME
-borg-extract \- Extract archive contents
 .SH SYNOPSIS
 .sp
 borg [common options] extract [options] ARCHIVE [PATH...]
@@ -40,7 +40,7 @@ archive is extracted but a subset of files and directories can be selected
 by passing a list of \fBPATHs\fP as arguments. The file selection can further
 be restricted by using the \fB\-\-exclude\fP option.
 .sp
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .sp
 By using \fB\-\-dry\-run\fP, you can do all extraction steps except actually writing the
 output data: reading metadata and data chunks from the repo, checking the hash/hmac,
@@ -54,6 +54,10 @@ pass over the archive metadata.
 .INDENT 3.5
 Currently, extract always writes into the current working directory ("."),
 so make sure you \fBcd\fP to the right place before calling \fBborg extract\fP\&.
+.sp
+When parent directories are not extracted (because of using file/directory selection
+or any other reason), borg can not restore parent directories\(aq metadata, e.g. owner,
+group, permission, etc.
 .UNINDENT
 .UNINDENT
 .SH OPTIONS
@@ -71,34 +75,34 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-\-list
+.B \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
-.B  \-n\fP,\fB  \-\-dry\-run
+.B \-n\fP,\fB  \-\-dry\-run
 do not actually change any files
 .TP
-.B  \-\-numeric\-owner
+.B \-\-numeric\-owner
 deprecated, use \fB\-\-numeric\-ids\fP instead
 .TP
-.B  \-\-numeric\-ids
+.B \-\-numeric\-ids
 only obey numeric user and group identifiers
 .TP
-.B  \-\-nobsdflags
+.B \-\-nobsdflags
 deprecated, use \fB\-\-noflags\fP instead
 .TP
-.B  \-\-noflags
+.B \-\-noflags
 do not extract/set flags (e.g. NODUMP, IMMUTABLE)
 .TP
-.B  \-\-noacls
+.B \-\-noacls
 do not extract/set ACLs
 .TP
-.B  \-\-noxattrs
+.B \-\-noxattrs
 do not extract/set xattrs
 .TP
-.B  \-\-stdout
+.B \-\-stdout
 write all extracted data to stdout
 .TP
-.B  \-\-sparse
+.B \-\-sparse
 create holes in output sparse file from all\-zero chunks
 .UNINDENT
 .SS Exclusion options
@@ -111,10 +115,10 @@ exclude paths matching PATTERN
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
 .BI \-\-pattern \ PATTERN
-experimental: include/exclude paths matching PATTERN
+include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-experimental: read include/exclude patterns from PATTERNFILE, one per line
+read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .BI \-\-strip\-components \ NUMBER
 Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.

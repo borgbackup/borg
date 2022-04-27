@@ -1,8 +1,8 @@
 version: '{build}'
 
-environment:  
+environment:
   matrix:
-    - PYTHON: C:\Python37-x64
+    - PYTHON: C:\Python38-x64
 
 # Disable automatic builds
 build: off

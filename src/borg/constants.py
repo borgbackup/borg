@@ -33,14 +33,15 @@ CACHE_TAG_CONTENTS = b'Signature: 8a477f597d28d172789f06886806bc55'
 # bytes. That's why it's 500 MiB instead of 512 MiB.
 DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 
-# 20 MiB minus 41 bytes for a Repository header (because the "size" field in the Repository includes
-# the header, and the total size was set to 20 MiB).
+# in borg < 1.3, this has been defined like this:
+# 20 MiB minus 41 bytes for a PUT header (because the "size" field in the Repository includes
+# the header, and the total size was set to precisely 20 MiB for borg < 1.3).
 MAX_DATA_SIZE = 20971479
 
-# MAX_OBJECT_SIZE = <20 MiB (MAX_DATA_SIZE) + 41 bytes for a Repository PUT header, which consists of
-# a 1 byte tag ID, 4 byte CRC, 4 byte size and 32 bytes for the ID.
-MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see LoggedIO.put_header_fmt.size assertion in repository module
-assert MAX_OBJECT_SIZE == 20 * 1024 * 1024
+# MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT2 header)
+# note: for borg >= 1.3, this makes the MAX_OBJECT_SIZE grow slightly over the precise 20MiB used by
+# borg < 1.3, but this is not expected to cause any issues.
+MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
 
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
 MAX_SEGMENT_SIZE_LIMIT = 2 ** 32 - MAX_OBJECT_SIZE
@@ -102,6 +103,51 @@ ISO_FORMAT = ISO_FORMAT_NO_USECS + '.%f'
 DASHES = '-' * 78
 
 PBKDF2_ITERATIONS = 100000
+
+# https://www.rfc-editor.org/rfc/rfc9106.html#section-4-6.2
+ARGON2_ARGS = {'time_cost': 3, 'memory_cost': 2**16, 'parallelism': 4, 'type': 'id'}
+ARGON2_SALT_BYTES = 16
+
+# Maps the CLI argument to our internal identifier for the format
+KEY_ALGORITHMS = {
+    # encrypt-and-MAC, kdf: PBKDF2(HMAC−SHA256), encryption: AES256-CTR, authentication: HMAC-SHA256
+    'pbkdf2': 'sha256',
+    # encrypt-then-MAC, kdf: argon2, encryption: chacha20, authentication: poly1305
+    'argon2': 'argon2 chacha20-poly1305',
+}
+
+
+class KeyBlobStorage:
+    NO_STORAGE = 'no_storage'
+    KEYFILE = 'keyfile'
+    REPO = 'repository'
+
+
+class KeyType:
+    # legacy crypto
+    # upper 4 bits are ciphersuite, 0 == legacy AES-CTR
+    KEYFILE = 0x00
+    # repos with PASSPHRASE mode could not be created any more since borg 1.0, see #97.
+    # in borg 1.3 all of its code and also the "borg key migrate-to-repokey" command was removed.
+    # if you still need to, you can use "borg key migrate-to-repokey" with borg 1.0, 1.1 and 1.2.
+    # Nowadays, we just dispatch this to RepoKey and assume the passphrase was migrated to a repokey.
+    PASSPHRASE = 0x01  # legacy, attic and borg < 1.0
+    PLAINTEXT = 0x02
+    REPO = 0x03
+    BLAKE2KEYFILE = 0x04
+    BLAKE2REPO = 0x05
+    BLAKE2AUTHENTICATED = 0x06
+    AUTHENTICATED = 0x07
+    # new crypto
+    # upper 4 bits are ciphersuite, lower 4 bits are keytype
+    AESOCBKEYFILE = 0x10
+    AESOCBREPO = 0x11
+    CHPOKEYFILE = 0x20
+    CHPOREPO = 0x21
+    BLAKE2AESOCBKEYFILE = 0x30
+    BLAKE2AESOCBREPO = 0x31
+    BLAKE2CHPOKEYFILE = 0x40
+    BLAKE2CHPOREPO = 0x41
 
 
 REPOSITORY_README = """This is a Borg Backup repository.

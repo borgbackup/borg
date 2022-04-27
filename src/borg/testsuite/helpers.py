@@ -1,3 +1,5 @@
+import errno
+import getpass
 import hashlib
 import os
 import shutil
@@ -30,6 +32,8 @@ from ..helpers import popen_with_error_handling
 from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
+from ..helpers import safe_unlink
+from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 
 from . import BaseTestCase, FakeInputs
 
@@ -96,6 +100,10 @@ class TestLocationWithoutEnv:
         assert repr(Location('ssh://user@[2001:db8::192.0.2.1]/some/path')) == \
             "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
         assert Location('ssh://user@[2001:db8::192.0.2.1]/some/path').to_key_filename() == keys_dir + '2001_db8__192_0_2_1__some_path'
+        assert repr(Location('ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]/some/path')) == \
+            "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='/some/path', archive=None)"
+        assert repr(Location('ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]:1234/some/path')) == \
+            "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path', archive=None)"
 
     def test_file(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -128,6 +136,8 @@ class TestLocationWithoutEnv:
         assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path')) == \
             "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
         assert Location('user@[2001:db8::192.0.2.1]:/some/path').to_key_filename() == keys_dir + '2001_db8__192_0_2_1__some_path'
+        assert repr(Location('user@[2a02:0001:0002:0003:0004:0005:0006:0007]:/some/path')) == \
+            "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='/some/path', archive=None)"
 
     def test_smb(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
@@ -223,7 +233,7 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv('BORG_REPO', raising=False)
         test_pid = os.getpid()
         assert repr(Location('/some/path::archive{pid}')) == \
-            "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{}')".format(test_pid)
+            f"Location(proto='file', user=None, host=None, port=None, path='/some/path', archive='archive{test_pid}')"
         location_time1 = Location('/some/path::archive{now:%s}')
         sleep(1.1)
         location_time2 = Location('/some/path::archive{now:%s}')
@@ -235,10 +245,12 @@ class TestLocationWithoutEnv:
             Location('ssh://user@host:/path')
 
     def test_omit_archive(self):
-        loc = Location('ssh://user@host:1234/some/path::archive')
+        from borg.platform import hostname
+        loc = Location('ssh://user@host:1234/repos/{hostname}::archive')
         loc_without_archive = loc.omit_archive()
         assert loc_without_archive.archive is None
-        assert loc_without_archive.orig == "ssh://user@host:1234/some/path"
+        assert loc_without_archive.raw == "ssh://user@host:1234/repos/{hostname}"
+        assert loc_without_archive.processed == "ssh://user@host:1234/repos/%s" % hostname
 
 
 class TestLocationWithEnv:
@@ -250,6 +262,16 @@ class TestLocationWithEnv:
             "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
         assert repr(Location()) == \
                "Location(proto='ssh', user='user', host='host', port=1234, path='/some/path', archive=None)"
+
+    def test_ssh_placeholder(self, monkeypatch):
+        from borg.platform import hostname
+        monkeypatch.setenv('BORG_REPO', 'ssh://user@host:1234/{hostname}')
+        assert repr(Location('::archive')) == \
+            f"Location(proto='ssh', user='user', host='host', port=1234, path='/{hostname}', archive='archive')"
+        assert repr(Location('::')) == \
+            f"Location(proto='ssh', user='user', host='host', port=1234, path='/{hostname}', archive=None)"
+        assert repr(Location()) == \
+            f"Location(proto='ssh', user='user', host='host', port=1234, path='/{hostname}', archive=None)"
 
     def test_file(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'file:///some/path')
@@ -366,7 +388,7 @@ class MockArchive:
         self.id = id
 
     def __repr__(self):
-        return "{0}: {1}".format(self.id, self.ts.isoformat())
+        return f"{self.id}: {self.ts.isoformat()}"
 
 
 @pytest.mark.parametrize(
@@ -1121,3 +1143,73 @@ def test_iter_separated():
 def test_eval_escapes():
     assert eval_escapes('\\n\\0\\x23') == '\n\0#'
     assert eval_escapes('äç\\n') == 'äç\n'
+
+
+def test_safe_unlink_is_safe(tmpdir):
+    contents = b"Hello, world\n"
+    victim = tmpdir / 'victim'
+    victim.write_binary(contents)
+    hard_link = tmpdir / 'hardlink'
+    hard_link.mklinkto(victim)
+
+    safe_unlink(hard_link)
+
+    assert victim.read_binary() == contents
+
+
+def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
+    contents = b"Hello, world\n"
+    victim = tmpdir / 'victim'
+    victim.write_binary(contents)
+    hard_link = tmpdir / 'hardlink'
+    hard_link.mklinkto(victim)
+
+    def os_unlink(_):
+        raise OSError(errno.ENOSPC, "Pretend that we ran out of space")
+    monkeypatch.setattr(os, "unlink", os_unlink)
+
+    with pytest.raises(OSError):
+        safe_unlink(hard_link)
+
+    assert victim.read_binary() == contents
+
+
+class TestPassphrase:
+    def test_passphrase_new_verification(self, capsys, monkeypatch):
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "12aöäü")
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "12" not in out
+        assert "12" not in err
+
+        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'yes')
+        passphrase = Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "313261c3b6c3a4c3bc" not in out
+        assert "313261c3b6c3a4c3bc" in err
+        assert passphrase == "12aöäü"
+
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "1234/@=")
+        Passphrase.new()
+        out, err = capsys.readouterr()
+        assert "1234/@=" not in out
+        assert "1234/@=" in err
+
+    def test_passphrase_new_empty(self, capsys, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "")
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new(allow_empty=False)
+        out, err = capsys.readouterr()
+        assert "must not be blank" in err
+
+    def test_passphrase_new_retries(self, monkeypatch):
+        monkeypatch.delenv('BORG_PASSPHRASE', False)
+        ascending_numbers = iter(range(20))
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: str(next(ascending_numbers)))
+        with pytest.raises(PasswordRetriesExceeded):
+            Passphrase.new()
+
+    def test_passphrase_repr(self):
+        assert "secret" not in repr(Passphrase("secret"))

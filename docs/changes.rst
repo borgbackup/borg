@@ -217,19 +217,91 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.0b4 (2022-01-23)
+Version 1.3.0a1 (2022-04-15)
 ----------------------------
 
 Please note:
 
-This is code released for testing (== helping us find bugs).
+This is an alpha release, only for testing - do not use this with production repos.
 
-It is not suitable to run against your production backup repositories!
+New features:
 
-So, if you want to help testing, please run this code additionally to your
-normal backup and use a separate, fresh repository for it.
+- init: new --encryption=(repokey|keyfile)-[blake2-](aes-ocb|chacha20-poly1305)
 
-See there for feedback: https://github.com/borgbackup/borg/issues/4360
+  - New, better, faster crypto (see encryption-aead diagram in the docs), #6463.
+  - New AEAD cipher suites: AES-OCB and CHACHA20-POLY1305.
+  - Session keys are derived via HKDF from random session id and master key.
+  - Nonces/MessageIVs are counters starting from 0 for each session.
+  - AAD: chunk id, key type, messageIV, sessionID are now authenticated also.
+  - Solves the potential AES-CTR mode counter management issues of the legacy crypto.
+- init: --key-algorithm=argon2 (new default KDF, older pbkdf2 also still available)
+
+  borg key change-passphrase / change-location keeps the key algorithm unchanged.
+- key change-algorithm: to upgrade existing keys to argon2 or downgrade to pbkdf2.
+
+  We recommend you to upgrade unless you have to keep the key compatible with older versions of borg.
+- key change-location: usable for repokey <-> keyfile location change
+- benchmark cpu: display benchmarks of cpu bound stuff
+- export-tar: new --tar-format=PAX (default: GNU)
+- import-tar/export-tar: can use PAX format for ctime and atime support
+- import-tar/export-tar: --tar-format=BORG: roundtrip ALL item metadata, #5830
+- repository: create and use version 2 repos only for now
+- repository: implement PUT2: header crc32, overall xxh64, #1704
+
+Other changes:
+
+- require python >= 3.9, #6315
+- simplify libs setup, #6482
+- unbundle most bundled 3rd party code, use libs, #6316
+- use libdeflate.crc32 (Linux and all others) or zlib.crc32 (macOS)
+- repository: code cleanups / simplifications
+- internal crypto api: speedups / cleanups / refactorings / modernisation
+- remove "borg upgrade" support for "attic backup" repos
+- remove PassphraseKey code and borg key migrate-to-repokey command
+- OpenBSD: build borg with OpenSSL (not: LibreSSL), #6474
+- remove support for LibreSSL, #6474
+- remove support for OpenSSL < 1.1.1
+
+
+Version 1.2.0 (2022-02-22 22:02:22 :-)
+--------------------------------------
+
+Please note:
+
+This is the first borg 1.2 release, so be careful and read the notes below.
+
+Upgrade notes:
+
+Strictly taken, nothing special is required for upgrading to 1.2, but some
+things can be recommended:
+
+- do you already want to upgrade? 1.1.x also will get fixes for a while.
+- be careful, first upgrade your less critical / smaller repos.
+- first upgrade to a recent 1.1.x release - especially if you run some older
+  1.1.* or even 1.0.* borg release.
+- using that, run at least one `borg create` (your normal backup), `prune`
+  and especially a `check` to see everything is in a good state.
+- check the output of `borg check` - if there is anything special, consider
+  a `borg check --repair` followed by another `borg check`.
+- if everything is fine so far (borg check reports no issues), you can consider
+  upgrading to 1.2.0. if not, please first fix any already existing issue.
+- if you want to play safer, first **create a backup of your borg repository**.
+- upgrade to latest borg 1.2.x release (you could use the fat binary from
+  github releases page)
+- run `borg compact --cleanup-commits` to clean up a ton of 17 bytes long files
+  in your repo caused by a borg 1.1 bug
+- run `borg check` again (now with borg 1.2.x) and check if there is anything
+  special.
+- run `borg info` (with borg 1.2.x) to build the local pre12-meta cache (can
+  take significant time, but after that it will be fast) - for more details
+  see below.
+- check the compatibility notes (see below) and adapt your scripts, if needed.
+- if you run into any issues, please check the github issue tracker before
+  posting new issues there or elsewhere.
+
+If you follow this procedure, you can help avoiding that we get a lot of
+"borg 1.2" issue reports that are not really 1.2 issues, but existed before
+and maybe just were not noticed.
 
 Compatibility notes:
 
@@ -270,6 +342,77 @@ Compatibility notes:
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
 
+Fixes:
+
+- diff: reduce memory consumption, fix is_hardlink_master, #6295
+- compact: fix / improve freeable / freed space log output
+
+  - derive really freed space from quota use before/after, #5679
+  - do not say "freeable", but "maybe freeable" (based on hint, unsure)
+- fix race conditions in internal SaveFile function, #6306 #6028
+- implement internal safe_unlink (was: truncate_and_unlink) function more safely:
+  usually it does not truncate any more, only under "disk full" circumstances
+  and only if there is only one hardlink.
+  see: https://github.com/borgbackup/borg/discussions/6286
+
+Other changes:
+
+- info: use a pre12-meta cache to accelerate stats for borg < 1.2 archives.
+  the first time borg info is invoked on a borg 1.1 repo, it can take a
+  rather long time computing and caching some stats values for 1.1 archives,
+  which borg 1.2 archives have in their archive metadata structure.
+  be patient, esp. if you have lots of old archives.
+  following invocations are much faster due to the cache.
+  related change: add archive name to calc_stats progress display.
+- docs:
+
+  - add borg 1.2 upgrade notes, #6217
+  - link to borg placeholders and borg patterns help
+  - init: explain the encryption modes better
+  - clarify usage of patternfile roots
+  - put import-tar docs into same file as export-tar docs
+  - explain the difference between a path that ends with or without a slash,
+    #6297
+
+
+Version 1.2.0rc1 (2022-02-05)
+-----------------------------
+
+Fixes:
+
+- repo::archive location placeholder expansion fixes, #5826, #5998
+- repository: fix intermediate commits, shall be at end of current segment
+- delete: don't commit if nothing was deleted, avoid cache sync, #6060
+- argument parsing: accept some options only once, #6026
+- disallow overwriting of existing keyfiles on init, #6036
+- if ensure_dir() fails, give more informative error message, #5952
+
+New features:
+
+- delete --force: do not ask when deleting a repo, #5941
+
+Other changes:
+
+- requirements: exclude broken or incompatible-with-pyinstaller setuptools
+- add a requirements.d/development.lock.txt and use it for vagrant
+- tests:
+
+  - added nonce-related tests
+  - refactor: remove assert_true
+  - vagrant: macos box tuning, netbsd box fixes, #5370, #5922
+- docs:
+
+  - update install docs / requirements docs, #6180
+  - borg mount / FUSE "versions" view is not experimental any more
+  - --pattern* is not experimental any more, #6134
+  - impact of deleting path/to/repo/nonce, #5858
+  - key export: add examples, #6204
+  - ~/.config/borg/keys is not used for repokey keys, #6107
+  - excluded parent dir's metadata can't restore
+
+
+Version 1.2.0b4 (2022-01-23)
+----------------------------
 
 Fixes:
 

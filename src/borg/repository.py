@@ -18,14 +18,14 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
-from .helpers import secure_erase, truncate_and_unlink
+from .helpers import secure_erase, safe_unlink
 from .helpers import Manifest
 from .helpers import msgpack
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
-from .algorithms.checksums import crc32
+from .checksums import crc32, StreamingXXH64
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
 logger = create_logger(__name__)
@@ -34,9 +34,11 @@ MAGIC = b'BORG_SEG'
 MAGIC_LEN = len(MAGIC)
 ATTIC_MAGIC = b'ATTICSEG'
 assert len(ATTIC_MAGIC) == MAGIC_LEN
+
 TAG_PUT = 0
 TAG_DELETE = 1
 TAG_COMMIT = 2
+TAG_PUT2 = 3
 
 # Highest ID usable as TAG_* value
 #
@@ -139,7 +141,7 @@ class Repository:
         """{} does not have a valid configuration. Check repo config [{}]."""
 
     class AtticRepository(Error):
-        """Attic repository detected. Please run "borg upgrade {}"."""
+        """Attic repository detected. Please use borg < 1.3 to run "borg upgrade {}"."""
 
     class CheckNeeded(ErrorWithTraceback):
         """Inconsistency detected. Please run "borg check {}"."""
@@ -163,6 +165,7 @@ class Repository:
                  make_parent_dirs=False):
         self.path = os.path.abspath(path)
         self._location = Location('file://%s' % self.path)
+        self.version = None
         self.io = None  # type: LoggedIO
         self.lock = None
         self.index = None
@@ -190,7 +193,7 @@ class Repository:
             assert False, "cleanup happened in Repository.__del__"
 
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.path)
+        return f'<{self.__class__.__name__} {self.path}>'
 
     def __enter__(self):
         if self.do_create:
@@ -284,7 +287,8 @@ class Repository:
         os.mkdir(os.path.join(path, 'data'))
         config = ConfigParser(interpolation=None)
         config.add_section('repository')
-        config.set('repository', 'version', '1')
+        self.version = 2
+        config.set('repository', 'version', str(self.version))
         config.set('repository', 'segments_per_dir', str(DEFAULT_SEGMENTS_PER_DIR))
         config.set('repository', 'max_segment_size', str(DEFAULT_MAX_SEGMENT_SIZE))
         config.set('repository', 'append_only', str(int(self.append_only)))
@@ -305,7 +309,7 @@ class Repository:
             secure_erase(old_config_path)
 
         if os.path.isfile(config_path):
-            link_error_msg = ("Failed to securely erase old repository config file (hardlinks not supported>). "
+            link_error_msg = ("Failed to securely erase old repository config file (hardlinks not supported). "
                               "Old repokey data, if any, might persist on physical storage.")
             try:
                 os.link(config_path, old_config_path)
@@ -334,11 +338,13 @@ class Repository:
     def save_key(self, keydata):
         assert self.config
         keydata = keydata.decode('utf-8')  # remote repo: msgpack issue #99, getting bytes
+        # note: saving an empty key means that there is no repokey any more
         self.config.set('repository', 'key', keydata)
         self.save_config(self.path, self.config)
 
     def load_key(self):
-        keydata = self.config.get('repository', 'key')
+        keydata = self.config.get('repository', 'key', fallback='').strip()
+        # note: if we return an empty string, it means there is no repo key
         return keydata.encode('utf-8')  # remote repo: msgpack issue #99, returning bytes
 
     def get_free_nonce(self):
@@ -347,7 +353,7 @@ class Repository:
 
         nonce_path = os.path.join(self.path, 'nonce')
         try:
-            with open(nonce_path, 'r') as fd:
+            with open(nonce_path) as fd:
                 return int.from_bytes(unhexlify(fd.read()), byteorder='big')
         except FileNotFoundError:
             return None
@@ -438,9 +444,16 @@ class Repository:
         except FileNotFoundError:
             self.close()
             raise self.InvalidRepository(self.path)
-        if 'repository' not in self.config.sections() or self.config.getint('repository', 'version') != 1:
+        if 'repository' not in self.config.sections():
             self.close()
-            raise self.InvalidRepository(path)
+            raise self.InvalidRepositoryConfig(path, 'no repository section found')
+        self.version = self.config.getint('repository', 'version')
+        if self.version not in (2, ):  # for now, only work on new repos
+            self.close()
+            raise self.InvalidRepositoryConfig(
+                path,
+                'repository version %d is not supported by this borg version' % self.version
+            )
         self.max_segment_size = parse_file_size(self.config.get('repository', 'max_segment_size'))
         if self.max_segment_size >= MAX_SEGMENT_SIZE_LIMIT:
             self.close()
@@ -716,7 +729,7 @@ class Repository:
         except OSError as os_error:
             logger.warning('Failed to check free space before committing: ' + str(os_error))
             return
-        logger.debug('check_free_space: required bytes {}, free bytes {}'.format(required_free_space, free_space))
+        logger.debug(f'check_free_space: required bytes {required_free_space}, free bytes {free_space}')
         if free_space < required_free_space:
             if self.created:
                 logger.error('Not enough free space to initialize repository at this location.')
@@ -738,7 +751,7 @@ class Repository:
         if not self.compact:
             logger.debug('nothing to do: compact empty')
             return
-        freed_space = 0
+        quota_use_before = self.storage_quota_use
         index_transaction_id = self.get_index_transaction_id()
         segments = self.segments
         unused = []  # list of segments, that are not used anymore
@@ -774,20 +787,19 @@ class Repository:
             # we want to compact if:
             # - we can free a considerable relative amount of space (freeable_ratio over some threshold)
             if not (freeable_ratio > threshold):
-                logger.debug('not compacting segment %d (freeable: %2.2f%% [%d bytes])',
+                logger.debug('not compacting segment %d (maybe freeable: %2.2f%% [%d bytes])',
                              segment, freeable_ratio * 100.0, freeable_space)
                 pi.show()
                 continue
-            freed_space += freeable_space  # this is what we THINK we can free
             segments.setdefault(segment, 0)
-            logger.debug('compacting segment %d with usage count %d (freeable: %2.2f%% [%d bytes])',
+            logger.debug('compacting segment %d with usage count %d (maybe freeable: %2.2f%% [%d bytes])',
                          segment, segments[segment], freeable_ratio * 100.0, freeable_space)
             for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
                 if tag == TAG_COMMIT:
                     continue
                 in_index = self.index.get(key)
                 is_index_object = in_index == (segment, offset)
-                if tag == TAG_PUT and is_index_object:
+                if tag in (TAG_PUT2, TAG_PUT) and is_index_object:
                     try:
                         new_segment, offset = self.io.write_put(key, data, raise_full=True)
                     except LoggedIO.SegmentFull:
@@ -797,7 +809,10 @@ class Repository:
                     segments.setdefault(new_segment, 0)
                     segments[new_segment] += 1
                     segments[segment] -= 1
-                elif tag == TAG_PUT and not is_index_object:
+                    if tag == TAG_PUT:
+                        # old tag is PUT, but new will be PUT2 and use a bit more storage
+                        self.storage_quota_use += self.io.ENTRY_HASH_SIZE
+                elif tag in (TAG_PUT2, TAG_PUT) and not is_index_object:
                     # If this is a PUT shadowed by a later tag, then it will be gone when this segment is deleted after
                     # this loop. Therefore it is removed from the shadow index.
                     try:
@@ -806,7 +821,10 @@ class Repository:
                         # do not remove entry with empty shadowed_segments list here,
                         # it is needed for shadowed_put_exists code (see below)!
                         pass
-                    self.storage_quota_use -= len(data) + self.io.put_header_fmt.size
+                    if tag == TAG_PUT2:
+                        self.storage_quota_use -= len(data) + self.io.HEADER_ID_SIZE + self.io.ENTRY_HASH_SIZE
+                    elif tag == TAG_PUT:
+                        self.storage_quota_use -= len(data) + self.io.HEADER_ID_SIZE
                 elif tag == TAG_DELETE and not in_index:
                     # If the shadow index doesn't contain this key, then we can't say if there's a shadowed older tag,
                     # therefore we do not drop the delete, but write it to a current segment.
@@ -829,7 +847,7 @@ class Repository:
                         # Consider the following series of operations if we would not do this, ie. this entire if:
                         # would be removed.
                         # Columns are segments, lines are different keys (line 1 = some key, line 2 = some other key)
-                        # Legend: P=TAG_PUT, D=TAG_DELETE, c=commit, i=index is written for latest commit
+                        # Legend: P=TAG_PUT/TAG_PUT2, D=TAG_DELETE, c=commit, i=index is written for latest commit
                         #
                         # Segment | 1     | 2   | 3
                         # --------+-------+-----+------
@@ -867,7 +885,8 @@ class Repository:
             pi.show()
         pi.finish()
         complete_xfer(intermediate=False)
-        logger.info('compaction freed about %s repository space.', format_file_size(freed_space))
+        quota_use_after = self.storage_quota_use
+        logger.info('compaction freed about %s repository space.', format_file_size(quota_use_before - quota_use_after))
         logger.debug('compaction completed.')
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
@@ -897,7 +916,7 @@ class Repository:
         """some code shared between replay_segments and check"""
         self.segments[segment] = 0
         for tag, key, offset, size in objects:
-            if tag == TAG_PUT:
+            if tag in (TAG_PUT2, TAG_PUT):
                 try:
                     # If this PUT supersedes an older PUT, mark the old segment for compaction and count the free space
                     s, _ = self.index[key]
@@ -924,7 +943,7 @@ class Repository:
             elif tag == TAG_COMMIT:
                 continue
             else:
-                msg = 'Unexpected tag {} in segment {}'.format(tag, segment)
+                msg = f'Unexpected tag {tag} in segment {segment}'
                 if report is None:
                     raise self.CheckNeeded(msg)
                 else:
@@ -948,7 +967,7 @@ class Repository:
 
         self.compact[segment] = 0
         for tag, key, offset, size in self.io.iter_objects(segment, read_data=False):
-            if tag == TAG_PUT:
+            if tag in (TAG_PUT2, TAG_PUT):
                 if self.index.get(key, (-1, -1)) != (segment, offset):
                     # This PUT is superseded later
                     self.compact[segment] += size
@@ -1045,7 +1064,7 @@ class Repository:
         # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>
         # We might need to add a commit tag if no committed segment is found
         if repair and segments_transaction_id is None:
-            report_error('Adding commit tag to segment {}'.format(transaction_id))
+            report_error(f'Adding commit tag to segment {transaction_id}')
             self.io.segment = transaction_id + 1
             self.io.write_commit()
         if not partial:
@@ -1167,7 +1186,7 @@ class Repository:
                     # also, for the next segment, we need to start at offset 0.
                     start_offset = 0
                     continue
-                if tag == TAG_PUT and (segment, offset) == self.index.get(id):
+                if tag in (TAG_PUT2, TAG_PUT) and (segment, offset) == self.index.get(id):
                     # we have found an existing and current object
                     result.append(id)
                     if len(result) == limit:
@@ -1206,7 +1225,7 @@ class Repository:
             # be in the repo index (and we won't need it in the shadow_index).
             self._delete(id, segment, offset, update_shadow_index=False)
         segment, offset = self.io.write_put(id, data)
-        self.storage_quota_use += len(data) + self.io.put_header_fmt.size
+        self.storage_quota_use += len(data) + self.io.HEADER_ID_SIZE + self.io.ENTRY_HASH_SIZE
         self.segments.setdefault(segment, 0)
         self.segments[segment] += 1
         self.index[id] = segment, offset
@@ -1267,8 +1286,6 @@ class LoggedIO:
 
     header_fmt = struct.Struct('<IIB')
     assert header_fmt.size == 9
-    put_header_fmt = struct.Struct('<IIB32s')
-    assert put_header_fmt.size == 41
     header_no_crc_fmt = struct.Struct('<IB')
     assert header_no_crc_fmt.size == 5
     crc_fmt = struct.Struct('<I')
@@ -1276,6 +1293,9 @@ class LoggedIO:
 
     _commit = header_no_crc_fmt.pack(9, TAG_COMMIT)
     COMMIT = crc_fmt.pack(crc32(_commit)) + _commit
+
+    HEADER_ID_SIZE = header_fmt.size + 32
+    ENTRY_HASH_SIZE = 8
 
     def __init__(self, path, limit, segments_per_dir, capacity=90):
         self.path = path
@@ -1342,7 +1362,7 @@ class LoggedIO:
             if segment > transaction_id:
                 if segment in self.fds:
                     del self.fds[segment]
-                truncate_and_unlink(filename)
+                safe_unlink(filename)
                 count += 1
             else:
                 break
@@ -1450,7 +1470,7 @@ class LoggedIO:
         if segment in self.fds:
             del self.fds[segment]
         try:
-            truncate_and_unlink(self.segment_filename(segment))
+            safe_unlink(self.segment_filename(segment))
         except FileNotFoundError:
             pass
 
@@ -1473,7 +1493,8 @@ class LoggedIO:
         Return object iterator for *segment*.
 
         If read_data is False then include_data must be False as well.
-        Integrity checks are skipped: all data obtained from the iterator must be considered informational.
+
+        See the _read() docstring about confidence in the returned data.
 
         The iterator returns four-tuples of (tag, key, offset, data|size).
         """
@@ -1484,12 +1505,12 @@ class LoggedIO:
             # Repository.scan() calls us with segment > 0 when it continues an ongoing iteration
             # from a marker position - but then we have checked the magic before already.
             if fd.read(MAGIC_LEN) != MAGIC:
-                raise IntegrityError('Invalid segment magic [segment {}, offset {}]'.format(segment, 0))
+                raise IntegrityError(f'Invalid segment magic [segment {segment}, offset {0}]')
             offset = MAGIC_LEN
         header = fd.read(self.header_fmt.size)
         while header:
-            size, tag, key, data = self._read(fd, self.header_fmt, header, segment, offset,
-                                              (TAG_PUT, TAG_DELETE, TAG_COMMIT),
+            size, tag, key, data = self._read(fd, header, segment, offset,
+                                              (TAG_PUT2, TAG_DELETE, TAG_COMMIT, TAG_PUT),
                                               read_data=read_data)
             if include_data:
                 yield tag, key, offset, data
@@ -1526,8 +1547,25 @@ class LoggedIO:
                         dst_fd.write(MAGIC)
                         while len(d) >= self.header_fmt.size:
                             crc, size, tag = self.header_fmt.unpack(d[:self.header_fmt.size])
-                            if size > MAX_OBJECT_SIZE or tag > MAX_TAG_ID or size < self.header_fmt.size \
-                               or size > len(d) or crc32(d[4:size]) & 0xffffffff != crc:
+                            size_invalid = size > MAX_OBJECT_SIZE or size < self.header_fmt.size or size > len(d)
+                            if size_invalid or tag > MAX_TAG_ID:
+                                d = d[1:]
+                                continue
+                            if tag == TAG_PUT2:
+                                c_offset = self.HEADER_ID_SIZE + self.ENTRY_HASH_SIZE
+                                # skip if header is invalid
+                                if crc32(d[4:c_offset]) & 0xffffffff != crc:
+                                    d = d[1:]
+                                    continue
+                                # skip if content is invalid
+                                if self.entry_hash(d[4:self.HEADER_ID_SIZE], d[c_offset:size]) != d[self.HEADER_ID_SIZE:c_offset]:
+                                    d = d[1:]
+                                    continue
+                            elif tag in (TAG_DELETE, TAG_COMMIT, TAG_PUT):
+                                if crc32(d[4:size]) & 0xffffffff != crc:
+                                    d = d[1:]
+                                    continue
+                            else:  # tag unknown
                                 d = d[1:]
                                 continue
                             dst_fd.write(d[:size])
@@ -1536,105 +1574,138 @@ class LoggedIO:
                         del d
                         data.release()
 
+    def entry_hash(self, *data):
+        h = StreamingXXH64()
+        for d in data:
+            h.update(d)
+        return h.digest()
+
     def read(self, segment, offset, id, read_data=True):
         """
         Read entry from *segment* at *offset* with *id*.
+        If read_data is False the size of the entry is returned instead.
 
-        If read_data is False the size of the entry is returned instead and integrity checks are skipped.
-        The return value should thus be considered informational.
+        See the _read() docstring about confidence in the returned data.
         """
         if segment == self.segment and self._write_fd:
             self._write_fd.sync()
         fd = self.get_fd(segment)
         fd.seek(offset)
-        header = fd.read(self.put_header_fmt.size)
-        size, tag, key, data = self._read(fd, self.put_header_fmt, header, segment, offset, (TAG_PUT, ), read_data)
+        header = fd.read(self.header_fmt.size)
+        size, tag, key, data = self._read(fd, header, segment, offset, (TAG_PUT2, TAG_PUT), read_data)
         if id != key:
             raise IntegrityError('Invalid segment entry header, is not for wanted id [segment {}, offset {}]'.format(
                 segment, offset))
         return data if read_data else size
 
-    def _read(self, fd, fmt, header, segment, offset, acceptable_tags, read_data=True):
-        # some code shared by read() and iter_objects()
+    def _read(self, fd, header, segment, offset, acceptable_tags, read_data=True):
+        """
+        Code shared by read() and iter_objects().
+
+        Confidence in returned data:
+        PUT2 tags, read_data == True: crc32 check (header) plus digest check (header+data)
+        PUT2 tags, read_data == False: crc32 check (header)
+        PUT tags, read_data == True: crc32 check (header+data)
+        PUT tags, read_data == False: crc32 check can not be done, all data obtained must be considered informational
+        """
+        def check_crc32(wanted, header, *data):
+            result = crc32(memoryview(header)[4:])  # skip first 32 bits of the header, they contain the crc.
+            for d in data:
+                result = crc32(d, result)
+            if result & 0xffffffff != wanted:
+                raise IntegrityError(f'Segment entry header checksum mismatch [segment {segment}, offset {offset}]')
 
         # See comment on MAX_TAG_ID for details
         assert max(acceptable_tags) <= MAX_TAG_ID, 'Exceeding MAX_TAG_ID will break backwards compatibility'
-
+        key = data = None
+        fmt = self.header_fmt
         try:
             hdr_tuple = fmt.unpack(header)
         except struct.error as err:
-            raise IntegrityError('Invalid segment entry header [segment {}, offset {}]: {}'.format(
-                segment, offset, err)) from None
-        if fmt is self.put_header_fmt:
-            crc, size, tag, key = hdr_tuple
-        elif fmt is self.header_fmt:
-            crc, size, tag = hdr_tuple
-            key = None
-        else:
-            raise TypeError("_read called with unsupported format")
+            raise IntegrityError(f'Invalid segment entry header [segment {segment}, offset {offset}]: {err}') from None
+        crc, size, tag = hdr_tuple
+        length = size - fmt.size  # we already read the header
         if size > MAX_OBJECT_SIZE:
             # if you get this on an archive made with borg < 1.0.7 and millions of files and
             # you need to restore it, you can disable this check by using "if False:" above.
-            raise IntegrityError('Invalid segment entry size {} - too big [segment {}, offset {}]'.format(
-                size, segment, offset))
+            raise IntegrityError(f'Invalid segment entry size {size} - too big [segment {segment}, offset {offset}]')
         if size < fmt.size:
-            raise IntegrityError('Invalid segment entry size {} - too small [segment {}, offset {}]'.format(
-                size, segment, offset))
-        length = size - fmt.size
-        if read_data:
-            data = fd.read(length)
-            if len(data) != length:
-                raise IntegrityError('Segment entry data short read [segment {}, offset {}]: expected {}, got {} bytes'.format(
-                    segment, offset, length, len(data)))
-            if crc32(data, crc32(memoryview(header)[4:])) & 0xffffffff != crc:
-                raise IntegrityError('Segment entry checksum mismatch [segment {}, offset {}]'.format(
-                    segment, offset))
-            if key is None and tag in (TAG_PUT, TAG_DELETE):
-                key, data = data[:32], data[32:]
-        else:
-            if key is None and tag in (TAG_PUT, TAG_DELETE):
-                key = fd.read(32)
-                length -= 32
-                if len(key) != 32:
-                    raise IntegrityError('Segment entry key short read [segment {}, offset {}]: expected {}, got {} bytes'.format(
-                        segment, offset, 32, len(key)))
-            oldpos = fd.tell()
-            seeked = fd.seek(length, os.SEEK_CUR) - oldpos
-            data = None
-            if seeked != length:
-                raise IntegrityError('Segment entry data short seek [segment {}, offset {}]: expected {}, got {} bytes'.format(
-                        segment, offset, length, seeked))
+            raise IntegrityError(f'Invalid segment entry size {size} - too small [segment {segment}, offset {offset}]')
+        if tag not in (TAG_PUT2, TAG_DELETE, TAG_COMMIT, TAG_PUT):
+            raise IntegrityError(f'Invalid segment entry header, did not get a known tag '
+                                 f'[segment {segment}, offset {offset}]')
         if tag not in acceptable_tags:
-            raise IntegrityError('Invalid segment entry header, did not get acceptable tag [segment {}, offset {}]'.format(
-                segment, offset))
+            raise IntegrityError(f'Invalid segment entry header, did not get acceptable tag '
+                                 f'[segment {segment}, offset {offset}]')
+        if tag == TAG_COMMIT:
+            check_crc32(crc, header)
+            # that's all for COMMITs.
+        else:
+            # all other tags (TAG_PUT2, TAG_DELETE, TAG_PUT) have a key
+            key = fd.read(32)
+            length -= 32
+            if len(key) != 32:
+                raise IntegrityError(f'Segment entry key short read [segment {segment}, offset {offset}]: '
+                                     f'expected {32}, got {len(key)} bytes')
+            if tag == TAG_DELETE:
+                check_crc32(crc, header, key)
+                # that's all for DELETEs.
+            else:
+                # TAG_PUT: we can not do a crc32 header check here, because the crc32 is computed over header+data!
+                #          for the check, see code below when read_data is True.
+                if tag == TAG_PUT2:
+                    entry_hash = fd.read(self.ENTRY_HASH_SIZE)
+                    length -= self.ENTRY_HASH_SIZE
+                    if len(entry_hash) != self.ENTRY_HASH_SIZE:
+                        raise IntegrityError(f'Segment entry hash short read [segment {segment}, offset {offset}]: '
+                                             f'expected {self.ENTRY_HASH_SIZE}, got {len(entry_hash)} bytes')
+                    check_crc32(crc, header, key, entry_hash)
+                if not read_data:  # seek over data
+                    oldpos = fd.tell()
+                    seeked = fd.seek(length, os.SEEK_CUR) - oldpos
+                    if seeked != length:
+                        raise IntegrityError(f'Segment entry data short seek [segment {segment}, offset {offset}]: '
+                                             f'expected {length}, got {seeked} bytes')
+                else:  # read data!
+                    data = fd.read(length)
+                    if len(data) != length:
+                        raise IntegrityError(f'Segment entry data short read [segment {segment}, offset {offset}]: '
+                                             f'expected {length}, got {len(data)} bytes')
+                    if tag == TAG_PUT2:
+                        if self.entry_hash(memoryview(header)[4:], key, data) != entry_hash:
+                            raise IntegrityError(f'Segment entry hash mismatch [segment {segment}, offset {offset}]')
+                    elif tag == TAG_PUT:
+                        check_crc32(crc, header, key, data)
         return size, tag, key, data
 
     def write_put(self, id, data, raise_full=False):
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             # this would push the segment entry size beyond MAX_OBJECT_SIZE.
-            raise IntegrityError('More than allowed put data [{} > {}]'.format(data_size, MAX_DATA_SIZE))
+            raise IntegrityError(f'More than allowed put data [{data_size} > {MAX_DATA_SIZE}]')
         fd = self.get_write_fd(want_new=(id == Manifest.MANIFEST_ID), raise_full=raise_full)
-        size = data_size + self.put_header_fmt.size
+        size = data_size + self.HEADER_ID_SIZE + self.ENTRY_HASH_SIZE
         offset = self.offset
-        header = self.header_no_crc_fmt.pack(size, TAG_PUT)
-        crc = self.crc_fmt.pack(crc32(data, crc32(id, crc32(header))) & 0xffffffff)
-        fd.write(b''.join((crc, header, id, data)))
+        header = self.header_no_crc_fmt.pack(size, TAG_PUT2)
+        entry_hash = self.entry_hash(header, id, data)
+        crc = self.crc_fmt.pack(crc32(entry_hash, crc32(id, crc32(header))) & 0xffffffff)
+        fd.write(b''.join((crc, header, id, entry_hash)))
+        fd.write(data)
         self.offset += size
         return self.segment, offset
 
     def write_delete(self, id, raise_full=False):
         fd = self.get_write_fd(want_new=(id == Manifest.MANIFEST_ID), raise_full=raise_full)
-        header = self.header_no_crc_fmt.pack(self.put_header_fmt.size, TAG_DELETE)
+        header = self.header_no_crc_fmt.pack(self.HEADER_ID_SIZE, TAG_DELETE)
         crc = self.crc_fmt.pack(crc32(id, crc32(header)) & 0xffffffff)
         fd.write(b''.join((crc, header, id)))
-        self.offset += self.put_header_fmt.size
-        return self.segment, self.put_header_fmt.size
+        self.offset += self.HEADER_ID_SIZE
+        return self.segment, self.HEADER_ID_SIZE
 
     def write_commit(self, intermediate=False):
         # Intermediate commits go directly into the current segment - this makes checking their validity more
         # expensive, but is faster and reduces clobber. Final commits go into a new segment.
-        fd = self.get_write_fd(want_new=not intermediate)
+        fd = self.get_write_fd(want_new=not intermediate, no_new=intermediate)
         if intermediate:
             fd.sync()
         header = self.header_no_crc_fmt.pack(self.header_fmt.size, TAG_COMMIT)
@@ -1644,4 +1715,4 @@ class LoggedIO:
         return self.segment - 1  # close_segment() increments it
 
 
-assert LoggedIO.put_header_fmt.size == 41  # see constants.MAX_OBJECT_SIZE
+assert LoggedIO.HEADER_ID_SIZE + LoggedIO.ENTRY_HASH_SIZE == 41 + 8  # see constants.MAX_OBJECT_SIZE

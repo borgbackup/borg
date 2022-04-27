@@ -1,4 +1,4 @@
-# borgbackup - main setup code (see also other setup_*.py files)
+# borgbackup - main setup code (see also setup.cfg and other setup_*.py files)
 
 import os
 import sys
@@ -19,81 +19,40 @@ try:
 except ImportError:
     cythonize = None
 
-import setup_checksums
-import setup_compress
-import setup_crypto
+sys.path += [os.path.dirname(__file__)]
 import setup_docs
 
 is_win32 = sys.platform.startswith('win32')
-
-# How the build process finds the system libs / uses the bundled code:
-#
-# 1. it will try to use (system) libs (see 1.1. and 1.2.),
-#    except if you use these env vars to force using the bundled code:
-#    BORG_USE_BUNDLED_XXX undefined  -->  try using system lib
-#    BORG_USE_BUNDLED_XXX=YES        -->  use the bundled code
-#    Note: do not use =NO, that is not supported!
-# 1.1. if BORG_LIBXXX_PREFIX is set, it will use headers and libs from there.
-# 1.2. if not and pkg-config can locate the lib, the lib located by
-#      pkg-config will be used. We use the pkg-config tool via the pkgconfig
-#      python package, which must be installed before invoking setup.py.
-#      if pkgconfig is not installed, this step is skipped.
-# 2. if no system lib could be located via 1.1. or 1.2., it will fall back
-#    to using the bundled code.
-
-# OpenSSL is required as a (system) lib in any case as we do not bundle it.
-# Thus, only step 1.1. and 1.2. apply to openssl (but not 1. and 2.).
-# needed: openssl >=1.0.2 or >=1.1.0 (or compatible)
-system_prefix_openssl = os.environ.get('BORG_OPENSSL_PREFIX')
-
-# needed: lz4 (>= 1.7.0 / r129)
-prefer_system_liblz4 = not bool(os.environ.get('BORG_USE_BUNDLED_LZ4'))
-system_prefix_liblz4 = os.environ.get('BORG_LIBLZ4_PREFIX')
-
-# needed: zstd (>= 1.3.0)
-prefer_system_libzstd = not bool(os.environ.get('BORG_USE_BUNDLED_ZSTD'))
-system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
-
-prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
-system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
+is_openbsd = sys.platform.startswith('openbsd')
 
 # Number of threads to use for cythonize, not used on windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != 'spawn' else None
 
+# How the build process finds the system libs:
+#
+# 1. if BORG_{LIBXXX,OPENSSL}_PREFIX is set, it will use headers and libs from there.
+# 2. if not and pkg-config can locate the lib, the lib located by
+#    pkg-config will be used. We use the pkg-config tool via the pkgconfig
+#    python package, which must be installed before invoking setup.py.
+#    if pkgconfig is not installed, this step is skipped.
+# 3. otherwise raise a fatal error.
+
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')
 
-install_requires = [
-    # we are rather picky about msgpack versions, because a good working msgpack is
-    # very important for borg, see: https://github.com/borgbackup/borg/issues/3753
-    'msgpack >=0.5.6, <=1.0.3, !=1.0.1',
-    # Please note:
-    # using any other version is not supported by borg development and
-    # any feedback related to issues caused by this will be ignored.
-    'packaging',
+# Extra cflags for all extensions, usually just warnings we want to explicitly enable
+cflags = [
+    '-Wall',
+    '-Wextra',
+    '-Wpointer-arith',
 ]
-
-# note for package maintainers: if you package borgbackup for distribution,
-# please (if available) add pyfuse3 (preferably) or llfuse (not maintained any more)
-# as a *requirement*. "borg mount" needs one of them to work.
-# if neither is available, do not require it, most of borgbackup will work.
-extras_require = {
-    'llfuse': [
-        'llfuse >= 1.3.8',
-    ],
-    'pyfuse3': [
-        'pyfuse3 >= 3.1.1',
-    ],
-    'nofuse': [],
-}
 
 compress_source = 'src/borg/compress.pyx'
 crypto_ll_source = 'src/borg/crypto/low_level.pyx'
-crypto_helpers = 'src/borg/crypto/_crypto_helpers.c'
 chunker_source = 'src/borg/chunker.pyx'
 hashindex_source = 'src/borg/hashindex.pyx'
 item_source = 'src/borg/item.pyx'
-checksums_source = 'src/borg/algorithms/checksums.pyx'
+checksums_source = 'src/borg/checksums.pyx'
 platform_posix_source = 'src/borg/platform/posix.pyx'
 platform_linux_source = 'src/borg/platform/linux.pyx'
 platform_syncfilerange_source = 'src/borg/platform/syncfilerange.pyx'
@@ -163,6 +122,7 @@ cmdclass = {
     'clean2': Clean,
 }
 
+
 ext_modules = []
 if not on_rtd:
 
@@ -180,38 +140,71 @@ if not on_rtd:
         print('Warning: can not import pkgconfig python package.')
         pc = None
 
+    def lib_ext_kwargs(pc, prefix_env_var, lib_name, lib_pkg_name, pc_version, lib_subdir='lib'):
+        system_prefix = os.environ.get(prefix_env_var)
+        if system_prefix:
+            print(f"Detected and preferring {lib_pkg_name} [via {prefix_env_var}]")
+            return dict(include_dirs=[os.path.join(system_prefix, 'include')],
+                        library_dirs=[os.path.join(system_prefix, lib_subdir)],
+                        libraries=[lib_name])
+
+        if pc and pc.installed(lib_pkg_name, pc_version):
+            print(f"Detected and preferring {lib_pkg_name} [via pkg-config]")
+            return pc.parse(lib_pkg_name)
+        raise Exception(
+            f"Could not find {lib_name} lib/headers, please set {prefix_env_var} "
+            f"or ensure {lib_pkg_name}.pc is in PKG_CONFIG_PATH."
+        )
+
+    crypto_ldflags = []
+    if is_win32:
+        crypto_ext_lib = lib_ext_kwargs(
+            pc, 'BORG_OPENSSL_PREFIX', 'libcrypto', 'libcrypto', '>=1.1.1', lib_subdir='')
+    elif is_openbsd:
+        # use openssl (not libressl) because we need AES-OCB and CHACHA20-POLY1305 via EVP api
+        crypto_ext_lib = lib_ext_kwargs(
+            pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libecrypto11', '>=1.1.1')
+        crypto_ldflags += ['-Wl,-rpath=/usr/local/lib/eopenssl11']
+    else:
+        crypto_ext_lib = lib_ext_kwargs(
+            pc, 'BORG_OPENSSL_PREFIX', 'crypto', 'libcrypto', '>=1.1.1')
+
     crypto_ext_kwargs = members_appended(
-        dict(sources=[crypto_ll_source, crypto_helpers]),
-        setup_crypto.crypto_ext_kwargs(pc, system_prefix_openssl),
+        dict(sources=[crypto_ll_source]),
+        crypto_ext_lib,
+        dict(extra_compile_args=cflags),
+        dict(extra_link_args=crypto_ldflags),
     )
 
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
-        setup_compress.lz4_ext_kwargs(pc, prefer_system_liblz4, system_prefix_liblz4),
-        setup_compress.zstd_ext_kwargs(pc, prefer_system_libzstd, system_prefix_libzstd,
-                                       multithreaded=False, legacy=False),
+        lib_ext_kwargs(pc, 'BORG_LIBLZ4_PREFIX', 'lz4', 'liblz4', '>= 1.7.0'),
+        lib_ext_kwargs(pc, 'BORG_LIBZSTD_PREFIX', 'zstd', 'libzstd', '>= 1.3.0'),
+        dict(extra_compile_args=cflags),
     )
 
     checksums_ext_kwargs = members_appended(
         dict(sources=[checksums_source]),
-        setup_checksums.xxhash_ext_kwargs(pc, prefer_system_libxxhash, system_prefix_libxxhash),
+        lib_ext_kwargs(pc, 'BORG_LIBXXHASH_PREFIX', 'xxhash', 'libxxhash', '>= 0.7.3'),
+        lib_ext_kwargs(pc, 'BORG_LIBDEFLATE_PREFIX', 'deflate', 'libdeflate', '>= 1.5'),
+        dict(extra_compile_args=cflags),
     )
 
     ext_modules += [
         Extension('borg.crypto.low_level', **crypto_ext_kwargs),
         Extension('borg.compress', **compress_ext_kwargs),
-        Extension('borg.hashindex', [hashindex_source]),
-        Extension('borg.item', [item_source]),
-        Extension('borg.chunker', [chunker_source]),
-        Extension('borg.algorithms.checksums', **checksums_ext_kwargs),
+        Extension('borg.hashindex', [hashindex_source], extra_compile_args=cflags),
+        Extension('borg.item', [item_source], extra_compile_args=cflags),
+        Extension('borg.chunker', [chunker_source], extra_compile_args=cflags),
+        Extension('borg.checksums', **checksums_ext_kwargs),
     ]
 
-    posix_ext = Extension('borg.platform.posix', [platform_posix_source])
-    linux_ext = Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'])
-    syncfilerange_ext = Extension('borg.platform.syncfilerange', [platform_syncfilerange_source])
-    freebsd_ext = Extension('borg.platform.freebsd', [platform_freebsd_source])
-    darwin_ext = Extension('borg.platform.darwin', [platform_darwin_source])
-    windows_ext = Extension('borg.platform.windows', [platform_windows_source])
+    posix_ext = Extension('borg.platform.posix', [platform_posix_source], extra_compile_args=cflags)
+    linux_ext = Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'], extra_compile_args=cflags)
+    syncfilerange_ext = Extension('borg.platform.syncfilerange', [platform_syncfilerange_source], extra_compile_args=cflags)
+    freebsd_ext = Extension('borg.platform.freebsd', [platform_freebsd_source], extra_compile_args=cflags)
+    darwin_ext = Extension('borg.platform.darwin', [platform_darwin_source], extra_compile_args=cflags)
+    windows_ext = Extension('borg.platform.windows', [platform_windows_source], extra_compile_args=cflags)
 
     if not is_win32:
         ext_modules.append(posix_ext)
@@ -248,55 +241,7 @@ if not on_rtd:
 
 
 setup(
-    name='borgbackup',
-    use_scm_version={
-        'write_to': 'src/borg/_version.py',
-    },
-    author='The Borg Collective (see AUTHORS file)',
-    author_email='borgbackup@python.org',
-    url='https://borgbackup.readthedocs.io/',
-    description='Deduplicated, encrypted, authenticated and compressed backups',
-    long_description=setup_docs.long_desc_from_readme(),
-    license='BSD',
-    platforms=['Linux', 'MacOS X', 'FreeBSD', 'OpenBSD', 'NetBSD', ],
-    classifiers=[
-        'Development Status :: 4 - Beta',
-        'Environment :: Console',
-        'Intended Audience :: System Administrators',
-        'License :: OSI Approved :: BSD License',
-        'Operating System :: POSIX :: BSD :: FreeBSD',
-        'Operating System :: POSIX :: BSD :: OpenBSD',
-        'Operating System :: POSIX :: BSD :: NetBSD',
-        'Operating System :: MacOS :: MacOS X',
-        'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Topic :: Security :: Cryptography',
-        'Topic :: System :: Archiving :: Backup',
-    ],
-    packages=find_packages('src'),
-    package_dir={'': 'src'},
-    zip_safe=False,
-    entry_points={
-        'console_scripts': [
-            'borg = borg.archiver:main',
-            'borgfs = borg.archiver:main',
-        ]
-    },
-    # See also the MANIFEST.in file.
-    # We want to install all the files in the package directories...
-    include_package_data=True,
-    # ...except the source files which have been compiled (C extensions):
-    exclude_package_data={
-        '': ['*.c', '*.h', '*.pyx', ],
-    },
     cmdclass=cmdclass,
     ext_modules=ext_modules,
-    setup_requires=['setuptools_scm>=1.7'],
-    install_requires=install_requires,
-    extras_require=extras_require,
-    python_requires='>=3.8',
+    long_description=setup_docs.long_desc_from_readme()
 )

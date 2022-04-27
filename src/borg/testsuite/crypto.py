@@ -1,9 +1,14 @@
-from binascii import hexlify, unhexlify
+from binascii import hexlify
+from unittest.mock import MagicMock
+import unittest
 
-from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, \
-                               IntegrityError, blake2b_128, blake2b_256, hmac_sha256, openssl10
+
+from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
+from ..crypto.low_level import AES, hmac_sha256
+from ..crypto.key import KeyfileKey, RepoKey, FlexiKey
+from ..helpers import msgpack
 
 from . import BaseTestCase
 
@@ -91,31 +96,27 @@ class CryptoTestCase(BaseTestCase):
 
     def test_AE(self):
         # used in legacy-like layout (1 type byte, no aad)
-        mac_key = None
-        enc_key = b'X' * 32
-        iv = 0
+        key = b'X' * 32
+        iv_int = 0
         data = b'foo' * 10
-        header = b'\x23'
+        header = b'\x23' + iv_int.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
+            (AES256_OCB,
+             b'b6909c23c9aaebd9abbe1ff42097652d',
+             b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
+            (CHACHA20_POLY1305,
+             b'fd08594796e0706cde1e8b461e3e0555',
+             b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
         ]
-        if not openssl10:
-            tests += [
-                (AES256_OCB,
-                 b'b6909c23c9aaebd9abbe1ff42097652d',
-                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
-                (CHACHA20_POLY1305,
-                 b'fd08594796e0706cde1e8b461e3e0555',
-                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
-            ]
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv, header_len=1, aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:1]
-            mac = hdr_mac_iv_cdata[1:17]
-            iv = hdr_mac_iv_cdata[17:29]
+            iv = hdr_mac_iv_cdata[1:13]
+            mac = hdr_mac_iv_cdata[13:29]
             cdata = hdr_mac_iv_cdata[29:]
             self.assert_equal(hexlify(hdr), b'23')
             self.assert_equal(hexlify(mac), exp_mac)
@@ -123,43 +124,39 @@ class CryptoTestCase(BaseTestCase):
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth/decrypt
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             pdata = cs.decrypt(hdr_mac_iv_cdata)
             self.assert_equal(data, pdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth-failure due to corruption (corrupted data)
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:29] + b'\0' + hdr_mac_iv_cdata[30:]
             self.assert_raises(IntegrityError,
                                lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
     def test_AEAD(self):
         # test with aad
-        mac_key = None
-        enc_key = b'X' * 32
-        iv = 0
+        key = b'X' * 32
+        iv_int = 0
         data = b'foo' * 10
-        header = b'\x12\x34\x56'
+        header = b'\x12\x34\x56' + iv_int.to_bytes(12, 'big')
         tests = [
             # (ciphersuite class, exp_mac, exp_cdata)
+            (AES256_OCB,
+             b'f2748c412af1c7ead81863a18c2c1893',
+             b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
+            (CHACHA20_POLY1305,
+             b'b7e7c9a79f2404e14f9aad156bf091dd',
+             b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
         ]
-        if not openssl10:
-            tests += [
-                (AES256_OCB,
-                 b'f2748c412af1c7ead81863a18c2c1893',
-                 b'877ce46d2f62dee54699cebc3ba41d9ab613f7c486778c1b3636664b1493', ),
-                (CHACHA20_POLY1305,
-                 b'b7e7c9a79f2404e14f9aad156bf091dd',
-                 b'a093e4b0387526f085d3c40cca84a35230a5c0dd766453b77ba38bcff775', )
-            ]
         for cs_cls, exp_mac, exp_cdata in tests:
             # print(repr(cs_cls))
             # encrypt/mac
-            cs = cs_cls(mac_key, enc_key, iv, header_len=3, aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata = cs.encrypt(data, header=header)
             hdr = hdr_mac_iv_cdata[0:3]
-            mac = hdr_mac_iv_cdata[3:19]
-            iv = hdr_mac_iv_cdata[19:31]
+            iv = hdr_mac_iv_cdata[3:15]
+            mac = hdr_mac_iv_cdata[15:31]
             cdata = hdr_mac_iv_cdata[31:]
             self.assert_equal(hexlify(hdr), b'123456')
             self.assert_equal(hexlify(mac), exp_mac)
@@ -167,63 +164,35 @@ class CryptoTestCase(BaseTestCase):
             self.assert_equal(hexlify(cdata), exp_cdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth/decrypt
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             pdata = cs.decrypt(hdr_mac_iv_cdata)
             self.assert_equal(data, pdata)
             self.assert_equal(cs.next_iv(), 1)
             # auth-failure due to corruption (corrupted aad)
-            cs = cs_cls(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
             hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b'\0' + hdr_mac_iv_cdata[2:]
             self.assert_raises(IntegrityError,
                                lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
-    def test_hmac_sha256(self):
-        # RFC 4231 test vectors
-        key = b'\x0b' * 20
-        # Also test that this works with memory views
-        data = memoryview(unhexlify('4869205468657265'))
-        hmac = unhexlify('b0344c61d8db38535ca8afceaf0bf12b'
-                         '881dc200c9833da726e9376c2e32cff7')
-        assert hmac_sha256(key, data) == hmac
-        key = unhexlify('4a656665')
-        data = unhexlify('7768617420646f2079612077616e7420'
-                         '666f72206e6f7468696e673f')
-        hmac = unhexlify('5bdcc146bf60754e6a042426089575c7'
-                         '5a003f089d2739839dec58b964ec3843')
-        assert hmac_sha256(key, data) == hmac
-        key = b'\xaa' * 20
-        data = b'\xdd' * 50
-        hmac = unhexlify('773ea91e36800e46854db8ebd09181a7'
-                         '2959098b3ef8c122d9635514ced565fe')
-        assert hmac_sha256(key, data) == hmac
-        key = unhexlify('0102030405060708090a0b0c0d0e0f10'
-                        '111213141516171819')
-        data = b'\xcd' * 50
-        hmac = unhexlify('82558a389a443c0ea4cc819899f2083a'
-                         '85f0faa3e578f8077a2e3ff46729665b')
-        assert hmac_sha256(key, data) == hmac
-
-    def test_blake2b_256(self):
-        # In BLAKE2 the output length actually is part of the hashes personality - it is *not* simple truncation like in
-        # the SHA-2 family. Therefore we need to generate test vectors ourselves (as is true for most applications that
-        # are not precisely vanilla BLAKE2b-512 or BLAKE2s-256).
-        #
-        # Obtained via "b2sum" utility from the official BLAKE2 repository. It calculates the exact hash of a file's
-        # contents, no extras (like length) included.
-        assert blake2b_256(b'', b'abc') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
-        assert blake2b_256(b'a', b'bc') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
-        assert blake2b_256(b'ab', b'c') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
-        assert blake2b_256(b'abc', b'') == unhexlify('bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319')
-
-        key = unhexlify('e944973af2256d4d670c12dd75304c319f58f4e40df6fb18ef996cb47e063676')
-        data = memoryview(b'1234567890' * 100)
-        assert blake2b_256(key, data) == unhexlify('97ede832378531dd0f4c668685d166e797da27b47d8cd441e885b60abd5e0cb2')
-
-    def test_blake2b_128(self):
-        # (see above)
-        assert blake2b_128(b'') == unhexlify('cae66941d9efbd404e4d88758ea67670')
-        assert blake2b_128(b'abc') == unhexlify('cf4ab791c62b8d2b2109c90275287816')
-        assert blake2b_128(b'abcd'*8) == unhexlify('0f759d9a32d3f99250c1781a8baa58b9')
+    def test_AEAD_with_more_AAD(self):
+        # test giving extra aad to the .encrypt() and .decrypt() calls
+        key = b'X' * 32
+        iv_int = 0
+        data = b'foo' * 10
+        header = b'\x12\x34'
+        tests = [AES256_OCB, CHACHA20_POLY1305]
+        for cs_cls in tests:
+            # encrypt/mac
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)
+            hdr_mac_iv_cdata = cs.encrypt(data, header=header, aad=b'correct_chunkid')
+            # successful auth/decrypt (correct aad)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)
+            pdata = cs.decrypt(hdr_mac_iv_cdata, aad=b'correct_chunkid')
+            self.assert_equal(data, pdata)
+            # unsuccessful auth (incorrect aad)
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)
+            self.assert_raises(IntegrityError,
+                               lambda: cs.decrypt(hdr_mac_iv_cdata, aad=b'incorrect_chunkid'))
 
     # These test vectors come from https://www.kullo.net/blog/hkdf-sha-512-test-vectors/
     # who claims to have verified these against independent Python and C++ implementations.
@@ -276,3 +245,88 @@ class CryptoTestCase(BaseTestCase):
 
         okm = hkdf_hmac_sha512(ikm, salt, info, l)
         assert okm == bytes.fromhex('1407d46013d98bc6decefcfee55f0f90b0c7f63d68eb1a80eaf07e953cfc0a3a5240a155d6e4daa965bb')
+
+
+def test_decrypt_key_file_argon2_chacha20_poly1305():
+    plain = b'hello'
+    # echo -n "hello, pass phrase" | argon2 saltsaltsaltsalt -id -t 1 -k 8 -p 1 -l 32 -r
+    key = bytes.fromhex('a1b0cba145c154fbd8960996c5ce3428e9920cfe53c84ef08b4102a70832bcec')
+    ae_cipher = CHACHA20_POLY1305(key=key, iv=0, header_len=0, aad_offset=0)
+
+    envelope = ae_cipher.encrypt(plain)
+
+    encrypted = msgpack.packb({
+        'version': 1,
+        'salt': b'salt'*4,
+        'argon2_time_cost': 1,
+        'argon2_memory_cost': 8,
+        'argon2_parallelism': 1,
+        'argon2_type': b'id',
+        'algorithm': 'argon2 chacha20-poly1305',
+        'data': envelope,
+    })
+    key = KeyfileKey(None)
+
+    decrypted = key.decrypt_key_file(encrypted, "hello, pass phrase")
+
+    assert decrypted == plain
+
+
+def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256():
+    plain = b'hello'
+    salt = b'salt'*4
+    passphrase = "hello, pass phrase"
+    key = FlexiKey.pbkdf2(passphrase, salt, 1, 32)
+    hash = hmac_sha256(key, plain)
+    data = AES(key, b'\0'*16).encrypt(plain)
+    encrypted = msgpack.packb({
+        'version': 1,
+        'algorithm': 'sha256',
+        'iterations': 1,
+        'salt': salt,
+        'data': data,
+        'hash': hash,
+    })
+    key = KeyfileKey(None)
+
+    decrypted = key.decrypt_key_file(encrypted, passphrase)
+
+    assert decrypted == plain
+
+
+@unittest.mock.patch('getpass.getpass')
+def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
+    """https://github.com/borgbackup/borg/pull/6469#discussion_r832670411
+
+    This is a regression test for a bug I introduced and fixed:
+
+    Traceback (most recent call last):
+      File "/home/user/borg-master/src/borg/testsuite/crypto.py", line 384, in test_repo_key_detect_does_not_raise_integrity_error
+        RepoKey.detect(repository, manifest_data=None)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 402, in detect
+        if not key.load(target, passphrase):
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 654, in load
+        success = self._load(key_data, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 418, in _load
+        data = self.decrypt_key_file(cdata, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 444, in decrypt_key_file
+        return self.decrypt_key_file_argon2(encrypted_key, passphrase)
+      File "/home/user/borg-master/src/borg/crypto/key.py", line 470, in decrypt_key_file_argon2
+        return ae_cipher.decrypt(encrypted_key.data)
+      File "src/borg/crypto/low_level.pyx", line 302, in borg.crypto.low_level.AES256_CTR_BASE.decrypt
+        self.mac_verify(<const unsigned char *> idata.buf+aoffset, alen,
+      File "src/borg/crypto/low_level.pyx", line 382, in borg.crypto.low_level.AES256_CTR_HMAC_SHA256.mac_verify
+        raise IntegrityError('MAC Authentication failed')
+    borg.crypto.low_level.IntegrityError: MAC Authentication failed
+
+    1. FlexiKey.decrypt_key_file() is supposed to signal the decryption failure by returning None
+    2. FlexiKey.detect() relies on that interface - it tries an empty passphrase before prompting the user
+    3. my initial implementation of decrypt_key_file_argon2() was simply passing through the IntegrityError() from AES256_CTR_BASE.decrypt()
+    """
+    repository = MagicMock(id=b'repository_id')
+    getpass.return_value = "hello, pass phrase"
+    monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
+    RepoKey.create(repository, args=MagicMock(key_algorithm='argon2'))
+    repository.load_key.return_value = repository.save_key.call_args.args[0]
+
+    RepoKey.detect(repository, manifest_data=None)

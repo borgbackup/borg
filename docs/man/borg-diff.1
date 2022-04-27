@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-DIFF 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-diff \- Diff contents of two archives
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DIFF" 1 "2022-01-23" "" "borg backup tool"
-.SH NAME
-borg-diff \- Diff contents of two archives
 .SH SYNOPSIS
 .sp
 borg [common options] diff [options] REPO::ARCHIVE1 ARCHIVE2 [PATH...]
@@ -50,7 +50,7 @@ If you did not create the archives with different chunker params,
 pass \fB\-\-same\-chunker\-params\fP\&.
 Note that the chunker params changed from Borg 0.xx to 1.0.
 .sp
-See the output of the "borg help patterns" command for more help on exclude patterns.
+For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -69,19 +69,19 @@ paths of items inside the archives to compare; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-\-numeric\-owner
+.B \-\-numeric\-owner
 deprecated, use \fB\-\-numeric\-ids\fP instead
 .TP
-.B  \-\-numeric\-ids
+.B \-\-numeric\-ids
 only consider numeric user and group identifiers
 .TP
-.B  \-\-same\-chunker\-params
+.B \-\-same\-chunker\-params
 Override check of chunker parameters.
 .TP
-.B  \-\-sort
+.B \-\-sort
 Sort the output lines by file path.
 .TP
-.B  \-\-json\-lines
+.B \-\-json\-lines
 Format output as JSON Lines.
 .UNINDENT
 .SS Exclusion options
@@ -94,10 +94,10 @@ exclude paths matching PATTERN
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
 .BI \-\-pattern \ PATTERN
-experimental: include/exclude paths matching PATTERN
+include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-experimental: read include/exclude patterns from PATTERNFILE, one per line
+read include/exclude patterns from PATTERNFILE, one per line
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

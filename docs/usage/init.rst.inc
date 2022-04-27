@@ -27,6 +27,8 @@ borg init
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--make-parent-dirs``             | create the parent directories of the repository directory, if they are missing.                                                                                                                                                        |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--key-algorithm``                | the algorithm we use to derive a key encryption key from your passphrase. Default: argon2                                                                                                                                              |
+    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                      |
     |                                                                                                                                                                                                                                                                                                                                     |
     | :ref:`common_options`                                                                                                                                                                                                                                                                                                               |
@@ -51,6 +53,7 @@ borg init
         --append-only                  create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details.
         --storage-quota QUOTA          Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
         --make-parent-dirs             create the parent directories of the repository directory, if they are missing.
+        --key-algorithm                the algorithm we use to derive a key encryption key from your passphrase. Default: argon2
 
 
     :ref:`common_options`
@@ -62,31 +65,39 @@ Description
 This command initializes an empty repository. A repository is a filesystem
 directory containing the deduplicated data from zero or more archives.
 
-Encryption can be enabled at repository init time. It cannot be changed later.
+Encryption mode TLDR
+++++++++++++++++++++
 
-It is not recommended to work without encryption. Repository encryption protects
-you e.g. against the case that an attacker has access to your backup repository.
+The encryption mode can only be configured when creating a new repository - you can
+neither configure it on a per-archive basis nor change the mode of an existing repository.
+This example will likely NOT give optimum performance on your machine (performance
+tips will come below):
 
-Borg relies on randomly generated key material and uses that for chunking, id
-generation, encryption and authentication. The key material is encrypted using
-the passphrase you give before it is stored on-disk.
+::
 
-You need to be careful with the key / the passphrase:
+    borg init --encryption repokey /path/to/repo
 
-If you want "passphrase-only" security, use one of the repokey modes. The
-key will be stored inside the repository (in its "config" file). In above
-mentioned attack scenario, the attacker will have the key (but not the
-passphrase).
+Borg will:
 
-If you want "passphrase and having-the-key" security, use one of the keyfile
-modes. The key will be stored in your home directory (in .config/borg/keys).
-In the attack scenario, the attacker who has just access to your repo won't
-have the key (and also not the passphrase).
+1. Ask you to come up with a passphrase.
+2. Create a borg key (which contains some random secrets. See :ref:`key_files`).
+3. Derive a "key encryption key" from your passphrase
+4. Encrypt and sign the key with the key encryption key
+5. Store the encrypted borg key inside the repository directory (in the repo config).
+   This is why it is essential to use a secure passphrase.
+6. Encrypt and sign your backups to prevent anyone from reading or forging them unless they
+   have the key and know the passphrase. Make sure to keep a backup of
+   your key **outside** the repository - do not lock yourself out by
+   "leaving your keys inside your car" (see :ref:`borg_key_export`).
+   For remote backups the encryption is done locally - the remote machine
+   never sees your passphrase, your unencrypted key or your unencrypted files.
+   Chunking and id generation are also based on your key to improve
+   your privacy.
+7. Use the key when extracting files to decrypt them and to verify that the contents of
+   the backups have not been accidentally or maliciously altered.
 
-Make a backup copy of the key file (keyfile mode) or repo config file
-(repokey mode) and keep it at a safe place, so you still have the key in
-case it gets corrupted or lost. Also keep the passphrase at a safe place.
-The backup that is encrypted with that key won't help you with that, of course.
+Picking a passphrase
+++++++++++++++++++++
 
 Make sure you use a good passphrase. Not too short, not too simple. The real
 encryption / decryption key is encrypted with / locked by your passphrase.
@@ -106,68 +117,69 @@ a different keyboard layout.
 You can change your passphrase for existing repos at any time, it won't affect
 the encryption/decryption key or other secrets.
 
-Encryption modes
-++++++++++++++++
+Choosing an encryption mode
++++++++++++++++++++++++++++
 
-You can choose from the encryption modes seen in the table below on a per-repo
-basis. The mode determines encryption algorithm, hash/MAC algorithm and also the
-key storage location.
+Depending on your hardware, hashing and crypto performance may vary widely.
+The easiest way to find out about what's fastest is to run ``borg benchmark cpu``.
 
-Example: `borg init --encryption repokey ...`
+`repokey` modes: if you want ease-of-use and "passphrase" security is good enough -
+the key will be stored in the repository (in ``repo_dir/config``).
+
+`keyfile` modes: if you rather want "passphrase and having-the-key" security -
+the key will be stored in your home directory (in ``~/.config/borg/keys``).
+
+The following table is roughly sorted in order of preference, the better ones are
+in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
 
 .. nanorst: inline-fill
 
-+----------+---------------+------------------------+--------------------------+
-| Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
-|          | no auth       | but authenticated      | and authenticated        |
-+----------+---------------+------------------------+--------------------------+
-| SHA-256  | none          | `authenticated`        | repokey                  |
-|          |               |                        | keyfile                  |
-+----------+---------------+------------------------+--------------------------+
-| BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`         |
-|          |               |                        | `keyfile-blake2`         |
-+----------+---------------+------------------------+--------------------------+
++-----------------------------------+--------------+----------------+--------------------+---------+
+| Mode (K = keyfile or repokey)     | ID-Hash      | Encryption     | Authentication     | V >=    |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           | 1.3     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           | 1.3     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         | 1.3     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         | 1.3     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| K-blake2                          | BLAKE2b      | AES256-CTR     | BLAKE2b            | 1.1     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| K                                 | HMAC-SHA-256 | AES256-CTR     | HMAC-SHA256        | any     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| authenticated-blake2              | BLAKE2b      | none           | BLAKE2b            | 1.1     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| authenticated                     | HMAC-SHA-256 | none           | HMAC-SHA256        | 1.1     |
++-----------------------------------+--------------+----------------+--------------------+---------+
+| none                              | SHA-256      | none           | none               | any     |
++-----------------------------------+--------------+----------------+--------------------+---------+
 
 .. nanorst: inline-replace
 
-Modes `marked like this` in the above table are new in Borg 1.1 and are not
-backwards-compatible with Borg 1.0.x.
+`none` mode uses no encryption and no authentication. You're advised to NOT use this mode
+as it would expose you to all sorts of issues (DoS, confidentiality, tampering, ...) in
+case of malicious activity in the repository.
 
-On modern Intel/AMD CPUs (except very cheap ones), AES is usually
-hardware-accelerated.
-BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs
-(except AMD Ryzen and future CPUs with SHA extensions),
-which makes `authenticated-blake2` faster than `none` and `authenticated`.
+If you do **not** want to encrypt the contents of your backups, but still want to detect
+malicious tampering use an `authenticated` mode. It's like `repokey` minus encryption.
 
-On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
-than BLAKE2b-256 there. NEON accelerates AES as well.
+Key derivation functions
+++++++++++++++++++++++++
 
-Hardware acceleration is always used automatically when available.
+- ``--key-algorithm argon2`` is the default and is recommended.
+  The key encryption key is derived from your passphrase via argon2-id.
+  Argon2 is considered more modern and secure than pbkdf2.
 
-`repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
-authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
-is HMAC-SHA256 as well (with a separate key).
-These modes are compatible with Borg 1.0.x.
+- You can use ``--key-algorithm pbkdf2`` if you want to access your repo via old versions of borg.
 
-`repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
-but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
-hash is a keyed BLAKE2b-256 hash.
-These modes are new and *not* compatible with Borg 1.0.x.
+Our implementation of argon2-based key algorithm follows the cryptographic best practices:
 
-`authenticated` mode uses no encryption, but authenticates repository contents
-through the same HMAC-SHA256 hash as the `repokey` and `keyfile` modes (it uses it
-as the chunk ID hash). The key is stored like `repokey`.
-This mode is new and *not* compatible with Borg 1.0.x.
+- It derives two separate keys from your passphrase: one to encrypt your key and another one
+  to sign it. ``--key-algorithm pbkdf2`` uses the same key for both.
 
-`authenticated-blake2` is like `authenticated`, but uses the keyed BLAKE2b-256 hash
-from the other blake2 modes.
-This mode is new and *not* compatible with Borg 1.0.x.
+- It uses encrypt-then-mac instead of encrypt-and-mac used by ``--key-algorithm pbkdf2``
 
-`none` mode uses no encryption and no authentication. It uses SHA256 as chunk
-ID hash. This mode is not recommended, you should rather consider using an authenticated
-or authenticated/encrypted mode. This mode has possible denial-of-service issues
-when running ``borg create`` on contents controlled by an attacker.
-Use it only for new repositories where no encryption is wanted **and** when compatibility
-with 1.0.x is important. If compatibility with 1.0.x is not important, use
-`authenticated-blake2` or `authenticated` instead.
-This mode is compatible with Borg 1.0.x.
+Neither is inherently linked to the key derivation function, but since we were going
+to break backwards compatibility anyway we took the opportunity to fix all 3 issues at once.

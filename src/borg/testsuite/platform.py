@@ -53,7 +53,7 @@ def user_exists(username):
     return False
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def are_acls_working():
     with unopened_tempfile() as filepath:
         open(filepath, 'w').close()
@@ -118,12 +118,12 @@ class PlatformLinuxTestCase(BaseTestCase):
         # but in practice they seem to be out there and must not make our code explode.
         file = tempfile.NamedTemporaryFile()
         self.assert_equal(self.get_acl(file.name), {})
-        nothing_special = 'user::rw-\ngroup::r--\nmask::rw-\nother::---\n'.encode('ascii')
+        nothing_special = b'user::rw-\ngroup::r--\nmask::rw-\nother::---\n'
         # TODO: can this be tested without having an existing system user übel with uid 666 gid 666?
-        user_entry = 'user:übel:rw-:666'.encode('utf-8')
-        user_entry_numeric = 'user:666:rw-:666'.encode('ascii')
-        group_entry = 'group:übel:rw-:666'.encode('utf-8')
-        group_entry_numeric = 'group:666:rw-:666'.encode('ascii')
+        user_entry = 'user:übel:rw-:666'.encode()
+        user_entry_numeric = b'user:666:rw-:666'
+        group_entry = 'group:übel:rw-:666'.encode()
+        group_entry_numeric = b'group:666:rw-:666'
         acl = b'\n'.join([nothing_special, user_entry, group_entry])
         self.set_acl(file.name, access=acl, numeric_ids=False)
         acl_access = self.get_acl(file.name, numeric_ids=False)['acl_access']

@@ -1703,9 +1703,8 @@ class ArchiveChecker:
                         chunk_ids = list(reversed(chunk_ids_revd))
                         chunk_data_iter = self.repository.get_many(chunk_ids)
                 else:
-                    _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
                     try:
-                        self.key.decrypt(_chunk_id, encrypted_data)
+                        self.key.decrypt(chunk_id, encrypted_data)
                     except IntegrityErrorBase as integrity_error:
                         self.error_found = True
                         errors += 1
@@ -1733,8 +1732,7 @@ class ArchiveChecker:
                     # from the underlying media.
                     try:
                         encrypted_data = self.repository.get(defect_chunk)
-                        _chunk_id = None if defect_chunk == Manifest.MANIFEST_ID else defect_chunk
-                        self.key.decrypt(_chunk_id, encrypted_data)
+                        self.key.decrypt(defect_chunk, encrypted_data)
                     except IntegrityErrorBase:
                         # failed twice -> get rid of this chunk
                         del self.chunks[defect_chunk]
@@ -2189,7 +2187,7 @@ class ArchiveRecreater:
         overwrite = self.recompress
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
-            old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
+            old_chunk = self.key.decrypt(chunk_id, self.repository.get(chunk_id), decompress=False)
             if Compressor.detect(old_chunk).name == self.key.compressor.decide(data).name:
                 # Stored chunk has the same compression we wanted
                 overwrite = False

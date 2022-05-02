@@ -2254,7 +2254,7 @@ class Archiver:
     def do_debug_dump_manifest(self, args, repository, manifest, key):
         """dump decoded repository manifest"""
 
-        data = key.decrypt(None, repository.get(manifest.MANIFEST_ID))
+        data = key.decrypt(manifest.MANIFEST_ID, repository.get(manifest.MANIFEST_ID))
 
         meta = prepare_dump_dict(msgpack.unpackb(data, object_hook=StableDict))
 
@@ -2269,8 +2269,7 @@ class Archiver:
 
         def decrypt_dump(i, id, cdata, tag=None, segment=None, offset=None):
             if cdata is not None:
-                give_id = id if id != Manifest.MANIFEST_ID else None
-                data = key.decrypt(give_id, cdata)
+                data = key.decrypt(id, cdata)
             else:
                 data = b''
             tag_str = '' if tag is None else '_' + tag
@@ -2360,8 +2359,7 @@ class Archiver:
             marker = result[-1]
             for id in result:
                 cdata = repository.get(id)
-                give_id = id if id != Manifest.MANIFEST_ID else None
-                data = key.decrypt(give_id, cdata)
+                data = key.decrypt(id, cdata)
 
                 # try to locate wanted sequence crossing the border of last_data and data
                 boundary_data = last_data[-(len(wanted) - 1):] + data[:len(wanted) - 1]

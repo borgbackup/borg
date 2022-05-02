@@ -112,6 +112,35 @@ def argument(args, str_or_bool):
     return str_or_bool
 
 
+def get_repository(location, *, create, exclusive, lock_wait, lock, append_only,
+                   make_parent_dirs, storage_quota, args):
+    if location.proto == 'ssh':
+        repository = RemoteRepository(location.omit_archive(), create=create, exclusive=exclusive,
+                                      lock_wait=lock_wait, lock=lock, append_only=append_only,
+                                      make_parent_dirs=make_parent_dirs, args=args)
+
+    else:
+        repository = Repository(location.path, create=create, exclusive=exclusive,
+                                lock_wait=lock_wait, lock=lock, append_only=append_only,
+                                make_parent_dirs=make_parent_dirs, storage_quota=storage_quota)
+    return repository
+
+
+def compat_check(*, create, manifest, key, cache, compatibility, decorator_name):
+    if not create and (manifest or key or cache):
+        if compatibility is None:
+            raise AssertionError(f"{decorator_name} decorator used without compatibility argument")
+        if type(compatibility) is not tuple:
+            raise AssertionError(f"{decorator_name} decorator compatibility argument must be of type tuple")
+    else:
+        if compatibility is not None:
+            raise AssertionError(f"{decorator_name} called with compatibility argument, "
+                                 f"but would not check {compatibility!r}")
+        if create:
+            compatibility = Manifest.NO_OPERATION_CHECK
+    return compatibility
+
+
 def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                     exclusive=False, manifest=True, cache=False, secure=True,
                     compatibility=None):
@@ -128,17 +157,9 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
     :param secure: do assert_secure after loading manifest
     :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory feature categories to check
     """
-
-    if not create and (manifest or cache):
-        if compatibility is None:
-            raise AssertionError("with_repository decorator used without compatibility argument")
-        if type(compatibility) is not tuple:
-            raise AssertionError("with_repository decorator compatibility argument must be of type tuple")
-    else:
-        if compatibility is not None:
-            raise AssertionError("with_repository called with compatibility argument but would not check" + repr(compatibility))
-        if create:
-            compatibility = Manifest.NO_OPERATION_CHECK
+    # Note: with_repository decorator does not have a "key" argument (yet?)
+    compatibility = compat_check(create=create, manifest=manifest, key=manifest, cache=cache,
+                                 compatibility=compatibility, decorator_name='with_repository')
 
     # To process the `--bypass-lock` option if specified, we need to
     # modify `lock` inside `wrapper`. Therefore we cannot use the
@@ -159,14 +180,12 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
             make_parent_dirs = getattr(args, 'make_parent_dirs', False)
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
-            elif location.proto == 'ssh':
-                repository = RemoteRepository(location.omit_archive(), create=create, exclusive=argument(args, exclusive),
-                                              lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                              make_parent_dirs=make_parent_dirs, args=args)
-            else:
-                repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
+
+            repository = get_repository(location, create=create, exclusive=argument(args, exclusive),
                                         lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                        storage_quota=storage_quota, make_parent_dirs=make_parent_dirs)
+                                        make_parent_dirs=make_parent_dirs, storage_quota=storage_quota,
+                                        args=args)
+
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)

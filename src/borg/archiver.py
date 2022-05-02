@@ -112,6 +112,35 @@ def argument(args, str_or_bool):
     return str_or_bool
 
 
+def get_repository(location, *, create, exclusive, lock_wait, lock, append_only,
+                   make_parent_dirs, storage_quota, args):
+    if location.proto == 'ssh':
+        repository = RemoteRepository(location.omit_archive(), create=create, exclusive=exclusive,
+                                      lock_wait=lock_wait, lock=lock, append_only=append_only,
+                                      make_parent_dirs=make_parent_dirs, args=args)
+
+    else:
+        repository = Repository(location.path, create=create, exclusive=exclusive,
+                                lock_wait=lock_wait, lock=lock, append_only=append_only,
+                                make_parent_dirs=make_parent_dirs, storage_quota=storage_quota)
+    return repository
+
+
+def compat_check(*, create, manifest, key, cache, compatibility, decorator_name):
+    if not create and (manifest or key or cache):
+        if compatibility is None:
+            raise AssertionError(f"{decorator_name} decorator used without compatibility argument")
+        if type(compatibility) is not tuple:
+            raise AssertionError(f"{decorator_name} decorator compatibility argument must be of type tuple")
+    else:
+        if compatibility is not None:
+            raise AssertionError(f"{decorator_name} called with compatibility argument, "
+                                 f"but would not check {compatibility!r}")
+        if create:
+            compatibility = Manifest.NO_OPERATION_CHECK
+    return compatibility
+
+
 def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                     exclusive=False, manifest=True, cache=False, secure=True,
                     compatibility=None):
@@ -128,17 +157,9 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
     :param secure: do assert_secure after loading manifest
     :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory feature categories to check
     """
-
-    if not create and (manifest or cache):
-        if compatibility is None:
-            raise AssertionError("with_repository decorator used without compatibility argument")
-        if type(compatibility) is not tuple:
-            raise AssertionError("with_repository decorator compatibility argument must be of type tuple")
-    else:
-        if compatibility is not None:
-            raise AssertionError("with_repository called with compatibility argument but would not check" + repr(compatibility))
-        if create:
-            compatibility = Manifest.NO_OPERATION_CHECK
+    # Note: with_repository decorator does not have a "key" argument (yet?)
+    compatibility = compat_check(create=create, manifest=manifest, key=manifest, cache=cache,
+                                 compatibility=compatibility, decorator_name='with_repository')
 
     # To process the `--bypass-lock` option if specified, we need to
     # modify `lock` inside `wrapper`. Therefore we cannot use the
@@ -159,14 +180,12 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
             make_parent_dirs = getattr(args, 'make_parent_dirs', False)
             if argument(args, fake) ^ invert_fake:
                 return method(self, args, repository=None, **kwargs)
-            elif location.proto == 'ssh':
-                repository = RemoteRepository(location.omit_archive(), create=create, exclusive=argument(args, exclusive),
-                                              lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                              make_parent_dirs=make_parent_dirs, args=args)
-            else:
-                repository = Repository(location.path, create=create, exclusive=argument(args, exclusive),
+
+            repository = get_repository(location, create=create, exclusive=argument(args, exclusive),
                                         lock_wait=self.lock_wait, lock=lock, append_only=append_only,
-                                        storage_quota=storage_quota, make_parent_dirs=make_parent_dirs)
+                                        make_parent_dirs=make_parent_dirs, storage_quota=storage_quota,
+                                        args=args)
+
             with repository:
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)
@@ -183,6 +202,51 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)
+        return wrapper
+    return decorator
+
+
+def with_other_repository(manifest=False, key=False, cache=False, compatibility=None):
+    """
+    this is a simplified version of "with_repository", just for the "other location".
+
+    the repository at the "other location" is intended to get used as a **source** (== read operations).
+    """
+
+    compatibility = compat_check(create=False, manifest=manifest, key=key, cache=cache,
+                                 compatibility=compatibility, decorator_name='with_other_repository')
+
+    def decorator(method):
+        @functools.wraps(method)
+        def wrapper(self, args, **kwargs):
+            location = getattr(args, 'other_location', None)
+            if location is None:  # nothing to do
+                return method(self, args, **kwargs)
+
+            repository = get_repository(location, create=False, exclusive=True,
+                                        lock_wait=self.lock_wait, lock=True, append_only=False,
+                                        make_parent_dirs=False, storage_quota=None,
+                                        args=args)
+
+            with repository:
+                kwargs['other_repository'] = repository
+                if manifest or key or cache:
+                    manifest_, key_ = Manifest.load(repository, compatibility)
+                    assert_secure(repository, manifest_, self.lock_wait)
+                    if manifest:
+                        kwargs['other_manifest'] = manifest_
+                    if key:
+                        kwargs['other_key'] = key_
+                if cache:
+                    with Cache(repository, key_, manifest_,
+                               progress=False, lock_wait=self.lock_wait,
+                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE),
+                               consider_part_files=getattr(args, 'consider_part_files', False),
+                               iec=getattr(args, 'iec', False)) as cache_:
+                        kwargs['other_cache'] = cache_
+                        return method(self, args, **kwargs)
+                else:
+                    return method(self, args, **kwargs)
         return wrapper
     return decorator
 
@@ -275,12 +339,13 @@ class Archiver:
         return EXIT_SUCCESS
 
     @with_repository(create=True, exclusive=True, manifest=False)
-    def do_init(self, args, repository):
+    @with_other_repository(key=True, compatibility=(Manifest.Operation.READ, ))
+    def do_init(self, args, repository, *, other_repository=None, other_key=None):
         """Initialize an empty repository"""
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
         try:
-            key = key_creator(repository, args)
+            key = key_creator(repository, args, other_key=other_key)
         except (EOFError, KeyboardInterrupt):
             repository.destroy()
             return EXIT_WARNING
@@ -4361,6 +4426,9 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to create')
+        subparser.add_argument('--other-location', metavar='OTHER_REPOSITORY', dest='other_location',
+                               type=location_validator(archive=False, other=True),
+                               help='reuse the key material from the other repository')
         subparser.add_argument('-e', '--encryption', metavar='MODE', dest='encryption', required=True,
                                choices=key_argument_names(),
                                help='select encryption key mode **(required)**')

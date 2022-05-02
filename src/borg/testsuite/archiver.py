@@ -2878,7 +2878,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "is invalid" in output
 
     def test_init_interrupt(self):
-        def raise_eof(*args):
+        def raise_eof(*args, **kwargs):
             raise EOFError
 
         with patch.object(FlexiKey, 'create', raise_eof):

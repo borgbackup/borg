@@ -386,7 +386,8 @@ class Location:
         )
         """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
-    def __init__(self, text='', overrides={}):
+    def __init__(self, text='', overrides={}, other=False):
+        self.repo_env_var = 'BORG_OTHER_REPO' if other else 'BORG_REPO'
         if not self.parse(text, overrides):
             raise ValueError('Invalid location format: "%s"' % self.processed)
 
@@ -399,7 +400,7 @@ class Location:
         m = self.env_re.match(text)
         if not m:
             return False
-        repo_raw = os.environ.get('BORG_REPO')
+        repo_raw = os.environ.get(self.repo_env_var)
         if repo_raw is None:
             return False
         repo = replace_placeholders(repo_raw, overrides)
@@ -512,10 +513,10 @@ class Location:
         return loc
 
 
-def location_validator(archive=None, proto=None):
+def location_validator(archive=None, proto=None, other=False):
     def validator(text):
         try:
-            loc = Location(text)
+            loc = Location(text, other=other)
         except ValueError as err:
             raise argparse.ArgumentTypeError(str(err)) from None
         if archive is True and not loc.archive:

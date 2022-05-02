@@ -85,11 +85,11 @@ class TAMUnsupportedSuiteError(IntegrityError):
     traceback = False
 
 
-def key_creator(repository, args):
+def key_creator(repository, args, *, other_key=None):
     for key in AVAILABLE_KEY_TYPES:
         if key.ARG_NAME == args.encryption:
             assert key.ARG_NAME is not None
-            return key.create(repository, args)
+            return key.create(repository, args, other_key=other_key)
     else:
         raise ValueError('Invalid encryption mode "%s"' % args.encryption)
 
@@ -262,7 +262,7 @@ class PlaintextKey(KeyBase):
         self.tam_required = False
 
     @classmethod
-    def create(cls, repository, args):
+    def create(cls, repository, args, **kw):
         logger.info('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile" to enable encryption.')
         return cls(repository)
 
@@ -367,15 +367,27 @@ class AESKeyBase(KeyBase):
         self.assert_id(id, data)
         return data
 
+    def init_from_given_data(self, *, enc_key, enc_hmac_key, id_key, chunk_seed):
+        assert len(enc_key) >= 32
+        assert len(enc_hmac_key) >= 32
+        assert len(id_key) >= 32
+        assert isinstance(chunk_seed, int)
+        self.enc_key = enc_key
+        self.enc_hmac_key = enc_hmac_key
+        self.id_key = id_key
+        self.chunk_seed = chunk_seed
+
     def init_from_random_data(self):
         data = os.urandom(100)
-        self.enc_key = data[0:32]
-        self.enc_hmac_key = data[32:64]
-        self.id_key = data[64:96]
-        self.chunk_seed = bytes_to_int(data[96:100])
+        chunk_seed = bytes_to_int(data[96:100])
         # Convert to signed int32
-        if self.chunk_seed & 0x80000000:
-            self.chunk_seed = self.chunk_seed - 0xffffffff - 1
+        if chunk_seed & 0x80000000:
+            chunk_seed = chunk_seed - 0xffffffff - 1
+        self.init_from_given_data(
+            enc_key=data[0:32],
+            enc_hmac_key=data[32:64],
+            id_key=data[64:96],
+            chunk_seed=chunk_seed)
 
     def init_ciphers(self, manifest_data=None):
         self.cipher = self.CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
@@ -572,11 +584,41 @@ class FlexiKey:
         self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm)
 
     @classmethod
-    def create(cls, repository, args):
-        passphrase = Passphrase.new(allow_empty=True)
+    def create(cls, repository, args, *, other_key=None):
         key = cls(repository)
         key.repository_id = repository.id
-        key.init_from_random_data()
+        if other_key is not None:
+            if isinstance(other_key, PlaintextKey):
+                raise Error("Copying key material from an unencrypted repository is not possible.")
+            if isinstance(key, AESKeyBase):
+                # user must use an AEADKeyBase subclass (AEAD modes with session keys)
+                raise Error("Copying key material to an AES-CTR based mode is insecure and unsupported.")
+            # avoid breaking the deduplication by changing the id hash
+            same_ids = (
+                # these use HMAC-SHA256 IDs:
+                isinstance(other_key, (RepoKey, KeyfileKey))
+                and
+                isinstance(key, (AESOCBRepoKey, AESOCBKeyfileKey,
+                                 CHPORepoKey, CHPOKeyfileKey))
+                or
+                # these use BLAKE2b IDs:
+                isinstance(other_key, (Blake2RepoKey, Blake2KeyfileKey))
+                and
+                isinstance(key, (Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey,
+                                 Blake2CHPORepoKey, Blake2CHPOKeyfileKey))
+            )
+            if not same_ids:
+                # either keep HMAC-SHA256 or keep BLAKE2b!
+                raise Error("You must keep the same ID hash (HMAC-SHA256 or BLAKE2b) or deduplication will break.")
+            key.init_from_given_data(
+                enc_key=other_key.enc_key,
+                enc_hmac_key=other_key.enc_hmac_key,
+                id_key=other_key.id_key,
+                chunk_seed=other_key.chunk_seed)
+            passphrase = other_key._passphrase
+        else:
+            key.init_from_random_data()
+            passphrase = Passphrase.new(allow_empty=True)
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS[args.key_algorithm])
@@ -851,15 +893,27 @@ class AEADKeyBase(KeyBase):
         self.assert_id(id, data)
         return data
 
+    def init_from_given_data(self, *, enc_key, enc_hmac_key, id_key, chunk_seed):
+        assert len(enc_key) >= 32
+        assert len(enc_hmac_key) >= 32
+        assert len(id_key) >= 32
+        assert isinstance(chunk_seed, int)
+        self.enc_key = enc_key
+        self.enc_hmac_key = enc_hmac_key
+        self.id_key = id_key
+        self.chunk_seed = chunk_seed
+
     def init_from_random_data(self):
         data = os.urandom(100)
-        self.enc_key = data[0:32]
-        self.enc_hmac_key = data[32:64]
-        self.id_key = data[64:96]
-        self.chunk_seed = bytes_to_int(data[96:100])
+        chunk_seed = bytes_to_int(data[96:100])
         # Convert to signed int32
-        if self.chunk_seed & 0x80000000:
-            self.chunk_seed = self.chunk_seed - 0xffffffff - 1
+        if chunk_seed & 0x80000000:
+            chunk_seed = chunk_seed - 0xffffffff - 1
+        self.init_from_given_data(
+            enc_key=data[0:32],
+            enc_hmac_key=data[32:64],
+            id_key=data[64:96],
+            chunk_seed=chunk_seed)
 
     def _get_session_key(self, sessionid):
         assert len(sessionid) == 24  # 192bit

@@ -206,6 +206,51 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
     return decorator
 
 
+def with_other_repository(manifest=False, key=False, cache=False, compatibility=None):
+    """
+    this is a simplified version of "with_repository", just for the "other location".
+
+    the repository at the "other location" is intended to get used as a **source** (== read operations).
+    """
+
+    compatibility = compat_check(create=False, manifest=manifest, key=key, cache=cache,
+                                 compatibility=compatibility, decorator_name='with_other_repository')
+
+    def decorator(method):
+        @functools.wraps(method)
+        def wrapper(self, args, **kwargs):
+            location = getattr(args, 'other_location', None)
+            if location is None:  # nothing to do
+                return method(self, args, **kwargs)
+
+            repository = get_repository(location, create=False, exclusive=True,
+                                        lock_wait=self.lock_wait, lock=True, append_only=False,
+                                        make_parent_dirs=False, storage_quota=None,
+                                        args=args)
+
+            with repository:
+                kwargs['other_repository'] = repository
+                if manifest or key or cache:
+                    manifest_, key_ = Manifest.load(repository, compatibility)
+                    assert_secure(repository, manifest_, self.lock_wait)
+                    if manifest:
+                        kwargs['other_manifest'] = manifest_
+                    if key:
+                        kwargs['other_key'] = key_
+                if cache:
+                    with Cache(repository, key_, manifest_,
+                               progress=False, lock_wait=self.lock_wait,
+                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE),
+                               consider_part_files=getattr(args, 'consider_part_files', False),
+                               iec=getattr(args, 'iec', False)) as cache_:
+                        kwargs['other_cache'] = cache_
+                        return method(self, args, **kwargs)
+                else:
+                    return method(self, args, **kwargs)
+        return wrapper
+    return decorator
+
+
 def with_archive(method):
     @functools.wraps(method)
     def wrapper(self, args, repository, key, manifest, **kwargs):

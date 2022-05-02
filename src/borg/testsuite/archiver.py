@@ -3974,7 +3974,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             key.tam_required = False
             key.change_passphrase(key._passphrase)
 
-            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
+            manifest = msgpack.unpackb(key.decrypt(Manifest.MANIFEST_ID, repository.get(Manifest.MANIFEST_ID)))
             del manifest[b'tam']
             repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb(manifest)))
             repository.commit(compact=False)

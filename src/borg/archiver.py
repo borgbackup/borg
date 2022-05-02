@@ -339,12 +339,13 @@ class Archiver:
         return EXIT_SUCCESS
 
     @with_repository(create=True, exclusive=True, manifest=False)
-    def do_init(self, args, repository):
+    @with_other_repository(key=True, compatibility=(Manifest.Operation.READ, ))
+    def do_init(self, args, repository, *, other_repository=None, other_key=None):
         """Initialize an empty repository"""
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
         try:
-            key = key_creator(repository, args)
+            key = key_creator(repository, args, other_key=other_key)
         except (EOFError, KeyboardInterrupt):
             repository.destroy()
             return EXIT_WARNING
@@ -4425,6 +4426,9 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to create')
+        subparser.add_argument('--other-location', metavar='OTHER_REPOSITORY', dest='other_location',
+                               type=location_validator(archive=False, other=True),
+                               help='reuse the key material from the other repository')
         subparser.add_argument('-e', '--encryption', metavar='MODE', dest='encryption', required=True,
                                choices=key_argument_names(),
                                help='select encryption key mode **(required)**')

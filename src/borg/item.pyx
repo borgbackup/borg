@@ -181,7 +181,8 @@ class Item(PropDict):
     # compatibility note: this is a new feature, in old archives size will be missing.
     size = PropDict._make_property('size', int)
 
-    hardlink_master = PropDict._make_property('hardlink_master', bool)
+    hlid = PropDict._make_property('hlid', bytes)  # hard link id: same value means same hard link.
+    hardlink_master = PropDict._make_property('hardlink_master', bool)  # legacy
 
     chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
     chunks_healthy = PropDict._make_property('chunks_healthy', (list, type(None)), 'list or None')

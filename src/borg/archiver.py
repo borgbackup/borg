@@ -347,6 +347,20 @@ class Archiver:
 
         def upgrade_item(item):
             """upgrade item as needed, get rid of legacy crap"""
+            if item.get('hardlink_master', True) and 'source' not in item and hardlinkable(item.mode):
+                item._dict['hlid'] = hlid = hashlib.sha256(item._dict['path'])
+                hardlink_masters[hlid] = (item._dict.get('chunks'), item._dict.get('chunks_healthy'))
+            elif 'source' in item and hardlinkable(item.mode):
+                item._dict['hlid'] = hlid = hashlib.sha256(item._dict['source'])
+                chunks, chunks_healthy = hardlink_masters.get(hlid, (None, None))
+                if chunks is not None:
+                    item._dict['chunks'] = chunks
+                    for chunk_id, _, _ in chunks:
+                        cache.chunk_incref(chunk_id, archive.stats)
+                if chunks_healthy is not None:
+                    item._dict['chunks_healthy'] = chunks
+                item._dict.pop('source')  # not used for hardlinks any more, replaced by hlid
+            item._dict.pop('hardlink_master', None)  # not used for hardlinks any more, replaced by hlid
             item._dict.pop('acl', None)  # remove remnants of bug in attic <= 0.13
             item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
             return item
@@ -371,6 +385,7 @@ class Archiver:
             else:
                 if not dry_run:
                     print(f"{name}: copying archive to destination repo...")
+                hardlink_masters = {}
                 other_archive = Archive(other_repository, other_key, other_manifest, name)
                 archive = Archive(repository, key, manifest, name, cache=cache, create=True) if not dry_run else None
                 for item in other_archive.iter_items():

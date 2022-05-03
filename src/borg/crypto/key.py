@@ -124,6 +124,21 @@ def tam_required(repository):
     return os.path.isfile(file)
 
 
+def uses_same_id_hash(other_key, key):
+    """other_key -> key upgrade: is the id hash the same?"""
+    # avoid breaking the deduplication by changing the id hash
+    old_hmac_sha256_ids = (RepoKey, KeyfileKey)
+    new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey)
+    old_blake2_ids = (Blake2RepoKey, Blake2KeyfileKey)
+    new_blake2_ids = (Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey)
+    same_ids = (
+        isinstance(other_key, old_hmac_sha256_ids + new_hmac_sha256_ids) and isinstance(key, new_hmac_sha256_ids)
+        or
+        isinstance(other_key, old_blake2_ids + new_blake2_ids) and isinstance(key, new_blake2_ids)
+    )
+    return same_ids
+
+
 class KeyBase:
     # Numeric key type ID, must fit in one byte.
     TYPE = None  # override in subclasses
@@ -595,20 +610,7 @@ class FlexiKey:
             if isinstance(key, AESKeyBase):
                 # user must use an AEADKeyBase subclass (AEAD modes with session keys)
                 raise Error("Copying key material to an AES-CTR based mode is insecure and unsupported.")
-            # avoid breaking the deduplication by changing the id hash
-            old_hmac_sha256_ids = (RepoKey, KeyfileKey)
-            new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey)
-            old_blake2_ids = (Blake2RepoKey, Blake2KeyfileKey)
-            new_blake2_ids = (Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey)
-            same_ids = (
-                isinstance(other_key, old_hmac_sha256_ids + new_hmac_sha256_ids)
-                and isinstance(key, new_hmac_sha256_ids)
-                or
-                isinstance(other_key, old_blake2_ids + new_blake2_ids)
-                and isinstance(key, new_blake2_ids)
-            )
-            if not same_ids:
-                # either keep HMAC-SHA256 or keep BLAKE2b!
+            if not uses_same_id_hash(other_key, key):
                 raise Error("You must keep the same ID hash (HMAC-SHA256 or BLAKE2b) or deduplication will break.")
             key.init_from_given_data(
                 enc_key=other_key.enc_key,

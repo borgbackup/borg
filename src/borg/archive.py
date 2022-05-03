@@ -1944,9 +1944,6 @@ class ArchiveChecker:
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
                     return False, 'not a dictionary'
-                # A bug in Attic up to and including release 0.13 added a (meaningless) b'acl' key to every item.
-                # We ignore it here, should it exist. See test_attic013_acl_bug for details.
-                obj.pop(b'acl', None)
                 keys = set(obj)
                 if not required_item_keys.issubset(keys):
                     return False, 'missing required keys: ' + list_keys_safe(required_item_keys - keys)

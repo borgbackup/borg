@@ -596,18 +596,16 @@ class FlexiKey:
                 # user must use an AEADKeyBase subclass (AEAD modes with session keys)
                 raise Error("Copying key material to an AES-CTR based mode is insecure and unsupported.")
             # avoid breaking the deduplication by changing the id hash
+            old_hmac_sha256_ids = (RepoKey, KeyfileKey)
+            new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey)
+            old_blake2_ids = (Blake2RepoKey, Blake2KeyfileKey)
+            new_blake2_ids = (Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey)
             same_ids = (
-                # these use HMAC-SHA256 IDs:
-                isinstance(other_key, (RepoKey, KeyfileKey))
-                and
-                isinstance(key, (AESOCBRepoKey, AESOCBKeyfileKey,
-                                 CHPORepoKey, CHPOKeyfileKey))
+                isinstance(other_key, old_hmac_sha256_ids + new_hmac_sha256_ids)
+                and isinstance(key, new_hmac_sha256_ids)
                 or
-                # these use BLAKE2b IDs:
-                isinstance(other_key, (Blake2RepoKey, Blake2KeyfileKey))
-                and
-                isinstance(key, (Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey,
-                                 Blake2CHPORepoKey, Blake2CHPOKeyfileKey))
+                isinstance(other_key, old_blake2_ids + new_blake2_ids)
+                and isinstance(key, new_blake2_ids)
             )
             if not same_ids:
                 # either keep HMAC-SHA256 or keep BLAKE2b!

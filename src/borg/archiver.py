@@ -344,6 +344,12 @@ class Archiver:
                repository, manifest, key, cache,
                other_repository=None, other_manifest=None, other_key=None):
         """archives transfer from other repository"""
+
+        def upgrade_item(item):
+            """upgrade item as needed, get rid of legacy crap"""
+            item._dict.pop('acl', None)  # remove remnants of bug in attic <= 0.13
+            return item
+
         dry_run = args.dry_run
 
         args.consider_checkpoints = True
@@ -384,9 +390,8 @@ class Archiver:
                         if not dry_run:
                             item.chunks = chunks  # overwrite! IDs and sizes are same, csizes are likely different
                             archive.stats.nfiles += 1
-                    # TODO: filter the item data, get rid of legacy crap
                     if not dry_run:
-                        archive.add_item(item)
+                        archive.add_item(upgrade_item(item))
                 if not dry_run:
                     additional_metadata = {}
                     # keep all metadata except archive version and stats. also do not keep

@@ -44,7 +44,7 @@ try:
     from .archive import has_link
     from .cache import Cache, assert_secure, SecurityManager
     from .constants import *  # NOQA
-    from .compress import CompressionSpec
+    from .compress import CompressionSpec, ZLIB, ZLIB_legacy
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
     from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
     from .crypto.keymanager import KeyManager
@@ -351,6 +351,11 @@ class Archiver:
             item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
             return item
 
+        def upgrade_compressed_chunk(chunk):
+            if ZLIB_legacy.detect(chunk):
+                chunk = ZLIB.ID + chunk  # get rid of the attic legacy: prepend separate type bytes for zlib
+            return chunk
+
         dry_run = args.dry_run
 
         args.consider_checkpoints = True
@@ -378,6 +383,7 @@ class Archiver:
                                     cdata = other_repository.get(chunk_id)
                                     # keep compressed payload same, avoid decompression / recompression
                                     data = other_key.decrypt(chunk_id, cdata, decompress=False)
+                                    data = upgrade_compressed_chunk(data)
                                     chunk_entry = cache.add_chunk(chunk_id, data, archive.stats, wait=False,
                                                                   compress=False, size=size)
                                     cache.repository.async_response(wait=False)

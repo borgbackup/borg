@@ -88,11 +88,11 @@ def test_autodetect_invalid():
         Compressor(**params).decompress(b'\x08\x00notreallyzlib')
 
 
-def test_zlib_compat():
+def test_zlib_legacy_compat():
     # for compatibility reasons, we do not add an extra header for zlib,
     # nor do we expect one when decompressing / autodetecting
     for level in range(10):
-        c = get_compressor(name='zlib', level=level)
+        c = get_compressor(name='zlib_legacy', level=level)
         cdata1 = c.compress(data)
         cdata2 = zlib.compress(data, level)
         assert cdata1 == cdata2

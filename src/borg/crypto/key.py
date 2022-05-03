@@ -167,7 +167,7 @@ class KeyBase:
         """
         raise NotImplementedError
 
-    def encrypt(self, id, data):
+    def encrypt(self, id, data, compress=True):
         pass
 
     def decrypt(self, id, data, decompress=True):
@@ -273,8 +273,9 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, id, data):
-        data = self.compressor.compress(data)
+    def encrypt(self, id, data, compress=True):
+        if compress:
+            data = self.compressor.compress(data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -349,8 +350,9 @@ class AESKeyBase(KeyBase):
 
     logically_encrypted = True
 
-    def encrypt(self, id, data):
-        data = self.compressor.compress(data)
+    def encrypt(self, id, data, compress=True):
+        if compress:
+            data = self.compressor.compress(data)
         next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(),
                                                         self.cipher.block_count(len(data)))
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
@@ -809,8 +811,9 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         if manifest_data is not None:
             self.assert_type(manifest_data[0])
 
-    def encrypt(self, id, data):
-        data = self.compressor.compress(data)
+    def encrypt(self, id, data, compress=True):
+        if compress:
+            data = self.compressor.compress(data)
         return b''.join([self.TYPE_STR, data])
 
     def decrypt(self, id, data, decompress=True):
@@ -865,9 +868,10 @@ class AEADKeyBase(KeyBase):
 
     MAX_IV = 2 ** 48 - 1
 
-    def encrypt(self, id, data):
+    def encrypt(self, id, data, compress=True):
         # to encrypt new data in this session we use always self.cipher and self.sessionid
-        data = self.compressor.compress(data)
+        if compress:
+            data = self.compressor.compress(data)
         reserved = b'\0'
         iv = self.cipher.next_iv()
         if iv > self.MAX_IV:  # see the data-structures docs about why the IV range is enough

@@ -939,14 +939,17 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.ignored_features.update(repo_features - my_features)
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
-    def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
+    def add_chunk(self, id, chunk, stats, *, overwrite=False, wait=True, compress=True, size=None):
         if not self.txn_active:
             self.begin_txn()
-        size = len(chunk)
+        if size is None and compress:
+            size = len(chunk)  # chunk is still uncompressed
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)
-        data = self.key.encrypt(id, chunk)
+        if size is None:
+            raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
+        data = self.key.encrypt(id, chunk, compress=compress)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
@@ -1103,15 +1106,18 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def memorize_file(self, hashed_path, path_hash, st, ids):
         pass
 
-    def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
+    def add_chunk(self, id, chunk, stats, *, overwrite=False, wait=True, compress=True, size=None):
         assert not overwrite, 'AdHocCache does not permit overwrites — trying to use it for recreate?'
         if not self._txn_active:
             self.begin_txn()
-        size = len(chunk)
+        if size is None and compress:
+            size = len(chunk)  # chunk is still uncompressed
+        if size is None:
+            raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         refcount = self.seen_chunk(id, size)
         if refcount:
             return self.chunk_incref(id, stats, size=size)
-        data = self.key.encrypt(id, chunk)
+        data = self.key.encrypt(id, chunk, compress=compress)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)

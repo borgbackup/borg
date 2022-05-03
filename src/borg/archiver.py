@@ -338,6 +338,74 @@ class Archiver:
         ).serve()
         return EXIT_SUCCESS
 
+    @with_other_repository(manifest=True, key=True, compatibility=(Manifest.Operation.READ,))
+    @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
+    def do_transfer(self, args, *,
+               repository, manifest, key, cache,
+               other_repository=None, other_manifest=None, other_key=None):
+        """archives transfer from other repository"""
+        dry_run = args.dry_run
+
+        args.consider_checkpoints = True
+        archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
+        if not archive_names:
+            return EXIT_SUCCESS
+
+        for name in archive_names:
+            transfer_size = 0
+            present_size = 0
+            if name in manifest.archives and not dry_run:
+                print(f"{name}: archive is already present in destination repo, skipping.")
+            else:
+                if not dry_run:
+                    print(f"{name}: copying archive to destination repo...")
+                other_archive = Archive(other_repository, other_key, other_manifest, name)
+                archive = Archive(repository, key, manifest, name, cache=cache, create=True) if not dry_run else None
+                for item in other_archive.iter_items():
+                    if 'chunks' in item:
+                        chunks = []
+                        for chunk_id, size, _ in item.chunks:
+                            refcount = cache.seen_chunk(chunk_id, size)
+                            if refcount == 0:  # target repo does not yet have this chunk
+                                if not dry_run:
+                                    cdata = other_repository.get(chunk_id)
+                                    # keep compressed payload same, avoid decompression / recompression
+                                    data = other_key.decrypt(chunk_id, cdata, decompress=False)
+                                    chunk_entry = cache.add_chunk(chunk_id, data, archive.stats, wait=False,
+                                                                  compress=False, size=size)
+                                    cache.repository.async_response(wait=False)
+                                    chunks.append(chunk_entry)
+                                transfer_size += size
+                            else:
+                                if not dry_run:
+                                    chunk_entry = cache.chunk_incref(chunk_id, archive.stats)
+                                    chunks.append(chunk_entry)
+                                present_size += size
+                        if not dry_run:
+                            item.chunks = chunks  # overwrite! IDs and sizes are same, csizes are likely different
+                            archive.stats.nfiles += 1
+                    # TODO: filter the item data, get rid of legacy crap
+                    if not dry_run:
+                        archive.add_item(item)
+                if not dry_run:
+                    additional_metadata = {}
+                    # keep all metadata except archive version and stats. also do not keep
+                    # recreate_source_id, recreate_args, recreate_partial_chunks which were used only in 1.1.0b1 .. b2.
+                    for attr in ('cmdline', 'hostname', 'username', 'time', 'time_end', 'comment',
+                                 'chunker_params', 'recreate_cmdline'):
+                        if hasattr(other_archive.metadata, attr):
+                            additional_metadata[attr] = getattr(other_archive.metadata, attr)
+                    archive.save(stats=archive.stats, additional_metadata=additional_metadata)
+                    print(f"{name}: finished. "
+                          f"transfer_size: {format_file_size(transfer_size)} "
+                          f"present_size: {format_file_size(present_size)}")
+                else:
+                    print(f"{name}: completed" if transfer_size == 0 else
+                          f"{name}: incomplete, "
+                          f"transfer_size: {format_file_size(transfer_size)} "
+                          f"present_size: {format_file_size(present_size)}")
+        return EXIT_SUCCESS
+
     @with_repository(create=True, exclusive=True, manifest=False)
     @with_other_repository(key=True, compatibility=(Manifest.Operation.READ, ))
     def do_init(self, args, repository, *, other_repository=None, other_key=None):
@@ -4081,6 +4149,43 @@ class Archiver:
                                help='repository or archive to delete')
         subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
                                help='archives to delete')
+        define_archive_filters_group(subparser)
+
+        # borg transfer
+        transfer_epilog = process_epilog("""
+        This command transfers archives from one repository to another repository.
+
+        Suggested use:
+
+        # initialize DST_REPO reusing key material from SRC_REPO, so that
+        # chunking and chunk id generation will work in the same way as before.
+        borg init --other-location=SRC_REPO --encryption=DST_ENC DST_REPO
+
+        # transfer archives from SRC_REPO to DST_REPO
+        borg transfer --dry-run SRC_REPO DST_REPO  # check what it would do
+        borg transfer           SRC_REPO DST_REPO  # do it!
+        borg transfer --dry-run SRC_REPO DST_REPO  # check! anything left?
+
+        The default is to transfer all archives, including checkpoint archives.
+
+        You could use the misc. archive filter options to limit which archives it will
+        transfer, e.g. using the --prefix option. This is recommended for big
+        repositories with multiple data sets to keep the runtime per invocation lower.
+        """)
+        subparser = subparsers.add_parser('transfer', parents=[common_parser], add_help=False,
+                                          description=self.do_transfer.__doc__,
+                                          epilog=transfer_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='transfer of archives from another repository')
+        subparser.set_defaults(func=self.do_transfer)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository, just check')
+        subparser.add_argument('other_location', metavar='SRC_REPOSITORY',
+                               type=location_validator(archive=False, other=True),
+                               help='source repository')
+        subparser.add_argument('location', metavar='DST_REPOSITORY',
+                               type=location_validator(archive=False, other=False),
+                               help='destination repository')
         define_archive_filters_group(subparser)
 
         # borg diff

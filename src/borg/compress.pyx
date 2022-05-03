@@ -331,13 +331,51 @@ class ZSTD(DecidingCompressor):
         return dest[:osize]
 
 
-class ZLIB(CompressorBase):
+class ZLIB(DecidingCompressor):
     """
     zlib compression / decompression (python stdlib)
     """
-    ID = b'\x08\x00'  # not used here, see detect()
-                      # avoid all 0x.8.. IDs elsewhere!
+    ID = b'\x05\x00'
     name = 'zlib'
+
+    def __init__(self, level=6, **kwargs):
+        super().__init__(**kwargs)
+        self.level = level
+
+    def _decide(self, data):
+        """
+        Decides what to do with *data*. Returns (compressor, zlib_data).
+
+        *zlib_data* is the ZLIB result if *compressor* is ZLIB as well, otherwise it is None.
+        """
+        zlib_data = zlib.compress(data, self.level)
+        if len(zlib_data) < len(data):
+            return self, zlib_data
+        else:
+            return NONE_COMPRESSOR, None
+
+    def decompress(self, data):
+        data = super().decompress(data)
+        try:
+            return zlib.decompress(data)
+        except zlib.error as e:
+            raise DecompressionError(str(e)) from None
+
+
+class ZLIB_legacy(CompressorBase):
+    """
+    zlib compression / decompression (python stdlib)
+
+    Note: This is the legacy ZLIB support as used by borg < 1.3.
+          It still suffers from attic *only* supporting zlib and not having separate
+          ID bytes to differentiate between differently compressed chunks.
+          This just works because zlib compressed stuff always starts with 0x.8.. bytes.
+          Newer borg uses the ZLIB class that has separate ID bytes (as all the other
+          compressors) and does not need this hack.
+    """
+    ID = b'\x08\x00'  # not used here, see detect()
+    # avoid all 0x.8.. IDs elsewhere!
+    name = 'zlib_legacy'
 
     @classmethod
     def detect(cls, data):
@@ -502,13 +540,14 @@ COMPRESSOR_TABLE = {
     CNONE.name: CNONE,
     LZ4.name: LZ4,
     ZLIB.name: ZLIB,
+    ZLIB_legacy.name: ZLIB_legacy,
     LZMA.name: LZMA,
     Auto.name: Auto,
     ZSTD.name: ZSTD,
     ObfuscateSize.name: ObfuscateSize,
 }
 # List of possible compression types. Does not include Auto, since it is a meta-Compressor.
-COMPRESSOR_LIST = [LZ4, ZSTD, CNONE, ZLIB, LZMA, ObfuscateSize, ]  # check fast stuff first
+COMPRESSOR_LIST = [LZ4, ZSTD, CNONE, ZLIB, ZLIB_legacy, LZMA, ObfuscateSize, ]  # check fast stuff first
 
 def get_compressor(name, **kwargs):
     cls = COMPRESSOR_TABLE[name]
@@ -554,7 +593,7 @@ class CompressionSpec:
         self.name = values[0]
         if self.name in ('none', 'lz4', ):
             return
-        elif self.name in ('zlib', 'lzma', ):
+        elif self.name in ('zlib', 'lzma', 'zlib_legacy'):  # zlib_legacy just for testing
             if count < 2:
                 level = 6  # default compression level in py stdlib
             elif count == 2:
@@ -597,7 +636,7 @@ class CompressionSpec:
     def compressor(self):
         if self.name in ('none', 'lz4', ):
             return get_compressor(self.name)
-        elif self.name in ('zlib', 'lzma', 'zstd', ):
+        elif self.name in ('zlib', 'lzma', 'zstd', 'zlib_legacy'):
             return get_compressor(self.name, level=self.level)
         elif self.name == 'auto':
             return get_compressor(self.name, compressor=self.inner.compressor)

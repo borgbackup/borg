@@ -348,6 +348,7 @@ class Archiver:
         def upgrade_item(item):
             """upgrade item as needed, get rid of legacy crap"""
             item._dict.pop('acl', None)  # remove remnants of bug in attic <= 0.13
+            item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
             return item
 
         dry_run = args.dry_run

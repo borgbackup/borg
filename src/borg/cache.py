@@ -19,7 +19,7 @@ from .helpers import Location
 from .helpers import Error
 from .helpers import Manifest
 from .helpers import get_cache_dir, get_security_dir
-from .helpers import int_to_bigint, bigint_to_int, bin_to_hex, parse_stringified_list
+from .helpers import bin_to_hex, parse_stringified_list
 from .helpers import format_file_size
 from .helpers import safe_ns
 from .helpers import yes
@@ -28,6 +28,7 @@ from .helpers import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .helpers import set_ec, EXIT_WARNING
 from .helpers import safe_unlink
 from .helpers import msgpack
+from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError
@@ -623,7 +624,7 @@ class LocalCache(CacheStatsMixin):
                     # this is to avoid issues with filesystem snapshots and cmtime granularity.
                     # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                     entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if entry.age == 0 and bigint_to_int(entry.cmtime) < self._newest_cmtime or \
+                    if entry.age == 0 and timestamp_to_int(entry.cmtime) < self._newest_cmtime or \
                        entry.age > 0 and entry.age < ttl:
                         msgpack.pack((path_hash, entry), fd)
                         entry_count += 1
@@ -1018,10 +1019,10 @@ class LocalCache(CacheStatsMixin):
         if 'i' in cache_mode and entry.inode != st.st_ino:
             files_cache_logger.debug('KNOWN-CHANGED: file inode number has changed: %r', hashed_path)
             return True, None
-        if 'c' in cache_mode and bigint_to_int(entry.cmtime) != st.st_ctime_ns:
+        if 'c' in cache_mode and timestamp_to_int(entry.cmtime) != st.st_ctime_ns:
             files_cache_logger.debug('KNOWN-CHANGED: file ctime has changed: %r', hashed_path)
             return True, None
-        elif 'm' in cache_mode and bigint_to_int(entry.cmtime) != st.st_mtime_ns:
+        elif 'm' in cache_mode and timestamp_to_int(entry.cmtime) != st.st_mtime_ns:
             files_cache_logger.debug('KNOWN-CHANGED: file mtime has changed: %r', hashed_path)
             return True, None
         # we ignored the inode number in the comparison above or it is still same.
@@ -1049,7 +1050,7 @@ class LocalCache(CacheStatsMixin):
         elif 'm' in cache_mode:
             cmtime_type = 'mtime'
             cmtime_ns = safe_ns(st.st_mtime_ns)
-        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_bigint(cmtime_ns), chunk_ids=ids)
+        entry = FileCacheEntry(age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_timestamp(cmtime_ns), chunk_ids=ids)
         self.files[path_hash] = msgpack.packb(entry)
         self._newest_cmtime = max(self._newest_cmtime or 0, cmtime_ns)
         files_cache_logger.debug('FILES-CACHE-UPDATE: put %r [has %s] <- %r',

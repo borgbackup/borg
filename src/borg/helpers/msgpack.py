@@ -24,7 +24,7 @@ from msgpack import unpackb as mp_unpackb
 from msgpack import unpack as mp_unpack
 from msgpack import version as mp_version
 
-from msgpack import ExtType
+from msgpack import ExtType, Timestamp
 from msgpack import OutOfData
 
 
@@ -164,7 +164,7 @@ def get_limited_unpacker(kind):
     return Unpacker(**args)
 
 
-def bigint_to_int(mtime):
+def bigint_to_int(mtime):  # legacy
     """Convert bytearray to int
     """
     if isinstance(mtime, bytes):
@@ -172,7 +172,7 @@ def bigint_to_int(mtime):
     return mtime
 
 
-def int_to_bigint(value):
+def int_to_bigint(value):  # legacy
     """Convert integers larger than 64 bits to bytearray
 
     Smaller integers are left alone
@@ -180,3 +180,14 @@ def int_to_bigint(value):
     if value.bit_length() > 63:
         return value.to_bytes((value.bit_length() + 9) // 8, 'little', signed=True)
     return value
+
+
+def int_to_timestamp(ns):
+    return Timestamp.from_unix_nano(ns)
+
+
+def timestamp_to_int(ts):
+    if isinstance(ts, Timestamp):
+        return ts.to_unix_nano()
+    # legacy support note: we need to keep the bigint conversion for compatibility with borg < 1.3 archives.
+    return bigint_to_int(ts)

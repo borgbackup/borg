@@ -19,6 +19,7 @@ logger = create_logger()
 
 from .errors import Error
 from .fs import get_keys_dir
+from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, to_localtime, safe_timestamp, safe_s
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
@@ -1043,6 +1044,8 @@ def prepare_dump_dict(d):
                 value = decode_tuple(value)
             elif isinstance(value, bytes):
                 value = decode_bytes(value)
+            elif isinstance(value, Timestamp):
+                value = value.to_unix_nano()
             if isinstance(key, bytes):
                 key = key.decode()
             res[key] = value

@@ -3,6 +3,7 @@ import pytest
 from ..cache import ChunkListEntry
 from ..item import Item
 from ..helpers import StableDict
+from ..helpers.msgpack import Timestamp
 
 
 def test_item_empty():
@@ -77,15 +78,15 @@ def test_item_int_property():
         item.mode = "invalid"
 
 
-def test_item_bigint_property():
+def test_item_mptimestamp_property():
     item = Item()
     small, big = 42, 2 ** 65
     item.atime = small
     assert item.atime == small
-    assert item.as_dict() == {'atime': small}
+    assert item.as_dict() == {'atime': Timestamp.from_unix_nano(small)}
     item.atime = big
     assert item.atime == big
-    assert item.as_dict() == {'atime': b'\0' * 8 + b'\x02'}
+    assert item.as_dict() == {'atime': Timestamp.from_unix_nano(big)}
 
 
 def test_item_user_group_none():

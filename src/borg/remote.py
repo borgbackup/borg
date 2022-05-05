@@ -38,7 +38,8 @@ logger = create_logger(__name__)
 
 RPC_PROTOCOL_VERSION = 2
 BORG_VERSION = parse_version(__version__)
-MSGID, MSG, ARGS, RESULT = b'i', b'm', b'a', b'r'
+MSGID, MSG, ARGS, RESULT = 'i', 'm', 'a', 'r'  # pack
+MSGIDB, MSGB, ARGSB, RESULTB = b'i', b'm', b'a', b'r'  # unpack
 
 MAX_INFLIGHT = 100
 
@@ -216,9 +217,9 @@ class RepositoryServer:  # pragma: no cover
                 for unpacked in unpacker:
                     if isinstance(unpacked, dict):
                         dictFormat = True
-                        msgid = unpacked[MSGID]
-                        method = unpacked[MSG].decode()
-                        args = decode_keys(unpacked[ARGS])
+                        msgid = unpacked[MSGIDB]
+                        method = unpacked[MSGB].decode()
+                        args = decode_keys(unpacked[ARGSB])
                     elif isinstance(unpacked, tuple) and len(unpacked) == 4:
                         dictFormat = False
                         # The first field 'type' was always 1 and has always been ignored
@@ -256,21 +257,21 @@ class RepositoryServer:  # pragma: no cover
 
                             try:
                                 msg = msgpack.packb({MSGID: msgid,
-                                                    b'exception_class': e.__class__.__name__,
-                                                    b'exception_args': e.args,
-                                                    b'exception_full': ex_full,
-                                                    b'exception_short': ex_short,
-                                                    b'exception_trace': ex_trace,
-                                                    b'sysinfo': sysinfo()})
+                                                    'exception_class': e.__class__.__name__,
+                                                    'exception_args': e.args,
+                                                    'exception_full': ex_full,
+                                                    'exception_short': ex_short,
+                                                    'exception_trace': ex_trace,
+                                                    'sysinfo': sysinfo()})
                             except TypeError:
                                 msg = msgpack.packb({MSGID: msgid,
-                                                    b'exception_class': e.__class__.__name__,
-                                                    b'exception_args': [x if isinstance(x, (str, bytes, int)) else None
-                                                                        for x in e.args],
-                                                    b'exception_full': ex_full,
-                                                    b'exception_short': ex_short,
-                                                    b'exception_trace': ex_trace,
-                                                    b'sysinfo': sysinfo()})
+                                                    'exception_class': e.__class__.__name__,
+                                                    'exception_args': [x if isinstance(x, (str, bytes, int)) else None
+                                                                       for x in e.args],
+                                                    'exception_full': ex_full,
+                                                    'exception_short': ex_short,
+                                                    'exception_trace': ex_trace,
+                                                    'sysinfo': sysinfo()})
 
                             os_write(stdout_fd, msg)
                         else:
@@ -570,7 +571,7 @@ class RemoteRepository:
         try:
             try:
                 version = self.call('negotiate', {'client_data': {
-                    b'client_version': BORG_VERSION,
+                    'client_version': BORG_VERSION,
                 }})
             except ConnectionClosed:
                 raise ConnectionClosedWithHint('Is borg working on the server?') from None
@@ -791,7 +792,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     if b'exception_class' in unpacked:
                         handle_error(unpacked)
                     else:
-                        yield unpacked[RESULT]
+                        yield unpacked[RESULTB]
                         if not waiting_for and not calls:
                             return
                 except KeyError:
@@ -811,7 +812,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         if b'exception_class' in unpacked:
                             handle_error(unpacked)
                         else:
-                            yield unpacked[RESULT]
+                            yield unpacked[RESULTB]
             if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
                 w_fds = [self.stdin_fd]
             else:
@@ -828,15 +829,15 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     self.unpacker.feed(data)
                     for unpacked in self.unpacker:
                         if isinstance(unpacked, dict):
-                            msgid = unpacked[MSGID]
+                            msgid = unpacked[MSGIDB]
                         elif isinstance(unpacked, tuple) and len(unpacked) == 4:
                             # The first field 'type' was always 1 and has always been ignored
                             _, msgid, error, res = unpacked
                             if error:
                                 # ignore res, because it is only a fixed string anyway.
-                                unpacked = {MSGID: msgid, b'exception_class': error}
+                                unpacked = {MSGIDB: msgid, b'exception_class': error}
                             else:
-                                unpacked = {MSGID: msgid, RESULT: res}
+                                unpacked = {MSGIDB: msgid, RESULTB: res}
                         else:
                             raise UnexpectedRPCDataFormatFromServer(data)
                         if msgid in self.ignore_responses:
@@ -847,7 +848,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             else:
                                 # we currently do not have async result values except "None",
                                 # so we do not add them into async_responses.
-                                if unpacked[RESULT] is not None:
+                                if unpacked[RESULTB] is not None:
                                     self.async_responses[msgid] = unpacked
                         else:
                             self.responses[msgid] = unpacked

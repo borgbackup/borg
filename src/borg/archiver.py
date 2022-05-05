@@ -55,7 +55,7 @@ try:
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
+    from .helpers import remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from .helpers import timestamp
     from .helpers import get_cache_dir, os_stat
@@ -1944,12 +1944,12 @@ class Archiver:
                 print('This repository is not encrypted, cannot enable TAM.')
                 return EXIT_ERROR
 
-            if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
+            if not manifest.tam_verified or not manifest.config.get('tam_required', False):
                 # The standard archive listing doesn't include the archive ID like in borg 1.1.x
                 print('Manifest contents:')
                 for archive_info in manifest.archives.list(sort_by=['ts']):
                     print(format_archive(archive_info), '[%s]' % bin_to_hex(archive_info.id))
-                manifest.config[b'tam_required'] = True
+                manifest.config['tam_required'] = True
                 manifest.write()
                 repository.commit(compact=False)
             if not key.tam_required:
@@ -1972,7 +1972,7 @@ class Archiver:
                 print('Key updated')
                 if hasattr(key, 'find_key'):
                     print('Key location:', key.find_key())
-            manifest.config[b'tam_required'] = False
+            manifest.config['tam_required'] = False
             manifest.write()
             repository.commit(compact=False)
         else:
@@ -2304,7 +2304,7 @@ class Archiver:
         """dump decoded archive metadata (not: data)"""
 
         try:
-            archive_meta_orig = manifest.archives.get_raw_dict()[safe_encode(args.location.archive)]
+            archive_meta_orig = manifest.archives.get_raw_dict()[args.location.archive]
         except KeyError:
             raise Archive.DoesNotExist(args.location.archive)
 
@@ -2321,7 +2321,7 @@ class Archiver:
             fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
             fd.write(',\n')
 
-            data = key.decrypt(archive_meta_orig[b'id'], repository.get(archive_meta_orig[b'id']))
+            data = key.decrypt(archive_meta_orig['id'], repository.get(archive_meta_orig['id']))
             archive_org_dict = msgpack.unpackb(data, object_hook=StableDict)
 
             fd.write('    "_meta":\n')

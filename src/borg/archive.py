@@ -34,7 +34,7 @@ from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
-from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
+from .helpers import safe_encode, make_path_safe, remove_surrogates
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
@@ -479,7 +479,6 @@ class Archive:
     def load(self, id):
         self.id = id
         self.metadata = self._load_meta(self.id)
-        self.metadata.cmdline = [safe_decode(arg) for arg in self.metadata.cmdline]
         self.name = self.metadata.name
         self.comment = self.metadata.get('comment', '')
 
@@ -1515,7 +1514,7 @@ class RobustUnpacker:
     """
     def __init__(self, validator, item_keys):
         super().__init__()
-        self.item_keys = [msgpack.packb(name.encode()) for name in item_keys]
+        self.item_keys = [msgpack.packb(name) for name in item_keys]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -1734,7 +1733,7 @@ class ArchiveChecker:
         # lost manifest on a older borg version than the most recent one that was ever used
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
-        archive_keys_serialized = [msgpack.packb(name.encode()) for name in ARCHIVE_KEYS]
+        archive_keys_serialized = [msgpack.packb(name) for name in ARCHIVE_KEYS]
         pi = ProgressIndicatorPercent(total=len(self.chunks), msg="Rebuilding manifest %6.2f%%", step=0.01,
                                       msgid='check.rebuild_manifest')
         for chunk_id, _ in self.chunks.iteritems():
@@ -1881,9 +1880,9 @@ class ArchiveChecker:
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            item_keys = frozenset(key.encode() for key in self.manifest.item_keys)
-            required_item_keys = frozenset(key.encode() for key in REQUIRED_ITEM_KEYS)
-            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and b'path' in item,
+            item_keys = self.manifest.item_keys
+            required_item_keys = REQUIRED_ITEM_KEYS
+            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and 'path' in item,
                                       self.manifest.item_keys)
             _state = 0
 
@@ -1905,7 +1904,7 @@ class ArchiveChecker:
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
                     return False, 'not a dictionary'
-                keys = set(obj)
+                keys = set(k.decode('utf-8', errors='replace') for k in obj)
                 if not required_item_keys.issubset(keys):
                     return False, 'missing required keys: ' + list_keys_safe(required_item_keys - keys)
                 if not keys.issubset(item_keys):
@@ -1991,7 +1990,6 @@ class ArchiveChecker:
                 archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
                 if archive.version != 2:
                     raise Exception('Unknown archive metadata version')
-                archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 for item in robust_iterator(archive):

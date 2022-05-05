@@ -186,8 +186,8 @@ class RobustUnpackerTestCase(BaseTestCase):
         return result
 
     def test_extra_garbage_no_sync(self):
-        chunks = [(False, [self.make_chunks([b'foo', b'bar'])]),
-                  (False, [b'garbage'] + [self.make_chunks([b'boo', b'baz'])])]
+        chunks = [(False, [self.make_chunks(['foo', 'bar'])]),
+                  (False, [b'garbage'] + [self.make_chunks(['boo', 'baz'])])]
         result = self.process(chunks)
         self.assert_equal(result, [
             {b'path': b'foo'}, {b'path': b'bar'},
@@ -203,19 +203,19 @@ class RobustUnpackerTestCase(BaseTestCase):
         return parts
 
     def test_correct_stream(self):
-        chunks = self.split(self.make_chunks([b'foo', b'bar', b'boo', b'baz']), 2)
+        chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 2)
         input = [(False, chunks)]
         result = self.process(input)
         self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'bar'}, {b'path': b'boo'}, {b'path': b'baz'}])
 
     def test_missing_chunk(self):
-        chunks = self.split(self.make_chunks([b'foo', b'bar', b'boo', b'baz']), 4)
+        chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 4)
         input = [(False, chunks[:3]), (True, chunks[4:])]
         result = self.process(input)
         self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
 
     def test_corrupt_chunk(self):
-        chunks = self.split(self.make_chunks([b'foo', b'bar', b'boo', b'baz']), 4)
+        chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 4)
         input = [(False, chunks[:3]), (True, [b'gar', b'bage'] + chunks[3:])]
         result = self.process(input)
         self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
@@ -242,7 +242,7 @@ IK = sorted(list(ITEM_KEYS))
 
 @pytest.mark.parametrize('packed',
     [msgpack.packb(o) for o in [
-        {b'path': b'/a/b/c'},  # small (different msgpack mapping type!)
+        {'path': b'/a/b/c'},  # small (different msgpack mapping type!)
         OrderedDict((k, b'') for k in IK),  # as big (key count) as it gets
         OrderedDict((k, b'x' * 1000) for k in IK),  # as big (key count and volume) as it gets
     ]])
@@ -251,7 +251,7 @@ def test_valid_msgpacked_items(packed, item_keys_serialized):
 
 
 def test_key_length_msgpacked_items():
-    key = b'x' * 32  # 31 bytes is the limit for fixstr msgpack type
+    key = 'x' * 32  # 31 bytes is the limit for fixstr msgpack type
     data = {key: b''}
     item_keys_serialized = [msgpack.packb(key), ]
     assert valid_msgpacked_dict(msgpack.packb(data), item_keys_serialized)

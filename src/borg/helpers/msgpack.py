@@ -1,20 +1,55 @@
+"""
+wrapping msgpack
+================
+
+Due to the planned breaking api changes in upstream msgpack, we wrap it the way we need it -
+to avoid having lots of clutter in the calling code. see tickets #968 and #3632.
+
+Packing
+-------
+- use_bin_type = True (used by borg since borg 1.3)
+  This is used to generate output according to new msgpack 2.0 spec.
+  This cleanly keeps bytes and str types apart.
+
+- use_bin_type = False (used by borg < 1.3)
+  This creates output according to the older msgpack spec.
+  BAD: str and bytes were packed into same "raw" representation.
+
+- unicode_errors = 'surrogateescape'
+  Guess backup applications are one of the rare cases when this needs to be used.
+  It is needed because borg also needs to deal with data that does not cleanly encode/decode using utf-8.
+  There's a lot of crap out there, e.g. in filenames and as a backup tool, we must keep them as good as possible.
+
+Unpacking
+---------
+- raw = True (the old way, used by borg <= 1.3)
+  This is currently still needed to not try to decode "raw" msgpack objects.
+  These could come either from str (new or old msgpack) or bytes (old msgpack).
+  Thus, we basically must know what we want and either keep the bytes we get
+  or decode them to str, if we want str.
+
+- raw = False (the new way)
+  This can be used in future, when we do not have to deal with data any more that was packed the old way.
+  It will then unpack according to the msgpack 2.0 spec format and directly output bytes or str.
+
+- unicode_errors = 'surrogateescape' -> see description above (will be used when raw is False).
+
+As of borg 1.3, we have the first part on the way to fix the msgpack str/bytes mess, #968.
+borg now still needs to **read** old repos, archives, keys, ... so we can not yet fix it completely.
+But from now on, borg only **writes** new data according to the new msgpack spec,
+thus we can complete the fix for #968 in a later borg release.
+
+current way in msgpack terms
+----------------------------
+
+- pack with use_bin_type=True (according to msgpack 2.0 spec)
+- packs str -> raw and bytes -> bin
+- unpack with raw=True (aka "the old way")
+- unpacks raw to bytes (thus we always need to decode manually if we want str)
+"""
+
 from .datastruct import StableDict
 from ..constants import *  # NOQA
-
-# wrapping msgpack ---------------------------------------------------------------------------------------------------
-#
-# due to the planned breaking api changes in upstream msgpack, we wrap it the way we need it -
-# to avoid having lots of clutter in the calling code. see tickets #968 and #3632.
-#
-# Packing
-# -------
-# use_bin_type = False is needed to generate the old msgpack format (not msgpack 2.0 spec) as borg always did.
-# unicode_errors = None is needed because usage of it is deprecated
-#
-# Unpacking
-# ---------
-# raw = True is needed to unpack the old msgpack format to bytes (not str, about the decoding see item.pyx).
-# unicode_errors = None is needed because usage of it is deprecated
 
 from msgpack import Packer as mp_Packer
 from msgpack import packb as mp_packb
@@ -30,6 +65,10 @@ from msgpack import OutOfData
 
 version = mp_version
 
+USE_BIN_TYPE = True
+RAW = True  # should become False later when we do not need to read old stuff any more
+UNICODE_ERRORS = 'surrogateescape'  # previously done by safe_encode, safe_decode
+
 
 class PackException(Exception):
     """Exception while msgpack packing"""
@@ -40,10 +79,10 @@ class UnpackException(Exception):
 
 
 class Packer(mp_Packer):
-    def __init__(self, *, default=None, unicode_errors=None,
-                 use_single_float=False, autoreset=True, use_bin_type=False,
+    def __init__(self, *, default=None, unicode_errors=UNICODE_ERRORS,
+                 use_single_float=False, autoreset=True, use_bin_type=USE_BIN_TYPE,
                  strict_types=False):
-        assert unicode_errors is None
+        assert unicode_errors == UNICODE_ERRORS
         super().__init__(default=default, unicode_errors=unicode_errors,
                          use_single_float=use_single_float, autoreset=autoreset, use_bin_type=use_bin_type,
                          strict_types=strict_types)
@@ -55,16 +94,16 @@ class Packer(mp_Packer):
             raise PackException(e)
 
 
-def packb(o, *, use_bin_type=False, unicode_errors=None, **kwargs):
-    assert unicode_errors is None
+def packb(o, *, use_bin_type=USE_BIN_TYPE, unicode_errors=UNICODE_ERRORS, **kwargs):
+    assert unicode_errors == UNICODE_ERRORS
     try:
         return mp_packb(o, use_bin_type=use_bin_type, unicode_errors=unicode_errors, **kwargs)
     except Exception as e:
         raise PackException(e)
 
 
-def pack(o, stream, *, use_bin_type=False, unicode_errors=None, **kwargs):
-    assert unicode_errors is None
+def pack(o, stream, *, use_bin_type=USE_BIN_TYPE, unicode_errors=UNICODE_ERRORS, **kwargs):
+    assert unicode_errors == UNICODE_ERRORS
     try:
         return mp_pack(o, stream, use_bin_type=use_bin_type, unicode_errors=unicode_errors, **kwargs)
     except Exception as e:
@@ -72,13 +111,13 @@ def pack(o, stream, *, use_bin_type=False, unicode_errors=None, **kwargs):
 
 
 class Unpacker(mp_Unpacker):
-    def __init__(self, file_like=None, *, read_size=0, use_list=True, raw=True,
+    def __init__(self, file_like=None, *, read_size=0, use_list=True, raw=RAW,
                  object_hook=None, object_pairs_hook=None, list_hook=None,
-                 unicode_errors=None, max_buffer_size=0,
+                 unicode_errors=UNICODE_ERRORS, max_buffer_size=0,
                  ext_hook=ExtType,
                  strict_map_key=False):
-        assert raw is True
-        assert unicode_errors is None
+        assert raw == RAW
+        assert unicode_errors == UNICODE_ERRORS
         kw = dict(file_like=file_like, read_size=read_size, use_list=use_list, raw=raw,
                   object_hook=object_hook, object_pairs_hook=object_pairs_hook, list_hook=list_hook,
                   unicode_errors=unicode_errors, max_buffer_size=max_buffer_size,
@@ -105,10 +144,11 @@ class Unpacker(mp_Unpacker):
     next = __next__
 
 
-def unpackb(packed, *, raw=True, unicode_errors=None,
+def unpackb(packed, *, raw=RAW, unicode_errors=UNICODE_ERRORS,
             strict_map_key=False,
             **kwargs):
-    assert unicode_errors is None
+    assert raw == RAW
+    assert unicode_errors == UNICODE_ERRORS
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors,
                   strict_map_key=strict_map_key)
@@ -118,10 +158,11 @@ def unpackb(packed, *, raw=True, unicode_errors=None,
         raise UnpackException(e)
 
 
-def unpack(stream, *, raw=True, unicode_errors=None,
+def unpack(stream, *, raw=RAW, unicode_errors=UNICODE_ERRORS,
            strict_map_key=False,
            **kwargs):
-    assert unicode_errors is None
+    # assert raw == RAW
+    assert unicode_errors == UNICODE_ERRORS
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors,
                   strict_map_key=strict_map_key)

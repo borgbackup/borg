@@ -384,19 +384,11 @@ static inline int unpack_callback_map_end(unpack_user* u)
 
 static inline int unpack_callback_raw(unpack_user* u, const char* b, const char* p, unsigned int length)
 {
-    /* raw = what Borg uses for binary stuff and strings as well */
+    /* raw = what Borg uses for text stuff */
     /* Note: p points to an internal buffer which contains l bytes. */
     (void)b;
 
     switch(u->expect) {
-    case expect_key:
-        if(length != 32) {
-            SET_LAST_ERROR("Incorrect key length");
-            return -1;
-        }
-        memcpy(u->current.key, p, 32);
-        u->expect = expect_size;
-        break;
     case expect_map_key:
         if(length == 6 && !memcmp("chunks", p, 6)) {
             u->expect = expect_chunks_begin;
@@ -409,19 +401,31 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
             u->expect = expect_map_item_end;
         }
         break;
-    default:
-        if(u->inside_chunks) {
-            SET_LAST_ERROR("Unexpected bytes in chunks structure");
-            return -1;
-        }
     }
     return 0;
 }
 
 static inline int unpack_callback_bin(unpack_user* u, const char* b, const char* p, unsigned int length)
 {
-    (void)u; (void)b; (void)p; (void)length;
-    UNEXPECTED("bin");
+    /* bin = what Borg uses for binary stuff */
+    /* Note: p points to an internal buffer which contains l bytes. */
+    (void)b;
+
+    switch(u->expect) {
+    case expect_key:
+        if(length != 32) {
+            SET_LAST_ERROR("Incorrect key length");
+            return -1;
+        }
+        memcpy(u->current.key, p, 32);
+        u->expect = expect_size;
+        break;
+    default:
+        if(u->inside_chunks) {
+            SET_LAST_ERROR("Unexpected bytes in chunks structure");
+            return -1;
+        }
+    }
     return 0;
 }
 

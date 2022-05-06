@@ -232,24 +232,24 @@ class KeyBase:
         unpacker = get_limited_unpacker('manifest')
         unpacker.feed(data)
         unpacked = unpacker.unpack()
-        if b'tam' not in unpacked:
+        if 'tam' not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
             else:
                 logger.debug('TAM not found and not required')
                 return unpacked, False
-        tam = unpacked.pop(b'tam', None)
+        tam = unpacked.pop('tam', None)
         if not isinstance(tam, dict):
             raise TAMInvalid()
-        tam_type = tam.get(b'type', b'<none>').decode('ascii', 'replace')
+        tam_type = tam.get('type', '<none>')
         if tam_type != 'HKDF_HMAC_SHA512':
             if tam_required:
                 raise TAMUnsupportedSuiteError(repr(tam_type))
             else:
                 logger.debug('Ignoring TAM made with unsupported suite, since TAM is not required: %r', tam_type)
                 return unpacked, False
-        tam_hmac = tam.get(b'hmac')
-        tam_salt = tam.get(b'salt')
+        tam_hmac = tam.get('hmac')
+        tam_salt = tam.get('salt')
         if not isinstance(tam_salt, bytes) or not isinstance(tam_hmac, bytes):
             raise TAMInvalid()
         offset = data.index(tam_hmac)

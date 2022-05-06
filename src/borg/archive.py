@@ -1753,13 +1753,10 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
-        required_archive_keys = frozenset(key.encode() for key in REQUIRED_ARCHIVE_KEYS)
-
         def valid_archive(obj):
             if not isinstance(obj, dict):
                 return False
-            keys = set(obj)
-            return required_archive_keys.issubset(keys)
+            return REQUIRED_ARCHIVE_KEYS.issubset(obj)
 
         logger.info('Rebuilding missing manifest, this might take some time...')
         # as we have lost the manifest, we do not know any more what valid item keys we had.
@@ -1939,10 +1936,10 @@ class ArchiveChecker:
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
                     return False, 'not a dictionary'
-                # A bug in Attic up to and including release 0.13 added a (meaningless) b'acl' key to every item.
+                # A bug in Attic up to and including release 0.13 added a (meaningless) 'acl' key to every item.
                 # We ignore it here, should it exist. See test_attic013_acl_bug for details.
-                obj.pop(b'acl', None)
-                keys = set(k.decode('utf-8', errors='replace') for k in obj)
+                obj.pop('acl', None)
+                keys = set(obj)
                 if not required_item_keys.issubset(keys):
                     return False, 'missing required keys: ' + list_keys_safe(required_item_keys - keys)
                 if not keys.issubset(item_keys):

@@ -2,8 +2,7 @@
 wrapping msgpack
 ================
 
-Due to the planned breaking api changes in upstream msgpack, we wrap it the way we need it -
-to avoid having lots of clutter in the calling code. see tickets #968 and #3632.
+We wrap msgpack here the way we need it - to avoid having lots of clutter in the calling code.
 
 Packing
 -------
@@ -22,30 +21,27 @@ Packing
 
 Unpacking
 ---------
-- raw = True (the old way, used by borg <= 1.3)
-  This is currently still needed to not try to decode "raw" msgpack objects.
-  These could come either from str (new or old msgpack) or bytes (old msgpack).
-  Thus, we basically must know what we want and either keep the bytes we get
-  or decode them to str, if we want str.
-
-- raw = False (the new way)
-  This can be used in future, when we do not have to deal with data any more that was packed the old way.
+- raw = False (used by borg since borg 1.3)
+  We already can use this with borg 1.3 due to the want_bytes decoder.
+  This decoder can be removed in future, when we do not have to deal with data any more that was packed the old way.
   It will then unpack according to the msgpack 2.0 spec format and directly output bytes or str.
+
+- raw = True (the old way, used by borg < 1.3)
 
 - unicode_errors = 'surrogateescape' -> see description above (will be used when raw is False).
 
-As of borg 1.3, we have the first part on the way to fix the msgpack str/bytes mess, #968.
-borg now still needs to **read** old repos, archives, keys, ... so we can not yet fix it completely.
-But from now on, borg only **writes** new data according to the new msgpack spec,
-thus we can complete the fix for #968 in a later borg release.
+As of borg 1.3, we have fixed most of the msgpack str/bytes mess, #968.
+Borg now still needs to **read** old repos, archives, keys, ... so we can not yet fix it completely.
+But from now on, borg only **writes** new data according to the new msgpack 2.0 spec,
+thus we can remove some legacy support in a later borg release (some places are marked with "legacy").
 
 current way in msgpack terms
 ----------------------------
 
 - pack with use_bin_type=True (according to msgpack 2.0 spec)
 - packs str -> raw and bytes -> bin
-- unpack with raw=True (aka "the old way")
-- unpacks raw to bytes (thus we always need to decode manually if we want str)
+- unpack with raw=False (according to msgpack 2.0 spec, using unicode_errors='surrogateescape')
+- unpacks bin to bytes and raw to str (thus we need to re-encode manually if we want bytes from "raw")
 """
 
 from .datastruct import StableDict
@@ -66,8 +62,8 @@ from msgpack import OutOfData
 version = mp_version
 
 USE_BIN_TYPE = True
-RAW = True  # should become False later when we do not need to read old stuff any more
-UNICODE_ERRORS = 'surrogateescape'  # previously done by safe_encode, safe_decode
+RAW = False
+UNICODE_ERRORS = 'surrogateescape'
 
 
 class PackException(Exception):
@@ -161,7 +157,7 @@ def unpackb(packed, *, raw=RAW, unicode_errors=UNICODE_ERRORS,
 def unpack(stream, *, raw=RAW, unicode_errors=UNICODE_ERRORS,
            strict_map_key=False,
            **kwargs):
-    # assert raw == RAW
+    assert raw == RAW
     assert unicode_errors == UNICODE_ERRORS
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors,

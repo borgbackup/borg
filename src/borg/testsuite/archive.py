@@ -171,7 +171,7 @@ class RobustUnpackerTestCase(BaseTestCase):
         return b''.join(msgpack.packb({'path': item}) for item in items)
 
     def _validator(self, value):
-        return isinstance(value, dict) and value.get(b'path') in (b'foo', b'bar', b'boo', b'baz')
+        return isinstance(value, dict) and value.get('path') in ('foo', 'bar', 'boo', 'baz')
 
     def process(self, input):
         unpacker = RobustUnpacker(validator=self._validator, item_keys=ITEM_KEYS)
@@ -190,10 +190,10 @@ class RobustUnpackerTestCase(BaseTestCase):
                   (False, [b'garbage'] + [self.make_chunks(['boo', 'baz'])])]
         result = self.process(chunks)
         self.assert_equal(result, [
-            {b'path': b'foo'}, {b'path': b'bar'},
+            {'path': 'foo'}, {'path': 'bar'},
             103, 97, 114, 98, 97, 103, 101,
-            {b'path': b'boo'},
-            {b'path': b'baz'}])
+            {'path': 'boo'},
+            {'path': 'baz'}])
 
     def split(self, left, length):
         parts = []
@@ -206,19 +206,19 @@ class RobustUnpackerTestCase(BaseTestCase):
         chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 2)
         input = [(False, chunks)]
         result = self.process(input)
-        self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'bar'}, {b'path': b'boo'}, {b'path': b'baz'}])
+        self.assert_equal(result, [{'path': 'foo'}, {'path': 'bar'}, {'path': 'boo'}, {'path': 'baz'}])
 
     def test_missing_chunk(self):
         chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 4)
         input = [(False, chunks[:3]), (True, chunks[4:])]
         result = self.process(input)
-        self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
+        self.assert_equal(result, [{'path': 'foo'}, {'path': 'boo'}, {'path': 'baz'}])
 
     def test_corrupt_chunk(self):
         chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 4)
         input = [(False, chunks[:3]), (True, [b'gar', b'bage'] + chunks[3:])]
         result = self.process(input)
-        self.assert_equal(result, [{b'path': b'foo'}, {b'path': b'boo'}, {b'path': b'baz'}])
+        self.assert_equal(result, [{'path': 'foo'}, {'path': 'boo'}, {'path': 'baz'}])
 
 
 @pytest.fixture

@@ -60,6 +60,15 @@ def fix_tuple_of_str_and_int(t):
     return t
 
 
+def want_bytes(v):
+    """we know that we want bytes and the value should be bytes"""
+    # legacy support: it being str can be caused by msgpack unpack decoding old data that was packed with use_bin_type=False
+    if isinstance(v, str):
+        v = v.encode('utf-8', errors='surrogateescape')
+    assert isinstance(v, bytes)
+    return v
+
+
 class PropDict:
     """
     Manage a dictionary via properties.
@@ -204,10 +213,10 @@ class Item(PropDict):
     user = PropDict._make_property('user', (str, type(None)), 'surrogate-escaped str or None')
     group = PropDict._make_property('group', (str, type(None)), 'surrogate-escaped str or None')
 
-    acl_access = PropDict._make_property('acl_access', bytes)
-    acl_default = PropDict._make_property('acl_default', bytes)
-    acl_extended = PropDict._make_property('acl_extended', bytes)
-    acl_nfs4 = PropDict._make_property('acl_nfs4', bytes)
+    acl_access = PropDict._make_property('acl_access', bytes, decode=want_bytes)
+    acl_default = PropDict._make_property('acl_default', bytes, decode=want_bytes)
+    acl_extended = PropDict._make_property('acl_extended', bytes, decode=want_bytes)
+    acl_nfs4 = PropDict._make_property('acl_nfs4', bytes, decode=want_bytes)
 
     mode = PropDict._make_property('mode', int)
     uid = PropDict._make_property('uid', int)
@@ -224,7 +233,7 @@ class Item(PropDict):
     # compatibility note: this is a new feature, in old archives size will be missing.
     size = PropDict._make_property('size', int)
 
-    hlid = PropDict._make_property('hlid', bytes)  # hard link id: same value means same hard link.
+    hlid = PropDict._make_property('hlid', bytes, decode=want_bytes)  # hard link id: same value means same hard link.
     hardlink_master = PropDict._make_property('hardlink_master', bool)  # legacy
 
     chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
@@ -363,9 +372,9 @@ class EncryptedKey(PropDict):
     version = PropDict._make_property('version', int)
     algorithm = PropDict._make_property('algorithm', str)
     iterations = PropDict._make_property('iterations', int)
-    salt = PropDict._make_property('salt', bytes)
-    hash = PropDict._make_property('hash', bytes)
-    data = PropDict._make_property('data', bytes)
+    salt = PropDict._make_property('salt', bytes, decode=want_bytes)
+    hash = PropDict._make_property('hash', bytes, decode=want_bytes)
+    data = PropDict._make_property('data', bytes, decode=want_bytes)
     argon2_time_cost = PropDict._make_property('argon2_time_cost', int)
     argon2_memory_cost = PropDict._make_property('argon2_memory_cost', int)
     argon2_parallelism = PropDict._make_property('argon2_parallelism', int)
@@ -399,10 +408,10 @@ class Key(PropDict):
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     version = PropDict._make_property('version', int)
-    repository_id = PropDict._make_property('repository_id', bytes)
-    enc_key = PropDict._make_property('enc_key', bytes)
-    enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes)
-    id_key = PropDict._make_property('id_key', bytes)
+    repository_id = PropDict._make_property('repository_id', bytes, decode=want_bytes)
+    enc_key = PropDict._make_property('enc_key', bytes, decode=want_bytes)
+    enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes, decode=want_bytes)
+    id_key = PropDict._make_property('id_key', bytes, decode=want_bytes)
     chunk_seed = PropDict._make_property('chunk_seed', int)
     tam_required = PropDict._make_property('tam_required', bool)
 
@@ -443,7 +452,7 @@ class ArchiveItem(PropDict):
     chunker_params = PropDict._make_property('chunker_params', tuple)
     recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
     # recreate_source_id, recreate_args, recreate_partial_chunks were used in 1.1.0b1 .. b2
-    recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
+    recreate_source_id = PropDict._make_property('recreate_source_id', bytes, decode=want_bytes)
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
     recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
     size = PropDict._make_property('size', int)

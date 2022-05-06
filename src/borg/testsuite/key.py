@@ -360,23 +360,23 @@ class TestTAM:
         assert blob.startswith(b'\x82')
 
         unpacked = msgpack.unpackb(blob)
-        assert unpacked[b'tam'][b'type'] == b'HKDF_HMAC_SHA512'
+        assert unpacked['tam']['type'] == 'HKDF_HMAC_SHA512'
 
         unpacked, verified = key.unpack_and_verify_manifest(blob)
         assert verified
-        assert unpacked[b'foo'] == b'bar'
-        assert b'tam' not in unpacked
+        assert unpacked['foo'] == 'bar'
+        assert 'tam' not in unpacked
 
-    @pytest.mark.parametrize('which', (b'hmac', b'salt'))
+    @pytest.mark.parametrize('which', ('hmac', 'salt'))
     def test_tampered(self, key, which):
         data = {'foo': 'bar'}
         blob = key.pack_and_authenticate_metadata(data)
         assert blob.startswith(b'\x82')
 
         unpacked = msgpack.unpackb(blob, object_hook=StableDict)
-        assert len(unpacked[b'tam'][which]) == 64
-        unpacked[b'tam'][which] = unpacked[b'tam'][which][0:32] + bytes(32)
-        assert len(unpacked[b'tam'][which]) == 64
+        assert len(unpacked['tam'][which]) == 64
+        unpacked['tam'][which] = unpacked['tam'][which][0:32] + bytes(32)
+        assert len(unpacked['tam'][which]) == 64
         blob = msgpack.packb(unpacked)
 
         with pytest.raises(TAMInvalid):
@@ -421,4 +421,4 @@ def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
     load_me = RepoKey.detect(repository, manifest_data=None)
 
     assert to_dict(load_me) == to_dict(save_me)
-    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expected_algorithm.encode()
+    assert msgpack.unpackb(a2b_base64(saved))['algorithm'] == expected_algorithm

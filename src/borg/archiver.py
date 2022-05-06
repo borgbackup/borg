@@ -2331,7 +2331,7 @@ class Archiver:
 
             unpacker = msgpack.Unpacker(use_list=False, object_hook=StableDict)
             first = True
-            for item_id in archive_org_dict[b'items']:
+            for item_id in archive_org_dict['items']:
                 data = key.decrypt(item_id, repository.get(item_id))
                 unpacker.feed(data)
                 for item in unpacker:

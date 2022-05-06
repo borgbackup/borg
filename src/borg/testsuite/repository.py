@@ -655,8 +655,8 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             hints = msgpack.unpack(fd)
             fd.seek(0)
             # Corrupt segment refcount
-            assert hints[b'segments'][2] == 1
-            hints[b'segments'][2] = 0
+            assert hints['segments'][2] == 1
+            hints['segments'][2] = 0
             msgpack.pack(hints, fd)
             fd.truncate()
 

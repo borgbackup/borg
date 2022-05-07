@@ -1080,6 +1080,10 @@ will be slow because it would chunk all the files each time. If you set
 BORG_FILES_CACHE_TTL to at least 26 (or maybe even a small multiple of that),
 it would be much faster.
 
+Besides using a higher BORG_FILES_CACHE_TTL (which also increases memory usage),
+there is also BORG_FILES_CACHE_SUFFIX which can be used to have separate (smaller)
+files caches for each backup set instead of the default one (big) unified files cache.
+
 Another possible reason is that files don't always have the same path, for
 example if you mount a filesystem without stable mount points for each backup
 or if you are running the backup from a filesystem snapshot whose name is not

@@ -1,3 +1,6 @@
+# Note: these tests are part of the self test, do not use or import pytest functionality here.
+#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+
 from binascii import hexlify
 
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, UNENCRYPTED, IntegrityError
@@ -5,9 +8,6 @@ from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 
 from . import BaseTestCase
-
-# Note: these tests are part of the self test, do not use or import py.test functionality here.
-#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
 
 
 class CryptoTestCase(BaseTestCase):

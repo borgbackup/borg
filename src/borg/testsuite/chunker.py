@@ -1,11 +1,11 @@
+# Note: these tests are part of the self test, do not use or import pytest functionality here.
+#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+
 from io import BytesIO
 
 from ..chunker import ChunkerFixed, Chunker, get_chunker, buzhash, buzhash_update
 from ..constants import *  # NOQA
 from . import BaseTestCase
-
-# Note: these tests are part of the self test, do not use or import py.test functionality here.
-#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
 
 
 def cf(chunks):

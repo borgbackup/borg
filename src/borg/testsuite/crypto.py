@@ -5,9 +5,6 @@ from ..crypto.low_level import increment_iv, bytes16_to_int, int_to_bytes16
 from ..crypto.low_level import hkdf_hmac_sha512
 from . import BaseTestCase
 
-# Note: these tests are part of the self test, do not use or import py.test functionality here.
-#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
-
 
 class CryptoTestCase(BaseTestCase):
 

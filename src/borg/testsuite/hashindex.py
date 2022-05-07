@@ -1,3 +1,6 @@
+# Note: these tests are part of the self test, do not use or import pytest functionality here.
+#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+
 import base64
 import hashlib
 import io
@@ -9,9 +12,6 @@ from ..hashindex import NSIndex, ChunkIndex, ChunkIndexEntry
 from .. import hashindex
 from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from . import BaseTestCase, unopened_tempfile
-
-# Note: these tests are part of the self test, do not use or import py.test functionality here.
-#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
 
 
 def H(x):

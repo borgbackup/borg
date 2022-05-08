@@ -143,11 +143,15 @@ class Statistics:
         if dt is None or now - self.last_progress > dt:
             self.last_progress = now
             if self.output_json:
-                data = self.as_dict()
+                if not final:
+                    data = self.as_dict()
+                    data['path'] = remove_surrogates(item.path if item else '')
+                else:
+                    data = {}
                 data.update({
                     'time': time.time(),
                     'type': 'archive_progress',
-                    'path': remove_surrogates(item.path if item else ''),
+                    'finished': final,
                 })
                 msg = json.dumps(data)
                 end = '\n'

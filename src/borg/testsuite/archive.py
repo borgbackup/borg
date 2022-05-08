@@ -1,3 +1,4 @@
+import json
 from collections import OrderedDict
 from datetime import datetime, timezone
 from io import StringIO
@@ -59,6 +60,34 @@ This archive:                   20 B                 10 B                 10 B""
     assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
     assert repr(stats) == f'<Statistics object at {id(stats):#x} (20, 10, 10)>'
+
+
+def test_stats_progress_json(stats):
+    stats.output_json = True
+
+    out = StringIO()
+    stats.show_progress(item=Item(path='foo'), stream=out)
+    result = json.loads(out.getvalue())
+    assert result['type'] == 'archive_progress'
+    assert isinstance(result['time'], float)
+    assert result['finished'] is False
+    assert result['path'] == 'foo'
+    assert result['original_size'] == 20
+    assert result['compressed_size'] == 10
+    assert result['deduplicated_size'] == 10
+    assert result['nfiles'] == 0  # this counter gets updated elsewhere
+
+    out = StringIO()
+    stats.show_progress(stream=out, final=True)
+    result = json.loads(out.getvalue())
+    assert result['type'] == 'archive_progress'
+    assert isinstance(result['time'], float)
+    assert result['finished'] is True  # see #6570
+    assert 'path' not in result
+    assert 'original_size' not in result
+    assert 'compressed_size' not in result
+    assert 'deduplicated_size' not in result
+    assert 'nfiles' not in result
 
 
 class MockCache:

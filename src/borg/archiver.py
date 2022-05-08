@@ -59,7 +59,7 @@ try:
     from .helpers import timestamp
     from .helpers import get_cache_dir, os_stat
     from .helpers import Manifest, AI_HUMAN_SORT_KEYS
-    from .helpers import hardlinkable
+    from .helpers import HardLinkManager
     from .helpers import StableDict
     from .helpers import check_python, check_extension_modules
     from .helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
@@ -347,12 +347,12 @@ class Archiver:
 
         def upgrade_item(item):
             """upgrade item as needed, get rid of legacy crap"""
-            if item.get('hardlink_master', True) and 'source' not in item and hardlinkable(item.mode):
-                item._dict['hlid'] = hlid = hashlib.sha256(item._dict['path'])
-                hardlink_masters[hlid] = (item._dict.get('chunks'), item._dict.get('chunks_healthy'))
-            elif 'source' in item and hardlinkable(item.mode):
-                item._dict['hlid'] = hlid = hashlib.sha256(item._dict['source'])
-                chunks, chunks_healthy = hardlink_masters.get(hlid, (None, None))
+            if hlm.borg1_hardlink_master(item):
+                item._dict['hlid'] = hlid = hlm.hardlink_id(item._dict['path'])
+                hlm.remember(id=hlid, info=(item._dict.get('chunks'), item._dict.get('chunks_healthy')))
+            elif hlm.borg1_hardlink_slave(item):
+                item._dict['hlid'] = hlid = hlm.hardlink_id(item._dict['source'])
+                chunks, chunks_healthy = hlm.retrieve(id=hlid, default=(None, None))
                 if chunks is not None:
                     item._dict['chunks'] = chunks
                     for chunk_id, _, _ in chunks:
@@ -389,7 +389,7 @@ class Archiver:
             else:
                 if not dry_run:
                     print(f"{name}: copying archive to destination repo...")
-                hardlink_masters = {}
+                hlm = HardLinkManager(id_type=bytes, info_type=tuple)  # hlid -> (chunks, chunks_healthy)
                 other_archive = Archive(other_repository, other_key, other_manifest, name)
                 archive = Archive(repository, key, manifest, name, cache=cache, create=True) if not dry_run else None
                 for item in other_archive.iter_items():
@@ -1154,16 +1154,14 @@ class Archiver:
             self.print_file_status(status, path)
 
     @staticmethod
-    def build_filter(matcher, peek_and_store_hardlink_masters, strip_components):
+    def build_filter(matcher, strip_components):
         if strip_components:
             def item_filter(item):
                 matched = matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
-                peek_and_store_hardlink_masters(item, matched)
                 return matched
         else:
             def item_filter(item):
                 matched = matcher.match(item.path)
-                peek_and_store_hardlink_masters(item, matched)
                 return matched
         return item_filter
 
@@ -1186,33 +1184,18 @@ class Archiver:
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract or not has_link else None
+        hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        def peek_and_store_hardlink_masters(item, matched):
-            # not has_link:
-            # OS does not have hardlink capability thus we need to remember the chunks so that
-            # we can extract all hardlinks as separate normal (not-hardlinked) files instead.
-            #
-            # partial_extract and not matched and hardlinkable:
-            # we do not extract the very first hardlink, so we need to remember the chunks
-            # in hardlinks_master, so we can use them when we extract some 2nd+ hardlink item
-            # that has no chunks list.
-            if ((not has_link or (partial_extract and not matched and hardlinkable(item.mode))) and
-                    (item.get('hardlink_master', True) and 'source' not in item)):
-                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
-
-        filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
+        filter = self.build_filter(matcher, strip_components)
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1, msgid='extract')
             pi.output('Calculating total archive size for the progress indicator (might take long for large archives)')
-            extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
+            extracted_size = sum(item.get_size() for item in archive.iter_items(filter))
             pi.total = extracted_size
         else:
             pi = None
 
-        for item in archive.iter_items(filter, partial_extract=partial_extract,
-                                       preload=True, hardlink_masters=hardlink_masters):
+        for item in archive.iter_items(filter, preload=True):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -1227,13 +1210,13 @@ class Archiver:
                 logging.getLogger('borg.output.list').info(remove_surrogates(item.path))
             try:
                 if dry_run:
-                    archive.extract_item(item, dry_run=True, pi=pi)
+                    archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
                 else:
                     if stat.S_ISDIR(item.mode):
                         dirs.append(item)
                         archive.extract_item(item, stdout=stdout, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
+                        archive.extract_item(item, stdout=stdout, sparse=sparse, hlm=hlm,
                                              stripped_components=strip_components, original_path=orig_path, pi=pi)
             except (BackupOSError, BackupError) as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
@@ -1298,15 +1281,9 @@ class Archiver:
         progress = args.progress
         output_list = args.output_list
         strip_components = args.strip_components
-        partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract else None
+        hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        def peek_and_store_hardlink_masters(item, matched):
-            if ((partial_extract and not matched and hardlinkable(item.mode)) and
-                    (item.get('hardlink_master', True) and 'source' not in item)):
-                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
-
-        filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
+        filter = self.build_filter(matcher, strip_components)
 
         # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
         # where it never seeks on the passed fileobj.
@@ -1316,7 +1293,7 @@ class Archiver:
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Processing: %s', step=0.1, msgid='extract')
             pi.output('Calculating size')
-            extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
+            extracted_size = sum(item.get_size() for item in archive.iter_items(filter))
             pi.total = extracted_size
         else:
             pi = None
@@ -1351,9 +1328,8 @@ class Archiver:
             tarinfo.gid = item.gid
             tarinfo.uname = item.user or ''
             tarinfo.gname = item.group or ''
-            # The linkname in tar has the same dual use the 'source' attribute of Borg items,
-            # i.e. for symlinks it means the destination, while for hardlinks it refers to the
-            # file.
+            # The linkname in tar has 2 uses:
+            # for symlinks it means the destination, while for hardlinks it refers to the file.
             # Since hardlinks in tar have a different type code (LNKTYPE) the format might
             # support hardlinking arbitrary objects (including symlinks and directories), but
             # whether implementations actually support that is a whole different question...
@@ -1362,23 +1338,16 @@ class Archiver:
             modebits = stat.S_IFMT(item.mode)
             if modebits == stat.S_IFREG:
                 tarinfo.type = tarfile.REGTYPE
-                if 'source' in item:
-                    source = os.sep.join(item.source.split(os.sep)[strip_components:])
-                    if hardlink_masters is None:
-                        linkname = source
-                    else:
-                        chunks, linkname = hardlink_masters.get(item.source, (None, source))
-                    if linkname:
-                        # Master was already added to the archive, add a hardlink reference to it.
+                if 'hlid' in item:
+                    linkname = hlm.retrieve(id=item.hlid)
+                    if linkname is not None:
+                        # the first hardlink was already added to the archive, add a tar-hardlink reference to it.
                         tarinfo.type = tarfile.LNKTYPE
                         tarinfo.linkname = linkname
-                    elif chunks is not None:
-                        # The item which has the chunks was not put into the tar, therefore
-                        # we do that now and update hardlink_masters to reflect that.
-                        item.chunks = chunks
+                    else:
                         tarinfo.size = item.get_size()
                         stream = item_content_stream(item)
-                        hardlink_masters[item.get('source') or original_path] = (None, item.path)
+                        hlm.remember(id=item.hlid, info=item.path)
                 else:
                     tarinfo.size = item.get_size()
                     stream = item_content_stream(item)
@@ -1436,8 +1405,7 @@ class Archiver:
                 ph['BORG.item.meta'] = meta_text
             return ph
 
-        for item in archive.iter_items(filter, partial_extract=partial_extract,
-                                       preload=True, hardlink_masters=hardlink_masters):
+        for item in archive.iter_items(filter, preload=True):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -2072,12 +2040,11 @@ class Archiver:
             elif tarinfo.isdir():
                 status = tfo.process_dir(tarinfo=tarinfo, status='d', type=stat.S_IFDIR)
             elif tarinfo.issym():
-                status = tfo.process_link(tarinfo=tarinfo, status='s', type=stat.S_IFLNK)
+                status = tfo.process_symlink(tarinfo=tarinfo, status='s', type=stat.S_IFLNK)
             elif tarinfo.islnk():
-                # tar uses the same hardlink model as borg (rather vice versa); the first instance of a hardlink
-                # is stored as a regular file, later instances are special entries referencing back to the
-                # first instance.
-                status = tfo.process_link(tarinfo=tarinfo, status='h', type=stat.S_IFREG)
+                # tar uses a hardlink model like: the first instance of a hardlink is stored as a regular file,
+                # later instances are special entries referencing back to the first instance.
+                status = tfo.process_hardlink(tarinfo=tarinfo, status='h', type=stat.S_IFREG)
             elif tarinfo.isblk():
                 status = tfo.process_dev(tarinfo=tarinfo, status='b', type=stat.S_IFBLK)
             elif tarinfo.ischr():

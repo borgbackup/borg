@@ -132,9 +132,6 @@ Which file types, attributes, etc. are *not* preserved?
       Archive extraction has optional support to extract all-zero chunks as
       holes in a sparse file.
     * Some filesystem specific attributes, like btrfs NOCOW, see :ref:`platforms`.
-    * For hardlinked symlinks, the hardlinking can not be archived (and thus,
-      the hardlinking will not be done at extraction time). The symlinks will
-      be archived and extracted as non-hardlinked symlinks, see :issue:`2379`.
 
 Are there other known limitations?
 ----------------------------------

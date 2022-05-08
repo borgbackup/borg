@@ -695,7 +695,8 @@ class ItemFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
         'bpath': 'verbatim POSIX path, can contain any character except NUL',
         'path': 'path interpreted as text (might be missing non-text characters, see bpath)',
-        'source': 'link target for links (identical to linktarget)',
+        'source': 'link target for symlinks (identical to linktarget)',
+        'hlid': 'hard link identity (same if hardlinking same fs object)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
         'csize': 'compressed size',
         'dsize': 'deduplicated size',
@@ -706,7 +707,7 @@ class ItemFormatter(BaseFormatter):
         'health': 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
-        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'flags'),
+        ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'hlid', 'flags'),
         ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hash_algorithms)),
@@ -802,11 +803,9 @@ class ItemFormatter(BaseFormatter):
         extra = ''
         if source:
             source = remove_surrogates(source)
-            if item_type == 'l':
-                extra = ' -> %s' % source
-            else:
-                mode = 'h' + mode[1:]
-                extra = ' link to %s' % source
+            extra = ' -> %s' % source
+        hlid = item.get('hlid')
+        hlid = bin_to_hex(hlid) if hlid else ''
         item_data['type'] = item_type
         item_data['mode'] = mode
         item_data['user'] = item.user or item.uid
@@ -822,6 +821,7 @@ class ItemFormatter(BaseFormatter):
             item_data['health'] = 'broken' if 'chunks_healthy' in item else 'healthy'
         item_data['source'] = source
         item_data['linktarget'] = source
+        item_data['hlid'] = hlid
         item_data['flags'] = item.get('bsdflags')
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)

@@ -321,7 +321,7 @@ class ArchiverTestCaseBase(BaseTestCase):
                 contents = b'X' * size
             fd.write(contents)
 
-    def create_test_files(self):
+    def create_test_files(self, create_hardlinks=True):
         """Create a minimal test case including all supported file types
         """
         # File
@@ -332,7 +332,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         # File mode
         os.chmod('input/file1', 0o4755)
         # Hard link
-        if are_hardlinks_supported():
+        if are_hardlinks_supported() and create_hardlinks:
             os.link(os.path.join(self.input_path, 'file1'),
                     os.path.join(self.input_path, 'hardlink'))
         # Symlink
@@ -432,7 +432,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
         info_output = self.cmd('info', self.repository_location + '::test')
-        item_count = 4 if has_lchflags else 5  # one file is UF_NODUMP
+        item_count = 5 if has_lchflags else 6  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
         info_output2 = self.cmd('info', self.repository_location + '::test')
@@ -505,6 +505,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
             assert os.readlink('input/link1') == 'somewhere'
+
+    @pytest.mark.skipif(not are_symlinks_supported() or not are_hardlinks_supported(),
+                        reason='symlinks or hardlinks not supported')
+    def test_hardlinked_symlinks_extract(self):
+        self.create_regular_file('target', size=1024)
+        with changedir('input'):
+            os.symlink('target', 'symlink1')
+            os.link('symlink1', 'symlink2', follow_symlinks=False)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::test')
+            print(output)
+            with changedir('input'):
+                assert os.path.exists('target')
+                assert os.readlink('symlink1') == 'target'
+                assert os.readlink('symlink2') == 'target'
+                st1 = os.stat('symlink1', follow_symlinks=False)
+                st2 = os.stat('symlink2', follow_symlinks=False)
+                assert st1.st_nlink == 2
+                assert st2.st_nlink == 2
+                assert st1.st_ino == st2.st_ino
+                assert st1.st_size == st2.st_size
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     def test_atime(self):
@@ -2661,7 +2684,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 hl3 = os.path.join(mountpoint, 'input', 'hardlink3', 'hardlink3.00001')
                 assert os.stat(hl1).st_ino == os.stat(hl2).st_ino == os.stat(hl3).st_ino
                 assert open(hl3, 'rb').read() == b'123456'
-        # similar again, but exclude the hardlink master:
+        # similar again, but exclude the 1st hardlink:
         with self.fuse_mount(self.repository_location, mountpoint, '-o', 'versions', '-e', 'input/hardlink1'):
             if are_hardlinks_supported():
                 hl2 = os.path.join(mountpoint, 'input', 'hardlink2', 'hardlink2.00001')
@@ -3475,7 +3498,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert os.stat('input/dir1/source2').st_nlink == 2
 
     def test_import_tar(self, tar_format='PAX'):
-        self.create_test_files()
+        self.create_test_files(create_hardlinks=False)  # hardlinks become separate files
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', self.repository_location + '::src', 'input')
@@ -3489,7 +3512,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_import_tar_gz(self, tar_format='GNU'):
         if not shutil.which('gzip'):
             pytest.skip('gzip is not installed')
-        self.create_test_files()
+        self.create_test_files(create_hardlinks=False)  # hardlinks become separate files
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', self.repository_location + '::src', 'input')
@@ -4444,26 +4467,23 @@ def test_chunk_content_equal():
 
 
 class TestBuildFilter:
-    @staticmethod
-    def peek_and_store_hardlink_masters(item, matched):
-        pass
 
     def test_basic(self):
         matcher = PatternMatcher()
         matcher.add([parse_pattern('included')], IECommand.Include)
-        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, 0)
+        filter = Archiver.build_filter(matcher, 0)
         assert filter(Item(path='included'))
         assert filter(Item(path='included/file'))
         assert not filter(Item(path='something else'))
 
     def test_empty(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, 0)
+        filter = Archiver.build_filter(matcher, 0)
         assert filter(Item(path='anything'))
 
     def test_strip_components(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, self.peek_and_store_hardlink_masters, strip_components=1)
+        filter = Archiver.build_filter(matcher, strip_components=1)
         assert not filter(Item(path='shallow'))
         assert not filter(Item(path='shallow/'))  # can this even happen? paths are normalized...
         assert filter(Item(path='deep enough/file'))

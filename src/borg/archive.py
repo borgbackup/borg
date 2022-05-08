@@ -28,7 +28,7 @@ from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Manifest
-from .helpers import hardlinkable
+from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
@@ -280,7 +280,7 @@ class DownloadPipeline:
         self.repository = repository
         self.key = key
 
-    def unpack_many(self, ids, filter=None, partial_extract=False, preload=False, hardlink_masters=None):
+    def unpack_many(self, ids, *, filter=None, preload=False):
         """
         Return iterator of items.
 
@@ -290,10 +290,7 @@ class DownloadPipeline:
         Warning: if *preload* is True then all data chunks of every yielded item have to be retrieved,
         otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
         """
-        def _preload(chunks):
-            self.repository.preload([c.id for c in chunks])
-
-        masters_preloaded = set()
+        hlids_preloaded = set()
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
             unpacker.feed(data)
@@ -306,33 +303,20 @@ class DownloadPipeline:
                 items = [item for item in items if filter(item)]
 
             if preload:
-                if filter and partial_extract:
-                    # if we do only a partial extraction, it gets a bit
-                    # complicated with computing the preload items: if a hardlink master item is not
-                    # selected (== not extracted), we will still need to preload its chunks if a
-                    # corresponding hardlink slave is selected (== is extracted).
-                    # due to a side effect of the filter() call, we now have hardlink_masters dict populated.
-                    for item in items:
-                        if hardlinkable(item.mode):
-                            source = item.get('source')
-                            if source is None:  # maybe a hardlink master
-                                if 'chunks' in item:
-                                    _preload(item.chunks)
-                                # if this is a hl master, remember that we already preloaded all chunks of it (if any):
-                                if item.get('hardlink_master', True):
-                                    masters_preloaded.add(item.path)
-                            else:  # hardlink slave
-                                if source not in masters_preloaded:
-                                    # we only need to preload *once* (for the 1st selected slave)
-                                    chunks, _ = hardlink_masters[source]
-                                    if chunks is not None:
-                                        _preload(chunks)
-                                    masters_preloaded.add(source)
-                else:
-                    # easy: we do not have a filter, thus all items are selected, thus we need to preload all chunks.
-                    for item in items:
-                        if 'chunks' in item:
-                            _preload(item.chunks)
+                for item in items:
+                    if 'chunks' in item:
+                        hlid = item.get('hlid', None)
+                        if hlid is None:
+                            preload_chunks = True
+                        else:
+                            if hlid in hlids_preloaded:
+                                preload_chunks = False
+                            else:
+                                # not having the hardlink's chunks already preloaded for other hardlink to same inode
+                                preload_chunks = True
+                                hlids_preloaded.add(hlid)
+                        if preload_chunks:
+                            self.repository.preload([c.id for c in item.chunks])
 
             for item in items:
                 yield item
@@ -443,7 +427,6 @@ class Archive:
         self.repository = repository
         self.cache = cache
         self.manifest = manifest
-        self.hard_links = {}
         self.stats = Statistics(output_json=log_json, iec=iec)
         self.iec = iec
         self.show_progress = progress
@@ -584,12 +567,10 @@ Utilization of max. archive size: {csize_max:.0%}
             return False
         return filter(item) if filter else True
 
-    def iter_items(self, filter=None, partial_extract=False, preload=False, hardlink_masters=None):
+    def iter_items(self, filter=None, preload=False):
         # note: when calling this with preload=True, later fetch_many() must be called with
         # is_preloaded=True or the RemoteRepository code will leak memory!
-        assert not (filter and partial_extract and preload) or hardlink_masters is not None
-        for item in self.pipeline.unpack_many(self.metadata.items, partial_extract=partial_extract,
-                                              preload=preload, hardlink_masters=hardlink_masters,
+        for item in self.pipeline.unpack_many(self.metadata.items, preload=preload,
                                               filter=lambda item: self.item_filter(item, filter)):
             yield item
 
@@ -719,33 +700,30 @@ Utilization of max. archive size: {csize_max:.0%}
         return stats
 
     @contextmanager
-    def extract_helper(self, dest, item, path, stripped_components, original_path, hardlink_masters):
+    def extract_helper(self, item, path, hlm, *, dry_run=False):
         hardlink_set = False
         # Hard link?
-        if 'source' in item:
-            source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
-            chunks, link_target = hardlink_masters.get(item.source, (None, source))
-            if link_target and has_link:
-                # Hard link was extracted previously, just link
-                with backup_io('link'):
-                    os.link(link_target, path)
-                    hardlink_set = True
-            elif chunks is not None:
-                # assign chunks to this item, since the item which had the chunks was not extracted
-                item.chunks = chunks
+        if 'hlid' in item:
+            link_target = hlm.retrieve(id=item.hlid)
+            if link_target is not None and has_link:
+                if not dry_run:
+                    # another hardlink to same inode (same hlid) was extracted previously, just link to it
+                    with backup_io('link'):
+                        os.link(link_target, path, follow_symlinks=False)
+                hardlink_set = True
         yield hardlink_set
-        if not hardlink_set and hardlink_masters:
-            if has_link:
-                # Update master entry with extracted item path, so that following hardlinks don't extract twice.
+        if not hardlink_set:
+            if 'hlid' in item and has_link:
+                # Update entry with extracted item path, so that following hardlinks don't extract twice.
                 # We have hardlinking support, so we will hardlink not extract.
-                hardlink_masters[item.get('source') or original_path] = (None, path)
+                hlm.remember(id=item.hlid, info=path)
             else:
                 # Broken platform with no hardlinking support.
                 # In this case, we *want* to extract twice, because there is no other way.
                 pass
 
     def extract_item(self, item, restore_attrs=True, dry_run=False, stdout=False, sparse=False,
-                     hardlink_masters=None, stripped_components=0, original_path=None, pi=None):
+                     hlm=None, stripped_components=0, original_path=None, pi=None):
         """
         Extract archive item.
 
@@ -754,29 +732,33 @@ Utilization of max. archive size: {csize_max:.0%}
         :param dry_run: do not write any data
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
-        :param hardlink_masters: maps paths to (chunks, link_target) for extracting subtrees with hardlinks correctly
+        :param hlm: maps hlid to link_target for extracting subtrees with hardlinks correctly
         :param stripped_components: stripped leading path components to correct hard link extraction
         :param original_path: 'path' key as stored in archive
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
         """
-        hardlink_masters = hardlink_masters or {}
         has_damaged_chunks = 'chunks_healthy' in item
         if dry_run or stdout:
-            if 'chunks' in item:
-                item_chunks_size = 0
-                for data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
-                    if pi:
-                        pi.show(increase=len(data), info=[remove_surrogates(item.path)])
-                    if stdout:
-                        sys.stdout.buffer.write(data)
-                    item_chunks_size += len(data)
-                if stdout:
-                    sys.stdout.buffer.flush()
-                if 'size' in item:
-                    item_size = item.size
-                    if item_size != item_chunks_size:
-                        raise BackupError('Size inconsistency detected: size {}, chunks size {}'.format(
-                                          item_size, item_chunks_size))
+            with self.extract_helper(item, '', hlm, dry_run=dry_run or stdout) as hardlink_set:
+                if not hardlink_set:
+                    # it does not really set hardlinks due to dry_run, but we need to behave same
+                    # as non-dry_run concerning fetching preloaded chunks from the pipeline or
+                    # it would get stuck.
+                    if 'chunks' in item:
+                        item_chunks_size = 0
+                        for data in self.pipeline.fetch_many([c.id for c in item.chunks], is_preloaded=True):
+                            if pi:
+                                pi.show(increase=len(data), info=[remove_surrogates(item.path)])
+                            if stdout:
+                                sys.stdout.buffer.write(data)
+                            item_chunks_size += len(data)
+                        if stdout:
+                            sys.stdout.buffer.flush()
+                        if 'size' in item:
+                            item_size = item.size
+                            if item_size != item_chunks_size:
+                                raise BackupError('Size inconsistency detected: size {}, chunks size {}'.format(
+                                                  item_size, item_chunks_size))
             if has_damaged_chunks:
                 raise BackupError('File has damaged (all-zero) chunks. Try running borg check --repair.')
             return
@@ -807,8 +789,7 @@ Utilization of max. archive size: {csize_max:.0%}
         if stat.S_ISREG(mode):
             with backup_io('makedirs'):
                 make_parent(path)
-            with self.extract_helper(dest, item, path, stripped_components, original_path,
-                                     hardlink_masters) as hardlink_set:
+            with self.extract_helper(item, path, hlm) as hardlink_set:
                 if hardlink_set:
                     return
                 with backup_io('open'):
@@ -847,24 +828,26 @@ Utilization of max. archive size: {csize_max:.0%}
                     self.restore_attrs(path, item)
             elif stat.S_ISLNK(mode):
                 make_parent(path)
-                source = item.source
-                try:
-                    os.symlink(source, path)
-                except UnicodeEncodeError:
-                    raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
-                self.restore_attrs(path, item, symlink=True)
+                with self.extract_helper(item, path, hlm) as hardlink_set:
+                    if hardlink_set:
+                        # unusual, but possible: this is a hardlinked symlink.
+                        return
+                    source = item.source
+                    try:
+                        os.symlink(source, path)
+                    except UnicodeEncodeError:
+                        raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
+                    self.restore_attrs(path, item, symlink=True)
             elif stat.S_ISFIFO(mode):
                 make_parent(path)
-                with self.extract_helper(dest, item, path, stripped_components, original_path,
-                                         hardlink_masters) as hardlink_set:
+                with self.extract_helper(item, path, hlm) as hardlink_set:
                     if hardlink_set:
                         return
                     os.mkfifo(path)
                     self.restore_attrs(path, item)
             elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
                 make_parent(path)
-                with self.extract_helper(dest, item, path, stripped_components, original_path,
-                                         hardlink_masters) as hardlink_set:
+                with self.extract_helper(item, path, hlm) as hardlink_set:
                     if hardlink_set:
                         return
                     os.mknod(path, item.mode, item.rdev)
@@ -1041,79 +1024,43 @@ Utilization of max. archive size: {csize_max:.0%}
         :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
         """
 
-        def hardlink_master_seen(item):
-            return 'source' not in item or not hardlinkable(item.mode) or item.source in hardlink_masters
-
-        def is_hardlink_master(item):
-            return item.get('hardlink_master', True) and 'source' not in item and hardlinkable(item.mode)
-
-        def update_hardlink_masters(item1, item2):
-            if is_hardlink_master(item1) or is_hardlink_master(item2):
-                hardlink_masters[item1.path] = (item1, item2)
-
-        def has_hardlink_master(item, hardlink_masters):
-            return hardlinkable(item.mode) and item.get('source') in hardlink_masters
-
         def compare_items(item1, item2):
-            if has_hardlink_master(item1, hardlink_masters):
-                item1 = hardlink_masters[item1.source][0]
-            if has_hardlink_master(item2, hardlink_masters):
-                item2 = hardlink_masters[item2.source][1]
             return ItemDiff(item1, item2,
                             archive1.pipeline.fetch_many([c.id for c in item1.get('chunks', [])]),
                             archive2.pipeline.fetch_many([c.id for c in item2.get('chunks', [])]),
                             can_compare_chunk_ids=can_compare_chunk_ids)
 
-        def defer_if_necessary(item1, item2):
-            """Adds item tuple to deferred if necessary and returns True, if items were deferred"""
-            update_hardlink_masters(item1, item2)
-            defer = not hardlink_master_seen(item1) or not hardlink_master_seen(item2)
-            if defer:
-                deferred.append((item1, item2))
-            return defer
-
         orphans_archive1 = OrderedDict()
         orphans_archive2 = OrderedDict()
-        deferred = []
-        hardlink_masters = {}
 
         for item1, item2 in zip_longest(
                 archive1.iter_items(lambda item: matcher.match(item.path)),
                 archive2.iter_items(lambda item: matcher.match(item.path)),
         ):
             if item1 and item2 and item1.path == item2.path:
-                if not defer_if_necessary(item1, item2):
-                    yield (item1.path, compare_items(item1, item2))
+                yield (item1.path, compare_items(item1, item2))
                 continue
             if item1:
                 matching_orphan = orphans_archive2.pop(item1.path, None)
                 if matching_orphan:
-                    if not defer_if_necessary(item1, matching_orphan):
-                        yield (item1.path, compare_items(item1, matching_orphan))
+                    yield (item1.path, compare_items(item1, matching_orphan))
                 else:
                     orphans_archive1[item1.path] = item1
             if item2:
                 matching_orphan = orphans_archive1.pop(item2.path, None)
                 if matching_orphan:
-                    if not defer_if_necessary(matching_orphan, item2):
-                        yield (matching_orphan.path, compare_items(matching_orphan, item2))
+                    yield (matching_orphan.path, compare_items(matching_orphan, item2))
                 else:
                     orphans_archive2[item2.path] = item2
         # At this point orphans_* contain items that had no matching partner in the other archive
         for added in orphans_archive2.values():
             path = added.path
             deleted_item = Item.create_deleted(path)
-            update_hardlink_masters(deleted_item, added)
             yield (path, compare_items(deleted_item, added))
         for deleted in orphans_archive1.values():
             path = deleted.path
             deleted_item = Item.create_deleted(path)
-            update_hardlink_masters(deleted, deleted_item)
             yield (path, compare_items(deleted, deleted_item))
-        for item1, item2 in deferred:
-            assert hardlink_master_seen(item1)
-            assert hardlink_master_seen(item2)
-            yield (path, compare_items(item1, item2))
 
 
 class MetadataCollector:
@@ -1289,7 +1236,7 @@ class FilesystemObjectProcessors:
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
 
-        self.hard_links = {}
+        self.hlm = HardLinkManager(id_type=tuple, info_type=tuple)  # (dev, ino) -> (hlid, chunks)
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
         self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
@@ -1298,29 +1245,32 @@ class FilesystemObjectProcessors:
     def create_helper(self, path, st, status=None, hardlinkable=True):
         safe_path = make_path_safe(path)
         item = Item(path=safe_path)
-        hardlink_master = False
         hardlinked = hardlinkable and st.st_nlink > 1
+        update_map = False
         if hardlinked:
-            source = self.hard_links.get((st.st_ino, st.st_dev))
-            if source is not None:
-                item.source = source
-                status = 'h'  # hardlink (to already seen inodes)
-            else:
-                hardlink_master = True
-        yield item, status, hardlinked, hardlink_master
-        # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
+            status = 'h'  # hardlink
+            hlid, chunks = self.hlm.retrieve(id=(st.st_ino, st.st_dev), default=(None, None))
+            if hlid is None:
+                update_map = True
+                hlid = self.hlm.hardlink_id(item._dict['path'])
+            item.hlid = hlid
+            if chunks is not None:
+                item.chunks = chunks
+        yield item, status, hardlinked
         self.add_item(item, stats=self.stats)
-        # ... and added to the archive, so we can remember it to refer to it later in the archive:
-        if hardlink_master:
-            self.hard_links[(st.st_ino, st.st_dev)] = safe_path
+        if update_map:
+            # remember the hlid of this fs object and if the item has chunks,
+            # also remember them, so we do not have to re-chunk a hardlink.
+            chunks = item.chunks if 'chunks' in item else None
+            self.hlm.remember(id=(st.st_ino, st.st_dev), info=(hlid, chunks))
 
     def process_dir_with_fd(self, *, path, fd, st):
-        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked):
             item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
             return status
 
     def process_dir(self, *, path, parent_fd, name, st):
-        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked):
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
                         noatime=True, op='dir_open') as fd:
                 # fd is None for directories on windows, in that case a race condition check is not possible.
@@ -1331,7 +1281,7 @@ class FilesystemObjectProcessors:
                 return status
 
     def process_fifo(self, *, path, parent_fd, name, st):
-        with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
+        with self.create_helper(path, st, 'f') as (item, status, hardlinked):  # fifo
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):
                     st = stat_update_check(st, os.fstat(fd))
@@ -1339,7 +1289,7 @@ class FilesystemObjectProcessors:
                 return status
 
     def process_dev(self, *, path, parent_fd, name, st, dev_type):
-        with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
+        with self.create_helper(path, st, dev_type) as (item, status, hardlinked):  # char/block device
             # looks like we can not work fd-based here without causing issues when trying to open/close the device
             with backup_io('stat'):
                 st = stat_update_check(st, os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False))
@@ -1348,10 +1298,7 @@ class FilesystemObjectProcessors:
             return status
 
     def process_symlink(self, *, path, parent_fd, name, st):
-        # note: using hardlinkable=False because we can not support hardlinked symlinks,
-        #       due to the dual-use of item.source, see issue #2343:
-        # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
-        with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+        with self.create_helper(path, st, 's', hardlinkable=True) as (item, status, hardlinked):
             fname = name if name is not None and parent_fd is not None else path
             with backup_io('readlink'):
                 source = os.readlink(fname, dir_fd=parent_fd)
@@ -1384,7 +1331,7 @@ class FilesystemObjectProcessors:
         return status
 
     def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal):
-        with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
+        with self.create_helper(path, st, None) as (item, status, hardlinked):  # no status yet
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io('fstat'):
                     st = stat_update_check(st, os.fstat(fd))
@@ -1395,7 +1342,9 @@ class FilesystemObjectProcessors:
                     # so it can be extracted / accessed in FUSE mount like a regular file.
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-                if not hardlinked or hardlink_master:
+                if 'chunks' in item:  # create_helper might have put chunks from a previous hardlink there
+                    [cache.chunk_incref(id_, self.stats) for id_, _, _ in item.chunks]
+                else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
                         path_hash = self.key.id_hash(hashed_path)
@@ -1420,7 +1369,6 @@ class FilesystemObjectProcessors:
                         status = 'M' if known else 'A'  # regular file, modified or added
                     self.print_file_status(status, path)
                     status = None  # we already printed the status
-                    item.hardlink_master = hardlinked
                     # Only chunkify the file if needed
                     if chunks is not None:
                         item.chunks = chunks
@@ -1444,7 +1392,7 @@ class FilesystemObjectProcessors:
                             # also, we must not memorize a potentially inconsistent/corrupt file that
                             # changed while we backed it up.
                             cache.memorize_file(hashed_path, path_hash, st, [c.id for c in item.chunks])
-                    self.stats.nfiles += 1
+                self.stats.nfiles += 1
                 item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
                 item.get_size(memorize=True)
                 return status
@@ -1464,6 +1412,7 @@ class TarfileObjectProcessors:
 
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
         self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=False)
+        self.hlm = HardLinkManager(id_type=str, info_type=list)  # path -> chunks
 
     @contextmanager
     def create_helper(self, tarinfo, status=None, type=None):
@@ -1504,9 +1453,19 @@ class TarfileObjectProcessors:
             item.rdev = os.makedev(tarinfo.devmajor, tarinfo.devminor)
             return status
 
-    def process_link(self, *, tarinfo, status, type):
+    def process_symlink(self, *, tarinfo, status, type):
         with self.create_helper(tarinfo, status, type) as (item, status):
             item.source = tarinfo.linkname
+            return status
+
+    def process_hardlink(self, *, tarinfo, status, type):
+        with self.create_helper(tarinfo, status, type) as (item, status):
+            # create a not hardlinked borg item, reusing the chunks, see HardLinkManager.__doc__
+            chunks = self.hlm.retrieve(tarinfo.linkname)
+            if chunks is not None:
+                item.chunks = chunks
+            item.get_size(memorize=True, from_chunks=True)
+            self.stats.nfiles += 1
             return status
 
     def process_file(self, *, tarinfo, status, type, tar):
@@ -1516,8 +1475,10 @@ class TarfileObjectProcessors:
             fd = tar.extractfile(tarinfo)
             self.process_file_chunks(item, self.cache, self.stats, self.show_progress,
                                      backup_io_iter(self.chunker.chunkify(fd)))
-            item.get_size(memorize=True)
+            item.get_size(memorize=True, from_chunks=True)
             self.stats.nfiles += 1
+            # we need to remember ALL files, see HardLinkManager.__doc__
+            self.hlm.remember(id=tarinfo.name, info=item.chunks)
             return status
 
 
@@ -2127,34 +2088,11 @@ class ArchiveRecreater:
 
     def process_items(self, archive, target):
         matcher = self.matcher
-        target_is_subset = not matcher.empty()
-        hardlink_masters = {} if target_is_subset else None
-
-        def item_is_hardlink_master(item):
-            return (target_is_subset and
-                    hardlinkable(item.mode) and
-                    item.get('hardlink_master', True) and
-                    'source' not in item)
 
         for item in archive.iter_items():
             if not matcher.match(item.path):
                 self.print_file_status('x', item.path)
-                if item_is_hardlink_master(item):
-                    hardlink_masters[item.path] = (item.get('chunks'), item.get('chunks_healthy'), None)
                 continue
-            if target_is_subset and hardlinkable(item.mode) and item.get('source') in hardlink_masters:
-                # master of this hard link is outside the target subset
-                chunks, chunks_healthy, new_source = hardlink_masters[item.source]
-                if new_source is None:
-                    # First item to use this master, move the chunks
-                    item.chunks = chunks
-                    if chunks_healthy is not None:
-                        item.chunks_healthy = chunks_healthy
-                    hardlink_masters[item.source] = (None, None, item.path)
-                    del item.source
-                else:
-                    # Master was already moved, only update this item's source
-                    item.source = new_source
             if self.dry_run:
                 self.print_file_status('-', item.path)
             else:
@@ -2261,7 +2199,7 @@ class ArchiveRecreater:
         tag_files = []
         tagged_dirs = []
 
-        # to support reading hard-linked CACHEDIR.TAGs (aka CACHE_TAG_NAME), similar to hardlink_masters:
+        # to support reading hard-linked CACHEDIR.TAGs (aka CACHE_TAG_NAME):
         cachedir_masters = {}
 
         if self.exclude_caches:

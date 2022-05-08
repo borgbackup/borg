@@ -520,18 +520,23 @@ To summarize, this is making size-based fingerprinting difficult:
 - optional ``obfuscate`` pseudo compressor with different choices
   of algorithm and parameters
 
-Secret  Key
-------------
+Secret key usage against fingerprinting
+---------------------------------------
 
-Borg uses the secret key for Chunking and ID generation. This key is used to enhance privacy and 
-to protect from an attacker who has access to a borg setup and encrypted chunks. The chunk's cutting 
-positions are determined by using the secret key and thereby the length of the chunks cut. Because 
-the attacker would use a different chunker secret than the borg setup being attacked, they would not 
-be able to determine the set of chunk lengths for a known set of files. For the chunk ID generation, 
-simply using the hashed values of these files is insecure. The secret key is combined with the chunk's 
-hashed value to generate chunk ID. So, the attacker can't use known small files' hashes to get chunk IDs 
-and thereby the contents of the borg setup. Thus, using SHA256 and a random MAC key makes fingerprinting 
-attacks impossible.
+Borg uses the borg key also for chunking and chunk ID generation to protect against fingerprinting.
+As usual for borg's attack model, the attacker is assumed to have access to a borg repository.
+
+The borg key includes a secret random chunk_seed which (together with the chunking algorithm)
+determines the cutting places and thereby the length of the chunks cut. Because the attacker trying
+a chunk length fingerprinting attack would use a different chunker secret than the borg setup being
+attacked, they would not be able to determine the set of chunk lengths for a known set of files.
+
+The borg key also includes a secret random id_key. The chunk ID generation is not just using a simple
+cryptographic hash like sha256 (because that would be insecure as an attacker could see the hashes of
+small files that result only in 1 chunk in the repository). Instead, borg uses keyed hash (a MAC,
+e.g. HMAC-SHA256) to compute the chunk ID from the content and the secret id_key. Thus, an attacker
+can't compute the same chunk IDs for a known set of small files to determine whether these are stored
+in the attacked repository.
 
 Stored chunk proximity
 ----------------------

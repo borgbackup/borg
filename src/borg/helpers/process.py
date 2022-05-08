@@ -332,7 +332,8 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
     except Exception:
         # something went wrong with processing the stream by borg
         logger.debug('Exception, killing the filter...')
-        proc.kill()
+        if cmd:
+            proc.kill()
         borg_succeeded = False
         raise
     else:

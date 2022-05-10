@@ -520,6 +520,24 @@ To summarize, this is making size-based fingerprinting difficult:
 - optional ``obfuscate`` pseudo compressor with different choices
   of algorithm and parameters
 
+Secret key usage against fingerprinting
+---------------------------------------
+
+Borg uses the borg key also for chunking and chunk ID generation to protect against fingerprinting.
+As usual for borg's attack model, the attacker is assumed to have access to a borg repository.
+
+The borg key includes a secret random chunk_seed which (together with the chunking algorithm)
+determines the cutting places and thereby the length of the chunks cut. Because the attacker trying
+a chunk length fingerprinting attack would use a different chunker secret than the borg setup being
+attacked, they would not be able to determine the set of chunk lengths for a known set of files.
+
+The borg key also includes a secret random id_key. The chunk ID generation is not just using a simple
+cryptographic hash like sha256 (because that would be insecure as an attacker could see the hashes of
+small files that result only in 1 chunk in the repository). Instead, borg uses keyed hash (a MAC,
+e.g. HMAC-SHA256) to compute the chunk ID from the content and the secret id_key. Thus, an attacker
+can't compute the same chunk IDs for a known set of small files to determine whether these are stored
+in the attacked repository.
+
 Stored chunk proximity
 ----------------------
 

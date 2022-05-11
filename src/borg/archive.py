@@ -2199,30 +2199,13 @@ class ArchiveRecreater:
         tag_files = []
         tagged_dirs = []
 
-        # to support reading hard-linked CACHEDIR.TAGs (aka CACHE_TAG_NAME):
-        cachedir_masters = {}
-
-        if self.exclude_caches:
-            # sadly, due to how CACHEDIR.TAG works (filename AND file [header] contents) and
-            # how borg deals with hardlinks (slave hardlinks referring back to master hardlinks),
-            # we need to pass over the archive collecting hardlink master paths.
-            # as seen in issue #4911, the master paths can have an arbitrary filenames,
-            # not just CACHEDIR.TAG.
-            for item in archive.iter_items(filter=lambda item: os.path.basename(item.path) == CACHE_TAG_NAME):
-                if stat.S_ISREG(item.mode) and 'chunks' not in item and 'source' in item:
-                    # this is a hardlink slave, referring back to its hardlink master (via item.source)
-                    cachedir_masters[item.source] = None  # we know the key (path), but not the value (item) yet
-
         for item in archive.iter_items(
                 filter=lambda item: os.path.basename(item.path) == CACHE_TAG_NAME or matcher.match(item.path)):
-            if self.exclude_caches and item.path in cachedir_masters:
-                cachedir_masters[item.path] = item
             dir, tag_file = os.path.split(item.path)
             if tag_file in self.exclude_if_present:
                 exclude(dir, item)
             elif self.exclude_caches and tag_file == CACHE_TAG_NAME and stat.S_ISREG(item.mode):
-                content_item = item if 'chunks' in item else cachedir_masters[item.source]
-                file = open_item(archive, content_item)
+                file = open_item(archive, item)
                 if file.read(len(CACHE_TAG_CONTENTS)) == CACHE_TAG_CONTENTS:
                     exclude(dir, item)
         matcher.add(tag_files, IECommand.Include)

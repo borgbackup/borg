@@ -1062,7 +1062,7 @@ class AdHocCache(CacheStatsMixin):
     Ad-hoc, non-persistent cache.
 
     Compared to the standard LocalCache the AdHocCache does not maintain accurate reference count,
-    nor does it provide a files cache (which would require persistence). Chunks that were not added
+    nor does it provides a files cache (which would require persistence). Chunks that were not added
     during the current AdHocCache lifetime won't have correct size/csize set (0 bytes) and will
     have an infinite reference count (MAX_VALUE).
     """

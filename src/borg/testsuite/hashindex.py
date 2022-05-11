@@ -87,8 +87,8 @@ class HashIndexTestCase(BaseTestCase):
         del idx
 
     def test_nsindex(self):
-        self._generic_test(NSIndex, lambda x: (x, x),
-                           '85f72b036c692c8266e4f51ccf0cff2147204282b5e316ae508d30a448d88fef')
+        self._generic_test(NSIndex, lambda x: (x, x, x, x),
+                           'c9fe5878800d2a0691b667c665a00d4a186e204e891076d6b109016940742bed')
 
     def test_chunkindex(self):
         self._generic_test(ChunkIndex, lambda x: (x, x),
@@ -102,7 +102,7 @@ class HashIndexTestCase(BaseTestCase):
             initial_size = os.path.getsize(filepath)
             self.assert_equal(len(idx), 0)
             for x in range(n):
-                idx[H(x)] = x, x
+                idx[H(x)] = x, x, x, x
             idx.write(filepath)
             assert initial_size < os.path.getsize(filepath)
             for x in range(n):
@@ -114,7 +114,7 @@ class HashIndexTestCase(BaseTestCase):
     def test_iteritems(self):
         idx = NSIndex()
         for x in range(100):
-            idx[H(x)] = x, x
+            idx[H(x)] = x, x, x, x
         iterator = idx.iteritems()
         all = list(iterator)
         self.assert_equal(len(all), 100)
@@ -514,9 +514,9 @@ class NSIndexTestCase(BaseTestCase):
     def test_nsindex_segment_limit(self):
         idx = NSIndex()
         with self.assert_raises(AssertionError):
-            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0
+            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0, 0, 0
         assert H(1) not in idx
-        idx[H(2)] = NSIndex.MAX_VALUE, 0
+        idx[H(2)] = NSIndex.MAX_VALUE, 0, 0, 0
         assert H(2) in idx
 
 
@@ -531,38 +531,38 @@ class IndexCorruptionTestCase(BaseTestCase):
 
         from struct import pack
 
-        def HH(x, y):
-            # make some 32byte long thing that depends on x and y.
-            # same x will mean a collision in the hashtable as bucket index is computed from
-            # first 4 bytes. giving a specific x targets bucket index x.
-            # y is to create different keys and does not go into the bucket index calculation.
-            # so, same x + different y --> collision
-            return pack('<IIQQQ', x, y, 0, 0, 0)  # 2 * 4 + 3 * 8 == 32
+        def HH(w, x, y, z):
+            # make some 32byte long thing that depends on w, x, y, z.
+            # same w will mean a collision in the hashtable as bucket index is computed from
+            # first 4 bytes. giving a specific w targets bucket index w.
+            # x is to create different keys and does not go into the bucket index calculation.
+            # so, same w + different x --> collision
+            return pack('<IIIIIIII', w, x, y, z, 0, 0, 0, 0)  # 8 * 4 == 32
 
         idx = NSIndex()
 
         # create lots of colliding entries
-        for y in range(700):  # stay below max load to not trigger resize
-            idx[HH(0, y)] = (0, y)
+        for x in range(700):  # stay below max load to not trigger resize
+            idx[HH(0, x, 0, 0)] = (0, x, 0, 0)
 
-        assert idx.size() == 1031 * 40 + 18  # 1031 buckets + header
+        assert idx.size() == 1031 * 48 + 18  # 1031 buckets + header
 
         # delete lots of the collisions, creating lots of tombstones
-        for y in range(400):  # stay above min load to not trigger resize
-            del idx[HH(0, y)]
+        for x in range(400):  # stay above min load to not trigger resize
+            del idx[HH(0, x, 0, 0)]
 
         # create lots of colliding entries, within the not yet used part of the hashtable
-        for y in range(330):  # stay below max load to not trigger resize
-            # at y == 259 a resize will happen due to going beyond max EFFECTIVE load
+        for x in range(330):  # stay below max load to not trigger resize
+            # at x == 259 a resize will happen due to going beyond max EFFECTIVE load
             # if the bug is present, that element will be inserted at the wrong place.
             # and because it will be at the wrong place, it can not be found again.
-            idx[HH(600, y)] = 600, y
+            idx[HH(600, x, 0, 0)] = 600, x, 0, 0
 
         # now check if hashtable contents is as expected:
 
-        assert [idx.get(HH(0, y)) for y in range(400, 700)] == [(0, y) for y in range(400, 700)]
+        assert [idx.get(HH(0, x, 0, 0)) for x in range(400, 700)] == [(0, x, 0, 0) for x in range(400, 700)]
 
-        assert [HH(0, y) in idx for y in range(400)] == [False for y in range(400)]  # deleted entries
+        assert [HH(0, x, 0, 0) in idx for x in range(400)] == [False for x in range(400)]  # deleted entries
 
         # this will fail at HH(600, 259) if the bug is present.
-        assert [idx.get(HH(600, y)) for y in range(330)] == [(600, y) for y in range(330)]
+        assert [idx.get(HH(600, x, 0, 0)) for x in range(330)] == [(600, x, 0, 0) for x in range(330)]

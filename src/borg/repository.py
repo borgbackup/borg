@@ -1462,6 +1462,9 @@ class LoggedIO:
                         del self.fds[k]
 
         clean_old()
+        if self._write_fd is not None:
+            # without this, we have a test failure now
+            self._write_fd.sync()
         try:
             ts, fd = self.fds[segment]
         except KeyError:

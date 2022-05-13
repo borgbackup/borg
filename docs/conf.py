@@ -40,7 +40,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Borg - Deduplicating Archiver'
-copyright = u'2010-2014 Jonas Borgström, 2015-2022 The Borg Collective (see AUTHORS file)'
+copyright = '2010-2014 Jonas Borgström, 2015-2022 The Borg Collective (see AUTHORS file)'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -154,6 +154,7 @@ html_last_updated_fmt = '%Y-%m-%d'
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
 html_use_smartypants = True
+smartquotes_action = 'qe'  # no D in there means "do not transform -- and ---"
 
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {

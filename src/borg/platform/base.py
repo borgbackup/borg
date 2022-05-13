@@ -4,6 +4,7 @@ import socket
 import tempfile
 import uuid
 
+from borg.constants import UMASK_DEFAULT
 from borg.helpers import safe_unlink
 from borg.platformflags import is_win32
 
@@ -237,6 +238,15 @@ class SaveFile:
         if exc_type is not None:
             safe_unlink(self.tmp_fname)  # with-body has failed, clean up tmp file
             return  # continue processing the exception normally
+
+        # tempfile.mkstemp always uses owner-only file permissions for the temp file,
+        # but as we'll rename it to the non-temp permanent file now, we need to respect
+        # the umask and change the file mode to what a normally created file would have.
+        # thanks to the crappy os.umask api, we can't query the umask without setting it. :-(
+        umask = os.umask(UMASK_DEFAULT)
+        os.umask(umask)
+        os.chmod(self.tmp_fname, mode=0o666 & ~ umask)
+
         try:
             os.replace(self.tmp_fname, self.path)  # POSIX: atomic rename
         except OSError:
@@ -265,7 +275,7 @@ def getfqdn(name=''):
         name = socket.gethostname()
     try:
         addrs = socket.getaddrinfo(name, None, 0, socket.SOCK_DGRAM, 0, socket.AI_CANONNAME)
-    except socket.error:
+    except OSError:
         pass
     else:
         for addr in addrs:
@@ -288,7 +298,7 @@ hostname = hostname.split('.')[0]
 # thus, we offer BORG_HOST_ID where a user can set an own, unique id for each of his hosts.
 hostid = os.environ.get('BORG_HOST_ID')
 if not hostid:
-    hostid = '%s@%s' % (fqdn, uuid.getnode())
+    hostid = f'{fqdn}@{uuid.getnode()}'
 
 
 def get_process_id():

@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import socket
@@ -49,7 +50,6 @@ from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
-has_lchmod = hasattr(os, 'lchmod')
 has_link = hasattr(os, 'link')
 
 
@@ -143,11 +143,15 @@ class Statistics:
         if dt is None or now - self.last_progress > dt:
             self.last_progress = now
             if self.output_json:
-                data = self.as_dict()
+                if not final:
+                    data = self.as_dict()
+                    data['path'] = remove_surrogates(item.path if item else '')
+                else:
+                    data = {}
                 data.update({
                     'time': time.time(),
                     'type': 'archive_progress',
-                    'path': remove_surrogates(item.path if item else ''),
+                    'finished': final,
                 })
                 msg = json.dumps(data)
                 end = '\n'
@@ -198,7 +202,7 @@ class BackupOSError(Exception):
 
     def __str__(self):
         if self.op:
-            return '%s: %s' % (self.op, self.os_error)
+            return f'{self.op}: {self.os_error}'
         else:
             return str(self.os_error)
 
@@ -362,10 +366,18 @@ class ChunkBuffer:
         self.buffer.seek(0)
         # The chunker returns a memoryview to its internal buffer,
         # thus a copy is needed before resuming the chunker iterator.
-        # note: this is the items metadata stream chunker, we only will get CH_DATA allocation here (because there are,
-        #       no all-zero chunks in a metadata stream), thus chunk.data will always be bytes/memoryview and allocation
-        #       is always CH_DATA and never CH_ALLOC/CH_HOLE).
-        chunks = list(bytes(chunk.data) for chunk in self.chunker.chunkify(self.buffer))
+        # the metadata stream may produce all-zero chunks, so deal
+        # with CH_ALLOC (and CH_HOLE, for completeness) here.
+        chunks = []
+        for chunk in self.chunker.chunkify(self.buffer):
+            alloc = chunk.meta['allocation']
+            if alloc == CH_DATA:
+                data = bytes(chunk.data)
+            elif alloc in (CH_ALLOC, CH_HOLE):
+                data = zeros[:chunk.meta['size']]
+            else:
+                raise ValueError("chunk allocation has unsupported value of %r" % alloc)
+            chunks.append(data)
         self.buffer.seek(0)
         self.buffer.truncate(0)
         # Leave the last partial chunk in the buffer unless flush is True
@@ -464,7 +476,7 @@ class Archive:
                 raise self.AlreadyExists(name)
             i = 0
             while True:
-                self.checkpoint_name = '%s.checkpoint%s' % (name, i and ('.%d' % i) or '')
+                self.checkpoint_name = '{}.checkpoint{}'.format(name, i and ('.%d' % i) or '')
                 if self.checkpoint_name not in manifest.archives:
                     break
                 i += 1
@@ -671,8 +683,10 @@ Utilization of max. archive size: {csize_max:.0%}
             archive_index = ChunkIndex()
             sync = CacheSynchronizer(archive_index)
             add(self.id)
+            # we must escape any % char in the archive name, because we use it in a format string, see #6500
+            arch_name_escd = self.name.replace('%', '%%')
             pi = ProgressIndicatorPercent(total=len(self.metadata.items),
-                                          msg='Calculating statistics for archive %s ... %%3d%%%%' % self.name,
+                                          msg='Calculating statistics for archive %s ... %%3.0f%%%%' % arch_name_escd,
                                           msgid='archive.calc_stats')
             for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
                 pi.show(increase=1)
@@ -877,10 +891,18 @@ Utilization of max. archive size: {csize_max:.0%}
                 pass
             if fd:
                 os.fchmod(fd, item.mode)
-            elif not symlink:
-                os.chmod(path, item.mode)
-            elif has_lchmod:  # Not available on Linux
-                os.lchmod(path, item.mode)
+            else:
+                # To check whether a particular function in the os module accepts False for its
+                # follow_symlinks parameter, the in operator on supports_follow_symlinks should be
+                # used. However, os.chmod is special as some platforms without a working lchmod() do
+                # have fchmodat(), which has a flag that makes it behave like lchmod(). fchmodat()
+                # is ignored when deciding whether or not os.chmod should be set in
+                # os.supports_follow_symlinks. Work around this by using try/except.
+                try:
+                    os.chmod(path, item.mode, follow_symlinks=False)
+                except NotImplementedError:
+                    if not symlink:
+                        os.chmod(path, item.mode)
             mtime = item.mtime
             if 'atime' in item:
                 atime = item.atime
@@ -1445,9 +1467,26 @@ class TarfileObjectProcessors:
 
     @contextmanager
     def create_helper(self, tarinfo, status=None, type=None):
-        item = Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
-                    uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname or None, group=tarinfo.gname or None,
-                    mtime=tarinfo.mtime * 1000**3)
+        ph = tarinfo.pax_headers
+        if ph and 'BORG.item.version' in ph:
+            assert ph['BORG.item.version'] == '1'
+            meta_bin = base64.b64decode(ph['BORG.item.meta'])
+            meta_dict = msgpack.unpackb(meta_bin, object_hook=StableDict)
+            item = Item(internal_dict=meta_dict)
+        else:
+            def s_to_ns(s):
+                return safe_ns(int(float(s) * 1e9))
+
+            item = Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
+                        uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname or None, group=tarinfo.gname or None,
+                        mtime=s_to_ns(tarinfo.mtime))
+            if ph:
+                # note: for mtime this is a bit redundant as it is already done by tarfile module,
+                #       but we just do it in our way to be consistent for sure.
+                for name in 'atime', 'ctime', 'mtime':
+                    if name in ph:
+                        ns = s_to_ns(ph[name])
+                        setattr(item, name, ns)
         yield item, status
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
         self.add_item(item, stats=self.stats)
@@ -1668,9 +1707,8 @@ class ArchiveChecker:
                         chunk_ids = list(reversed(chunk_ids_revd))
                         chunk_data_iter = self.repository.get_many(chunk_ids)
                 else:
-                    _chunk_id = None if chunk_id == Manifest.MANIFEST_ID else chunk_id
                     try:
-                        self.key.decrypt(_chunk_id, encrypted_data)
+                        self.key.decrypt(chunk_id, encrypted_data)
                     except IntegrityErrorBase as integrity_error:
                         self.error_found = True
                         errors += 1
@@ -1698,8 +1736,7 @@ class ArchiveChecker:
                     # from the underlying media.
                     try:
                         encrypted_data = self.repository.get(defect_chunk)
-                        _chunk_id = None if defect_chunk == Manifest.MANIFEST_ID else defect_chunk
-                        self.key.decrypt(_chunk_id, encrypted_data)
+                        self.key.decrypt(defect_chunk, encrypted_data)
                     except IntegrityErrorBase:
                         # failed twice -> get rid of this chunk
                         del self.chunks[defect_chunk]
@@ -1789,7 +1826,7 @@ class ArchiveChecker:
 
         def add_callback(chunk):
             id_ = self.key.id_hash(chunk)
-            cdata = self.key.encrypt(chunk)
+            cdata = self.key.encrypt(id_, chunk)
             add_reference(id_, len(chunk), len(cdata), cdata)
             return id_
 
@@ -1811,7 +1848,7 @@ class ArchiveChecker:
             def replacement_chunk(size):
                 chunk = Chunk(None, allocation=CH_ALLOC, size=size)
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
-                cdata = self.key.encrypt(data)
+                cdata = self.key.encrypt(chunk_id, data)
                 csize = len(cdata)
                 return chunk_id, size, csize, cdata
 
@@ -1823,7 +1860,7 @@ class ArchiveChecker:
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
             if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
                 # should never happen, but there was issue #3218.
-                logger.warning('{}: {}: Invalid chunks_healthy metadata removed!'.format(archive_name, item.path))
+                logger.warning(f'{archive_name}: {item.path}: Invalid chunks_healthy metadata removed!')
                 del item.chunks_healthy
                 has_chunks_healthy = False
                 chunks_healthy = chunks_current
@@ -1867,7 +1904,7 @@ class ArchiveChecker:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
                 item.chunks_healthy = item.chunks
             if has_chunks_healthy and chunk_list == chunks_healthy:
-                logger.info('{}: {}: Completely healed previously damaged file!'.format(archive_name, item.path))
+                logger.info(f'{archive_name}: {item.path}: Completely healed previously damaged file!')
                 del item.chunks_healthy
             item.chunks = chunk_list
             if 'size' in item:
@@ -1902,7 +1939,7 @@ class ArchiveChecker:
                 logger.error(msg)
 
             def list_keys_safe(keys):
-                return ', '.join((k.decode(errors='replace') if isinstance(k, bytes) else str(k) for k in keys))
+                return ', '.join(k.decode(errors='replace') if isinstance(k, bytes) else str(k) for k in keys)
 
             def valid_item(obj):
                 if not isinstance(obj, StableDict):
@@ -1928,20 +1965,25 @@ class ArchiveChecker:
                 if state > 0:
                     unpacker.resync()
                 for chunk_id, cdata in zip(items, repository.get_many(items)):
-                    data = self.key.decrypt(chunk_id, cdata)
-                    unpacker.feed(data)
                     try:
+                        data = self.key.decrypt(chunk_id, cdata)
+                        unpacker.feed(data)
                         for item in unpacker:
                             valid, reason = valid_item(item)
                             if valid:
                                 yield Item(internal_dict=item)
                             else:
                                 report('Did not get expected metadata dict when unpacking item metadata (%s)' % reason, chunk_id, i)
+                    except IntegrityError as integrity_error:
+                        # key.decrypt() detected integrity issues.
+                        # maybe the repo gave us a valid cdata, but not for the chunk_id we wanted.
+                        # or the authentication of cdata failed, meaning the encrypted data was corrupted.
+                        report(str(integrity_error), chunk_id, i)
                     except msgpack.UnpackException:
                         report('Unpacker crashed while unpacking item metadata, trying to resync...', chunk_id, i)
                         unpacker.resync()
                     except Exception:
-                        report('Exception while unpacking item metadata', chunk_id, i)
+                        report('Exception while decrypting or unpacking item metadata', chunk_id, i)
                         raise
                     i += 1
 
@@ -1972,16 +2014,22 @@ class ArchiveChecker:
         with cache_if_remote(self.repository) as repository:
             for i, info in enumerate(archive_infos):
                 pi.show(i)
-                logger.info('Analyzing archive {} ({}/{})'.format(info.name, i + 1, num_archives))
+                logger.info(f'Analyzing archive {info.name} ({i + 1}/{num_archives})')
                 archive_id = info.id
                 if archive_id not in self.chunks:
-                    logger.error('Archive metadata block is missing!')
+                    logger.error('Archive metadata block %s is missing!', bin_to_hex(archive_id))
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue
                 mark_as_possibly_superseded(archive_id)
                 cdata = self.repository.get(archive_id)
-                data = self.key.decrypt(archive_id, cdata)
+                try:
+                    data = self.key.decrypt(archive_id, cdata)
+                except IntegrityError as integrity_error:
+                    logger.error('Archive metadata block %s is corrupted: %s', bin_to_hex(archive_id), integrity_error)
+                    self.error_found = True
+                    del self.manifest.archives[info.name]
+                    continue
                 archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
                 if archive.version != 1:
                     raise Exception('Unknown archive metadata version')
@@ -1998,7 +2046,7 @@ class ArchiveChecker:
                 archive.items = items_buffer.chunks
                 data = msgpack.packb(archive.as_dict())
                 new_archive_id = self.key.id_hash(data)
-                cdata = self.key.encrypt(data)
+                cdata = self.key.encrypt(new_archive_id, data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)
                 self.manifest.archives[info.name] = (new_archive_id, info.ts)
             pi.finish()
@@ -2008,7 +2056,7 @@ class ArchiveChecker:
             unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
             orphaned = unused - self.possibly_superseded
             if orphaned:
-                logger.error('{} orphaned objects found!'.format(len(orphaned)))
+                logger.error(f'{len(orphaned)} orphaned objects found!')
                 self.error_found = True
             if self.repair and unused:
                 logger.info('Deleting %d orphaned and %d superseded objects...' % (
@@ -2143,7 +2191,7 @@ class ArchiveRecreater:
         overwrite = self.recompress
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
-            old_chunk = self.key.decrypt(None, self.repository.get(chunk_id), decompress=False)
+            old_chunk = self.key.decrypt(chunk_id, self.repository.get(chunk_id), decompress=False)
             if Compressor.detect(old_chunk).name == self.key.compressor.decide(data).name:
                 # Stored chunk has the same compression we wanted
                 overwrite = False

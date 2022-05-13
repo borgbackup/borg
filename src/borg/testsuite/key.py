@@ -2,15 +2,17 @@ import getpass
 import os.path
 import re
 import tempfile
-from binascii import hexlify, unhexlify
+from binascii import hexlify, unhexlify, a2b_base64
+from unittest.mock import MagicMock
 
 import pytest
 
-from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
-from ..crypto.key import PlaintextKey, PassphraseKey, AuthenticatedKey, RepoKey, KeyfileKey, \
-    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey
+from ..crypto.key import bin_to_hex
+from ..crypto.key import PlaintextKey, AuthenticatedKey, RepoKey, KeyfileKey, \
+    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey, \
+    AESOCBKeyfileKey, AESOCBRepoKey, CHPOKeyfileKey, CHPORepoKey
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
-from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError
+from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError, UnsupportedKeyFormatError
 from ..crypto.key import identify_key
 from ..crypto.low_level import bytes_to_long
 from ..crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -19,21 +21,23 @@ from ..helpers import Location
 from ..helpers import StableDict
 from ..helpers import get_security_dir
 from ..helpers import msgpack
+from ..constants import KEY_ALGORITHMS
 
 
 class TestKey:
     class MockArgs:
         location = Location(tempfile.mkstemp()[1])
+        key_algorithm = "argon2"
 
     keyfile2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
-        hqppdGVyYXRpb25zzgABhqCkaGFzaNoAIMyonNI+7Cjv0qHi0AOBM6bLGxACJhfgzVD2oq
-        bIS9SFqWFsZ29yaXRobaZzaGEyNTakc2FsdNoAINNK5qqJc1JWSUjACwFEWGTdM7Nd0a5l
-        1uBGPEb+9XM9p3ZlcnNpb24BpGRhdGHaANAYDT5yfPpU099oBJwMomsxouKyx/OG4QIXK2
-        hQCG2L2L/9PUu4WIuKvGrsXoP7syemujNfcZws5jLp2UPva4PkQhQsrF1RYDEMLh2eF9Ol
-        rwtkThq1tnh7KjWMG9Ijt7/aoQtq0zDYP/xaFF8XXSJxiyP5zjH5+spB6RL0oQHvbsliSh
-        /cXJq7jrqmrJ1phd6dg4SHAM/i+hubadZoS6m25OQzYAW09wZD/phG8OVa698Z5ed3HTaT
-        SmrtgJL3EoOKgUI9d6BLE4dJdBqntifo""".strip()
+        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAN4u2SiN7hqISe3OA8raBWNuvHn1R50ZU7HVCn
+        11vTJNEaj9soxUaIGcW+pAB2N5yYoKMg/sGCMuZa286iJ008DvN99rf/ORfcKrK2GmzslO
+        N3uv9Tk9HtqV/Sq5zgM9xuY9rEeQGDQVQ+AOsFamJqSUrAemGJbJqw9IerXC/jN4XPnX6J
+        pi1cXCFxHfDaEhmWrkdPNoZdirCv/eP/dOVOLmwU58YsS+MvkZNfEa16el/fSb/ENdrwJ/
+        2aYMQrDdk1d5MYzkjotv/KpofNwPXZchu2EwH7OIHWQjEVL1DZWkaGFzaNoAIO/7qn1hr3
+        F84MsMMiqpbz4KVICeBZhfAaTPs4W7BC63qml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgLENQ
+        2uVCoR7EnAoiRzn8J+orbojKtJlNCnQ31SSC8rendmVyc2lvbgE=""".strip()
 
     keyfile2_cdata = unhexlify(re.sub(r'\W', '', """
         0055f161493fcfc16276e8c31493c4641e1eb19a79d0326fad0291e5a9c98e5933
@@ -43,17 +47,17 @@ class TestKey:
 
     keyfile_blake2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
-        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAZBu680Do3CmfWzeMCwe48KJi3Vps9mEDy7MKF
-        TastsEhiAd1RQMuxfZpklkLeddMMWk+aPtFiURRFb02JLXV5cKRC1o2ZDdiNa0nao+o6+i
-        gUjjsea9TAu25t3vxh8uQWs5BuKRLBRr0nUgrSd0IYMUgn+iVbLJRzCCssvxsklkwQxN3F
-        Y+MvBnn8kUXSeoSoQ2l0fBHzq94Y7LMOm/owMam5URnE8/UEc6ZXBrbyX4EXxDtUqJcs+D
-        i451thtlGdigDLpvf9nyK66mjiCpPCTCgtlzq0Pe1jcdhnsUYLg+qWzXZ7e2opEZoC6XxS
-        3DIuBOxG3Odqj9IKB+6/kl94vz98awPWFSpYcLZVWu7sIP38ZkUK+ad5MHTo/LvTuZdFnd
-        iqKzZIDUJl3Zl1WGmP/0xVOmfIlznkCZy4d3SMuujwIcqQ5kDvwDRPpdhBBk+UWQY5vFXk
-        kR1NBNLSTyhAzu3fiUmFl0qZ+UWPRkGAEBy/NuoEibrWwab8BX97cATyvnmOqYkU9PT0C6
-        l2l9E4bPpGhhc2jaACDnIa8KgKv84/b5sjaMgSZeIVkuKSLJy2NN8zoH8lnd36ppdGVyYX
-        Rpb25zzgABhqCkc2FsdNoAIEJLlLh7q74j3q53856H5GgzA1HH+aW5bA/as544+PGkp3Zl
-        cnNpb24B""".strip()
+        hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAZ7VCsTjbLhC1ipXOyhcGn7YnROEhP24UQvOCi
+        Oar1G+JpwgO9BIYaiCODUpzPuDQEm6WxyTwEneJ3wsuyeqyh7ru2xo9FAUKRf6jcqqZnan
+        ycTfktkUC+CPhKR7W6MTu5fPvy99chyL09/RGdD15aswR5PjNoFu4626sfMrBReyPdlxqt
+        F80m+fbNE/vln2Trqoz9EMHQ3IxjIK4q0m4Aj7TwCu7ZankFtwt898+tYsWE7lb2Ps/gXB
+        F8PM/5wHpYps2AKhDCpwKp5HyqIqlF5IzR2ydL9QP20QBjp/rSi6b+xwrfxNJZfw78f8ef
+        A2Yj7xIsxNQ0kmVmTL/UF6d7+Mw1JfurWrySiDU7QQ+RiZpWUZ0DdReB+e4zn6/KNKC884
+        34SGywADuLIQe2FKU+5jBCbutEyEGILQbAR/cgeLy5+V2XwXMJh4ytwXVIeT6Lk+qhYAdz
+        Klx4ub7XijKcOxJyBE+4k33DAhcfIT2r4/sxgMhXrIOEQPKsMAixzdcqVYkpou+6c4PZeL
+        nr+UjfJwOqK1BlWk1NgwE4GXYIKkaGFzaNoAIAzjUtpBPPh6kItZtHQZvnQG6FpucZNfBC
+        UTHFJg343jqml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgz3YaUZZ/s+UWywj97EY5b4KhtJYi
+        qkPqtDDxs2j/T7+ndmVyc2lvbgE=""".strip()
 
     keyfile_blake2_cdata = bytes.fromhex('04fdf9475cf2323c0ba7a99ddc011064f2e7d039f539f2e448'
                                          '0e6f5fc6ff9993d604040404040404098c8cee1c6db8c28947')
@@ -80,6 +84,8 @@ class TestKey:
         Blake2KeyfileKey,
         Blake2RepoKey,
         Blake2AuthenticatedKey,
+        AESOCBKeyfileKey, AESOCBRepoKey,
+        CHPOKeyfileKey, CHPORepoKey,
     ))
     def key(self, request, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -111,18 +117,21 @@ class TestKey:
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
         chunk = b'foo'
-        assert hexlify(key.id_hash(chunk)) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
-        assert chunk == key.decrypt(key.id_hash(chunk), key.encrypt(chunk))
+        id = key.id_hash(chunk)
+        assert hexlify(id) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
+        assert chunk == key.decrypt(id, key.encrypt(id, chunk))
 
     def test_keyfile(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
         assert key.cipher.next_iv() == 0
-        manifest = key.encrypt(b'ABC')
+        chunk = b'ABC'
+        id = key.id_hash(chunk)
+        manifest = key.encrypt(id, chunk)
         assert key.cipher.extract_iv(manifest) == 0
-        manifest2 = key.encrypt(b'ABC')
+        manifest2 = key.encrypt(id, chunk)
         assert manifest != manifest2
-        assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
+        assert key.decrypt(id, manifest) == key.decrypt(id, manifest2)
         assert key.cipher.extract_iv(manifest2) == 1
         iv = key.cipher.extract_iv(manifest)
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
@@ -131,7 +140,8 @@ class TestKey:
         assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
         assert key2.chunk_seed != 0
         chunk = b'foo'
-        assert chunk == key2.decrypt(key.id_hash(chunk), key.encrypt(chunk))
+        id = key.id_hash(chunk)
+        assert chunk == key2.decrypt(id, key.encrypt(id, chunk))
 
     def test_keyfile_nonce_rollback_protection(self, monkeypatch, keys_dir):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -139,9 +149,11 @@ class TestKey:
         with open(os.path.join(get_security_dir(repository.id_str), 'nonce'), "w") as fd:
             fd.write("0000000000002000")
         key = KeyfileKey.create(repository, self.MockArgs())
-        data = key.encrypt(b'ABC')
+        chunk = b'ABC'
+        id = key.id_hash(chunk)
+        data = key.encrypt(id, chunk)
         assert key.cipher.extract_iv(data) == 0x2000
-        assert key.decrypt(None, data) == b'ABC'
+        assert key.decrypt(id, data) == chunk
 
     def test_keyfile_kfenv(self, tmpdir, monkeypatch):
         keyfile = tmpdir.join('keyfile')
@@ -152,7 +164,7 @@ class TestKey:
         assert keyfile.exists()
         chunk = b'ABC'
         chunk_id = key.id_hash(chunk)
-        chunk_cdata = key.encrypt(chunk)
+        chunk_cdata = key.encrypt(chunk_id, chunk)
         key = KeyfileKey.detect(self.MockRepository(), chunk_cdata)
         assert chunk == key.decrypt(chunk_id, chunk_cdata)
         keyfile.remove()
@@ -182,34 +194,11 @@ class TestKey:
         key = Blake2KeyfileKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
         assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata) == b'payload'
 
-    def test_passphrase(self, keys_dir, monkeypatch):
-        monkeypatch.setenv('BORG_PASSPHRASE', 'test')
-        key = PassphraseKey.create(self.MockRepository(), None)
-        assert key.cipher.next_iv() == 0
-        assert hexlify(key.id_key) == b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6'
-        assert hexlify(key.enc_hmac_key) == b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
-        assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
-        assert key.chunk_seed == -775740477
-        manifest = key.encrypt(b'ABC')
-        assert key.cipher.extract_iv(manifest) == 0
-        manifest2 = key.encrypt(b'ABC')
-        assert manifest != manifest2
-        assert key.decrypt(None, manifest) == key.decrypt(None, manifest2)
-        assert key.cipher.extract_iv(manifest2) == 1
-        iv = key.cipher.extract_iv(manifest)
-        key2 = PassphraseKey.detect(self.MockRepository(), manifest)
-        assert key2.cipher.next_iv() == iv + key2.cipher.block_count(len(manifest))
-        assert key.id_key == key2.id_key
-        assert key.enc_hmac_key == key2.enc_hmac_key
-        assert key.enc_key == key2.enc_key
-        assert key.chunk_seed == key2.chunk_seed
-        chunk = b'foo'
-        assert hexlify(key.id_hash(chunk)) == b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
-        assert chunk == key2.decrypt(key2.id_hash(chunk), key.encrypt(chunk))
-
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
-        data[offset] ^= 1
+        # note: we corrupt in a way so that even corruption of the unauthenticated encryption type byte
+        # will trigger an IntegrityError (does not happen while we stay within TYPES_ACCEPTABLE).
+        data[offset] ^= 64
         with pytest.raises(IntegrityErrorBase):
             key.decrypt(b'', data)
 
@@ -232,18 +221,20 @@ class TestKey:
     def test_roundtrip(self, key):
         repository = key.repository
         plaintext = b'foo'
-        encrypted = key.encrypt(plaintext)
+        id = key.id_hash(plaintext)
+        encrypted = key.encrypt(id, plaintext)
         identified_key_class = identify_key(encrypted)
         assert identified_key_class == key.__class__
         loaded_key = identified_key_class.detect(repository, encrypted)
-        decrypted = loaded_key.decrypt(None, encrypted)
+        decrypted = loaded_key.decrypt(id, encrypted)
         assert decrypted == plaintext
 
     def test_decrypt_decompress(self, key):
         plaintext = b'123456789'
-        encrypted = key.encrypt(plaintext)
-        assert key.decrypt(None, encrypted, decompress=False) != plaintext
-        assert key.decrypt(None, encrypted) == plaintext
+        id = key.id_hash(plaintext)
+        encrypted = key.encrypt(id, plaintext)
+        assert key.decrypt(id, encrypted, decompress=False) != plaintext
+        assert key.decrypt(id, encrypted) == plaintext
 
     def test_assert_id(self, key):
         plaintext = b'123456789'
@@ -263,7 +254,8 @@ class TestKey:
         assert AuthenticatedKey.id_hash is ID_HMAC_SHA_256.id_hash
         assert len(key.id_key) == 32
         plaintext = b'123456789'
-        authenticated = key.encrypt(plaintext)
+        id = key.id_hash(plaintext)
+        authenticated = key.encrypt(id, plaintext)
         # 0x07 is the key TYPE, \x0000 identifies no compression.
         assert authenticated == b'\x07\x00\x00' + plaintext
 
@@ -273,50 +265,10 @@ class TestKey:
         assert Blake2AuthenticatedKey.id_hash is ID_BLAKE2b_256.id_hash
         assert len(key.id_key) == 128
         plaintext = b'123456789'
-        authenticated = key.encrypt(plaintext)
+        id = key.id_hash(plaintext)
+        authenticated = key.encrypt(id, plaintext)
         # 0x06 is the key TYPE, 0x0000 identifies no compression.
         assert authenticated == b'\x06\x00\x00' + plaintext
-
-
-class TestPassphrase:
-    def test_passphrase_new_verification(self, capsys, monkeypatch):
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "12aöäü")
-        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
-        Passphrase.new()
-        out, err = capsys.readouterr()
-        assert "12" not in out
-        assert "12" not in err
-
-        monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'yes')
-        passphrase = Passphrase.new()
-        out, err = capsys.readouterr()
-        assert "313261c3b6c3a4c3bc" not in out
-        assert "313261c3b6c3a4c3bc" in err
-        assert passphrase == "12aöäü"
-
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "1234/@=")
-        Passphrase.new()
-        out, err = capsys.readouterr()
-        assert "1234/@=" not in out
-        assert "1234/@=" in err
-
-    def test_passphrase_new_empty(self, capsys, monkeypatch):
-        monkeypatch.delenv('BORG_PASSPHRASE', False)
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: "")
-        with pytest.raises(PasswordRetriesExceeded):
-            Passphrase.new(allow_empty=False)
-        out, err = capsys.readouterr()
-        assert "must not be blank" in err
-
-    def test_passphrase_new_retries(self, monkeypatch):
-        monkeypatch.delenv('BORG_PASSPHRASE', False)
-        ascending_numbers = iter(range(20))
-        monkeypatch.setattr(getpass, 'getpass', lambda prompt: str(next(ascending_numbers)))
-        with pytest.raises(PasswordRetriesExceeded):
-            Passphrase.new()
-
-    def test_passphrase_repr(self):
-        assert "secret" not in repr(Passphrase("secret"))
 
 
 class TestTAM:
@@ -429,3 +381,44 @@ class TestTAM:
 
         with pytest.raises(TAMInvalid):
             key.unpack_and_verify_manifest(blob)
+
+
+def test_decrypt_key_file_unsupported_algorithm():
+    """We will add more algorithms in the future. We should raise a helpful error."""
+    key = KeyfileKey(None)
+    encrypted = msgpack.packb({
+        'algorithm': 'THIS ALGORITHM IS NOT SUPPORTED',
+        'version': 1,
+    })
+
+    with pytest.raises(UnsupportedKeyFormatError):
+        key.decrypt_key_file(encrypted, "hello, pass phrase")
+
+
+def test_decrypt_key_file_v2_is_unsupported():
+    """There may eventually be a version 2 of the format. For now we should raise a helpful error."""
+    key = KeyfileKey(None)
+    encrypted = msgpack.packb({
+        'version': 2,
+    })
+
+    with pytest.raises(UnsupportedKeyFormatError):
+        key.decrypt_key_file(encrypted, "hello, pass phrase")
+
+
+@pytest.mark.parametrize('cli_argument, expected_algorithm', KEY_ALGORITHMS.items())
+def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
+    def to_dict(key):
+        extract = 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'
+        return {a: getattr(key, a) for a in extract}
+
+    repository = MagicMock(id=b'repository_id')
+    monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
+
+    save_me = RepoKey.create(repository, args=MagicMock(key_algorithm=cli_argument))
+    saved = repository.save_key.call_args.args[0]
+    repository.load_key.return_value = saved
+    load_me = RepoKey.detect(repository, manifest_data=None)
+
+    assert to_dict(load_me) == to_dict(save_me)
+    assert msgpack.unpackb(a2b_base64(saved))[b'algorithm'] == expected_algorithm.encode()

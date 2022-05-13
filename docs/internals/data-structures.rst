@@ -59,7 +59,7 @@ Each repository has a ``config`` file which is a ``INI``-style file
 and looks like this::
 
     [repository]
-    version = 1
+    version = 2
     segments_per_dir = 1000
     max_segment_size = 524288000
     id = 57d6c1d52ce76a836b532b0e42e677dec6af9fca3673db511279358828a21ed6
@@ -94,17 +94,26 @@ this value in a non-empty repository, you may also need to relocate the segment
 files manually.
 
 A segment starts with a magic number (``BORG_SEG`` as an eight byte ASCII string),
-followed by a number of log entries. Each log entry consists of:
+followed by a number of log entries. Each log entry consists of (in this order):
 
-* 32-bit size of the entry
-* CRC32 of the entire entry (for a PUT this includes the data)
-* entry tag: PUT, DELETE or COMMIT
-* PUT and DELETE follow this with the 32 byte key
-* PUT follow the key with the data
+* crc32 checksum (uint32):
+  - for PUT2: CRC32(size + tag + key + digest)
+  - for PUT: CRC32(size + tag + key + data)
+  - for DELETE: CRC32(size + tag + key)
+  - for COMMIT: CRC32(size + tag)
+* size (uint32) of the entry (including the whole header)
+* tag (uint8): PUT(0), DELETE(1), COMMIT(2) or PUT2(3)
+* key (256 bit) - only for PUT/PUT2/DELETE
+* data (size - 41 bytes) - only for PUT
+* xxh64 digest (64 bit) = XXH64(size + tag + key + data) - only for PUT2
+* data (size - 41 - 8 bytes) - only for PUT2
+
+PUT2 is new since repository version 2. For new log entries PUT2 is used.
+PUT is still supported to read version 1 repositories, but not generated any more.
+If we talk about ``PUT`` in general, it shall usually mean PUT2 for repository
+version 2+.
 
 Those files are strictly append-only and modified only once.
-
-Tag is either ``PUT``, ``DELETE``, or ``COMMIT``.
 
 When an object is written to the repository a ``PUT`` entry is written
 to the file containing the object id and data. If an object is deleted
@@ -865,6 +874,31 @@ Encryption
 
 .. seealso:: The :ref:`borgcrypto` section for an in-depth review.
 
+AEAD modes
+~~~~~~~~~~
+
+Uses modern AEAD ciphers: AES-OCB or CHACHA20-POLY1305.
+For each borg invocation, a new sessionkey is derived from the borg key material
+and the 48bit IV starts from 0 again (both ciphers internally add a 32bit counter
+to our IV, so we'll just count up by 1 per chunk).
+
+The chunk layout is best seen at the bottom of this diagram:
+
+.. figure:: encryption-aead.png
+    :figwidth: 100%
+    :width: 100%
+
+No special IV/counter management is needed here due to the use of session keys.
+
+A 48 bit IV is way more than needed: If you only backed up 4kiB chunks (2^12B),
+the IV would "limit" the data encrypted in one session to 2^(12+48)B == 2.3 exabytes,
+meaning you would run against other limitations (RAM, storage, time) way before that.
+In practice, chunks are usually bigger, for big files even much bigger, giving an
+even higher limit.
+
+Legacy modes
+~~~~~~~~~~~~
+
 AES_-256 is used in CTR mode (so no need for padding). A 64 bit initialization
 vector is used, a MAC is computed on the encrypted chunk
 and both are stored in the chunk. Encryption and MAC use two different keys.
@@ -883,6 +917,9 @@ higher than any previously used counter value before encrypting new data.
 To reduce payload size, only 8 bytes of the 16 bytes nonce is saved in the
 payload, the first 8 bytes are always zeros. This does not affect security but
 limits the maximum repository capacity to only 295 exabytes (2**64 * 16 bytes).
+
+Both modes
+~~~~~~~~~~
 
 Encryption keys (and other secrets) are kept either in a key file on the client
 ('keyfile' mode) or in the repository config on the server ('repokey' mode).

@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-DIFF 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-diff \- Diff contents of two archives
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DIFF" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-diff \- Diff contents of two archives
 .SH SYNOPSIS
 .sp
 borg [common options] diff [options] REPO::ARCHIVE1 ARCHIVE2 [PATH...]
@@ -69,19 +69,19 @@ paths of items inside the archives to compare; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-\-numeric\-owner
+.B \-\-numeric\-owner
 deprecated, use \fB\-\-numeric\-ids\fP instead
 .TP
-.B  \-\-numeric\-ids
+.B \-\-numeric\-ids
 only consider numeric user and group identifiers
 .TP
-.B  \-\-same\-chunker\-params
+.B \-\-same\-chunker\-params
 Override check of chunker parameters.
 .TP
-.B  \-\-sort
+.B \-\-sort
 Sort the output lines by file path.
 .TP
-.B  \-\-json\-lines
+.B \-\-json\-lines
 Format output as JSON Lines.
 .UNINDENT
 .SS Exclusion options

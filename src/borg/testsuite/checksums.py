@@ -4,12 +4,10 @@ from binascii import unhexlify
 
 import pytest
 
-from ..algorithms import checksums
+from .. import checksums
 from ..helpers import bin_to_hex
 
-crc32_implementations = [checksums.crc32_slice_by_8]
-if checksums.have_clmul:
-    crc32_implementations.append(checksums.crc32_clmul)
+crc32_implementations = [checksums.deflate_crc32]
 
 
 @pytest.mark.parametrize('implementation', crc32_implementations)

@@ -27,6 +27,8 @@ borg export-tar
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--list``                            | output verbose list of items (files, dirs, ...)                                                           |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--tar-format FMT``                  | select tar format: BORG, PAX or GNU                                                                       |
+    +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                            |
     |                                                                                                                                                                                                           |
     | :ref:`common_options`                                                                                                                                                                                     |
@@ -63,8 +65,9 @@ borg export-tar
 
 
     optional arguments
-        --tar-filter     filter program to pipe data through
-        --list           output verbose list of items (files, dirs, ...)
+        --tar-filter         filter program to pipe data through
+        --list               output verbose list of items (files, dirs, ...)
+        --tar-format FMT     select tar format: BORG, PAX or GNU
 
 
     :ref:`common_options`
@@ -99,12 +102,18 @@ Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered
 tar stream to stdout.
 
-The generated tarball uses the GNU tar format.
+Depending on the ``-tar-format`` option, these formats are created:
 
-export-tar is a lossy conversion:
-BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-otherwise supported by Borg.
++--------------+---------------------------+----------------------------+
+| --tar-format | Specification             | Metadata                   |
++--------------+---------------------------+----------------------------+
+| BORG         | BORG specific, like PAX   | all as supported by borg   |
++--------------+---------------------------+----------------------------+
+| PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
++--------------+---------------------------+----------------------------+
+| GNU          | GNU tar format            | mtime s, no atime/ctime,   |
+|              |                           | no ACLs/xattrs/bsdflags    |
++--------------+---------------------------+----------------------------+
 
 A ``--sparse`` option (as found in borg extract) is not supported.
 

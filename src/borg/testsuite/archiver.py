@@ -16,7 +16,7 @@ import sys
 import tempfile
 import time
 import unittest
-from binascii import unhexlify, b2a_base64
+from binascii import unhexlify, b2a_base64, a2b_base64
 from configparser import ConfigParser
 from datetime import datetime
 from datetime import timezone
@@ -36,7 +36,7 @@ from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_cipher_blocks
-from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
+from ..crypto.key import FlexiKey, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
@@ -57,7 +57,6 @@ from . import has_lchflags, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected
-from .upgrader import make_attic_repo
 from . import key
 
 
@@ -1867,7 +1866,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
                 cache.begin_txn()
-                cache.cache_config.mandatory_features = set(['unknown-feature'])
+                cache.cache_config.mandatory_features = {'unknown-feature'}
                 cache.commit()
 
         if self.FORK_DEFAULT:
@@ -1891,7 +1890,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 repository._location = Location(self.repository_location)
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest) as cache:
-                assert cache.cache_config.mandatory_features == set([])
+                assert cache.cache_config.mandatory_features == set()
 
     def test_progress_on(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -2490,6 +2489,38 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
         self.cmd('list', self.repository_location)
 
+    def test_change_location_to_keyfile(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'keyfile')
+        log = self.cmd('info', self.repository_location)
+        assert '(key file)' in log
+
+    def test_change_location_to_b2keyfile(self):
+        self.cmd('init', '--encryption=repokey-blake2', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey BLAKE2b)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'keyfile')
+        log = self.cmd('info', self.repository_location)
+        assert '(key file BLAKE2b)' in log
+
+    def test_change_location_to_repokey(self):
+        self.cmd('init', '--encryption=keyfile', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(key file)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'repokey')
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey)' in log
+
+    def test_change_location_to_b2repokey(self):
+        self.cmd('init', '--encryption=keyfile-blake2', self.repository_location)
+        log = self.cmd('info', self.repository_location)
+        assert '(key file BLAKE2b)' in log
+        self.cmd('key', 'change-location', self.repository_location, 'repokey')
+        log = self.cmd('info', self.repository_location)
+        assert '(repokey BLAKE2b)' in log
+
     def test_break_lock(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('break-lock', self.repository_location)
@@ -2748,7 +2779,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 pass
             with open(assert_data_file, 'rb') as _in:
                 assert_data = pickle.load(_in)
-            print('\nLock.migrate_lock(): assert_data = %r.' % (assert_data, ), file=sys.stderr, flush=True)
+            print(f'\nLock.migrate_lock(): assert_data = {assert_data!r}.', file=sys.stderr, flush=True)
             exception = assert_data['exception']
             if exception is not None:
                 extracted_tb = assert_data['exception.extr_tb']
@@ -2847,10 +2878,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "is invalid" in output
 
     def test_init_interrupt(self):
-        def raise_eof(*args):
+        def raise_eof(*args, **kwargs):
             raise EOFError
 
-        with patch.object(KeyfileKeyBase, 'create', raise_eof):
+        with patch.object(FlexiKey, 'create', raise_eof):
             self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=1)
         assert not os.path.exists(self.repository_location)
 
@@ -3089,14 +3120,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo_id = self._extract_repository_id(self.repository_path)
         self.cmd('key', 'export', self.repository_location, export_file)
 
-        with open(export_file, 'r') as fd:
+        with open(export_file) as fd:
             export_contents = fd.read()
 
         assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
 
-        with open(key_file, 'r') as fd:
+        with open(key_file) as fd:
             key_contents = fd.read()
 
         assert key_contents == export_contents
@@ -3105,7 +3136,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd('key', 'import', self.repository_location, export_file)
 
-        with open(key_file, 'r') as fd:
+        with open(key_file) as fd:
             key_contents2 = fd.read()
 
         assert key_contents2 == key_contents
@@ -3117,7 +3148,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('key', 'export', self.repository_location, exported_key_file)
 
         key_file = os.path.join(self.keys_path, os.listdir(self.keys_path)[0])
-        with open(key_file, 'r') as fd:
+        with open(key_file) as fd:
             key_contents = fd.read()
         os.unlink(key_file)
 
@@ -3126,7 +3157,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('key', 'import', self.repository_location, exported_key_file)
         assert not os.path.isfile(key_file), '"borg key import" should respect BORG_KEY_FILE'
 
-        with open(imported_key_file, 'r') as fd:
+        with open(imported_key_file) as fd:
             imported_key_contents = fd.read()
         assert imported_key_contents == key_contents
 
@@ -3136,7 +3167,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo_id = self._extract_repository_id(self.repository_path)
         self.cmd('key', 'export', self.repository_location, export_file)
 
-        with open(export_file, 'r') as fd:
+        with open(export_file) as fd:
             export_contents = fd.read()
 
         assert export_contents.startswith('BORG_KEY ' + bin_to_hex(repo_id) + '\n')
@@ -3167,7 +3198,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo_id = self._extract_repository_id(self.repository_path)
         self.cmd('key', 'export', '--qr-html', self.repository_location, export_file)
 
-        with open(export_file, 'r', encoding='utf-8') as fd:
+        with open(export_file, encoding='utf-8') as fd:
             export_contents = fd.read()
 
         assert bin_to_hex(repo_id) in export_contents
@@ -3221,7 +3252,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd('key', 'export', '--paper', self.repository_location, export_file)
 
-        with open(export_file, 'r') as fd:
+        with open(export_file) as fd:
             export_contents = fd.read()
 
         assert export_contents == """To restore key use borg key import --paper /path/to/repo
@@ -3284,7 +3315,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         dump_file = self.output_path + '/dump'
         output = self.cmd('debug', 'dump-manifest', self.repository_location, dump_file)
         assert output == ""
-        with open(dump_file, "r") as f:
+        with open(dump_file) as f:
             result = json.load(f)
         assert 'archives' in result
         assert 'config' in result
@@ -3299,7 +3330,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         dump_file = self.output_path + '/dump'
         output = self.cmd('debug', 'dump-archive', self.repository_location + "::test", dump_file)
         assert output == ""
-        with open(dump_file, "r") as f:
+        with open(dump_file) as f:
             result = json.load(f)
         assert '_name' in result
         assert '_manifest_entry' in result
@@ -3378,7 +3409,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--progress')
+        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--progress', '--tar-format=GNU')
         with changedir('output'):
             # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
             subprocess.check_call(['tar', 'xpf', '../simple.tar', '--warning=no-timestamp'])
@@ -3393,7 +3424,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz', '--list')
+        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz',
+                        '--list', '--tar-format=GNU')
         assert 'input/file1\n' in list
         assert 'input/dir2\n' in list
         with changedir('output'):
@@ -3408,7 +3440,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')
-        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--strip-components=1', '--list')
+        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar',
+                        '--strip-components=1', '--list', '--tar-format=GNU')
         # --list's path are those before processing with --strip-components
         assert 'input/file1\n' in list
         assert 'input/dir2\n' in list
@@ -3420,7 +3453,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     @requires_gnutar
     def test_export_tar_strip_components_links(self):
         self._extract_hardlinks_setup()
-        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', '--strip-components=2')
+        self.cmd('export-tar', self.repository_location + '::test', 'output.tar',
+                 '--strip-components=2', '--tar-format=GNU')
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
             assert os.stat('hardlink').st_nlink == 2
@@ -3432,7 +3466,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     @requires_gnutar
     def test_extract_hardlinks_tar(self):
         self._extract_hardlinks_setup()
-        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1')
+        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1', '--tar-format=GNU')
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
             assert os.stat('input/dir1/hardlink').st_nlink == 2
@@ -3440,50 +3474,40 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
 
-    def test_import_tar(self):
+    def test_import_tar(self, tar_format='PAX'):
         self.create_test_files()
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar', f'--tar-format={tar_format}')
         self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
     @requires_gzip
-    def test_import_tar_gz(self):
+    def test_import_tar_gz(self, tar_format='GNU'):
         if not shutil.which('gzip'):
             pytest.skip('gzip is not installed')
         self.create_test_files()
         os.unlink('input/flagfile')
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', self.repository_location + '::src', 'simple.tgz')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tgz', f'--tar-format={tar_format}')
         self.cmd('import-tar', self.repository_location + '::dst', 'simple.tgz')
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
-    def test_detect_attic_repo(self):
-        path = make_attic_repo(self.repository_path)
-        cmds = [
-            ['create', path + '::test', self.tmpdir],
-            ['extract', path + '::test'],
-            ['check', path],
-            ['rename', path + '::test', 'newname'],
-            ['list', path],
-            ['delete', path],
-            ['prune', path],
-            ['info', path + '::test'],
-            ['key', 'export', path, 'exported'],
-            ['key', 'import', path, 'import'],
-            ['key', 'change-passphrase', path],
-            ['break-lock', path],
-        ]
-        for args in cmds:
-            output = self.cmd(*args, fork=True, exit_code=2)
-            assert 'Attic repository detected.' in output
+    def test_roundtrip_pax_borg(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar', '--tar-format=BORG')
+        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+        self.assert_dirs_equal('input', 'output/input')
 
     # derived from test_extract_xattrs_errors()
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
@@ -3570,6 +3594,61 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
         self.cmd('create', self.repository_location + '::test2', 'input')
         assert os.path.exists(nonce)
+
+    def test_init_defaults_to_argon2(self):
+        """https://github.com/borgbackup/borg/issues/747#issuecomment-1076160401"""
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with Repository(self.repository_path) as repository:
+            key = msgpack.unpackb(a2b_base64(repository.load_key()))
+        assert key[b'algorithm'] == b'argon2 chacha20-poly1305'
+
+    def test_init_with_explicit_key_algorithm(self):
+        """https://github.com/borgbackup/borg/issues/747#issuecomment-1076160401"""
+        self.cmd('init', '--encryption=repokey', '--key-algorithm=pbkdf2', self.repository_location)
+        with Repository(self.repository_path) as repository:
+            key = msgpack.unpackb(a2b_base64(repository.load_key()))
+        assert key[b'algorithm'] == b'sha256'
+
+    def verify_change_passphrase_does_not_change_algorithm(self, given_algorithm, expected_algorithm):
+        self.cmd('init', '--encryption=repokey', '--key-algorithm', given_algorithm, self.repository_location)
+        os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
+
+        self.cmd('key', 'change-passphrase', self.repository_location)
+
+        with Repository(self.repository_path) as repository:
+            key = msgpack.unpackb(a2b_base64(repository.load_key()))
+            assert key[b'algorithm'] == expected_algorithm
+
+    def test_change_passphrase_does_not_change_algorithm_argon2(self):
+        self.verify_change_passphrase_does_not_change_algorithm('argon2', b'argon2 chacha20-poly1305')
+
+    def test_change_passphrase_does_not_change_algorithm_pbkdf2(self):
+        self.verify_change_passphrase_does_not_change_algorithm('pbkdf2', b'sha256')
+
+    def verify_change_location_does_not_change_algorithm(self, given_algorithm, expected_algorithm):
+        self.cmd('init', '--encryption=keyfile', '--key-algorithm', given_algorithm, self.repository_location)
+
+        self.cmd('key', 'change-location', self.repository_location, 'repokey')
+
+        with Repository(self.repository_path) as repository:
+            key = msgpack.unpackb(a2b_base64(repository.load_key()))
+            assert key[b'algorithm'] == expected_algorithm
+
+    def test_change_location_does_not_change_algorithm_argon2(self):
+        self.verify_change_location_does_not_change_algorithm('argon2', b'argon2 chacha20-poly1305')
+
+    def test_change_location_does_not_change_algorithm_pbkdf2(self):
+        self.verify_change_location_does_not_change_algorithm('pbkdf2', b'sha256')
+
+    def test_key_change_algorithm(self):
+        self.cmd('init', '--encryption=repokey', '--key-algorithm=pbkdf2', self.repository_location)
+
+        self.cmd('key', 'change-algorithm', self.repository_location, 'argon2')
+
+        with Repository(self.repository_path) as repository:
+            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        assert key._encrypted_key_algorithm == 'argon2 chacha20-poly1305'
+        self.cmd('info', self.repository_location)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
@@ -3774,7 +3853,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 'version': 1,
             })
             archive_id = key.id_hash(archive)
-            repository.put(archive_id, key.encrypt(archive))
+            repository.put(archive_id, key.encrypt(archive_id, archive))
             repository.commit(compact=False)
         self.cmd('check', self.repository_location, exit_code=1)
         self.cmd('check', '--repair', self.repository_location, exit_code=0)
@@ -3862,7 +3941,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
     def spoof_manifest(self, repository):
         with repository:
             _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'config': {},
@@ -3875,7 +3954,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb({
                 'version': 1,
                 'archives': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
@@ -3895,9 +3974,9 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             key.tam_required = False
             key.change_passphrase(key._passphrase)
 
-            manifest = msgpack.unpackb(key.decrypt(None, repository.get(Manifest.MANIFEST_ID)))
+            manifest = msgpack.unpackb(key.decrypt(Manifest.MANIFEST_ID, repository.get(Manifest.MANIFEST_ID)))
             del manifest[b'tam']
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb(manifest)))
+            repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb(manifest)))
             repository.commit(compact=False)
         output = self.cmd('list', '--debug', self.repository_location)
         assert 'archive1234' in output
@@ -4144,7 +4223,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # File contents changed (deleted and replaced with a new file)
             change = 'B' if can_compare_ids else '{:<19}'.format('modified')
             assert 'file_replaced' in output  # added to debug #3494
-            assert '{} input/file_replaced'.format(change) in output
+            assert f'{change} input/file_replaced' in output
 
             # File unchanged
             assert 'input/file_unchanged' not in output
@@ -4174,9 +4253,9 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
             change = '0 B' if can_compare_ids else '{:<19}'.format('modified')
-            assert '{} input/empty'.format(change) in output
+            assert f'{change} input/empty' in output
             if are_hardlinks_supported():
-                assert '{} input/hardlink_contents_changed'.format(change) in output
+                assert f'{change} input/hardlink_contents_changed' in output
             if are_symlinks_supported():
                 assert 'input/link_target_contents_changed' not in output
 

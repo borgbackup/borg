@@ -83,7 +83,7 @@ class SecurityManager:
         if not self.known():
             return False
         try:
-            with open(self.key_type_file, 'r') as fd:
+            with open(self.key_type_file) as fd:
                 type = fd.read()
                 return type == str(key.TYPE)
         except OSError as exc:
@@ -232,6 +232,10 @@ def cache_dir(repository, path=None):
 def files_cache_name():
     suffix = os.environ.get('BORG_FILES_CACHE_SUFFIX', '')
     return 'files.' + suffix if suffix else 'files'
+
+
+def discover_files_cache_name(path):
+    return [fn for fn in os.listdir(path) if fn == 'files' or fn.startswith('files.')][0]
 
 
 class CacheConfig:
@@ -650,7 +654,7 @@ class LocalCache(CacheStatsMixin):
         if os.path.exists(txn_dir):
             shutil.copy(os.path.join(txn_dir, 'config'), self.path)
             shutil.copy(os.path.join(txn_dir, 'chunks'), self.path)
-            shutil.copy(os.path.join(txn_dir, files_cache_name()), self.path)
+            shutil.copy(os.path.join(txn_dir, discover_files_cache_name(txn_dir)), self.path)
             os.rename(txn_dir, os.path.join(self.path, 'txn.tmp'))
             if os.path.exists(os.path.join(self.path, 'txn.tmp')):
                 shutil.rmtree(os.path.join(self.path, 'txn.tmp'))
@@ -687,13 +691,13 @@ class LocalCache(CacheStatsMixin):
                 fns = os.listdir(archive_path)
                 # filenames with 64 hex digits == 256bit,
                 # or compact indices which are 64 hex digits + ".compact"
-                return set(unhexlify(fn) for fn in fns if len(fn) == 64) | \
-                       set(unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith('.compact'))
+                return {unhexlify(fn) for fn in fns if len(fn) == 64} | \
+                       {unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith('.compact')}
             else:
                 return set()
 
         def repo_archives():
-            return set(info.id for info in self.manifest.archives.list())
+            return {info.id for info in self.manifest.archives.list()}
 
         def cleanup_outdated(ids):
             for id in ids:
@@ -935,14 +939,17 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.ignored_features.update(repo_features - my_features)
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
-    def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
+    def add_chunk(self, id, chunk, stats, *, overwrite=False, wait=True, compress=True, size=None):
         if not self.txn_active:
             self.begin_txn()
-        size = len(chunk)
+        if size is None and compress:
+            size = len(chunk)  # chunk is still uncompressed
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)
-        data = self.key.encrypt(chunk)
+        if size is None:
+            raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
+        data = self.key.encrypt(id, chunk, compress=compress)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
@@ -1099,15 +1106,18 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def memorize_file(self, hashed_path, path_hash, st, ids):
         pass
 
-    def add_chunk(self, id, chunk, stats, overwrite=False, wait=True):
+    def add_chunk(self, id, chunk, stats, *, overwrite=False, wait=True, compress=True, size=None):
         assert not overwrite, 'AdHocCache does not permit overwrites — trying to use it for recreate?'
         if not self._txn_active:
             self.begin_txn()
-        size = len(chunk)
+        if size is None and compress:
+            size = len(chunk)  # chunk is still uncompressed
+        if size is None:
+            raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         refcount = self.seen_chunk(id, size)
         if refcount:
             return self.chunk_incref(id, stats, size=size)
-        data = self.key.encrypt(chunk)
+        data = self.key.encrypt(id, chunk, compress=compress)
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)

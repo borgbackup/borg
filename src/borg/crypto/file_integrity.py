@@ -6,7 +6,7 @@ from hmac import compare_digest
 
 from ..helpers import IntegrityError
 from ..logger import create_logger
-from ..algorithms.checksums import StreamingXXH64
+from ..checksums import StreamingXXH64
 
 logger = create_logger()
 
@@ -224,7 +224,7 @@ class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
     @classmethod
     def read_integrity_file(cls, path):
         try:
-            with open(cls.integrity_file_path(path), 'r') as fd:
+            with open(cls.integrity_file_path(path)) as fd:
                 return cls.parse_integrity_data(path, fd.read())
         except FileNotFoundError:
             logger.info('No integrity file found for %s', path)

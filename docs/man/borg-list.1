@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-LIST 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-list \- List archive or repository contents
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-list \- List archive or repository contents
 .SH SYNOPSIS
 .sp
 borg [common options] list [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
@@ -53,19 +53,19 @@ paths to list; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-\-consider\-checkpoints
+.B \-\-consider\-checkpoints
 Show checkpoint archives in the repository contents list (default: hidden).
 .TP
-.B  \-\-short
+.B \-\-short
 only print file/directory names, nothing else
 .TP
 .BI \-\-format \ FORMAT
 specify format for file or archive listing (default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; for archives: "{archive:<36} {time} [{id}]{NL}")
 .TP
-.B  \-\-json
+.B \-\-json
 Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
 .TP
-.B  \-\-json\-lines
+.B \-\-json\-lines
 Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 .UNINDENT
 .SS Archive filters

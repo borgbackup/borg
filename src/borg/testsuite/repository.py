@@ -14,7 +14,7 @@ from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, ConnectionClosedWithHint, handle_remote_line
-from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
+from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from . import BaseTestCase
 from .hashindex import H
 
@@ -58,7 +58,7 @@ class RepositoryTestCaseBase(BaseTestCase):
         label = label + ': ' if label is not None else ''
         H_trans = {H(i): i for i in range(10)}
         H_trans[None] = -1  # key == None appears in commits
-        tag_trans = {TAG_PUT: 'put', TAG_DELETE: 'del', TAG_COMMIT: 'comm'}
+        tag_trans = {TAG_PUT2: 'put2', TAG_PUT: 'put', TAG_DELETE: 'del', TAG_COMMIT: 'comm'}
         for segment, fn in self.repository.io.segment_iterator():
             for tag, key, offset, size in self.repository.io.iter_objects(segment):
                 print("%s%s H(%d) -> %s[%d..+%d]" % (label, tag_trans[tag], H_trans[key], fn, offset, size))
@@ -185,13 +185,13 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
 
     def _assert_sparse(self):
         # The superseded 123456... PUT
-        assert self.repository.compact[0] == 41 + 9
+        assert self.repository.compact[0] == 41 + 8 + 9
         # a COMMIT
         assert self.repository.compact[1] == 9
         # The DELETE issued by the superseding PUT (or issued directly)
         assert self.repository.compact[2] == 41
         self.repository._rebuild_sparse(0)
-        assert self.repository.compact[0] == 41 + 9
+        assert self.repository.compact[0] == 41 + 8 + 9
 
     def test_sparse1(self):
         self.repository.put(H(0), b'foo')
@@ -213,10 +213,10 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         self.repository.io._write_fd.sync()
 
         # The on-line tracking works on a per-object basis...
-        assert self.repository.compact[0] == 41 + 41 + 4
+        assert self.repository.compact[0] == 41 + 8 + 41 + 4
         self.repository._rebuild_sparse(0)
         # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
-        assert self.repository.compact[0] == 41 + 41 + 4 + len(MAGIC)
+        assert self.repository.compact[0] == 41 + 8 + 41 + 4 + len(MAGIC)
 
         self.repository.commit(compact=True)
         assert 0 not in [segment for segment, _ in self.repository.io.segment_iterator()]
@@ -459,42 +459,42 @@ class QuotaTestCase(RepositoryTestCaseBase):
     def test_tracking(self):
         assert self.repository.storage_quota_use == 0
         self.repository.put(H(1), bytes(1234))
-        assert self.repository.storage_quota_use == 1234 + 41
+        assert self.repository.storage_quota_use == 1234 + 41 + 8
         self.repository.put(H(2), bytes(5678))
-        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * (41 + 8)
         self.repository.delete(H(1))
-        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41  # we have not compacted yet
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * (41 + 8)  # we have not compacted yet
         self.repository.commit(compact=False)
-        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * 41  # we have not compacted yet
+        assert self.repository.storage_quota_use == 1234 + 5678 + 2 * (41 + 8)  # we have not compacted yet
         self.reopen()
         with self.repository:
             # Open new transaction; hints and thus quota data is not loaded unless needed.
             self.repository.put(H(3), b'')
             self.repository.delete(H(3))
-            assert self.repository.storage_quota_use == 1234 + 5678 + 3 * 41  # we have not compacted yet
+            assert self.repository.storage_quota_use == 1234 + 5678 + 3 * (41 + 8)  # we have not compacted yet
             self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == 5678 + 41
+            assert self.repository.storage_quota_use == 5678 + 41 + 8
 
     def test_exceed_quota(self):
         assert self.repository.storage_quota_use == 0
-        self.repository.storage_quota = 50
+        self.repository.storage_quota = 80
         self.repository.put(H(1), b'')
-        assert self.repository.storage_quota_use == 41
+        assert self.repository.storage_quota_use == 41 + 8
         self.repository.commit(compact=False)
         with pytest.raises(Repository.StorageQuotaExceeded):
             self.repository.put(H(2), b'')
-        assert self.repository.storage_quota_use == 82
+        assert self.repository.storage_quota_use == (41 + 8) * 2
         with pytest.raises(Repository.StorageQuotaExceeded):
             self.repository.commit(compact=False)
-        assert self.repository.storage_quota_use == 82
+        assert self.repository.storage_quota_use == (41 + 8) * 2
         self.reopen()
         with self.repository:
-            self.repository.storage_quota = 100
+            self.repository.storage_quota = 150
             # Open new transaction; hints and thus quota data is not loaded unless needed.
             self.repository.put(H(1), b'')
-            assert self.repository.storage_quota_use == 82  # we have 2 puts for H(1) here and not yet compacted.
+            assert self.repository.storage_quota_use == (41 + 8) * 2  # we have 2 puts for H(1) here and not yet compacted.
             self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == 41  # now we have compacted.
+            assert self.repository.storage_quota_use == 41 + 8  # now we have compacted.
 
 
 class NonceReservation(RepositoryTestCaseBase):
@@ -528,14 +528,14 @@ class NonceReservation(RepositoryTestCaseBase):
                 self.repository.commit_nonce_reservation(0x200, 15)
 
             self.repository.commit_nonce_reservation(0x200, None)
-            with open(os.path.join(self.repository.path, "nonce"), "r") as fd:
+            with open(os.path.join(self.repository.path, "nonce")) as fd:
                 assert fd.read() == "0000000000000200"
 
             with pytest.raises(Exception):
                 self.repository.commit_nonce_reservation(0x200, 15)
 
             self.repository.commit_nonce_reservation(0x400, 0x200)
-            with open(os.path.join(self.repository.path, "nonce"), "r") as fd:
+            with open(os.path.join(self.repository.path, "nonce")) as fd:
                 assert fd.read() == "0000000000000400"
 
 
@@ -710,7 +710,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')) if n.isdigit())[-1]
 
     def open_index(self):
-        return NSIndex.read(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+        return NSIndex.read(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'))
 
     def corrupt_object(self, id_):
         idx = self.open_index()
@@ -723,18 +723,18 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         os.unlink(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)))
 
     def delete_index(self):
-        os.unlink(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())))
+        os.unlink(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'))
 
     def rename_index(self, new_name):
-        os.rename(os.path.join(self.tmppath, 'repository', 'index.{}'.format(self.get_head())),
+        os.rename(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'),
                   os.path.join(self.tmppath, 'repository', new_name))
 
     def list_objects(self):
-        return set(int(key) for key in self.repository.list())
+        return {int(key) for key in self.repository.list()}
 
     def test_repair_corrupted_segment(self):
         self.add_objects([[1, 2, 3], [4, 5], [6]])
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
         self.check(status=True)
         self.corrupt_object(5)
         self.assert_raises(IntegrityError, lambda: self.get_objects(5))
@@ -746,22 +746,22 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.check(repair=True, status=True)
         self.get_objects(4)
         self.check(status=True)
-        self.assert_equal(set([1, 2, 3, 4, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 6}, self.list_objects())
 
     def test_repair_missing_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
         self.check(status=True)
         self.delete_segment(2)
         self.repository.rollback()
         self.check(repair=True, status=True)
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_missing_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_segment(3)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_corrupted_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
@@ -771,7 +771,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
         self.check(status=True)
         self.get_objects(3)
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_no_commits(self):
         self.add_objects([[1, 2, 3]])
@@ -786,14 +786,14 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.assert_equal(self.list_indices(), ['index.2'])
         self.check(status=True)
         self.get_objects(3)
-        self.assert_equal(set([1, 2, 3]), self.list_objects())
+        self.assert_equal({1, 2, 3}, self.list_objects())
 
     def test_repair_missing_index(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
         self.delete_index()
         self.check(status=True)
         self.get_objects(4)
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
 
     def test_repair_index_too_new(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
@@ -802,7 +802,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.check(status=True)
         self.assert_equal(self.list_indices(), ['index.3'])
         self.get_objects(4)
-        self.assert_equal(set([1, 2, 3, 4, 5, 6]), self.list_objects())
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
 
     def test_crash_before_compact(self):
         self.repository.put(H(0), b'data')

@@ -91,13 +91,13 @@ def sysinfo():
     from ..fuse_impl import llfuse, BORG_FUSE_IMPL
     llfuse_name = llfuse.__name__ if llfuse else 'None'
     llfuse_version = (' %s' % llfuse.__version__) if llfuse else ''
-    llfuse_info = '%s%s [%s]' % (llfuse_name, llfuse_version, BORG_FUSE_IMPL)
+    llfuse_info = f'{llfuse_name}{llfuse_version} [{BORG_FUSE_IMPL}]'
     info = []
     if uname is not None:
-        info.append('Platform: %s' % (' '.join(uname), ))
+        info.append('Platform: {}'.format(' '.join(uname)))
     if linux_distribution is not None:
         info.append('Linux: %s %s %s' % linux_distribution)
-    info.append('Borg: %s  Python: %s %s msgpack: %s fuse: %s' % (
+    info.append('Borg: {}  Python: {} {} msgpack: {} fuse: {}'.format(
                 borg_version, python_implementation, python_version, msgpack_version, llfuse_info))
     info.append('PID: %d  CWD: %s' % (os.getpid(), os.getcwd()))
     info.append('sys.argv: %r' % sys.argv)

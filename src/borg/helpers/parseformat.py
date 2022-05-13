@@ -80,7 +80,7 @@ def interval(s):
         # range suffixes in ascending multiplier order
         ranges = [k for k, v in sorted(multiplier.items(), key=lambda t: t[1])]
         raise argparse.ArgumentTypeError(
-            'Unexpected interval time unit "%s": expected one of %r' % (s[-1], ranges))
+            f'Unexpected interval time unit "{s[-1]}": expected one of {ranges!r}')
 
     try:
         hours = int(number) * multiplier[suffix]
@@ -117,7 +117,7 @@ def ChunkerParams(s):
         return CHUNKER_PARAMS
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
-        chunk_min, chunk_max, chunk_mask, window_size = [int(p) for p in params[count - 4:]]
+        chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4:])
         if not (chunk_min <= chunk_mask <= chunk_max):
             raise ValueError('required: chunk_min <= chunk_mask <= chunk_max')
         if chunk_min < 6:
@@ -150,7 +150,7 @@ def partial_format(format, mapping):
     """
     for key, value in mapping.items():
         key = re.escape(key)
-        format = re.sub(r'(?<!\{)((\{%s\})|(\{%s:[^\}]*\}))' % (key, key),
+        format = re.sub(fr'(?<!\{{)((\{{{key}\}})|(\{{{key}:[^\}}]*\}}))',
                         lambda match: match.group(1).format_map(mapping),
                         format)
     return format
@@ -341,24 +341,33 @@ class Location:
             (?P<archive>[^/]+)                              # archive name must not contain "/"
         )?$"""                                              # must match until the end
 
+    # host NAME, or host IP ADDRESS (v4 or v6, v6 must be in square brackets)
+    host_re = r"""
+        (?P<host>(
+            (?!\[)[^:/]+(?<!\])     # hostname or v4 addr, not containing : or / (does not match v6 addr: no brackets!)
+            |
+            \[[0-9a-fA-F:.]+\])     # ipv6 address in brackets
+        )
+    """
+
     # regexes for misc. kinds of supported location specifiers:
     ssh_re = re.compile(r"""
-        (?P<proto>ssh)://                                   # ssh://
-        """ + optional_user_re + r"""                       # user@  (optional)
-        (?P<host>([^:/]+|\[[0-9a-fA-F:.]+\]))(?::(?P<port>\d+))?  # host or host:port or [ipv6] or [ipv6]:port
-        """ + abs_path_re + optional_archive_re, re.VERBOSE)  # path or path::archive
+        (?P<proto>ssh)://                                       # ssh://
+        """ + optional_user_re + host_re + r"""                 # user@  (optional), host name or address
+        (?::(?P<port>\d+))?                                     # :port (optional)
+        """ + abs_path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
 
     file_re = re.compile(r"""
-        (?P<proto>file)://                                  # file://
-        """ + file_path_re + optional_archive_re, re.VERBOSE)  # servername/path, path or path::archive
+        (?P<proto>file)://                                      # file://
+        """ + file_path_re + optional_archive_re, re.VERBOSE)   # servername/path, path or path::archive
 
-    # note: scp_re is also use for local paths
+    # note: scp_re is also used for local paths
     scp_re = re.compile(r"""
         (
-            """ + optional_user_re + r"""                   # user@  (optional)
-            (?P<host>([^:/]+|\[[0-9a-fA-F:.]+\])):          # host: (don't match / or [ipv6] in host to disambiguate from file:)
-        )?                                                  # user@host: part is optional
-        """ + scp_path_re + optional_archive_re, re.VERBOSE)  # path with optional archive
+            """ + optional_user_re + host_re + r"""             # user@  (optional), host name or address
+            :                                                   # : (required!)
+        )?                                                      # user@host: part is optional
+        """ + scp_path_re + optional_archive_re, re.VERBOSE)    # path with optional archive
 
     # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),
@@ -377,7 +386,8 @@ class Location:
         )
         """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
 
-    def __init__(self, text='', overrides={}):
+    def __init__(self, text='', overrides={}, other=False):
+        self.repo_env_var = 'BORG_OTHER_REPO' if other else 'BORG_REPO'
         if not self.parse(text, overrides):
             raise ValueError('Invalid location format: "%s"' % self.processed)
 
@@ -390,14 +400,14 @@ class Location:
         m = self.env_re.match(text)
         if not m:
             return False
-        repo_raw = os.environ.get('BORG_REPO')
+        repo_raw = os.environ.get(self.repo_env_var)
         if repo_raw is None:
             return False
         repo = replace_placeholders(repo_raw, overrides)
         valid = self._parse(repo)
         self.archive = m.group('archive')
         self.raw = repo_raw if not self.archive else repo_raw + self.raw
-        self.processed = repo if not self.archive else '%s::%s' % (repo, self.archive)
+        self.processed = repo if not self.archive else f'{repo}::{self.archive}'
         return valid
 
     def _parse(self, text):
@@ -484,9 +494,9 @@ class Location:
                 path = '/./' + self.path  # /./x = path x relative to cwd
             else:
                 path = self.path
-            return 'ssh://{}{}{}{}'.format('{}@'.format(self.user) if self.user else '',
+            return 'ssh://{}{}{}{}'.format(f'{self.user}@' if self.user else '',
                                            self._host,  # needed for ipv6 addrs
-                                           ':{}'.format(self.port) if self.port else '',
+                                           f':{self.port}' if self.port else '',
                                            path)
 
     def with_timestamp(self, timestamp):
@@ -503,10 +513,10 @@ class Location:
         return loc
 
 
-def location_validator(archive=None, proto=None):
+def location_validator(archive=None, proto=None, other=False):
     def validator(text):
         try:
-            loc = Location(text)
+            loc = Location(text, other=other)
         except ValueError as err:
             raise argparse.ArgumentTypeError(str(err)) from None
         if archive is True and not loc.archive:
@@ -751,7 +761,7 @@ class ItemFormatter(BaseFormatter):
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format, *, json_lines=False):
-        from ..algorithms.checksums import StreamingXXH64
+        from ..checksums import StreamingXXH64
         self.xxh64 = StreamingXXH64
         self.archive = archive
         self.json_lines = json_lines
@@ -947,8 +957,8 @@ def ellipsis_truncate(msg, space):
         # if there is very little space, just show ...
         return '...' + ' ' * (space - ellipsis_width)
     if space < ellipsis_width + msg_width:
-        return '%s...%s' % (swidth_slice(msg, space // 2 - ellipsis_width),
-                            swidth_slice(msg, -space // 2))
+        return '{}...{}'.format(swidth_slice(msg, space // 2 - ellipsis_width),
+                                swidth_slice(msg, -space // 2))
     return msg + ' ' * (space - msg_width)
 
 

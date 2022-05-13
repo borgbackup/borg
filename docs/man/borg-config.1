@@ -1,5 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
+.TH BORG-CONFIG 1 "2022-04-14" "" "borg backup tool"
+.SH NAME
+borg-config \- get, set, and delete values in a repository or cache config file
 .
 .nr rst2man-indent-level 0
 .
@@ -27,9 +30,6 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CONFIG" 1 "2022-02-19" "" "borg backup tool"
-.SH NAME
-borg-config \- get, set, and delete values in a repository or cache config file
 .SH SYNOPSIS
 .sp
 borg [common options] config [options] [REPOSITORY] [NAME] [VALUE]
@@ -65,13 +65,13 @@ new value for key
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B  \-c\fP,\fB  \-\-cache
+.B \-c\fP,\fB  \-\-cache
 get and set values from the repo cache
 .TP
-.B  \-d\fP,\fB  \-\-delete
+.B \-d\fP,\fB  \-\-delete
 delete the key from the config file
 .TP
-.B  \-l\fP,\fB  \-\-list
+.B \-l\fP,\fB  \-\-list
 list the configuration of the repo
 .UNINDENT
 .SH EXAMPLES

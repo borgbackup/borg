@@ -230,8 +230,8 @@ Depending on the chosen mode (see :ref:`borg_init`) different primitives are use
   of SHA-256 against length extension attacks does not apply to HMAC-SHA-256.
   
   The authentication primitive should be chosen based upon SHA hardware support:
-  AMD Ryzen and new 12th+ Generation Intel Core processors (beginning with 
-  the Alder Lake architecture) support SHA extensions and are likely to perform
+  all AMD Ryzen, new Intel 10th+ generation mobile and Intel 11th+ generation
+  desktop processors support SHA extensions and are likely to perform
   best with HMAC-SHA-256. Among ARM processors, support for SHA extensions varies.
   64-bit CPUs without SHA extensions are likely to perform best with BLAKE2b.
 

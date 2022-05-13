@@ -45,6 +45,10 @@ that is the safer way; see the warning below.
     experience errors and read broken data if changes to that repository are
     being made at the same time.
 
+Option ``--help`` when used as a command works as expected on subcommands (e.g., ``borg help compact``).
+But it does not work when the help command is being used on sub-sub-commands (e.g., ``borg help key export``).
+The workaround for this to use the help command as a flag (e.g., ``borg key export --help``).
+
 Examples
 ~~~~~~~~
 ::

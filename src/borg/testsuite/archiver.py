@@ -4014,7 +4014,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):
-    prefix = '__testsuite__:'
+    prefix = 'ssh://__testsuite__'
 
     def open_repository(self):
         return RemoteRepository(Location(self.repository_location))

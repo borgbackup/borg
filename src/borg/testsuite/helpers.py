@@ -113,32 +113,6 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
         assert Location('file:///some/path').to_key_filename() == keys_dir + 'some_path'
 
-    def test_scp(self, monkeypatch, keys_dir):
-        monkeypatch.delenv('BORG_REPO', raising=False)
-        assert repr(Location('user@host:/some/path::archive')) == \
-            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
-        assert repr(Location('user@host:/some/path')) == \
-            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
-        assert repr(Location('user@[::]:/some/path::archive')) == \
-            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive='archive')"
-        assert repr(Location('user@[::]:/some/path')) == \
-            "Location(proto='ssh', user='user', host='::', port=None, path='/some/path', archive=None)"
-        assert repr(Location('user@[2001:db8::]:/some/path::archive')) == \
-            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive='archive')"
-        assert repr(Location('user@[2001:db8::]:/some/path')) == \
-            "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='/some/path', archive=None)"
-        assert repr(Location('user@[2001:db8::c0:ffee]:/some/path::archive')) == \
-            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive='archive')"
-        assert repr(Location('user@[2001:db8::c0:ffee]:/some/path')) == \
-            "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='/some/path', archive=None)"
-        assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path::archive')) == \
-            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive='archive')"
-        assert repr(Location('user@[2001:db8::192.0.2.1]:/some/path')) == \
-            "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='/some/path', archive=None)"
-        assert Location('user@[2001:db8::192.0.2.1]:/some/path').to_key_filename() == keys_dir + '2001_db8__192_0_2_1__some_path'
-        assert repr(Location('user@[2a02:0001:0002:0003:0004:0005:0006:0007]:/some/path')) == \
-            "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='/some/path', archive=None)"
-
     def test_smb(self, monkeypatch, keys_dir):
         monkeypatch.delenv('BORG_REPO', raising=False)
         assert repr(Location('file:////server/share/path::archive')) == \
@@ -197,8 +171,6 @@ class TestLocationWithoutEnv:
 
     def test_user_parsing(self):
         # see issue #1930
-        assert repr(Location('host:path::2016-12-31@23:59:59')) == \
-            "Location(proto='ssh', user=None, host='host', port=None, path='path', archive='2016-12-31@23:59:59')"
         assert repr(Location('ssh://host/path::2016-12-31@23:59:59')) == \
             "Location(proto='ssh', user=None, host='host', port=None, path='/path', archive='2016-12-31@23:59:59')"
 
@@ -281,15 +253,6 @@ class TestLocationWithEnv:
             "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
         assert repr(Location()) == \
                "Location(proto='file', user=None, host=None, port=None, path='/some/path', archive=None)"
-
-    def test_scp(self, monkeypatch):
-        monkeypatch.setenv('BORG_REPO', 'user@host:/some/path')
-        assert repr(Location('::archive')) == \
-            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive='archive')"
-        assert repr(Location('::')) == \
-            "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
-        assert repr(Location()) == \
-               "Location(proto='ssh', user='user', host='host', port=None, path='/some/path', archive=None)"
 
     def test_folder(self, monkeypatch):
         monkeypatch.setenv('BORG_REPO', 'path')

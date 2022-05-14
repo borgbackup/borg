@@ -14,31 +14,15 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 **Remote repositories** accessed via ssh user@host:
 
-``user@host:/path/to/repo`` - remote repo, absolute path
-
-``ssh://user@host:port/path/to/repo`` - same, alternative syntax, port can be given
-
+``ssh://user@host:port/path/to/repo`` - remote repo, absolute path
 
 **Remote repositories with relative paths** can be given using this syntax:
-
-``user@host:path/to/repo`` - path relative to current directory
-
-``user@host:~/path/to/repo`` - path relative to user's home directory
-
-``user@host:~other/path/to/repo`` - path relative to other's home directory
-
-Note: giving ``user@host:/./path/to/repo`` or ``user@host:/~/path/to/repo`` or
-``user@host:/~other/path/to/repo`` is also supported, but not required here.
-
-
-**Remote repositories with relative paths, alternative syntax with port**:
 
 ``ssh://user@host:port/./path/to/repo`` - path relative to current directory
 
 ``ssh://user@host:port/~/path/to/repo`` - path relative to user's home directory
 
 ``ssh://user@host:port/~other/path/to/repo`` - path relative to other's home directory
-
 
 If you frequently need the same repo URL, it is a good idea to set the
 ``BORG_REPO`` environment variable to set a default for the repo URL:

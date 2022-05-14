@@ -229,11 +229,21 @@ Depending on the chosen mode (see :ref:`borg_init`) different primitives are use
   and have proven secure against known attacks. The known vulnerability
   of SHA-256 against length extension attacks does not apply to HMAC-SHA-256.
   
-  The authentication primitive should be chosen based upon SHA hardware support:
-  all AMD Ryzen, Intel 10th+ generation mobile and Intel 11th+ generation
-  desktop processors, Apple M1+ and most current ARM64 architectures support
-  SHA extensions and are likely to perform best with HMAC-SHA-256.
-  64-bit CPUs without SHA extensions are likely to perform best with BLAKE2b.
+  The authentication primitive should be chosen based upon SHA hardware support.
+  With SHA hardware support, hmac-sha256 is likely to be much faster. 
+  If no hardware support is provided, Blake2b-256 will outperform hmac-sha256.
+  To find out if you have SHA hardware support, use::
+
+  $ borg benchmark cpu
+
+  The output will include an evaluation of cryptographic hashes/MACs like::
+
+  Cryptographic hashes / MACs ====================================
+  hmac-sha256              1GB        0.436s
+  blake2b-256              1GB        1.579s
+
+  Based upon your output, choose the primitive that is faster (in the above
+  example, hmac-sha256 is much faster, which indicates SHA hardware support).
 
 - The primitive used for authentication is always the same primitive
   that is used for deriving the chunk ID, but they are always

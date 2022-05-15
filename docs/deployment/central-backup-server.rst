@@ -81,7 +81,7 @@ The options which are added to the key will perform the following:
 Due to the ``cd`` command we use, the server automatically changes the current
 working directory. Then client doesn't need to have knowledge of the absolute
 or relative remote repository path and can directly access the repositories at
-``ssh://<user>@<host>/<repo>``.
+``ssh://<user>@<host>/./<repo>``.
 
 .. note:: The setup above ignores all client given commandline parameters
           which are normally appended to the `borg serve` command.

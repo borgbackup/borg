@@ -46,11 +46,11 @@ Here is how you can convert to URL style:
 
 ::
 
-    user@host:path/to/repo             # relative to cwd
+    user@host:path/to/repo              # relative to cwd
     -->
-    ssh://user@host:22/./path/to/repo  # relative to cwd
+    ssh://user@host:22/./path/to/repo   # relative to cwd
     or (usually the cwd is the home dir after ssh login)
-    ssh://user@host:22/~/path/to/repo  # relative to home dir
+    ssh://user@host:22/~/path/to/repo   # relative to home dir
 
     user@host:/path/to/repo             # absolute repo path
     -->

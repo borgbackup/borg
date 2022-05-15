@@ -2101,7 +2101,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test3.checkpoint', output)
         self.assert_not_in('test3.checkpoint.1', output)
         self.assert_in('test4.checkpoint', output)
-        # now we supercede the latest checkpoint by a successful backup:
+        # now we supersede the latest checkpoint by a successful backup:
         self.cmd('create', self.repository_location + '::test5', src_dir)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
         output = self.cmd('list', '--consider-checkpoints', self.repository_location)

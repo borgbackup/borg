@@ -588,7 +588,7 @@ Other changes:
   - add examples for --paths-from-stdin, --paths-from-command, --paths-separator, #5644
   - fix typos/grammar
   - update docs for dev environment installation instructions
-  - recomend running tests only on installed versions for setup
+  - recommend running tests only on installed versions for setup
   - add badge with current status of package
 - vagrant:
 
@@ -1217,7 +1217,7 @@ Other changes:
   - use macFUSE (not osxfuse) for Apple M1 compatibility
   - update docs for dev environment installation instructions, #5643
   - fix grammar in faq
-  - recomend running tests only on installed versions for setup
+  - recommend running tests only on installed versions for setup
   - add link back to git-installation
   - remove /var/cache exclusion in example commands, #5625.
     This is generally a poor idea and shouldn't be promoted through examples.
@@ -3230,7 +3230,7 @@ Other changes:
     cryptohash for dedupe, so people don't worry, #2390
   - add hint about chunker params to borg upgrade docs, #2421
   - clarify borg upgrade docs, #2436
-  - quickstart: delete problematic BORG_PASSPRHASE use, #2623
+  - quickstart: delete problematic BORG_PASSPHRASE use, #2623
   - faq: specify "using inline shell scripts"
   - document pattern denial of service, #2624
 - tests:
@@ -3970,7 +3970,7 @@ Bug fixes:
   Makes --cache-only idempotent: it won't fail if the cache is already deleted.
 - fixed borg create --one-file-system erroneously traversing into other
   filesystems (if starting fs device number was 0), #873
-- workround a bug in Linux fadvise FADV_DONTNEED, #907
+- workaround a bug in Linux fadvise FADV_DONTNEED, #907
 
 Other changes:
 

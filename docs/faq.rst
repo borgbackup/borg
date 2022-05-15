@@ -733,7 +733,7 @@ Since the nonce is not necessary to read the data that is already encrypted,
 ``borg info``, ``borg list``, ``borg extract`` and ``borg mount`` should work
 just fine without it.
 
-If the the nonce file stored in the repo is lost, but you still have your local copy,
+If the nonce file stored in the repo is lost, but you still have your local copy,
 borg will recreate the repository nonce file the next time you run ``borg create``.
 This should be safe for repositories that are only used from one user account
 on one machine.
@@ -953,7 +953,7 @@ If you feel your Borg backup is too slow somehow, here is what you can do:
   from the beginning each time, but it is still faster then as it does not store
   data into the repo which it already has there from last checkpoint.
 - If you don’t need additional file attributes, you can disable them with ``--noflags``,
-  ``--noacls``, ``--noxattrs``. This can lead to noticable performance improvements
+  ``--noacls``, ``--noxattrs``. This can lead to noticeable performance improvements
   when your backup consists of many small files.
 
 If you feel that Borg "freezes" on a file, it could be in the middle of processing a

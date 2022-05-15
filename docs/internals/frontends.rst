@@ -10,7 +10,7 @@ Borg does not have a public API on the Python level. That does not keep you from
 but does mean that there are no release-to-release guarantees on what you might find in that package, not
 even for point releases (1.1.x), and there is no documentation beyond the code and the internals documents.
 
-Borg does on the other hand provide an API on a command-line level. In other words, a frontend should to
+Borg does on the other hand provide an API on a command-line level. In other words, a frontend should
 (for example) create a backup archive just invoke :ref:`borg_create`, give commandline parameters/options
 as needed and parse JSON output from borg.
 
@@ -465,13 +465,13 @@ changes:
     A list of *Change* objects describing the changes made to the item in the two archives. For example,
     there will be two changes if the contents of a file are changed, and its ownership are changed.
 
-The *Change* object can contain a number of properties depending on the type of change that occured. 
+The *Change* object can contain a number of properties depending on the type of change that occurred.
 If a 'property' is not required for the type of change, it is not output.
 The possible properties of a *Change* object are:
 
 type:
   The **type** property is always present. It identifies the type of change and will be one of these values:
-  
+
   - *modified* - file contents changed.
   - *added* - the file was added.
   - *removed* - the file was removed.

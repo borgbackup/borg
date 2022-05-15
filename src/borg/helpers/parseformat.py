@@ -362,7 +362,7 @@ class Location:
         """ + file_path_re + optional_archive_re, re.VERBOSE)   # servername/path, path or path::archive
 
     local_re = re.compile(
-            local_path_re + optional_archive_re, re.VERBOSE)    # local path with optional archive
+        local_path_re + optional_archive_re, re.VERBOSE)    # local path with optional archive
 
     # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),

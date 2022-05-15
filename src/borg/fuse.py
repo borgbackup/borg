@@ -18,7 +18,7 @@ from .crypto.low_level import blake2b_128
 from .archiver import Archiver
 from .archive import Archive
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, hardlinkable, signal_handler, format_file_size
+from .helpers import daemonize, hardlinkable, signal_handler, format_file_size, Error
 from .helpers import msgpack
 from .item import Item
 from .lrucache import LRUCache
@@ -257,6 +257,9 @@ class FuseOperations(llfuse.Operations):
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
         if self.args.location.archive:
+            if self.versions:
+                raise Error("for versions view, do not specify a single archive, "
+                            "but always give the repository as location.")
             self.process_archive(self.args.location.archive)
         else:
             self.versions_index = FuseVersionsIndex()

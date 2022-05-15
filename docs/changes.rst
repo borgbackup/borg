@@ -466,7 +466,7 @@ Other changes:
   - use macFUSE (not osxfuse) for Apple M1 compatibility
   - update docs for dev environment installation instructions, #5643
   - fix grammar in faq
-  - recomend running tests only on installed versions for setup
+  - recommend running tests only on installed versions for setup
   - add link back to git-installation
   - remove /var/cache exclusion in example commands, #5625.
     This is generally a poor idea and shouldn't be promoted through examples.
@@ -2925,7 +2925,7 @@ Bug fixes:
   Makes --cache-only idempotent: it won't fail if the cache is already deleted.
 - fixed borg create --one-file-system erroneously traversing into other
   filesystems (if starting fs device number was 0), #873
-- workround a bug in Linux fadvise FADV_DONTNEED, #907
+- workaround a bug in Linux fadvise FADV_DONTNEED, #907
 
 Other changes:
 

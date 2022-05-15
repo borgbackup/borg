@@ -268,7 +268,7 @@ class LZMA(DecidingCompressor):
 class ZSTD(DecidingCompressor):
     """zstd compression / decompression (pypi: zstandard, gh: python-zstandard)"""
     # This is a NOT THREAD SAFE implementation.
-    # Only ONE python context must to be created at a time.
+    # Only ONE python context must be created at a time.
     # It should work flawlessly as long as borg will call ONLY ONE compression job at time.
     ID = b'\x03\x00'
     name = 'zstd'

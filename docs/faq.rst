@@ -726,7 +726,7 @@ Since the nonce is not necessary to read the data that is already encrypted,
 ``borg info``, ``borg list``, ``borg extract`` and ``borg mount`` should work
 just fine without it.
 
-If the the nonce file stored in the repo is lost, but you still have your local copy,
+If the nonce file stored in the repo is lost, but you still have your local copy,
 borg will recreate the repository nonce file the next time you run ``borg create``.
 This should be safe for repositories that are only used from one user account
 on one machine.

@@ -379,8 +379,13 @@ class Archiver:
             return new_item
 
         def upgrade_compressed_chunk(chunk):
+            level = b'\xFF'  # FF means unknown compression level
             if ZLIB_legacy.detect(chunk):
-                chunk = ZLIB.ID + chunk  # get rid of the attic legacy: prepend separate type bytes for zlib
+                ctype = ZLIB.ID
+                chunk = ctype + level + chunk  # get rid of the attic legacy: prepend separate type/level bytes
+            else:
+                ctype = chunk[0:1]
+                chunk = ctype + level + chunk[2:]  # keep type same, but set level
             return chunk
 
         dry_run = args.dry_run

@@ -3873,7 +3873,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 'username': 'bar',
                 'name': 'archive1',
                 'time': '2016-12-15T18:49:51.849711',
-                'version': 1,
+                'version': 2,
             })
             archive_id = key.id_hash(archive)
             repository.put(archive_id, key.encrypt(archive_id, archive))
@@ -3936,7 +3936,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         with repository:
             _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb({
-                'version': 1,
+                'version': 2,
                 'archives': {},
                 'config': {},
                 'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),

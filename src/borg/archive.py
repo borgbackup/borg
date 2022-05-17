@@ -472,7 +472,7 @@ class Archive:
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
         metadata = ArchiveItem(internal_dict=msgpack.unpackb(data))
-        if metadata.version != 1:
+        if metadata.version not in (1, 2):  # legacy: still need to read v1 archives
             raise Exception('Unknown archive metadata version')
         return metadata
 
@@ -601,7 +601,7 @@ Utilization of max. archive size: {csize_max:.0%}
         self.start = start
         self.end = end
         metadata = {
-            'version': 1,
+            'version': 2,
             'name': name,
             'comment': comment or '',
             'items': self.items_buffer.chunks,
@@ -1748,7 +1748,7 @@ class ArchiveChecker:
                 continue
             if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
-            if b'cmdline' not in data or b'\xa7version\x01' not in data:
+            if b'cmdline' not in data or b'\xa7version\x02' not in data:
                 continue
             try:
                 archive = msgpack.unpackb(data)
@@ -1989,7 +1989,7 @@ class ArchiveChecker:
                     del self.manifest.archives[info.name]
                     continue
                 archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
-                if archive.version != 1:
+                if archive.version != 2:
                     raise Exception('Unknown archive metadata version')
                 archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
                 items_buffer = ChunkBuffer(self.key)

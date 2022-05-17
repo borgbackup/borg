@@ -29,6 +29,7 @@ try:
     from contextlib import contextmanager
     from datetime import datetime, timedelta
     from io import TextIOWrapper
+    from struct import Struct
 
     from .logger import create_logger, setup_logging
 
@@ -44,7 +45,7 @@ try:
     from .archive import has_link
     from .cache import Cache, assert_secure, SecurityManager
     from .constants import *  # NOQA
-    from .compress import CompressionSpec, ZLIB, ZLIB_legacy
+    from .compress import CompressionSpec, ZLIB, ZLIB_legacy, ObfuscateSize
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
     from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
     from .crypto.keymanager import KeyManager
@@ -386,6 +387,15 @@ class Archiver:
             else:
                 ctype = chunk[0:1]
                 chunk = ctype + level + chunk[2:]  # keep type same, but set level
+            if ctype == ObfuscateSize.ID:
+                # in older borg, we used unusual byte order
+                old_header_fmt = Struct('>I')
+                new_header_fmt = ObfuscateSize.header_fmt
+                length = ObfuscateSize.header_len
+                size_bytes = chunk[2:2+length]
+                size = old_header_fmt.unpack(size_bytes)
+                size_bytes = new_header_fmt.pack(size)
+                chunk = chunk[0:2] + size_bytes + chunk[2+length:]
             return chunk
 
         dry_run = args.dry_run

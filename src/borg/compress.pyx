@@ -489,7 +489,7 @@ class ObfuscateSize(CompressorBase):
     ID = b'\x04'
     name = 'obfuscate'
 
-    header_fmt = Struct('>I')
+    header_fmt = Struct('<I')
     header_len = len(header_fmt.pack(0))
 
     def __init__(self, level=None, compressor=None):

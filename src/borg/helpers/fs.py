@@ -181,7 +181,7 @@ class HardLinkManager:
     C) When transferring from a borg1 archive, we need:
        path -> chunks, chunks_healthy  # for borg1_hl_targets
        If we encounter a regular file item with source == path later, we reuse chunks and chunks_healthy
-       and create the same hlid = hardlink_id(source).
+       and create the same hlid = hardlink_id_from_path(source).
 
     D) When importing a tar file (simplified 1-pass way for now, not creating borg hardlink items):
        path -> chunks
@@ -203,10 +203,16 @@ class HardLinkManager:
     def borg1_hardlink_slave(self, item):  # legacy
         return 'source' in item and self.borg1_hardlinkable(item.mode)
 
-    def hardlink_id(self, path):
+    def hardlink_id_from_path(self, path):
         """compute a hardlink id from a path"""
         assert isinstance(path, bytes)
         return hashlib.sha256(path).digest()
+
+    def hardlink_id_from_inode(self, *, ino, dev):
+        """compute a hardlink id from an inode"""
+        assert isinstance(ino, int)
+        assert isinstance(dev, int)
+        return hashlib.sha256(f'{ino}/{dev}'.encode()).digest()
 
     def remember(self, *, id, info):
         """
@@ -220,8 +226,8 @@ class HardLinkManager:
                      chunks / chunks_healthy list
                      hlid
         """
-        assert isinstance(id, self.id_type)
-        assert isinstance(info, self.info_type)
+        assert isinstance(id, self.id_type), f"key is {key!r}, not of type {self.key_type}"
+        assert isinstance(info, self.info_type), f"info is {info!r}, not of type {self.info_type}"
         self._map[id] = info
 
     def retrieve(self, id, *, default=None):

@@ -1236,7 +1236,7 @@ class FilesystemObjectProcessors:
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
 
-        self.hlm = HardLinkManager(id_type=tuple, info_type=tuple)  # (dev, ino) -> (hlid, chunks)
+        self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
         self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
@@ -1249,20 +1249,20 @@ class FilesystemObjectProcessors:
         update_map = False
         if hardlinked:
             status = 'h'  # hardlink
-            hlid, chunks = self.hlm.retrieve(id=(st.st_ino, st.st_dev), default=(None, None))
-            if hlid is None:
+            nothing = object()
+            chunks = self.hlm.retrieve(id=(st.st_ino, st.st_dev), default=nothing)
+            if chunks is nothing:
                 update_map = True
-                hlid = self.hlm.hardlink_id(item._dict['path'])
-            item.hlid = hlid
-            if chunks is not None:
+            elif chunks is not None:
                 item.chunks = chunks
+            item.hlid = self.hlm.hardlink_id_from_inode(ino=st.st_ino, dev=st.st_dev)
         yield item, status, hardlinked
         self.add_item(item, stats=self.stats)
         if update_map:
             # remember the hlid of this fs object and if the item has chunks,
             # also remember them, so we do not have to re-chunk a hardlink.
             chunks = item.chunks if 'chunks' in item else None
-            self.hlm.remember(id=(st.st_ino, st.st_dev), info=(hlid, chunks))
+            self.hlm.remember(id=(st.st_ino, st.st_dev), info=chunks)
 
     def process_dir_with_fd(self, *, path, fd, st):
         with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked):

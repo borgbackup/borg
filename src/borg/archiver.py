@@ -353,10 +353,10 @@ class Archiver:
         def upgrade_item(item):
             """upgrade item as needed, get rid of legacy crap"""
             if hlm.borg1_hardlink_master(item):
-                item._dict['hlid'] = hlid = hlm.hardlink_id(item._dict['path'])
+                item._dict['hlid'] = hlid = hlm.hardlink_id_from_path(item._dict['path'])
                 hlm.remember(id=hlid, info=(item._dict.get('chunks'), item._dict.get('chunks_healthy')))
             elif hlm.borg1_hardlink_slave(item):
-                item._dict['hlid'] = hlid = hlm.hardlink_id(item._dict['source'])
+                item._dict['hlid'] = hlid = hlm.hardlink_id_from_path(item._dict['source'])
                 chunks, chunks_healthy = hlm.retrieve(id=hlid, default=(None, None))
                 if chunks is not None:
                     item._dict['chunks'] = chunks

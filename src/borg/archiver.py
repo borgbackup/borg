@@ -345,6 +345,11 @@ class Archiver:
                other_repository=None, other_manifest=None, other_key=None):
         """archives transfer from other repository"""
 
+        ITEM_KEY_WHITELIST = {'path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'hlid',
+                              'mode', 'user', 'group', 'uid', 'gid', 'mtime', 'atime', 'ctime', 'birthtime', 'size',
+                              'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended',
+                              'part'}
+
         def upgrade_item(item):
             """upgrade item as needed, get rid of legacy crap"""
             if hlm.borg1_hardlink_master(item):
@@ -364,10 +369,14 @@ class Archiver:
                 if attr in item:
                     ns = getattr(item, attr)  # decode (bigint or Timestamp) --> int ns
                     setattr(item, attr, ns)  # encode int ns --> msgpack.Timestamp only, no bigint any more
-            item._dict.pop('hardlink_master', None)  # not used for hardlinks any more, replaced by hlid
-            item._dict.pop('acl', None)  # remove remnants of bug in attic <= 0.13
-            item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
-            return item
+            # make sure we only have desired stuff in the new item. specifically, make sure to get rid of:
+            # - 'acl' remnants of bug in attic <= 0.13
+            # - 'hardlink_master' (superseded by hlid)
+            new_item_dict = {key: value for key, value in item.as_dict().items() if key in ITEM_KEY_WHITELIST}
+            new_item = Item(internal_dict=new_item_dict)
+            new_item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
+            assert all(key in new_item for key in REQUIRED_ITEM_KEYS)
+            return new_item
 
         def upgrade_compressed_chunk(chunk):
             if ZLIB_legacy.detect(chunk):

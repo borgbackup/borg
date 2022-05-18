@@ -315,7 +315,7 @@ class Location:
 
     # path must not contain :: (it ends at :: or string end), but may contain single colons.
     # to avoid ambiguities with other regexes, it must also not start with ":" nor with "//" nor with "ssh://".
-    local_path_re = r"""
+    scp_path_re = r"""
         (?!(:|//|ssh://))                                   # not starting with ":" or // or ssh://
         (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
         """
@@ -361,8 +361,13 @@ class Location:
         (?P<proto>file)://                                      # file://
         """ + file_path_re + optional_archive_re, re.VERBOSE)   # servername/path, path or path::archive
 
-    local_re = re.compile(
-        local_path_re + optional_archive_re, re.VERBOSE)    # local path with optional archive
+    # note: scp_re is also used for local paths
+    scp_re = re.compile(r"""
+        (
+            """ + optional_user_re + host_re + r"""             # user@  (optional), host name or address
+            :                                                   # : (required!)
+        )?                                                      # user@host: part is optional
+        """ + scp_path_re + optional_archive_re, re.VERBOSE)    # path with optional archive
 
     # get the repo from BORG_REPO env and the optional archive from param.
     # if the syntax requires giving REPOSITORY (see "borg mount"),
@@ -438,11 +443,13 @@ class Location:
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
             return True
-        m = self.local_re.match(text)
+        m = self.scp_re.match(text)
         if m:
+            self.user = m.group('user')
+            self._host = m.group('host')
             self.path = normpath_special(m.group('path'))
             self.archive = m.group('archive')
-            self.proto = 'file'
+            self.proto = self._host and 'ssh' or 'file'
             return True
         return False
 

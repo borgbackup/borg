@@ -861,7 +861,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
     repository = None  # type: RemoteRepository
 
     def open(self, create=False):
-        return RemoteRepository(Location('ssh://__testsuite__' + os.path.join(self.tmppath, 'repository')),
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
                                 exclusive=True, create=create)
 
     def _get_mock_args(self):
@@ -937,11 +937,12 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
     def test_ssh_cmd(self):
         args = self._get_mock_args()
         self.repository._args = args
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', 'example.com']
         assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', 'example.com']
         assert self.repository.ssh_cmd(Location('ssh://user@example.com/foo')) == ['ssh', 'user@example.com']
         assert self.repository.ssh_cmd(Location('ssh://user@example.com:1234/foo')) == ['ssh', '-p', '1234', 'user@example.com']
         os.environ['BORG_RSH'] = 'ssh --foo'
-        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', '--foo', 'example.com']
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '--foo', 'example.com']
 
     def test_borg_cmd(self):
         assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
@@ -963,7 +964,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
                                                                  '--storage-quota=314159265']
         args.rsh = 'ssh -i foo'
         self.repository._args = args
-        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', '-i', 'foo', 'example.com']
+        assert self.repository.ssh_cmd(Location('example.com:foo')) == ['ssh', '-i', 'foo', 'example.com']
 
 
 class RemoteLegacyFree(RepositoryTestCaseBase):
@@ -971,7 +972,7 @@ class RemoteLegacyFree(RepositoryTestCaseBase):
 
     def open(self, create=False):
         with patch.object(RemoteRepository, 'dictFormat', True):
-            return RemoteRepository(Location('ssh://__testsuite__' + os.path.join(self.tmppath, 'repository')),
+            return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
                                     exclusive=True, create=create)
 
     def test_legacy_free(self):
@@ -994,7 +995,7 @@ class RemoteLegacyFree(RepositoryTestCaseBase):
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def open(self, create=False):
-        return RemoteRepository(Location('ssh://__testsuite__' + os.path.join(self.tmppath, 'repository')),
+        return RemoteRepository(Location('__testsuite__:' + os.path.join(self.tmppath, 'repository')),
                                 exclusive=True, create=create)
 
     def test_crash_before_compact(self):

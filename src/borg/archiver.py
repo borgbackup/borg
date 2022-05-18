@@ -380,13 +380,18 @@ class Archiver:
             return new_item
 
         def upgrade_compressed_chunk(chunk):
+            def upgrade_zlib_and_level(chunk):
+                if ZLIB_legacy.detect(chunk):
+                    ctype = ZLIB.ID
+                    chunk = ctype + level + chunk  # get rid of the attic legacy: prepend separate type/level bytes
+                else:
+                    ctype = chunk[0:1]
+                    chunk = ctype + level + chunk[2:]  # keep type same, but set level
+                return chunk
+
+            ctype = chunk[0:1]
             level = b'\xFF'  # FF means unknown compression level
-            if ZLIB_legacy.detect(chunk):
-                ctype = ZLIB.ID
-                chunk = ctype + level + chunk  # get rid of the attic legacy: prepend separate type/level bytes
-            else:
-                ctype = chunk[0:1]
-                chunk = ctype + level + chunk[2:]  # keep type same, but set level
+
             if ctype == ObfuscateSize.ID:
                 # in older borg, we used unusual byte order
                 old_header_fmt = Struct('>I')
@@ -395,7 +400,11 @@ class Archiver:
                 size_bytes = chunk[2:2+length]
                 size = old_header_fmt.unpack(size_bytes)
                 size_bytes = new_header_fmt.pack(size)
-                chunk = chunk[0:2] + size_bytes + chunk[2+length:]
+                compressed = chunk[2+length:]
+                compressed = upgrade_zlib_and_level(compressed)
+                chunk = ctype + level + size_bytes + compressed
+            else:
+                chunk = upgrade_zlib_and_level(chunk)
             return chunk
 
         dry_run = args.dry_run

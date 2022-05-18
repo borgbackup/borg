@@ -405,7 +405,7 @@ Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg init ssh://user@hostname/path/to/repo
+  $ borg init user@hostname:/path/to/repo
 
 Note: please see the usage chapter for a full documentation of repo URLs.
 

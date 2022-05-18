@@ -15,8 +15,8 @@ Examples
 
     # Remote repository (accesses a remote borg via ssh)
     # repokey: stores the (encrypted) key into <REPO_DIR>/config
-    $ borg init --encryption=repokey-aes-ocb ssh://user@hostname/./backup
+    $ borg init --encryption=repokey-aes-ocb user@hostname:backup
 
     # Remote repository (accesses a remote borg via ssh)
     # keyfile: stores the (encrypted) key into ~/.config/borg/keys/
-    $ borg init --encryption=keyfile-aes-ocb ssh://user@hostname/./backup
+    $ borg init --encryption=keyfile-aes-ocb user@hostname:backup

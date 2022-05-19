@@ -205,8 +205,8 @@ class HardLinkManager:
 
     def hardlink_id_from_path(self, path):
         """compute a hardlink id from a path"""
-        assert isinstance(path, bytes)
-        return hashlib.sha256(path).digest()
+        assert isinstance(path, str)
+        return hashlib.sha256(path.encode('utf-8', errors='surrogateescape')).digest()
 
     def hardlink_id_from_inode(self, *, ino, dev):
         """compute a hardlink id from an inode"""

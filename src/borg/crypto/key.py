@@ -22,7 +22,7 @@ from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
 from ..helpers import msgpack
 from ..helpers.manifest import Manifest
-from ..item import Key, EncryptedKey
+from ..item import Key, EncryptedKey, want_bytes
 from ..platform import SaveFile
 
 from .nonces import NonceManager
@@ -250,8 +250,10 @@ class KeyBase:
                 return unpacked, False
         tam_hmac = tam.get('hmac')
         tam_salt = tam.get('salt')
-        if not isinstance(tam_salt, bytes) or not isinstance(tam_hmac, bytes):
+        if not isinstance(tam_salt, (bytes, str)) or not isinstance(tam_hmac, (bytes, str)):
             raise TAMInvalid()
+        tam_hmac = want_bytes(tam_hmac)  # legacy
+        tam_salt = want_bytes(tam_salt)  # legacy
         offset = data.index(tam_hmac)
         data[offset:offset + 64] = bytes(64)
         tam_key = self._tam_key(tam_salt, context=b'manifest')

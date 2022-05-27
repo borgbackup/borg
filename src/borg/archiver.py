@@ -2698,8 +2698,8 @@ class Archiver:
             # note that excludes use fm: by default and patternfiles use sh: by default.
             # therefore, we need to specify fm: to have the same exact behavior.
             P fm
-            R home/bobby
-            R home/susan
+            R /home/bobby
+            R /home/susan
 
             - home/bobby/junk
 

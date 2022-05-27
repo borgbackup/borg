@@ -182,8 +182,8 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
         --show-rc                       \
         --compression lz4               \
         --exclude-caches                \
-        --exclude '/home/*/.cache/*'    \
-        --exclude '/var/tmp/*'          \
+        --exclude 'home/*/.cache/*'     \
+        --exclude 'var/tmp/*'           \
                                         \
         ::'{hostname}-{now}'            \
         /etc                            \

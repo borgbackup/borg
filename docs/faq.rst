@@ -433,7 +433,7 @@ Say you want to prune ``/var/log`` faster than the rest of
 archive *names* and then implement different prune policies for
 different prefixes. For example, you could have a script that does::
 
-    borg create --exclude /var/log $REPOSITORY:main-$(date +%Y-%m-%d) /
+    borg create --exclude var/log $REPOSITORY:main-$(date +%Y-%m-%d) /
     borg create $REPOSITORY:logs-$(date +%Y-%m-%d) /var/log
 
 Then you would have two different prune calls with different policies::

@@ -305,6 +305,10 @@ and maybe just were not noticed.
 
 Compatibility notes:
 
+- matching of path patterns has been aligned with borg storing relative paths.
+  Borg archives file paths without leading slashes. Previously, include/exclude
+  patterns could contain leading slashes. You should check your patterns and
+  remove leading slashes.
 - dropped support / testing for older Pythons, minimum requirement is 3.8.
   In case your OS does not provide Python >= 3.8, consider using our binary,
   which does not need an external Python interpreter. Or continue using

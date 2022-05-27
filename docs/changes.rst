@@ -218,17 +218,13 @@ Change Log
 ==========
 
 
-Version 1.2.0 (2022-02-22 22:02:22 :-)
---------------------------------------
-
-Please note:
-
-This is the first borg 1.2 release, so be careful and read the notes below.
+Version 1.2.1 (not released yet)
+--------------------------------
 
 Upgrade notes:
 
-Strictly taken, nothing special is required for upgrading to 1.2, but some
-things can be recommended:
+Some things can be recommended for the upgrade process from borg 1.1.x
+(please also read the important compatibility notes below):
 
 - do you already want to upgrade? 1.1.x also will get fixes for a while.
 - be careful, first upgrade your less critical / smaller repos.
@@ -300,6 +296,83 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+Fixes:
+
+- create: skip with warning if opening the parent dir of recursion root fails, #6374
+- create: fix crash. metadata stream can produce all-zero chunks, #6587
+- fix crash when computing stats, escape % chars in archive name, #6500
+- fix transaction rollback: use files cache filename as found in txn.active/, #6353
+- import-tar: kill filter process in case of borg exceptions, #6401 #6681
+- import-tar: fix mtime type bug
+- ensure_dir: respect umask for created directory modes, #6400
+- SaveFile: respect umask for final file mode, #6400
+- check archive: improve error handling for corrupt archive metadata block, make
+  robust_iterator more robust, #4777
+- pre12-meta cache: do not use the cache if want_unique is True, #6612
+- fix scp-style repo url parsing for ip v6 address, #6526
+- mount -o versions: give clear error msg instead of crashing.
+  it does not make sense to request versions view if you only look at 1 archive,
+  but the code shall not crash in that case as it did, but give a clear error msg.
+- show_progress: add finished=true/false to archive_progress json, #6570
+- delete/prune: fix --iec mode output (decimal vs. binary units), #6606
+- info: fix authenticated mode repo to show "Encrypted: No", #6462
+- diff: support presence change for blkdev, chrdev and fifo items, #6615
+
+New features:
+
+- delete: add repository id and location to prompt, #6453
+
+Other changes:
+
+- load_key: no key is same as empty key, #6441
+- give a more helpful error msg for unsupported key formats, #6561
+- better error msg for defect or unsupported repo configs, #6566
+- docs:
+
+  - document borg 1.2 pattern matching behavior change, #6407
+    Make clear that absolute paths always go into the matcher as if they are
+    relative (without leading slash). Adapt all examples accordingly.
+  - authentication primitives: improved security and performance infos
+  - mention BORG_FILES_CACHE_SUFFIX as alternative to BORG_FILES_CACHE_TTL, #5602
+  - FAQ: add a hint about --debug-topic=files_cache
+  - improve borg check --max-duration description
+  - fix values of TAG bytes, #6515
+  - borg compact --cleanup-commits also runs a normal compaction, #6324
+  - virtualization speed tips
+  - recommend umask for passphrase file perms
+  - borg 1.2 is security supported
+  - update link to ubuntu packages, #6485
+  - use --numeric-ids in pull mode docs
+  - remove blake2 docs, blake2 code not bundled any more, #6371
+  - clarify on-disk order and size of segment file log entry fields, #6357
+  - docs building: do not transform --/--- to unicode dashes
+- tests:
+
+  - check that borg does not require pytest for normal usage, fixes #6563
+  - fix OpenBSD symlink mode test failure, #2055
+  - vagrant: darwin64: remove fakeroot, #6314
+- crypto:
+
+  - use hmac.compare_digest instead of ==, #6470
+  - hmac_sha256: replace own cython wrapper code by hmac.digest python stdlib (since py38)
+  - hmac and blake2b minor optimizations and cleanups
+  - removed some unused crypto related code, #6472
+  - avoid losing the key (potential use-after-free). this never could happen in
+    1.2 due to the way we use the code. The issue was discovered in master after
+    other changes, so we also "fixed" it here before it bites us.
+- setup / build:
+
+  - add pyproject.toml, fix sys.path, #6466
+  - setuptools_scm: also require it via pyproject.toml
+  - allow extra compiler flags for every extension build
+  - fix misc. C / Cython compiler warnings, deprecation warnings
+  - fix zstd.h include for bundled zstd, #6369
+- source using python 3.8 features: pyupgrade --py38-plus ./**/*.py
+
+
+Version 1.2.0 (2022-02-22 22:02:22 :-)
+--------------------------------------
 
 Fixes:
 

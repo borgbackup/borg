@@ -136,8 +136,8 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
 
     # This is just an example, change it however you see fit
     borg create $BORG_OPTS \
-      --exclude /root/.cache \
-      --exclude /var/lib/docker/devicemapper \
+      --exclude root/.cache \
+      --exclude var/lib/docker/devicemapper \
       $TARGET::$DATE-$$-system \
       / /boot
 
@@ -145,7 +145,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # Even if it isn't (add --exclude /home above), it probably makes sense
     # to have /home in a separate archive.
     borg create $BORG_OPTS \
-      --exclude 'sh:/home/*/.cache' \
+      --exclude 'sh:home/*/.cache' \
       $TARGET::$DATE-$$-home \
       /home/
 

@@ -19,7 +19,7 @@ Examples
     # Backup home directories excluding image thumbnails (i.e. only
     # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
     $ borg create /path/to/repo::my-files /home \
-        --exclude 'sh:/home/*/.thumbnails'
+        --exclude 'sh:home/*/.thumbnails'
 
     # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
     # use zlib compression (good, but slow) - default is lz4 (fast, low compression ratio)

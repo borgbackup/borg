@@ -1,6 +1,6 @@
 from ..constants import *  # NOQA
 
-import borg.crypto.low_level
+from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 
 
 class Error(Exception):
@@ -30,7 +30,7 @@ class ErrorWithTraceback(Error):
     traceback = True
 
 
-class IntegrityError(ErrorWithTraceback, borg.crypto.low_level.IntegrityError):
+class IntegrityError(ErrorWithTraceback, IntegrityErrorBase):
     """Data integrity error: {}"""
 
 

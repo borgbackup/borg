@@ -2290,7 +2290,7 @@ class Archiver:
                     key = key_factory(repository, cdata)
                     break
             i = 0
-            for id, cdata, tag, segment, offset in repository.scan_low_level():
+            for id, cdata, tag, segment, offset in repository.scan_low_level(segment=args.segment, offset=args.offset):
                 if tag == TAG_PUT:
                     decrypt_dump(i, id, cdata, tag='put', segment=segment, offset=offset)
                 elif tag == TAG_DELETE:
@@ -3917,6 +3917,10 @@ class Archiver:
                                help='repository to dump')
         subparser.add_argument('--ghost', dest='ghost', action='store_true',
                                help='dump all segment file contents, including deleted/uncommitted objects and commits.')
+        subparser.add_argument('--segment', metavar='SEG', dest='segment', default=None, type=positive_int_validator,
+                               help='used together with --ghost: limit processing to given segment.')
+        subparser.add_argument('--offset', metavar='OFFS', dest='offset', default=None, type=positive_int_validator,
+                               help='used together with --ghost: limit processing to given offset.')
 
         debug_search_repo_objs_epilog = process_epilog("""
         This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.

@@ -622,7 +622,7 @@ class Archiver:
         key_96 = os.urandom(12)
 
         import io
-        from borg.chunker import get_chunker
+        from .chunker import get_chunker
         print("Chunkers =======================================================")
         size = "1GB"
 
@@ -639,7 +639,7 @@ class Archiver:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
         import zlib
-        from borg.checksums import crc32, deflate_crc32, xxh64
+        from .checksums import crc32, deflate_crc32, xxh64
         print("Non-cryptographic checksums / hashes ===========================")
         size = "1GB"
         tests = [
@@ -656,7 +656,7 @@ class Archiver:
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
-        from borg.crypto.low_level import hmac_sha256, blake2b_256
+        from .crypto.low_level import hmac_sha256, blake2b_256
         print("Cryptographic hashes / MACs ====================================")
         size = "1GB"
         for spec, func in [
@@ -665,8 +665,8 @@ class Archiver:
         ]:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
-        from borg.crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
-        from borg.crypto.low_level import AES256_OCB, CHACHA20_POLY1305
+        from .crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
+        from .crypto.low_level import AES256_OCB, CHACHA20_POLY1305
         print("Encryption =====================================================")
         size = "1GB"
 
@@ -691,7 +691,7 @@ class Archiver:
         ]:
             print(f"{spec:<24} {count:<10} {timeit(func, number=count):.3f}s")
 
-        from borg.compress import CompressionSpec
+        from .compress import CompressionSpec
         print("Compression ====================================================")
         for spec in [
             'lz4',

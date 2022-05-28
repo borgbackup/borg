@@ -85,7 +85,7 @@ CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
 
 # operating mode of the files cache (for fast skipping of unchanged files)
 DEFAULT_FILES_CACHE_MODE_UI = 'ctime,size,inode'  # default for "borg create" command (CLI UI)
-DEFAULT_FILES_CACHE_MODE = 'd'  # most borg commands do not use the files cache at all (disable)
+FILES_CACHE_MODE_DISABLED = 'd'  # most borg commands do not use the files cache at all (disable)
 
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N

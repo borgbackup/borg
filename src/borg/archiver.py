@@ -196,7 +196,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
-                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE),
+                               cache_mode=getattr(args, 'files_cache_mode', FILES_CACHE_MODE_DISABLED),
                                consider_part_files=getattr(args, 'consider_part_files', False),
                                iec=getattr(args, 'iec', False)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -240,7 +240,7 @@ def with_other_repository(manifest=False, key=False, cache=False, compatibility=
                 if cache:
                     with Cache(repository, key_, manifest_,
                                progress=False, lock_wait=self.lock_wait,
-                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE),
+                               cache_mode=getattr(args, 'files_cache_mode', FILES_CACHE_MODE_DISABLED),
                                consider_part_files=getattr(args, 'consider_part_files', False),
                                iec=getattr(args, 'iec', False)) as cache_:
                         kwargs['other_cache'] = cache_

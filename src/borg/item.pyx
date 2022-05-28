@@ -223,14 +223,9 @@ class Item(PropDict):
     Items are created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to Item(internal_dict=d) and use item.key_name later.
-    msgpack gives us byte-typed values for stuff that should be str, we automatically decode when getting
-    such a property and encode when setting it.
+    msgpack unpacker gives us a dict, just give it to Item(internal_dict=d) and use item.key_name later.
 
     If an Item shall be serialized, give as_dict() method output to msgpack packer.
-
-    A bug in Attic up to and including release 0.13 added a (meaningless) 'acl' key to every item.
-    We must never re-use this key. See test_attic013_acl_bug for details.
     """
 
     VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys
@@ -261,7 +256,6 @@ class Item(PropDict):
     birthtime = PropDict._make_property('birthtime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
 
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
-    # compatibility note: this is a new feature, in old archives size will be missing.
     size = PropDict._make_property('size', int)
 
     hlid = PropDict._make_property('hlid', bytes, decode=want_bytes)  # hard link id: same value means same hard link.
@@ -395,13 +389,13 @@ class EncryptedKey(PropDict):
     A EncryptedKey is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to EncryptedKey(d) and use enc_key.xxx later.
+    msgpack unpacker gives us a dict, just give it to EncryptedKey(d) and use enc_key.xxx later.
 
     If a EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = { 'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
-                   'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type' }
+    VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
+                  'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type'}
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
@@ -434,7 +428,7 @@ class Key(PropDict):
     A Key is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to Key(d) and use key.xxx later.
+    msgpack unpacker gives us a dict, just give it to Key(d) and use key.xxx later.
 
     If a Key shall be serialized, give as_dict() method output to msgpack packer.
     """
@@ -467,7 +461,7 @@ class ArchiveItem(PropDict):
     An ArchiveItem is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to ArchiveItem(d) and use arch.xxx later.
+    msgpack unpacker gives us a dict, just give it to ArchiveItem(d) and use arch.xxx later.
 
     If a ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
     """
@@ -524,7 +518,7 @@ class ManifestItem(PropDict):
     A ManifestItem is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to ManifestItem(d) and use manifest.xxx later.
+    msgpack unpacker gives us a dict, just give it to ManifestItem(d) and use manifest.xxx later.
 
     If a ManifestItem shall be serialized, give as_dict() method output to msgpack packer.
     """

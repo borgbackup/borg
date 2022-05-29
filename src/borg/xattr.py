@@ -76,9 +76,7 @@ def get_all(path, follow_symlinks=False):
         for name in names:
             try:
                 # xattr name is a bytes object, we directly use it.
-                # if we get an empty xattr value (b''), we store None into the result dict -
-                # borg always did it like that...
-                result[name] = getxattr(path, name, follow_symlinks=follow_symlinks) or None
+                result[name] = getxattr(path, name, follow_symlinks=follow_symlinks)
             except OSError as e:
                 name_str = name.decode()
                 if isinstance(path, int):
@@ -122,9 +120,7 @@ def set_all(path, xattrs, follow_symlinks=False):
     warning = False
     for k, v in xattrs.items():
         try:
-            # the key k is a bytes object due to msgpack unpacking it as such.
-            # if we have a None value, it means "empty", so give b'' to setxattr in that case:
-            setxattr(path, k, v or b'', follow_symlinks=follow_symlinks)
+            setxattr(path, k, v, follow_symlinks=follow_symlinks)
         except OSError as e:
             warning = True
             k_str = k.decode()

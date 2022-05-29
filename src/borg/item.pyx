@@ -99,7 +99,7 @@ def want_bytes(v, *, errors='surrogateescape'):
     # legacy support: it being str can be caused by msgpack unpack decoding old data that was packed with use_bin_type=False
     if isinstance(v, str):
         v = v.encode('utf-8', errors=errors)
-    assert isinstance(v, bytes)
+    assert isinstance(v, bytes), f'not a bytes object, but {v!r}'
     return v
 
 
@@ -107,7 +107,7 @@ def want_str(v, *, errors='surrogateescape'):
     """we know that we want str and the value should be str"""
     if isinstance(v, bytes):
         v = v.decode('utf-8', errors=errors)
-    assert isinstance(v, str)
+    assert isinstance(v, str), f'not a str object, but {v!r}'
     return v
 
 
@@ -397,7 +397,13 @@ class Item(PropDict):
             if k == 'xattrs':
                 if not isinstance(v, StableDict):
                     v = StableDict(v)
-                # TODO: xattrs key/value types
+                v_new = StableDict()
+                for xk, xv in list(v.items()):
+                    xk = want_bytes(xk)
+                    # old borg used to store None instead of a b'' value
+                    xv = b'' if xv is None else want_bytes(xv)
+                    v_new[xk] = xv
+                v = v_new  # xattrs is a StableDict(bytes keys -> bytes values)
             self._dict[k] = v
 
 

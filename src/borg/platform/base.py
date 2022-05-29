@@ -4,9 +4,9 @@ import socket
 import tempfile
 import uuid
 
-from borg.constants import UMASK_DEFAULT
-from borg.helpers import safe_unlink
-from borg.platformflags import is_win32
+from ..constants import UMASK_DEFAULT
+from ..helpers import safe_unlink
+from ..platformflags import is_win32
 
 """
 platform base module

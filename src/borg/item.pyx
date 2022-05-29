@@ -207,6 +207,8 @@ class PropDict:
                 raise AttributeError(attr_error_msg) from None
             if decode is not None:
                 value = decode(value)
+            if not isinstance(value, value_type):
+                raise TypeError(type_error_msg)
             return value
 
         def _set(self, value):
@@ -392,7 +394,10 @@ class Item(PropDict):
                 v = fix_timestamp(v)
             if k in ('acl_access', 'acl_default', 'acl_extended', 'acl_nfs4'):
                 v = fix_bytes_value(d, k)
-            # TODO: xattrs
+            if k == 'xattrs':
+                if not isinstance(v, StableDict):
+                    v = StableDict(v)
+                # TODO: xattrs key/value types
             self._dict[k] = v
 
 

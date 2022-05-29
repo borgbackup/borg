@@ -249,8 +249,8 @@ class Item(PropDict):
 
     path = PropDict._make_property('path', str, 'surrogate-escaped str')
     source = PropDict._make_property('source', str, 'surrogate-escaped str')
-    user = PropDict._make_property('user', (str, type(None)), 'surrogate-escaped str or None')
-    group = PropDict._make_property('group', (str, type(None)), 'surrogate-escaped str or None')
+    user = PropDict._make_property('user', str, 'surrogate-escaped str')
+    group = PropDict._make_property('group', str, 'surrogate-escaped str')
 
     acl_access = PropDict._make_property('acl_access', bytes)
     acl_default = PropDict._make_property('acl_default', bytes)
@@ -274,8 +274,8 @@ class Item(PropDict):
     hlid = PropDict._make_property('hlid', bytes)  # hard link id: same value means same hard link.
     hardlink_master = PropDict._make_property('hardlink_master', bool)  # legacy
 
-    chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
-    chunks_healthy = PropDict._make_property('chunks_healthy', (list, type(None)), 'list or None')
+    chunks = PropDict._make_property('chunks', list, 'list')
+    chunks_healthy = PropDict._make_property('chunks_healthy', list, 'list')
 
     xattrs = PropDict._make_property('xattrs', StableDict)
 

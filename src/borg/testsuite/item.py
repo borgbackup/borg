@@ -89,14 +89,6 @@ def test_item_mptimestamp_property():
     assert item.as_dict() == {'atime': Timestamp.from_unix_nano(big)}
 
 
-def test_item_user_group_none():
-    item = Item()
-    item.user = None
-    assert item.user is None
-    item.group = None
-    assert item.group is None
-
-
 def test_item_se_str_property():
     # start simple
     item = Item()

@@ -1355,8 +1355,8 @@ class Archiver:
             tarinfo.mode = stat.S_IMODE(item.mode)
             tarinfo.uid = item.uid
             tarinfo.gid = item.gid
-            tarinfo.uname = item.user or ''
-            tarinfo.gname = item.group or ''
+            tarinfo.uname = item.get('user', '')
+            tarinfo.gname = item.get('group',  '')
             # The linkname in tar has 2 uses:
             # for symlinks it means the destination, while for hardlinks it refers to the file.
             # Since hardlinks in tar have a different type code (LNKTYPE) the format might

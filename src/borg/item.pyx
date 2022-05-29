@@ -4,7 +4,7 @@ from collections import namedtuple
 from .constants import ITEM_KEYS, ARCHIVE_KEYS
 from .helpers import StableDict
 from .helpers import format_file_size
-from .helpers.msgpack import timestamp_to_int, int_to_timestamp
+from .helpers.msgpack import timestamp_to_int, int_to_timestamp, Timestamp
 
 
 cdef extern from "_item.c":
@@ -81,6 +81,17 @@ def fix_tuple_of_str_and_int(v):
     t = tuple(e.decode() if isinstance(e, bytes) else e for e in v)
     assert all(isinstance(e, (str, int)) for e in t), repr(t)
     return t
+
+
+def fix_timestamp(v):
+    """make sure v is a Timestamp"""
+    if isinstance(v, Timestamp):
+        return v
+    # legacy support
+    if isinstance(v, bytes):  # was: bigint_to_int()
+        v = int.from_bytes(v, 'little', signed=True)
+    assert isinstance(v, int)
+    return int_to_timestamp(v)
 
 
 def want_bytes(v, *, errors='surrogateescape'):
@@ -369,13 +380,16 @@ class Item(PropDict):
             return False
 
     def update_internal(self, d):
-        # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
+        # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str),
+        # also need to fix old timestamp data types.
         for k, v in list(d.items()):
             k = fix_key(d, k)
             if k in ('path', 'source', 'user', 'group'):
                 v = fix_str_value(d, k)
             if k in ('chunks', 'chunks_healthy'):
                 v = fix_list_of_chunkentries(v)
+            if k in ('atime', 'ctime', 'mtime', 'birthtime'):
+                v = fix_timestamp(v)
             if k in ('acl_access', 'acl_default', 'acl_extended', 'acl_nfs4'):
                 v = fix_bytes_value(d, k)
             # TODO: xattrs

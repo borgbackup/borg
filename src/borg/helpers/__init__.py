@@ -18,7 +18,7 @@ from .progress import *  # NOQA
 from .time import *  # NOQA
 from .yes import *  # NOQA
 
-from .msgpack import is_slow_msgpack, is_supported_msgpack, int_to_bigint, bigint_to_int, get_limited_unpacker
+from .msgpack import is_slow_msgpack, is_supported_msgpack, get_limited_unpacker
 from . import msgpack
 
 # generic mechanism to enable users to invoke workarounds by setting the

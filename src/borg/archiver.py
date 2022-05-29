@@ -366,10 +366,6 @@ class Archiver:
                 if chunks_healthy is not None:
                     item._dict['chunks_healthy'] = chunks
                 item._dict.pop('source')  # not used for hardlinks any more, replaced by hlid
-            for attr in 'atime', 'ctime', 'mtime', 'birthtime':
-                if attr in item:
-                    ns = getattr(item, attr)  # decode (bigint or Timestamp) --> int ns
-                    setattr(item, attr, ns)  # encode int ns --> msgpack.Timestamp only, no bigint any more
             # make sure we only have desired stuff in the new item. specifically, make sure to get rid of:
             # - 'acl' remnants of bug in attic <= 0.13
             # - 'hardlink_master' (superseded by hlid)

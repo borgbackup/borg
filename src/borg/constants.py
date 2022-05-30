@@ -72,8 +72,8 @@ CHUNKER_PARAMS = (CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE
 ITEMS_CHUNKER_PARAMS = (15, 19, 17, HASH_WINDOW_SIZE)
 
 # operating mode of the files cache (for fast skipping of unchanged files)
-DEFAULT_FILES_CACHE_MODE_UI = 'ctime,size,inode'  # default for "borg create" command (CLI UI)
-DEFAULT_FILES_CACHE_MODE = 'd'  # most borg commands do not use the files cache at all (disable)
+FILES_CACHE_MODE_UI_DEFAULT = 'ctime,size,inode'  # default for "borg create" command (CLI UI)
+FILES_CACHE_MODE_DISABLED = 'd'  # most borg commands do not use the files cache at all (disable)
 
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N

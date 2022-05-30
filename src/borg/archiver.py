@@ -171,7 +171,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                                do_files=getattr(args, 'cache_files', False),
                                ignore_inode=getattr(args, 'ignore_inode', False),
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,
-                               cache_mode=getattr(args, 'files_cache_mode', DEFAULT_FILES_CACHE_MODE)) as cache_:
+                               cache_mode=getattr(args, 'files_cache_mode', FILES_CACHE_MODE_DISABLED)) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
                     return method(self, args, repository=repository, **kwargs)
@@ -3623,8 +3623,8 @@ class Archiver:
         fs_group.add_argument('--ignore-inode', dest='ignore_inode', action='store_true',
                               help='ignore inode data in the file metadata cache used to detect unchanged files.')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode',
-                              type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
-                              help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
+                              type=FilesCacheMode, default=FILES_CACHE_MODE_UI_DEFAULT,
+                              help='operate files cache in MODE. default: %s' % FILES_CACHE_MODE_UI_DEFAULT)
         fs_group.add_argument('--read-special', dest='read_special', action='store_true',
                               help='open and read block and char device files as well as FIFOs as if they were '
                                    'regular files. Also follows symlinks pointing to these kinds of files.')

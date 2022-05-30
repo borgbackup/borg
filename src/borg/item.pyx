@@ -465,10 +465,10 @@ class Key(PropDict):
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     version = PropDict._make_property('version', int)
-    repository_id = PropDict._make_property('repository_id', bytes, decode=want_bytes)
-    enc_key = PropDict._make_property('enc_key', bytes, decode=want_bytes)
-    enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes, decode=want_bytes)
-    id_key = PropDict._make_property('id_key', bytes, decode=want_bytes)
+    repository_id = PropDict._make_property('repository_id', bytes)
+    enc_key = PropDict._make_property('enc_key', bytes)
+    enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes)
+    id_key = PropDict._make_property('id_key', bytes)
     chunk_seed = PropDict._make_property('chunk_seed', int)
     tam_required = PropDict._make_property('tam_required', bool)
 
@@ -478,6 +478,8 @@ class Key(PropDict):
             k = fix_key(d, k)
             if k == 'version':
                 assert isinstance(v, int)
+            if k in ('repository_id', 'enc_key', 'enc_hmac_key', 'id_key'):
+                v = fix_bytes_value(d, k)
             self._dict[k] = v
 
 

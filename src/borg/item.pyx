@@ -427,9 +427,9 @@ class EncryptedKey(PropDict):
     version = PropDict._make_property('version', int)
     algorithm = PropDict._make_property('algorithm', str)
     iterations = PropDict._make_property('iterations', int)
-    salt = PropDict._make_property('salt', bytes, decode=want_bytes)
-    hash = PropDict._make_property('hash', bytes, decode=want_bytes)
-    data = PropDict._make_property('data', bytes, decode=want_bytes)
+    salt = PropDict._make_property('salt', bytes)
+    hash = PropDict._make_property('hash', bytes)
+    data = PropDict._make_property('data', bytes)
     argon2_time_cost = PropDict._make_property('argon2_time_cost', int)
     argon2_memory_cost = PropDict._make_property('argon2_memory_cost', int)
     argon2_parallelism = PropDict._make_property('argon2_parallelism', int)
@@ -443,6 +443,8 @@ class EncryptedKey(PropDict):
                 assert isinstance(v, int)
             if k in ('algorithm', 'argon2_type'):
                 v = fix_str_value(d, k)
+            if k in ('salt', 'hash', 'data'):
+                v = fix_bytes_value(d, k)
             self._dict[k] = v
 
 

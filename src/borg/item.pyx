@@ -284,12 +284,10 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
+    def get_size(self, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
         """
         Determine the (uncompressed or compressed) size of this item.
 
-        :param hardlink_masters: If given, the size of hardlink slaves is computed via the hardlink master's chunk list,
-        otherwise size will be returned as 0.
         :param memorize: Whether the computed size value will be stored into the item.
         :param compressed: Whether the compressed or uncompressed size will be returned.
         :param from_chunks: If true, size is computed from chunks even if a precomputed value is available.
@@ -309,31 +307,14 @@ class Item(PropDict):
             # no precomputed (c)size value available, compute it:
             try:
                 chunks = getattr(self, 'chunks')
-                having_chunks = True
             except AttributeError:
-                having_chunks = False
-                # this item has no (own) chunks list, but if this is a hardlink slave
-                # and we know the master, we can still compute the size.
-                if hardlink_masters is None:
-                    chunks = None
-                else:
-                    try:
-                        master = getattr(self, 'source')
-                    except AttributeError:
-                        # not a hardlink slave, likely a directory or special file w/o chunks
-                        chunks = None
-                    else:
-                        # hardlink slave, try to fetch hardlink master's chunks list
-                        # todo: put precomputed size into hardlink_masters' values and use it, if present
-                        chunks, _ = hardlink_masters.get(master, (None, None))
-                if chunks is None:
-                    return 0
+                return 0
             if consider_ids is not None:
                 size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks if chunk.id in consider_ids)
             else:
                 size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks)
             # if requested, memorize the precomputed (c)size for items that have an own chunks list:
-            if memorize and having_chunks:
+            if memorize:
                 setattr(self, attr, size)
         return size
 

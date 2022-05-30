@@ -3799,8 +3799,8 @@ class Archiver:
         fs_group.add_argument('--sparse', dest='sparse', action='store_true',
                                help='detect sparse holes in input (supported only by fixed chunker)')
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode', action=Highlander,
-                              type=FilesCacheMode, default=DEFAULT_FILES_CACHE_MODE_UI,
-                              help='operate files cache in MODE. default: %s' % DEFAULT_FILES_CACHE_MODE_UI)
+                              type=FilesCacheMode, default=FILES_CACHE_MODE_UI_DEFAULT,
+                              help='operate files cache in MODE. default: %s' % FILES_CACHE_MODE_UI_DEFAULT)
         fs_group.add_argument('--read-special', dest='read_special', action='store_true',
                               help='open and read block and char device files as well as FIFOs as if they were '
                                    'regular files. Also follows symlinks pointing to these kinds of files.')

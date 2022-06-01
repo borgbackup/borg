@@ -206,10 +206,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    git clone https://github.com/thomaswaldmann/pyinstaller.git
-    cd pyinstaller
-    git checkout v4.7-maint
-    python setup.py install
+    pip install 'pyinstaller==4.10'
   EOF
 end
 

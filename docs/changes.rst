@@ -263,6 +263,8 @@ Fixes:
 - info: fix authenticated mode repo to show "Encrypted: No", #6462
 - info: emit repo info even if repo has 0 archives, #6120
 - list: remove placeholders for shake_* hashes, #6082
+- mount -o versions: give clear error msg instead of crashing
+- show_progress: add finished=true/false to archive_progress json, #6570
 - fix hardlinkable file type check, #6037
 - do not show archive name in error msgs referring to the repository, #6023
 - prettier error msg (no stacktrace) if exclude file is missing, #5734
@@ -341,7 +343,8 @@ Other changes:
   - fix/update cygwin package requirements
   - impact of deleting path/to/repo/nonce, #5858
   - warn about tampered server nonce
-
+  - mention BORG_FILES_CACHE_SUFFIX as alternative to BORG_FILES_CACHE_TTL, #5602
+  - add a troubleshooting note about "is not a valid repository" to the FAQ
 - vagrant / CI / testing:
 
   - misc. fixes and updates, new python versions

@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2021-07-12" "" "borg backup tool"
-.SH NAME
-borg-recreate \- Re-create archives
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-RECREATE" 1 "2022-06-04" "" "borg backup tool"
+.SH NAME
+borg-recreate \- Re-create archives
 .SH SYNOPSIS
 .sp
 borg [common options] recreate [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
@@ -99,16 +99,16 @@ paths to recreate; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters (listed in borg create \-\-help)
 .TP
-.B \-n\fP,\fB  \-\-dry\-run
+.B  \-n\fP,\fB  \-\-dry\-run
 do not change anything
 .TP
-.B \-s\fP,\fB  \-\-stats
+.B  \-s\fP,\fB  \-\-stats
 print statistics at end
 .UNINDENT
 .SS Exclusion options
@@ -121,18 +121,18 @@ exclude paths matching PATTERN
 read exclude patterns from EXCLUDEFILE, one per line
 .TP
 .BI \-\-pattern \ PATTERN
-experimental: include/exclude paths matching PATTERN
+include/exclude paths matching PATTERN
 .TP
 .BI \-\-patterns\-from \ PATTERNFILE
-experimental: read include/exclude patterns from PATTERNFILE, one per line
+read include/exclude patterns from PATTERNFILE, one per line
 .TP
-.B \-\-exclude\-caches
+.B  \-\-exclude\-caches
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.bford.info/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
-.B \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
+.B  \-\-keep\-exclude\-tags\fP,\fB  \-\-keep\-tag\-files
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
 .UNINDENT
 .SS Archive options

@@ -100,6 +100,9 @@ Description
 The prune command prunes a repository by deleting all archives not matching
 any of the specified retention options. This command is normally used by
 automated backup scripts wanting to keep a certain number of historic backups.
+This retention policy is commonly referred to as
+`GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
+(Grandfather-father-son) backup rotation scheme.
 
 Also, prune automatically removes checkpoint archives (incomplete archives left
 behind by interrupted backup runs) except if the checkpoint is the latest

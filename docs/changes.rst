@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Changelog
 =========
 
-Version 1.1.18 (not released yet)
----------------------------------
+Version 1.1.18 (2022-06-05)
+---------------------------
 
 Compatibility notes:
 
@@ -256,7 +256,7 @@ New features:
 Fixes:
 
 - check: improve error handling for corrupt archive metadata block,
-         make robust_iterator more robust, #4777
+  make robust_iterator more robust, #4777
 - diff: support presence change for blkdev, chrdev and fifo items, #6483
 - diff: reduce memory consumption, fix is_hardlink_master
 - init: disallow overwriting of existing keyfiles
@@ -287,8 +287,10 @@ Fixes:
 
 Other changes:
 
-- fix xxh64 related build (setup.py)
 - upgrade bundled xxhash code to 0.8.1
+- fix xxh64 related build (setup.py and post-0.8.1 patch for static_assert).
+  The patch was required to build the bundled xxhash code on FreeBSD, see
+  https://github.com/Cyan4973/xxHash/pull/670
 - msgpack build: remove endianness macro, #6105
 - update and fix shell completions
 - fuse: remove unneeded version check and compat code
@@ -308,6 +310,7 @@ Other changes:
 - allow extra compiler flags for every extension build
 - C code: make switch fallthrough explicit
 - Cython code: fix "useless trailing comma" cython warnings
+- requirements.lock.txt: use the latest cython 0.29.30
 - fix compilation warnings: ‘PyUnicode_AsUnicode’ is deprecated
 - docs:
 
@@ -350,6 +353,7 @@ Other changes:
   - misc. fixes and updates, new python versions
   - macOS on github: re-enable fuse2 testing by downgrading to older macOS, #6099
   - fix OpenBSD symlink mode test failure, #2055
+  - use the generic/openbsd6 box
   - strengthen the test: we can read data w/o nonces
   - add tests for path/to/repo/nonce deletion
   - darwin64: backport some tunings from master

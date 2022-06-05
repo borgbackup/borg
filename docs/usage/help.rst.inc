@@ -10,15 +10,12 @@ The path/filenames used as input for the pattern matching start from the
 currently active recursion root. You usually give the recursion root(s)
 when invoking borg and these can be either relative or absolute paths.
 
-So, when you give `relative/` as root, the paths going into the matcher
-will look like `relative/.../file.ext`. When you give `/absolute/` as
-root, they will look like `/absolute/.../file.ext`.
-
-File paths in Borg archives are always stored normalized and relative.
-This means that e.g. ``borg create /path/to/repo ../some/path`` will
-store all files as `some/path/.../file.ext` and ``borg create
-/path/to/repo /home/user`` will store all files as
-`home/user/.../file.ext`.
+If you give `/absolute/` as root, the paths going into the matcher will
+look relative like `absolute/.../file.ext`, because file paths in Borg
+archives are always stored normalized and relative. This means that e.g.
+``borg create /path/to/repo ../some/path`` will store all files as
+`some/path/.../file.ext` and ``borg create /path/to/repo /home/user``
+will store all files as `home/user/.../file.ext`.
 
 A directory exclusion pattern can end either with or without a slash ('/').
 If it ends with a slash, such as `some/path/`, the directory will be
@@ -31,10 +28,11 @@ path prefixes and path full-matches. By default, fnmatch is used for
 option. For commands that support patterns in their ``PATH`` argument
 like (``borg list``), the default pattern is path prefix.
 
-Starting with Borg 1.2, for all but regular expression pattern matching
-styles, all paths are treated as relative, meaning that a leading path
-separator is removed after normalizing and before matching. This allows
-you to use absolute or relative patterns arbitrarily.
+Starting with Borg 1.2, discovered fs paths are normalised, have leading
+slashes removed and then are matched against your patterns.
+Note: You need to review your include / exclude patterns and make
+sure they do not expect leading slashes. Borg can only deal with this
+for some very simple patterns by removing leading slashes there also.
 
 If followed by a colon (':') the first two characters of a pattern are
 used as a style selector. Explicit style selection is necessary when a
@@ -124,26 +122,26 @@ Examples::
 
     # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
     # not '/home/user/importantjunk' or '/etc/junk':
-    $ borg create -e '/home/*/junk' backup /
+    $ borg create -e 'home/*/junk' backup /
 
     # Exclude the contents of '/home/user/cache' but not the directory itself:
     $ borg create -e home/user/cache/ backup /
 
     # The file '/home/user/cache/important' is *not* backed up:
-    $ borg create -e /home/user/cache/ backup / /home/user/cache/important
+    $ borg create -e home/user/cache/ backup / /home/user/cache/important
 
     # The contents of directories in '/home' are not backed up when their name
     # ends in '.tmp'
-    $ borg create --exclude 're:^/home/[^/]+\.tmp/' backup /
+    $ borg create --exclude 're:^home/[^/]+\.tmp/' backup /
 
     # Load exclusions from file
     $ cat >exclude.txt <<EOF
     # Comment line
-    /home/*/junk
+    home/*/junk
     *.tmp
     fm:aa:something/*
-    re:^/home/[^/]+\.tmp/
-    sh:/home/*/.thumbnails
+    re:^home/[^/]+\.tmp/
+    sh:home/*/.thumbnails
     # Example with spaces, no need to escape as it is processed by borg
     some file with spaces.txt
     EOF
@@ -197,23 +195,23 @@ The patterns.lst file could look like that::
     P sh
     R /
     # can be rebuild
-    - /home/*/.cache
+    - home/*/.cache
     # they're downloads for a reason
-    - /home/*/Downloads
+    - home/*/Downloads
     # susan is a nice person
     # include susans home
-    + /home/susan
+    + home/susan
     # also back up this exact file
-    + pf:/home/bobby/specialfile.txt
+    + pf:home/bobby/specialfile.txt
     # don't backup the other home directories
-    - /home/*
+    - home/*
     # don't even look in /proc
-    ! /proc
+    ! proc
 
 You can specify recursion roots either on the command line or in a patternfile::
 
     # these two commands do the same thing
-    borg create --exclude /home/bobby/junk repo::arch /home/bobby /home/susan
+    borg create --exclude home/bobby/junk repo::arch /home/bobby /home/susan
     borg create --patterns-from patternfile.lst repo::arch
 
 The patternfile::
@@ -224,7 +222,7 @@ The patternfile::
     R /home/bobby
     R /home/susan
 
-    - /home/bobby/junk
+    - home/bobby/junk
 
 This allows you to share the same patterns between multiple repositories
 without needing to specify them on the command line.

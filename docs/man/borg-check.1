@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CHECK" 1 "2022-02-19" "" "borg backup tool"
+.TH "BORG-CHECK" 1 "2022-06-05" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .SH SYNOPSIS
@@ -104,15 +104,18 @@ The archive checks can be time consuming; they can be skipped using the
 The \fB\-\-max\-duration\fP option can be used to split a long\-running repository check
 into multiple partial checks. After the given number of seconds the check is
 interrupted. The next partial check will continue where the previous one stopped,
-until the complete repository has been checked. Example: Assuming a full check took 7
+until the complete repository has been checked. Example: Assuming a complete check took 7
 hours, then running a daily check with \-\-max\-duration=3600 (1 hour) resulted in one
-full check per week.
+completed check per week.
 .sp
-Attention: Partial checks can only do way less checking than a full check (only the
-CRC32 checks on segment file entries are done), and cannot be combined with the
-\fB\-\-repair\fP option. Partial checks may therefore be useful only with very large
-repositories where a full check took too long. Doing a full repository check aborts a
-partial check; the next partial check will restart from the beginning.
+Attention: A partial \-\-repository\-only check can only do way less checking than a full
+\-\-repository\-only check: only the non\-cryptographic checksum checks on segment file
+entries are done, while a full \-\-repository\-only check would also do a repo index check.
+A partial check cannot be combined with the \fB\-\-repair\fP option. Partial checks
+may therefore be useful only with very large repositories where a full check would take
+too long.
+Doing a full repository check aborts a partial check; the next partial check will restart
+from the beginning.
 .sp
 The \fB\-\-verify\-data\fP option will perform a full integrity verification (as opposed to
 checking the CRC32 of the segment) of data, which means reading the data from the
@@ -157,7 +160,7 @@ do only a partial repo check for max. SECONDS seconds (Default: unlimited)
 only consider archive names starting with this prefix.
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq. \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

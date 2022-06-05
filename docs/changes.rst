@@ -218,8 +218,8 @@ Change Log
 ==========
 
 
-Version 1.2.1 (not released yet)
---------------------------------
+Version 1.2.1 (2022-06-06)
+--------------------------
 
 Upgrade notes:
 
@@ -359,6 +359,7 @@ Other changes:
   - darwin64: remove fakeroot, #6314
   - update development.lock.txt
   - use pyinstaller 4.10 and python 3.9.13 for binary build
+  - upgrade VMCPUS and xdistn from 4 to 16, maybe this speeds up the tests
 - crypto:
 
   - use hmac.compare_digest instead of ==, #6470
@@ -375,7 +376,7 @@ Other changes:
   - allow extra compiler flags for every extension build
   - fix misc. C / Cython compiler warnings, deprecation warnings
   - fix zstd.h include for bundled zstd, #6369
-- source using python 3.8 features: pyupgrade --py38-plus ./**/*.py
+- source using python 3.8 features: ``pyupgrade --py38-plus ./**/*.py``
 
 
 Version 1.2.0 (2022-02-22 22:02:22 :-)

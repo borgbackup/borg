@@ -71,6 +71,7 @@ When using ``--verbose``, borg will output an estimate of the freed space.
 
 After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
 to clean up the numerous 17byte commit-only segments that borg 1.1 did not clean up
-due to a bug. It is enough to do that once per repository.
+due to a bug. It is enough to do that once per repository. After cleaning up the
+commits, borg will also do a normal compaction.
 
 See :ref:`separate_compaction` in Additional Notes for more details.

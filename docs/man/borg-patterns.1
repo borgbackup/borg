@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PATTERNS" 1 "2022-02-19" "" "borg backup tool"
+.TH "BORG-PATTERNS" 1 "2022-06-05" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -36,15 +36,12 @@ The path/filenames used as input for the pattern matching start from the
 currently active recursion root. You usually give the recursion root(s)
 when invoking borg and these can be either relative or absolute paths.
 .sp
-So, when you give \fIrelative/\fP as root, the paths going into the matcher
-will look like \fIrelative/.../file.ext\fP\&. When you give \fI/absolute/\fP as
-root, they will look like \fI/absolute/.../file.ext\fP\&.
-.sp
-File paths in Borg archives are always stored normalized and relative.
-This means that e.g. \fBborg create /path/to/repo ../some/path\fP will
-store all files as \fIsome/path/.../file.ext\fP and \fBborg create
-/path/to/repo /home/user\fP will store all files as
-\fIhome/user/.../file.ext\fP\&.
+If you give \fI/absolute/\fP as root, the paths going into the matcher will
+look relative like \fIabsolute/.../file.ext\fP, because file paths in Borg
+archives are always stored normalized and relative. This means that e.g.
+\fBborg create /path/to/repo ../some/path\fP will store all files as
+\fIsome/path/.../file.ext\fP and \fBborg create /path/to/repo /home/user\fP
+will store all files as \fIhome/user/.../file.ext\fP\&.
 .sp
 A directory exclusion pattern can end either with or without a slash (\(aq/\(aq).
 If it ends with a slash, such as \fIsome/path/\fP, the directory will be
@@ -57,10 +54,11 @@ path prefixes and path full\-matches. By default, fnmatch is used for
 option. For commands that support patterns in their \fBPATH\fP argument
 like (\fBborg list\fP), the default pattern is path prefix.
 .sp
-Starting with Borg 1.2, for all but regular expression pattern matching
-styles, all paths are treated as relative, meaning that a leading path
-separator is removed after normalizing and before matching. This allows
-you to use absolute or relative patterns arbitrarily.
+Starting with Borg 1.2, discovered fs paths are normalised, have leading
+slashes removed and then are matched against your patterns.
+Note: You need to review your include / exclude patterns and make
+sure they do not expect leading slashes. Borg can only deal with this
+for some very simple patterns by removing leading slashes there also.
 .sp
 If followed by a colon (\(aq:\(aq) the first two characters of a pattern are
 used as a style selector. Explicit style selection is necessary when a
@@ -159,26 +157,26 @@ $ borg create \-e \(aq*.o\(aq backup /
 
 # Exclude \(aq/home/user/junk\(aq and \(aq/home/user/subdir/junk\(aq but
 # not \(aq/home/user/importantjunk\(aq or \(aq/etc/junk\(aq:
-$ borg create \-e \(aq/home/*/junk\(aq backup /
+$ borg create \-e \(aqhome/*/junk\(aq backup /
 
 # Exclude the contents of \(aq/home/user/cache\(aq but not the directory itself:
 $ borg create \-e home/user/cache/ backup /
 
 # The file \(aq/home/user/cache/important\(aq is *not* backed up:
-$ borg create \-e /home/user/cache/ backup / /home/user/cache/important
+$ borg create \-e home/user/cache/ backup / /home/user/cache/important
 
 # The contents of directories in \(aq/home\(aq are not backed up when their name
 # ends in \(aq.tmp\(aq
-$ borg create \-\-exclude \(aqre:^/home/[^/]+\e.tmp/\(aq backup /
+$ borg create \-\-exclude \(aqre:^home/[^/]+\e.tmp/\(aq backup /
 
 # Load exclusions from file
 $ cat >exclude.txt <<EOF
 # Comment line
-/home/*/junk
+home/*/junk
 *.tmp
 fm:aa:something/*
-re:^/home/[^/]+\e.tmp/
-sh:/home/*/.thumbnails
+re:^home/[^/]+\e.tmp/
+sh:home/*/.thumbnails
 # Example with spaces, no need to escape as it is processed by borg
 some file with spaces.txt
 EOF
@@ -250,22 +248,22 @@ The patterns.lst file could look like that:
 .sp
 .nf
 .ft C
-# "sh:" pattern style is the default, so the following line is not needed:
+# \(dqsh:\(dq pattern style is the default, so the following line is not needed:
 P sh
 R /
 # can be rebuild
-\- /home/*/.cache
+\- home/*/.cache
 # they\(aqre downloads for a reason
-\- /home/*/Downloads
+\- home/*/Downloads
 # susan is a nice person
 # include susans home
-+ /home/susan
++ home/susan
 # also back up this exact file
-+ pf:/home/bobby/specialfile.txt
++ pf:home/bobby/specialfile.txt
 # don\(aqt backup the other home directories
-\- /home/*
+\- home/*
 # don\(aqt even look in /proc
-! /proc
+! proc
 .ft P
 .fi
 .UNINDENT
@@ -278,7 +276,7 @@ You can specify recursion roots either on the command line or in a patternfile:
 .nf
 .ft C
 # these two commands do the same thing
-borg create \-\-exclude /home/bobby/junk repo::arch /home/bobby /home/susan
+borg create \-\-exclude home/bobby/junk repo::arch /home/bobby /home/susan
 borg create \-\-patterns\-from patternfile.lst repo::arch
 .ft P
 .fi
@@ -297,7 +295,7 @@ P fm
 R /home/bobby
 R /home/susan
 
-\- /home/bobby/junk
+\- home/bobby/junk
 .ft P
 .fi
 .UNINDENT

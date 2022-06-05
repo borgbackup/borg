@@ -45,6 +45,12 @@ repository is only modified from one place. Also keep in mind that
 Borg will keep an exclusive lock on the repository while creating
 or deleting archives, which may make *simultaneous* backups fail.
 
+Can I back up to multiple, swapped backup targets?
+--------------------------------------------------
+
+It is possible to swap your backup disks if each backup medium is assigned its
+own repository by creating a new one with :ref:`borg_init`.
+
 Can I copy or synchronize my repo to another location?
 ------------------------------------------------------
 

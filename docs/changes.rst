@@ -235,7 +235,7 @@ Some things can be recommended for the upgrade process from borg 1.1.x
 - check the output of `borg check` - if there is anything special, consider
   a `borg check --repair` followed by another `borg check`.
 - if everything is fine so far (borg check reports no issues), you can consider
-  upgrading to 1.2.0. if not, please first fix any already existing issue.
+  upgrading to 1.2.x. if not, please first fix any already existing issue.
 - if you want to play safer, first **create a backup of your borg repository**.
 - upgrade to latest borg 1.2.x release (you could use the fat binary from
   github releases page)
@@ -322,9 +322,12 @@ Fixes:
 New features:
 
 - delete: add repository id and location to prompt, #6453
+- borg debug dump-repo-objs --ghost: new --segment=S --offset=O options
 
 Other changes:
 
+- support python 3.11
+- allow msgpack 1.0.4, #6716
 - load_key: no key is same as empty key, #6441
 - give a more helpful error msg for unsupported key formats, #6561
 - better error msg for defect or unsupported repo configs, #6566
@@ -351,7 +354,11 @@ Other changes:
 
   - check that borg does not require pytest for normal usage, fixes #6563
   - fix OpenBSD symlink mode test failure, #2055
-  - vagrant: darwin64: remove fakeroot, #6314
+- vagrant:
+
+  - darwin64: remove fakeroot, #6314
+  - update development.lock.txt
+  - use pyinstaller 4.10 and python 3.9.13 for binary build
 - crypto:
 
   - use hmac.compare_digest instead of ==, #6470

@@ -102,7 +102,6 @@ def packages_openbsd
     pkg_add git  # no fakeroot
     pkg_add py3-pip
     pkg_add py3-virtualenv
-    ln -sf /usr/local/bin/virtualenv-3 /usr/local/bin/virtualenv
   EOF
 end
 
@@ -475,11 +474,10 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "openbsd64-64"  # note: basic openbsd install for vagrant WITH sudo and rsync pre-installed
+    b.vm.box = "generic/openbsd6"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
-    b.ssh.shell = "sh"
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")

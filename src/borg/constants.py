@@ -128,7 +128,7 @@ class KeyType:
     # upper 4 bits are ciphersuite, 0 == legacy AES-CTR
     KEYFILE = 0x00
     # repos with PASSPHRASE mode could not be created any more since borg 1.0, see #97.
-    # in borg 1.3 all of its code and also the "borg key migrate-to-repokey" command was removed.
+    # in borg 2. all of its code and also the "borg key migrate-to-repokey" command was removed.
     # if you still need to, you can use "borg key migrate-to-repokey" with borg 1.0, 1.1 and 1.2.
     # Nowadays, we just dispatch this to RepoKey and assume the passphrase was migrated to a repokey.
     PASSPHRASE = 0x01  # legacy, attic and borg < 1.0

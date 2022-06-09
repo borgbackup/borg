@@ -6,7 +6,7 @@ We wrap msgpack here the way we need it - to avoid having lots of clutter in the
 
 Packing
 -------
-- use_bin_type = True (used by borg since borg 1.3)
+- use_bin_type = True (used by borg since borg 2.0)
   This is used to generate output according to new msgpack 2.0 spec.
   This cleanly keeps bytes and str types apart.
 
@@ -21,16 +21,17 @@ Packing
 
 Unpacking
 ---------
-- raw = False (used by borg since borg 1.3)
-  We already can use this with borg 1.3 due to the want_bytes decoder.
-  This decoder can be removed in future, when we do not have to deal with data any more that was packed the old way.
+- raw = False (used by borg since borg 2.0)
+  We already can use this with borg 2.0 due to the type conversion to the desired type in item.py update_internal
+  methods. This type conversion code can be removed in future, when we do not have to deal with data any more
+  that was packed the old way.
   It will then unpack according to the msgpack 2.0 spec format and directly output bytes or str.
 
 - raw = True (the old way, used by borg < 1.3)
 
 - unicode_errors = 'surrogateescape' -> see description above (will be used when raw is False).
 
-As of borg 1.3, we have fixed most of the msgpack str/bytes mess, #968.
+As of borg 2.0, we have fixed most of the msgpack str/bytes mess, #968.
 Borg now still needs to **read** old repos, archives, keys, ... so we can not yet fix it completely.
 But from now on, borg only **writes** new data according to the new msgpack 2.0 spec,
 thus we can remove some legacy support in a later borg release (some places are marked with "legacy").
@@ -41,7 +42,7 @@ current way in msgpack terms
 - pack with use_bin_type=True (according to msgpack 2.0 spec)
 - packs str -> raw and bytes -> bin
 - unpack with raw=False (according to msgpack 2.0 spec, using unicode_errors='surrogateescape')
-- unpacks bin to bytes and raw to str (thus we need to re-encode manually if we want bytes from "raw")
+- unpacks bin to bytes and raw to str (thus we need to convert to desired type if we want bytes from "raw")
 """
 
 from .datastruct import StableDict

@@ -12,7 +12,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 from .datastruct import StableDict
-from .parseformat import bin_to_hex, safe_encode, safe_decode
+from .parseformat import bin_to_hex
 from .time import parse_timestamp
 from .. import shellpattern
 from ..constants import *  # NOQA
@@ -39,39 +39,35 @@ class Archives(abc.MutableMapping):
     str timestamps or datetime timestamps.
     """
     def __init__(self):
-        # key: encoded archive name, value: dict(b'id': bytes_id, b'time': bytes_iso_ts)
+        # key: str archive name, value: dict('id': bytes_id, 'time': str_iso_ts)
         self._archives = {}
 
     def __len__(self):
         return len(self._archives)
 
     def __iter__(self):
-        return iter(safe_decode(name) for name in self._archives)
+        return iter(self._archives)
 
     def __getitem__(self, name):
         assert isinstance(name, str)
-        _name = safe_encode(name)
-        values = self._archives.get(_name)
+        values = self._archives.get(name)
         if values is None:
             raise KeyError
-        ts = parse_timestamp(values[b'time'].decode())
-        return ArchiveInfo(name=name, id=values[b'id'], ts=ts)
+        ts = parse_timestamp(values['time'])
+        return ArchiveInfo(name=name, id=values['id'], ts=ts)
 
     def __setitem__(self, name, info):
         assert isinstance(name, str)
-        name = safe_encode(name)
         assert isinstance(info, tuple)
         id, ts = info
         assert isinstance(id, bytes)
         if isinstance(ts, datetime):
             ts = ts.replace(tzinfo=None).strftime(ISO_FORMAT)
         assert isinstance(ts, str)
-        ts = ts.encode()
-        self._archives[name] = {b'id': id, b'time': ts}
+        self._archives[name] = {'id': id, 'time': ts}
 
     def __delitem__(self, name):
         assert isinstance(name, str)
-        name = safe_encode(name)
         del self._archives[name]
 
     def list(self, *, glob=None, match_end=r'\Z', sort_by=(), consider_checkpoints=True, first=None, last=None, reverse=False):
@@ -116,8 +112,8 @@ class Archives(abc.MutableMapping):
     def set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""
         for k, v in d.items():
-            assert isinstance(k, bytes)
-            assert isinstance(v, dict) and b'id' in v and b'time' in v
+            assert isinstance(k, str)
+            assert isinstance(v, dict) and 'id' in v and 'time' in v
             self._archives[k] = v
 
     def get_raw_dict(self):
@@ -196,10 +192,10 @@ class Manifest:
         manifest.timestamp = m.get('timestamp')
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
-        manifest.item_keys = ITEM_KEYS | frozenset(key.decode() for key in m.get('item_keys', []))
+        manifest.item_keys = ITEM_KEYS | frozenset(m.get('item_keys', []))
 
         if manifest.tam_verified:
-            manifest_required = manifest.config.get(b'tam_required', False)
+            manifest_required = manifest.config.get('tam_required', False)
             security_required = tam_required(repository)
             if manifest_required and not security_required:
                 logger.debug('Manifest is TAM verified and says TAM is required, updating security database...')
@@ -214,32 +210,32 @@ class Manifest:
     def check_repository_compatibility(self, operations):
         for operation in operations:
             assert isinstance(operation, self.Operation)
-            feature_flags = self.config.get(b'feature_flags', None)
+            feature_flags = self.config.get('feature_flags', None)
             if feature_flags is None:
                 return
-            if operation.value.encode() not in feature_flags:
+            if operation.value not in feature_flags:
                 continue
-            requirements = feature_flags[operation.value.encode()]
-            if b'mandatory' in requirements:
-                unsupported = set(requirements[b'mandatory']) - self.SUPPORTED_REPO_FEATURES
+            requirements = feature_flags[operation.value]
+            if 'mandatory' in requirements:
+                unsupported = set(requirements['mandatory']) - self.SUPPORTED_REPO_FEATURES
                 if unsupported:
-                    raise MandatoryFeatureUnsupported([f.decode() for f in unsupported])
+                    raise MandatoryFeatureUnsupported(list(unsupported))
 
     def get_all_mandatory_features(self):
         result = {}
-        feature_flags = self.config.get(b'feature_flags', None)
+        feature_flags = self.config.get('feature_flags', None)
         if feature_flags is None:
             return result
 
         for operation, requirements in feature_flags.items():
-            if b'mandatory' in requirements:
-                result[operation.decode()] = {feature.decode() for feature in requirements[b'mandatory']}
+            if 'mandatory' in requirements:
+                result[operation] = set(requirements['mandatory'])
         return result
 
     def write(self):
         from ..item import ManifestItem
         if self.key.tam_required:
-            self.config[b'tam_required'] = True
+            self.config['tam_required'] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
             self.timestamp = datetime.utcnow().strftime(ISO_FORMAT)

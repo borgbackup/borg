@@ -516,16 +516,16 @@ class Repository:
                 integrity = msgpack.unpack(fd)
         except FileNotFoundError:
             return
-        if integrity.get(b'version') != 2:
-            logger.warning('Unknown integrity data version %r in %s', integrity.get(b'version'), integrity_file)
+        if integrity.get('version') != 2:
+            logger.warning('Unknown integrity data version %r in %s', integrity.get('version'), integrity_file)
             return
-        return integrity[key].decode()
+        return integrity[key]
 
     def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
             return NSIndex()
         index_path = os.path.join(self.path, 'index.%d' % transaction_id)
-        integrity_data = self._read_integrity(transaction_id, b'index')
+        integrity_data = self._read_integrity(transaction_id, 'index')
         try:
             with IntegrityCheckedFile(index_path, write=False, integrity_data=integrity_data) as fd:
                 return NSIndex.read(fd)
@@ -575,7 +575,7 @@ class Repository:
                 self.io.cleanup(transaction_id)
             hints_path = os.path.join(self.path, 'hints.%d' % transaction_id)
             index_path = os.path.join(self.path, 'index.%d' % transaction_id)
-            integrity_data = self._read_integrity(transaction_id, b'hints')
+            integrity_data = self._read_integrity(transaction_id, 'hints')
             try:
                 with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
                     hints = msgpack.unpack(fd)
@@ -588,23 +588,23 @@ class Repository:
                 self.check_transaction()
                 self.prepare_txn(transaction_id)
                 return
-            if hints[b'version'] == 1:
+            if hints['version'] == 1:
                 logger.debug('Upgrading from v1 hints.%d', transaction_id)
-                self.segments = hints[b'segments']
+                self.segments = hints['segments']
                 self.compact = FreeSpace()
                 self.storage_quota_use = 0
                 self.shadow_index = {}
-                for segment in sorted(hints[b'compact']):
+                for segment in sorted(hints['compact']):
                     logger.debug('Rebuilding sparse info for segment %d', segment)
                     self._rebuild_sparse(segment)
                 logger.debug('Upgrade to v2 hints complete')
-            elif hints[b'version'] != 2:
-                raise ValueError('Unknown hints file version: %d' % hints[b'version'])
+            elif hints['version'] != 2:
+                raise ValueError('Unknown hints file version: %d' % hints['version'])
             else:
-                self.segments = hints[b'segments']
-                self.compact = FreeSpace(hints[b'compact'])
-                self.storage_quota_use = hints.get(b'storage_quota_use', 0)
-                self.shadow_index = hints.get(b'shadow_index', {})
+                self.segments = hints['segments']
+                self.compact = FreeSpace(hints['compact'])
+                self.storage_quota_use = hints.get('storage_quota_use', 0)
+                self.shadow_index = hints.get('shadow_index', {})
             self.log_storage_quota()
             # Drop uncommitted segments in the shadow index
             for key, shadowed_segments in self.shadow_index.items():
@@ -621,16 +621,16 @@ class Repository:
             os.rename(file + '.tmp', file)
 
         hints = {
-            b'version': 2,
-            b'segments': self.segments,
-            b'compact': self.compact,
-            b'storage_quota_use': self.storage_quota_use,
-            b'shadow_index': self.shadow_index,
+            'version': 2,
+            'segments': self.segments,
+            'compact': self.compact,
+            'storage_quota_use': self.storage_quota_use,
+            'shadow_index': self.shadow_index,
         }
         integrity = {
             # Integrity version started at 2, the current hints version.
             # Thus, integrity version == hints version, for now.
-            b'version': 2,
+            'version': 2,
         }
         transaction_id = self.io.get_segments_transaction_id()
         assert transaction_id is not None
@@ -647,7 +647,7 @@ class Repository:
         with IntegrityCheckedFile(hints_file + '.tmp', filename=hints_name, write=True) as fd:
             msgpack.pack(hints, fd)
             flush_and_sync(fd)
-        integrity[b'hints'] = fd.integrity_data
+        integrity['hints'] = fd.integrity_data
 
         # Write repository index
         index_name = 'index.%d' % transaction_id
@@ -656,7 +656,7 @@ class Repository:
             # XXX: Consider using SyncFile for index write-outs.
             self.index.write(fd)
             flush_and_sync(fd)
-        integrity[b'index'] = fd.integrity_data
+        integrity['index'] = fd.integrity_data
 
         # Write integrity file, containing checksums of the hints and index files
         integrity_name = 'integrity.%d' % transaction_id

@@ -808,8 +808,8 @@ class ItemFormatter(BaseFormatter):
         hlid = bin_to_hex(hlid) if hlid else ''
         item_data['type'] = item_type
         item_data['mode'] = mode
-        item_data['user'] = item.user or item.uid
-        item_data['group'] = item.group or item.gid
+        item_data['user'] = item.get('user', str(item.uid))
+        item_data['group'] = item.get('group', str(item.gid))
         item_data['uid'] = item.uid
         item_data['gid'] = item.gid
         item_data['path'] = remove_surrogates(item.path)

@@ -89,20 +89,12 @@ def test_item_mptimestamp_property():
     assert item.as_dict() == {'atime': Timestamp.from_unix_nano(big)}
 
 
-def test_item_user_group_none():
-    item = Item()
-    item.user = None
-    assert item.user is None
-    item.group = None
-    assert item.group is None
-
-
 def test_item_se_str_property():
     # start simple
     item = Item()
     item.path = '/a/b/c'
     assert item.path == '/a/b/c'
-    assert item.as_dict() == {'path': b'/a/b/c'}
+    assert item.as_dict() == {'path': '/a/b/c'}
     del item.path
     assert item.as_dict() == {}
     with pytest.raises(TypeError):
@@ -111,11 +103,11 @@ def test_item_se_str_property():
     # non-utf-8 path, needing surrogate-escaping for latin-1 u-umlaut
     item = Item(internal_dict={'path': b'/a/\xfc/c'})
     assert item.path == '/a/\udcfc/c'  # getting a surrogate-escaped representation
-    assert item.as_dict() == {'path': b'/a/\xfc/c'}
+    assert item.as_dict() == {'path': '/a/\udcfc/c'}
     del item.path
     assert 'path' not in item
     item.path = '/a/\udcfc/c'  # setting using a surrogate-escaped representation
-    assert item.as_dict() == {'path': b'/a/\xfc/c'}
+    assert item.as_dict() == {'path': '/a/\udcfc/c'}
 
 
 def test_item_list_property():

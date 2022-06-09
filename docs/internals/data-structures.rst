@@ -329,17 +329,17 @@ or modified. It looks like this:
 .. code-block:: python
 
     {
-        b'version': 1,
-        b'timestamp': b'2017-05-05T12:42:23.042864',
-        b'item_keys': [b'acl_access', b'acl_default', ...],
-        b'config': {},
-        b'archives': {
-            b'2017-05-05-system-backup': {
-                b'id': b'<32 byte binary object ID>',
-                b'time': b'2017-05-05T12:42:22.942864',
+        'version': 1,
+        'timestamp': '2017-05-05T12:42:23.042864',
+        'item_keys': ['acl_access', 'acl_default', ...],
+        'config': {},
+        'archives': {
+            '2017-05-05-system-backup': {
+                'id': b'<32 byte binary object ID>',
+                'time': '2017-05-05T12:42:22.942864',
             },
         },
-        b'tam': ...,
+        'tam': ...,
     }
 
 The *version* field can be either 1 or 2. The versions differ in the
@@ -393,15 +393,15 @@ The *config* key stores the feature flags enabled on a repository:
 .. code-block:: python
 
     config = {
-        b'feature_flags': {
-            b'read': {
-                b'mandatory': [b'some_feature'],
+        'feature_flags': {
+            'read': {
+                'mandatory': ['some_feature'],
             },
-            b'check': {
-                b'mandatory': [b'other_feature'],
+            'check': {
+                'mandatory': ['other_feature'],
             }
-            b'write': ...,
-            b'delete': ...
+            'write': ...,
+            'delete': ...
         },
     }
 
@@ -1220,9 +1220,9 @@ transaction ID in the file names. Integrity data is stored in a third file
 .. code-block:: python
 
     {
-        b'version': 2,
-        b'hints': b'{"algorithm": "XXH64", "digests": {"final": "411208db2aa13f1a"}}',
-        b'index': b'{"algorithm": "XXH64", "digests": {"HashHeader": "846b7315f91b8e48", "final": "cb3e26cadc173e40"}}'
+        'version': 2,
+        'hints': '{"algorithm": "XXH64", "digests": {"final": "411208db2aa13f1a"}}',
+        'index': '{"algorithm": "XXH64", "digests": {"HashHeader": "846b7315f91b8e48", "final": "cb3e26cadc173e40"}}'
     }
 
 The *version* key started at 2, the same version used for the hints. Since Borg has

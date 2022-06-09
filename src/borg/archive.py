@@ -34,7 +34,7 @@ from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
-from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
+from .helpers import safe_encode, make_path_safe, remove_surrogates
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
@@ -392,14 +392,14 @@ def get_item_uid_gid(item, *, numeric, uid_forced=None, gid_forced=None, uid_def
     if uid_forced is not None:
         uid = uid_forced
     else:
-        uid = None if numeric else user2uid(item.user)
+        uid = None if numeric else user2uid(item.get('user'))
         uid = item.uid if uid is None else uid
         if uid < 0:
             uid = uid_default
     if gid_forced is not None:
         gid = gid_forced
     else:
-        gid = None if numeric else group2gid(item.group)
+        gid = None if numeric else group2gid(item.get('group'))
         gid = item.gid if gid is None else gid
         if gid < 0:
             gid = gid_default
@@ -479,7 +479,6 @@ class Archive:
     def load(self, id):
         self.id = id
         self.metadata = self._load_meta(self.id)
-        self.metadata.cmdline = [safe_decode(arg) for arg in self.metadata.cmdline]
         self.name = self.metadata.name
         self.comment = self.metadata.get('comment', '')
 
@@ -1090,11 +1089,13 @@ class MetadataCollector:
         if not self.nobirthtime and hasattr(st, 'st_birthtime'):
             # sadly, there's no stat_result.st_birthtime_ns
             attrs['birthtime'] = safe_ns(int(st.st_birthtime * 10**9))
-        if self.numeric_ids:
-            attrs['user'] = attrs['group'] = None
-        else:
-            attrs['user'] = uid2user(st.st_uid)
-            attrs['group'] = gid2group(st.st_gid)
+        if not self.numeric_ids:
+            user = uid2user(st.st_uid)
+            if user is not None:
+                attrs['user'] = user
+            group = gid2group(st.st_gid)
+            if group is not None:
+                attrs['group'] = group
         return attrs
 
     def stat_ext_attrs(self, st, path, fd=None):
@@ -1427,8 +1428,11 @@ class TarfileObjectProcessors:
                 return safe_ns(int(float(s) * 1e9))
 
             item = Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
-                        uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname or None, group=tarinfo.gname or None,
-                        mtime=s_to_ns(tarinfo.mtime))
+                        uid=tarinfo.uid, gid=tarinfo.gid, mtime=s_to_ns(tarinfo.mtime))
+            if tarinfo.uname:
+                item.user = tarinfo.uname
+            if tarinfo.gname:
+                item.group = tarinfo.gname
             if ph:
                 # note: for mtime this is a bit redundant as it is already done by tarfile module,
                 #       but we just do it in our way to be consistent for sure.
@@ -1515,7 +1519,7 @@ class RobustUnpacker:
     """
     def __init__(self, validator, item_keys):
         super().__init__()
-        self.item_keys = [msgpack.packb(name.encode()) for name in item_keys]
+        self.item_keys = [msgpack.packb(name) for name in item_keys]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -1719,13 +1723,10 @@ class ArchiveChecker:
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
-        required_archive_keys = frozenset(key.encode() for key in REQUIRED_ARCHIVE_KEYS)
-
         def valid_archive(obj):
             if not isinstance(obj, dict):
                 return False
-            keys = set(obj)
-            return required_archive_keys.issubset(keys)
+            return REQUIRED_ARCHIVE_KEYS.issubset(obj)
 
         logger.info('Rebuilding missing manifest, this might take some time...')
         # as we have lost the manifest, we do not know any more what valid item keys we had.
@@ -1734,7 +1735,7 @@ class ArchiveChecker:
         # lost manifest on a older borg version than the most recent one that was ever used
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
-        archive_keys_serialized = [msgpack.packb(name.encode()) for name in ARCHIVE_KEYS]
+        archive_keys_serialized = [msgpack.packb(name) for name in ARCHIVE_KEYS]
         pi = ProgressIndicatorPercent(total=len(self.chunks), msg="Rebuilding manifest %6.2f%%", step=0.01,
                                       msgid='check.rebuild_manifest')
         for chunk_id, _ in self.chunks.iteritems():
@@ -1881,9 +1882,9 @@ class ArchiveChecker:
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            item_keys = frozenset(key.encode() for key in self.manifest.item_keys)
-            required_item_keys = frozenset(key.encode() for key in REQUIRED_ITEM_KEYS)
-            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and b'path' in item,
+            item_keys = self.manifest.item_keys
+            required_item_keys = REQUIRED_ITEM_KEYS
+            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and 'path' in item,
                                       self.manifest.item_keys)
             _state = 0
 
@@ -1991,7 +1992,6 @@ class ArchiveChecker:
                 archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
                 if archive.version != 2:
                     raise Exception('Unknown archive metadata version')
-                archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 for item in robust_iterator(archive):

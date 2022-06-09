@@ -38,7 +38,7 @@ logger = create_logger(__name__)
 
 RPC_PROTOCOL_VERSION = 2
 BORG_VERSION = parse_version(__version__)
-MSGID, MSG, ARGS, RESULT = b'i', b'm', b'a', b'r'
+MSGID, MSG, ARGS, RESULT = 'i', 'm', 'a', 'r'
 
 MAX_INFLIGHT = 100
 
@@ -138,10 +138,6 @@ compatMap = {
 }
 
 
-def decode_keys(d):
-    return {k.decode(): d[k] for k in d}
-
-
 class RepositoryServer:  # pragma: no cover
     rpc_methods = (
         '__len__',
@@ -217,13 +213,12 @@ class RepositoryServer:  # pragma: no cover
                     if isinstance(unpacked, dict):
                         dictFormat = True
                         msgid = unpacked[MSGID]
-                        method = unpacked[MSG].decode()
-                        args = decode_keys(unpacked[ARGS])
+                        method = unpacked[MSG]
+                        args = unpacked[ARGS]
                     elif isinstance(unpacked, tuple) and len(unpacked) == 4:
                         dictFormat = False
                         # The first field 'type' was always 1 and has always been ignored
                         _, msgid, method, args = unpacked
-                        method = method.decode()
                         args = self.positional_to_named(method, args)
                     else:
                         if self.repository is not None:
@@ -256,21 +251,21 @@ class RepositoryServer:  # pragma: no cover
 
                             try:
                                 msg = msgpack.packb({MSGID: msgid,
-                                                    b'exception_class': e.__class__.__name__,
-                                                    b'exception_args': e.args,
-                                                    b'exception_full': ex_full,
-                                                    b'exception_short': ex_short,
-                                                    b'exception_trace': ex_trace,
-                                                    b'sysinfo': sysinfo()})
+                                                    'exception_class': e.__class__.__name__,
+                                                    'exception_args': e.args,
+                                                    'exception_full': ex_full,
+                                                    'exception_short': ex_short,
+                                                    'exception_trace': ex_trace,
+                                                    'sysinfo': sysinfo()})
                             except TypeError:
                                 msg = msgpack.packb({MSGID: msgid,
-                                                    b'exception_class': e.__class__.__name__,
-                                                    b'exception_args': [x if isinstance(x, (str, bytes, int)) else None
-                                                                        for x in e.args],
-                                                    b'exception_full': ex_full,
-                                                    b'exception_short': ex_short,
-                                                    b'exception_trace': ex_trace,
-                                                    b'sysinfo': sysinfo()})
+                                                    'exception_class': e.__class__.__name__,
+                                                    'exception_args': [x if isinstance(x, (str, bytes, int)) else None
+                                                                       for x in e.args],
+                                                    'exception_full': ex_full,
+                                                    'exception_short': ex_short,
+                                                    'exception_trace': ex_trace,
+                                                    'sysinfo': sysinfo()})
 
                             os_write(stdout_fd, msg)
                         else:
@@ -307,7 +302,7 @@ class RepositoryServer:  # pragma: no cover
         # clients since 1.1.0b3 use a dict as client_data
         # clients since 1.1.0b6 support json log format from server
         if isinstance(client_data, dict):
-            self.client_version = client_data[b'client_version']
+            self.client_version = client_data['client_version']
             level = logging.getLevelName(logging.getLogger('').level)
             setup_logging(is_serve=True, json=True, level=level)
             logger.debug('Initialized logging system for JSON-based protocol')
@@ -369,7 +364,6 @@ class RepositoryServer:  # pragma: no cover
         return self.repository.id
 
     def inject_exception(self, kind):
-        kind = kind.decode()
         s1 = 'test string'
         s2 = 'test string2'
         if kind == 'DoesNotExist':
@@ -483,35 +477,35 @@ class RemoteRepository:
 
     class RPCError(Exception):
         def __init__(self, unpacked):
-            # for borg < 1.1: unpacked only has b'exception_class' as key
-            # for borg 1.1+: unpacked has keys: b'exception_args', b'exception_full', b'exception_short', b'sysinfo'
+            # for borg < 1.1: unpacked only has 'exception_class' as key
+            # for borg 1.1+: unpacked has keys: 'exception_args', 'exception_full', 'exception_short', 'sysinfo'
             self.unpacked = unpacked
 
         def get_message(self):
-            if b'exception_short' in self.unpacked:
-                return b'\n'.join(self.unpacked[b'exception_short']).decode()
+            if 'exception_short' in self.unpacked:
+                return '\n'.join(self.unpacked['exception_short'])
             else:
                 return self.exception_class
 
         @property
         def traceback(self):
-            return self.unpacked.get(b'exception_trace', True)
+            return self.unpacked.get('exception_trace', True)
 
         @property
         def exception_class(self):
-            return self.unpacked[b'exception_class'].decode()
+            return self.unpacked['exception_class']
 
         @property
         def exception_full(self):
-            if b'exception_full' in self.unpacked:
-                return b'\n'.join(self.unpacked[b'exception_full']).decode()
+            if 'exception_full' in self.unpacked:
+                return '\n'.join(self.unpacked['exception_full'])
             else:
                 return self.get_message() + '\nRemote Exception (see remote log for the traceback)'
 
         @property
         def sysinfo(self):
-            if b'sysinfo' in self.unpacked:
-                return self.unpacked[b'sysinfo'].decode()
+            if 'sysinfo' in self.unpacked:
+                return self.unpacked['sysinfo']
             else:
                 return ''
 
@@ -570,15 +564,15 @@ class RemoteRepository:
         try:
             try:
                 version = self.call('negotiate', {'client_data': {
-                    b'client_version': BORG_VERSION,
+                    'client_version': BORG_VERSION,
                 }})
             except ConnectionClosed:
                 raise ConnectionClosedWithHint('Is borg working on the server?') from None
             if version == RPC_PROTOCOL_VERSION:
                 self.dictFormat = False
-            elif isinstance(version, dict) and b'server_version' in version:
+            elif isinstance(version, dict) and 'server_version' in version:
                 self.dictFormat = True
-                self.server_version = version[b'server_version']
+                self.server_version = version['server_version']
             else:
                 raise Exception('Server insisted on using unsupported protocol version %s' % version)
 
@@ -733,9 +727,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             return msgid
 
         def handle_error(unpacked):
-            error = unpacked[b'exception_class'].decode()
-            old_server = b'exception_args' not in unpacked
-            args = unpacked.get(b'exception_args')
+            error = unpacked['exception_class']
+            old_server = 'exception_args' not in unpacked
+            args = unpacked.get('exception_args')
 
             if error == 'DoesNotExist':
                 raise Repository.DoesNotExist(self.location.processed)
@@ -747,29 +741,29 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 if old_server:
                     raise IntegrityError('(not available)')
                 else:
-                    raise IntegrityError(args[0].decode())
+                    raise IntegrityError(args[0])
             elif error == 'AtticRepository':
                 if old_server:
                     raise Repository.AtticRepository('(not available)')
                 else:
-                    raise Repository.AtticRepository(args[0].decode())
+                    raise Repository.AtticRepository(args[0])
             elif error == 'PathNotAllowed':
                 if old_server:
                     raise PathNotAllowed('(unknown)')
                 else:
-                    raise PathNotAllowed(args[0].decode())
+                    raise PathNotAllowed(args[0])
             elif error == 'ParentPathDoesNotExist':
-                raise Repository.ParentPathDoesNotExist(args[0].decode())
+                raise Repository.ParentPathDoesNotExist(args[0])
             elif error == 'ObjectNotFound':
                 if old_server:
                     raise Repository.ObjectNotFound('(not available)', self.location.processed)
                 else:
-                    raise Repository.ObjectNotFound(args[0].decode(), self.location.processed)
+                    raise Repository.ObjectNotFound(args[0], self.location.processed)
             elif error == 'InvalidRPCMethod':
                 if old_server:
                     raise InvalidRPCMethod('(not available)')
                 else:
-                    raise InvalidRPCMethod(args[0].decode())
+                    raise InvalidRPCMethod(args[0])
             else:
                 raise self.RPCError(unpacked)
 
@@ -788,7 +782,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 try:
                     unpacked = self.responses.pop(waiting_for[0])
                     waiting_for.pop(0)
-                    if b'exception_class' in unpacked:
+                    if 'exception_class' in unpacked:
                         handle_error(unpacked)
                     else:
                         yield unpacked[RESULT]
@@ -808,7 +802,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         else:
                             return
                     else:
-                        if b'exception_class' in unpacked:
+                        if 'exception_class' in unpacked:
                             handle_error(unpacked)
                         else:
                             yield unpacked[RESULT]
@@ -834,7 +828,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             _, msgid, error, res = unpacked
                             if error:
                                 # ignore res, because it is only a fixed string anyway.
-                                unpacked = {MSGID: msgid, b'exception_class': error}
+                                unpacked = {MSGID: msgid, 'exception_class': error}
                             else:
                                 unpacked = {MSGID: msgid, RESULT: res}
                         else:
@@ -842,7 +836,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
                             # async methods never return values, but may raise exceptions.
-                            if b'exception_class' in unpacked:
+                            if 'exception_class' in unpacked:
                                 self.async_responses[msgid] = unpacked
                             else:
                                 # we currently do not have async result values except "None",

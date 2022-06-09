@@ -821,7 +821,7 @@ class Repository:
                     except LoggedIO.SegmentFull:
                         complete_xfer()
                         new_segment, offset = self.io.write_put(key, data)
-                    self.index[key] = NSIndexEntry(new_segment, offset, len(data), in_index.extra)
+                    self.index[key] = NSIndexEntry(new_segment, offset, len(data))
                     segments.setdefault(new_segment, 0)
                     segments[new_segment] += 1
                     segments[segment] -= 1
@@ -937,7 +937,7 @@ class Repository:
                     self.segments[in_index.segment] -= 1
                 except KeyError:
                     pass
-                self.index[key] = NSIndexEntry(segment, offset, size, 0)
+                self.index[key] = NSIndexEntry(segment, offset, size)
                 self.segments[segment] += 1
                 self.storage_quota_use += header_size(tag) + size
             elif tag == TAG_DELETE:
@@ -1182,7 +1182,7 @@ class Repository:
             self.index = self.open_index(transaction_id)
         at_start = marker is None
         # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
-        start_segment, start_offset, _, _ = (0, 0, 0, 0) if at_start else self.index[marker]
+        start_segment, start_offset, _ = (0, 0, 0) if at_start else self.index[marker]
         result = []
         for segment, filename in self.io.segment_iterator(start_segment):
             obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False, include_data=False)
@@ -1212,7 +1212,7 @@ class Repository:
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
-            in_index = NSIndexEntry(*((self.index[id] + (None, None))[:4]))  # legacy: no size/extra
+            in_index = NSIndexEntry(*((self.index[id] + (None, ))[:3]))  # legacy: index entriess have no size element
             return self.io.read(in_index.segment, in_index.offset, id, expected_size=in_index.size)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
@@ -1243,7 +1243,7 @@ class Repository:
         self.storage_quota_use += header_size(TAG_PUT2) + len(data)
         self.segments.setdefault(segment, 0)
         self.segments[segment] += 1
-        self.index[id] = NSIndexEntry(segment, offset, len(data), 0)
+        self.index[id] = NSIndexEntry(segment, offset, len(data))
         if self.storage_quota and self.storage_quota_use > self.storage_quota:
             self.transaction_doomed = self.StorageQuotaExceeded(
                 format_file_size(self.storage_quota), format_file_size(self.storage_quota_use))

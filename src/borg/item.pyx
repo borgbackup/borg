@@ -3,9 +3,9 @@ from collections import namedtuple
 
 from .constants import ITEM_KEYS, ARCHIVE_KEYS
 from .helpers import safe_encode, safe_decode
-from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 from .helpers import format_file_size
+from .helpers.msgpack import timestamp_to_int, int_to_timestamp
 
 
 cdef extern from "_item.c":
@@ -171,17 +171,17 @@ class Item(PropDict):
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 
-    # note: we need to keep the bigint conversion for compatibility with borg 1.0 archives.
-    atime = PropDict._make_property('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    ctime = PropDict._make_property('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    mtime = PropDict._make_property('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    birthtime = PropDict._make_property('birthtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    atime = PropDict._make_property('atime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    ctime = PropDict._make_property('ctime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    mtime = PropDict._make_property('mtime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    birthtime = PropDict._make_property('birthtime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
 
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
     # compatibility note: this is a new feature, in old archives size will be missing.
     size = PropDict._make_property('size', int)
 
-    hardlink_master = PropDict._make_property('hardlink_master', bool)
+    hlid = PropDict._make_property('hlid', bytes)  # hard link id: same value means same hard link.
+    hardlink_master = PropDict._make_property('hardlink_master', bool)  # legacy
 
     chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
     chunks_healthy = PropDict._make_property('chunks_healthy', (list, type(None)), 'list or None')
@@ -214,7 +214,6 @@ class Item(PropDict):
         except AttributeError:
             if stat.S_ISLNK(self.mode):
                 # get out of here quickly. symlinks have no own chunks, their fs size is the length of the target name.
-                # also, there is the dual-use issue of .source (#2343), so don't confuse it with a hardlink slave.
                 return len(self.source)
             # no precomputed (c)size value available, compute it:
             try:

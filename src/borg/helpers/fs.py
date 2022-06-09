@@ -1,4 +1,5 @@
 import errno
+import hashlib
 import os
 import os.path
 import re
@@ -165,9 +166,76 @@ def make_path_safe(path):
     return _safe_re.sub('', path) or '.'
 
 
-def hardlinkable(mode):
-    """return True if we support hardlinked items of this type"""
-    return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
+class HardLinkManager:
+    """
+    Manage hardlinks (and avoid code duplication doing so).
+
+    A) When creating a borg2 archive from the filesystem, we have to maintain a mapping like:
+       (dev, ino) -> (hlid, chunks)  # for fs_hl_targets
+       If we encounter the same (dev, ino) again later, we'll just re-use the hlid and chunks list.
+
+    B) When extracting a borg2 archive to the filesystem, we have to maintain a mapping like:
+       hlid -> path
+       If we encounter the same hlid again later, we hardlink to the path of the already extracted content of same hlid.
+
+    C) When transferring from a borg1 archive, we need:
+       path -> chunks, chunks_healthy  # for borg1_hl_targets
+       If we encounter a regular file item with source == path later, we reuse chunks and chunks_healthy
+       and create the same hlid = hardlink_id_from_path(source).
+
+    D) When importing a tar file (simplified 1-pass way for now, not creating borg hardlink items):
+       path -> chunks
+       If we encounter a LNK tar entry later with linkname==path, we re-use the chunks and create a regular file item.
+       For better hardlink support (including the very first hardlink item for each group of same-target hardlinks),
+       we would need a 2-pass processing, which is not yet implemented.
+    """
+    def __init__(self, *, id_type, info_type):
+        self._map = {}
+        self.id_type = id_type
+        self.info_type = info_type
+
+    def borg1_hardlinkable(self, mode):  # legacy
+        return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
+
+    def borg1_hardlink_master(self, item):  # legacy
+        return item.get('hardlink_master', True) and 'source' not in item and self.borg1_hardlinkable(item.mode)
+
+    def borg1_hardlink_slave(self, item):  # legacy
+        return 'source' in item and self.borg1_hardlinkable(item.mode)
+
+    def hardlink_id_from_path(self, path):
+        """compute a hardlink id from a path"""
+        assert isinstance(path, bytes)
+        return hashlib.sha256(path).digest()
+
+    def hardlink_id_from_inode(self, *, ino, dev):
+        """compute a hardlink id from an inode"""
+        assert isinstance(ino, int)
+        assert isinstance(dev, int)
+        return hashlib.sha256(f'{ino}/{dev}'.encode()).digest()
+
+    def remember(self, *, id, info):
+        """
+        remember stuff from a (usually contentful) item.
+
+        :param id: some id used to reference to the contentful item, could be:
+                   a path (tar style, old borg style) [bytes]
+                   a hlid (new borg style) [bytes]
+                   a (dev, inode) tuple (filesystem)
+        :param info: information to remember, could be:
+                     chunks / chunks_healthy list
+                     hlid
+        """
+        assert isinstance(id, self.id_type), f"key is {key!r}, not of type {self.key_type}"
+        assert isinstance(info, self.info_type), f"info is {info!r}, not of type {self.info_type}"
+        self._map[id] = info
+
+    def retrieve(self, id, *, default=None):
+        """
+        retrieve stuff to use it in a (usually contentless) item.
+        """
+        assert isinstance(id, self.id_type)
+        return self._map.get(id, default)
 
 
 def scandir_keyfunc(dirent):

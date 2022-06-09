@@ -29,6 +29,7 @@ try:
     from contextlib import contextmanager
     from datetime import datetime, timedelta
     from io import TextIOWrapper
+    from struct import Struct
 
     from .logger import create_logger, setup_logging
 
@@ -44,7 +45,7 @@ try:
     from .archive import has_link
     from .cache import Cache, assert_secure, SecurityManager
     from .constants import *  # NOQA
-    from .compress import CompressionSpec
+    from .compress import CompressionSpec, ZLIB, ZLIB_legacy, ObfuscateSize
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
     from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
     from .crypto.keymanager import KeyManager
@@ -59,7 +60,7 @@ try:
     from .helpers import timestamp
     from .helpers import get_cache_dir, os_stat
     from .helpers import Manifest, AI_HUMAN_SORT_KEYS
-    from .helpers import hardlinkable
+    from .helpers import HardLinkManager
     from .helpers import StableDict
     from .helpers import check_python, check_extension_modules
     from .helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
@@ -336,6 +337,137 @@ class Archiver:
             append_only=args.append_only,
             storage_quota=args.storage_quota,
         ).serve()
+        return EXIT_SUCCESS
+
+    @with_other_repository(manifest=True, key=True, compatibility=(Manifest.Operation.READ,))
+    @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
+    def do_transfer(self, args, *,
+               repository, manifest, key, cache,
+               other_repository=None, other_manifest=None, other_key=None):
+        """archives transfer from other repository"""
+
+        ITEM_KEY_WHITELIST = {'path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'hlid',
+                              'mode', 'user', 'group', 'uid', 'gid', 'mtime', 'atime', 'ctime', 'birthtime', 'size',
+                              'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended',
+                              'part'}
+
+        def upgrade_item(item):
+            """upgrade item as needed, get rid of legacy crap"""
+            if hlm.borg1_hardlink_master(item):
+                item._dict['hlid'] = hlid = hlm.hardlink_id_from_path(item._dict['path'])
+                hlm.remember(id=hlid, info=(item._dict.get('chunks'), item._dict.get('chunks_healthy')))
+            elif hlm.borg1_hardlink_slave(item):
+                item._dict['hlid'] = hlid = hlm.hardlink_id_from_path(item._dict['source'])
+                chunks, chunks_healthy = hlm.retrieve(id=hlid, default=(None, None))
+                if chunks is not None:
+                    item._dict['chunks'] = chunks
+                    for chunk_id, _, _ in chunks:
+                        cache.chunk_incref(chunk_id, archive.stats)
+                if chunks_healthy is not None:
+                    item._dict['chunks_healthy'] = chunks
+                item._dict.pop('source')  # not used for hardlinks any more, replaced by hlid
+            for attr in 'atime', 'ctime', 'mtime', 'birthtime':
+                if attr in item:
+                    ns = getattr(item, attr)  # decode (bigint or Timestamp) --> int ns
+                    setattr(item, attr, ns)  # encode int ns --> msgpack.Timestamp only, no bigint any more
+            # make sure we only have desired stuff in the new item. specifically, make sure to get rid of:
+            # - 'acl' remnants of bug in attic <= 0.13
+            # - 'hardlink_master' (superseded by hlid)
+            new_item_dict = {key: value for key, value in item.as_dict().items() if key in ITEM_KEY_WHITELIST}
+            new_item = Item(internal_dict=new_item_dict)
+            new_item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
+            assert all(key in new_item for key in REQUIRED_ITEM_KEYS)
+            return new_item
+
+        def upgrade_compressed_chunk(chunk):
+            def upgrade_zlib_and_level(chunk):
+                if ZLIB_legacy.detect(chunk):
+                    ctype = ZLIB.ID
+                    chunk = ctype + level + chunk  # get rid of the attic legacy: prepend separate type/level bytes
+                else:
+                    ctype = chunk[0:1]
+                    chunk = ctype + level + chunk[2:]  # keep type same, but set level
+                return chunk
+
+            ctype = chunk[0:1]
+            level = b'\xFF'  # FF means unknown compression level
+
+            if ctype == ObfuscateSize.ID:
+                # in older borg, we used unusual byte order
+                old_header_fmt = Struct('>I')
+                new_header_fmt = ObfuscateSize.header_fmt
+                length = ObfuscateSize.header_len
+                size_bytes = chunk[2:2+length]
+                size = old_header_fmt.unpack(size_bytes)
+                size_bytes = new_header_fmt.pack(size)
+                compressed = chunk[2+length:]
+                compressed = upgrade_zlib_and_level(compressed)
+                chunk = ctype + level + size_bytes + compressed
+            else:
+                chunk = upgrade_zlib_and_level(chunk)
+            return chunk
+
+        dry_run = args.dry_run
+
+        args.consider_checkpoints = True
+        archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
+        if not archive_names:
+            return EXIT_SUCCESS
+
+        for name in archive_names:
+            transfer_size = 0
+            present_size = 0
+            if name in manifest.archives and not dry_run:
+                print(f"{name}: archive is already present in destination repo, skipping.")
+            else:
+                if not dry_run:
+                    print(f"{name}: copying archive to destination repo...")
+                hlm = HardLinkManager(id_type=bytes, info_type=tuple)  # hlid -> (chunks, chunks_healthy)
+                other_archive = Archive(other_repository, other_key, other_manifest, name)
+                archive = Archive(repository, key, manifest, name, cache=cache, create=True) if not dry_run else None
+                for item in other_archive.iter_items():
+                    if 'chunks' in item:
+                        chunks = []
+                        for chunk_id, size, _ in item.chunks:
+                            refcount = cache.seen_chunk(chunk_id, size)
+                            if refcount == 0:  # target repo does not yet have this chunk
+                                if not dry_run:
+                                    cdata = other_repository.get(chunk_id)
+                                    # keep compressed payload same, avoid decompression / recompression
+                                    data = other_key.decrypt(chunk_id, cdata, decompress=False)
+                                    data = upgrade_compressed_chunk(data)
+                                    chunk_entry = cache.add_chunk(chunk_id, data, archive.stats, wait=False,
+                                                                  compress=False, size=size)
+                                    cache.repository.async_response(wait=False)
+                                    chunks.append(chunk_entry)
+                                transfer_size += size
+                            else:
+                                if not dry_run:
+                                    chunk_entry = cache.chunk_incref(chunk_id, archive.stats)
+                                    chunks.append(chunk_entry)
+                                present_size += size
+                        if not dry_run:
+                            item.chunks = chunks  # overwrite! IDs and sizes are same, csizes are likely different
+                            archive.stats.nfiles += 1
+                    if not dry_run:
+                        archive.add_item(upgrade_item(item))
+                if not dry_run:
+                    additional_metadata = {}
+                    # keep all metadata except archive version and stats. also do not keep
+                    # recreate_source_id, recreate_args, recreate_partial_chunks which were used only in 1.1.0b1 .. b2.
+                    for attr in ('cmdline', 'hostname', 'username', 'time', 'time_end', 'comment',
+                                 'chunker_params', 'recreate_cmdline'):
+                        if hasattr(other_archive.metadata, attr):
+                            additional_metadata[attr] = getattr(other_archive.metadata, attr)
+                    archive.save(stats=archive.stats, additional_metadata=additional_metadata)
+                    print(f"{name}: finished. "
+                          f"transfer_size: {format_file_size(transfer_size)} "
+                          f"present_size: {format_file_size(present_size)}")
+                else:
+                    print(f"{name}: completed" if transfer_size == 0 else
+                          f"{name}: incomplete, "
+                          f"transfer_size: {format_file_size(transfer_size)} "
+                          f"present_size: {format_file_size(present_size)}")
         return EXIT_SUCCESS
 
     @with_repository(create=True, exclusive=True, manifest=False)
@@ -1055,16 +1187,14 @@ class Archiver:
             self.print_file_status(status, path)
 
     @staticmethod
-    def build_filter(matcher, peek_and_store_hardlink_masters, strip_components):
+    def build_filter(matcher, strip_components):
         if strip_components:
             def item_filter(item):
                 matched = matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
-                peek_and_store_hardlink_masters(item, matched)
                 return matched
         else:
             def item_filter(item):
                 matched = matcher.match(item.path)
-                peek_and_store_hardlink_masters(item, matched)
                 return matched
         return item_filter
 
@@ -1087,33 +1217,18 @@ class Archiver:
         sparse = args.sparse
         strip_components = args.strip_components
         dirs = []
-        partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract or not has_link else None
+        hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        def peek_and_store_hardlink_masters(item, matched):
-            # not has_link:
-            # OS does not have hardlink capability thus we need to remember the chunks so that
-            # we can extract all hardlinks as separate normal (not-hardlinked) files instead.
-            #
-            # partial_extract and not matched and hardlinkable:
-            # we do not extract the very first hardlink, so we need to remember the chunks
-            # in hardlinks_master, so we can use them when we extract some 2nd+ hardlink item
-            # that has no chunks list.
-            if ((not has_link or (partial_extract and not matched and hardlinkable(item.mode))) and
-                    (item.get('hardlink_master', True) and 'source' not in item)):
-                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
-
-        filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
+        filter = self.build_filter(matcher, strip_components)
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Extracting: %s', step=0.1, msgid='extract')
             pi.output('Calculating total archive size for the progress indicator (might take long for large archives)')
-            extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
+            extracted_size = sum(item.get_size() for item in archive.iter_items(filter))
             pi.total = extracted_size
         else:
             pi = None
 
-        for item in archive.iter_items(filter, partial_extract=partial_extract,
-                                       preload=True, hardlink_masters=hardlink_masters):
+        for item in archive.iter_items(filter, preload=True):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -1128,13 +1243,13 @@ class Archiver:
                 logging.getLogger('borg.output.list').info(remove_surrogates(item.path))
             try:
                 if dry_run:
-                    archive.extract_item(item, dry_run=True, pi=pi)
+                    archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
                 else:
                     if stat.S_ISDIR(item.mode):
                         dirs.append(item)
                         archive.extract_item(item, stdout=stdout, restore_attrs=False)
                     else:
-                        archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
+                        archive.extract_item(item, stdout=stdout, sparse=sparse, hlm=hlm,
                                              stripped_components=strip_components, original_path=orig_path, pi=pi)
             except (BackupOSError, BackupError) as e:
                 self.print_warning('%s: %s', remove_surrogates(orig_path), e)
@@ -1199,15 +1314,9 @@ class Archiver:
         progress = args.progress
         output_list = args.output_list
         strip_components = args.strip_components
-        partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract else None
+        hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        def peek_and_store_hardlink_masters(item, matched):
-            if ((partial_extract and not matched and hardlinkable(item.mode)) and
-                    (item.get('hardlink_master', True) and 'source' not in item)):
-                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
-
-        filter = self.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
+        filter = self.build_filter(matcher, strip_components)
 
         # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
         # where it never seeks on the passed fileobj.
@@ -1217,7 +1326,7 @@ class Archiver:
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Processing: %s', step=0.1, msgid='extract')
             pi.output('Calculating size')
-            extracted_size = sum(item.get_size(hardlink_masters) for item in archive.iter_items(filter))
+            extracted_size = sum(item.get_size() for item in archive.iter_items(filter))
             pi.total = extracted_size
         else:
             pi = None
@@ -1252,9 +1361,8 @@ class Archiver:
             tarinfo.gid = item.gid
             tarinfo.uname = item.user or ''
             tarinfo.gname = item.group or ''
-            # The linkname in tar has the same dual use the 'source' attribute of Borg items,
-            # i.e. for symlinks it means the destination, while for hardlinks it refers to the
-            # file.
+            # The linkname in tar has 2 uses:
+            # for symlinks it means the destination, while for hardlinks it refers to the file.
             # Since hardlinks in tar have a different type code (LNKTYPE) the format might
             # support hardlinking arbitrary objects (including symlinks and directories), but
             # whether implementations actually support that is a whole different question...
@@ -1263,23 +1371,16 @@ class Archiver:
             modebits = stat.S_IFMT(item.mode)
             if modebits == stat.S_IFREG:
                 tarinfo.type = tarfile.REGTYPE
-                if 'source' in item:
-                    source = os.sep.join(item.source.split(os.sep)[strip_components:])
-                    if hardlink_masters is None:
-                        linkname = source
-                    else:
-                        chunks, linkname = hardlink_masters.get(item.source, (None, source))
-                    if linkname:
-                        # Master was already added to the archive, add a hardlink reference to it.
+                if 'hlid' in item:
+                    linkname = hlm.retrieve(id=item.hlid)
+                    if linkname is not None:
+                        # the first hardlink was already added to the archive, add a tar-hardlink reference to it.
                         tarinfo.type = tarfile.LNKTYPE
                         tarinfo.linkname = linkname
-                    elif chunks is not None:
-                        # The item which has the chunks was not put into the tar, therefore
-                        # we do that now and update hardlink_masters to reflect that.
-                        item.chunks = chunks
+                    else:
                         tarinfo.size = item.get_size()
                         stream = item_content_stream(item)
-                        hardlink_masters[item.get('source') or original_path] = (None, item.path)
+                        hlm.remember(id=item.hlid, info=item.path)
                 else:
                     tarinfo.size = item.get_size()
                     stream = item_content_stream(item)
@@ -1337,8 +1438,7 @@ class Archiver:
                 ph['BORG.item.meta'] = meta_text
             return ph
 
-        for item in archive.iter_items(filter, partial_extract=partial_extract,
-                                       preload=True, hardlink_masters=hardlink_masters):
+        for item in archive.iter_items(filter, preload=True):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -1973,12 +2073,11 @@ class Archiver:
             elif tarinfo.isdir():
                 status = tfo.process_dir(tarinfo=tarinfo, status='d', type=stat.S_IFDIR)
             elif tarinfo.issym():
-                status = tfo.process_link(tarinfo=tarinfo, status='s', type=stat.S_IFLNK)
+                status = tfo.process_symlink(tarinfo=tarinfo, status='s', type=stat.S_IFLNK)
             elif tarinfo.islnk():
-                # tar uses the same hardlink model as borg (rather vice versa); the first instance of a hardlink
-                # is stored as a regular file, later instances are special entries referencing back to the
-                # first instance.
-                status = tfo.process_link(tarinfo=tarinfo, status='h', type=stat.S_IFREG)
+                # tar uses a hardlink model like: the first instance of a hardlink is stored as a regular file,
+                # later instances are special entries referencing back to the first instance.
+                status = tfo.process_hardlink(tarinfo=tarinfo, status='h', type=stat.S_IFREG)
             elif tarinfo.isblk():
                 status = tfo.process_dev(tarinfo=tarinfo, status='b', type=stat.S_IFBLK)
             elif tarinfo.ischr():
@@ -4081,6 +4180,43 @@ class Archiver:
                                help='repository or archive to delete')
         subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
                                help='archives to delete')
+        define_archive_filters_group(subparser)
+
+        # borg transfer
+        transfer_epilog = process_epilog("""
+        This command transfers archives from one repository to another repository.
+
+        Suggested use:
+
+        # initialize DST_REPO reusing key material from SRC_REPO, so that
+        # chunking and chunk id generation will work in the same way as before.
+        borg init --other-location=SRC_REPO --encryption=DST_ENC DST_REPO
+
+        # transfer archives from SRC_REPO to DST_REPO
+        borg transfer --dry-run SRC_REPO DST_REPO  # check what it would do
+        borg transfer           SRC_REPO DST_REPO  # do it!
+        borg transfer --dry-run SRC_REPO DST_REPO  # check! anything left?
+
+        The default is to transfer all archives, including checkpoint archives.
+
+        You could use the misc. archive filter options to limit which archives it will
+        transfer, e.g. using the --prefix option. This is recommended for big
+        repositories with multiple data sets to keep the runtime per invocation lower.
+        """)
+        subparser = subparsers.add_parser('transfer', parents=[common_parser], add_help=False,
+                                          description=self.do_transfer.__doc__,
+                                          epilog=transfer_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='transfer of archives from another repository')
+        subparser.set_defaults(func=self.do_transfer)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository, just check')
+        subparser.add_argument('other_location', metavar='SRC_REPOSITORY',
+                               type=location_validator(archive=False, other=True),
+                               help='source repository')
+        subparser.add_argument('location', metavar='DST_REPOSITORY',
+                               type=location_validator(archive=False, other=False),
+                               help='destination repository')
         define_archive_filters_group(subparser)
 
         # borg diff

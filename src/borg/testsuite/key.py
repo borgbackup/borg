@@ -256,8 +256,8 @@ class TestKey:
         plaintext = b'123456789'
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
-        # 0x07 is the key TYPE, \x0000 identifies no compression.
-        assert authenticated == b'\x07\x00\x00' + plaintext
+        # 0x07 is the key TYPE, \x00ff identifies no compression / unknown level.
+        assert authenticated == b'\x07\x00\xff' + plaintext
 
     def test_blake2_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
@@ -267,8 +267,8 @@ class TestKey:
         plaintext = b'123456789'
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
-        # 0x06 is the key TYPE, 0x0000 identifies no compression.
-        assert authenticated == b'\x06\x00\x00' + plaintext
+        # 0x06 is the key TYPE, 0x00ff identifies no compression / unknown level.
+        assert authenticated == b'\x06\x00\xff' + plaintext
 
 
 class TestTAM:

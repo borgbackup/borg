@@ -567,7 +567,7 @@ dictionary created by the ``Item`` class that contains:
 * uid
 * gid
 * mode (item type + permissions)
-* source (for symlinks, and for hardlinks within one archive)
+* source (for symlinks)
 * rdev (for device files)
 * mtime, atime, ctime in nanoseconds
 * xattrs

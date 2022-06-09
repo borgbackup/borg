@@ -35,7 +35,8 @@ from .crypto.low_level import blake2b_128
 from .archiver import Archiver
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, daemonizing, hardlinkable, signal_handler, format_file_size, Error
+from .helpers import daemonize, daemonizing, signal_handler, format_file_size, Error
+from .helpers import HardLinkManager
 from .helpers import msgpack
 from .item import Item
 from .lrucache import LRUCache
@@ -339,15 +340,9 @@ class FuseBackend:
                           consider_part_files=self._args.consider_part_files)
         strip_components = self._args.strip_components
         matcher = Archiver.build_matcher(self._args.patterns, self._args.paths)
-        partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract else None
+        hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        def peek_and_store_hardlink_masters(item, matched):
-            if (partial_extract and not matched and hardlinkable(item.mode) and
-                    item.get('hardlink_master', True) and 'source' not in item):
-                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
-
-        filter = Archiver.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
+        filter = Archiver.build_filter(matcher, strip_components)
         for item_inode, item in self.cache.iter_archive_items(archive.metadata.items, filter=filter,
                                                               consider_part_files=self._args.consider_part_files):
             if strip_components:
@@ -369,15 +364,13 @@ class FuseBackend:
             parent = 1
             for segment in segments[:-1]:
                 parent = self._process_inner(segment, parent)
-            self._process_leaf(segments[-1], item, parent, prefix, is_dir, item_inode,
-                               hardlink_masters, strip_components)
+            self._process_leaf(segments[-1], item, parent, prefix, is_dir, item_inode, hlm)
         duration = time.perf_counter() - t0
         logger.debug('fuse: _process_archive completed in %.1f s for archive %s', duration, archive.name)
 
-    def _process_leaf(self, name, item, parent, prefix, is_dir, item_inode, hardlink_masters, stripped_components):
+    def _process_leaf(self, name, item, parent, prefix, is_dir, item_inode, hlm):
         path = item.path
         del item.path  # save some space
-        hardlink_masters = hardlink_masters or {}
 
         def file_version(item, path):
             if 'chunks' in item:
@@ -402,10 +395,9 @@ class FuseBackend:
             version_enc = os.fsencode('.%05d' % version)
             return name + version_enc + ext
 
-        if 'source' in item and hardlinkable(item.mode):
-            source = os.sep.join(item.source.split(os.sep)[stripped_components:])
-            chunks, link_target = hardlink_masters.get(item.source, (None, source))
-            if link_target:
+        if 'hlid' in item:
+            link_target = hlm.retrieve(id=item.hlid, default=None)
+            if link_target is not None:
                 # Hard link was extracted previously, just link
                 link_target = os.fsencode(link_target)
                 if self.versions:
@@ -415,19 +407,16 @@ class FuseBackend:
                 try:
                     inode = self.find_inode(link_target, prefix)
                 except KeyError:
-                    logger.warning('Skipping broken hard link: %s -> %s', path, source)
+                    logger.warning('Skipping broken hard link: %s -> %s', path, link_target)
                     return
                 item = self.get_item(inode)
                 item.nlink = item.get('nlink', 1) + 1
                 self._items[inode] = item
-            elif chunks is not None:
-                # assign chunks to this item, since the item which had the chunks was not extracted
-                item.chunks = chunks
+            else:
                 inode = item_inode
                 self._items[inode] = item
-                if hardlink_masters:
-                    # Update master entry with extracted item path, so that following hardlinks don't extract twice.
-                    hardlink_masters[item.source] = (None, path)
+                # remember extracted item path, so that following hardlinks don't extract twice.
+                hlm.remember(id=item.hlid, info=path)
         else:
             inode = item_inode
 
@@ -436,7 +425,7 @@ class FuseBackend:
             enc_path = os.fsencode(path)
             version = file_version(item, enc_path)
             if version is not None:
-                # regular file, with contents - maybe a hardlink master
+                # regular file, with contents
                 name = make_versioned_name(name, version)
                 self.file_versions[enc_path] = version
 

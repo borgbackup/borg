@@ -387,9 +387,9 @@ cdef class ChunkIndex(IndexBase):
         This index must be a subset of *master_index*.
 
         Return the same statistics tuple as summarize:
-        size, csize, unique_size, unique_csize, unique_chunks, chunks.
+        size, unique_size, unique_chunks, chunks.
         """
-        cdef uint64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
+        cdef uint64_t size = 0, unique_size = 0, chunks = 0, unique_chunks = 0
         cdef uint32_t our_refcount, chunk_size, chunk_csize
         cdef const uint32_t *our_values
         cdef const uint32_t *master_values
@@ -406,18 +406,15 @@ cdef class ChunkIndex(IndexBase):
                 raise ValueError('stats_against: key contained in self but not in master_index.')
             our_refcount = _le32toh(our_values[0])
             chunk_size = _le32toh(master_values[1])
-            chunk_csize = _le32toh(master_values[2])
 
             chunks += our_refcount
             size += <uint64_t> chunk_size * our_refcount
-            csize += <uint64_t> chunk_csize * our_refcount
             if our_values[0] == master_values[0]:
                 # our refcount equals the master's refcount, so this chunk is unique to us
                 unique_chunks += 1
                 unique_size += chunk_size
-                unique_csize += chunk_csize
 
-        return size, csize, unique_size, unique_csize, unique_chunks, chunks
+        return size, unique_size, unique_chunks, chunks
 
     def add(self, key, refs, size, csize):
         assert len(key) == self.key_size

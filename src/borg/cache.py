@@ -713,13 +713,13 @@ class LocalCache(CacheStatsMixin):
             nonlocal processed_item_metadata_bytes
             nonlocal processed_item_metadata_chunks
             csize, data = decrypted_repository.get(archive_id)
-            chunk_idx.add(archive_id, 1, len(data), csize)
+            chunk_idx.add(archive_id, 1, len(data))
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version not in (1, 2):  # legacy
                 raise Exception('Unknown archive metadata version')
             sync = CacheSynchronizer(chunk_idx)
             for item_id, (csize, data) in zip(archive.items, decrypted_repository.get_many(archive.items)):
-                chunk_idx.add(item_id, 1, len(data), csize)
+                chunk_idx.add(item_id, 1, len(data))
                 processed_item_metadata_bytes += len(data)
                 processed_item_metadata_chunks += 1
                 sync.feed(data)
@@ -903,14 +903,13 @@ class LocalCache(CacheStatsMixin):
         if size is None:
             raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
         data = self.key.encrypt(id, chunk, compress=compress)
-        csize = 0  # len(data)
         self.repository.put(id, data, wait=wait)
-        self.chunks.add(id, 1, size, csize)
+        self.chunks.add(id, 1, size)
         stats.update(size)
         return ChunkListEntry(id, size)
 
     def seen_chunk(self, id, size=None):
-        refcount, stored_size, _ = self.chunks.get(id, ChunkIndexEntry(0, None, None))
+        refcount, stored_size = self.chunks.get(id, ChunkIndexEntry(0, None))
         if size is not None and stored_size is not None and size != stored_size:
             # we already have a chunk with that id, but different size.
             # this is either a hash collision (unlikely) or corruption or a bug.
@@ -921,14 +920,14 @@ class LocalCache(CacheStatsMixin):
     def chunk_incref(self, id, stats, size=None, part=False):
         if not self.txn_active:
             self.begin_txn()
-        count, _size, _ = self.chunks.incref(id)
+        count, _size = self.chunks.incref(id)
         stats.update(_size, part=part)
         return ChunkListEntry(id, _size)
 
     def chunk_decref(self, id, stats, wait=True, part=False):
         if not self.txn_active:
             self.begin_txn()
-        count, size, _ = self.chunks.decref(id)
+        count, size = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
@@ -1071,16 +1070,15 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         if refcount:
             return self.chunk_incref(id, stats, size=size)
         data = self.key.encrypt(id, chunk, compress=compress)
-        csize = len(data)
         self.repository.put(id, data, wait=wait)
-        self.chunks.add(id, 1, size, csize)
+        self.chunks.add(id, 1, size)
         stats.update(size)
         return ChunkListEntry(id, size)
 
     def seen_chunk(self, id, size=None):
         if not self._txn_active:
             self.begin_txn()
-        entry = self.chunks.get(id, ChunkIndexEntry(0, None, None))
+        entry = self.chunks.get(id, ChunkIndexEntry(0, None))
         if entry.refcount and size and not entry.size:
             # The LocalCache has existing size information and uses *size* to make an effort at detecting collisions.
             # This is of course not possible for the AdHocCache.
@@ -1091,7 +1089,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def chunk_incref(self, id, stats, size=None, part=False):
         if not self._txn_active:
             self.begin_txn()
-        count, _size, csize = self.chunks.incref(id)
+        count, _size = self.chunks.incref(id)
         # When _size is 0 and size is not given, then this chunk has not been locally visited yet (seen_chunk with
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
         size = _size or size
@@ -1102,7 +1100,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def chunk_decref(self, id, stats, wait=True, part=False):
         if not self._txn_active:
             self.begin_txn()
-        count, size, csize = self.chunks.decref(id)
+        count, size = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
@@ -1142,7 +1140,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
             # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
             # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
             # (e.g. checkpoint archives) are tracked correctly.
-            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0, csize=0)
+            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
             for id_ in result:
                 self.chunks[id_] = init_entry
         assert len(self.chunks) == num_chunks

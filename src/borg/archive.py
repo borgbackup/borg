@@ -483,6 +483,10 @@ class Archive:
     def duration_from_meta(self):
         return format_timedelta(self.ts_end - self.ts)
 
+    def _archive_csize(self):
+        cdata = self.repository.get(self.id)
+        return len(cdata)
+
     def info(self):
         if self.create:
             stats = self.stats
@@ -500,7 +504,7 @@ class Archive:
             'duration': (end - start).total_seconds(),
             'stats': stats.as_dict(),
             'limits': {
-                'max_archive_size': self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
+                'max_archive_size': self._archive_csize() / MAX_DATA_SIZE,
             },
         }
         if self.create:
@@ -529,7 +533,7 @@ Utilization of max. archive size: {csize_max:.0%}
             self,
             start=OutputTimestamp(self.start.replace(tzinfo=timezone.utc)),
             end=OutputTimestamp(self.end.replace(tzinfo=timezone.utc)),
-            csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
+            csize_max=self._archive_csize() / MAX_DATA_SIZE,
             location=self.repository._location.canonical_path()
 )
 
@@ -1561,7 +1565,7 @@ class ArchiveChecker:
             if not result:
                 break
             marker = result[-1]
-            init_entry = ChunkIndexEntry(refcount=0, size=0, csize=0)
+            init_entry = ChunkIndexEntry(refcount=0, size=0)
             for id_ in result:
                 self.chunks[id_] = init_entry
 
@@ -1718,7 +1722,7 @@ class ArchiveChecker:
         self.chunks.pop(Manifest.MANIFEST_ID, None)
 
         def mark_as_possibly_superseded(id_):
-            if self.chunks.get(id_, ChunkIndexEntry(0, 0, 0)).refcount == 0:
+            if self.chunks.get(id_, ChunkIndexEntry(0, 0)).refcount == 0:
                 self.possibly_superseded.add(id_)
 
         def add_callback(chunk):
@@ -1732,7 +1736,7 @@ class ArchiveChecker:
                 self.chunks.incref(id_)
             except KeyError:
                 assert cdata is not None
-                self.chunks[id_] = ChunkIndexEntry(refcount=1, size=size, csize=0)  # was: csize=csize
+                self.chunks[id_] = ChunkIndexEntry(refcount=1, size=size)
                 if self.repair:
                     self.repository.put(id_, cdata)
 

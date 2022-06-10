@@ -279,7 +279,6 @@ static inline int unpack_callback_array_end(unpack_user* u)
             /* refcount, size */
             cache_values[0] = _htole32(1);
             cache_values[1] = _htole32(u->current.size);
-            cache_values[2] = _htole32(0);  /* fake csize for now */
             if(!hashindex_set(u->chunks, u->current.key, cache_values)) {
                 SET_LAST_ERROR("hashindex_set failed");
                 return -1;

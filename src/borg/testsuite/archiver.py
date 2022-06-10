@@ -2885,12 +2885,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 correct_chunks = cache.chunks
         assert original_chunks is not correct_chunks
         seen = set()
-        for id, (refcount, size, _) in correct_chunks.iteritems():
-            o_refcount, o_size, _ = original_chunks[id]
+        for id, (refcount, size) in correct_chunks.iteritems():
+            o_refcount, o_size = original_chunks[id]
             assert refcount == o_refcount
             assert size == o_size
             seen.add(id)
-        for id, (refcount, size, _) in original_chunks.iteritems():
+        for id, (refcount, size) in original_chunks.iteritems():
             assert id in seen
 
     def test_check_cache(self):

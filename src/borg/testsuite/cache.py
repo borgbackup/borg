@@ -49,8 +49,8 @@ class TestCacheSynchronizer:
         })
         sync.feed(data)
         assert len(index) == 2
-        assert index[H(1)] == (1, 1, 0)
-        assert index[H(2)] == (1, 2, 0)
+        assert index[H(1)] == (1, 1)
+        assert index[H(2)] == (1, 2)
 
     def test_multiple(self, index, sync):
         data = packb({
@@ -103,9 +103,9 @@ class TestCacheSynchronizer:
         sync.feed(part2)
         sync.feed(part3)
         assert len(index) == 3
-        assert index[H(1)] == (3, 1, 0)
-        assert index[H(2)] == (2, 2, 0)
-        assert index[H(3)] == (1, 1, 0)
+        assert index[H(1)] == (3, 1)
+        assert index[H(2)] == (2, 2)
+        assert index[H(3)] == (1, 1)
 
     @pytest.mark.parametrize('elem,error', (
         ({1: 2}, 'Unexpected object: map'),
@@ -189,7 +189,7 @@ class TestCacheSynchronizer:
             ]
         })
         sync.feed(data)
-        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)
+        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234)
 
     def test_refcount_one_below_max_value(self):
         index = self.make_index_with_refcount(ChunkIndex.MAX_VALUE - 1)
@@ -201,9 +201,9 @@ class TestCacheSynchronizer:
         })
         sync.feed(data)
         # Incremented to maximum
-        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)
+        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234)
         sync.feed(data)
-        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234, 5678)
+        assert index[H(0)] == (ChunkIndex.MAX_VALUE, 1234)
 
 
 class TestAdHocCache:

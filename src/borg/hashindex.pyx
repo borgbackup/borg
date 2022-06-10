@@ -358,7 +358,7 @@ cdef class ChunkIndex(IndexBase):
         return iter
 
     def summarize(self):
-        cdef uint64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
+        cdef uint64_t size = 0, unique_size = 0, chunks = 0, unique_chunks = 0
         cdef uint32_t *values
         cdef uint32_t refcount
         cdef unsigned char *key = NULL
@@ -375,7 +375,7 @@ cdef class ChunkIndex(IndexBase):
             unique_size += _le32toh(values[1])
             size += <uint64_t> _le32toh(values[1]) * _le32toh(values[0])
 
-        return size, csize, unique_size, unique_csize, unique_chunks, chunks
+        return size, unique_size, unique_chunks, chunks
 
     def stats_against(self, ChunkIndex master_index):
         """

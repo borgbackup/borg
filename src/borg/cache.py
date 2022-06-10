@@ -423,7 +423,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def stats(self):
         from .archive import Archive
         # XXX: this should really be moved down to `hashindex.pyx`
-        total_size, _, unique_size, _, total_unique_chunks, total_chunks = self.chunks.summarize()
+        total_size, unique_size, total_unique_chunks, total_chunks = self.chunks.summarize()
         # the above values have the problem that they do not consider part files,
         # thus the total_size might be too high (chunks referenced
         # by the part files AND by the complete file).

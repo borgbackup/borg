@@ -147,7 +147,7 @@ class HashIndexTestCase(BaseTestCase):
         idx[H(2)] = 2, 2000, 200
         idx[H(3)] = 3, 3000, 300
 
-        size, _, unique_size, _, unique_chunks, chunks = idx.summarize()
+        size, unique_size, unique_chunks, chunks = idx.summarize()
         assert size == 1000 + 2 * 2000 + 3 * 3000
         assert unique_size == 1000 + 2000 + 3000
         assert chunks == 1 + 2 + 3

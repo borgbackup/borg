@@ -49,8 +49,6 @@ cdef extern from "cache_sync/cache_sync.c":
     uint64_t cache_sync_num_files_parts(const CacheSyncCtx *ctx)
     uint64_t cache_sync_size_totals(const CacheSyncCtx *ctx)
     uint64_t cache_sync_size_parts(const CacheSyncCtx *ctx)
-    uint64_t cache_sync_csize_totals(const CacheSyncCtx *ctx)
-    uint64_t cache_sync_csize_parts(const CacheSyncCtx *ctx)
     int cache_sync_feed(CacheSyncCtx *ctx, void *data, uint32_t length)
     void cache_sync_free(CacheSyncCtx *ctx)
 
@@ -544,11 +542,3 @@ cdef class CacheSynchronizer:
     @property
     def size_parts(self):
         return cache_sync_size_parts(self.sync)
-
-    @property
-    def csize_totals(self):
-        return cache_sync_csize_totals(self.sync)
-
-    @property
-    def csize_parts(self):
-        return cache_sync_csize_parts(self.sync)

@@ -377,7 +377,7 @@ class FuseBackend:
                 file_id = blake2b_128(path)
                 current_version, previous_id = self.versions_index.get(file_id, (0, None))
 
-                contents_id = blake2b_128(b''.join(chunk_id for chunk_id, _, _ in item.chunks))
+                contents_id = blake2b_128(b''.join(chunk_id for chunk_id, _ in item.chunks))
 
                 if contents_id != previous_id:
                     current_version += 1
@@ -658,7 +658,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         chunks = item.chunks
         # note: using index iteration to avoid frequently copying big (sub)lists by slicing
         for idx in range(chunk_no, len(chunks)):
-            id, s, csize = chunks[idx]
+            id, s = chunks[idx]
             if s < offset:
                 offset -= s
                 chunk_offset += s

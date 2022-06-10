@@ -907,7 +907,7 @@ class LocalCache(CacheStatsMixin):
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
         stats.update(size)
-        return ChunkListEntry(id, size, csize)
+        return ChunkListEntry(id, size)
 
     def seen_chunk(self, id, size=None):
         refcount, stored_size, _ = self.chunks.get(id, ChunkIndexEntry(0, None, None))
@@ -921,14 +921,14 @@ class LocalCache(CacheStatsMixin):
     def chunk_incref(self, id, stats, size=None, part=False):
         if not self.txn_active:
             self.begin_txn()
-        count, _size, csize = self.chunks.incref(id)
+        count, _size, _ = self.chunks.incref(id)
         stats.update(_size, part=part)
-        return ChunkListEntry(id, _size, csize)
+        return ChunkListEntry(id, _size)
 
     def chunk_decref(self, id, stats, wait=True, part=False):
         if not self.txn_active:
             self.begin_txn()
-        count, size, csize = self.chunks.decref(id)
+        count, size, _ = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
@@ -1075,7 +1075,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
         stats.update(size)
-        return ChunkListEntry(id, size, csize)
+        return ChunkListEntry(id, size)
 
     def seen_chunk(self, id, size=None):
         if not self._txn_active:
@@ -1097,7 +1097,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         size = _size or size
         assert size
         stats.update(size, part=part)
-        return ChunkListEntry(id, size, csize)
+        return ChunkListEntry(id, size)
 
     def chunk_decref(self, id, stats, wait=True, part=False):
         if not self._txn_active:

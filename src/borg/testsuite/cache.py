@@ -43,14 +43,14 @@ class TestCacheSynchronizer:
             'bar': 5678,
             'user': 'chunks',
             'chunks': [
-                (H(1), 1, 2),
-                (H(2), 2, 3),
+                (H(1), 1),
+                (H(2), 2),
             ]
         })
         sync.feed(data)
         assert len(index) == 2
-        assert index[H(1)] == (1, 1, 2)
-        assert index[H(2)] == (1, 2, 3)
+        assert index[H(1)] == (1, 1, 0)
+        assert index[H(2)] == (1, 2, 0)
 
     def test_multiple(self, index, sync):
         data = packb({
@@ -59,8 +59,8 @@ class TestCacheSynchronizer:
             'bar': 5678,
             'user': 'chunks',
             'chunks': [
-                (H(1), 1, 2),
-                (H(2), 2, 3),
+                (H(1), 1),
+                (H(2), 2),
             ]
         })
         data += packb({
@@ -78,8 +78,8 @@ class TestCacheSynchronizer:
                 'chunks': '123456',
             },
             'chunks': [
-                (H(1), 1, 2),
-                (H(2), 2, 3),
+                (H(1), 1),
+                (H(2), 2),
             ],
             'stuff': [
                 (1, 2, 3),
@@ -87,12 +87,12 @@ class TestCacheSynchronizer:
         })
         data += packb({
             'chunks': [
-                (H(3), 1, 2),
+                (H(3), 1),
             ],
         })
         data += packb({
             'chunks': [
-                (H(1), 1, 2),
+                (H(1), 1),
             ],
         })
 
@@ -103,9 +103,9 @@ class TestCacheSynchronizer:
         sync.feed(part2)
         sync.feed(part3)
         assert len(index) == 3
-        assert index[H(1)] == (3, 1, 2)
-        assert index[H(2)] == (2, 2, 3)
-        assert index[H(3)] == (1, 1, 2)
+        assert index[H(1)] == (3, 1, 0)
+        assert index[H(2)] == (2, 2, 0)
+        assert index[H(3)] == (1, 1, 0)
 
     @pytest.mark.parametrize('elem,error', (
         ({1: 2}, 'Unexpected object: map'),
@@ -121,7 +121,7 @@ class TestCacheSynchronizer:
     @pytest.mark.parametrize('structure', (
         lambda elem: {'chunks': elem},
         lambda elem: {'chunks': [elem]},
-        lambda elem: {'chunks': [(elem, 1, 2)]},
+        lambda elem: {'chunks': [(elem, 1)]},
     ))
     def test_corrupted(self, sync, structure, elem, error):
         packed = packb(structure(elem))
@@ -135,11 +135,11 @@ class TestCacheSynchronizer:
     @pytest.mark.parametrize('data,error', (
         # Incorrect tuple length
         ({'chunks': [(bytes(32), 2, 3, 4)]}, 'Invalid chunk list entry length'),
-        ({'chunks': [(bytes(32), 2)]}, 'Invalid chunk list entry length'),
+        ({'chunks': [(bytes(32), )]}, 'Invalid chunk list entry length'),
         # Incorrect types
-        ({'chunks': [(1, 2, 3)]}, 'Unexpected object: integer'),
-        ({'chunks': [(1, bytes(32), 2)]}, 'Unexpected object: integer'),
-        ({'chunks': [(bytes(32), 1.0, 2)]}, 'Unexpected object: double'),
+        ({'chunks': [(1, 2)]}, 'Unexpected object: integer'),
+        ({'chunks': [(1, bytes(32))]}, 'Unexpected object: integer'),
+        ({'chunks': [(bytes(32), 1.0)]}, 'Unexpected object: double'),
     ))
     def test_corrupted_ancillary(self, index, sync, data, error):
         packed = packb(data)
@@ -173,7 +173,7 @@ class TestCacheSynchronizer:
         sync = CacheSynchronizer(index)
         data = packb({
             'chunks': [
-                (H(0), 1, 2),
+                (H(0), 1),
             ]
         })
         with pytest.raises(ValueError) as excinfo:
@@ -185,7 +185,7 @@ class TestCacheSynchronizer:
         sync = CacheSynchronizer(index)
         data = packb({
             'chunks': [
-                (H(0), 1, 2),
+                (H(0), 1),
             ]
         })
         sync.feed(data)
@@ -196,7 +196,7 @@ class TestCacheSynchronizer:
         sync = CacheSynchronizer(index)
         data = packb({
             'chunks': [
-                (H(0), 1, 2),
+                (H(0), 1),
             ]
         })
         sync.feed(data)
@@ -244,7 +244,7 @@ class TestAdHocCache:
             cache.add_chunk(H(1), b'5678', Statistics(), overwrite=True)
 
     def test_seen_chunk_add_chunk_size(self, cache):
-        assert cache.add_chunk(H(1), b'5678', Statistics()) == (H(1), 4, 0)
+        assert cache.add_chunk(H(1), b'5678', Statistics()) == (H(1), 4)
 
     def test_deletes_chunks_during_lifetime(self, cache, repository):
         """E.g. checkpoint archives"""
@@ -270,10 +270,10 @@ class TestAdHocCache:
         assert not hasattr(cache, 'chunks')
 
     def test_incref_after_add_chunk(self, cache):
-        assert cache.add_chunk(H(3), b'5678', Statistics()) == (H(3), 4, 47)
-        assert cache.chunk_incref(H(3), Statistics()) == (H(3), 4, 47)
+        assert cache.add_chunk(H(3), b'5678', Statistics()) == (H(3), 4)
+        assert cache.chunk_incref(H(3), Statistics()) == (H(3), 4)
 
     def test_existing_incref_after_add_chunk(self, cache):
         """This case occurs with part files, see Archive.chunk_file."""
-        assert cache.add_chunk(H(1), b'5678', Statistics()) == (H(1), 4, 0)
-        assert cache.chunk_incref(H(1), Statistics()) == (H(1), 4, 0)
+        assert cache.add_chunk(H(1), b'5678', Statistics()) == (H(1), 4)
+        assert cache.chunk_incref(H(1), Statistics()) == (H(1), 4)

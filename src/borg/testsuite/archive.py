@@ -95,7 +95,7 @@ class MockCache:
 
     def add_chunk(self, id, chunk, stats=None, wait=True):
         self.objects[id] = chunk
-        return id, len(chunk), len(chunk)
+        return id, len(chunk)
 
 
 class ArchiveTimestampTestCase(BaseTestCase):

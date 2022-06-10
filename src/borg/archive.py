@@ -359,7 +359,7 @@ class CacheChunkBuffer(ChunkBuffer):
         self.stats = stats
 
     def write_chunk(self, chunk):
-        id_, _, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats, wait=False)
+        id_, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats, wait=False)
         self.cache.repository.async_response(wait=False)
         return id_
 
@@ -921,7 +921,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         item = Item(internal_dict=item)
                         if 'chunks' in item:
                             part = not self.consider_part_files and 'part' in item
-                            for chunk_id, size, _ in item.chunks:
+                            for chunk_id, size in item.chunks:
                                 chunk_decref(chunk_id, stats, part=part)
                 except (TypeError, ValueError):
                     # if items metadata spans multiple chunks and one chunk got dropped somehow,
@@ -1279,7 +1279,7 @@ class FilesystemObjectProcessors:
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
                 if 'chunks' in item:  # create_helper might have put chunks from a previous hardlink there
-                    [cache.chunk_incref(id_, self.stats) for id_, _, _ in item.chunks]
+                    [cache.chunk_incref(id_, self.stats) for id_, _ in item.chunks]
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
@@ -1761,7 +1761,7 @@ class ArchiveChecker:
                 has_chunks_healthy = False
                 chunks_healthy = chunks_current
             for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
-                chunk_id, size, csize = chunk_healthy
+                chunk_id, size = chunk_healthy
                 if chunk_id not in self.chunks:
                     # a chunk of the healthy list is missing
                     if chunk_current == chunk_healthy:
@@ -1775,7 +1775,7 @@ class ArchiveChecker:
                         logger.info('{}: {}: Previously missing file chunk is still missing (Byte {}-{}, Chunk {}). '
                                     'It has an all-zero replacement chunk already.'.format(
                                     archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
-                        chunk_id, size, csize = chunk_current
+                        chunk_id, size = chunk_current
                         if chunk_id in self.chunks:
                             add_reference(chunk_id, size)
                         else:
@@ -1794,7 +1794,7 @@ class ArchiveChecker:
                             archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
                         add_reference(chunk_id, size)
                         mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
-                chunk_list.append([chunk_id, size, csize])  # list-typed element as chunks_healthy is list-of-lists
+                chunk_list.append([chunk_id, size])  # list-typed element as chunks_healthy is list-of-lists
                 offset += size
             if chunks_replaced and not has_chunks_healthy:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
@@ -2046,7 +2046,7 @@ class ArchiveRecreater:
 
     def process_chunks(self, archive, target, item):
         if not self.recompress and not target.recreate_rechunkify:
-            for chunk_id, size, csize in item.chunks:
+            for chunk_id, size in item.chunks:
                 self.cache.chunk_incref(chunk_id, target.stats)
             return item.chunks
         chunk_iterator = self.iter_chunks(archive, target, list(item.chunks))
@@ -2070,7 +2070,7 @@ class ArchiveRecreater:
         return chunk_entry
 
     def iter_chunks(self, archive, target, chunks):
-        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in chunks])
+        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _ in chunks])
         if target.recreate_rechunkify:
             # The target.chunker will read the file contents through ChunkIteratorFileWrapper chunk-by-chunk
             # (does not load the entire file into memory)

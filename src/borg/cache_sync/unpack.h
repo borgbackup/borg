@@ -86,14 +86,12 @@ typedef struct unpack_user {
 
         /*
          * processing ChunkListEntry tuple:
-         * expect_key, expect_size, expect_csize, expect_entry_end
+         * expect_key, expect_size, expect_entry_end
          */
         /* next thing must be the key (raw, l=32) */
         expect_key,
         /* next thing must be the size (int) */
         expect_size,
-        /* next thing must be the csize (int) */
-        expect_csize,
         /* next thing must be the end of the CLE (array_end) */
         expect_entry_end,
 
@@ -103,23 +101,22 @@ typedef struct unpack_user {
     /* collect values here for current chunklist entry */
     struct {
         unsigned char key[32];
-        uint32_t csize;
         uint32_t size;
     } current;
 
     /* summing up chunks sizes here within a single item */
     struct {
-        uint64_t size, csize;
+        uint64_t size;
     } item;
 
     /* total sizes and files count coming from all files */
     struct {
-        uint64_t size, csize, num_files;
+        uint64_t size, num_files;
     } totals;
 
     /* total sizes and files count coming from part files */
     struct {
-        uint64_t size, csize, num_files;
+        uint64_t size, num_files;
     } parts;
 
 } unpack_user;
@@ -147,10 +144,6 @@ static inline int unpack_callback_uint64(unpack_user* u, int64_t d)
     switch(u->expect) {
         case expect_size:
             u->current.size = d;
-            u->expect = expect_csize;
-            break;
-        case expect_csize:
-            u->current.csize = d;
             u->expect = expect_entry_end;
             break;
         default:
@@ -239,7 +232,7 @@ static inline int unpack_callback_array(unpack_user* u, unsigned int n)
     case expect_entry_begin_or_chunks_end:
         /* b'chunks': [ (
          *              ^ */
-        if(n != 3) {
+        if(n != 2) {
             SET_LAST_ERROR("Invalid chunk list entry length");
             return -1;
         }
@@ -283,18 +276,16 @@ static inline int unpack_callback_array_end(unpack_user* u)
             refcount += 1;
             cache_entry[0] = _htole32(MIN(refcount, _MAX_VALUE));
         } else {
-            /* refcount, size, csize */
+            /* refcount, size */
             cache_values[0] = _htole32(1);
             cache_values[1] = _htole32(u->current.size);
-            cache_values[2] = _htole32(u->current.csize);
+            cache_values[2] = _htole32(0);  /* fake csize for now */
             if(!hashindex_set(u->chunks, u->current.key, cache_values)) {
                 SET_LAST_ERROR("hashindex_set failed");
                 return -1;
             }
         }
         u->item.size += u->current.size;
-        u->item.csize += u->current.csize;
-
         u->expect = expect_entry_begin_or_chunks_end;
         break;
     case expect_entry_begin_or_chunks_end:
@@ -330,7 +321,6 @@ static inline int unpack_callback_map(unpack_user* u, unsigned int n)
         u->part = 0;
         u->has_chunks = 0;
         u->item.size = 0;
-        u->item.csize = 0;
     }
 
     if(u->inside_chunks) {
@@ -372,11 +362,9 @@ static inline int unpack_callback_map_end(unpack_user* u)
             if(u->part) {
                 u->parts.num_files += 1;
                 u->parts.size += u->item.size;
-                u->parts.csize += u->item.csize;
             }
             u->totals.num_files += 1;
             u->totals.size += u->item.size;
-            u->totals.csize += u->item.csize;
         }
     }
     return 0;

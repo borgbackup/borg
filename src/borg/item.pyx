@@ -61,10 +61,10 @@ def fix_list_of_chunkentries(v):
     chunks = []
     for ce in v:
         assert isinstance(ce, (tuple, list))
-        assert len(ce) == 3  # id, size, csize
+        assert len(ce) in (2, 3)  # id, size[, csize]
         assert isinstance(ce[1], int)
-        assert isinstance(ce[2], int)
-        ce_fixed = [want_bytes(ce[0]), ce[1], ce[2]]  # list!
+        assert len(ce) == 2 or isinstance(ce[2], int)
+        ce_fixed = [want_bytes(ce[0]), ce[1]]  # list! id, size only, drop csize
         chunks.append(ce_fixed)  # create a list of lists
     return chunks
 
@@ -227,7 +227,7 @@ class PropDict:
         return property(_get, _set, _del, doc=doc)
 
 
-ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+ChunkListEntry = namedtuple('ChunkListEntry', 'id size')
 
 class Item(PropDict):
     """

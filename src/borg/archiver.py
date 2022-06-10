@@ -443,7 +443,7 @@ class Archiver:
                                     chunks.append(chunk_entry)
                                 present_size += size
                         if not dry_run:
-                            item.chunks = chunks  # overwrite! IDs and sizes are same, csizes are likely different
+                            item.chunks = chunks  # TODO: overwrite? IDs and sizes are same.
                             archive.stats.nfiles += 1
                     if not dry_run:
                         archive.add_item(upgrade_item(item))

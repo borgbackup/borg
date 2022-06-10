@@ -293,8 +293,9 @@ class Item(PropDict):
         :param from_chunks: If true, size is computed from chunks even if a precomputed value is available.
         :param consider_ids: Returns the size of the given ids only.
         """
-        attr = 'csize' if compressed else 'size'
-        assert not (compressed and memorize), 'Item does not have a csize field.'
+        if compressed:
+            return 0  # try to live without csize
+        attr = 'size'
         assert not (consider_ids is not None and memorize), "Can't store size when considering only certain ids"
         try:
             if from_chunks or consider_ids is not None:

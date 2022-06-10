@@ -406,7 +406,7 @@ class Cache:
 
 class CacheStatsMixin:
     str_format = """\
-All archives:   {0.total_size:>20s} {0.total_csize:>20s} {0.unique_csize:>20s}
+All archives:   {0.total_size:>20s}
 
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
@@ -418,38 +418,31 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
     def __str__(self):
         return self.str_format.format(self.format_tuple())
 
-    Summary = namedtuple('Summary', ['total_size', 'total_csize', 'unique_size', 'unique_csize', 'total_unique_chunks',
-                                     'total_chunks'])
+    Summary = namedtuple('Summary', ['total_size', 'unique_size', 'total_unique_chunks', 'total_chunks'])
 
     def stats(self):
         from .archive import Archive
         # XXX: this should really be moved down to `hashindex.pyx`
-        total_size, total_csize, unique_size, unique_csize, total_unique_chunks, total_chunks = self.chunks.summarize()
+        total_size, _, unique_size, _, total_unique_chunks, total_chunks = self.chunks.summarize()
         # the above values have the problem that they do not consider part files,
-        # thus the total_size and total_csize might be too high (chunks referenced
+        # thus the total_size might be too high (chunks referenced
         # by the part files AND by the complete file).
-        # since borg 1.2 we have new archive metadata telling the total size and
-        # csize per archive, so we can just sum up all archives to get the "all
-        # archives" stats:
-        total_size, total_csize = 0, 0
+        # since borg 1.2 we have new archive metadata telling the total size per archive,
+        # so we can just sum up all archives to get the "all archives" stats:
+        total_size = 0
         for archive_name in self.manifest.archives:
             archive = Archive(self.repository, self.key, self.manifest, archive_name,
                               consider_part_files=self.consider_part_files)
             stats = archive.calc_stats(self, want_unique=False)
             total_size += stats.osize
-            total_csize += stats.csize
-        stats = self.Summary(total_size, total_csize, unique_size, unique_csize,
-                             total_unique_chunks, total_chunks)._asdict()
+        stats = self.Summary(total_size, unique_size, total_unique_chunks, total_chunks)._asdict()
         return stats
 
     def format_tuple(self):
         stats = self.stats()
-        for field in ['total_size', 'total_csize', 'unique_csize']:
+        for field in ['total_size', ]:
             stats[field] = format_file_size(stats[field], iec=self.iec)
         return self.Summary(**stats)
-
-    def chunks_stored_size(self):
-        return self.stats()['unique_csize']
 
 
 class LocalCache(CacheStatsMixin):
@@ -679,8 +672,6 @@ class LocalCache(CacheStatsMixin):
         processed_item_metadata_bytes = 0
         processed_item_metadata_chunks = 0
         compact_chunks_archive_saved_space = 0
-        fetched_chunks_for_csize = 0
-        fetched_bytes_for_csize = 0
 
         def mkpath(id, suffix=''):
             id_hex = bin_to_hex(id)
@@ -718,39 +709,6 @@ class LocalCache(CacheStatsMixin):
             except FileNotFoundError:
                 pass
 
-        def fetch_missing_csize(chunk_idx):
-            """
-            Archives created with AdHocCache will have csize=0 in all chunk list entries whose
-            chunks were already in the repository.
-
-            Scan *chunk_idx* for entries where csize=0 and fill in the correct information.
-            """
-            nonlocal fetched_chunks_for_csize
-            nonlocal fetched_bytes_for_csize
-
-            all_missing_ids = chunk_idx.zero_csize_ids()
-            fetch_ids = []
-            if len(chunks_fetched_size_index):
-                for id_ in all_missing_ids:
-                    already_fetched_entry = chunks_fetched_size_index.get(id_)
-                    if already_fetched_entry:
-                        entry = chunk_idx[id_]._replace(csize=already_fetched_entry.csize)
-                        assert entry.size == already_fetched_entry.size, 'Chunk size mismatch'
-                        chunk_idx[id_] = entry
-                    else:
-                        fetch_ids.append(id_)
-            else:
-                fetch_ids = all_missing_ids
-
-            # This is potentially a rather expensive operation, but it's hard to tell at this point
-            # if it's a problem in practice (hence the experimental status of --no-cache-sync).
-            for id_, data in zip(fetch_ids, decrypted_repository.repository.get_many(fetch_ids)):
-                entry = chunk_idx[id_]._replace(csize=len(data))
-                chunk_idx[id_] = entry
-                chunks_fetched_size_index[id_] = entry
-                fetched_chunks_for_csize += 1
-                fetched_bytes_for_csize += len(data)
-
         def fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx):
             nonlocal processed_item_metadata_bytes
             nonlocal processed_item_metadata_chunks
@@ -766,7 +724,6 @@ class LocalCache(CacheStatsMixin):
                 processed_item_metadata_chunks += 1
                 sync.feed(data)
             if self.do_cache:
-                fetch_missing_csize(chunk_idx)
                 write_archive_index(archive_id, chunk_idx)
 
         def write_archive_index(archive_id, chunk_idx):
@@ -862,12 +819,7 @@ class LocalCache(CacheStatsMixin):
                         chunk_idx = chunk_idx or ChunkIndex(usable=master_index_capacity)
                         logger.info('Fetching archive index for %s ...', archive_name)
                         fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
-                if not self.do_cache:
-                    fetch_missing_csize(chunk_idx)
                 pi.finish()
-                logger.debug('Cache sync: had to fetch %s (%d chunks) because no archive had a csize set for them '
-                             '(due to --no-cache-sync)',
-                             format_file_size(fetched_bytes_for_csize), fetched_chunks_for_csize)
                 logger.debug('Cache sync: processed %s (%d chunks) of metadata',
                              format_file_size(processed_item_metadata_bytes), processed_item_metadata_chunks)
                 logger.debug('Cache sync: compact chunks.archive.d storage saved %s bytes',
@@ -951,10 +903,10 @@ class LocalCache(CacheStatsMixin):
         if size is None:
             raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
         data = self.key.encrypt(id, chunk, compress=compress)
-        csize = len(data)
+        csize = 0  # len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
-        stats.update(size, csize, not refcount)
+        stats.update(size)
         return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):
@@ -970,7 +922,7 @@ class LocalCache(CacheStatsMixin):
         if not self.txn_active:
             self.begin_txn()
         count, _size, csize = self.chunks.incref(id)
-        stats.update(_size, csize, False, part=part)
+        stats.update(_size, part=part)
         return ChunkListEntry(id, _size, csize)
 
     def chunk_decref(self, id, stats, wait=True, part=False):
@@ -980,9 +932,9 @@ class LocalCache(CacheStatsMixin):
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, -csize, True, part=part)
+            stats.update(-size, part=part)
         else:
-            stats.update(-size, -csize, False, part=part)
+            stats.update(-size, part=part)
 
     def file_known_and_unchanged(self, hashed_path, path_hash, st):
         """
@@ -1122,7 +1074,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         csize = len(data)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size, csize)
-        stats.update(size, csize, not refcount)
+        stats.update(size)
         return ChunkListEntry(id, size, csize)
 
     def seen_chunk(self, id, size=None):
@@ -1144,7 +1096,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
         size = _size or size
         assert size
-        stats.update(size, csize, False, part=part)
+        stats.update(size, part=part)
         return ChunkListEntry(id, size, csize)
 
     def chunk_decref(self, id, stats, wait=True, part=False):
@@ -1154,9 +1106,9 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, -csize, True, part=part)
+            stats.update(-size, part=part)
         else:
-            stats.update(-size, -csize, False, part=part)
+            stats.update(-size, part=part)
 
     def commit(self):
         if not self._txn_active:

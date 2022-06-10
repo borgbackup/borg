@@ -99,7 +99,7 @@ except BaseException:
 assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND exception handler right above this line."
 
 
-STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
+STATS_HEADER = "                       Original size"
 
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
@@ -1797,8 +1797,8 @@ class Archiver:
                 Command line: {command_line}
                 Utilization of maximum supported archive size: {limits[max_archive_size]:.0%}
                 ------------------------------------------------------------------------------
-                                       Original size      Compressed size    Deduplicated size
-                This archive:   {stats[original_size]:>20s} {stats[compressed_size]:>20s} {stats[deduplicated_size]:>20s}
+                                       Original size
+                This archive:   {stats[original_size]:>20s}
                 {cache}
                 """).strip().format(cache=cache, **info))
             if self.exit_code:

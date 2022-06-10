@@ -143,13 +143,11 @@ def test_unknown_property():
 
 def test_item_file_size():
     item = Item(mode=0o100666, chunks=[
-        ChunkListEntry(csize=1, size=1000, id=None),
-        ChunkListEntry(csize=1, size=2000, id=None),
+        ChunkListEntry(csize=0, size=1000, id=None),
+        ChunkListEntry(csize=0, size=2000, id=None),
     ])
     assert item.get_size() == 3000
-    with pytest.raises(AssertionError):
-        item.get_size(compressed=True, memorize=True)
-    assert item.get_size(compressed=True) == 2
+    assert item.get_size(compressed=True) == 0  # no csize any more
     item.get_size(memorize=True)
     assert item.size == 3000
 

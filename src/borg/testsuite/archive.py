@@ -19,47 +19,44 @@ from ..platform import uid2user, gid2group
 @pytest.fixture()
 def stats():
     stats = Statistics()
-    stats.update(20, 10, unique=True)
+    stats.update(20)
     return stats
 
 
 def test_stats_basic(stats):
     assert stats.osize == 20
-    assert stats.csize == stats.usize == 10
-    stats.update(20, 10, unique=False)
+    stats.update(20)
     assert stats.osize == 40
-    assert stats.csize == 20
-    assert stats.usize == 10
 
 
 def tests_stats_progress(stats, monkeypatch, columns=80):
     monkeypatch.setenv('COLUMNS', str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
-    s = '20 B O 10 B C 10 B D 0 N '
+    s = '20 B O 0 N '
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
     out = StringIO()
-    stats.update(10**3, 0, unique=False)
+    stats.update(10 ** 3)
     stats.show_progress(item=Item(path='foo'), final=False, stream=out)
-    s = '1.02 kB O 10 B C 10 B D 0 N foo'
+    s = '1.02 kB O 0 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
     stats.show_progress(item=Item(path='foo'*40), final=False, stream=out)
-    s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
+    s = '1.02 kB O 0 N foofoofoofoofoofoofoofoofoofoo...foofoofoofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
 
 def test_stats_format(stats):
     assert str(stats) == """\
-This archive:                   20 B                 10 B                 10 B"""
+This archive:                   20 B"""
     s = f"{stats.osize_fmt}"
     assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
-    assert repr(stats) == f'<Statistics object at {id(stats):#x} (20, 10, 10)>'
+    assert repr(stats) == f'<Statistics object at {id(stats):#x} (20)>'
 
 
 def test_stats_progress_json(stats):
@@ -73,8 +70,6 @@ def test_stats_progress_json(stats):
     assert result['finished'] is False
     assert result['path'] == 'foo'
     assert result['original_size'] == 20
-    assert result['compressed_size'] == 10
-    assert result['deduplicated_size'] == 10
     assert result['nfiles'] == 0  # this counter gets updated elsewhere
 
     out = StringIO()
@@ -85,8 +80,6 @@ def test_stats_progress_json(stats):
     assert result['finished'] is True  # see #6570
     assert 'path' not in result
     assert 'original_size' not in result
-    assert 'compressed_size' not in result
-    assert 'deduplicated_size' not in result
     assert 'nfiles' not in result
 
 

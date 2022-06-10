@@ -375,9 +375,7 @@ cdef class ChunkIndex(IndexBase):
             assert refcount <= _MAX_VALUE, "invalid reference count"
             chunks += refcount
             unique_size += _le32toh(values[1])
-            unique_csize += _le32toh(values[2])
             size += <uint64_t> _le32toh(values[1]) * _le32toh(values[0])
-            csize += <uint64_t> _le32toh(values[2]) * _le32toh(values[0])
 
         return size, csize, unique_size, unique_csize, unique_chunks, chunks
 

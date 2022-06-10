@@ -840,7 +840,7 @@ class ItemFormatter(BaseFormatter):
 
     def calculate_size(self, item):
         # note: does not support hardlink slaves, they will be size 0
-        return item.get_size(compressed=False)
+        return item.get_size()
 
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:

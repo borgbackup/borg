@@ -413,7 +413,6 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def __init__(self, iec=False):
         self.iec = iec
-        self.pre12_meta = {}  # here we cache archive metadata for borg < 1.2
 
     def __str__(self):
         return self.str_format.format(self.format_tuple())
@@ -511,8 +510,6 @@ class LocalCache(CacheStatsMixin):
         os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
             pass  # empty file
-        with SaveFile(os.path.join(self.path, 'pre12-meta'), binary=False) as fd:
-            json.dump(self.pre12_meta, fd, indent=4)
 
     def _do_open(self):
         self.cache_config.load()
@@ -523,11 +520,6 @@ class LocalCache(CacheStatsMixin):
             self.files = None
         else:
             self._read_files()
-        try:
-            with open(os.path.join(self.path, 'pre12-meta')) as fd:
-                self.pre12_meta = json.load(fd)
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
 
     def open(self):
         if not os.path.isdir(self.path):
@@ -536,9 +528,6 @@ class LocalCache(CacheStatsMixin):
         self.rollback()
 
     def close(self):
-        # save the pre12_meta cache in any case
-        with open(os.path.join(self.path, 'pre12-meta'), 'w') as fd:
-            json.dump(self.pre12_meta, fd, indent=4)
         if self.cache_config is not None:
             self.cache_config.close()
             self.cache_config = None
@@ -1037,7 +1026,6 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         self.security_manager = SecurityManager(repository)
         self.security_manager.assert_secure(manifest, key, lock_wait=lock_wait)
 
-        self.pre12_meta = {}
         logger.warning('Note: --no-cache-sync is an experimental feature.')
 
     # Public API

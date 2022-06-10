@@ -629,18 +629,31 @@ Utilization of max. archive size: {csize_max:.0%}
         self.cache.commit()
 
     def calc_stats(self, cache, want_unique=True):
-        # caching wrapper around _calc_stats which is rather slow for archives made with borg < 1.2
-        have_borg12_meta = self.metadata.get('nfiles') is not None
-        try:
-            stats = Statistics.from_raw_dict(**cache.pre12_meta[self.fpr])
-        except KeyError:  # not in pre12_meta cache
-            stats = self._calc_stats(cache, want_unique=want_unique)
-            if not have_borg12_meta:
-                cache.pre12_meta[self.fpr] = stats.as_raw_dict()
-        return stats
+        if not want_unique:
+            unique_size = 0
+        else:
+            def add(id):
+                entry = cache.chunks[id]
+                archive_index.add(id, 1, entry.size)
 
-    def _calc_stats(self, cache, want_unique=True):
+            archive_index = ChunkIndex()
+            sync = CacheSynchronizer(archive_index)
+            add(self.id)
+            # we must escape any % char in the archive name, because we use it in a format string, see #6500
+            arch_name_escd = self.name.replace('%', '%%')
+            pi = ProgressIndicatorPercent(total=len(self.metadata.items),
+                                          msg='Calculating statistics for archive %s ... %%3.0f%%%%' % arch_name_escd,
+                                          msgid='archive.calc_stats')
+            for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
+                pi.show(increase=1)
+                add(id)
+                data = self.key.decrypt(id, chunk)
+                sync.feed(data)
+            unique_size = archive_index.stats_against(cache.chunks)[1]
+            pi.finish()
+
         stats = Statistics(iec=self.iec)
+        stats.usize = unique_size  # the part files use same chunks as the full file
         stats.nfiles = self.metadata.nfiles
         stats.osize = self.metadata.size
         if self.consider_part_files:

@@ -698,6 +698,7 @@ class ItemFormatter(BaseFormatter):
         'source': 'link target for symlinks (identical to linktarget)',
         'hlid': 'hard link identity (same if hardlinking same fs object)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
+        'dsize': 'deduplicated size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
         'xxh64': 'XXH64 checksum of this file (note: this is NOT a cryptographic hash!)',
@@ -705,7 +706,7 @@ class ItemFormatter(BaseFormatter):
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'hlid', 'flags'),
-        ('size', 'num_chunks', 'unique_chunks'),
+        ('size', 'dsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hash_algorithms)),
         ('archiveid', 'archivename', 'extra'),
@@ -713,7 +714,7 @@ class ItemFormatter(BaseFormatter):
     )
 
     KEYS_REQUIRING_CACHE = (
-        'unique_chunks',
+        'dsize', 'unique_chunks',
     )
 
     @classmethod
@@ -771,6 +772,7 @@ class ItemFormatter(BaseFormatter):
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             'size': self.calculate_size,
+            'dsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
             'isomtime': partial(self.format_iso_time, 'mtime'),

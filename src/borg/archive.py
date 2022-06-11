@@ -58,38 +58,45 @@ class Statistics:
     def __init__(self, output_json=False, iec=False):
         self.output_json = output_json
         self.iec = iec
-        self.osize = self.nfiles = 0
-        self.osize_parts = self.nfiles_parts = 0
+        self.osize = self.usize = self.nfiles = 0
+        self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
 
-    def update(self, size, part=False):
+    def update(self, size, unique, part=False):
         if not part:
             self.osize += size
+            if unique:
+                self.usize += size
         else:
             self.osize_parts += size
+            if unique:
+                self.usize_parts += size
 
     def __add__(self, other):
         if not isinstance(other, Statistics):
             raise TypeError('can only add Statistics objects')
         stats = Statistics(self.output_json, self.iec)
         stats.osize = self.osize + other.osize
+        stats.usize = self.usize + other.usize
         stats.nfiles = self.nfiles + other.nfiles
         stats.osize_parts = self.osize_parts + other.osize_parts
+        stats.usize_parts = self.usize_parts + other.usize_parts
         stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
         return stats
 
-    summary = "{label:15} {stats.osize_fmt:>20s}"
+    summary = "{label:15} {stats.osize_fmt:>20s} {stats.usize_fmt:>20s}"
 
     def __str__(self):
         return self.summary.format(stats=self, label='This archive:')
 
     def __repr__(self):
-        return "<{cls} object at {hash:#x} ({self.osize})>".format(
+        return "<{cls} object at {hash:#x} ({self.osize}, {self.usize})>".format(
             cls=type(self).__name__, hash=id(self), self=self)
 
     def as_dict(self):
         return {
             'original_size': FileSize(self.osize, iec=self.iec),
+            'deduplicated_size': FileSize(self.usize, iec=self.iec),
             'nfiles': self.nfiles,
         }
 
@@ -114,6 +121,10 @@ class Statistics:
     def osize_fmt(self):
         return format_file_size(self.osize, iec=self.iec)
 
+    @property
+    def usize_fmt(self):
+        return format_file_size(self.usize, iec=self.iec)
+
     def show_progress(self, item=None, final=False, stream=None, dt=None):
         now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
@@ -134,7 +145,7 @@ class Statistics:
             else:
                 columns, lines = get_terminal_size()
                 if not final:
-                    msg = '{0.osize_fmt} O {0.nfiles} N '.format(self)
+                    msg = '{0.osize_fmt} O {0.usize_fmt} U {0.nfiles} N '.format(self)
                     path = remove_surrogates(item.path) if item else ''
                     space = columns - swidth(msg)
                     if space < 12:

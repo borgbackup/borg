@@ -19,44 +19,46 @@ from ..platform import uid2user, gid2group
 @pytest.fixture()
 def stats():
     stats = Statistics()
-    stats.update(20)
+    stats.update(20, unique=True)
     return stats
 
 
 def test_stats_basic(stats):
     assert stats.osize == 20
-    stats.update(20)
+    assert stats.usize == 20
+    stats.update(20, unique=False)
     assert stats.osize == 40
+    assert stats.usize == 20
 
 
 def tests_stats_progress(stats, monkeypatch, columns=80):
     monkeypatch.setenv('COLUMNS', str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
-    s = '20 B O 0 N '
+    s = '20 B O 20 B U 0 N '
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
     out = StringIO()
-    stats.update(10 ** 3)
+    stats.update(10 ** 3, unique=False)
     stats.show_progress(item=Item(path='foo'), final=False, stream=out)
-    s = '1.02 kB O 0 N foo'
+    s = '1.02 kB O 20 B U 0 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
     stats.show_progress(item=Item(path='foo'*40), final=False, stream=out)
-    s = '1.02 kB O 0 N foofoofoofoofoofoofoofoofoofoo...foofoofoofoofoofoofoofoofoofoofoo'
+    s = '1.02 kB O 20 B U 0 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
 
 def test_stats_format(stats):
     assert str(stats) == """\
-This archive:                   20 B"""
+This archive:                   20 B                 20 B"""
     s = f"{stats.osize_fmt}"
     assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
-    assert repr(stats) == f'<Statistics object at {id(stats):#x} (20)>'
+    assert repr(stats) == f'<Statistics object at {id(stats):#x} (20, 20)>'
 
 
 def test_stats_progress_json(stats):

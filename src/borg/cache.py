@@ -406,7 +406,7 @@ class Cache:
 
 class CacheStatsMixin:
     str_format = """\
-All archives:   {0.total_size:>20s}
+All archives:   {0.total_size:>20s} {0.unique_size:>20s}
 
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
@@ -440,7 +440,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def format_tuple(self):
         stats = self.stats()
-        for field in ['total_size', ]:
+        for field in ['total_size', 'unique_size']:
             stats[field] = format_file_size(stats[field], iec=self.iec)
         return self.Summary(**stats)
 
@@ -905,7 +905,7 @@ class LocalCache(CacheStatsMixin):
         data = self.key.encrypt(id, chunk, compress=compress)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size)
-        stats.update(size)
+        stats.update(size, not refcount)
         return ChunkListEntry(id, size)
 
     def seen_chunk(self, id, size=None):
@@ -921,7 +921,7 @@ class LocalCache(CacheStatsMixin):
         if not self.txn_active:
             self.begin_txn()
         count, _size = self.chunks.incref(id)
-        stats.update(_size, part=part)
+        stats.update(_size, False, part=part)
         return ChunkListEntry(id, _size)
 
     def chunk_decref(self, id, stats, wait=True, part=False):
@@ -931,9 +931,9 @@ class LocalCache(CacheStatsMixin):
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, part=part)
+            stats.update(-size, True, part=part)
         else:
-            stats.update(-size, part=part)
+            stats.update(-size, False, part=part)
 
     def file_known_and_unchanged(self, hashed_path, path_hash, st):
         """
@@ -1072,7 +1072,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         data = self.key.encrypt(id, chunk, compress=compress)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size)
-        stats.update(size)
+        stats.update(size, not refcount)
         return ChunkListEntry(id, size)
 
     def seen_chunk(self, id, size=None):
@@ -1094,7 +1094,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
         size = _size or size
         assert size
-        stats.update(size, part=part)
+        stats.update(size, False, part=part)
         return ChunkListEntry(id, size)
 
     def chunk_decref(self, id, stats, wait=True, part=False):
@@ -1104,9 +1104,9 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, part=part)
+            stats.update(-size, True, part=part)
         else:
-            stats.update(-size, part=part)
+            stats.update(-size, False, part=part)
 
     def commit(self):
         if not self._txn_active:

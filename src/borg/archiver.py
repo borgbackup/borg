@@ -361,7 +361,7 @@ class Archiver:
                 chunks, chunks_healthy = hlm.retrieve(id=hlid, default=(None, None))
                 if chunks is not None:
                     item._dict['chunks'] = chunks
-                    for chunk_id, _, _ in chunks:
+                    for chunk_id, _ in chunks:
                         cache.chunk_incref(chunk_id, archive.stats)
                 if chunks_healthy is not None:
                     item._dict['chunks_healthy'] = chunks

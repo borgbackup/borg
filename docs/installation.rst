@@ -371,7 +371,7 @@ While we try not to break master, there are no guarantees on anything.
     git clone https://github.com/borgbackup/borg.git
 
     # create a virtual environment
-    virtualenv --python=${which python3} borg-env
+    virtualenv --python=$(which python3) borg-env
     source borg-env/bin/activate   # always before using!
 
     # install borg + dependencies into virtualenv

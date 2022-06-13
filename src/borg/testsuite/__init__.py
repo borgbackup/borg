@@ -248,7 +248,7 @@ class BaseTestCase(unittest.TestCase):
             mountpoint = tempfile.mkdtemp()
         else:
             os.mkdir(mountpoint)
-        args = ['mount', location, mountpoint] + list(options)
+        args = [f'--repo={location}', 'mount', mountpoint] + list(options)
         if os_fork:
             # Do not spawn, but actually (OS) fork.
             if os.fork() == 0:

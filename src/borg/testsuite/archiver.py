@@ -147,16 +147,16 @@ def test_return_codes(cmd, tmpdir):
     input = tmpdir.mkdir('input')
     output = tmpdir.mkdir('output')
     input.join('test_file').write('content')
-    rc, out = cmd('init', '--encryption=none', '%s' % str(repo))
+    rc, out = cmd('--repo=%s' % str(repo), 'init', '--encryption=none')
     assert rc == EXIT_SUCCESS
-    rc, out = cmd('create', '%s::archive' % repo, str(input))
+    rc, out = cmd('--repo=%s::archive' % repo, 'create', str(input))
     assert rc == EXIT_SUCCESS
     with changedir(str(output)):
-        rc, out = cmd('extract', '%s::archive' % repo)
+        rc, out = cmd('--repo=%s::archive' % repo, 'extract')
         assert rc == EXIT_SUCCESS
-    rc, out = cmd('extract', '%s::archive' % repo, 'does/not/match')
+    rc, out = cmd('--repo=%s::archive' % repo, 'extract', 'does/not/match')
     assert rc == EXIT_WARNING  # pattern did not match
-    rc, out = cmd('create', '%s::archive' % repo, str(input))
+    rc, out = cmd('--repo=%s::archive' % repo, 'create', str(input))
     assert rc == EXIT_ERROR  # duplicate archive name
 
 
@@ -203,7 +203,7 @@ def test_disk_full(cmd):
             shutil.rmtree(input, ignore_errors=True)
             # keep some space and some inodes in reserve that we can free up later:
             make_files(reserve, 80, 100000, rnd=False)
-            rc, out = cmd('init', repo)
+            rc, out = cmd(f'--repo={repo}', 'init')
             if rc != EXIT_SUCCESS:
                 print('init', rc, out)
             assert rc == EXIT_SUCCESS
@@ -219,7 +219,7 @@ def test_disk_full(cmd):
                             break
                         raise
                     try:
-                        rc, out = cmd('create', '%s::test%03d' % (repo, i), input)
+                        rc, out = cmd('--repo=%s::test%03d' % (repo, i), 'create', input)
                         success = rc == EXIT_SUCCESS
                         if not success:
                             print('create', rc, out)
@@ -231,10 +231,10 @@ def test_disk_full(cmd):
                 # now some error happened, likely we are out of disk space.
                 # free some space so we can expect borg to be able to work normally:
                 shutil.rmtree(reserve, ignore_errors=True)
-            rc, out = cmd('list', repo)
+            rc, out = cmd(f'--repo={repo}', 'list')
             if rc != EXIT_SUCCESS:
                 print('list', rc, out)
-            rc, out = cmd('check', '--repair', repo)
+            rc, out = cmd(f'--repo={repo}', 'check', '--repair')
             if rc != EXIT_SUCCESS:
                 print('check', rc, out)
             assert rc == EXIT_SUCCESS
@@ -299,7 +299,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         return output
 
     def create_src_archive(self, name):
-        self.cmd('create', '--compression=lz4', self.repository_location + '::' + name, src_dir)
+        self.cmd(f'--repo={self.repository_location}::{name}', 'create', '--compression=lz4', src_dir)
 
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)
@@ -391,16 +391,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_basic_functionality(self):
         have_root = self.create_test_files()
         # fork required to test show-rc output
-        output = self.cmd('init', '--encryption=repokey', '--show-version', '--show-rc', self.repository_location, fork=True)
+        output = self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey', '--show-version', '--show-rc', fork=True)
         self.assert_in('borgbackup version', output)
         self.assert_in('terminating with success status, rc 0', output)
-        self.cmd('create', '--exclude-nodump', self.repository_location + '::test', 'input')
-        output = self.cmd('create', '--exclude-nodump', '--stats', self.repository_location + '::test.2', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--exclude-nodump', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test.2', 'create', '--exclude-nodump', '--stats', 'input')
         self.assert_in('Archive name: test.2', output)
         self.assert_in('This archive: ', output)
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
-        list_output = self.cmd('list', '--short', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
+        list_output = self.cmd(f'--repo={self.repository_location}', 'list', '--short')
         self.assert_in('test', list_output)
         self.assert_in('test.2', list_output)
         expected = [
@@ -427,15 +427,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # remove the file we did not backup, so input and output become equal
             expected.remove('input/flagfile')  # this file is UF_NODUMP
             os.remove(os.path.join('input', 'flagfile'))
-        list_output = self.cmd('list', '--short', self.repository_location + '::test')
+        list_output = self.cmd(f'--repo={self.repository_location}::test', 'list', '--short')
         for name in expected:
             self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
-        info_output = self.cmd('info', self.repository_location + '::test')
+        info_output = self.cmd(f'--repo={self.repository_location}::test', 'info')
         item_count = 5 if has_lchflags else 6  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
-        info_output2 = self.cmd('info', self.repository_location + '::test')
+        info_output2 = self.cmd(f'--repo={self.repository_location}::test', 'info')
 
         def filter(output):
             # filter for interesting "info" output, ignore cache rebuilding related stuff
@@ -462,10 +462,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         hl_b = os.path.join(path_b, 'hardlink')
         self.create_regular_file(hl_a, contents=b'123456')
         os.link(hl_a, hl_b)
-        self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input', 'input')  # give input twice!
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input', 'input')  # give input twice!
         # test if created archive has 'input' contents twice:
-        archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        archive_list = self.cmd(f'--repo={self.repository_location}::test', 'list', '--json-lines')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         # we have all fs items exactly once!
         assert sorted(paths) == ['input', 'input/a', 'input/a/hardlink', 'input/b', 'input/b/hardlink']
@@ -476,13 +476,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repository_location = self.prefix + repository_path
         with pytest.raises(Repository.ParentPathDoesNotExist):
             # normal borg init does NOT create missing parent dirs
-            self.cmd('init', '--encryption=none', repository_location)
+            self.cmd(f'--repo={repository_location}', 'init', '--encryption=none')
         # but if told so, it does:
-        self.cmd('init', '--encryption=none', '--make-parent-dirs', repository_location)
+        self.cmd(f'--repo={repository_location}', 'init', '--encryption=none', '--make-parent-dirs')
         assert os.path.exists(parent_path)
 
     def test_unix_socket(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.bind(os.path.join(self.input_path, 'unix-socket'))
@@ -491,19 +491,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 pytest.skip('unix sockets disabled or not supported')
             elif err.errno == errno.EACCES:
                 pytest.skip('permission denied to create unix sockets')
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         sock.close()
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
             assert not os.path.exists('input/unix-socket')
 
     @pytest.mark.skipif(not are_symlinks_supported(), reason='symlinks not supported')
     def test_symlink_extract(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
             assert os.readlink('input/link1') == 'somewhere'
 
     @pytest.mark.skipif(not are_symlinks_supported() or not are_hardlinks_supported(),
@@ -513,10 +513,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('input'):
             os.symlink('target', 'symlink1')
             os.link('symlink1', 'symlink2', follow_symlinks=False)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
-            output = self.cmd('extract', self.repository_location + '::test')
+            output = self.cmd(f'--repo={self.repository_location}::test', 'extract')
             print(output)
             with changedir('input'):
                 assert os.path.exists('target')
@@ -547,10 +547,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         atime, mtime = 123456780, 234567890
         have_noatime = has_noatime('input/file1')
         os.utime('input/file1', (atime, mtime))
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--atime', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--atime', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
@@ -567,10 +567,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         birthtime, mtime, atime = 946598400, 946684800, 946771200
         os.utime('input/file1', (atime, birthtime))
         os.utime('input/file1', (atime, mtime))
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert int(sti.st_birthtime * 1e9) == int(sto.st_birthtime * 1e9) == birthtime * 1e9
@@ -583,10 +583,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         birthtime, mtime, atime = 946598400, 946684800, 946771200
         os.utime('input/file1', (atime, birthtime))
         os.utime('input/file1', (atime, mtime))
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--nobirthtime', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--nobirthtime', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert int(sti.st_birthtime * 1e9) == birthtime * 1e9
@@ -644,10 +644,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if sparse_support:
             # we could create a sparse input file, so creating a backup of it and
             # extracting it again (as sparse) should also work:
-            self.cmd('init', '--encryption=repokey', self.repository_location)
-            self.cmd('create', self.repository_location + '::test', 'input')
+            self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+            self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
             with changedir(self.output_path):
-                self.cmd('extract', '--sparse', self.repository_location + '::test')
+                self.cmd(f'--repo={self.repository_location}::test', 'extract', '--sparse')
             self.assert_dirs_equal('input', 'output/input')
             filename = os.path.join(self.output_path, 'input', 'sparse')
             with open(filename, 'rb') as fd:
@@ -663,158 +663,158 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             filename = os.path.join(self.input_path, filename)
             with open(filename, 'wb'):
                 pass
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         for filename in filenames:
             with changedir('output'):
-                self.cmd('extract', self.repository_location + '::test', os.path.join('input', filename))
+                self.cmd(f'--repo={self.repository_location}::test', 'extract', os.path.join('input', filename))
             assert os.path.exists(os.path.join('output', 'input', filename))
 
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         repository_id = self._extract_repository_id(self.repository_path)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         shutil.rmtree(self.repository_path)
-        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+            self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input', exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.EncryptionMethodMismatch):
-                self.cmd('create', self.repository_location + '::test.2', 'input')
+                self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input')
 
     def test_repository_swap_detection2(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
+        self.cmd(f'--repo={self.repository_location}_unencrypted', 'init', '--encryption=none')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
-        self.cmd('create', self.repository_location + '_encrypted::test', 'input')
+        self.cmd(f'--repo={self.repository_location}_encrypted', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}_encrypted::test', 'create', 'input')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
+            self.cmd(f'--repo={self.repository_location}_encrypted::test.2', 'create', 'input', exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.RepositoryAccessAborted):
-                self.cmd('create', self.repository_location + '_encrypted::test.2', 'input')
+                self.cmd(f'--repo={self.repository_location}_encrypted::test.2', 'create', 'input')
 
     def test_repository_swap_detection_no_cache(self):
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         repository_id = self._extract_repository_id(self.repository_path)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         shutil.rmtree(self.repository_path)
-        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
-        self.cmd('delete', '--cache-only', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+            self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input', exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.EncryptionMethodMismatch):
-                self.cmd('create', self.repository_location + '::test.2', 'input')
+                self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input')
 
     def test_repository_swap_detection2_no_cache(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=none', self.repository_location + '_unencrypted')
+        self.cmd(f'--repo={self.repository_location}_unencrypted', 'init', '--encryption=none')
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=repokey', self.repository_location + '_encrypted')
-        self.cmd('create', self.repository_location + '_encrypted::test', 'input')
-        self.cmd('delete', '--cache-only', self.repository_location + '_unencrypted')
-        self.cmd('delete', '--cache-only', self.repository_location + '_encrypted')
+        self.cmd(f'--repo={self.repository_location}_encrypted', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}_encrypted::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}_unencrypted', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}_encrypted', 'delete', '--cache-only')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '_encrypted::test.2', 'input', exit_code=EXIT_ERROR)
+            self.cmd(f'--repo={self.repository_location}_encrypted::test.2', 'create', 'input', exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.RepositoryAccessAborted):
-                self.cmd('create', self.repository_location + '_encrypted::test.2', 'input')
+                self.cmd(f'--repo={self.repository_location}_encrypted::test.2', 'create', 'input')
 
     def test_repository_swap_detection_repokey_blank_passphrase(self):
         # Check that a repokey repo with a blank passphrase is considered like a plaintext repo.
         self.create_test_files()
         # User initializes her repository with her passphrase
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         # Attacker replaces it with her own repository, which is encrypted but has no passphrase set
         shutil.rmtree(self.repository_path)
         with environment_variable(BORG_PASSPHRASE=''):
-            self.cmd('init', '--encryption=repokey', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
             # Delete cache & security database, AKA switch to user perspective
-            self.cmd('delete', '--cache-only', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
             shutil.rmtree(self.get_security_dir())
         with environment_variable(BORG_PASSPHRASE=None):
             # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
             # is set, while it isn't. Previously this raised no warning,
             # since the repository is, technically, encrypted.
             if self.FORK_DEFAULT:
-                self.cmd('create', self.repository_location + '::test.2', 'input', exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises(Cache.CacheInitAbortedError):
-                    self.cmd('create', self.repository_location + '::test.2', 'input')
+                    self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input')
 
     def test_repository_move(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         security_dir = self.get_security_dir()
         os.rename(self.repository_path, self.repository_path + '_new')
         with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK='yes'):
-            self.cmd('info', self.repository_location + '_new')
+            self.cmd(f'--repo={self.repository_location}_new', 'info')
         with open(os.path.join(security_dir, 'location')) as fd:
             location = fd.read()
             assert location == Location(self.repository_location + '_new').canonical_path()
         # Needs no confirmation anymore
-        self.cmd('info', self.repository_location + '_new')
+        self.cmd(f'--repo={self.repository_location}_new', 'info')
         shutil.rmtree(self.cache_path)
-        self.cmd('info', self.repository_location + '_new')
+        self.cmd(f'--repo={self.repository_location}_new', 'info')
         shutil.rmtree(security_dir)
-        self.cmd('info', self.repository_location + '_new')
+        self.cmd(f'--repo={self.repository_location}_new', 'info')
         for file in ('location', 'key-type', 'manifest-timestamp'):
             assert os.path.exists(os.path.join(security_dir, file))
 
     def test_security_dir_compat(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         with open(os.path.join(self.get_security_dir(), 'location'), 'w') as fd:
             fd.write('something outdated')
         # This is fine, because the cache still has the correct information. security_dir and cache can disagree
         # if older versions are used to confirm a renamed repository.
-        self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'info')
 
     def test_unknown_unencrypted(self):
-        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         # Ok: repository is known
-        self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'info')
 
         # Ok: repository is still known (through security_dir)
         shutil.rmtree(self.cache_path)
-        self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'info')
 
         # Needs confirmation: cache and security dir both gone (eg. another host or rm -rf ~)
         shutil.rmtree(self.cache_path)
         shutil.rmtree(self.get_security_dir())
         if self.FORK_DEFAULT:
-            self.cmd('info', self.repository_location, exit_code=EXIT_ERROR)
+            self.cmd(f'--repo={self.repository_location}', 'info', exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.CacheInitAbortedError):
-                self.cmd('info', self.repository_location)
+                self.cmd(f'--repo={self.repository_location}', 'info')
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
-            self.cmd('info', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'info')
 
     def test_strip_components(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('dir/file')
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test', '--strip-components', '3')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--strip-components', '3')
             assert not os.path.exists('file')
             with self.assert_creates_file('file'):
-                self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
+                self.cmd(f'--repo={self.repository_location}::test', 'extract', '--strip-components', '2')
             with self.assert_creates_file('dir/file'):
-                self.cmd('extract', self.repository_location + '::test', '--strip-components', '1')
+                self.cmd(f'--repo={self.repository_location}::test', 'extract', '--strip-components', '1')
             with self.assert_creates_file('input/dir/file'):
-                self.cmd('extract', self.repository_location + '::test', '--strip-components', '0')
+                self.cmd(f'--repo={self.repository_location}::test', 'extract', '--strip-components', '0')
 
     def _extract_hardlinks_setup(self):
         os.mkdir(os.path.join(self.input_path, 'dir1'))
@@ -832,8 +832,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.link(os.path.join(self.input_path, 'dir1/source2'),
                 os.path.join(self.input_path, 'dir1/aaaa'))
 
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
 
     @requires_hardlinks
     @unittest.skipUnless(llfuse, 'llfuse not installed')
@@ -873,7 +873,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_extract_hardlinks1(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
             assert os.stat('input/source').st_nlink == 4
             assert os.stat('input/abba').st_nlink == 4
             assert os.stat('input/dir1/hardlink').st_nlink == 4
@@ -884,14 +884,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_extract_hardlinks2(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test', '--strip-components', '2')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--strip-components', '2')
             assert os.stat('hardlink').st_nlink == 2
             assert os.stat('subdir/hardlink').st_nlink == 2
             assert open('subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('aaaa').st_nlink == 2
             assert os.stat('source2').st_nlink == 2
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test', 'input/dir1')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', 'input/dir1')
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
@@ -909,11 +909,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         hl_b = os.path.join(path_b, 'hardlink')
         self.create_regular_file(hl_a, contents=b'123456')
         os.link(hl_a, hl_b)
-        self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input', 'input')  # give input twice!
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input', 'input')  # give input twice!
         # now test extraction
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
             # if issue #5603 happens, extraction gives rc == 1 (triggering AssertionError) and warnings like:
             # input/a/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/a/hardlink'
             # input/b/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/b/hardlink'
@@ -922,24 +922,24 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert os.stat('input/b/hardlink').st_nlink == 2
 
     def test_extract_include_exclude(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file3', size=1024 * 80)
         self.create_regular_file('file4', size=1024 * 80)
-        self.cmd('create', '--exclude=input/file4', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--exclude=input/file4', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test', 'input/file1', )
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', 'input/file1', )
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
         with changedir('output'):
-            self.cmd('extract', '--exclude=input/file2', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--exclude=input/file2')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
         with changedir('output'):
-            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--exclude-from=' + self.exclude_file_path)
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
     def test_extract_include_exclude_regex(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file3', size=1024 * 80)
@@ -947,32 +947,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file333', size=1024 * 80)
 
         # Create with regular expression exclusion for file4
-        self.cmd('create', '--exclude=re:input/file4$', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--exclude=re:input/file4$', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
         shutil.rmtree('output/input')
 
         # Extract with regular expression exclusion
         with changedir('output'):
-            self.cmd('extract', '--exclude=re:file3+', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--exclude=re:file3+')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
         shutil.rmtree('output/input')
 
         # Combine --exclude with fnmatch and regular expression
         with changedir('output'):
-            self.cmd('extract', '--exclude=input/file2', '--exclude=re:file[01]', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--exclude=input/file2', '--exclude=re:file[01]')
         self.assert_equal(sorted(os.listdir('output/input')), ['file3', 'file333'])
         shutil.rmtree('output/input')
 
         # Combine --exclude-from and regular expression exclusion
         with changedir('output'):
-            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, '--exclude=re:file1',
-                     '--exclude=re:file(\\d)\\1\\1$', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--exclude-from=' + self.exclude_file_path,
+                     '--exclude=re:file1', '--exclude=re:file(\\d)\\1\\1$')
         self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
 
     def test_extract_include_exclude_regex_from_file(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file3', size=1024 * 80)
@@ -985,9 +985,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b're:input/file4$\n')
             fd.write(b'fm:*aa:*thing\n')
 
-        self.cmd('create', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--exclude-from=' + self.exclude_file_path, 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
         shutil.rmtree('output/input')
 
@@ -996,7 +996,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b're:file3+\n')
 
         with changedir('output'):
-            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--exclude-from=' + self.exclude_file_path)
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
         shutil.rmtree('output/input')
 
@@ -1008,78 +1008,78 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b're:file2$\n')
 
         with changedir('output'):
-            self.cmd('extract', '--exclude-from=' + self.exclude_file_path, self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--exclude-from=' + self.exclude_file_path)
         self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
 
     def test_extract_with_pattern(self):
-        self.cmd("init", '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', "init", '--encryption=repokey')
         self.create_regular_file("file1", size=1024 * 80)
         self.create_regular_file("file2", size=1024 * 80)
         self.create_regular_file("file3", size=1024 * 80)
         self.create_regular_file("file4", size=1024 * 80)
         self.create_regular_file("file333", size=1024 * 80)
 
-        self.cmd("create", self.repository_location + "::test", "input")
+        self.cmd(f'--repo={self.repository_location}::test', "create", "input")
 
         # Extract everything with regular expression
         with changedir("output"):
-            self.cmd("extract", self.repository_location + "::test", "re:.*")
+            self.cmd(f'--repo={self.repository_location}::test', "extract", "re:.*")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file3", "file333", "file4"])
         shutil.rmtree("output/input")
 
         # Extract with pattern while also excluding files
         with changedir("output"):
-            self.cmd("extract", "--exclude=re:file[34]$", self.repository_location + "::test", r"re:file\d$")
+            self.cmd(f'--repo={self.repository_location}::test', "extract", "--exclude=re:file[34]$", r"re:file\d$")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2"])
         shutil.rmtree("output/input")
 
         # Combine --exclude with pattern for extraction
         with changedir("output"):
-            self.cmd("extract", "--exclude=input/file1", self.repository_location + "::test", "re:file[12]$")
+            self.cmd(f'--repo={self.repository_location}::test', "extract", "--exclude=input/file1", "re:file[12]$")
         self.assert_equal(sorted(os.listdir("output/input")), ["file2"])
         shutil.rmtree("output/input")
 
         # Multiple pattern
         with changedir("output"):
-            self.cmd("extract", self.repository_location + "::test", "fm:input/file1", "fm:*file33*", "input/file2")
+            self.cmd(f'--repo={self.repository_location}::test', "extract", "fm:input/file1", "fm:*file33*", "input/file2")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file333"])
 
     def test_extract_list_output(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file', size=1024 * 80)
 
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
 
         with changedir('output'):
-            output = self.cmd('extract', self.repository_location + '::test')
+            output = self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_not_in("input/file", output)
         shutil.rmtree('output/input')
 
         with changedir('output'):
-            output = self.cmd('extract', '--info', self.repository_location + '::test')
+            output = self.cmd(f'--repo={self.repository_location}::test', 'extract', '--info')
         self.assert_not_in("input/file", output)
         shutil.rmtree('output/input')
 
         with changedir('output'):
-            output = self.cmd('extract', '--list', self.repository_location + '::test')
+            output = self.cmd(f'--repo={self.repository_location}::test', 'extract', '--list')
         self.assert_in("input/file", output)
         shutil.rmtree('output/input')
 
         with changedir('output'):
-            output = self.cmd('extract', '--list', '--info', self.repository_location + '::test')
+            output = self.cmd(f'--repo={self.repository_location}::test', 'extract', '--list', '--info')
         self.assert_in("input/file", output)
 
     def test_extract_progress(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file', size=1024 * 80)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
 
         with changedir('output'):
-            output = self.cmd('extract', self.repository_location + '::test', '--progress')
+            output = self.cmd(f'--repo={self.repository_location}::test', 'extract', '--progress')
             assert 'Extracting:' in output
 
     def _create_test_caches(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('cache1/%s' % CACHE_TAG_NAME,
                                  contents=CACHE_TAG_CONTENTS + b' extra stuff')
@@ -1093,122 +1093,122 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                                      contents=CACHE_TAG_CONTENTS + b' extra stuff')
 
     def test_create_stdin(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         input_data = b'\x00foo\n\nbar\n   \n'
-        self.cmd('create', self.repository_location + '::test', '-', input=input_data)
-        item = json.loads(self.cmd('list', '--json-lines', self.repository_location + '::test'))
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '-', input=input_data)
+        item = json.loads(self.cmd(f'--repo={self.repository_location}::test', 'list', '--json-lines'))
         assert item['uid'] == 0
         assert item['gid'] == 0
         assert item['size'] == len(input_data)
         assert item['path'] == 'stdin'
-        extracted_data = self.cmd('extract', '--stdout', self.repository_location + '::test', binary_output=True)
+        extracted_data = self.cmd(f'--repo={self.repository_location}::test', 'extract', '--stdout', binary_output=True)
         assert extracted_data == input_data
 
     def test_create_content_from_command(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         input_data = 'some test content'
         name = 'a/b/c'
-        self.cmd('create', '--stdin-name', name, '--content-from-command',
-                 self.repository_location + '::test', '--', 'echo', input_data)
-        item = json.loads(self.cmd('list', '--json-lines', self.repository_location + '::test'))
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--stdin-name', name, '--content-from-command',
+                 '--', 'echo', input_data)
+        item = json.loads(self.cmd(f'--repo={self.repository_location}::test', 'list', '--json-lines'))
         assert item['uid'] == 0
         assert item['gid'] == 0
         assert item['size'] == len(input_data) + 1  # `echo` adds newline
         assert item['path'] == name
-        extracted_data = self.cmd('extract', '--stdout', self.repository_location + '::test')
+        extracted_data = self.cmd(f'--repo={self.repository_location}::test', 'extract', '--stdout')
         assert extracted_data == input_data + '\n'
 
     def test_create_content_from_command_with_failed_command(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--content-from-command', self.repository_location + '::test',
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '--content-from-command',
                           '--', 'sh', '-c', 'exit 73;', exit_code=2)
         assert output.endswith("Command 'sh' exited with status 73\n")
-        archive_list = json.loads(self.cmd('list', '--json', self.repository_location))
+        archive_list = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--json'))
         assert archive_list['archives'] == []
 
     def test_create_content_from_command_missing_command(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--content-from-command', self.repository_location + '::test', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '--content-from-command', exit_code=2)
         assert output.endswith('No command given.\n')
 
     def test_create_paths_from_stdin(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file("file1", size=1024 * 80)
         self.create_regular_file("dir1/file2", size=1024 * 80)
         self.create_regular_file("dir1/file3", size=1024 * 80)
         self.create_regular_file("file4", size=1024 * 80)
 
         input_data = b'input/file1\0input/dir1\0input/file4'
-        self.cmd('create', '--paths-from-stdin', '--paths-delimiter', '\\0',
-                 self.repository_location + '::test', input=input_data)
-        archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        self.cmd(f'--repo={self.repository_location}::test', 'create',
+                 '--paths-from-stdin', '--paths-delimiter', '\\0', input=input_data)
+        archive_list = self.cmd(f'--repo={self.repository_location}::test', 'list', '--json-lines')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         assert paths == ['input/file1', 'input/dir1', 'input/file4']
 
     def test_create_paths_from_command(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file("file1", size=1024 * 80)
         self.create_regular_file("file2", size=1024 * 80)
         self.create_regular_file("file3", size=1024 * 80)
         self.create_regular_file("file4", size=1024 * 80)
 
         input_data = 'input/file1\ninput/file2\ninput/file3'
-        self.cmd('create', '--paths-from-command',
-                 self.repository_location + '::test', '--', 'echo', input_data)
-        archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--paths-from-command',
+                 '--', 'echo', input_data)
+        archive_list = self.cmd(f'--repo={self.repository_location}::test', 'list', '--json-lines')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         assert paths == ['input/file1', 'input/file2', 'input/file3']
 
     def test_create_paths_from_command_with_failed_command(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--paths-from-command', self.repository_location + '::test',
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '--paths-from-command',
                           '--', 'sh', '-c', 'exit 73;', exit_code=2)
         assert output.endswith("Command 'sh' exited with status 73\n")
-        archive_list = json.loads(self.cmd('list', '--json', self.repository_location))
+        archive_list = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--json'))
         assert archive_list['archives'] == []
 
     def test_create_paths_from_command_missing_command(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--paths-from-command', self.repository_location + '::test', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '--paths-from-command', exit_code=2)
         assert output.endswith('No command given.\n')
 
     def test_create_without_root(self):
         """test create without a root"""
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', exit_code=2)
 
     def test_create_pattern_root(self):
         """test create with only a root pattern"""
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list', '--pattern=R input', self.repository_location + '::test')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '-v', '--list', '--pattern=R input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
 
     def test_create_pattern(self):
         """test file patterns during create"""
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file_important', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list',
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '-v', '--list',
                           '--pattern=+input/file_important', '--pattern=-input/file*',
-                          self.repository_location + '::test', 'input')
+                          'input')
         self.assert_in("A input/file_important", output)
         self.assert_in('x input/file1', output)
         self.assert_in('x input/file2', output)
 
     def test_create_pattern_file(self):
         """test file patterns during create"""
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('otherfile', size=1024 * 80)
         self.create_regular_file('file_important', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list',
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '-v', '--list',
                           '--pattern=-input/otherfile', '--patterns-from=' + self.patterns_file_path,
-                          self.repository_location + '::test', 'input')
+                          'input')
         self.assert_in("A input/file_important", output)
         self.assert_in('x input/file1', output)
         self.assert_in('x input/file2', output)
@@ -1220,13 +1220,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(self.patterns_file_path2, 'wb') as fd:
             fd.write(b'+ input/x/b\n- input/x*\n')
 
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('x/a/foo_a', size=1024 * 80)
         self.create_regular_file('x/b/foo_b', size=1024 * 80)
         self.create_regular_file('y/foo_y', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list',
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '-v', '--list',
                           '--patterns-from=' + self.patterns_file_path2,
-                          self.repository_location + '::test', 'input')
+                          'input')
         self.assert_in('x input/x/a/foo_a', output)
         self.assert_in("A input/x/b/foo_b", output)
         self.assert_in('A input/y/foo_y', output)
@@ -1237,13 +1237,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(self.patterns_file_path2, 'wb') as fd:
             fd.write(b'+ input/x/b\n! input/x*\n')
 
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('x/a/foo_a', size=1024 * 80)
         self.create_regular_file('x/b/foo_b', size=1024 * 80)
         self.create_regular_file('y/foo_y', size=1024 * 80)
-        output = self.cmd('create', '-v', '--list',
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '-v', '--list',
                           '--patterns-from=' + self.patterns_file_path2,
-                          self.repository_location + '::test', 'input')
+                          'input')
         self.assert_not_in('input/x/a/foo_a', output)
         self.assert_not_in('input/x/a', output)
         self.assert_in('A input/y/foo_y', output)
@@ -1254,17 +1254,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(self.patterns_file_path2, 'wb') as fd:
             fd.write(b'+ input/x/a\n+ input/x/b\n- input/x*\n')
 
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
 
         self.create_regular_file('x/a/foo_a', size=1024 * 80)
         self.create_regular_file('x/b/foo_b', size=1024 * 80)
         with changedir('input'):
-            self.cmd('create', '--patterns-from=' + self.patterns_file_path2,
-                     self.repository_location + '::test', '.')
+            self.cmd(f'--repo={self.repository_location}::test', 'create', '--patterns-from=' + self.patterns_file_path2,
+                     '.')
 
         # list the archive and verify that the "intermediate" folders appear before
         # their contents
-        out = self.cmd('list', '--format', '{type} {path}{NL}', self.repository_location + '::test')
+        out = self.cmd(f'--repo={self.repository_location}::test', 'list', '--format', '{type} {path}{NL}')
         out_list = out.splitlines()
 
         self.assert_in('d x/a', out_list)
@@ -1275,50 +1275,49 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_create_no_cache_sync(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('delete', '--cache-only', self.repository_location)
-        create_json = json.loads(self.cmd('create', '--no-cache-sync', self.repository_location + '::test', 'input',
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        create_json = json.loads(self.cmd(f'--repo={self.repository_location}::test', 'create', '--no-cache-sync', 'input',
                                           '--json', '--error'))  # ignore experimental warning
-        info_json = json.loads(self.cmd('info', self.repository_location + '::test', '--json'))
+        info_json = json.loads(self.cmd(f'--repo={self.repository_location}::test', 'info', '--json'))
         create_stats = create_json['cache']['stats']
         info_stats = info_json['cache']['stats']
         assert create_stats == info_stats
-        self.cmd('delete', '--cache-only', self.repository_location)
-        self.cmd('create', '--no-cache-sync', self.repository_location + '::test2', 'input')
-        self.cmd('info', self.repository_location)
-        self.cmd('check', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', '--no-cache-sync', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'info')
+        self.cmd(f'--repo={self.repository_location}', 'check')
 
     def test_extract_pattern_opt(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         self.create_regular_file('file_important', size=1024 * 80)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
-            self.cmd('extract',
-                     '--pattern=+input/file_important', '--pattern=-input/file*',
-                     self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract',
+                     '--pattern=+input/file_important', '--pattern=-input/file*')
         self.assert_equal(sorted(os.listdir('output/input')), ['file_important'])
 
     def _assert_test_caches(self):
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_equal(sorted(os.listdir('output/input')), ['cache2', 'file1'])
         self.assert_equal(sorted(os.listdir('output/input/cache2')), [CACHE_TAG_NAME])
 
     def test_exclude_caches(self):
         self._create_test_caches()
-        self.cmd('create', '--exclude-caches', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--exclude-caches', 'input')
         self._assert_test_caches()
 
     def test_recreate_exclude_caches(self):
         self._create_test_caches()
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('recreate', '--exclude-caches', self.repository_location + '::test')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'recreate', '--exclude-caches')
         self._assert_test_caches()
 
     def _create_test_tagged(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('tagged1/.NOBACKUP')
         self.create_regular_file('tagged2/00-NOBACKUP')
@@ -1326,23 +1325,24 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def _assert_test_tagged(self):
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
 
     def test_exclude_tagged(self):
         self._create_test_tagged()
-        self.cmd('create', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--exclude-if-present', '.NOBACKUP',
+                 '--exclude-if-present', '00-NOBACKUP', 'input')
         self._assert_test_tagged()
 
     def test_recreate_exclude_tagged(self):
         self._create_test_tagged()
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('recreate', '--exclude-if-present', '.NOBACKUP', '--exclude-if-present', '00-NOBACKUP',
-                 self.repository_location + '::test')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'recreate', '--exclude-if-present', '.NOBACKUP',
+                 '--exclude-if-present', '00-NOBACKUP')
         self._assert_test_tagged()
 
     def _create_test_keep_tagged(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file0', size=1024)
         self.create_regular_file('tagged1/.NOBACKUP1')
         self.create_regular_file('tagged1/file1', size=1024)
@@ -1359,7 +1359,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def _assert_test_keep_tagged(self):
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_equal(sorted(os.listdir('output/input')), ['file0', 'tagged1', 'tagged2', 'tagged3', 'taggedall'])
         self.assert_equal(os.listdir('output/input/tagged1'), ['.NOBACKUP1'])
         self.assert_equal(os.listdir('output/input/tagged2'), ['.NOBACKUP2'])
@@ -1369,29 +1369,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
-        self.cmd('create', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
-                 '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--exclude-if-present', '.NOBACKUP1',
+                 '--exclude-if-present', '.NOBACKUP2', '--exclude-caches', '--keep-exclude-tags', 'input')
         self._assert_test_keep_tagged()
 
     def test_recreate_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('recreate', '--exclude-if-present', '.NOBACKUP1', '--exclude-if-present', '.NOBACKUP2',
-                 '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'recreate', '--exclude-if-present', '.NOBACKUP1',
+                 '--exclude-if-present', '.NOBACKUP2', '--exclude-caches', '--keep-exclude-tags')
         self._assert_test_keep_tagged()
 
     @pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
     def test_recreate_hardlinked_tags(self):  # test for issue #4911
-        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         self.create_regular_file('file1', contents=CACHE_TAG_CONTENTS)  # "wrong" filename, but correct tag contents
         os.mkdir(os.path.join(self.input_path, 'subdir'))  # to make sure the tag is encountered *after* file1
         os.link(os.path.join(self.input_path, 'file1'),
                 os.path.join(self.input_path, 'subdir', CACHE_TAG_NAME))  # correct tag name, hardlink to file1
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         # in the "test" archive, we now have, in this order:
         # - a regular file item for "file1"
         # - a hardlink item for "CACHEDIR.TAG" referring back to file1 for its contents
-        self.cmd('recreate', '--exclude-caches', '--keep-exclude-tags', self.repository_location + '::test')
+        self.cmd(f'--repo={self.repository_location}::test', 'recreate', '--exclude-caches', '--keep-exclude-tags')
         # if issue #4911 is present, the recreate will crash with a KeyError for "input/file1"
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='Linux capabilities test, requires fakeroot >= 1.20.2')
@@ -1408,11 +1408,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         capabilities = b'\x01\x00\x00\x02\x00 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         self.create_regular_file('file')
         xattr.setxattr(b'input/file', b'security.capability', capabilities)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
             with patch.object(os, 'fchown', patched_fchown):
-                self.cmd('extract', self.repository_location + '::test')
+                self.cmd(f'--repo={self.repository_location}::test', 'extract')
             assert xattr.getxattr(b'input/file', b'security.capability') == capabilities
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
@@ -1429,88 +1429,88 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.create_regular_file('file')
         xattr.setxattr(b'input/file', b'user.attribute', b'value')
-        self.cmd('init', self.repository_location, '-e' 'none')
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '-e' 'none')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
             input_abspath = os.path.abspath('input/file')
             with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
-                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                out = self.cmd(f'--repo={self.repository_location}::test', 'extract', exit_code=EXIT_WARNING)
                 assert ': when setting extended attribute user.attribute: too big for this filesystem\n' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
-                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                out = self.cmd(f'--repo={self.repository_location}::test', 'extract', exit_code=EXIT_WARNING)
                 assert ': when setting extended attribute user.attribute: xattrs not supported on this filesystem\n' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
-                out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                out = self.cmd(f'--repo={self.repository_location}::test', 'extract', exit_code=EXIT_WARNING)
                 assert ': when setting extended attribute user.attribute: Permission denied\n' in out
             assert os.path.isfile(input_abspath)
 
     def test_path_normalization(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)
         with changedir('input/dir1/dir2'):
-            self.cmd('create', self.repository_location + '::test', '../../../input/dir1/../dir1/dir2/..')
-        output = self.cmd('list', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'create', '../../../input/dir1/../dir1/dir2/..')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'list')
         self.assert_not_in('..', output)
         self.assert_in(' input/dir1/dir2/file', output)
 
     def test_exclude_normalization(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('file2', size=1024 * 80)
         with changedir('input'):
-            self.cmd('create', '--exclude=file1', self.repository_location + '::test1', '.')
+            self.cmd(f'--repo={self.repository_location}::test1', 'create', '--exclude=file1', '.')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test1')
+            self.cmd(f'--repo={self.repository_location}::test1', 'extract')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
         with changedir('input'):
-            self.cmd('create', '--exclude=./file1', self.repository_location + '::test2', '.')
+            self.cmd(f'--repo={self.repository_location}::test2', 'create', '--exclude=./file1', '.')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test2')
+            self.cmd(f'--repo={self.repository_location}::test2', 'extract')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
-        self.cmd('create', '--exclude=input/./file1', self.repository_location + '::test3', 'input')
+        self.cmd(f'--repo={self.repository_location}::test3', 'create', '--exclude=input/./file1', 'input')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test3')
+            self.cmd(f'--repo={self.repository_location}::test3', 'extract')
         self.assert_equal(sorted(os.listdir('output/input')), ['file2'])
 
     def test_repeated_files(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input', 'input')
 
     def test_overwrite(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         # Overwriting regular files and directories should be supported
         os.mkdir('output/input')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/dir2')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_dirs_equal('input', 'output/input')
         # But non-empty dirs should fail
         os.unlink('output/input/file1')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/file1/dir')
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test', exit_code=1)
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', exit_code=1)
 
     def test_rename(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        self.cmd('rename', self.repository_location + '::test', 'test.3')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        self.cmd('rename', self.repository_location + '::test.2', 'test.4')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test.3')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test.4')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'extract', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'extract', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}::test', 'rename', 'TODO_test', 'test.3')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'extract', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'rename', 'TODO_test.2', 'test.4')
+        self.cmd(f'--repo={self.repository_location}::test.3', 'extract', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}::test.4', 'extract', '--dry-run')
         # Make sure both archives have been renamed
         with Repository(self.repository_path) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -1520,20 +1520,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_info(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        info_repo = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        info_repo = self.cmd(f'--repo={self.repository_location}', 'info')
         assert 'All archives:' in info_repo
-        info_archive = self.cmd('info', self.repository_location + '::test')
+        info_archive = self.cmd(f'--repo={self.repository_location}::test', 'info')
         assert 'Archive name: test\n' in info_archive
-        info_archive = self.cmd('info', '--first', '1', self.repository_location)
+        info_archive = self.cmd(f'--repo={self.repository_location}', 'info', '--first', '1')
         assert 'Archive name: test\n' in info_archive
 
     def test_info_json(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        info_repo = json.loads(self.cmd('info', '--json', self.repository_location))
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        info_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--json'))
         repository = info_repo['repository']
         assert len(repository['id']) == 64
         assert 'last_modified' in repository
@@ -1545,7 +1545,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert all(isinstance(o, int) for o in stats.values())
         assert all(key in stats for key in ('total_chunks', 'total_size', 'total_unique_chunks', 'unique_size'))
 
-        info_archive = json.loads(self.cmd('info', '--json', self.repository_location + '::test'))
+        info_archive = json.loads(self.cmd(f'--repo={self.repository_location}::test', 'info', '--json'))
         assert info_repo['repository'] == info_archive['repository']
         assert info_repo['cache'] == info_archive['cache']
         archives = info_archive['archives']
@@ -1561,47 +1561,47 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_info_json_of_empty_archive(self):
         """See https://github.com/borgbackup/borg/issues/6120"""
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        info_repo = json.loads(self.cmd('info', '--json', '--first=1', self.repository_location))
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        info_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--json', '--first=1'))
         assert info_repo["archives"] == []
-        info_repo = json.loads(self.cmd('info', '--json', '--last=1', self.repository_location))
+        info_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--json', '--last=1'))
         assert info_repo["archives"] == []
 
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', 'input')
-        self.cmd('create', '--comment', 'this is the comment', self.repository_location + '::test2', 'input')
-        self.cmd('create', '--comment', '"deleted" comment', self.repository_location + '::test3', 'input')
-        self.cmd('create', '--comment', 'preserved comment', self.repository_location + '::test4', 'input')
-        assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test1')
-        assert 'Comment: this is the comment' in self.cmd('info', self.repository_location + '::test2')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', '--comment', 'this is the comment', 'input')
+        self.cmd(f'--repo={self.repository_location}::test3', 'create', '--comment', '"deleted" comment', 'input')
+        self.cmd(f'--repo={self.repository_location}::test4', 'create', '--comment', 'preserved comment', 'input')
+        assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}::test1', 'info')
+        assert 'Comment: this is the comment' in self.cmd(f'--repo={self.repository_location}::test2', 'info')
 
-        self.cmd('recreate', self.repository_location + '::test1', '--comment', 'added comment')
-        self.cmd('recreate', self.repository_location + '::test2', '--comment', 'modified comment')
-        self.cmd('recreate', self.repository_location + '::test3', '--comment', '')
-        self.cmd('recreate', self.repository_location + '::test4', '12345')
-        assert 'Comment: added comment' in self.cmd('info', self.repository_location + '::test1')
-        assert 'Comment: modified comment' in self.cmd('info', self.repository_location + '::test2')
-        assert 'Comment: \n' in self.cmd('info', self.repository_location + '::test3')
-        assert 'Comment: preserved comment' in self.cmd('info', self.repository_location + '::test4')
+        self.cmd(f'--repo={self.repository_location}::test1', 'recreate', '--comment', 'added comment')
+        self.cmd(f'--repo={self.repository_location}::test2', 'recreate', '--comment', 'modified comment')
+        self.cmd(f'--repo={self.repository_location}::test3', 'recreate', '--comment', '')
+        self.cmd(f'--repo={self.repository_location}::test4', 'recreate', '12345')
+        assert 'Comment: added comment' in self.cmd(f'--repo={self.repository_location}::test1', 'info')
+        assert 'Comment: modified comment' in self.cmd(f'--repo={self.repository_location}::test2', 'info')
+        assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}::test3', 'info')
+        assert 'Comment: preserved comment' in self.cmd(f'--repo={self.repository_location}::test4', 'info')
 
     def test_delete(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
-        self.cmd('create', self.repository_location + '::test.3', 'input')
-        self.cmd('create', self.repository_location + '::another_test.1', 'input')
-        self.cmd('create', self.repository_location + '::another_test.2', 'input')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        self.cmd('delete', '--prefix', 'another_', self.repository_location)
-        self.cmd('delete', '--last', '1', self.repository_location)
-        self.cmd('delete', self.repository_location + '::test')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        output = self.cmd('delete', '--stats', self.repository_location + '::test.2')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test.3', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::another_test.1', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::another_test.2', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'extract', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'extract', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--prefix', 'another_')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--last', '1')
+        self.cmd(f'--repo={self.repository_location}::test', 'delete')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'extract', '--dry-run')
+        output = self.cmd(f'--repo={self.repository_location}::test.2', 'delete', '--stats')
         self.assert_in('Deleted data:', output)
         # Make sure all data except the manifest has been deleted
         with Repository(self.repository_path) as repository:
@@ -1609,31 +1609,31 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_delete_multiple(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', 'input')
-        self.cmd('create', self.repository_location + '::test2', 'input')
-        self.cmd('create', self.repository_location + '::test3', 'input')
-        self.cmd('delete', self.repository_location + '::test1', 'test2')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test3')
-        self.cmd('delete', self.repository_location, 'test3')
-        assert not self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test3', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test1', 'delete', 'test2')
+        self.cmd(f'--repo={self.repository_location}::test3', 'extract', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}::test3', 'delete')
+        assert not self.cmd(f'--repo={self.repository_location}', 'list')
 
     def test_delete_repo(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.create_regular_file('dir2/file2', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input')
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'no'
-        self.cmd('delete', self.repository_location, exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'delete', exit_code=2)
         assert os.path.exists(self.repository_path)
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
-        self.cmd('delete', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'delete')
         # Make sure the repo is gone
         self.assertFalse(os.path.exists(self.repository_path))
 
     def test_delete_force(self):
-        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         self.create_src_archive('test')
         with Repository(self.repository_path, exclusive=True) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -1645,14 +1645,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             else:
                 assert False  # missed the file
             repository.commit(compact=False)
-        output = self.cmd('delete', '--force', self.repository_location + '::test')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'delete', '--force')
         self.assert_in('deleted archive was corrupted', output)
-        self.cmd('check', '--repair', self.repository_location)
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'check', '--repair')
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_not_in('test', output)
 
     def test_delete_double_force(self):
-        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         self.create_src_archive('test')
         with Repository(self.repository_path, exclusive=True) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -1660,16 +1660,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             id = archive.metadata.items[0]
             repository.put(id, b'corrupted items metadata stream chunk')
             repository.commit(compact=False)
-        self.cmd('delete', '--force', '--force', self.repository_location + '::test')
-        self.cmd('check', '--repair', self.repository_location)
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}::test', 'delete', '--force', '--force')
+        self.cmd(f'--repo={self.repository_location}', 'check', '--repair')
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_not_in('test', output)
 
     def test_corrupted_repository(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
-        self.cmd('extract', '--dry-run', self.repository_location + '::test')
-        output = self.cmd('check', '--show-version', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}::test', 'extract', '--dry-run')
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '--show-version')
         self.assert_in('borgbackup version', output)  # implied output even without --info given
         self.assert_not_in('Starting repository check', output)  # --info not given for root logger
 
@@ -1677,103 +1677,103 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(os.path.join(self.tmpdir, 'repository', 'data', '0', name), 'r+b') as fd:
             fd.seek(100)
             fd.write(b'XXXX')
-        output = self.cmd('check', '--info', self.repository_location, exit_code=1)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '--info', exit_code=1)
         self.assert_in('Starting repository check', output)  # --info given for root logger
 
     def test_readonly_check(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd('check', '--verify-data', self.repository_location, exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}', 'check', '--verify-data', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd('check', '--verify-data', self.repository_location)
+                    self.cmd(f'--repo={self.repository_location}', 'check', '--verify-data')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd('check', '--verify-data', self.repository_location, '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}', 'check', '--verify-data', '--bypass-lock')
 
     def test_readonly_diff(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('a')
         self.create_src_archive('b')
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd('diff', '%s::a' % self.repository_location, 'b', exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}::a', 'diff', 'TODO_a', 'b', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd('diff', '%s::a' % self.repository_location, 'b')
+                    self.cmd(f'--repo={self.repository_location}::a', 'diff', 'TODO_a', 'b')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd('diff', '%s::a' % self.repository_location, 'b', '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}::a', 'diff', 'TODO_a', 'b', '--bypass-lock')
 
     def test_readonly_export_tar(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd('export-tar', '%s::test' % self.repository_location, 'test.tar', exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'test.tar', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd('export-tar', '%s::test' % self.repository_location, 'test.tar')
+                    self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'test.tar')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd('export-tar', '%s::test' % self.repository_location, 'test.tar', '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'test.tar', '--bypass-lock')
 
     def test_readonly_extract(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd('extract', '%s::test' % self.repository_location, exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}::test', 'extract', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd('extract', '%s::test' % self.repository_location)
+                    self.cmd(f'--repo={self.repository_location}::test', 'extract')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd('extract', '%s::test' % self.repository_location, '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract', '--bypass-lock')
 
     def test_readonly_info(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd('info', self.repository_location, exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}', 'info', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd('info', self.repository_location)
+                    self.cmd(f'--repo={self.repository_location}', 'info')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd('info', self.repository_location, '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}', 'info', '--bypass-lock')
 
     def test_readonly_list(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd('list', self.repository_location, exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}', 'list', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd('list', self.repository_location)
+                    self.cmd(f'--repo={self.repository_location}', 'list')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd('list', self.repository_location, '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}', 'list', '--bypass-lock')
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_readonly_mount(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
@@ -1794,14 +1794,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     @pytest.mark.skipif('BORG_TESTS_IGNORE_MODES' in os.environ, reason='modes unreliable')
     def test_umask(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         mode = os.stat(self.repository_path).st_mode
         self.assertEqual(stat.S_IMODE(mode), 0o700)
 
     def test_create_dry_run(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--dry-run', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--dry-run', 'input')
         # Make sure no archive has been created
         with Repository(self.repository_path) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -1823,56 +1823,56 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert excinfo.value.args == (['unknown-feature'],)
 
     def test_unknown_feature_on_create(self):
-        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
         self.add_unknown_feature(Manifest.Operation.WRITE)
-        self.cmd_raises_unknown_feature(['create', self.repository_location + '::test', 'input'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}::test', 'create', 'input'])
 
     def test_unknown_feature_on_cache_sync(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('delete', '--cache-only', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
         self.add_unknown_feature(Manifest.Operation.READ)
-        self.cmd_raises_unknown_feature(['create', self.repository_location + '::test', 'input'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}::test', 'create', 'input'])
 
     def test_unknown_feature_on_change_passphrase(self):
-        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
         self.add_unknown_feature(Manifest.Operation.CHECK)
-        self.cmd_raises_unknown_feature(['key', 'change-passphrase', self.repository_location])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'key', 'change-passphrase'])
 
     def test_unknown_feature_on_read(self):
-        print(self.cmd('init', '--encryption=repokey', self.repository_location))
-        self.cmd('create', self.repository_location + '::test', 'input')
+        print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         self.add_unknown_feature(Manifest.Operation.READ)
         with changedir('output'):
-            self.cmd_raises_unknown_feature(['extract', self.repository_location + '::test'])
+            self.cmd_raises_unknown_feature([f'--repo={self.repository_location}::test', 'extract'])
 
-        self.cmd_raises_unknown_feature(['list', self.repository_location])
-        self.cmd_raises_unknown_feature(['info', self.repository_location + '::test'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'list'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}::test', 'info'])
 
     def test_unknown_feature_on_rename(self):
-        print(self.cmd('init', '--encryption=repokey', self.repository_location))
-        self.cmd('create', self.repository_location + '::test', 'input')
+        print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         self.add_unknown_feature(Manifest.Operation.CHECK)
-        self.cmd_raises_unknown_feature(['rename', self.repository_location + '::test', 'other'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}::test', 'rename', 'TODO_test', 'other'])
 
     def test_unknown_feature_on_delete(self):
-        print(self.cmd('init', '--encryption=repokey', self.repository_location))
-        self.cmd('create', self.repository_location + '::test', 'input')
+        print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         self.add_unknown_feature(Manifest.Operation.DELETE)
         # delete of an archive raises
-        self.cmd_raises_unknown_feature(['delete', self.repository_location + '::test'])
-        self.cmd_raises_unknown_feature(['prune', '--keep-daily=3', self.repository_location])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}::test', 'delete'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'prune', '--keep-daily=3'])
         # delete of the whole repository ignores features
-        self.cmd('delete', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'delete')
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_unknown_feature_on_mount(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         self.add_unknown_feature(Manifest.Operation.READ)
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         os.mkdir(mountpoint)
         # XXX this might hang if it doesn't raise an error
-        self.cmd_raises_unknown_feature(['mount', self.repository_location + '::test', mountpoint])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}::test', 'mount', mountpoint])
 
     @pytest.mark.allow_cache_wipe
     def test_unknown_mandatory_feature_in_cache(self):
@@ -1881,7 +1881,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         else:
             path_prefix = ''
 
-        print(self.cmd('init', '--encryption=repokey', self.repository_location))
+        print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
 
         with Repository(self.repository_path, exclusive=True) as repository:
             if path_prefix:
@@ -1893,7 +1893,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 cache.commit()
 
         if self.FORK_DEFAULT:
-            self.cmd('create', self.repository_location + '::test', 'input')
+            self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         else:
             called = False
             wipe_cache_safe = LocalCache.wipe_cache
@@ -1904,7 +1904,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 wipe_cache_safe(*args)
 
             with patch.object(LocalCache, 'wipe_cache', wipe_wrapper):
-                self.cmd('create', self.repository_location + '::test', 'input')
+                self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
 
             assert called
 
@@ -1917,14 +1917,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_progress_on(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--progress', self.repository_location + '::test4', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test4', 'create', '--progress', 'input')
         self.assert_in("\r", output)
 
     def test_progress_off(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', self.repository_location + '::test5', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test5', 'create', 'input')
         self.assert_not_in("\r", output)
 
     def test_file_status(self):
@@ -1934,12 +1934,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '--list', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         # should find first file as unmodified
-        output = self.cmd('create', '--list', self.repository_location + '::test1', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test1', 'create', '--list', 'input')
         self.assert_in("U input/file1", output)
         # this is expected, although surprising, for why, see:
         # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
@@ -1950,14 +1950,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', contents=b'123')
         time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=10)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', '--files-cache=ctime,size', self.repository_location + '::test1', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test1', 'create',
+                          '--list', '--files-cache=ctime,size', 'input')
         # modify file1, but cheat with the mtime (and atime) and also keep same size:
         st = os.stat('input/file1')
         self.create_regular_file('file1', contents=b'321')
         os.utime('input/file1', ns=(st.st_atime_ns, st.st_mtime_ns))
         # this mode uses ctime for change detection, so it should find file1 as modified
-        output = self.cmd('create', '--list', '--files-cache=ctime,size', self.repository_location + '::test2', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test2', 'create',
+                          '--list', '--files-cache=ctime,size', 'input')
         self.assert_in("M input/file1", output)
 
     def test_file_status_ms_cache_mode(self):
@@ -1965,13 +1967,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=10)
         time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=10)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', '--files-cache=mtime,size', self.repository_location + '::test1', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test1', 'create',
+                          '--list', '--files-cache=mtime,size', 'input')
         # change mode of file1, no content change:
         st = os.stat('input/file1')
         os.chmod('input/file1', st.st_mode ^ stat.S_IRWXO)  # this triggers a ctime change, but mtime is unchanged
         # this mode uses mtime for change detection, so it should find file1 as unmodified
-        output = self.cmd('create', '--list', '--files-cache=mtime,size', self.repository_location + '::test2', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test2', 'create',
+                          '--list', '--files-cache=mtime,size', 'input')
         self.assert_in("U input/file1", output)
 
     def test_file_status_rc_cache_mode(self):
@@ -1979,10 +1983,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=10)
         time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=10)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', '--files-cache=rechunk,ctime', self.repository_location + '::test1', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test1', 'create',
+                          '--list', '--files-cache=rechunk,ctime', 'input')
         # no changes here, but this mode rechunks unconditionally
-        output = self.cmd('create', '--list', '--files-cache=rechunk,ctime', self.repository_location + '::test2', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test2', 'create',
+                          '--list', '--files-cache=rechunk,ctime', 'input')
         self.assert_in("A input/file1", output)
 
     def test_file_status_excluded(self):
@@ -1994,14 +2000,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if has_lchflags:
             self.create_regular_file('file3', size=1024 * 80)
             platform.set_flags(os.path.join(self.input_path, 'file3'), stat.UF_NODUMP)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--list', '--exclude-nodump', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', '--list', '--exclude-nodump', 'input')
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         if has_lchflags:
             self.assert_in("x input/file3", output)
         # should find second file as excluded
-        output = self.cmd('create', '--list', '--exclude-nodump', self.repository_location + '::test1', 'input', '--exclude', '*/file2')
+        output = self.cmd(f'--repo={self.repository_location}::test1', 'create',
+                          '--list', '--exclude-nodump', 'input', '--exclude', '*/file2')
         self.assert_in("U input/file1", output)
         self.assert_in("x input/file2", output)
         if has_lchflags:
@@ -2009,8 +2016,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_create_json(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        create_info = json.loads(self.cmd('create', '--json', self.repository_location + '::test', 'input'))
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        create_info = json.loads(self.cmd(f'--repo={self.repository_location}::test', 'create',
+                                          '--json', 'input'))
         # The usual keys
         assert 'encryption' in create_info
         assert 'repository' in create_info
@@ -2028,23 +2036,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         time.sleep(1)  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         # no listing by default
-        output = self.cmd('create', self.repository_location + '::test', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         self.assert_not_in('file1', output)
         # shouldn't be listed even if unchanged
-        output = self.cmd('create', self.repository_location + '::test0', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test0', 'create', 'input')
         self.assert_not_in('file1', output)
         # should list the file as unchanged
-        output = self.cmd('create', '--list', '--filter=U', self.repository_location + '::test1', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test1', 'create', '--list', '--filter=U', 'input')
         self.assert_in('file1', output)
         # should *not* list the file as changed
-        output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test2', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test2', 'create', '--list', '--filter=AM', 'input')
         self.assert_not_in('file1', output)
         # change the file
         self.create_regular_file('file1', size=1024 * 100)
         # should list the file as changed
-        output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test3', 'create', '--list', '--filter=AM', 'input')
         self.assert_in('file1', output)
 
     @pytest.mark.skipif(not are_fifos_supported(), reason='FIFOs not supported')
@@ -2058,8 +2066,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             finally:
                 os.close(fd)
 
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        archive = self.repository_location + '::test'
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         data = b'foobar' * 1000
 
         fifo_fn = os.path.join(self.input_path, 'fifo')
@@ -2070,11 +2077,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         t = Thread(target=fifo_feeder, args=(fifo_fn, data))
         t.start()
         try:
-            self.cmd('create', '--read-special', archive, 'input/link_fifo')
+            self.cmd(f'--repo={self.repository_location}::test', 'create', '--read-special', 'input/link_fifo')
         finally:
             t.join()
         with changedir('output'):
-            self.cmd('extract', archive)
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
             fifo_fn = 'input/link_fifo'
             with open(fifo_fn, 'rb') as f:
                 extracted_data = f.read()
@@ -2082,41 +2089,40 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_create_read_special_broken_symlink(self):
         os.symlink('somewhere does not exist', os.path.join(self.input_path, 'link'))
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        archive = self.repository_location + '::test'
-        self.cmd('create', '--read-special', archive, 'input')
-        output = self.cmd('list', archive)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '--read-special', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'list')
         assert 'input/link -> somewhere does not exist' in output
 
     # def test_cmdline_compatibility(self):
     #    self.create_regular_file('file1', size=1024 * 80)
-    #    self.cmd('init', '--encryption=repokey', self.repository_location)
+    #    self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
     #    self.cmd('create', self.repository_location + '::test', 'input')
     #    output = self.cmd('foo', self.repository_location, '--old')
     #    self.assert_in('"--old" has been deprecated. Use "--new" instead', output)
 
     def test_prune_repository(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', src_dir)
         # these are not really a checkpoints, but they look like some:
-        self.cmd('create', self.repository_location + '::test3.checkpoint', src_dir)
-        self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
-        self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
-        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1')
+        self.cmd(f'--repo={self.repository_location}::test3.checkpoint', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::test3.checkpoint.1', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::test4.checkpoint', 'create', src_dir)
+        output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=1')
         assert re.search(r'Would prune:\s+test1', output)
         # must keep the latest non-checkpoint archive:
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         # must keep the latest checkpoint archive:
         assert re.search(r'Keeping checkpoint archive:\s+test4.checkpoint', output)
-        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
         self.assert_in('test1', output)
         self.assert_in('test2', output)
         self.assert_in('test3.checkpoint', output)
         self.assert_in('test3.checkpoint.1', output)
         self.assert_in('test4.checkpoint', output)
-        self.cmd('prune', self.repository_location, '--keep-daily=1')
-        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=1')
+        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
         self.assert_not_in('test1', output)
         # the latest non-checkpoint archive must be still there:
         self.assert_in('test2', output)
@@ -2125,9 +2131,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test3.checkpoint.1', output)
         self.assert_in('test4.checkpoint', output)
         # now we supersede the latest checkpoint by a successful backup:
-        self.cmd('create', self.repository_location + '::test5', src_dir)
-        self.cmd('prune', self.repository_location, '--keep-daily=2')
-        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}::test5', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=2')
+        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
         # all checkpoints should be gone now:
         self.assert_not_in('checkpoint', output)
         # the latest archive must be still there
@@ -2140,12 +2146,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         return dtime.astimezone(dateutil.tz.UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
     def _create_archive_ts(self, name, y, m, d, H=0, M=0, S=0):
-        loc = self.repository_location + '::' + name
-        self.cmd('create', '--timestamp', self._to_utc_timestamp(y, m, d, H, M, S), loc, src_dir)
+        self.cmd(f'--repo={self.repository_location}::{name}', 'create',
+                 '--timestamp', self._to_utc_timestamp(y, m, d, H, M, S), src_dir)
 
     # This test must match docs/misc/prune-example.txt
     def test_prune_repository_example(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         # Archives that will be kept, per the example
         # Oldest archive
         self._create_archive_ts('test01', 2015, 1, 1)
@@ -2178,7 +2184,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self._create_archive_ts('test23', 2015, 5, 31)
         # The next older daily backup
         self._create_archive_ts('test24', 2015, 12, 16)
-        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=14', '--keep-monthly=6', '--keep-yearly=1')
+        output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=14', '--keep-monthly=6', '--keep-yearly=1')
         # Prune second backup of the year
         assert re.search(r'Would prune:\s+test22', output)
         # Prune next older monthly and daily backups
@@ -2191,12 +2197,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert re.search(r'Keeping archive \(rule: monthly #' + str(i) + r'\):\s+test' + ("%02d" % (8-i)), output)
         for i in range(1, 15):
             assert re.search(r'Keeping archive \(rule: daily #' + str(i) + r'\):\s+test' + ("%02d" % (22-i)), output)
-        output = self.cmd('list', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         # Nothing pruned after dry run
         for i in range(1, 25):
             self.assert_in('test%02d' % i, output)
-        self.cmd('prune', self.repository_location, '--keep-daily=14', '--keep-monthly=6', '--keep-yearly=1')
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=14', '--keep-monthly=6', '--keep-yearly=1')
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         # All matching backups plus oldest kept
         for i in range(1, 22):
             self.assert_in('test%02d' % i, output)
@@ -2206,141 +2212,139 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     # With an initial and daily backup, prune daily until oldest is replaced by a monthly backup
     def test_prune_retain_and_expire_oldest(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         # Initial backup
         self._create_archive_ts('original_archive', 2020, 9, 1, 11, 15)
         # Archive and prune daily for 30 days
         for i in range(1, 31):
             self._create_archive_ts('september%02d' % i, 2020, 9, i, 12)
-            self.cmd('prune', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+            self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=7', '--keep-monthly=1')
         # Archive and prune 6 days into the next month
         for i in range(1, 7):
             self._create_archive_ts('october%02d' % i, 2020, 10, i, 12)
-            self.cmd('prune', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+            self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=7', '--keep-monthly=1')
         # Oldest backup is still retained
-        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=7', '--keep-monthly=1')
         assert re.search(r'Keeping archive \(rule: monthly\[oldest\] #1' + r'\):\s+original_archive', output)
         # Archive one more day and prune.
         self._create_archive_ts('october07', 2020, 10, 7, 12)
-        self.cmd('prune', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=7', '--keep-monthly=1')
         # Last day of previous month is retained as monthly, and oldest is expired.
-        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=7', '--keep-monthly=1')
+        output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=7', '--keep-monthly=1')
         assert re.search(r'Keeping archive \(rule: monthly #1\):\s+september30', output)
         self.assert_not_in('original_archive', output)
 
     def test_prune_repository_save_space(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
-        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', src_dir)
+        output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=1')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         assert re.search(r'Would prune:\s+test1', output)
-        output = self.cmd('list', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_in('test1', output)
         self.assert_in('test2', output)
-        self.cmd('prune', '--save-space', self.repository_location, '--keep-daily=1')
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'prune', '--save-space', '--keep-daily=1')
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
 
     def test_prune_repository_prefix(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', src_dir)
-        self.cmd('create', self.repository_location + '::foo-2015-08-12-20:00', src_dir)
-        self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
-        self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
-        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1', '--prefix=foo-')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::foo-2015-08-12-10:00', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::foo-2015-08-12-20:00', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::bar-2015-08-12-10:00', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::bar-2015-08-12-20:00', 'create', src_dir)
+        output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=1', '--prefix=foo-')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00', output)
         assert re.search(r'Would prune:\s+foo-2015-08-12-10:00', output)
-        output = self.cmd('list', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_in('foo-2015-08-12-10:00', output)
         self.assert_in('foo-2015-08-12-20:00', output)
         self.assert_in('bar-2015-08-12-10:00', output)
         self.assert_in('bar-2015-08-12-20:00', output)
-        self.cmd('prune', self.repository_location, '--keep-daily=1', '--prefix=foo-')
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=1', '--prefix=foo-')
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_not_in('foo-2015-08-12-10:00', output)
         self.assert_in('foo-2015-08-12-20:00', output)
         self.assert_in('bar-2015-08-12-10:00', output)
         self.assert_in('bar-2015-08-12-20:00', output)
 
     def test_prune_repository_glob(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::2015-08-12-10:00-foo', src_dir)
-        self.cmd('create', self.repository_location + '::2015-08-12-20:00-foo', src_dir)
-        self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
-        self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
-        output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1', '--glob-archives=2015-*-foo')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::2015-08-12-10:00-foo', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::2015-08-12-20:00-foo', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::2015-08-12-10:00-bar', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::2015-08-12-20:00-bar', 'create', src_dir)
+        output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=1', '--glob-archives=2015-*-foo')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo', output)
         assert re.search(r'Would prune:\s+2015-08-12-10:00-foo', output)
-        output = self.cmd('list', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_in('2015-08-12-10:00-foo', output)
         self.assert_in('2015-08-12-20:00-foo', output)
         self.assert_in('2015-08-12-10:00-bar', output)
         self.assert_in('2015-08-12-20:00-bar', output)
-        self.cmd('prune', self.repository_location, '--keep-daily=1', '--glob-archives=2015-*-foo')
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=1', '--glob-archives=2015-*-foo')
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_not_in('2015-08-12-10:00-foo', output)
         self.assert_in('2015-08-12-20:00-foo', output)
         self.assert_in('2015-08-12-10:00-bar', output)
         self.assert_in('2015-08-12-20:00-bar', output)
 
     def test_list_prefix(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test-1', src_dir)
-        self.cmd('create', self.repository_location + '::something-else-than-test-1', src_dir)
-        self.cmd('create', self.repository_location + '::test-2', src_dir)
-        output = self.cmd('list', '--prefix=test-', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test-1', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::something-else-than-test-1', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::test-2', 'create', src_dir)
+        output = self.cmd(f'--repo={self.repository_location}', 'list', '--prefix=test-')
         self.assert_in('test-1', output)
         self.assert_in('test-2', output)
         self.assert_not_in('something-else', output)
 
     def test_list_format(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        test_archive = self.repository_location + '::test'
-        self.cmd('create', test_archive, src_dir)
-        output_1 = self.cmd('list', test_archive)
-        output_2 = self.cmd('list', '--format', '{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}', test_archive)
-        output_3 = self.cmd('list', '--format', '{mtime:%s} {path}{NL}', test_archive)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', src_dir)
+        output_1 = self.cmd(f'--repo={self.repository_location}::test', 'list')
+        output_2 = self.cmd(f'--repo={self.repository_location}::test', 'list', '--format', '{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}')
+        output_3 = self.cmd(f'--repo={self.repository_location}::test', 'list', '--format', '{mtime:%s} {path}{NL}')
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)
 
     def test_list_repository_format(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--comment', 'comment 1', self.repository_location + '::test-1', src_dir)
-        self.cmd('create', '--comment', 'comment 2', self.repository_location + '::test-2', src_dir)
-        output_1 = self.cmd('list', self.repository_location)
-        output_2 = self.cmd('list', '--format', '{archive:<36} {time} [{id}]{NL}', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test-1', 'create', '--comment', 'comment 1', src_dir)
+        self.cmd(f'--repo={self.repository_location}::test-2', 'create', '--comment', 'comment 2', src_dir)
+        output_1 = self.cmd(f'--repo={self.repository_location}', 'list')
+        output_2 = self.cmd(f'--repo={self.repository_location}', 'list', '--format', '{archive:<36} {time} [{id}]{NL}')
         self.assertEqual(output_1, output_2)
-        output_1 = self.cmd('list', '--short', self.repository_location)
+        output_1 = self.cmd(f'--repo={self.repository_location}', 'list', '--short')
         self.assertEqual(output_1, 'test-1\ntest-2\n')
-        output_1 = self.cmd('list', '--format', '{barchive}/', self.repository_location)
+        output_1 = self.cmd(f'--repo={self.repository_location}', 'list', '--format', '{barchive}/')
         self.assertEqual(output_1, 'test-1/test-2/')
-        output_3 = self.cmd('list', '--format', '{name} {comment}{NL}', self.repository_location)
+        output_3 = self.cmd(f'--repo={self.repository_location}', 'list', '--format', '{name} {comment}{NL}')
         self.assert_in('test-1 comment 1\n', output_3)
         self.assert_in('test-2 comment 2\n', output_3)
 
     def test_list_hash(self):
         self.create_regular_file('empty_file', size=0)
         self.create_regular_file('amb', contents=b'a' * 1000000)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        test_archive = self.repository_location + '::test'
-        self.cmd('create', test_archive, 'input')
-        output = self.cmd('list', '--format', '{sha256} {path}{NL}', test_archive)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'list', '--format', '{sha256} {path}{NL}')
         assert "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0 input/amb" in output
         assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
 
     def test_list_consider_checkpoints(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', src_dir)
         # these are not really a checkpoints, but they look like some:
-        self.cmd('create', self.repository_location + '::test2.checkpoint', src_dir)
-        self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}::test2.checkpoint', 'create', src_dir)
+        self.cmd(f'--repo={self.repository_location}::test3.checkpoint.1', 'create', src_dir)
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         assert "test1" in output
         assert "test2.checkpoint" not in output
         assert "test3.checkpoint.1" not in output
-        output = self.cmd('list', '--consider-checkpoints', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
         assert "test1" in output
         assert "test2.checkpoint" in output
         assert "test3.checkpoint.1" in output
@@ -2351,27 +2355,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(os.path.join(self.input_path, 'two_chunks'), 'wb') as fd:
             fd.write(b'abba' * 2000000)
             fd.write(b'baab' * 2000000)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        test_archive = self.repository_location + '::test'
-        self.cmd('create', test_archive, 'input')
-        output = self.cmd('list', '--format', '{num_chunks} {unique_chunks} {path}{NL}', test_archive)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'list', '--format', '{num_chunks} {unique_chunks} {path}{NL}')
         assert "0 0 input/empty_file" in output
         assert "2 2 input/two_chunks" in output
 
     def test_list_size(self):
         self.create_regular_file('compressible_file', size=10000)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        test_archive = self.repository_location + '::test'
-        self.cmd('create', '-C', 'lz4', test_archive, 'input')
-        output = self.cmd('list', '--format', '{size} {path}{NL}', test_archive)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', '-C', 'lz4', 'input')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'list', '--format', '{size} {path}{NL}')
         size, path = output.split("\n")[1].split(" ")
         assert int(size) == 10000
 
     def test_list_json(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        list_repo = json.loads(self.cmd('list', '--json', self.repository_location))
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        list_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--json'))
         repository = list_repo['repository']
         assert len(repository['id']) == 64
         assert datetime.strptime(repository['last_modified'], ISO_FORMAT)  # must not raise
@@ -2380,7 +2382,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         archive0 = list_repo['archives'][0]
         assert datetime.strptime(archive0['time'], ISO_FORMAT)  # must not raise
 
-        list_archive = self.cmd('list', '--json-lines', self.repository_location + '::test')
+        list_archive = self.cmd(f'--repo={self.repository_location}::test', 'list', '--json-lines')
         items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
@@ -2388,7 +2390,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert file1['size'] == 81920
         assert datetime.strptime(file1['mtime'], ISO_FORMAT)  # must not raise
 
-        list_archive = self.cmd('list', '--json-lines', '--format={sha256}', self.repository_location + '::test')
+        list_archive = self.cmd(f'--repo={self.repository_location}::test', 'list', '--json-lines', '--format={sha256}')
         items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
@@ -2396,14 +2398,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert file1['sha256'] == 'b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b'
 
     def test_list_json_args(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('list', '--json-lines', self.repository_location, exit_code=2)
-        self.cmd('list', '--json', self.repository_location + '::archive', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}', 'list', '--json-lines', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}::archive', 'list', '--json', exit_code=2)
 
     def test_log_json(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        log = self.cmd('create', '--log-json', self.repository_location + '::test', 'input', '--list', '--debug')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        log = self.cmd(f'--repo={self.repository_location}::test', 'create', '--log-json', 'input', '--list', '--debug')
         messages = {}  # type -> message, one of each kind
         for line in log.splitlines():
             msg = json.loads(line)
@@ -2420,67 +2422,67 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_debug_profile(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input', '--debug-profile=create.prof')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input', '--debug-profile=create.prof')
         self.cmd('debug', 'convert-profile', 'create.prof', 'create.pyprof')
         stats = pstats.Stats('create.pyprof')
         stats.strip_dirs()
         stats.sort_stats('cumtime')
 
-        self.cmd('create', self.repository_location + '::test2', 'input', '--debug-profile=create.pyprof')
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', 'input', '--debug-profile=create.pyprof')
         stats = pstats.Stats('create.pyprof')  # Only do this on trusted data!
         stats.strip_dirs()
         stats.sort_stats('cumtime')
 
     def test_common_options(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        log = self.cmd('--debug', 'create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        log = self.cmd(f'--repo={self.repository_location}::test', '--debug', 'create', 'input')
         assert 'security: read previous location' in log
 
     def test_change_passphrase(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
         # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
-        self.cmd('key', 'change-passphrase', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-passphrase')
         os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
-        self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'list')
 
     def test_change_location_to_keyfile(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(repokey)' in log
-        self.cmd('key', 'change-location', self.repository_location, 'keyfile')
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'keyfile')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(key file)' in log
 
     def test_change_location_to_b2keyfile(self):
-        self.cmd('init', '--encryption=repokey-blake2', self.repository_location)
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey-blake2')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(repokey BLAKE2b)' in log
-        self.cmd('key', 'change-location', self.repository_location, 'keyfile')
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'keyfile')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(key file BLAKE2b)' in log
 
     def test_change_location_to_repokey(self):
-        self.cmd('init', '--encryption=keyfile', self.repository_location)
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=keyfile')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(key file)' in log
-        self.cmd('key', 'change-location', self.repository_location, 'repokey')
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'repokey')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(repokey)' in log
 
     def test_change_location_to_b2repokey(self):
-        self.cmd('init', '--encryption=keyfile-blake2', self.repository_location)
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=keyfile-blake2')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(key file BLAKE2b)' in log
-        self.cmd('key', 'change-location', self.repository_location, 'repokey')
-        log = self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'repokey')
+        log = self.cmd(f'--repo={self.repository_location}', 'info')
         assert '(repokey BLAKE2b)' in log
 
     def test_break_lock(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('break-lock', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}', 'break-lock')
 
     def test_usage(self):
         self.cmd()
@@ -2506,11 +2508,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 noatime_used = flags_noatime != flags_normal
                 return noatime_used and atime_before == atime_after
 
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_test_files()
         have_noatime = has_noatime('input/file1')
-        self.cmd('create', '--exclude-nodump', '--atime', self.repository_location + '::archive', 'input')
-        self.cmd('create', '--exclude-nodump', '--atime', self.repository_location + '::archive2', 'input')
+        self.cmd(f'--repo={self.repository_location}::archive', 'create', '--exclude-nodump', '--atime', 'input')
+        self.cmd(f'--repo={self.repository_location}::archive2', 'create', '--exclude-nodump', '--atime', 'input')
         if has_lchflags:
             # remove the file we did not backup, so input and output become equal
             os.remove(os.path.join('input', 'flagfile'))
@@ -2596,15 +2598,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_versions_view(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('test', contents=b'first')
         if are_hardlinks_supported():
             self.create_regular_file('hardlink1', contents=b'123456')
             os.link('input/hardlink1', 'input/hardlink2')
             os.link('input/hardlink1', 'input/hardlink3')
-        self.cmd('create', self.repository_location + '::archive1', 'input')
+        self.cmd(f'--repo={self.repository_location}::archive1', 'create', 'input')
         self.create_regular_file('test', contents=b'second')
-        self.cmd('create', self.repository_location + '::archive2', 'input')
+        self.cmd(f'--repo={self.repository_location}::archive2', 'create', 'input')
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         # mount the whole repository, archive contents shall show up in versioned view:
         with self.fuse_mount(self.repository_location, mountpoint, '-o', 'versions'):
@@ -2628,7 +2630,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_allow_damaged_files(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('archive')
         # Get rid of a chunk and repair it
         archive, repository = self.open_archive('archive')
@@ -2641,7 +2643,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             else:
                 assert False  # missed the file
             repository.commit(compact=False)
-        self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
 
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
         with self.fuse_mount(self.repository_location + '::archive', mountpoint):
@@ -2653,7 +2655,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_mount_options(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('arch11')
         self.create_src_archive('arch12')
         self.create_src_archive('arch21')
@@ -2727,7 +2729,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # Decorate
         borg.locking.Lock.migrate_lock = write_assert_data(borg.locking.Lock.migrate_lock)
         try:
-            self.cmd('init', '--encryption=none', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
             self.create_src_archive('arch')
             mountpoint = os.path.join(self.tmpdir, 'mountpoint')
             # In order that the decoration is kept for the borg mount process, we must not spawn, but actually fork;
@@ -2780,13 +2782,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.create_test_files()
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
-        self.cmd('init', '--encryption=' + method, self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=' + method)
         verify_uniqueness()
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         verify_uniqueness()
-        self.cmd('create', self.repository_location + '::test.2', 'input')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'create', 'input')
         verify_uniqueness()
-        self.cmd('delete', self.repository_location + '::test.2')
+        self.cmd(f'--repo={self.repository_location}::test.2', 'delete')
         verify_uniqueness()
 
     def test_aes_counter_uniqueness_keyfile(self):
@@ -2797,41 +2799,41 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_debug_dump_archive_items(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
-            output = self.cmd('debug', 'dump-archive-items', self.repository_location + '::test')
+            output = self.cmd(f'--repo={self.repository_location}::test', 'debug', 'dump-archive-items')
         output_dir = sorted(os.listdir('output'))
         assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
         assert 'Done.' in output
 
     def test_debug_dump_repo_objs(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
-            output = self.cmd('debug', 'dump-repo-objs', self.repository_location)
+            output = self.cmd(f'--repo={self.repository_location}', 'debug', 'dump-repo-objs')
         output_dir = sorted(os.listdir('output'))
         assert len(output_dir) > 0 and output_dir[0].startswith('00000000_')
         assert 'Done.' in output
 
     def test_debug_put_get_delete_obj(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         data = b'some data'
         hexkey = sha256(data).hexdigest()
         self.create_regular_file('file', contents=data)
-        output = self.cmd('debug', 'put-obj', self.repository_location, 'input/file')
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'put-obj', 'input/file')
         assert hexkey in output
-        output = self.cmd('debug', 'get-obj', self.repository_location, hexkey, 'output/file')
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'get-obj', hexkey, 'output/file')
         assert hexkey in output
         with open('output/file', 'rb') as f:
             data_read = f.read()
         assert data == data_read
-        output = self.cmd('debug', 'delete-obj', self.repository_location, hexkey)
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'delete-obj', hexkey)
         assert "deleted" in output
-        output = self.cmd('debug', 'delete-obj', self.repository_location, hexkey)
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'delete-obj', hexkey)
         assert "not found" in output
-        output = self.cmd('debug', 'delete-obj', self.repository_location, 'invalid')
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'delete-obj', 'invalid')
         assert "is invalid" in output
 
     def test_init_interrupt(self):
@@ -2839,19 +2841,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             raise EOFError
 
         with patch.object(FlexiKey, 'create', raise_eof):
-            self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=1)
+            self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey', exit_code=1)
         assert not os.path.exists(self.repository_location)
 
     def test_init_requires_encryption_option(self):
-        self.cmd('init', self.repository_location, exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'init', exit_code=2)
 
     def test_init_nested_repositories(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         if self.FORK_DEFAULT:
-            self.cmd('init', '--encryption=repokey', self.repository_location + '/nested', exit_code=2)
+            self.cmd(f'--repo={self.repository_location}/nested', 'init', '--encryption=repokey', exit_code=2)
         else:
             with pytest.raises(Repository.AlreadyExists):
-                self.cmd('init', '--encryption=repokey', self.repository_location + '/nested')
+                self.cmd(f'--repo={self.repository_location}/nested', 'init', '--encryption=repokey')
 
     def test_init_refuse_to_overwrite_keyfile(self):
         """BORG_KEY_FILE=something borg init should quit if "something" already exists.
@@ -2859,10 +2861,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         See https://github.com/borgbackup/borg/pull/6046"""
         keyfile = os.path.join(self.tmpdir, 'keyfile')
         with environment_variable(BORG_KEY_FILE=keyfile):
-            self.cmd('init', '--encryption=keyfile', self.repository_location + '0')
+            self.cmd(f'--repo={self.repository_location}0', 'init', '--encryption=keyfile')
             with open(keyfile) as file:
                 before = file.read()
-            arg = ('init', '--encryption=keyfile', self.repository_location + '1')
+            arg = (f'--repo={self.repository_location}1', 'init', '--encryption=keyfile')
             if self.FORK_DEFAULT:
                 self.cmd(*arg, exit_code=2)
             else:
@@ -2874,7 +2876,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def check_cache(self):
         # First run a regular borg check
-        self.cmd('check', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'check')
         # Then check that the cache on disk matches exactly what's in the repo.
         with self.open_repository() as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -2894,8 +2896,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert id in seen
 
     def test_check_cache(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with self.open_repository() as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, key, manifest, sync=False) as cache:
@@ -2906,26 +2908,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.check_cache()
 
     def test_recreate_target_rc(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('recreate', self.repository_location, '--target=asdf', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '--target=asdf', exit_code=2)
         assert 'Need to specify single archive' in output
 
     def test_recreate_target(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.check_cache()
-        archive = self.repository_location + '::test0'
-        self.cmd('create', archive, 'input')
+        self.cmd(f'--repo={self.repository_location}::test0', 'create', 'input')
         self.check_cache()
-        original_archive = self.cmd('list', self.repository_location)
-        self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3', '--target=new-archive')
+        original_archive = self.cmd(f'--repo={self.repository_location}', 'list')
+        self.cmd(f'--repo={self.repository_location}::test0', 'recreate', 'input/dir2',
+                 '-e', 'input/dir2/file3', '--target=new-archive')
         self.check_cache()
-        archives = self.cmd('list', self.repository_location)
+        archives = self.cmd(f'--repo={self.repository_location}', 'list')
         assert original_archive in archives
         assert 'new-archive' in archives
 
-        archive = self.repository_location + '::new-archive'
-        listing = self.cmd('list', '--short', archive)
+        listing = self.cmd(f'--repo={self.repository_location}::new-archive', 'list', '--short')
         assert 'file1' not in listing
         assert 'dir2/file2' in listing
         assert 'dir2/file3' not in listing
@@ -2933,12 +2934,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_basic(self):
         self.create_test_files()
         self.create_regular_file('dir2/file3', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        archive = self.repository_location + '::test0'
-        self.cmd('create', archive, 'input')
-        self.cmd('recreate', archive, 'input/dir2', '-e', 'input/dir2/file3')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test0', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test0', 'recreate', 'input/dir2', '-e', 'input/dir2/file3')
         self.check_cache()
-        listing = self.cmd('list', '--short', archive)
+        listing = self.cmd(f'--repo={self.repository_location}::test0', 'list', '--short')
         assert 'file1' not in listing
         assert 'dir2/file2' in listing
         assert 'dir2/file3' not in listing
@@ -2947,48 +2947,48 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_subtree_hardlinks(self):
         # This is essentially the same problem set as in test_extract_hardlinks
         self._extract_hardlinks_setup()
-        self.cmd('create', self.repository_location + '::test2', 'input')
-        self.cmd('recreate', self.repository_location + '::test', 'input/dir1')
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'recreate', 'input/dir1')
         self.check_cache()
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test2')
+            self.cmd(f'--repo={self.repository_location}::test2', 'extract')
             assert os.stat('input/dir1/hardlink').st_nlink == 4
 
     def test_recreate_rechunkify(self):
         with open(os.path.join(self.input_path, 'large_file'), 'wb') as fd:
             fd.write(b'a' * 280)
             fd.write(b'b' * 280)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test1', 'input')
-        self.cmd('create', self.repository_location + '::test2', 'input', '--files-cache=disabled')
-        list = self.cmd('list', self.repository_location + '::test1', 'input/large_file',
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', '--chunker-params', '7,9,8,128', 'input')
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', 'input', '--files-cache=disabled')
+        list = self.cmd(f'--repo={self.repository_location}::test1', 'list', 'input/large_file',
                         '--format', '{num_chunks} {unique_chunks}')
         num_chunks, unique_chunks = map(int, list.split(' '))
         # test1 and test2 do not deduplicate
         assert num_chunks == unique_chunks
-        self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '--chunker-params', 'default')
         self.check_cache()
         # test1 and test2 do deduplicate after recreate
-        assert int(self.cmd('list', self.repository_location + '::test1', 'input/large_file', '--format={size}'))
-        assert not int(self.cmd('list', self.repository_location + '::test1', 'input/large_file',
+        assert int(self.cmd(f'--repo={self.repository_location}::test1', 'list', 'input/large_file', '--format={size}'))
+        assert not int(self.cmd(f'--repo={self.repository_location}::test1', 'list', 'input/large_file',
                                 '--format', '{unique_chunks}'))
 
     def test_recreate_recompress(self):
         self.create_regular_file('compressible', size=10000)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input', '-C', 'none')
-        file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input', '-C', 'none')
+        file_list = self.cmd(f'--repo={self.repository_location}::test', 'list', 'input/compressible',
                              '--format', '{size} {sha256}')
         size, sha256_before = file_list.split(' ')
-        self.cmd('recreate', self.repository_location, '-C', 'lz4', '--recompress')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-C', 'lz4', '--recompress')
         self.check_cache()
-        file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
+        file_list = self.cmd(f'--repo={self.repository_location}::test', 'list', 'input/compressible',
                              '--format', '{size} {sha256}')
         size, sha256_after = file_list.split(' ')
         assert sha256_before == sha256_after
@@ -2996,12 +2996,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_timestamp(self):
         local_timezone = datetime.now(timezone(timedelta(0))).astimezone().tzinfo
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        archive = self.repository_location + '::test0'
-        self.cmd('create', archive, 'input')
-        self.cmd('recreate', '--timestamp', "1970-01-02T00:00:00", '--comment',
-                 'test', archive)
-        info = self.cmd('info', archive).splitlines()
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test0', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test0', 'recreate', '--timestamp', "1970-01-02T00:00:00",
+                 '--comment', 'test')
+        info = self.cmd(f'--repo={self.repository_location}::test0', 'info').splitlines()
         dtime = datetime(1970, 1, 2) + local_timezone.utcoffset(None)
         s_time = dtime.strftime("%Y-%m-%d")
         assert any([re.search(r'Time \(start\).+ %s' % s_time, item) for item in info])
@@ -3009,70 +3008,70 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_recreate_dry_run(self):
         self.create_regular_file('compressible', size=10000)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        archives_before = self.cmd('list', self.repository_location + '::test')
-        self.cmd('recreate', self.repository_location, '-n', '-e', 'input/compressible')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        archives_before = self.cmd(f'--repo={self.repository_location}::test', 'list')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-n', '-e', 'input/compressible')
         self.check_cache()
-        archives_after = self.cmd('list', self.repository_location + '::test')
+        archives_after = self.cmd(f'--repo={self.repository_location}::test', 'list')
         assert archives_after == archives_before
 
     def test_recreate_skips_nothing_to_do(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        info_before = self.cmd('info', self.repository_location + '::test')
-        self.cmd('recreate', self.repository_location, '--chunker-params', 'default')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        info_before = self.cmd(f'--repo={self.repository_location}::test', 'info')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '--chunker-params', 'default')
         self.check_cache()
-        info_after = self.cmd('info', self.repository_location + '::test')
+        info_after = self.cmd(f'--repo={self.repository_location}::test', 'info')
         assert info_before == info_after  # includes archive ID
 
     def test_with_lock(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         lock_path = os.path.join(self.repository_path, 'lock.exclusive')
         cmd = 'python3', '-c', 'import os, sys; sys.exit(42 if os.path.exists("%s") else 23)' % lock_path
-        self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=42)
+        self.cmd(f'--repo={self.repository_location}', 'with-lock', *cmd, fork=True, exit_code=42)
 
     def test_recreate_list_output(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('file1', size=0)
         self.create_regular_file('file2', size=0)
         self.create_regular_file('file3', size=0)
         self.create_regular_file('file4', size=0)
         self.create_regular_file('file5', size=0)
 
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
 
-        output = self.cmd('recreate', '--list', '--info', self.repository_location + '::test', '-e', 'input/file2')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'recreate', '--list', '--info', '-e', 'input/file2')
         self.check_cache()
         self.assert_in("input/file1", output)
         self.assert_in("x input/file2", output)
 
-        output = self.cmd('recreate', '--list', self.repository_location + '::test', '-e', 'input/file3')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'recreate', '--list', '-e', 'input/file3')
         self.check_cache()
         self.assert_in("input/file1", output)
         self.assert_in("x input/file3", output)
 
-        output = self.cmd('recreate', self.repository_location + '::test', '-e', 'input/file4')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'recreate', '-e', 'input/file4')
         self.check_cache()
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file4", output)
 
-        output = self.cmd('recreate', '--info', self.repository_location + '::test', '-e', 'input/file5')
+        output = self.cmd(f'--repo={self.repository_location}::test', 'recreate', '--info', '-e', 'input/file5')
         self.check_cache()
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file5", output)
 
     def test_bad_filters(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('delete', '--first', '1', '--last', '1', self.repository_location, fork=True, exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--first', '1', '--last', '1', fork=True, exit_code=2)
 
     def test_key_export_keyfile(self):
         export_file = self.output_path + '/exported'
-        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'keyfile')
         repo_id = self._extract_repository_id(self.repository_path)
-        self.cmd('key', 'export', self.repository_location, export_file)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'export', export_file)
 
         with open(export_file) as fd:
             export_contents = fd.read()
@@ -3088,7 +3087,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         os.unlink(key_file)
 
-        self.cmd('key', 'import', self.repository_location, export_file)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'import', export_file)
 
         with open(key_file) as fd:
             key_contents2 = fd.read()
@@ -3096,10 +3095,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert key_contents2 == key_contents
 
     def test_key_import_keyfile_with_borg_key_file(self):
-        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'keyfile')
 
         exported_key_file = os.path.join(self.output_path, 'exported')
-        self.cmd('key', 'export', self.repository_location, exported_key_file)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'export', exported_key_file)
 
         key_file = os.path.join(self.keys_path, os.listdir(self.keys_path)[0])
         with open(key_file) as fd:
@@ -3108,7 +3107,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         imported_key_file = os.path.join(self.output_path, 'imported')
         with environment_variable(BORG_KEY_FILE=imported_key_file):
-            self.cmd('key', 'import', self.repository_location, exported_key_file)
+            self.cmd(f'--repo={self.repository_location}', 'key', 'import', exported_key_file)
         assert not os.path.isfile(key_file), '"borg key import" should respect BORG_KEY_FILE'
 
         with open(imported_key_file) as fd:
@@ -3117,9 +3116,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_key_export_repokey(self):
         export_file = self.output_path + '/exported'
-        self.cmd('init', self.repository_location, '--encryption', 'repokey')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'repokey')
         repo_id = self._extract_repository_id(self.repository_path)
-        self.cmd('key', 'export', self.repository_location, export_file)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'export', export_file)
 
         with open(export_file) as fd:
             export_contents = fd.read()
@@ -3138,7 +3137,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_path) as repository:
             repository.save_key(b'')
 
-        self.cmd('key', 'import', self.repository_location, export_file)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'import', export_file)
 
         with Repository(self.repository_path) as repository:
             repo_key2 = RepoKey(repository)
@@ -3148,9 +3147,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_key_export_qr(self):
         export_file = self.output_path + '/exported.html'
-        self.cmd('init', self.repository_location, '--encryption', 'repokey')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'repokey')
         repo_id = self._extract_repository_id(self.repository_path)
-        self.cmd('key', 'export', '--qr-html', self.repository_location, export_file)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'export', '--qr-html', export_file)
 
         with open(export_file, encoding='utf-8') as fd:
             export_contents = fd.read()
@@ -3163,39 +3162,39 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         export_directory = self.output_path + '/exported'
         os.mkdir(export_directory)
 
-        self.cmd('init', self.repository_location, '--encryption', 'repokey')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'repokey')
 
-        self.cmd('key', 'export', self.repository_location, export_directory, exit_code=EXIT_ERROR)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'export', export_directory, exit_code=EXIT_ERROR)
 
     def test_key_import_errors(self):
         export_file = self.output_path + '/exported'
-        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'keyfile')
 
-        self.cmd('key', 'import', self.repository_location, export_file, exit_code=EXIT_ERROR)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'import', export_file, exit_code=EXIT_ERROR)
 
         with open(export_file, 'w') as fd:
             fd.write('something not a key\n')
 
         if self.FORK_DEFAULT:
-            self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
+            self.cmd(f'--repo={self.repository_location}', 'key', 'import', export_file, exit_code=2)
         else:
             with pytest.raises(NotABorgKeyFile):
-                self.cmd('key', 'import', self.repository_location, export_file)
+                self.cmd(f'--repo={self.repository_location}', 'key', 'import', export_file)
 
         with open(export_file, 'w') as fd:
             fd.write('BORG_KEY a0a0a0\n')
 
         if self.FORK_DEFAULT:
-            self.cmd('key', 'import', self.repository_location, export_file, exit_code=2)
+            self.cmd(f'--repo={self.repository_location}', 'key', 'import', export_file, exit_code=2)
         else:
             with pytest.raises(RepoIdMismatch):
-                self.cmd('key', 'import', self.repository_location, export_file)
+                self.cmd(f'--repo={self.repository_location}', 'key', 'import', export_file)
 
     def test_key_export_paperkey(self):
         repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'
 
         export_file = self.output_path + '/exported'
-        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'keyfile')
         self._set_repository_id(self.repository_path, unhexlify(repo_id))
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
@@ -3204,7 +3203,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(KeyfileKey.FILE_ID + ' ' + repo_id + '\n')
             fd.write(b2a_base64(b'abcdefghijklmnopqrstu').decode())
 
-        self.cmd('key', 'export', '--paper', self.repository_location, export_file)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'export', '--paper', export_file)
 
         with open(export_file) as fd:
             export_contents = fd.read()
@@ -3219,7 +3218,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     def test_key_import_paperkey(self):
         repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'
-        self.cmd('init', self.repository_location, '--encryption', 'keyfile')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption', 'keyfile')
         self._set_repository_id(self.repository_path, unhexlify(repo_id))
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
@@ -3254,20 +3253,20 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         #         print(i.to_bytes(2, 'big'))
         #         break
 
-        self.cmd('key', 'import', '--paper', self.repository_location, input=typed_input)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'import', '--paper', input=typed_input)
 
         # Test abort paths
         typed_input = b'\ny\n'
-        self.cmd('key', 'import', '--paper', self.repository_location, input=typed_input)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'import', '--paper', input=typed_input)
         typed_input = b'2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02\n\ny\n'
-        self.cmd('key', 'import', '--paper', self.repository_location, input=typed_input)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'import', '--paper', input=typed_input)
 
     def test_debug_dump_manifest(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         dump_file = self.output_path + '/dump'
-        output = self.cmd('debug', 'dump-manifest', self.repository_location, dump_file)
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'dump-manifest', dump_file)
         assert output == ""
         with open(dump_file) as f:
             result = json.load(f)
@@ -3279,10 +3278,10 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     def test_debug_dump_archive(self):
         self.create_regular_file('file1', size=1024 * 80)
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         dump_file = self.output_path + '/dump'
-        output = self.cmd('debug', 'dump-archive', self.repository_location + "::test", dump_file)
+        output = self.cmd(f'--repo={self.repository_location}::test', 'debug', 'dump-archive', dump_file)
         assert output == ""
         with open(dump_file) as f:
             result = json.load(f)
@@ -3292,17 +3291,17 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert '_items' in result
 
     def test_debug_refcount_obj(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('debug', 'refcount-obj', self.repository_location, '0' * 64).strip()
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'refcount-obj', '0' * 64).strip()
         assert output == 'object 0000000000000000000000000000000000000000000000000000000000000000 not found [info from chunks cache].'
 
-        create_json = json.loads(self.cmd('create', '--json', self.repository_location + '::test', 'input'))
+        create_json = json.loads(self.cmd(f'--repo={self.repository_location}::test', 'create', '--json', 'input'))
         archive_id = create_json['archive']['id']
-        output = self.cmd('debug', 'refcount-obj', self.repository_location, archive_id).strip()
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'refcount-obj', archive_id).strip()
         assert output == 'object ' + archive_id + ' has 1 referrers [info from chunks cache].'
 
         # Invalid IDs do not abort or return an error
-        output = self.cmd('debug', 'refcount-obj', self.repository_location, '124', 'xyza').strip()
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'refcount-obj', '124', 'xyza').strip()
         assert output == 'object id 124 is invalid.\nobject id xyza is invalid.'
 
     def test_debug_info(self):
@@ -3311,15 +3310,15 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'Python' in output
 
     def test_benchmark_crud(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         with environment_variable(_BORG_BENCHMARK_CRUD_TEST='YES'):
-            self.cmd('benchmark', 'crud', self.repository_location, self.input_path)
+            self.cmd(f'--repo={self.repository_location}', 'benchmark', 'crud', self.input_path)
 
     def test_config(self):
         self.create_test_files()
         os.unlink('input/flagfile')
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('config', '--list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        output = self.cmd(f'--repo={self.repository_location}', 'config', '--list')
         self.assert_in('[repository]', output)
         self.assert_in('version', output)
         self.assert_in('segments_per_dir', output)
@@ -3329,30 +3328,30 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.assert_in('id', output)
         self.assert_not_in('last_segment_checked', output)
 
-        output = self.cmd('config', self.repository_location, 'last_segment_checked', exit_code=1)
+        output = self.cmd(f'--repo={self.repository_location}', 'config', 'last_segment_checked', exit_code=1)
         self.assert_in('No option ', output)
-        self.cmd('config', self.repository_location, 'last_segment_checked', '123')
-        output = self.cmd('config', self.repository_location, 'last_segment_checked')
+        self.cmd(f'--repo={self.repository_location}', 'config', 'last_segment_checked', '123')
+        output = self.cmd(f'--repo={self.repository_location}', 'config', 'last_segment_checked')
         assert output == '123' + '\n'
-        output = self.cmd('config', '--list', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'config', '--list')
         self.assert_in('last_segment_checked', output)
-        self.cmd('config', '--delete', self.repository_location, 'last_segment_checked')
+        self.cmd(f'--repo={self.repository_location}', 'config', '--delete', 'last_segment_checked')
 
         for cfg_key, cfg_value in [
             ('additional_free_space', '2G'),
             ('repository.append_only', '1'),
         ]:
-            output = self.cmd('config', self.repository_location, cfg_key)
+            output = self.cmd(f'--repo={self.repository_location}', 'config', cfg_key)
             assert output == '0' + '\n'
-            self.cmd('config', self.repository_location, cfg_key, cfg_value)
-            output = self.cmd('config', self.repository_location, cfg_key)
+            self.cmd(f'--repo={self.repository_location}', 'config', cfg_key, cfg_value)
+            output = self.cmd(f'--repo={self.repository_location}', 'config', cfg_key)
             assert output == cfg_value + '\n'
-            self.cmd('config', '--delete', self.repository_location, cfg_key)
-            self.cmd('config', self.repository_location, cfg_key, exit_code=1)
+            self.cmd(f'--repo={self.repository_location}', 'config', '--delete', cfg_key)
+            self.cmd(f'--repo={self.repository_location}', 'config', cfg_key, exit_code=1)
 
-        self.cmd('config', '--list', '--delete', self.repository_location, exit_code=2)
-        self.cmd('config', self.repository_location, exit_code=2)
-        self.cmd('config', self.repository_location, 'invalid-option', exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'config', '--list', '--delete', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'config', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'config', 'invalid-option', exit_code=1)
 
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
@@ -3361,9 +3360,9 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_export_tar(self):
         self.create_test_files()
         os.unlink('input/flagfile')
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        self.cmd('export-tar', self.repository_location + '::test', 'simple.tar', '--progress', '--tar-format=GNU')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'simple.tar', '--progress', '--tar-format=GNU')
         with changedir('output'):
             # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
             subprocess.check_call(['tar', 'xpf', '../simple.tar', '--warning=no-timestamp'])
@@ -3376,9 +3375,9 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             pytest.skip('gzip is not installed')
         self.create_test_files()
         os.unlink('input/flagfile')
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar.gz',
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        list = self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'simple.tar.gz',
                         '--list', '--tar-format=GNU')
         assert 'input/file1\n' in list
         assert 'input/dir2\n' in list
@@ -3392,9 +3391,9 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             pytest.skip('gzip is not installed')
         self.create_test_files()
         os.unlink('input/flagfile')
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
-        list = self.cmd('export-tar', self.repository_location + '::test', 'simple.tar',
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
+        list = self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'simple.tar',
                         '--strip-components=1', '--list', '--tar-format=GNU')
         # --list's path are those before processing with --strip-components
         assert 'input/file1\n' in list
@@ -3407,7 +3406,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     @requires_gnutar
     def test_export_tar_strip_components_links(self):
         self._extract_hardlinks_setup()
-        self.cmd('export-tar', self.repository_location + '::test', 'output.tar',
+        self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'output.tar',
                  '--strip-components=2', '--tar-format=GNU')
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
@@ -3420,7 +3419,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     @requires_gnutar
     def test_extract_hardlinks_tar(self):
         self._extract_hardlinks_setup()
-        self.cmd('export-tar', self.repository_location + '::test', 'output.tar', 'input/dir1', '--tar-format=GNU')
+        self.cmd(f'--repo={self.repository_location}::test', 'export-tar', 'output.tar', 'input/dir1', '--tar-format=GNU')
         with changedir('output'):
             subprocess.check_call(['tar', 'xpf', '../output.tar', '--warning=no-timestamp'])
             assert os.stat('input/dir1/hardlink').st_nlink == 2
@@ -3431,12 +3430,12 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_import_tar(self, tar_format='PAX'):
         self.create_test_files(create_hardlinks=False)  # hardlinks become separate files
         os.unlink('input/flagfile')
-        self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar', f'--tar-format={tar_format}')
-        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
+        self.cmd(f'--repo={self.repository_location}::src', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::src', 'export-tar', 'simple.tar', f'--tar-format={tar_format}')
+        self.cmd(f'--repo={self.repository_location}::dst', 'import-tar', 'simple.tar')
         with changedir(self.output_path):
-            self.cmd('extract', self.repository_location + '::dst')
+            self.cmd(f'--repo={self.repository_location}::dst', 'extract')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
     @requires_gzip
@@ -3445,22 +3444,22 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             pytest.skip('gzip is not installed')
         self.create_test_files(create_hardlinks=False)  # hardlinks become separate files
         os.unlink('input/flagfile')
-        self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', self.repository_location + '::src', 'simple.tgz', f'--tar-format={tar_format}')
-        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tgz')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
+        self.cmd(f'--repo={self.repository_location}::src', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::src', 'export-tar', 'simple.tgz', f'--tar-format={tar_format}')
+        self.cmd(f'--repo={self.repository_location}::dst', 'import-tar', 'simple.tgz')
         with changedir(self.output_path):
-            self.cmd('extract', self.repository_location + '::dst')
+            self.cmd(f'--repo={self.repository_location}::dst', 'extract')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
     def test_roundtrip_pax_borg(self):
         self.create_test_files()
-        self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar', '--tar-format=BORG')
-        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
+        self.cmd(f'--repo={self.repository_location}::src', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::src', 'export-tar', 'simple.tar', '--tar-format=BORG')
+        self.cmd(f'--repo={self.repository_location}::dst', 'import-tar', 'simple.tar')
         with changedir(self.output_path):
-            self.cmd('extract', self.repository_location + '::dst')
+            self.cmd(f'--repo={self.repository_location}::dst', 'extract')
         self.assert_dirs_equal('input', 'output/input')
 
     # derived from test_extract_xattrs_errors()
@@ -3489,16 +3488,16 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
         os.makedirs(os.path.join(self.input_path, 'dir%p'))
         xattr.setxattr(b'input/dir%p', b'user.attribute', b'value')
-        self.cmd('init', self.repository_location, '-e' 'none')
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '-e' 'none')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         with changedir('output'):
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
-                self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+                self.cmd(f'--repo={self.repository_location}::test', 'extract', exit_code=EXIT_WARNING)
 
     def test_do_not_mention_archive_if_you_can_not_find_repo(self):
         """https://github.com/borgbackup/borg/issues/6014"""
-        archive = self.repository_location + '-this-repository-does-not-exist' + '::test'
-        output = self.cmd('info', archive, exit_code=2, fork=True)
+        output = self.cmd(f'--repo={self.repository_location}-this-repository-does-not-exist::test', 'info',
+                          exit_code=2, fork=True)
         self.assert_in('this-repository-does-not-exist', output)
         self.assert_not_in('this-repository-does-not-exist::test', output)
 
@@ -3508,8 +3507,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         It should be possible to retrieve the data from an archive even if
         both the client and the server forget the nonce"""
         self.create_regular_file('file1', contents=b'Hello, borg')
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         # Oops! We have removed the repo-side memory of the nonce!
         # See https://github.com/borgbackup/borg/issues/5858
         os.remove(os.path.join(self.repository_path, 'nonce'))
@@ -3517,18 +3516,18 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.remove(os.path.join(self.get_security_dir(), 'nonce'))
 
         # The repo should still be readable
-        repo_info = self.cmd('info', self.repository_location)
+        repo_info = self.cmd(f'--repo={self.repository_location}', 'info')
         assert 'All archives:' in repo_info
-        repo_list = self.cmd('list', self.repository_location)
+        repo_list = self.cmd(f'--repo={self.repository_location}', 'list')
         assert 'test' in repo_list
         # The archive should still be readable
-        archive_info = self.cmd('info', self.repository_location + '::test')
+        archive_info = self.cmd(f'--repo={self.repository_location}::test', 'info')
         assert 'Archive name: test\n' in archive_info
-        archive_list = self.cmd('list', self.repository_location + '::test')
+        archive_list = self.cmd(f'--repo={self.repository_location}::test', 'list')
         assert 'file1' in archive_list
         # Extracting the archive should work
         with changedir('output'):
-            self.cmd('extract', self.repository_location + '::test')
+            self.cmd(f'--repo={self.repository_location}::test', 'extract')
         self.assert_dirs_equal('input', 'output/input')
 
     def test_recovery_from_deleted_repo_nonce(self):
@@ -3539,35 +3538,35 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         repo. Otherwise we can just use our own copy of the nonce.
         """
         self.create_regular_file('file1', contents=b'Hello, borg')
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         # Oops! We have removed the repo-side memory of the nonce!
         # See https://github.com/borgbackup/borg/issues/5858
         nonce = os.path.join(self.repository_path, 'nonce')
         os.remove(nonce)
 
-        self.cmd('create', self.repository_location + '::test2', 'input')
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', 'input')
         assert os.path.exists(nonce)
 
     def test_init_defaults_to_argon2(self):
         """https://github.com/borgbackup/borg/issues/747#issuecomment-1076160401"""
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
         assert key['algorithm'] == 'argon2 chacha20-poly1305'
 
     def test_init_with_explicit_key_algorithm(self):
         """https://github.com/borgbackup/borg/issues/747#issuecomment-1076160401"""
-        self.cmd('init', '--encryption=repokey', '--key-algorithm=pbkdf2', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey', '--key-algorithm=pbkdf2')
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
         assert key['algorithm'] == 'sha256'
 
     def verify_change_passphrase_does_not_change_algorithm(self, given_algorithm, expected_algorithm):
-        self.cmd('init', '--encryption=repokey', '--key-algorithm', given_algorithm, self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey', '--key-algorithm', given_algorithm)
         os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
 
-        self.cmd('key', 'change-passphrase', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-passphrase')
 
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
@@ -3580,9 +3579,9 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.verify_change_passphrase_does_not_change_algorithm('pbkdf2', 'sha256')
 
     def verify_change_location_does_not_change_algorithm(self, given_algorithm, expected_algorithm):
-        self.cmd('init', '--encryption=keyfile', '--key-algorithm', given_algorithm, self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=keyfile', '--key-algorithm', given_algorithm)
 
-        self.cmd('key', 'change-location', self.repository_location, 'repokey')
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'repokey')
 
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
@@ -3595,14 +3594,14 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.verify_change_location_does_not_change_algorithm('pbkdf2', 'sha256')
 
     def test_key_change_algorithm(self):
-        self.cmd('init', '--encryption=repokey', '--key-algorithm=pbkdf2', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey', '--key-algorithm=pbkdf2')
 
-        self.cmd('key', 'change-algorithm', self.repository_location, 'argon2')
+        self.cmd(f'--repo={self.repository_location}', 'key', 'change-algorithm', 'argon2')
 
         with Repository(self.repository_path) as repository:
             _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         assert key._encrypted_key_algorithm == 'argon2 chacha20-poly1305'
-        self.cmd('info', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'info')
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
@@ -3654,30 +3653,30 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
     def setUp(self):
         super().setUp()
         with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
-            self.cmd('init', '--encryption=repokey', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
             self.create_src_archive('archive1')
             self.create_src_archive('archive2')
 
     def test_check_usage(self):
-        output = self.cmd('check', '-v', '--progress', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--progress', exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
         self.assert_in('Checking segments', output)
         # reset logging to new process default to avoid need for fork=True on next check
         logging.getLogger('borg.output.progress').setLevel(logging.NOTSET)
-        output = self.cmd('check', '-v', '--repository-only', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--repository-only', exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)
         self.assert_not_in('Checking segments', output)
-        output = self.cmd('check', '-v', '--archives-only', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--archives-only', exit_code=0)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
-        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--archives-only', '--prefix=archive2', exit_code=0)
         self.assert_not_in('archive1', output)
-        output = self.cmd('check', '-v', '--archives-only', '--first=1', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--archives-only', '--first=1', exit_code=0)
         self.assert_in('archive1', output)
         self.assert_not_in('archive2', output)
-        output = self.cmd('check', '-v', '--archives-only', '--last=1', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--archives-only', '--last=1', exit_code=0)
         self.assert_not_in('archive1', output)
         self.assert_in('archive2', output)
 
@@ -3693,11 +3692,11 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             else:
                 self.fail('should not happen')
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
         self.assert_in('New missing file chunk detected', output)
-        self.cmd('check', self.repository_location, exit_code=0)
-        output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}::archive1', 'list', '--format={health}#{path}{LF}', exit_code=0)
         self.assert_in('broken#', output)
         # check that the file in the old archives has now a different chunk list without the killed chunk
         for archive_name in ('archive1', 'archive2'):
@@ -3714,7 +3713,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         with patch.object(ChunkBuffer, 'BUFFER_SIZE', 10):
             self.create_src_archive('archive3')
         # check should be able to heal the file now:
-        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--repair', exit_code=0)
         self.assert_in('Healed previously missing file chunk', output)
         self.assert_in('testsuite/archiver.py: Completely healed previously damaged file!', output)
         # check that the file in the old archives has the correct chunks again
@@ -3728,7 +3727,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 else:
                     self.fail('should not happen')
         # list is also all-healthy again
-        output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}::archive1', 'list', '--format={health}#{path}{LF}', exit_code=0)
         self.assert_not_in('broken#', output)
 
     def test_missing_archive_item_chunk(self):
@@ -3736,29 +3735,29 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         with repository:
             repository.delete(archive.metadata.items[0])
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        self.cmd('check', '--repair', self.repository_location, exit_code=0)
-        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
 
     def test_missing_archive_metadata(self):
         archive, repository = self.open_archive('archive1')
         with repository:
             repository.delete(archive.id)
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        self.cmd('check', '--repair', self.repository_location, exit_code=0)
-        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
 
     def test_missing_manifest(self):
         archive, repository = self.open_archive('archive1')
         with repository:
             repository.delete(Manifest.MANIFEST_ID)
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--repair', exit_code=0)
         self.assert_in('archive1', output)
         self.assert_in('archive2', output)
-        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
 
     def test_corrupted_manifest(self):
         archive, repository = self.open_archive('archive1')
@@ -3767,11 +3766,11 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             corrupted_manifest = manifest + b'corrupted!'
             repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--repair', exit_code=0)
         self.assert_in('archive1', output)
         self.assert_in('archive2', output)
-        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
 
     def test_manifest_rebuild_corrupted_chunk(self):
         archive, repository = self.open_archive('archive1')
@@ -3784,10 +3783,10 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             corrupted_chunk = chunk + b'corrupted!'
             repository.put(archive.id, corrupted_chunk)
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '-v', '--repair', exit_code=0)
         self.assert_in('archive2', output)
-        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
 
     def test_manifest_rebuild_duplicate_archive(self):
         archive, repository = self.open_archive('archive1')
@@ -3809,27 +3808,27 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             archive_id = key.id_hash(archive)
             repository.put(archive_id, key.encrypt(archive_id, archive))
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        self.cmd('check', '--repair', self.repository_location, exit_code=0)
-        output = self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'list')
         self.assert_in('archive1', output)
         self.assert_in('archive1.1', output)
         self.assert_in('archive2', output)
 
     def test_extra_chunks(self):
-        self.cmd('check', self.repository_location, exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
         with Repository(self.repository_location, exclusive=True) as repository:
             repository.put(b'01234567890123456789012345678901', b'xxxx')
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
-        self.cmd('check', self.repository_location, exit_code=1)
-        self.cmd('check', '--repair', self.repository_location, exit_code=0)
-        self.cmd('check', self.repository_location, exit_code=0)
-        self.cmd('extract', '--dry-run', self.repository_location + '::archive1', exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
+        self.cmd(f'--repo={self.repository_location}::archive1', 'extract', '--dry-run', exit_code=0)
 
     def _test_verify_data(self, *init_args):
         shutil.rmtree(self.repository_path)
-        self.cmd('init', self.repository_location, *init_args)
+        self.cmd(f'--repo={self.repository_location}', 'init', *init_args)
         self.create_src_archive('archive1')
         archive, repository = self.open_archive('archive1')
         with repository:
@@ -3840,11 +3839,11 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                     repository.put(chunk.id, data)
                     break
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=0)
-        output = self.cmd('check', '--verify-data', self.repository_location, exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '--verify-data', exit_code=1)
         assert bin_to_hex(chunk.id) + ', integrity error' in output
         # repair (heal is tested in another test)
-        output = self.cmd('check', '--repair', '--verify-data', self.repository_location, exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'check', '--repair', '--verify-data', exit_code=0)
         assert bin_to_hex(chunk.id) + ', integrity error' in output
         assert 'testsuite/archiver.py: New missing file chunk detected' in output
 
@@ -3859,7 +3858,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             for id_ in repository.list():
                 repository.delete(id_)
             repository.commit(compact=False)
-        self.cmd('check', self.repository_location, exit_code=1)
+        self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
 
 
 class ManifestAuthenticationTest(ArchiverTestCaseBase):
@@ -3875,7 +3874,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.commit(compact=False)
 
     def test_fresh_init_tam_required(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -3887,10 +3886,10 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.commit(compact=False)
 
         with pytest.raises(TAMRequiredError):
-            self.cmd('list', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'list')
 
     def test_not_required(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('archive1234')
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
@@ -3903,39 +3902,39 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             del manifest['tam']
             repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb(manifest)))
             repository.commit(compact=False)
-        output = self.cmd('list', '--debug', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list', '--debug')
         assert 'archive1234' in output
         assert 'TAM not found and not required' in output
         # Run upgrade
-        self.cmd('upgrade', '--tam', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--tam')
         # Manifest must be authenticated now
-        output = self.cmd('list', '--debug', self.repository_location)
+        output = self.cmd(f'--repo={self.repository_location}', 'list', '--debug')
         assert 'archive1234' in output
         assert 'TAM-verified manifest' in output
         # Try to spoof / modify pre-1.0.9
         self.spoof_manifest(repository)
         # Fails
         with pytest.raises(TAMRequiredError):
-            self.cmd('list', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'list')
         # Force upgrade
-        self.cmd('upgrade', '--tam', '--force', self.repository_location)
-        self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--tam', '--force')
+        self.cmd(f'--repo={self.repository_location}', 'list')
 
     def test_disable(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('archive1234')
-        self.cmd('upgrade', '--disable-tam', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--disable-tam')
         repository = Repository(self.repository_path, exclusive=True)
         self.spoof_manifest(repository)
-        assert not self.cmd('list', self.repository_location)
+        assert not self.cmd(f'--repo={self.repository_location}', 'list')
 
     def test_disable2(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('archive1234')
         repository = Repository(self.repository_path, exclusive=True)
         self.spoof_manifest(repository)
-        self.cmd('upgrade', '--disable-tam', self.repository_location)
-        assert not self.cmd('list', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--disable-tam')
+        assert not self.cmd(f'--repo={self.repository_location}', 'list')
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):
@@ -3947,32 +3946,32 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     def test_remote_repo_restrict_to_path(self):
         # restricted to repo directory itself:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
-            self.cmd('init', '--encryption=repokey', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         # restricted to repo directory itself, fail for other directories with same prefix:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', self.repository_path]):
             with pytest.raises(PathNotAllowed):
-                self.cmd('init', '--encryption=repokey', self.repository_location + '_0')
+                self.cmd(f'--repo={self.repository_location}_0', 'init', '--encryption=repokey')
 
         # restricted to a completely different path:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo']):
             with pytest.raises(PathNotAllowed):
-                self.cmd('init', '--encryption=repokey', self.repository_location + '_1')
+                self.cmd(f'--repo={self.repository_location}_1', 'init', '--encryption=repokey')
         path_prefix = os.path.dirname(self.repository_path)
         # restrict to repo directory's parent directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', path_prefix]):
-            self.cmd('init', '--encryption=repokey', self.repository_location + '_2')
+            self.cmd(f'--repo={self.repository_location}_2', 'init', '--encryption=repokey')
         # restrict to repo directory's parent directory and another directory:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-path', '/foo', '--restrict-to-path', path_prefix]):
-            self.cmd('init', '--encryption=repokey', self.repository_location + '_3')
+            self.cmd(f'--repo={self.repository_location}_3', 'init', '--encryption=repokey')
 
     def test_remote_repo_restrict_to_repository(self):
         # restricted to repo directory itself:
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-repository', self.repository_path]):
-            self.cmd('init', '--encryption=repokey', self.repository_location)
+            self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         parent_path = os.path.join(self.repository_path, '..')
         with patch.object(RemoteRepository, 'extra_test_args', ['--restrict-to-repository', parent_path]):
             with pytest.raises(PathNotAllowed):
-                self.cmd('init', '--encryption=repokey', self.repository_location)
+                self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
 
     @unittest.skip('only works locally')
     def test_debug_put_get_delete_obj(self):
@@ -3987,25 +3986,25 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         pass
 
     def test_remote_repo_strip_components_doesnt_leak(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_regular_file('dir/file', contents=b"test file contents 1")
         self.create_regular_file('dir/file2', contents=b"test file contents 2")
         self.create_regular_file('skipped-file1', contents=b"test file contents 3")
         self.create_regular_file('skipped-file2', contents=b"test file contents 4")
         self.create_regular_file('skipped-file3', contents=b"test file contents 5")
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         marker = 'cached responses left in RemoteRepository'
         with changedir('output'):
-            res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '3')
+            res = self.cmd(f'--repo={self.repository_location}::test', 'extract', "--debug", '--strip-components', '3')
             assert marker not in res
             with self.assert_creates_file('file'):
-                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '2')
+                res = self.cmd(f'--repo={self.repository_location}::test', 'extract', "--debug", '--strip-components', '2')
                 assert marker not in res
             with self.assert_creates_file('dir/file'):
-                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '1')
+                res = self.cmd(f'--repo={self.repository_location}::test', 'extract', "--debug", '--strip-components', '1')
                 assert marker not in res
             with self.assert_creates_file('input/dir/file'):
-                res = self.cmd('extract', "--debug", self.repository_location + '::test', '--strip-components', '0')
+                res = self.cmd(f'--repo={self.repository_location}::test', 'extract', "--debug", '--strip-components', '0')
                 assert marker not in res
 
 
@@ -4013,8 +4012,8 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
     def setUp(self):
         super().setUp()
         self.create_test_files()
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cache_path = json.loads(self.cmd('info', self.repository_location, '--json'))['cache']['path']
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
+        self.cache_path = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--json'))['cache']['path']
 
     def corrupt(self, file, amount=1):
         with open(file, 'r+b') as fd:
@@ -4027,28 +4026,28 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         self.corrupt(os.path.join(self.cache_path, 'chunks'))
 
         if self.FORK_DEFAULT:
-            out = self.cmd('info', self.repository_location, exit_code=2)
+            out = self.cmd(f'--repo={self.repository_location}', 'info', exit_code=2)
             assert 'failed integrity check' in out
         else:
             with pytest.raises(FileIntegrityError):
-                self.cmd('info', self.repository_location)
+                self.cmd(f'--repo={self.repository_location}', 'info')
 
     def test_cache_files(self):
-        self.cmd('create', self.repository_location + '::test', 'input')
+        self.cmd(f'--repo={self.repository_location}::test', 'create', 'input')
         self.corrupt(os.path.join(self.cache_path, 'files'))
-        out = self.cmd('create', self.repository_location + '::test1', 'input')
+        out = self.cmd(f'--repo={self.repository_location}::test1', 'create', 'input')
         # borg warns about the corrupt files cache, but then continues without files cache.
         assert 'files cache is corrupted' in out
 
     def test_chunks_archive(self):
-        self.cmd('create', self.repository_location + '::test1', 'input')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', 'input')
         # Find ID of test1 so we can corrupt it later :)
-        target_id = self.cmd('list', self.repository_location, '--format={id}{LF}').strip()
-        self.cmd('create', self.repository_location + '::test2', 'input')
+        target_id = self.cmd(f'--repo={self.repository_location}', 'list', '--format={id}{LF}').strip()
+        self.cmd(f'--repo={self.repository_location}::test2', 'create', 'input')
 
         # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d
-        self.cmd('delete', '--cache-only', self.repository_location)
-        self.cmd('info', self.repository_location, '--json')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}', 'info', '--json')
 
         chunks_archive = os.path.join(self.cache_path, 'chunks.archive.d')
         assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
@@ -4064,7 +4063,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
             config.write(fd)
 
         # Cache sync notices corrupted archive chunks, but automatically recovers.
-        out = self.cmd('create', '-v', self.repository_location + '::test3', 'input', exit_code=1)
+        out = self.cmd(f'--repo={self.repository_location}::test3', 'create', '-v', 'input', exit_code=1)
         assert 'Reading cached archive chunk index for test1' in out
         assert 'Cached archive chunk index of test1 is corrupted' in out
         assert 'Fetching and building archive index for test1' in out
@@ -4079,7 +4078,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         with open(config_path, 'w') as fd:
             config.write(fd)
 
-        out = self.cmd('info', self.repository_location)
+        out = self.cmd(f'--repo={self.repository_location}', 'info')
         assert 'Cache integrity data not available: old Borg version modified the cache.' in out
 
 
@@ -4107,10 +4106,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             os.link('input/file_removed', 'input/hardlink_removed')
             os.link('input/file_removed2', 'input/hardlink_target_removed')
 
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
 
         # Create the first snapshot
-        self.cmd('create', self.repository_location + '::test0', 'input')
+        self.cmd(f'--repo={self.repository_location}::test0', 'create', 'input')
 
         # Setup files for the second snapshot
         self.create_regular_file('file_added', size=2048)
@@ -4141,8 +4140,8 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'appended_data')
 
         # Create the second snapshot
-        self.cmd('create', self.repository_location + '::test1a', 'input')
-        self.cmd('create', '--chunker-params', '16,18,17,4095', self.repository_location + '::test1b', 'input')
+        self.cmd(f'--repo={self.repository_location}::test1a', 'create', 'input')
+        self.cmd(f'--repo={self.repository_location}::test1b', 'create', '--chunker-params', '16,18,17,4095', 'input')
 
         def do_asserts(output, can_compare_ids):
             # File contents changed (deleted and replaced with a new file)
@@ -4287,19 +4286,19 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert not any(get_changes('input/hardlink_target_replaced', joutput))
 
-        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), True)
+        do_asserts(self.cmd(f'--repo={self.repository_location}::test0', 'diff', 'TODO_test0', 'test1a'), True)
         # We expect exit_code=1 due to the chunker params warning
-        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), False)
-        do_json_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a', '--json-lines'), True)
+        do_asserts(self.cmd(f'--repo={self.repository_location}::test0', 'diff', 'TODO_test0', 'test1b', exit_code=1), False)
+        do_json_asserts(self.cmd(f'--repo={self.repository_location}::test0', 'diff', 'TODO_test0', 'test1a', '--json-lines'), True)
 
     def test_sort_option(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
 
         self.create_regular_file('a_file_removed', size=8)
         self.create_regular_file('f_file_removed', size=16)
         self.create_regular_file('c_file_changed', size=32)
         self.create_regular_file('e_file_changed', size=64)
-        self.cmd('create', self.repository_location + '::test0', 'input')
+        self.cmd(f'--repo={self.repository_location}::test0', 'create', 'input')
 
         os.unlink('input/a_file_removed')
         os.unlink('input/f_file_removed')
@@ -4309,9 +4308,9 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('e_file_changed', size=1024)
         self.create_regular_file('b_file_added', size=128)
         self.create_regular_file('d_file_added', size=256)
-        self.cmd('create', self.repository_location + '::test1', 'input')
+        self.cmd(f'--repo={self.repository_location}::test1', 'create', 'input')
 
-        output = self.cmd('diff', '--sort', self.repository_location + '::test0', 'test1')
+        output = self.cmd(f'--repo={self.repository_location}::test0', 'diff', '--sort', 'TODO_test0', 'test1')
         expected = [
             'a_file_removed',
             'b_file_added',
@@ -4353,7 +4352,7 @@ def test_get_args():
     assert args.restrict_to_repositories == ['/r1', '/r2']
     # trying to cheat - try to execute different subcommand
     args = archiver.get_args(['borg', 'serve', '--restrict-to-path=/p1', '--restrict-to-path=/p2', ],
-                             'borg init --encryption=repokey /')
+                             'borg --repo=/ init --encryption=repokey')
     assert args.func == archiver.do_serve
 
     # Check that environment variables in the forced command don't cause issues. If the command

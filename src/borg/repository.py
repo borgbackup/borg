@@ -306,7 +306,7 @@ class Repository:
 
         if os.path.isfile(old_config_path):
             logger.warning("Old config file not securely erased on previous config update")
-            secure_erase(old_config_path)
+            secure_erase(old_config_path, avoid_collateral_damage=True)
 
         if os.path.isfile(config_path):
             link_error_msg = ("Failed to securely erase old repository config file (hardlinks not supported). "
@@ -333,7 +333,7 @@ class Repository:
                            "read-only repositories." % (e.strerror, e.filename))
 
         if os.path.isfile(old_config_path):
-            secure_erase(old_config_path)
+            secure_erase(old_config_path, avoid_collateral_damage=True)
 
     def save_key(self, keydata):
         assert self.config

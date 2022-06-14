@@ -99,7 +99,7 @@ except BaseException:
 assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND exception handler right above this line."
 
 
-STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
+STATS_HEADER = "                       Original size    Deduplicated size"
 
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
@@ -361,7 +361,7 @@ class Archiver:
                 chunks, chunks_healthy = hlm.retrieve(id=hlid, default=(None, None))
                 if chunks is not None:
                     item._dict['chunks'] = chunks
-                    for chunk_id, _, _ in chunks:
+                    for chunk_id, _ in chunks:
                         cache.chunk_incref(chunk_id, archive.stats)
                 if chunks_healthy is not None:
                     item._dict['chunks_healthy'] = chunks
@@ -424,7 +424,7 @@ class Archiver:
                 for item in other_archive.iter_items():
                     if 'chunks' in item:
                         chunks = []
-                        for chunk_id, size, _ in item.chunks:
+                        for chunk_id, size in item.chunks:
                             refcount = cache.seen_chunk(chunk_id, size)
                             if refcount == 0:  # target repo does not yet have this chunk
                                 if not dry_run:
@@ -443,7 +443,7 @@ class Archiver:
                                     chunks.append(chunk_entry)
                                 present_size += size
                         if not dry_run:
-                            item.chunks = chunks  # overwrite! IDs and sizes are same, csizes are likely different
+                            item.chunks = chunks  # TODO: overwrite? IDs and sizes are same.
                             archive.stats.nfiles += 1
                     if not dry_run:
                         archive.add_item(upgrade_item(item))
@@ -1331,7 +1331,7 @@ class Archiver:
             """
             Return a file-like object that reads from the chunks of *item*.
             """
-            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in item.chunks],
+            chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _ in item.chunks],
                                                          is_preloaded=True)
             if pi:
                 info = [remove_surrogates(item.path)]
@@ -1797,8 +1797,8 @@ class Archiver:
                 Command line: {command_line}
                 Utilization of maximum supported archive size: {limits[max_archive_size]:.0%}
                 ------------------------------------------------------------------------------
-                                       Original size      Compressed size    Deduplicated size
-                This archive:   {stats[original_size]:>20s} {stats[compressed_size]:>20s} {stats[deduplicated_size]:>20s}
+                                       Original size    Deduplicated size
+                This archive:   {stats[original_size]:>20s} {stats[deduplicated_size]:>20s}
                 {cache}
                 """).strip().format(cache=cache, **info))
             if self.exit_code:

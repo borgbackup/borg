@@ -61,10 +61,10 @@ def fix_list_of_chunkentries(v):
     chunks = []
     for ce in v:
         assert isinstance(ce, (tuple, list))
-        assert len(ce) == 3  # id, size, csize
+        assert len(ce) in (2, 3)  # id, size[, csize]
         assert isinstance(ce[1], int)
-        assert isinstance(ce[2], int)
-        ce_fixed = [want_bytes(ce[0]), ce[1], ce[2]]  # list!
+        assert len(ce) == 2 or isinstance(ce[2], int)
+        ce_fixed = [want_bytes(ce[0]), ce[1]]  # list! id, size only, drop csize
         chunks.append(ce_fixed)  # create a list of lists
     return chunks
 
@@ -227,7 +227,7 @@ class PropDict:
         return property(_get, _set, _del, doc=doc)
 
 
-ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+ChunkListEntry = namedtuple('ChunkListEntry', 'id size')
 
 class Item(PropDict):
     """
@@ -284,17 +284,15 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def get_size(self, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
+    def get_size(self, *, memorize=False, from_chunks=False, consider_ids=None):
         """
-        Determine the (uncompressed or compressed) size of this item.
+        Determine the uncompressed size of this item.
 
         :param memorize: Whether the computed size value will be stored into the item.
-        :param compressed: Whether the compressed or uncompressed size will be returned.
         :param from_chunks: If true, size is computed from chunks even if a precomputed value is available.
         :param consider_ids: Returns the size of the given ids only.
         """
-        attr = 'csize' if compressed else 'size'
-        assert not (compressed and memorize), 'Item does not have a csize field.'
+        attr = 'size'
         assert not (consider_ids is not None and memorize), "Can't store size when considering only certain ids"
         try:
             if from_chunks or consider_ids is not None:
@@ -496,10 +494,8 @@ class ArchiveItem(PropDict):
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
     recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
     size = PropDict._make_property('size', int)
-    csize = PropDict._make_property('csize', int)
     nfiles = PropDict._make_property('nfiles', int)
     size_parts = PropDict._make_property('size_parts', int)
-    csize_parts = PropDict._make_property('csize_parts', int)
     nfiles_parts = PropDict._make_property('nfiles_parts', int)
 
     def update_internal(self, d):

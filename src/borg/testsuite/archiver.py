@@ -1543,7 +1543,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         cache = info_repo['cache']
         stats = cache['stats']
         assert all(isinstance(o, int) for o in stats.values())
-        assert all(key in stats for key in ('total_chunks', 'total_csize', 'total_size', 'total_unique_chunks', 'unique_csize', 'unique_size'))
+        assert all(key in stats for key in ('total_chunks', 'total_size', 'total_unique_chunks', 'unique_size'))
 
         info_archive = json.loads(self.cmd('info', '--json', self.repository_location + '::test'))
         assert info_repo['repository'] == info_archive['repository']
@@ -2363,12 +2363,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', '-C', 'lz4', test_archive, 'input')
-        output = self.cmd('list', '--format', '{size} {csize} {dsize} {dcsize} {path}{NL}', test_archive)
-        size, csize, dsize, dcsize, path = output.split("\n")[1].split(" ")
-        assert int(csize) < int(size)
-        assert int(dcsize) < int(dsize)
-        assert int(dsize) <= int(size)
-        assert int(dcsize) <= int(csize)
+        output = self.cmd('list', '--format', '{size} {path}{NL}', test_archive)
+        size, path = output.split("\n")[1].split(" ")
+        assert int(size) == 10000
 
     def test_list_json(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -2440,69 +2437,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         log = self.cmd('--debug', 'create', self.repository_location + '::test', 'input')
         assert 'security: read previous location' in log
-
-    def _get_sizes(self, compression, compressible, size=10000):
-        if compressible:
-            contents = b'X' * size
-        else:
-            contents = os.urandom(size)
-        self.create_regular_file('file', contents=contents)
-        self.cmd('init', '--encryption=none', self.repository_location)
-        archive = self.repository_location + '::test'
-        self.cmd('create', '-C', compression, archive, 'input')
-        output = self.cmd('list', '--format', '{size} {csize} {path}{NL}', archive)
-        size, csize, path = output.split("\n")[1].split(" ")
-        return int(size), int(csize)
-
-    def test_compression_none_compressible(self):
-        size, csize = self._get_sizes('none', compressible=True)
-        assert csize == size + 3
-
-    def test_compression_none_uncompressible(self):
-        size, csize = self._get_sizes('none', compressible=False)
-        assert csize == size + 3
-
-    def test_compression_zlib_compressible(self):
-        size, csize = self._get_sizes('zlib', compressible=True)
-        assert csize < size * 0.1
-        assert csize == 37
-
-    def test_compression_zlib_uncompressible(self):
-        size, csize = self._get_sizes('zlib', compressible=False)
-        assert csize >= size
-
-    def test_compression_auto_compressible(self):
-        size, csize = self._get_sizes('auto,zlib', compressible=True)
-        assert csize < size * 0.1
-        assert csize == 37  # same as compression 'zlib'
-
-    def test_compression_auto_uncompressible(self):
-        size, csize = self._get_sizes('auto,zlib', compressible=False)
-        assert csize == size + 3  # same as compression 'none'
-
-    def test_compression_lz4_compressible(self):
-        size, csize = self._get_sizes('lz4', compressible=True)
-        assert csize < size * 0.1
-
-    def test_compression_lz4_uncompressible(self):
-        size, csize = self._get_sizes('lz4', compressible=False)
-        assert csize == size + 3  # same as compression 'none'
-
-    def test_compression_lzma_compressible(self):
-        size, csize = self._get_sizes('lzma', compressible=True)
-        assert csize < size * 0.1
-
-    def test_compression_lzma_uncompressible(self):
-        size, csize = self._get_sizes('lzma', compressible=False)
-        assert csize == size + 3  # same as compression 'none'
-
-    def test_compression_zstd_compressible(self):
-        size, csize = self._get_sizes('zstd', compressible=True)
-        assert csize < size * 0.1
-
-    def test_compression_zstd_uncompressible(self):
-        size, csize = self._get_sizes('zstd', compressible=False)
-        assert csize == size + 3  # same as compression 'none'
 
     def test_change_passphrase(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -2951,13 +2885,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 correct_chunks = cache.chunks
         assert original_chunks is not correct_chunks
         seen = set()
-        for id, (refcount, size, csize) in correct_chunks.iteritems():
-            o_refcount, o_size, o_csize = original_chunks[id]
+        for id, (refcount, size) in correct_chunks.iteritems():
+            o_refcount, o_size = original_chunks[id]
             assert refcount == o_refcount
             assert size == o_size
-            assert csize == o_csize
             seen.add(id)
-        for id, (refcount, size, csize) in original_chunks.iteritems():
+        for id, (refcount, size) in original_chunks.iteritems():
             assert id in seen
 
     def test_check_cache(self):
@@ -3051,15 +2984,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input', '-C', 'none')
         file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
-                             '--format', '{size} {csize} {sha256}')
-        size, csize, sha256_before = file_list.split(' ')
-        assert int(csize) >= int(size)  # >= due to metadata overhead
+                             '--format', '{size} {sha256}')
+        size, sha256_before = file_list.split(' ')
         self.cmd('recreate', self.repository_location, '-C', 'lz4', '--recompress')
         self.check_cache()
         file_list = self.cmd('list', self.repository_location + '::test', 'input/compressible',
-                             '--format', '{size} {csize} {sha256}')
-        size, csize, sha256_after = file_list.split(' ')
-        assert int(csize) < int(size)
+                             '--format', '{size} {sha256}')
+        size, sha256_after = file_list.split(' ')
         assert sha256_before == sha256_after
 
     def test_recreate_timestamp(self):

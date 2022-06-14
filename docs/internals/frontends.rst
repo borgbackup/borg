@@ -269,12 +269,8 @@ stats
         Number of unique chunks
     total_size
         Total uncompressed size of all chunks multiplied with their reference counts
-    total_csize
-        Total compressed and encrypted size of all chunks multiplied with their reference counts
     unique_size
         Uncompressed size of all chunks
-    unique_csize
-        Compressed and encrypted size of all chunks
 
 .. highlight: json
 
@@ -285,10 +281,8 @@ Example *borg info* output::
             "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
             "stats": {
                 "total_chunks": 511533,
-                "total_csize": 17948017540,
                 "total_size": 22635749792,
                 "total_unique_chunks": 54892,
-                "unique_csize": 1920405405,
                 "unique_size": 2449675468
             }
         },
@@ -424,10 +418,8 @@ The same archive with more information (``borg info --last 1 --json``)::
             "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
             "stats": {
                 "total_chunks": 511533,
-                "total_csize": 17948017540,
                 "total_size": 22635749792,
                 "total_unique_chunks": 54892,
-                "unique_csize": 1920405405,
                 "unique_size": 2449675468
             }
         },
@@ -495,26 +487,26 @@ added:
 
 removed:
     See **added** property.
-    
+
 old_mode:
     If **type** == '*mode*', then **old_mode** and **new_mode** provide the mode and permissions changes.
 
 new_mode:
     See **old_mode** property.
- 
+
 old_user:
     If **type** == '*owner*', then **old_user**, **new_user**, **old_group** and **new_group** provide the user
     and group ownership changes.
 
 old_group:
     See **old_user** property.
- 
+
 new_user:
     See **old_user** property.
- 
+
 new_group:
     See **old_user** property.
-    
+
 
 Example (excerpt) of ``borg diff --json-lines``::
 

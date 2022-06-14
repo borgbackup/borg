@@ -698,9 +698,7 @@ class ItemFormatter(BaseFormatter):
         'source': 'link target for symlinks (identical to linktarget)',
         'hlid': 'hard link identity (same if hardlinking same fs object)',
         'extra': 'prepends {source} with " -> " for soft links and " link to " for hard links',
-        'csize': 'compressed size',
         'dsize': 'deduplicated size',
-        'dcsize': 'deduplicated compressed size',
         'num_chunks': 'number of chunks in this file',
         'unique_chunks': 'number of unique chunks in this file',
         'xxh64': 'XXH64 checksum of this file (note: this is NOT a cryptographic hash!)',
@@ -708,7 +706,7 @@ class ItemFormatter(BaseFormatter):
     }
     KEY_GROUPS = (
         ('type', 'mode', 'uid', 'gid', 'user', 'group', 'path', 'bpath', 'source', 'linktarget', 'hlid', 'flags'),
-        ('size', 'csize', 'dsize', 'dcsize', 'num_chunks', 'unique_chunks'),
+        ('size', 'dsize', 'num_chunks', 'unique_chunks'),
         ('mtime', 'ctime', 'atime', 'isomtime', 'isoctime', 'isoatime'),
         tuple(sorted(hash_algorithms)),
         ('archiveid', 'archivename', 'extra'),
@@ -716,7 +714,7 @@ class ItemFormatter(BaseFormatter):
     )
 
     KEYS_REQUIRING_CACHE = (
-        'dsize', 'dcsize', 'unique_chunks',
+        'dsize', 'unique_chunks',
     )
 
     @classmethod
@@ -774,9 +772,7 @@ class ItemFormatter(BaseFormatter):
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             'size': self.calculate_size,
-            'csize': self.calculate_csize,
             'dsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
-            'dcsize': partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.csize),
             'num_chunks': self.calculate_num_chunks,
             'unique_chunks': partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
             'isomtime': partial(self.format_iso_time, 'mtime'),
@@ -846,11 +842,7 @@ class ItemFormatter(BaseFormatter):
 
     def calculate_size(self, item):
         # note: does not support hardlink slaves, they will be size 0
-        return item.get_size(compressed=False)
-
-    def calculate_csize(self, item):
-        # note: does not support hardlink slaves, they will be csize 0
-        return item.get_size(compressed=True)
+        return item.get_size()
 
     def hash_item(self, hash_function, item):
         if 'chunks' not in item:

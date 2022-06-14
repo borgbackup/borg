@@ -58,49 +58,44 @@ class Statistics:
     def __init__(self, output_json=False, iec=False):
         self.output_json = output_json
         self.iec = iec
-        self.osize = self.csize = self.usize = self.nfiles = 0
-        self.osize_parts = self.csize_parts = self.usize_parts = self.nfiles_parts = 0
+        self.osize = self.usize = self.nfiles = 0
+        self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
 
-    def update(self, size, csize, unique, part=False):
+    def update(self, size, unique, part=False):
         if not part:
             self.osize += size
-            self.csize += csize
             if unique:
-                self.usize += csize
+                self.usize += size
         else:
             self.osize_parts += size
-            self.csize_parts += csize
             if unique:
-                self.usize_parts += csize
+                self.usize_parts += size
 
     def __add__(self, other):
         if not isinstance(other, Statistics):
             raise TypeError('can only add Statistics objects')
         stats = Statistics(self.output_json, self.iec)
         stats.osize = self.osize + other.osize
-        stats.csize = self.csize + other.csize
         stats.usize = self.usize + other.usize
         stats.nfiles = self.nfiles + other.nfiles
         stats.osize_parts = self.osize_parts + other.osize_parts
-        stats.csize_parts = self.csize_parts + other.csize_parts
         stats.usize_parts = self.usize_parts + other.usize_parts
         stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
         return stats
 
-    summary = "{label:15} {stats.osize_fmt:>20s} {stats.csize_fmt:>20s} {stats.usize_fmt:>20s}"
+    summary = "{label:15} {stats.osize_fmt:>20s} {stats.usize_fmt:>20s}"
 
     def __str__(self):
         return self.summary.format(stats=self, label='This archive:')
 
     def __repr__(self):
-        return "<{cls} object at {hash:#x} ({self.osize}, {self.csize}, {self.usize})>".format(
+        return "<{cls} object at {hash:#x} ({self.osize}, {self.usize})>".format(
             cls=type(self).__name__, hash=id(self), self=self)
 
     def as_dict(self):
         return {
             'original_size': FileSize(self.osize, iec=self.iec),
-            'compressed_size': FileSize(self.csize, iec=self.iec),
             'deduplicated_size': FileSize(self.usize, iec=self.iec),
             'nfiles': self.nfiles,
         }
@@ -108,10 +103,8 @@ class Statistics:
     def as_raw_dict(self):
         return {
             'size': self.osize,
-            'csize': self.csize,
             'nfiles': self.nfiles,
             'size_parts': self.osize_parts,
-            'csize_parts': self.csize_parts,
             'nfiles_parts': self.nfiles_parts,
         }
 
@@ -119,10 +112,8 @@ class Statistics:
     def from_raw_dict(cls, **kw):
         self = cls()
         self.osize = kw['size']
-        self.csize = kw['csize']
         self.nfiles = kw['nfiles']
         self.osize_parts = kw['size_parts']
-        self.csize_parts = kw['csize_parts']
         self.nfiles_parts = kw['nfiles_parts']
         return self
 
@@ -133,10 +124,6 @@ class Statistics:
     @property
     def usize_fmt(self):
         return format_file_size(self.usize, iec=self.iec)
-
-    @property
-    def csize_fmt(self):
-        return format_file_size(self.csize, iec=self.iec)
 
     def show_progress(self, item=None, final=False, stream=None, dt=None):
         now = time.monotonic()
@@ -158,7 +145,7 @@ class Statistics:
             else:
                 columns, lines = get_terminal_size()
                 if not final:
-                    msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
+                    msg = '{0.osize_fmt} O {0.usize_fmt} U {0.nfiles} N '.format(self)
                     path = remove_surrogates(item.path) if item else ''
                     space = columns - swidth(msg)
                     if space < 12:
@@ -383,7 +370,7 @@ class CacheChunkBuffer(ChunkBuffer):
         self.stats = stats
 
     def write_chunk(self, chunk):
-        id_, _, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats, wait=False)
+        id_, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats, wait=False)
         self.cache.repository.async_response(wait=False)
         return id_
 
@@ -507,6 +494,10 @@ class Archive:
     def duration_from_meta(self):
         return format_timedelta(self.ts_end - self.ts)
 
+    def _archive_csize(self):
+        cdata = self.repository.get(self.id)
+        return len(cdata)
+
     def info(self):
         if self.create:
             stats = self.stats
@@ -524,7 +515,7 @@ class Archive:
             'duration': (end - start).total_seconds(),
             'stats': stats.as_dict(),
             'limits': {
-                'max_archive_size': self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
+                'max_archive_size': self._archive_csize() / MAX_DATA_SIZE,
             },
         }
         if self.create:
@@ -553,7 +544,7 @@ Utilization of max. archive size: {csize_max:.0%}
             self,
             start=OutputTimestamp(self.start.replace(tzinfo=timezone.utc)),
             end=OutputTimestamp(self.end.replace(tzinfo=timezone.utc)),
-            csize_max=self.cache.chunks[self.id].csize / MAX_DATA_SIZE,
+            csize_max=self._archive_csize() / MAX_DATA_SIZE,
             location=self.repository._location.canonical_path()
 )
 
@@ -614,10 +605,8 @@ Utilization of max. archive size: {csize_max:.0%}
         if stats is not None:
             metadata.update({
                 'size': stats.osize,
-                'csize': stats.csize,
                 'nfiles': stats.nfiles,
                 'size_parts': stats.osize_parts,
-                'csize_parts': stats.csize_parts,
                 'nfiles_parts': stats.nfiles_parts})
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
@@ -640,25 +629,12 @@ Utilization of max. archive size: {csize_max:.0%}
         self.cache.commit()
 
     def calc_stats(self, cache, want_unique=True):
-        # caching wrapper around _calc_stats which is rather slow for archives made with borg < 1.2
-        have_borg12_meta = self.metadata.get('nfiles') is not None
-        try:
-            stats = Statistics.from_raw_dict(**cache.pre12_meta[self.fpr])
-        except KeyError:  # not in pre12_meta cache
-            stats = self._calc_stats(cache, want_unique=want_unique)
-            if not have_borg12_meta:
-                cache.pre12_meta[self.fpr] = stats.as_raw_dict()
-        return stats
-
-    def _calc_stats(self, cache, want_unique=True):
-        have_borg12_meta = self.metadata.get('nfiles') is not None
-
-        if have_borg12_meta and not want_unique:
-            unique_csize = 0
+        if not want_unique:
+            unique_size = 0
         else:
             def add(id):
                 entry = cache.chunks[id]
-                archive_index.add(id, 1, entry.size, entry.csize)
+                archive_index.add(id, 1, entry.size)
 
             archive_index = ChunkIndex()
             sync = CacheSynchronizer(archive_index)
@@ -673,29 +649,16 @@ Utilization of max. archive size: {csize_max:.0%}
                 add(id)
                 data = self.key.decrypt(id, chunk)
                 sync.feed(data)
-            unique_csize = archive_index.stats_against(cache.chunks)[3]
+            unique_size = archive_index.stats_against(cache.chunks)[1]
             pi.finish()
 
         stats = Statistics(iec=self.iec)
-        stats.usize = unique_csize  # the part files use same chunks as the full file
-        if not have_borg12_meta:
-            if self.consider_part_files:
-                stats.nfiles = sync.num_files_totals
-                stats.osize = sync.size_totals
-                stats.csize = sync.csize_totals
-            else:
-                stats.nfiles = sync.num_files_totals - sync.num_files_parts
-                stats.osize = sync.size_totals - sync.size_parts
-                stats.csize = sync.csize_totals - sync.csize_parts
-        else:
-            if self.consider_part_files:
-                stats.nfiles = self.metadata.nfiles_parts + self.metadata.nfiles
-                stats.osize = self.metadata.size_parts + self.metadata.size
-                stats.csize = self.metadata.csize_parts + self.metadata.csize
-            else:
-                stats.nfiles = self.metadata.nfiles
-                stats.osize = self.metadata.size
-                stats.csize = self.metadata.csize
+        stats.usize = unique_size  # the part files use same chunks as the full file
+        stats.nfiles = self.metadata.nfiles
+        stats.osize = self.metadata.size
+        if self.consider_part_files:
+            stats.nfiles += self.metadata.nfiles_parts
+            stats.osize += self.metadata.size_parts
         return stats
 
     @contextmanager
@@ -986,7 +949,7 @@ Utilization of max. archive size: {csize_max:.0%}
                         item = Item(internal_dict=item)
                         if 'chunks' in item:
                             part = not self.consider_part_files and 'part' in item
-                            for chunk_id, size, csize in item.chunks:
+                            for chunk_id, size in item.chunks:
                                 chunk_decref(chunk_id, stats, part=part)
                 except (TypeError, ValueError):
                     # if items metadata spans multiple chunks and one chunk got dropped somehow,
@@ -1344,7 +1307,7 @@ class FilesystemObjectProcessors:
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
                 if 'chunks' in item:  # create_helper might have put chunks from a previous hardlink there
-                    [cache.chunk_incref(id_, self.stats) for id_, _, _ in item.chunks]
+                    [cache.chunk_incref(id_, self.stats) for id_, _ in item.chunks]
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
@@ -1626,7 +1589,7 @@ class ArchiveChecker:
             if not result:
                 break
             marker = result[-1]
-            init_entry = ChunkIndexEntry(refcount=0, size=0, csize=0)
+            init_entry = ChunkIndexEntry(refcount=0, size=0)
             for id_ in result:
                 self.chunks[id_] = init_entry
 
@@ -1783,21 +1746,21 @@ class ArchiveChecker:
         self.chunks.pop(Manifest.MANIFEST_ID, None)
 
         def mark_as_possibly_superseded(id_):
-            if self.chunks.get(id_, ChunkIndexEntry(0, 0, 0)).refcount == 0:
+            if self.chunks.get(id_, ChunkIndexEntry(0, 0)).refcount == 0:
                 self.possibly_superseded.add(id_)
 
         def add_callback(chunk):
             id_ = self.key.id_hash(chunk)
             cdata = self.key.encrypt(id_, chunk)
-            add_reference(id_, len(chunk), len(cdata), cdata)
+            add_reference(id_, len(chunk), cdata)
             return id_
 
-        def add_reference(id_, size, csize, cdata=None):
+        def add_reference(id_, size, cdata=None):
             try:
                 self.chunks.incref(id_)
             except KeyError:
                 assert cdata is not None
-                self.chunks[id_] = ChunkIndexEntry(refcount=1, size=size, csize=csize)
+                self.chunks[id_] = ChunkIndexEntry(refcount=1, size=size)
                 if self.repair:
                     self.repository.put(id_, cdata)
 
@@ -1811,8 +1774,7 @@ class ArchiveChecker:
                 chunk = Chunk(None, allocation=CH_ALLOC, size=size)
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 cdata = self.key.encrypt(chunk_id, data)
-                csize = len(cdata)
-                return chunk_id, size, csize, cdata
+                return chunk_id, size, cdata
 
             offset = 0
             chunk_list = []
@@ -1827,7 +1789,7 @@ class ArchiveChecker:
                 has_chunks_healthy = False
                 chunks_healthy = chunks_current
             for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
-                chunk_id, size, csize = chunk_healthy
+                chunk_id, size = chunk_healthy
                 if chunk_id not in self.chunks:
                     # a chunk of the healthy list is missing
                     if chunk_current == chunk_healthy:
@@ -1835,32 +1797,32 @@ class ArchiveChecker:
                                      'Replacing with all-zero chunk.'.format(
                                      archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
                         self.error_found = chunks_replaced = True
-                        chunk_id, size, csize, cdata = replacement_chunk(size)
-                        add_reference(chunk_id, size, csize, cdata)
+                        chunk_id, size, cdata = replacement_chunk(size)
+                        add_reference(chunk_id, size, cdata)
                     else:
                         logger.info('{}: {}: Previously missing file chunk is still missing (Byte {}-{}, Chunk {}). '
                                     'It has an all-zero replacement chunk already.'.format(
                                     archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
-                        chunk_id, size, csize = chunk_current
+                        chunk_id, size = chunk_current
                         if chunk_id in self.chunks:
-                            add_reference(chunk_id, size, csize)
+                            add_reference(chunk_id, size)
                         else:
                             logger.warning('{}: {}: Missing all-zero replacement chunk detected (Byte {}-{}, Chunk {}). '
                                            'Generating new replacement chunk.'.format(
                                            archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
                             self.error_found = chunks_replaced = True
-                            chunk_id, size, csize, cdata = replacement_chunk(size)
-                            add_reference(chunk_id, size, csize, cdata)
+                            chunk_id, size, cdata = replacement_chunk(size)
+                            add_reference(chunk_id, size, cdata)
                 else:
                     if chunk_current == chunk_healthy:
                         # normal case, all fine.
-                        add_reference(chunk_id, size, csize)
+                        add_reference(chunk_id, size)
                     else:
                         logger.info('{}: {}: Healed previously missing file chunk! (Byte {}-{}, Chunk {}).'.format(
                             archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
-                        add_reference(chunk_id, size, csize)
+                        add_reference(chunk_id, size)
                         mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
-                chunk_list.append([chunk_id, size, csize])  # list-typed element as chunks_healthy is list-of-lists
+                chunk_list.append([chunk_id, size])  # list-typed element as chunks_healthy is list-of-lists
                 offset += size
             if chunks_replaced and not has_chunks_healthy:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
@@ -1871,7 +1833,7 @@ class ArchiveChecker:
             item.chunks = chunk_list
             if 'size' in item:
                 item_size = item.size
-                item_chunks_size = item.get_size(compressed=False, from_chunks=True)
+                item_chunks_size = item.get_size(from_chunks=True)
                 if item_size != item_chunks_size:
                     # just warn, but keep the inconsistency, so that borg extract can warn about it.
                     logger.warning('{}: {}: size inconsistency detected: size {}, chunks size {}'.format(
@@ -2005,7 +1967,7 @@ class ArchiveChecker:
                 data = msgpack.packb(archive.as_dict())
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(new_archive_id, data)
-                add_reference(new_archive_id, len(data), len(cdata), cdata)
+                add_reference(new_archive_id, len(data), cdata)
                 self.manifest.archives[info.name] = (new_archive_id, info.ts)
             pi.finish()
 
@@ -2112,7 +2074,7 @@ class ArchiveRecreater:
 
     def process_chunks(self, archive, target, item):
         if not self.recompress and not target.recreate_rechunkify:
-            for chunk_id, size, csize in item.chunks:
+            for chunk_id, size in item.chunks:
                 self.cache.chunk_incref(chunk_id, target.stats)
             return item.chunks
         chunk_iterator = self.iter_chunks(archive, target, list(item.chunks))
@@ -2136,7 +2098,7 @@ class ArchiveRecreater:
         return chunk_entry
 
     def iter_chunks(self, archive, target, chunks):
-        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _, _ in chunks])
+        chunk_iterator = archive.pipeline.fetch_many([chunk_id for chunk_id, _ in chunks])
         if target.recreate_rechunkify:
             # The target.chunker will read the file contents through ChunkIteratorFileWrapper chunk-by-chunk
             # (does not load the entire file into memory)

@@ -77,6 +77,20 @@ assert UINT32_MAX == 2**32-1
 assert _MAX_VALUE % 2 == 1
 
 
+def hashindex_variant(fn):
+    """peek into an index file and find out what it is"""
+    with open(fn, 'rb') as f:
+        hh = f.read(18)  # len(HashHeader)
+    magic = hh[0:8]
+    if magic == b'BORG_IDX':
+        key_size = hh[16]
+        value_size = hh[17]
+        return f'k{key_size}_v{value_size}'
+    if magic == b'12345678':  # used by unit tests
+        return 'k32_v16'  # just return the current variant
+    raise ValueError(f'unknown hashindex format, magic: {magic!r}')
+
+
 @cython.internal
 cdef class IndexBase:
     cdef HashIndex *index
@@ -196,7 +210,114 @@ cdef class FuseVersionsIndex(IndexBase):
         return hashindex_get(self.index, <unsigned char *>key) != NULL
 
 
+NSIndexEntry = namedtuple('NSIndexEntry', 'segment offset size')
+
+
 cdef class NSIndex(IndexBase):
+
+    value_size = 16
+
+    def __getitem__(self, key):
+        assert len(key) == self.key_size
+        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
+        if not data:
+            raise KeyError(key)
+        cdef uint32_t segment = _le32toh(data[0])
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return NSIndexEntry(segment, _le32toh(data[1]), _le32toh(data[2]))
+
+    def __setitem__(self, key, value):
+        assert len(key) == self.key_size
+        cdef uint32_t[4] data
+        cdef uint32_t segment = value[0]
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        data[0] = _htole32(segment)
+        data[1] = _htole32(value[1])
+        data[2] = _htole32(value[2])
+        data[3] = 0  # init flags to all cleared
+        if not hashindex_set(self.index, <unsigned char *>key, data):
+            raise Exception('hashindex_set failed')
+
+    def __contains__(self, key):
+        cdef uint32_t segment
+        assert len(key) == self.key_size
+        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
+        if data != NULL:
+            segment = _le32toh(data[0])
+            assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return data != NULL
+
+    def iteritems(self, marker=None, mask=0, value=0):
+        """iterate over all items or optionally only over items having specific flag values"""
+        cdef const unsigned char *key
+        assert isinstance(mask, int)
+        assert isinstance(value, int)
+        iter = NSKeyIterator(self.key_size, mask, value)
+        iter.idx = self
+        iter.index = self.index
+        if marker:
+            key = hashindex_get(self.index, <unsigned char *>marker)
+            if marker is None:
+                raise IndexError
+            iter.key = key - self.key_size
+        return iter
+
+    def flags(self, key, mask=0xFFFFFFFF, value=None):
+        """query and optionally set flags"""
+        assert len(key) == self.key_size
+        assert isinstance(mask, int)
+        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
+        if not data:
+            raise KeyError(key)
+        flags = _le32toh(data[3])
+        if isinstance(value, int):
+            new_flags = flags & ~mask  # clear masked bits
+            new_flags |= value & mask  # set value bits
+            data[3] = _htole32(new_flags)
+        return flags & mask # always return previous flags value
+
+
+cdef class NSKeyIterator:
+    cdef NSIndex idx
+    cdef HashIndex *index
+    cdef const unsigned char *key
+    cdef int key_size
+    cdef int exhausted
+    cdef int flag_mask
+    cdef int flag_value
+
+    def __cinit__(self, key_size, mask, value):
+        self.key = NULL
+        self.key_size = key_size
+        # note: mask and value both default to 0, so they will match all entries
+        self.flag_mask = _htole32(mask)
+        self.flag_value = _htole32(value)
+        self.exhausted = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef uint32_t *value
+        if self.exhausted:
+            raise StopIteration
+        while True:
+            self.key = hashindex_next_key(self.index, <unsigned char *>self.key)
+            if not self.key:
+                self.exhausted = 1
+                raise StopIteration
+            value = <uint32_t *> (self.key + self.key_size)
+            if value[3] & self.flag_mask == self.flag_value:
+                # we found a matching entry!
+                break
+
+        cdef uint32_t segment = _le32toh(value[0])
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return ((<char *>self.key)[:self.key_size],
+                NSIndexEntry(segment, _le32toh(value[1]), _le32toh(value[2])))
+
+
+cdef class NSIndex1(IndexBase):  # legacy borg 1.x
 
     value_size = 8
 
@@ -230,7 +351,7 @@ cdef class NSIndex(IndexBase):
 
     def iteritems(self, marker=None):
         cdef const unsigned char *key
-        iter = NSKeyIterator(self.key_size)
+        iter = NSKeyIterator1(self.key_size)
         iter.idx = self
         iter.index = self.index
         if marker:
@@ -241,8 +362,8 @@ cdef class NSIndex(IndexBase):
         return iter
 
 
-cdef class NSKeyIterator:
-    cdef NSIndex idx
+cdef class NSKeyIterator1:  # legacy borg 1.x
+    cdef NSIndex1 idx
     cdef HashIndex *index
     cdef const unsigned char *key
     cdef int key_size

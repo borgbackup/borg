@@ -87,8 +87,8 @@ class HashIndexTestCase(BaseTestCase):
         del idx
 
     def test_nsindex(self):
-        self._generic_test(NSIndex, lambda x: (x, x),
-                           '85f72b036c692c8266e4f51ccf0cff2147204282b5e316ae508d30a448d88fef')
+        self._generic_test(NSIndex, lambda x: (x, x, x),
+                           '7d70671d0b7e9d2f51b2691ecf35184b9f8ecc1202cceb2748c905c8fc04c256')
 
     def test_chunkindex(self):
         self._generic_test(ChunkIndex, lambda x: (x, x),
@@ -102,7 +102,7 @@ class HashIndexTestCase(BaseTestCase):
             initial_size = os.path.getsize(filepath)
             self.assert_equal(len(idx), 0)
             for x in range(n):
-                idx[H(x)] = x, x
+                idx[H(x)] = x, x, x, x
             idx.write(filepath)
             assert initial_size < os.path.getsize(filepath)
             for x in range(n):
@@ -114,7 +114,7 @@ class HashIndexTestCase(BaseTestCase):
     def test_iteritems(self):
         idx = NSIndex()
         for x in range(100):
-            idx[H(x)] = x, x
+            idx[H(x)] = x, x, x, x
         iterator = idx.iteritems()
         all = list(iterator)
         self.assert_equal(len(all), 100)
@@ -152,6 +152,70 @@ class HashIndexTestCase(BaseTestCase):
         assert unique_size == 1000 + 2000 + 3000
         assert chunks == 1 + 2 + 3
         assert unique_chunks == 3
+
+    def test_flags(self):
+        idx = NSIndex()
+        key = H(0)
+        self.assert_raises(KeyError, idx.flags, key, 0)
+        idx[key] = 0, 0, 0  # create entry
+        # check bit 0 and 1, should be both 0 after entry creation
+        self.assert_equal(idx.flags(key, mask=3), 0)
+        # set bit 0
+        idx.flags(key, mask=1, value=1)
+        self.assert_equal(idx.flags(key, mask=1), 1)
+        # set bit 1
+        idx.flags(key, mask=2, value=2)
+        self.assert_equal(idx.flags(key, mask=2), 2)
+        # check both bit 0 and 1, both should be set
+        self.assert_equal(idx.flags(key, mask=3), 3)
+        # clear bit 1
+        idx.flags(key, mask=2, value=0)
+        self.assert_equal(idx.flags(key, mask=2), 0)
+        # clear bit 0
+        idx.flags(key, mask=1, value=0)
+        self.assert_equal(idx.flags(key, mask=1), 0)
+        # check both bit 0 and 1, both should be cleared
+        self.assert_equal(idx.flags(key, mask=3), 0)
+
+    def test_flags_iteritems(self):
+        idx = NSIndex()
+        keys_flagged0 = {H(i) for i in (1, 2, 3, 42)}
+        keys_flagged1 = {H(i) for i in (11, 12, 13, 142)}
+        keys_flagged2 = {H(i) for i in (21, 22, 23, 242)}
+        keys_flagged3 = {H(i) for i in (31, 32, 33, 342)}
+        for key in keys_flagged0:
+            idx[key] = 0, 0, 0  # create entry
+            idx.flags(key, mask=3, value=0)  # not really necessary, unflagged is default
+        for key in keys_flagged1:
+            idx[key] = 0, 0, 0  # create entry
+            idx.flags(key, mask=3, value=1)
+        for key in keys_flagged2:
+            idx[key] = 0, 0, 0  # create entry
+            idx.flags(key, mask=3, value=2)
+        for key in keys_flagged3:
+            idx[key] = 0, 0, 0  # create entry
+            idx.flags(key, mask=3, value=3)
+        # check if we can iterate over all items
+        k_all = {k for k, v in idx.iteritems()}
+        self.assert_equal(k_all, keys_flagged0 | keys_flagged1 | keys_flagged2 | keys_flagged3)
+        # check if we can iterate over the flagged0 items
+        k0 = {k for k, v in idx.iteritems(mask=3, value=0)}
+        self.assert_equal(k0, keys_flagged0)
+        # check if we can iterate over the flagged1 items
+        k1 = {k for k, v in idx.iteritems(mask=3, value=1)}
+        self.assert_equal(k1, keys_flagged1)
+        # check if we can iterate over the flagged2 items
+        k1 = {k for k, v in idx.iteritems(mask=3, value=2)}
+        self.assert_equal(k1, keys_flagged2)
+        # check if we can iterate over the flagged3 items
+        k1 = {k for k, v in idx.iteritems(mask=3, value=3)}
+        self.assert_equal(k1, keys_flagged3)
+        # check if we can iterate over the flagged1 + flagged3 items
+        k1 = {k for k, v in idx.iteritems(mask=1, value=1)}
+        self.assert_equal(k1, keys_flagged1 | keys_flagged3)
+        # check if we can iterate over the flagged0 + flagged2 items
+        k1 = {k for k, v in idx.iteritems(mask=1, value=0)}
+        self.assert_equal(k1, keys_flagged0 | keys_flagged2)
 
 
 class HashIndexExtraTestCase(BaseTestCase):
@@ -514,9 +578,9 @@ class NSIndexTestCase(BaseTestCase):
     def test_nsindex_segment_limit(self):
         idx = NSIndex()
         with self.assert_raises(AssertionError):
-            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0
+            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0, 0, 0
         assert H(1) not in idx
-        idx[H(2)] = NSIndex.MAX_VALUE, 0
+        idx[H(2)] = NSIndex.MAX_VALUE, 0, 0, 0
         assert H(2) in idx
 
 
@@ -531,38 +595,38 @@ class IndexCorruptionTestCase(BaseTestCase):
 
         from struct import pack
 
-        def HH(x, y):
-            # make some 32byte long thing that depends on x and y.
+        def HH(x, y, z):
+            # make some 32byte long thing that depends on x, y, z.
             # same x will mean a collision in the hashtable as bucket index is computed from
             # first 4 bytes. giving a specific x targets bucket index x.
             # y is to create different keys and does not go into the bucket index calculation.
             # so, same x + different y --> collision
-            return pack('<IIQQQ', x, y, 0, 0, 0)  # 2 * 4 + 3 * 8 == 32
+            return pack('<IIIIIIII', x, y, z, 0, 0, 0, 0, 0)  # 8 * 4 == 32
 
         idx = NSIndex()
 
         # create lots of colliding entries
         for y in range(700):  # stay below max load to not trigger resize
-            idx[HH(0, y)] = (0, y)
+            idx[HH(0, y, 0)] = (0, y, 0)
 
-        assert idx.size() == 1031 * 40 + 18  # 1031 buckets + header
+        assert idx.size() == 1031 * 48 + 18  # 1031 buckets + header
 
         # delete lots of the collisions, creating lots of tombstones
         for y in range(400):  # stay above min load to not trigger resize
-            del idx[HH(0, y)]
+            del idx[HH(0, y, 0)]
 
         # create lots of colliding entries, within the not yet used part of the hashtable
         for y in range(330):  # stay below max load to not trigger resize
             # at y == 259 a resize will happen due to going beyond max EFFECTIVE load
             # if the bug is present, that element will be inserted at the wrong place.
             # and because it will be at the wrong place, it can not be found again.
-            idx[HH(600, y)] = 600, y
+            idx[HH(600, y, 0)] = 600, y, 0
 
         # now check if hashtable contents is as expected:
 
-        assert [idx.get(HH(0, y)) for y in range(400, 700)] == [(0, y) for y in range(400, 700)]
+        assert [idx.get(HH(0, y, 0)) for y in range(400, 700)] == [(0, y, 0) for y in range(400, 700)]
 
-        assert [HH(0, y) in idx for y in range(400)] == [False for y in range(400)]  # deleted entries
+        assert [HH(0, y, 0) in idx for y in range(400)] == [False for y in range(400)]  # deleted entries
 
         # this will fail at HH(600, 259) if the bug is present.
-        assert [idx.get(HH(600, y)) for y in range(330)] == [(600, y) for y in range(330)]
+        assert [idx.get(HH(600, y, 0)) for y in range(330)] == [(600, y, 0) for y in range(330)]

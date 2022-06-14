@@ -714,7 +714,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def corrupt_object(self, id_):
         idx = self.open_index()
-        segment, offset = idx[H(id_)]
+        segment, offset, _ = idx[H(id_)]
         with open(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)), 'r+b') as fd:
             fd.seek(offset)
             fd.write(b'BOOM')

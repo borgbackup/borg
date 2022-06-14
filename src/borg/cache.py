@@ -1,5 +1,4 @@
 import configparser
-import json
 import os
 import shutil
 import stat
@@ -655,8 +654,6 @@ class LocalCache(CacheStatsMixin):
         archive indexes.
         """
         archive_path = os.path.join(self.path, 'chunks.archive.d')
-        # An index of chunks whose size had to be fetched
-        chunks_fetched_size_index = ChunkIndex()
         # Instrumentation
         processed_item_metadata_bytes = 0
         processed_item_metadata_chunks = 0

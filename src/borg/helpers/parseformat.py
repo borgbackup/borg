@@ -507,16 +507,12 @@ class Location:
         return loc
 
 
-def location_validator(archive=None, proto=None, other=False):
+def location_validator(proto=None, other=False):
     def validator(text):
         try:
             loc = Location(text, other=other)
         except ValueError as err:
             raise argparse.ArgumentTypeError(str(err)) from None
-        if archive is True and not loc.archive:
-            raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
-        elif archive is False and loc.archive:
-            raise argparse.ArgumentTypeError('"%s": No archive can be specified' % text)
         if proto is not None and loc.proto != proto:
             if proto == 'file':
                 raise argparse.ArgumentTypeError('"%s": Repository must be local' % text)

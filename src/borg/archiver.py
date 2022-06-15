@@ -4143,12 +4143,12 @@ class Archiver:
 
         # initialize DST_REPO reusing key material from SRC_REPO, so that
         # chunking and chunk id generation will work in the same way as before.
-        borg init --other-location=SRC_REPO --encryption=DST_ENC DST_REPO
+        borg --repo=DST_REPO init --other-repo=SRC_REPO --encryption=DST_ENC
 
         # transfer archives from SRC_REPO to DST_REPO
-        borg transfer --dry-run SRC_REPO DST_REPO  # check what it would do
-        borg transfer           SRC_REPO DST_REPO  # do it!
-        borg transfer --dry-run SRC_REPO DST_REPO  # check! anything left?
+        borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check what it would do
+        borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
+        borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
         The default is to transfer all archives, including checkpoint archives.
 
@@ -4164,12 +4164,9 @@ class Archiver:
         subparser.set_defaults(func=self.do_transfer)
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not change repository, just check')
-        subparser.add_argument('other_location', metavar='SRC_REPOSITORY',
-                               type=location_validator(archive=False, other=True),
+        subparser.add_argument('--other-repo', metavar='SRC_REPOSITORY', dest='other_location',
+                               type=location_validator(other=True),
                                help='source repository')
-        # subparser.add_argument('-r', '--repo', dest='location', metavar='DST_REPOSITORY',
-        #                        type=location_validator(archive=False, other=False),
-        #                        help='destination repository')
         define_archive_filters_group(subparser)
 
         # borg diff
@@ -4504,8 +4501,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='initialize empty repository')
         subparser.set_defaults(func=self.do_init)
-        subparser.add_argument('--other-location', metavar='OTHER_REPOSITORY', dest='other_location',
-                               type=location_validator(archive=False, other=True),
+        subparser.add_argument('--other-repo', metavar='SRC_REPOSITORY', dest='other_location',
+                               type=location_validator(other=True),
                                help='reuse the key material from the other repository')
         subparser.add_argument('-e', '--encryption', metavar='MODE', dest='encryption', required=True,
                                choices=key_argument_names(),

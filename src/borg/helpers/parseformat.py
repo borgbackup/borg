@@ -301,9 +301,7 @@ def parse_stringified_list(s):
 
 
 class Location:
-    """Object representing a repository / archive location
-    """
-    proto = user = _host = port = path = archive = None
+    """Object representing a repository location"""
 
     # user must not contain "@", ":" or "/".
     # Quoting adduser error message:
@@ -335,15 +333,6 @@ class Location:
         (?P<path>(/([^:]|(:(?!:)))+))                       # start with /, then any chars, but no "::"
         """
 
-    # optional ::archive_name at the end, archive name must not contain "/".
-    # borg mount's FUSE filesystem creates one level of directories from
-    # the archive names and of course "/" is not valid in a directory name.
-    optional_archive_re = r"""
-        (?:
-            ::                                              # "::" as separator
-            (?P<archive>[^/]+)                              # archive name must not contain "/"
-        )?$"""                                              # must match until the end
-
     # host NAME, or host IP ADDRESS (v4 or v6, v6 must be in square brackets)
     host_re = r"""
         (?P<host>(
@@ -358,14 +347,13 @@ class Location:
         (?P<proto>ssh)://                                       # ssh://
         """ + optional_user_re + host_re + r"""                 # user@  (optional), host name or address
         (?::(?P<port>\d+))?                                     # :port (optional)
-        """ + abs_path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
+        """ + abs_path_re, re.VERBOSE)                          # path
 
     file_re = re.compile(r"""
         (?P<proto>file)://                                      # file://
-        """ + file_path_re + optional_archive_re, re.VERBOSE)   # servername/path, path or path::archive
+        """ + file_path_re, re.VERBOSE)                         # servername/path or path
 
-    local_re = re.compile(
-        local_path_re + optional_archive_re, re.VERBOSE)    # local path with optional archive
+    local_re = re.compile(local_path_re, re.VERBOSE)            # local path
 
     win_file_re = re.compile(r"""
         (?:file://)?                                        # optional file protocol
@@ -373,7 +361,7 @@ class Location:
             (?:[a-zA-Z]:)?                                  # Drive letter followed by a colon (optional)
             (?:[^:]+)                                       # Anything which does not contain a :, at least one character
         )
-        """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
+        """, re.VERBOSE)
 
     def __init__(self, text='', overrides={}, other=False):
         self.repo_env_var = 'BORG_OTHER_REPO' if other else 'BORG_REPO'
@@ -383,7 +371,8 @@ class Location:
         self._host = None
         self.port = None
         self.path = None
-        self.archive = None
+        self.raw = None
+        self.processed = None
         self.parse(text, overrides)
 
     def parse(self, text, overrides={}):
@@ -413,10 +402,9 @@ class Location:
             if m:
                 self.proto = 'file'
                 self.path = m.group('path')
-                self.archive = m.group('archive')
                 return True
 
-            # On windows we currently only support windows paths
+            # On windows we currently only support windows paths.
             return False
 
         m = self.ssh_re.match(text)
@@ -426,19 +414,16 @@ class Location:
             self._host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
             self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
             return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group('proto')
             self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
             return True
         m = self.local_re.match(text)
         if m:
-            self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
             self.proto = 'file'
+            self.path = normpath_special(m.group('path'))
             return True
         return False
 
@@ -449,7 +434,6 @@ class Location:
             'host=%r' % self.host,
             'port=%r' % self.port,
             'path=%r' % self.path,
-            'archive=%r' % self.archive,
         ]
         return ', '.join(items)
 
@@ -493,13 +477,6 @@ class Location:
             'now': DatetimeWrapper(timestamp.astimezone(None)),
             'utcnow': DatetimeWrapper(timestamp),
         })
-
-    def omit_archive(self):
-        loc = Location(self.raw)
-        loc.archive = None
-        loc.raw = loc.raw.split("::")[0]
-        loc.processed = loc.processed.split("::")[0]
-        return loc
 
 
 def location_validator(proto=None, other=False):

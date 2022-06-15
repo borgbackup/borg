@@ -116,7 +116,7 @@ def argument(args, str_or_bool):
 def get_repository(location, *, create, exclusive, lock_wait, lock, append_only,
                    make_parent_dirs, storage_quota, args):
     if location.proto == 'ssh':
-        repository = RemoteRepository(location.omit_archive(), create=create, exclusive=exclusive,
+        repository = RemoteRepository(location, create=create, exclusive=exclusive,
                                       lock_wait=lock_wait, lock=lock, append_only=append_only,
                                       make_parent_dirs=make_parent_dirs, args=args)
 

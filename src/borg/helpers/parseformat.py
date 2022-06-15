@@ -365,15 +365,6 @@ class Location:
     local_re = re.compile(
         local_path_re + optional_archive_re, re.VERBOSE)    # local path with optional archive
 
-    # get the repo from BORG_REPO env and the optional archive from param.
-    # if the syntax requires giving REPOSITORY (see "borg mount"),
-    # use "::" to let it use the env var.
-    # if REPOSITORY argument is optional, it'll automatically use the env.
-    env_re = re.compile(r"""                                # the repo part is fetched from BORG_REPO
-        (?:::$)                                             # just "::" is ok (when a pos. arg is required, no archive)
-        |                                                   # or
-        """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
-
     win_file_re = re.compile(r"""
         (?:file://)?                                        # optional file protocol
         (?P<path>
@@ -384,27 +375,29 @@ class Location:
 
     def __init__(self, text='', overrides={}, other=False):
         self.repo_env_var = 'BORG_OTHER_REPO' if other else 'BORG_REPO'
-        if not self.parse(text, overrides):
-            raise ValueError('Invalid location format: "%s"' % self.processed)
+        self.valid = False
+        self.proto = None
+        self.user = None
+        self._host = None
+        self.port = None
+        self.path = None
+        self.archive = None
+        self.parse(text, overrides)
 
     def parse(self, text, overrides={}):
+        if not text:
+            # we did not get a text to parse, so we try to fetch from the environment
+            text = os.environ.get(self.repo_env_var)
+            if text is None:
+                return
+
         self.raw = text  # as given by user, might contain placeholders
-        self.processed = text = replace_placeholders(text, overrides)  # after placeholder replacement
-        valid = self._parse(text)
+        self.processed = replace_placeholders(self.raw, overrides)  # after placeholder replacement
+        valid = self._parse(self.processed)
         if valid:
-            return True
-        m = self.env_re.match(text)
-        if not m:
-            return False
-        repo_raw = os.environ.get(self.repo_env_var)
-        if repo_raw is None:
-            return False
-        repo = replace_placeholders(repo_raw, overrides)
-        valid = self._parse(repo)
-        self.archive = m.group('archive')
-        self.raw = repo_raw if not self.archive else repo_raw + self.raw
-        self.processed = repo if not self.archive else f'{repo}::{self.archive}'
-        return valid
+            self.valid = True
+        else:
+            raise ValueError('Invalid location format: "%s"' % self.processed)
 
     def _parse(self, text):
         def normpath_special(p):

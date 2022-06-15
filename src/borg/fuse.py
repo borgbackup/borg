@@ -272,11 +272,11 @@ class FuseBackend:
 
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
-        if self._args.location.archive:
+        if self._args.name:
             if self.versions:
                 raise Error("for versions view, do not specify a single archive, "
                             "but always give the repository as location.")
-            self._process_archive(self._args.location.archive)
+            self._process_archive(self._args.name)
         else:
             self.versions_index = FuseVersionsIndex()
             for archive in self._manifest.archives.list_considering(self._args):

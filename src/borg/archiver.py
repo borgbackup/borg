@@ -52,7 +52,7 @@ try:
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
-    from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
+    from .helpers import PrefixSpec, GlobSpec, NameSpec, CommentSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
     from .helpers import remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
@@ -257,7 +257,9 @@ def with_other_repository(manifest=False, key=False, cache=False, compatibility=
 def with_archive(method):
     @functools.wraps(method)
     def wrapper(self, args, repository, key, manifest, **kwargs):
-        archive = Archive(repository, key, manifest, args.location.archive,
+        archive_name = getattr(args, 'name', None)
+        assert archive_name is not None
+        archive = Archive(repository, key, manifest, archive_name,
                           numeric_ids=getattr(args, 'numeric_ids', False),
                           noflags=getattr(args, 'nobsdflags', False) or getattr(args, 'noflags', False),
                           noacls=getattr(args, 'noacls', False),
@@ -541,7 +543,7 @@ class Archiver:
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         if not args.repo_only and not ArchiveChecker().check(
-                repository, repair=args.repair, archive=args.location.archive,
+                repository, repair=args.repair, archive=args.name,
                 first=args.first, last=args.last, sort_by=args.sort_by or 'ts', glob=args.glob_archives,
                 verify_data=args.verify_data, save_space=args.save_space):
             return EXIT_WARNING
@@ -669,34 +671,34 @@ class Archiver:
             compression = '--compression=none'
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
-            rc = self.do_create(self.parse_args([f'--repo={repo}::borg-benchmark-crud1', 'create',
+            rc = self.do_create(self.parse_args([f'--repo={repo}', 'create', '--name=borg-benchmark-crud1',
                                                  compression, '--files-cache=disabled', path]))
             t_end = time.monotonic()
             dt_create = t_end - t_start
             assert rc == 0
             # now build files cache
-            rc1 = self.do_create(self.parse_args([f'--repo={repo}::borg-benchmark-crud2', 'create',
+            rc1 = self.do_create(self.parse_args([f'--repo={repo}', 'create', '--name=borg-benchmark-crud2',
                                                   compression, path]))
-            rc2 = self.do_delete(self.parse_args([f'--repo={repo}::borg-benchmark-crud2', 'delete']))
+            rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud2']))
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
-            rc1 = self.do_create(self.parse_args([f'--repo={repo}::borg-benchmark-crud3', 'create',
+            rc1 = self.do_create(self.parse_args([f'--repo={repo}', 'create', '--name=borg-benchmark-crud3',
                                                   compression, path]))
             t_end = time.monotonic()
             dt_update = t_end - t_start
-            rc2 = self.do_delete(self.parse_args([f'--repo={repo}::borg-benchmark-crud3', 'delete']))
+            rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud3']))
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
-            rc = self.do_extract(self.parse_args([f'--repo={repo}::borg-benchmark-crud1', 'extract',
+            rc = self.do_extract(self.parse_args([f'--repo={repo}', 'extract', '--name=borg-benchmark-crud1',
                                                   '--dry-run']))
             t_end = time.monotonic()
             dt_extract = t_end - t_start
             assert rc == 0
             # measure archive deletion (of LAST present archive with the data)
             t_start = time.monotonic()
-            rc = self.do_delete(self.parse_args([f'--repo={repo}::borg-benchmark-crud1', 'delete']))
+            rc = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud1']))
             t_end = time.monotonic()
             dt_delete = t_end - t_start
             assert rc == 0
@@ -1012,7 +1014,7 @@ class Archiver:
             with Cache(repository, key, manifest, progress=args.progress,
                        lock_wait=self.lock_wait, permit_adhoc_cache=args.no_cache_sync,
                        cache_mode=args.files_cache_mode, iec=args.iec) as cache:
-                archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+                archive = Archive(repository, key, manifest, args.name, cache=cache,
                                   create=True, checkpoint_interval=args.checkpoint_interval,
                                   numeric_ids=args.numeric_ids, noatime=not args.atime, noctime=args.noctime,
                                   progress=args.progress,
@@ -1475,7 +1477,7 @@ class Archiver:
         print_output = print_json_output if args.json_lines else print_text_output
 
         archive1 = archive
-        archive2 = Archive(repository, key, manifest, args.archive2,
+        archive2 = Archive(repository, key, manifest, args.name2,
                            consider_part_files=args.consider_part_files)
 
         can_compare_chunk_ids = archive1.metadata.get('chunker_params', False) == archive2.metadata.get(
@@ -1506,7 +1508,7 @@ class Archiver:
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        archive.rename(args.name)
+        archive.rename(args.name2)
         manifest.write()
         repository.commit(compact=False)
         cache.commit()
@@ -1516,7 +1518,7 @@ class Archiver:
     def do_delete(self, args, repository):
         """Delete an existing repository or archives"""
         archive_filter_specified = any((args.first, args.last, args.prefix is not None, args.glob_archives))
-        explicit_archives_specified = args.location.archive or args.archives
+        explicit_archives_specified = args.name or args.archives
         self.output_list = args.output_list
         if archive_filter_specified and explicit_archives_specified:
             self.print_error('Mixing archive filters and explicitly named archives is not supported.')
@@ -1532,10 +1534,10 @@ class Archiver:
 
         manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
 
-        if args.location.archive or args.archives:
+        if args.name or args.archives:
             archives = list(args.archives)
-            if args.location.archive:
-                archives.insert(0, args.location.archive)
+            if args.name:
+                archives.insert(0, args.name)
             archive_names = tuple(archives)
         else:
             args.consider_checkpoints = True
@@ -1699,7 +1701,7 @@ class Archiver:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest, key):
         """List archive or repository contents"""
-        if args.location.archive:
+        if args.name:
             if args.json:
                 self.print_error('The --json option is only valid for listing archives, not archive contents.')
                 return self.exit_code
@@ -1720,7 +1722,7 @@ class Archiver:
             format = "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"
 
         def _list_inner(cache):
-            archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+            archive = Archive(repository, key, manifest, args.name, cache=cache,
                               consider_part_files=args.consider_part_files)
 
             formatter = ItemFormatter(archive, format, json_lines=args.json_lines)
@@ -1763,7 +1765,7 @@ class Archiver:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
-        if any((args.location.archive, args.first, args.last, args.prefix is not None, args.glob_archives)):
+        if any((args.name, args.first, args.last, args.prefix is not None, args.glob_archives)):
             return self._info_archives(args, repository, manifest, key, cache)
         else:
             return self._info_repository(args, repository, manifest, key, cache)
@@ -1772,8 +1774,8 @@ class Archiver:
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
-        if args.location.archive:
-            archive_names = (args.location.archive,)
+        if args.name:
+            archive_names = (args.name,)
         else:
             args.consider_checkpoints = True
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
@@ -2003,8 +2005,8 @@ class Archiver:
                                      checkpoint_interval=args.checkpoint_interval,
                                      dry_run=args.dry_run, timestamp=args.timestamp)
 
-        if args.location.archive:
-            name = args.location.archive
+        if args.name:
+            name = args.name
             if recreater.is_temporary_archive(name):
                 self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
                 return self.exit_code
@@ -2048,7 +2050,7 @@ class Archiver:
         t0 = datetime.utcnow()
         t0_monotonic = time.monotonic()
 
-        archive = Archive(repository, key, manifest, args.location.archive, cache=cache,
+        archive = Archive(repository, key, manifest, args.name, cache=cache,
                           create=True, checkpoint_interval=args.checkpoint_interval,
                           progress=args.progress,
                           chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
@@ -2289,7 +2291,7 @@ class Archiver:
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
-        archive = Archive(repository, key, manifest, args.location.archive,
+        archive = Archive(repository, key, manifest, args.name,
                           consider_part_files=args.consider_part_files)
         for i, item_id in enumerate(archive.metadata.items):
             data = key.decrypt(item_id, repository.get(item_id))
@@ -2305,9 +2307,9 @@ class Archiver:
         """dump decoded archive metadata (not: data)"""
 
         try:
-            archive_meta_orig = manifest.archives.get_raw_dict()[args.location.archive]
+            archive_meta_orig = manifest.archives.get_raw_dict()[args.name]
         except KeyError:
-            raise Archive.DoesNotExist(args.location.archive)
+            raise Archive.DoesNotExist(args.name)
 
         indent = 4
 
@@ -2317,7 +2319,7 @@ class Archiver:
         def output(fd):
             # this outputs megabytes of data for a modest sized archive, so some manual streaming json output
             fd.write('{\n')
-            fd.write('    "_name": ' + json.dumps(args.location.archive) + ",\n")
+            fd.write('    "_name": ' + json.dumps(args.name) + ",\n")
             fd.write('    "_manifest_entry":\n')
             fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
             fd.write(',\n')
@@ -2808,7 +2810,7 @@ class Archiver:
         This allows you to share the same patterns between multiple repositories
         without needing to specify them on the command line.\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
-        Repository (or Archive) URLs, ``--prefix``, ``--glob-archives``, ``--comment``
+        Repository URLs, ``--name``, ``--prefix``, ``--glob-archives``, ``--comment``
         and ``--remote-path`` values support these placeholders:
 
         {hostname}
@@ -3271,7 +3273,8 @@ class Archiver:
 
         def define_borg_mount(parser):
             parser.set_defaults(func=self.do_mount)
-            # archive name
+            parser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                                help='specify the archive name')
             parser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
                                 help='Show checkpoint archives in the repository contents list (default: hidden).')
             parser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
@@ -3545,7 +3548,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='verify repository')
         subparser.set_defaults(func=self.do_check)
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
                                help='only perform repository checks')
         subparser.add_argument('--archives-only', dest='archives_only', action='store_true',
@@ -3895,6 +3899,8 @@ class Archiver:
                                    'regular files. Also follows symlinks pointing to these kinds of files.')
 
         archive_group = subparser.add_argument_group('Archive options')
+        archive_group.add_argument('--name', dest='name', metavar='NAME', type=NameSpec, default='{hostname}-{now}',
+                                   help='specify the name for the archive')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', type=CommentSpec, default='',
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
@@ -3913,7 +3919,6 @@ class Archiver:
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
 
-        # archive name
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to archive')
 
@@ -3956,7 +3961,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='dump archive items (metadata) (debug)')
         subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
 
         debug_dump_archive_epilog = process_epilog("""
         This command dumps all metadata of an archive in a decoded form to a file.
@@ -3967,7 +3973,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='dump decoded archive metadata (debug)')
         subparser.set_defaults(func=self.do_debug_dump_archive)
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('path', metavar='PATH', type=str,
                                help='file to dump data into')
 
@@ -4133,7 +4140,8 @@ class Archiver:
                                help='keep the local security info when deleting a repository')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
                                help='archives to delete')
         define_archive_filters_group(subparser)
@@ -4207,10 +4215,10 @@ class Archiver:
                                help='Sort the output lines by file path.')
         subparser.add_argument('--json-lines', action='store_true',
                                help='Format output as JSON Lines. ')
-        subparser.add_argument('archive1', metavar='ARCHIVE1',
+        subparser.add_argument('--name', metavar='ARCHIVE1',
                                type=archivename_validator(),
                                help='ARCHIVE1 name')
-        subparser.add_argument('archive2', metavar='ARCHIVE2',
+        subparser.add_argument('--name2', metavar='ARCHIVE2',
                                type=archivename_validator(),
                                help='ARCHIVE2 name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
@@ -4267,6 +4275,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create tarball from archive')
         subparser.set_defaults(func=self.do_export_tar)
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
                                help='filter program to pipe data through')
         subparser.add_argument('--list', dest='output_list', action='store_true',
@@ -4274,7 +4284,6 @@ class Archiver:
         subparser.add_argument('--tar-format', metavar='FMT', dest='tar_format', default='GNU',
                                choices=('BORG', 'PAX', 'GNU'),
                                help='select tar format: BORG, PAX or GNU')
-        # archive name
         subparser.add_argument('tarfile', metavar='FILE',
                                help='output tar file. "-" to write to stdout instead.')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
@@ -4312,6 +4321,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
@@ -4332,7 +4343,6 @@ class Archiver:
                                help='write all extracted data to stdout')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',
                                help='create holes in output sparse file from all-zero chunks')
-        # archive name
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
@@ -4370,7 +4380,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='show repository or archive information')
         subparser.set_defaults(func=self.do_info)
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('--json', action='store_true',
                                help='format output as JSON')
         define_archive_filters_group(subparser)
@@ -4759,7 +4770,8 @@ class Archiver:
                                     'but keys used in it are added to the JSON output. '
                                     'Some keys are always present. Note: JSON can only represent text. '
                                     'A "bpath" key is therefore not available.')
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
         define_archive_filters_group(subparser)
@@ -4969,7 +4981,8 @@ class Archiver:
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
                                         'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
 
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
 
@@ -4985,10 +4998,10 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='rename archive')
         subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument('name_current', metavar='OLDNAME',
+        subparser.add_argument('--name', metavar='OLDNAME',
                                type=archivename_validator(),
                                help='the current archive name')
-        subparser.add_argument('name', metavar='NEWNAME',
+        subparser.add_argument('--name2', metavar='NEWNAME',
                                type=archivename_validator(),
                                help='the new archive name')
 
@@ -5211,7 +5224,8 @@ class Archiver:
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
 
-        # archive name
+        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('tarfile', metavar='TARFILE',
                                help='input tar file. "-" to read from stdin instead.')
         return parser

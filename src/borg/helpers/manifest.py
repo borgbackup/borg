@@ -103,7 +103,7 @@ class Archives(abc.MutableMapping):
         """
         get a list of archives, considering --first/last/prefix/glob-archives/sort/consider-checkpoints cmdline args
         """
-        if args.location.archive:
+        if args.name:
             raise Error('The options --first, --last, --prefix, and --glob-archives, and --consider-checkpoints can only be used on repository targets.')
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'

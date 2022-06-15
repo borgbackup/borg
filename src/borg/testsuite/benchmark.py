@@ -28,7 +28,7 @@ def repo_url(request, tmpdir, monkeypatch):
 
 @pytest.fixture(params=["none", "repokey"])
 def repo(request, cmd, repo_url):
-    cmd('init', '--encryption', request.param, repo_url)
+    cmd(f'--repo={repo_url}', 'init', '--encryption', request.param)
     return repo_url
 
 
@@ -55,46 +55,52 @@ def testdata(request, tmpdir_factory):
 
 
 @pytest.fixture(params=['none', 'lz4'])
-def archive(request, cmd, repo, testdata):
-    archive_url = repo + '::test'
-    cmd('create', '--compression', request.param, archive_url, testdata)
-    return archive_url
+def repo_archive(request, cmd, repo, testdata):
+    archive = 'test'
+    cmd(f'--repo={repo}', 'create', f'--name={archive}', '--compression', request.param, testdata)
+    return repo, archive
 
 
 def test_create_none(benchmark, cmd, repo, testdata):
-    result, out = benchmark.pedantic(cmd, ('create', '--compression', 'none', repo + '::test', testdata))
+    result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'create', '--compression', 'none',
+                                           '--name', 'test', testdata))
     assert result == 0
 
 
 def test_create_lz4(benchmark, cmd, repo, testdata):
-    result, out = benchmark.pedantic(cmd, ('create', '--compression', 'lz4', repo + '::test', testdata))
+    result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'create', '--compression', 'lz4',
+                                           '--name', 'test', testdata))
     assert result == 0
 
 
-def test_extract(benchmark, cmd, archive, tmpdir):
+def test_extract(benchmark, cmd, repo_archive, tmpdir):
+    repo, archive = repo_archive
     with changedir(str(tmpdir)):
-        result, out = benchmark.pedantic(cmd, ('extract', archive))
+        result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'extract', '--name', archive))
     assert result == 0
 
 
-def test_delete(benchmark, cmd, archive):
-    result, out = benchmark.pedantic(cmd, ('delete', archive))
+def test_delete(benchmark, cmd, repo_archive):
+    repo, archive = repo_archive
+    result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'delete', '--name', archive))
     assert result == 0
 
 
-def test_list(benchmark, cmd, archive):
-    result, out = benchmark(cmd, 'list', archive)
+def test_list(benchmark, cmd, repo_archive):
+    repo, archive = repo_archive
+    result, out = benchmark(cmd, f'--repo={repo}', 'list', '--name', archive)
     assert result == 0
 
 
-def test_info(benchmark, cmd, archive):
-    result, out = benchmark(cmd, 'info', archive)
+def test_info(benchmark, cmd, repo_archive):
+    repo, archive = repo_archive
+    result, out = benchmark(cmd, f'--repo={repo}', 'info', '--name', archive)
     assert result == 0
 
 
-def test_check(benchmark, cmd, archive):
-    repo = archive.split('::')[0]
-    result, out = benchmark(cmd, 'check', repo)
+def test_check(benchmark, cmd, repo_archive):
+    repo, archive = repo_archive
+    result, out = benchmark(cmd, f'--repo={repo}', 'check')
     assert result == 0
 
 

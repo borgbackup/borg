@@ -213,6 +213,8 @@ PrefixSpec = replace_placeholders
 
 GlobSpec = replace_placeholders
 
+NameSpec = replace_placeholders
+
 CommentSpec = replace_placeholders
 
 

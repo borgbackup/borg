@@ -4177,7 +4177,7 @@ class Archiver:
                                help='do not change repository, just check')
         subparser.add_argument('--other-repo', metavar='SRC_REPOSITORY', dest='other_location',
                                type=location_validator(other=True), default=Location(other=True),
-                               help='source repository')
+                               help='transfer archives from the other repository')
         define_archive_filters_group(subparser)
 
         # borg diff

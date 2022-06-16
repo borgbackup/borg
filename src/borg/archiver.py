@@ -3900,7 +3900,7 @@ class Archiver:
 
         archive_group = subparser.add_argument_group('Archive options')
         archive_group.add_argument('--name', dest='name', metavar='NAME', type=NameSpec, default='{hostname}-{now}',
-                                   help='specify the name for the archive')
+                                   help='specify the archive name')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', type=CommentSpec, default='',
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
@@ -5000,10 +5000,10 @@ class Archiver:
         subparser.set_defaults(func=self.do_rename)
         subparser.add_argument('--name', metavar='OLDNAME',
                                type=archivename_validator(),
-                               help='the current archive name')
+                               help='specify the archive name')
         subparser.add_argument('--name2', metavar='NEWNAME',
                                type=archivename_validator(),
-                               help='the new archive name')
+                               help='specify the new archive name')
 
         # borg serve
         serve_epilog = process_epilog("""

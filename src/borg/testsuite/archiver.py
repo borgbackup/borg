@@ -431,11 +431,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         for name in expected:
             self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
-        info_output = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test')
+        info_output = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test')
         item_count = 5 if has_lchflags else 6  # one file is UF_NODUMP
         self.assert_in('Number of files: %d' % item_count, info_output)
         shutil.rmtree(self.cache_path)
-        info_output2 = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test')
+        info_output2 = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test')
 
         def filter(output):
             # filter for interesting "info" output, ignore cache rebuilding related stuff
@@ -761,16 +761,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         security_dir = self.get_security_dir()
         os.rename(self.repository_path, self.repository_path + '_new')
         with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK='yes'):
-            self.cmd(f'--repo={self.repository_location}_new', 'info')
+            self.cmd(f'--repo={self.repository_location}_new', 'rinfo')
         with open(os.path.join(security_dir, 'location')) as fd:
             location = fd.read()
             assert location == Location(self.repository_location + '_new').canonical_path()
         # Needs no confirmation anymore
-        self.cmd(f'--repo={self.repository_location}_new', 'info')
+        self.cmd(f'--repo={self.repository_location}_new', 'rinfo')
         shutil.rmtree(self.cache_path)
-        self.cmd(f'--repo={self.repository_location}_new', 'info')
+        self.cmd(f'--repo={self.repository_location}_new', 'rinfo')
         shutil.rmtree(security_dir)
-        self.cmd(f'--repo={self.repository_location}_new', 'info')
+        self.cmd(f'--repo={self.repository_location}_new', 'rinfo')
         for file in ('location', 'key-type', 'manifest-timestamp'):
             assert os.path.exists(os.path.join(security_dir, file))
 
@@ -780,27 +780,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write('something outdated')
         # This is fine, because the cache still has the correct information. security_dir and cache can disagree
         # if older versions are used to confirm a renamed repository.
-        self.cmd(f'--repo={self.repository_location}', 'info')
+        self.cmd(f'--repo={self.repository_location}', 'rinfo')
 
     def test_unknown_unencrypted(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         # Ok: repository is known
-        self.cmd(f'--repo={self.repository_location}', 'info')
+        self.cmd(f'--repo={self.repository_location}', 'rinfo')
 
         # Ok: repository is still known (through security_dir)
         shutil.rmtree(self.cache_path)
-        self.cmd(f'--repo={self.repository_location}', 'info')
+        self.cmd(f'--repo={self.repository_location}', 'rinfo')
 
         # Needs confirmation: cache and security dir both gone (eg. another host or rm -rf ~)
         shutil.rmtree(self.cache_path)
         shutil.rmtree(self.get_security_dir())
         if self.FORK_DEFAULT:
-            self.cmd(f'--repo={self.repository_location}', 'info', exit_code=EXIT_ERROR)
+            self.cmd(f'--repo={self.repository_location}', 'rinfo', exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.CacheInitAbortedError):
-                self.cmd(f'--repo={self.repository_location}', 'info')
+                self.cmd(f'--repo={self.repository_location}', 'rinfo')
         with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK='yes'):
-            self.cmd(f'--repo={self.repository_location}', 'info')
+            self.cmd(f'--repo={self.repository_location}', 'rinfo')
 
     def test_strip_components(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -1280,13 +1280,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         create_json = json.loads(self.cmd(f'--repo={self.repository_location}', 'create',
                                           '--no-cache-sync', '--json', '--error',
                                           'test', 'input'))  # ignore experimental warning
-        info_json = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--name=test', '--json'))
+        info_json = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test', '--json'))
         create_stats = create_json['cache']['stats']
         info_stats = info_json['cache']['stats']
         assert create_stats == info_stats
         self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
         self.cmd(f'--repo={self.repository_location}', 'create', '--no-cache-sync', 'test2', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'info')
+        self.cmd(f'--repo={self.repository_location}', 'rinfo')
         self.cmd(f'--repo={self.repository_location}', 'check')
 
     def test_extract_pattern_opt(self):
@@ -1524,9 +1524,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        info_repo = self.cmd(f'--repo={self.repository_location}', 'info')
+        info_repo = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert 'All archives:' in info_repo
-        info_archive = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test')
+        info_archive = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test')
         assert 'Archive name: test\n' in info_archive
         info_archive = self.cmd(f'--repo={self.repository_location}', 'info', '--first', '1')
         assert 'Archive name: test\n' in info_archive
@@ -1535,7 +1535,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        info_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--json'))
+        info_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'rinfo', '--json'))
         repository = info_repo['repository']
         assert len(repository['id']) == 64
         assert 'last_modified' in repository
@@ -1547,7 +1547,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert all(isinstance(o, int) for o in stats.values())
         assert all(key in stats for key in ('total_chunks', 'total_size', 'total_unique_chunks', 'unique_size'))
 
-        info_archive = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--name=test', '--json'))
+        info_archive = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test', '--json'))
         assert info_repo['repository'] == info_archive['repository']
         assert info_repo['cache'] == info_archive['cache']
         archives = info_archive['archives']
@@ -1576,17 +1576,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2', 'input', '--comment', 'this is the comment')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test3', 'input', '--comment', '"deleted" comment')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test4', 'input', '--comment', 'preserved comment')
-        assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test1')
-        assert 'Comment: this is the comment' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test2')
+        assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test1')
+        assert 'Comment: this is the comment' in self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test2')
 
         self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test1', '--comment', 'added comment')
         self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test2', '--comment', 'modified comment')
         self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test3', '--comment', '')
         self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test4', '12345')
-        assert 'Comment: added comment' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test1')
-        assert 'Comment: modified comment' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test2')
-        assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test3')
-        assert 'Comment: preserved comment' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test4')
+        assert 'Comment: added comment' in self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test1')
+        assert 'Comment: modified comment' in self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test2')
+        assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test3')
+        assert 'Comment: preserved comment' in self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test4')
 
     def test_delete(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -1749,14 +1749,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd(f'--repo={self.repository_location}', 'info', exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}', 'rinfo', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd(f'--repo={self.repository_location}', 'info')
+                    self.cmd(f'--repo={self.repository_location}', 'rinfo')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd(f'--repo={self.repository_location}', 'info', '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}', 'rinfo', '--bypass-lock')
 
     def test_readonly_list(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -1848,7 +1848,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'extract', 'test'])
 
         self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'rlist'])
-        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'info', '--name=test'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'info', '-a', 'test'])
 
     def test_unknown_feature_on_rename(self):
         print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
@@ -2447,34 +2447,34 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_change_location_to_keyfile(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(repokey)' in log
         self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'keyfile')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(key file)' in log
 
     def test_change_location_to_b2keyfile(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey-blake2')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(repokey BLAKE2b)' in log
         self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'keyfile')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(key file BLAKE2b)' in log
 
     def test_change_location_to_repokey(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=keyfile')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(key file)' in log
         self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'repokey')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(repokey)' in log
 
     def test_change_location_to_b2repokey(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=keyfile-blake2')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(key file BLAKE2b)' in log
         self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'repokey')
-        log = self.cmd(f'--repo={self.repository_location}', 'info')
+        log = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert '(repokey BLAKE2b)' in log
 
     def test_break_lock(self):
@@ -2996,7 +2996,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test0', 'input')
         self.cmd(f'--repo={self.repository_location}', 'recreate', 'test0', '--timestamp', "1970-01-02T00:00:00",
                  '--comment', 'test')
-        info = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test0').splitlines()
+        info = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test0').splitlines()
         dtime = datetime(1970, 1, 2) + local_timezone.utcoffset(None)
         s_time = dtime.strftime("%Y-%m-%d")
         assert any([re.search(r'Time \(start\).+ %s' % s_time, item) for item in info])
@@ -3016,10 +3016,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        info_before = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test')
+        info_before = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test')
         self.cmd(f'--repo={self.repository_location}', 'recreate', '--chunker-params', 'default')
         self.check_cache()
-        info_after = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test')
+        info_after = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test')
         assert info_before == info_after  # includes archive ID
 
     def test_with_lock(self):
@@ -3492,7 +3492,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     def test_do_not_mention_archive_if_you_can_not_find_repo(self):
         """https://github.com/borgbackup/borg/issues/6014"""
-        output = self.cmd(f'--repo={self.repository_location}-this-repository-does-not-exist', 'info', '--name=test',
+        output = self.cmd(f'--repo={self.repository_location}-this-repository-does-not-exist', 'info', '-a', 'test',
                           exit_code=2, fork=True)
         self.assert_in('this-repository-does-not-exist', output)
         self.assert_not_in('this-repository-does-not-exist::test', output)
@@ -3512,12 +3512,12 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         os.remove(os.path.join(self.get_security_dir(), 'nonce'))
 
         # The repo should still be readable
-        repo_info = self.cmd(f'--repo={self.repository_location}', 'info')
+        repo_info = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert 'All archives:' in repo_info
         repo_list = self.cmd(f'--repo={self.repository_location}', 'rlist')
         assert 'test' in repo_list
         # The archive should still be readable
-        archive_info = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test')
+        archive_info = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test')
         assert 'Archive name: test\n' in archive_info
         archive_list = self.cmd(f'--repo={self.repository_location}', 'list', 'test')
         assert 'file1' in archive_list
@@ -3597,7 +3597,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with Repository(self.repository_path) as repository:
             _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         assert key._encrypted_key_algorithm == 'argon2 chacha20-poly1305'
-        self.cmd(f'--repo={self.repository_location}', 'info')
+        self.cmd(f'--repo={self.repository_location}', 'rinfo')
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
@@ -4009,7 +4009,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         super().setUp()
         self.create_test_files()
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
-        self.cache_path = json.loads(self.cmd(f'--repo={self.repository_location}', 'info', '--json'))['cache']['path']
+        self.cache_path = json.loads(self.cmd(f'--repo={self.repository_location}', 'rinfo', '--json'))['cache']['path']
 
     def corrupt(self, file, amount=1):
         with open(file, 'r+b') as fd:
@@ -4022,11 +4022,11 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         self.corrupt(os.path.join(self.cache_path, 'chunks'))
 
         if self.FORK_DEFAULT:
-            out = self.cmd(f'--repo={self.repository_location}', 'info', exit_code=2)
+            out = self.cmd(f'--repo={self.repository_location}', 'rinfo', exit_code=2)
             assert 'failed integrity check' in out
         else:
             with pytest.raises(FileIntegrityError):
-                self.cmd(f'--repo={self.repository_location}', 'info')
+                self.cmd(f'--repo={self.repository_location}', 'rinfo')
 
     def test_cache_files(self):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
@@ -4043,7 +4043,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
 
         # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d
         self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
-        self.cmd(f'--repo={self.repository_location}', 'info', '--json')
+        self.cmd(f'--repo={self.repository_location}', 'rinfo', '--json')
 
         chunks_archive = os.path.join(self.cache_path, 'chunks.archive.d')
         assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
@@ -4074,7 +4074,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         with open(config_path, 'w') as fd:
             config.write(fd)
 
-        out = self.cmd(f'--repo={self.repository_location}', 'info')
+        out = self.cmd(f'--repo={self.repository_location}', 'rinfo')
         assert 'Cache integrity data not available: old Borg version modified the cache.' in out
 
 

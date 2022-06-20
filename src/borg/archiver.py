@@ -1753,22 +1753,47 @@ class Archiver:
         return self.exit_code
 
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
+    def do_rinfo(self, args, repository, manifest, key, cache):
+        """Show repository infos"""
+        info = basic_json_data(manifest, cache=cache, extra={
+            'security_dir': cache.security_manager.dir,
+        })
+
+        if args.json:
+            json_print(info)
+        else:
+            encryption = 'Encrypted: '
+            if key.NAME in ('plaintext', 'authenticated'):
+                encryption += 'No'
+            else:
+                encryption += 'Yes (%s)' % key.NAME
+            if key.NAME.startswith('key file'):
+                encryption += '\nKey file: %s' % key.find_key()
+            info['encryption'] = encryption
+
+            print(textwrap.dedent("""
+            Repository ID: {id}
+            Location: {location}
+            {encryption}
+            Cache: {cache.path}
+            Security dir: {security_dir}
+            """).strip().format(
+                id=bin_to_hex(repository.id),
+                location=repository._location.canonical_path(),
+                **info))
+            print(DASHES)
+            print(STATS_HEADER)
+            print(str(cache))
+        return self.exit_code
+
+    @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
-        if any((args.name, args.first, args.last, args.prefix is not None, args.glob_archives)):
-            return self._info_archives(args, repository, manifest, key, cache)
-        else:
-            return self._info_repository(args, repository, manifest, key, cache)
-
-    def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
             return remove_surrogates(' '.join(shlex.quote(x) for x in cmdline))
 
-        if args.name:
-            archive_names = (args.name,)
-        else:
-            args.consider_checkpoints = True
-            archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
+        args.consider_checkpoints = True
+        archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
 
         output_data = []
 
@@ -1807,38 +1832,6 @@ class Archiver:
             json_print(basic_json_data(manifest, cache=cache, extra={
                 'archives': output_data,
             }))
-        return self.exit_code
-
-    def _info_repository(self, args, repository, manifest, key, cache):
-        info = basic_json_data(manifest, cache=cache, extra={
-            'security_dir': cache.security_manager.dir,
-        })
-
-        if args.json:
-            json_print(info)
-        else:
-            encryption = 'Encrypted: '
-            if key.NAME in ('plaintext', 'authenticated'):
-                encryption += 'No'
-            else:
-                encryption += 'Yes (%s)' % key.NAME
-            if key.NAME.startswith('key file'):
-                encryption += '\nKey file: %s' % key.find_key()
-            info['encryption'] = encryption
-
-            print(textwrap.dedent("""
-            Repository ID: {id}
-            Location: {location}
-            {encryption}
-            Cache: {cache.path}
-            Security dir: {security_dir}
-            """).strip().format(
-                id=bin_to_hex(repository.id),
-                location=repository._location.canonical_path(),
-                **info))
-            print(DASHES)
-            print(STATS_HEADER)
-            print(str(cache))
         return self.exit_code
 
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
@@ -4335,9 +4328,31 @@ class Archiver:
         subparser.add_argument('topic', metavar='TOPIC', type=str, nargs='?',
                                help='additional help on TOPIC')
 
+        # borg rinfo
+        rinfo_epilog = process_epilog("""
+        This command displays detailed information about the repository.
+
+        Please note that the deduplicated sizes of the individual archives do not add
+        up to the deduplicated size of the repository ("all archives"), because the two
+        are meaning different things:
+
+        This archive / deduplicated size = amount of data stored ONLY for this archive
+        = unique chunks of this archive.
+        All archives / deduplicated size = amount of data stored in the repo
+        = all chunks in the repository.
+        """)
+        subparser = subparsers.add_parser('rinfo', parents=[common_parser], add_help=False,
+                                          description=self.do_rinfo.__doc__,
+                                          epilog=rinfo_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='show repository information')
+        subparser.set_defaults(func=self.do_rinfo)
+        subparser.add_argument('--json', action='store_true',
+                               help='format output as JSON')
+
         # borg info
         info_epilog = process_epilog("""
-        This command displays detailed information about the specified archive or repository.
+        This command displays detailed information about the specified archive.
 
         Please note that the deduplicated sizes of the individual archives do not add
         up to the deduplicated size of the repository ("all archives"), because the two
@@ -4359,8 +4374,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='show repository or archive information')
         subparser.set_defaults(func=self.do_info)
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
-                               help='specify the archive name')
         subparser.add_argument('--json', action='store_true',
                                help='format output as JSON')
         define_archive_filters_group(subparser)
@@ -5293,7 +5306,7 @@ class Archiver:
                 parser.error('Need at least one PATH argument.')
         if not getattr(args, 'lock', True):  # Option --bypass-lock sets args.lock = False
             bypass_allowed = {self.do_check, self.do_config, self.do_diff,
-                              self.do_export_tar, self.do_extract, self.do_info,
+                              self.do_export_tar, self.do_extract, self.do_info, self.do_rinfo,
                               self.do_list, self.do_rlist, self.do_mount, self.do_umount}
             if func not in bypass_allowed:
                 raise Error('Not allowed to bypass locking mechanism for chosen command')

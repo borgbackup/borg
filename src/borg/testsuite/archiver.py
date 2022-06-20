@@ -152,9 +152,9 @@ def test_return_codes(cmd, tmpdir):
     rc, out = cmd('--repo=%s' % repo, 'create', 'archive', str(input))
     assert rc == EXIT_SUCCESS
     with changedir(str(output)):
-        rc, out = cmd('--repo=%s' % repo, 'extract', '--name=archive')
+        rc, out = cmd('--repo=%s' % repo, 'extract', 'archive')
         assert rc == EXIT_SUCCESS
-    rc, out = cmd('--repo=%s' % repo, 'extract', '--name=archive', 'does/not/match')
+    rc, out = cmd('--repo=%s' % repo, 'extract', 'archive', 'does/not/match')
     assert rc == EXIT_WARNING  # pattern did not match
     rc, out = cmd('--repo=%s' % repo, 'create', 'archive', str(input))
     assert rc == EXIT_ERROR  # duplicate archive name
@@ -399,7 +399,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('Archive name: test.2', output)
         self.assert_in('This archive: ', output)
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         list_output = self.cmd(f'--repo={self.repository_location}', 'list', '--short')
         self.assert_in('test', list_output)
         self.assert_in('test.2', list_output)
@@ -494,7 +494,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         sock.close()
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             assert not os.path.exists('input/unix-socket')
 
     @pytest.mark.skipif(not are_symlinks_supported(), reason='symlinks not supported')
@@ -503,7 +503,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             assert os.readlink('input/link1') == 'somewhere'
 
     @pytest.mark.skipif(not are_symlinks_supported() or not are_hardlinks_supported(),
@@ -516,7 +516,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
-            output = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            output = self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             print(output)
             with changedir('input'):
                 assert os.path.exists('target')
@@ -550,7 +550,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', '--atime', 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
@@ -570,7 +570,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert int(sti.st_birthtime * 1e9) == int(sto.st_birthtime * 1e9) == birthtime * 1e9
@@ -586,7 +586,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input', '--nobirthtime')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
         assert int(sti.st_birthtime * 1e9) == birthtime * 1e9
@@ -647,7 +647,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
             self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
             with changedir(self.output_path):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--sparse')
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--sparse')
             self.assert_dirs_equal('input', 'output/input')
             filename = os.path.join(self.output_path, 'input', 'sparse')
             with open(filename, 'rb') as fd:
@@ -667,7 +667,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         for filename in filenames:
             with changedir('output'):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', os.path.join('input', filename))
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', os.path.join('input', filename))
             assert os.path.exists(os.path.join('output', 'input', filename))
 
     def test_repository_swap_detection(self):
@@ -807,14 +807,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('dir/file')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--strip-components', '3')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--strip-components', '3')
             assert not os.path.exists('file')
             with self.assert_creates_file('file'):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--strip-components', '2')
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--strip-components', '2')
             with self.assert_creates_file('dir/file'):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--strip-components', '1')
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--strip-components', '1')
             with self.assert_creates_file('input/dir/file'):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--strip-components', '0')
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--strip-components', '0')
 
     def _extract_hardlinks_setup(self):
         os.mkdir(os.path.join(self.input_path, 'dir1'))
@@ -873,7 +873,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_extract_hardlinks1(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             assert os.stat('input/source').st_nlink == 4
             assert os.stat('input/abba').st_nlink == 4
             assert os.stat('input/dir1/hardlink').st_nlink == 4
@@ -884,14 +884,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_extract_hardlinks2(self):
         self._extract_hardlinks_setup()
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--strip-components', '2')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--strip-components', '2')
             assert os.stat('hardlink').st_nlink == 2
             assert os.stat('subdir/hardlink').st_nlink == 2
             assert open('subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('aaaa').st_nlink == 2
             assert os.stat('source2').st_nlink == 2
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', 'input/dir1')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', 'input/dir1')
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
@@ -913,7 +913,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input', 'input')  # give input twice!
         # now test extraction
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             # if issue #5603 happens, extraction gives rc == 1 (triggering AssertionError) and warnings like:
             # input/a/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/a/hardlink'
             # input/b/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/b/hardlink'
@@ -929,13 +929,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file4', size=1024 * 80)
         self.cmd(f'--repo={self.repository_location}', 'create', '--exclude=input/file4', 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', 'input/file1', )
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', 'input/file1', )
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--exclude=input/file2')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--exclude=input/file2')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--exclude-from=' + self.exclude_file_path)
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--exclude-from=' + self.exclude_file_path)
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file3'])
 
     def test_extract_include_exclude_regex(self):
@@ -949,25 +949,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # Create with regular expression exclusion for file4
         self.cmd(f'--repo={self.repository_location}', 'create', '--exclude=re:input/file4$', 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
         shutil.rmtree('output/input')
 
         # Extract with regular expression exclusion
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--exclude=re:file3+')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--exclude=re:file3+')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
         shutil.rmtree('output/input')
 
         # Combine --exclude with fnmatch and regular expression
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--exclude=input/file2', '--exclude=re:file[01]')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--exclude=input/file2', '--exclude=re:file[01]')
         self.assert_equal(sorted(os.listdir('output/input')), ['file3', 'file333'])
         shutil.rmtree('output/input')
 
         # Combine --exclude-from and regular expression exclusion
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--exclude-from=' + self.exclude_file_path,
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--exclude-from=' + self.exclude_file_path,
                      '--exclude=re:file1', '--exclude=re:file(\\d)\\1\\1$')
         self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
 
@@ -987,7 +987,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd(f'--repo={self.repository_location}', 'create', '--exclude-from=' + self.exclude_file_path, 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2', 'file3', 'file333'])
         shutil.rmtree('output/input')
 
@@ -996,7 +996,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b're:file3+\n')
 
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--exclude-from=' + self.exclude_file_path)
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--exclude-from=' + self.exclude_file_path)
         self.assert_equal(sorted(os.listdir('output/input')), ['file1', 'file2'])
         shutil.rmtree('output/input')
 
@@ -1008,7 +1008,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b're:file2$\n')
 
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--exclude-from=' + self.exclude_file_path)
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--exclude-from=' + self.exclude_file_path)
         self.assert_equal(sorted(os.listdir('output/input')), ['file3'])
 
     def test_extract_with_pattern(self):
@@ -1023,25 +1023,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # Extract everything with regular expression
         with changedir("output"):
-            self.cmd(f'--repo={self.repository_location}', "extract", "--name=test", "re:.*")
+            self.cmd(f'--repo={self.repository_location}', "extract", "test", "re:.*")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file3", "file333", "file4"])
         shutil.rmtree("output/input")
 
         # Extract with pattern while also excluding files
         with changedir("output"):
-            self.cmd(f'--repo={self.repository_location}', "extract", "--name=test", "--exclude=re:file[34]$", r"re:file\d$")
+            self.cmd(f'--repo={self.repository_location}', "extract", "--exclude=re:file[34]$", "test", r"re:file\d$")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2"])
         shutil.rmtree("output/input")
 
         # Combine --exclude with pattern for extraction
         with changedir("output"):
-            self.cmd(f'--repo={self.repository_location}', "extract", "--name=test", "--exclude=input/file1", "re:file[12]$")
+            self.cmd(f'--repo={self.repository_location}', "extract", "--exclude=input/file1", "test", "re:file[12]$")
         self.assert_equal(sorted(os.listdir("output/input")), ["file2"])
         shutil.rmtree("output/input")
 
         # Multiple pattern
         with changedir("output"):
-            self.cmd(f'--repo={self.repository_location}', "extract", "--name=test", "fm:input/file1", "fm:*file33*", "input/file2")
+            self.cmd(f'--repo={self.repository_location}', "extract", "test", "fm:input/file1", "fm:*file33*", "input/file2")
         self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file333"])
 
     def test_extract_list_output(self):
@@ -1051,22 +1051,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
 
         with changedir('output'):
-            output = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            output = self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_not_in("input/file", output)
         shutil.rmtree('output/input')
 
         with changedir('output'):
-            output = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--info')
+            output = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--info')
         self.assert_not_in("input/file", output)
         shutil.rmtree('output/input')
 
         with changedir('output'):
-            output = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--list')
+            output = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--list')
         self.assert_in("input/file", output)
         shutil.rmtree('output/input')
 
         with changedir('output'):
-            output = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--list', '--info')
+            output = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--list', '--info')
         self.assert_in("input/file", output)
 
     def test_extract_progress(self):
@@ -1075,7 +1075,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
 
         with changedir('output'):
-            output = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--progress')
+            output = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--progress')
             assert 'Extracting:' in output
 
     def _create_test_caches(self):
@@ -1101,7 +1101,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert item['gid'] == 0
         assert item['size'] == len(input_data)
         assert item['path'] == 'stdin'
-        extracted_data = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--stdout', binary_output=True)
+        extracted_data = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--stdout', binary_output=True)
         assert extracted_data == input_data
 
     def test_create_content_from_command(self):
@@ -1115,7 +1115,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert item['gid'] == 0
         assert item['size'] == len(input_data) + 1  # `echo` adds newline
         assert item['path'] == name
-        extracted_data = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--stdout')
+        extracted_data = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--stdout')
         assert extracted_data == input_data + '\n'
 
     def test_create_content_from_command_with_failed_command(self):
@@ -1296,13 +1296,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_important', size=1024 * 80)
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test',
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test',
                      '--pattern=+input/file_important', '--pattern=-input/file*')
         self.assert_equal(sorted(os.listdir('output/input')), ['file_important'])
 
     def _assert_test_caches(self):
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_equal(sorted(os.listdir('output/input')), ['cache2', 'file1'])
         self.assert_equal(sorted(os.listdir('output/input/cache2')), [CACHE_TAG_NAME])
 
@@ -1326,7 +1326,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def _assert_test_tagged(self):
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file1'])
 
     def test_exclude_tagged(self):
@@ -1360,7 +1360,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def _assert_test_keep_tagged(self):
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_equal(sorted(os.listdir('output/input')), ['file0', 'tagged1', 'tagged2', 'tagged3', 'taggedall'])
         self.assert_equal(os.listdir('output/input/tagged1'), ['.NOBACKUP1'])
         self.assert_equal(os.listdir('output/input/tagged2'), ['.NOBACKUP2'])
@@ -1413,7 +1413,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
             with patch.object(os, 'fchown', patched_fchown):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             assert xattr.getxattr(b'input/file', b'security.capability') == capabilities
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
@@ -1435,15 +1435,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             input_abspath = os.path.abspath('input/file')
             with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
-                out = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', exit_code=EXIT_WARNING)
+                out = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', exit_code=EXIT_WARNING)
                 assert ': when setting extended attribute user.attribute: too big for this filesystem\n' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
-                out = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', exit_code=EXIT_WARNING)
+                out = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', exit_code=EXIT_WARNING)
                 assert ': when setting extended attribute user.attribute: xattrs not supported on this filesystem\n' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
-                out = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', exit_code=EXIT_WARNING)
+                out = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', exit_code=EXIT_WARNING)
                 assert ': when setting extended attribute user.attribute: Permission denied\n' in out
             assert os.path.isfile(input_abspath)
 
@@ -1464,16 +1464,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('input'):
             self.cmd(f'--repo={self.repository_location}', 'create', 'test1', '.', '--exclude=file1')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test1')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test1')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
         with changedir('input'):
             self.cmd(f'--repo={self.repository_location}', 'create', 'test2', '.', '--exclude=./file1')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test2')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test2')
         self.assert_equal(sorted(os.listdir('output')), ['file2'])
         self.cmd(f'--repo={self.repository_location}', 'create', 'test3', 'input', '--exclude=input/./file1')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test3')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test3')
         self.assert_equal(sorted(os.listdir('output/input')), ['file2'])
 
     def test_repeated_files(self):
@@ -1491,14 +1491,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.mkdir('output/input/file1')
         os.mkdir('output/input/dir2')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_dirs_equal('input', 'output/input')
         # But non-empty dirs should fail
         os.unlink('output/input/file1')
         os.mkdir('output/input/file1')
         os.mkdir('output/input/file1/dir')
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', exit_code=1)
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', exit_code=1)
 
     def test_rename(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -1506,13 +1506,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test.2', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--dry-run')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.2', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test.2', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'rename', 'test', 'test.3')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.2', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test.2', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'rename', 'test.2', 'test.4')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.3', '--dry-run')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.4', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test.3', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test.4', '--dry-run')
         # Make sure both archives have been renamed
         with Repository(self.repository_path) as repository:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -1597,12 +1597,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test.3', 'input')
         self.cmd(f'--repo={self.repository_location}', 'create', 'another_test.1', 'input')
         self.cmd(f'--repo={self.repository_location}', 'create', 'another_test.2', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--dry-run')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.2', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test.2', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--prefix', 'another_')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--last', '1')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.2', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test.2', '--dry-run')
         output = self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test.2', '--stats')
         self.assert_in('Deleted data:', output)
         # Make sure all data except the manifest has been deleted
@@ -1616,7 +1616,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2', 'input')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test3', 'input')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test1', 'test2')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test3', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test3', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test3')
         assert not self.cmd(f'--repo={self.repository_location}', 'list')
 
@@ -1670,7 +1670,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_corrupted_repository(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.create_src_archive('test')
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--dry-run')
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--dry-run')
         output = self.cmd(f'--repo={self.repository_location}', 'check', '--show-version')
         self.assert_in('borgbackup version', output)  # implied output even without --info given
         self.assert_not_in('Starting repository check', output)  # --info not given for root logger
@@ -1734,14 +1734,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+                    self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test', '--bypass-lock')
 
     def test_readonly_info(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -1845,7 +1845,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         self.add_unknown_feature(Manifest.Operation.READ)
         with changedir('output'):
-            self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'extract', '--name=test'])
+            self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'extract', 'test'])
 
         self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'list'])
         self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'info', '--name=test'])
@@ -2083,7 +2083,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         finally:
             t.join()
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             fifo_fn = 'input/link_fifo'
             with open(fifo_fn, 'rb') as f:
                 extracted_data = f.read()
@@ -2953,13 +2953,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', 'input/dir1')
         self.check_cache()
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test2')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test2')
             assert os.stat('input/dir1/hardlink').st_nlink == 4
 
     def test_recreate_rechunkify(self):
@@ -3437,7 +3437,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd(f'--repo={self.repository_location}', 'export-tar', '--name=src', 'simple.tar', f'--tar-format={tar_format}')
         self.cmd(f'--repo={self.repository_location}', 'import-tar', '--name=dst', 'simple.tar')
         with changedir(self.output_path):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=dst')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
     @requires_gzip
@@ -3451,7 +3451,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd(f'--repo={self.repository_location}', 'export-tar', '--name=src', 'simple.tgz', f'--tar-format={tar_format}')
         self.cmd(f'--repo={self.repository_location}', 'import-tar', '--name=dst', 'simple.tgz')
         with changedir(self.output_path):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=dst')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
 
     def test_roundtrip_pax_borg(self):
@@ -3461,7 +3461,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd(f'--repo={self.repository_location}', 'export-tar', '--name=src', 'simple.tar', '--tar-format=BORG')
         self.cmd(f'--repo={self.repository_location}', 'import-tar', '--name=dst', 'simple.tar')
         with changedir(self.output_path):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=dst')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'dst')
         self.assert_dirs_equal('input', 'output/input')
 
     # derived from test_extract_xattrs_errors()
@@ -3478,7 +3478,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', exit_code=EXIT_WARNING)
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', exit_code=EXIT_WARNING)
 
     # derived from test_extract_xattrs_errors()
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of'
@@ -3494,7 +3494,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
-                self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', exit_code=EXIT_WARNING)
+                self.cmd(f'--repo={self.repository_location}', 'extract', 'test', exit_code=EXIT_WARNING)
 
     def test_do_not_mention_archive_if_you_can_not_find_repo(self):
         """https://github.com/borgbackup/borg/issues/6014"""
@@ -3529,7 +3529,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'file1' in archive_list
         # Extracting the archive should work
         with changedir('output'):
-            self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
+            self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         self.assert_dirs_equal('input', 'output/input')
 
     def test_recovery_from_deleted_repo_nonce(self):
@@ -3826,7 +3826,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
         self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
         self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
-        self.cmd(f'--repo={self.repository_location}', 'extract', '--name=archive1', '--dry-run', exit_code=0)
+        self.cmd(f'--repo={self.repository_location}', 'extract', 'archive1', '--dry-run', exit_code=0)
 
     def _test_verify_data(self, *init_args):
         shutil.rmtree(self.repository_path)
@@ -3997,16 +3997,16 @@ class RemoteArchiverTestCase(ArchiverTestCase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         marker = 'cached responses left in RemoteRepository'
         with changedir('output'):
-            res = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', "--debug", '--strip-components', '3')
+            res = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', "--debug", '--strip-components', '3')
             assert marker not in res
             with self.assert_creates_file('file'):
-                res = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', "--debug", '--strip-components', '2')
+                res = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', "--debug", '--strip-components', '2')
                 assert marker not in res
             with self.assert_creates_file('dir/file'):
-                res = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', "--debug", '--strip-components', '1')
+                res = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', "--debug", '--strip-components', '1')
                 assert marker not in res
             with self.assert_creates_file('input/dir/file'):
-                res = self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', "--debug", '--strip-components', '0')
+                res = self.cmd(f'--repo={self.repository_location}', 'extract', 'test', "--debug", '--strip-components', '0')
                 assert marker not in res
 
 

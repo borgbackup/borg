@@ -691,7 +691,7 @@ class Archiver:
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
-            rc = self.do_extract(self.parse_args([f'--repo={repo}', 'extract', '--name=borg-benchmark-crud1',
+            rc = self.do_extract(self.parse_args([f'--repo={repo}', 'extract', 'borg-benchmark-crud1',
                                                   '--dry-run']))
             t_end = time.monotonic()
             dt_extract = t_end - t_start
@@ -4312,8 +4312,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='extract archive contents')
         subparser.set_defaults(func=self.do_extract)
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
-                               help='specify the archive name')
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
@@ -4334,6 +4332,8 @@ class Archiver:
                                help='write all extracted data to stdout')
         subparser.add_argument('--sparse', dest='sparse', action='store_true',
                                help='create holes in output sparse file from all-zero chunks')
+        subparser.add_argument('name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)

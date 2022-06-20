@@ -1477,7 +1477,7 @@ class Archiver:
         print_output = print_json_output if args.json_lines else print_text_output
 
         archive1 = archive
-        archive2 = Archive(repository, key, manifest, args.name2,
+        archive2 = Archive(repository, key, manifest, args.other_name,
                            consider_part_files=args.consider_part_files)
 
         can_compare_chunk_ids = archive1.metadata.get('chunker_params', False) == archive2.metadata.get(
@@ -4206,10 +4206,10 @@ class Archiver:
                                help='Sort the output lines by file path.')
         subparser.add_argument('--json-lines', action='store_true',
                                help='Format output as JSON Lines. ')
-        subparser.add_argument('--name', metavar='ARCHIVE1',
+        subparser.add_argument('name', metavar='ARCHIVE1',
                                type=archivename_validator(),
                                help='ARCHIVE1 name')
-        subparser.add_argument('--name2', metavar='ARCHIVE2',
+        subparser.add_argument('other_name', metavar='ARCHIVE2',
                                type=archivename_validator(),
                                help='ARCHIVE2 name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,

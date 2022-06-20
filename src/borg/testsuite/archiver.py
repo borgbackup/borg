@@ -1704,14 +1704,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd(f'--repo={self.repository_location}', 'diff', '--name=a', '--name2=b', exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}', 'diff', 'a', 'b', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd(f'--repo={self.repository_location}', 'diff', '--name=a', '--name=b')
+                    self.cmd(f'--repo={self.repository_location}', 'diff', 'a', 'b')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd(f'--repo={self.repository_location}', 'diff', '--name=a', '--name2=b', '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}', 'diff', 'a', 'b', '--bypass-lock')
 
     def test_readonly_export_tar(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -4288,10 +4288,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert not any(get_changes('input/hardlink_target_replaced', joutput))
 
-        do_asserts(self.cmd(f'--repo={self.repository_location}', 'diff', '--name=test0', '--name2=test1a'), True)
+        do_asserts(self.cmd(f'--repo={self.repository_location}', 'diff', 'test0', 'test1a'), True)
         # We expect exit_code=1 due to the chunker params warning
-        do_asserts(self.cmd(f'--repo={self.repository_location}', 'diff', '--name=test0', '--name2=test1b', exit_code=1), False)
-        do_json_asserts(self.cmd(f'--repo={self.repository_location}', 'diff', '--name=test0', '--name2=test1a', '--json-lines'), True)
+        do_asserts(self.cmd(f'--repo={self.repository_location}', 'diff', 'test0', 'test1b', exit_code=1), False)
+        do_json_asserts(self.cmd(f'--repo={self.repository_location}', 'diff', 'test0', 'test1a', '--json-lines'), True)
 
     def test_sort_option(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -4312,7 +4312,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('d_file_added', size=256)
         self.cmd(f'--repo={self.repository_location}', 'create', 'test1', 'input')
 
-        output = self.cmd(f'--repo={self.repository_location}', 'diff', '--name=test0', '--name2=test1',
+        output = self.cmd(f'--repo={self.repository_location}', 'diff', 'test0', 'test1',
                           '--sort')
         expected = [
             'a_file_removed',

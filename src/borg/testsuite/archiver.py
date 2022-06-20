@@ -847,22 +847,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             ignore_perms = ['-o', 'ignore_permissions,defer_permissions']
         else:
             ignore_perms = ['-o', 'ignore_permissions']
-        with self.fuse_mount(self.repository_location, mountpoint, '--name=test', '--strip-components=2', *ignore_perms), \
-             changedir(mountpoint):
+        with self.fuse_mount(self.repository_location, mountpoint, '-a', 'test', '--strip-components=2', *ignore_perms), \
+             changedir(os.path.join(mountpoint, 'test')):
             assert os.stat('hardlink').st_nlink == 2
             assert os.stat('subdir/hardlink').st_nlink == 2
             assert open('subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('aaaa').st_nlink == 2
             assert os.stat('source2').st_nlink == 2
-        with self.fuse_mount(self.repository_location, mountpoint, 'input/dir1', '--name=test', *ignore_perms), \
-             changedir(mountpoint):
+        with self.fuse_mount(self.repository_location, mountpoint, 'input/dir1', '-a', 'test', *ignore_perms), \
+             changedir(os.path.join(mountpoint, 'test')):
             assert os.stat('input/dir1/hardlink').st_nlink == 2
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert open('input/dir1/subdir/hardlink', 'rb').read() == b'123456'
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
-        with self.fuse_mount(self.repository_location, mountpoint, '--name=test', *ignore_perms), \
-             changedir(mountpoint):
+        with self.fuse_mount(self.repository_location, mountpoint, '-a', 'test', *ignore_perms), \
+             changedir(os.path.join(mountpoint, 'test')):
             assert os.stat('input/source').st_nlink == 4
             assert os.stat('input/abba').st_nlink == 4
             assert os.stat('input/dir1/hardlink').st_nlink == 4
@@ -2527,13 +2527,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                                    ignore_flags=True, ignore_xattrs=True)
             self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive2', 'input'),
                                    ignore_flags=True, ignore_xattrs=True)
-        # mount only 1 archive, its contents shall show up directly in mountpoint:
-        with self.fuse_mount(self.repository_location, mountpoint, '--name=archive'):
-            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'input'),
+        with self.fuse_mount(self.repository_location, mountpoint, '-a', 'archive'):
+            self.assert_dirs_equal(self.input_path, os.path.join(mountpoint, 'archive', 'input'),
                                    ignore_flags=True, ignore_xattrs=True)
             # regular file
             in_fn = 'input/file1'
-            out_fn = os.path.join(mountpoint, 'input', 'file1')
+            out_fn = os.path.join(mountpoint, 'archive', 'input', 'file1')
             # stat
             sti1 = os.stat(in_fn)
             sto1 = os.stat(out_fn)
@@ -2554,7 +2553,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # hardlink (to 'input/file1')
             if are_hardlinks_supported():
                 in_fn = 'input/hardlink'
-                out_fn = os.path.join(mountpoint, 'input', 'hardlink')
+                out_fn = os.path.join(mountpoint, 'archive', 'input', 'hardlink')
                 sti2 = os.stat(in_fn)
                 sto2 = os.stat(out_fn)
                 assert sti2.st_nlink == sto2.st_nlink == 2
@@ -2562,7 +2561,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # symlink
             if are_symlinks_supported():
                 in_fn = 'input/link1'
-                out_fn = os.path.join(mountpoint, 'input', 'link1')
+                out_fn = os.path.join(mountpoint, 'archive', 'input', 'link1')
                 sti = os.stat(in_fn, follow_symlinks=False)
                 sto = os.stat(out_fn, follow_symlinks=False)
                 assert sti.st_size == len('somewhere')
@@ -2572,13 +2571,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert os.readlink(in_fn) == os.readlink(out_fn)
             # FIFO
             if are_fifos_supported():
-                out_fn = os.path.join(mountpoint, 'input', 'fifo1')
+                out_fn = os.path.join(mountpoint, 'archive', 'input', 'fifo1')
                 sto = os.stat(out_fn)
                 assert stat.S_ISFIFO(sto.st_mode)
             # list/read xattrs
             try:
                 in_fn = 'input/fusexattr'
-                out_fn = os.fsencode(os.path.join(mountpoint, 'input', 'fusexattr'))
+                out_fn = os.fsencode(os.path.join(mountpoint, 'archive', 'input', 'fusexattr'))
                 if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
                     assert sorted(no_selinux(xattr.listxattr(out_fn))) == [b'user.empty', b'user.foo', ]
                     assert xattr.getxattr(out_fn, b'user.foo') == b'bar'
@@ -2648,12 +2647,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
 
         mountpoint = os.path.join(self.tmpdir, 'mountpoint')
-        with self.fuse_mount(self.repository_location, mountpoint, '--name=archive'):
+        with self.fuse_mount(self.repository_location, mountpoint, '-a', 'archive'):
             with pytest.raises(OSError) as excinfo:
-                open(os.path.join(mountpoint, path))
+                open(os.path.join(mountpoint, 'archive', path))
             assert excinfo.value.errno == errno.EIO
-        with self.fuse_mount(self.repository_location, mountpoint, '--name=archive', '-o', 'allow_damaged_files'):
-            open(os.path.join(mountpoint, path)).close()
+        with self.fuse_mount(self.repository_location, mountpoint, '-a', 'archive', '-o', 'allow_damaged_files'):
+            open(os.path.join(mountpoint, 'archive', path)).close()
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse_mount_options(self):

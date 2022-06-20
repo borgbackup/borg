@@ -3264,8 +3264,6 @@ class Archiver:
 
         def define_borg_mount(parser):
             parser.set_defaults(func=self.do_mount)
-            parser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
-                                help='specify the archive name')
             parser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
                                 help='Show checkpoint archives in the repository contents list (default: hidden).')
             parser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,

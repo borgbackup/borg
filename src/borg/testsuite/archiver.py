@@ -2804,7 +2804,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         with changedir('output'):
-            output = self.cmd(f'--repo={self.repository_location}', 'debug', 'dump-archive-items', '--name=test')
+            output = self.cmd(f'--repo={self.repository_location}', 'debug', 'dump-archive-items', 'test')
         output_dir = sorted(os.listdir('output'))
         assert len(output_dir) > 0 and output_dir[0].startswith('000000_')
         assert 'Done.' in output
@@ -3283,7 +3283,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         dump_file = self.output_path + '/dump'
-        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'dump-archive', '--name=test', dump_file)
+        output = self.cmd(f'--repo={self.repository_location}', 'debug', 'dump-archive', 'test', dump_file)
         assert output == ""
         with open(dump_file) as f:
             result = json.load(f)

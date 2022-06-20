@@ -3952,7 +3952,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='dump archive items (metadata) (debug)')
         subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+        subparser.add_argument('name', metavar='NAME', type=NameSpec,
                                help='specify the archive name')
 
         debug_dump_archive_epilog = process_epilog("""
@@ -3964,7 +3964,7 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='dump decoded archive metadata (debug)')
         subparser.set_defaults(func=self.do_debug_dump_archive)
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+        subparser.add_argument('name', metavar='NAME', type=NameSpec,
                                help='specify the archive name')
         subparser.add_argument('path', metavar='PATH', type=str,
                                help='file to dump data into')

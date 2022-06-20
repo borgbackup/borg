@@ -779,6 +779,7 @@ class Archiver:
                     pipe_bin = sys.stdin.buffer
                 pipe = TextIOWrapper(pipe_bin, errors='surrogateescape')
                 for path in iter_separated(pipe, paths_sep):
+                    path = os.path.normpath(path)
                     try:
                         with backup_io('stat'):
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)

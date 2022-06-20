@@ -4266,8 +4266,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='create tarball from archive')
         subparser.set_defaults(func=self.do_export_tar)
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
-                               help='specify the archive name')
         subparser.add_argument('--tar-filter', dest='tar_filter', default='auto',
                                help='filter program to pipe data through')
         subparser.add_argument('--list', dest='output_list', action='store_true',
@@ -4275,6 +4273,8 @@ class Archiver:
         subparser.add_argument('--tar-format', metavar='FMT', dest='tar_format', default='GNU',
                                choices=('BORG', 'PAX', 'GNU'),
                                help='select tar format: BORG, PAX or GNU')
+        subparser.add_argument('name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('tarfile', metavar='FILE',
                                help='output tar file. "-" to write to stdout instead.')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
@@ -5214,7 +5214,7 @@ class Archiver:
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
 
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+        subparser.add_argument('name', metavar='NAME', type=NameSpec,
                                help='specify the archive name')
         subparser.add_argument('tarfile', metavar='TARFILE',
                                help='input tar file. "-" to read from stdin instead.')

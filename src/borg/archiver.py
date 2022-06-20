@@ -671,20 +671,20 @@ class Archiver:
             compression = '--compression=none'
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
-            rc = self.do_create(self.parse_args([f'--repo={repo}', 'create', '--name=borg-benchmark-crud1',
-                                                 compression, '--files-cache=disabled', path]))
+            rc = self.do_create(self.parse_args([f'--repo={repo}', 'create', compression, '--files-cache=disabled',
+                                                 'borg-benchmark-crud1', path]))
             t_end = time.monotonic()
             dt_create = t_end - t_start
             assert rc == 0
             # now build files cache
-            rc1 = self.do_create(self.parse_args([f'--repo={repo}', 'create', '--name=borg-benchmark-crud2',
-                                                  compression, path]))
+            rc1 = self.do_create(self.parse_args([f'--repo={repo}', 'create', compression,
+                                                  'borg-benchmark-crud2', path]))
             rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud2']))
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
-            rc1 = self.do_create(self.parse_args([f'--repo={repo}', 'create', '--name=borg-benchmark-crud3',
-                                                  compression, path]))
+            rc1 = self.do_create(self.parse_args([f'--repo={repo}', 'create', compression,
+                                                  'borg-benchmark-crud3', path]))
             t_end = time.monotonic()
             dt_update = t_end - t_start
             rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud3']))
@@ -3899,8 +3899,6 @@ class Archiver:
                                    'regular files. Also follows symlinks pointing to these kinds of files.')
 
         archive_group = subparser.add_argument_group('Archive options')
-        archive_group.add_argument('--name', dest='name', metavar='NAME', type=NameSpec, default='{hostname}-{now}',
-                                   help='specify the archive name')
         archive_group.add_argument('--comment', dest='comment', metavar='COMMENT', type=CommentSpec, default='',
                                    help='add a comment text to the archive')
         archive_group.add_argument('--timestamp', metavar='TIMESTAMP', dest='timestamp',
@@ -3919,6 +3917,8 @@ class Archiver:
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
 
+        subparser.add_argument('name', metavar='NAME', type=NameSpec,
+                               help='specify the archive name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to archive')
 

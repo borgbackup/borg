@@ -57,19 +57,19 @@ def testdata(request, tmpdir_factory):
 @pytest.fixture(params=['none', 'lz4'])
 def repo_archive(request, cmd, repo, testdata):
     archive = 'test'
-    cmd(f'--repo={repo}', 'create', f'--name={archive}', '--compression', request.param, testdata)
+    cmd(f'--repo={repo}', 'create', f'{archive}', '--compression', request.param, testdata)
     return repo, archive
 
 
 def test_create_none(benchmark, cmd, repo, testdata):
     result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'create', '--compression', 'none',
-                                           '--name', 'test', testdata))
+                                           'test', testdata))
     assert result == 0
 
 
 def test_create_lz4(benchmark, cmd, repo, testdata):
     result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'create', '--compression', 'lz4',
-                                           '--name', 'test', testdata))
+                                           'test', testdata))
     assert result == 0
 
 

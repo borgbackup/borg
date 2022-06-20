@@ -2005,25 +2005,16 @@ class Archiver:
                                      checkpoint_interval=args.checkpoint_interval,
                                      dry_run=args.dry_run, timestamp=args.timestamp)
 
-        if args.name:
-            name = args.name
+        archive_names = tuple(archive.name for archive in manifest.archives.list_considering(args))
+        if args.target is not None and len(archive_names) != 1:
+            self.print_error('--target: Need to specify single archive')
+            return self.exit_code
+        for name in archive_names:
             if recreater.is_temporary_archive(name):
-                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
-                return self.exit_code
+                continue
+            print('Processing', name)
             if not recreater.recreate(name, args.comment, args.target):
-                self.print_error('Nothing to do. Archive was not processed.\n'
-                                 'Specify at least one pattern, PATH, --comment, re-compression or re-chunking option.')
-        else:
-            if args.target is not None:
-                self.print_error('--target: Need to specify single archive')
-                return self.exit_code
-            for archive in manifest.archives.list(sort_by=['ts']):
-                name = archive.name
-                if recreater.is_temporary_archive(name):
-                    continue
-                print('Processing', name)
-                if not recreater.recreate(name, args.comment):
-                    logger.info('Skipped archive %s: Nothing to do. Archive was not processed.', name)
+                logger.info('Skipped archive %s: Nothing to do. Archive was not processed.', name)
         if not args.dry_run:
             manifest.write()
             repository.commit(compact=False)
@@ -4946,6 +4937,7 @@ class Archiver:
         define_exclusion_group(subparser, tag_files=True)
 
         archive_group = subparser.add_argument_group('Archive options')
+        define_archive_filters_group(archive_group)
         archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
                                    type=archivename_validator(),
                                    help='create a new archive with the name ARCHIVE, do not replace existing archive '
@@ -4981,8 +4973,6 @@ class Archiver:
                                         'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
                                         'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
 
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
-                               help='specify the archive name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to recreate; patterns are supported')
 

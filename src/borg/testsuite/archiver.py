@@ -1314,7 +1314,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_exclude_caches(self):
         self._create_test_caches()
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '--exclude-caches')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', '--exclude-caches')
         self._assert_test_caches()
 
     def _create_test_tagged(self):
@@ -1338,7 +1338,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_exclude_tagged(self):
         self._create_test_tagged()
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '--exclude-if-present', '.NOBACKUP',
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', '--exclude-if-present', '.NOBACKUP',
                  '--exclude-if-present', '00-NOBACKUP')
         self._assert_test_tagged()
 
@@ -1377,7 +1377,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_recreate_exclude_keep_tagged(self):
         self._create_test_keep_tagged()
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '--exclude-if-present', '.NOBACKUP1',
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', '--exclude-if-present', '.NOBACKUP1',
                  '--exclude-if-present', '.NOBACKUP2', '--exclude-caches', '--keep-exclude-tags')
         self._assert_test_keep_tagged()
 
@@ -1392,7 +1392,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # in the "test" archive, we now have, in this order:
         # - a regular file item for "file1"
         # - a hardlink item for "CACHEDIR.TAG" referring back to file1 for its contents
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '--exclude-caches', '--keep-exclude-tags')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', 'test', '--exclude-caches', '--keep-exclude-tags')
         # if issue #4911 is present, the recreate will crash with a KeyError for "input/file1"
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='Linux capabilities test, requires fakeroot >= 1.20.2')
@@ -1579,10 +1579,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test1')
         assert 'Comment: this is the comment' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test2')
 
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test1', '--comment', 'added comment')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test2', '--comment', 'modified comment')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test3', '--comment', '')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test4', '12345')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test1', '--comment', 'added comment')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test2', '--comment', 'modified comment')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test3', '--comment', '')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test4', '12345')
         assert 'Comment: added comment' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test1')
         assert 'Comment: modified comment' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test2')
         assert 'Comment: \n' in self.cmd(f'--repo={self.repository_location}', 'info', '--name=test3')
@@ -2921,7 +2921,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test0', 'input')
         self.check_cache()
         original_archive = self.cmd(f'--repo={self.repository_location}', 'list')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test0', 'input/dir2',
+        self.cmd(f'--repo={self.repository_location}', 'recreate', 'test0', 'input/dir2',
                  '-e', 'input/dir2/file3', '--target=new-archive')
         self.check_cache()
         archives = self.cmd(f'--repo={self.repository_location}', 'list')
@@ -2938,7 +2938,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('dir2/file3', size=1024 * 80)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test0', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test0', 'input/dir2', '-e', 'input/dir2/file3')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', 'test0', 'input/dir2', '-e', 'input/dir2/file3')
         self.check_cache()
         listing = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test0', '--short')
         assert 'file1' not in listing
@@ -2950,7 +2950,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # This is essentially the same problem set as in test_extract_hardlinks
         self._extract_hardlinks_setup()
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', 'input/dir1')
+        self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', 'input/dir1')
         self.check_cache()
         with changedir('output'):
             self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test')
@@ -3000,7 +3000,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_test_files()
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test0', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test0', '--timestamp', "1970-01-02T00:00:00",
+        self.cmd(f'--repo={self.repository_location}', 'recreate', 'test0', '--timestamp', "1970-01-02T00:00:00",
                  '--comment', 'test')
         info = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test0').splitlines()
         dtime = datetime(1970, 1, 2) + local_timezone.utcoffset(None)
@@ -3044,22 +3044,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
 
-        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '--list', '--info', '-e', 'input/file2')
+        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', '--list', '--info', '-e', 'input/file2')
         self.check_cache()
         self.assert_in("input/file1", output)
         self.assert_in("x input/file2", output)
 
-        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '--list', '-e', 'input/file3')
+        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', '--list', '-e', 'input/file3')
         self.check_cache()
         self.assert_in("input/file1", output)
         self.assert_in("x input/file3", output)
 
-        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '-e', 'input/file4')
+        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', '-e', 'input/file4')
         self.check_cache()
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file4", output)
 
-        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '--name=test', '--info', '-e', 'input/file5')
+        output = self.cmd(f'--repo={self.repository_location}', 'recreate', '-a', 'test', '--info', '-e', 'input/file5')
         self.check_cache()
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file5", output)

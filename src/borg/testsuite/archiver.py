@@ -1508,9 +1508,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', '--name=test.2', 'input')
         self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.2', '--dry-run')
-        self.cmd(f'--repo={self.repository_location}', 'rename', '--name=test', '--name2=test.3')
+        self.cmd(f'--repo={self.repository_location}', 'rename', 'test', 'test.3')
         self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.2', '--dry-run')
-        self.cmd(f'--repo={self.repository_location}', 'rename', '--name=test.2', '--name2=test.4')
+        self.cmd(f'--repo={self.repository_location}', 'rename', 'test.2', 'test.4')
         self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.3', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'extract', '--name=test.4', '--dry-run')
         # Make sure both archives have been renamed
@@ -1854,7 +1854,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))
         self.cmd(f'--repo={self.repository_location}', 'create', '--name=test', 'input')
         self.add_unknown_feature(Manifest.Operation.CHECK)
-        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'rename', '--name=test', '--name2=other'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'rename', 'test', 'other'])
 
     def test_unknown_feature_on_delete(self):
         print(self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey'))

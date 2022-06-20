@@ -1508,7 +1508,7 @@ class Archiver:
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
         """Rename an existing archive"""
-        archive.rename(args.name2)
+        archive.rename(args.newname)
         manifest.write()
         repository.commit(compact=False)
         cache.commit()
@@ -4998,10 +4998,10 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='rename archive')
         subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument('--name', metavar='OLDNAME',
+        subparser.add_argument('name', metavar='OLDNAME',
                                type=archivename_validator(),
                                help='specify the archive name')
-        subparser.add_argument('--name2', metavar='NEWNAME',
+        subparser.add_argument('newname', metavar='NEWNAME',
                                type=archivename_validator(),
                                help='specify the new archive name')
 

@@ -231,9 +231,9 @@ def test_disk_full(cmd):
                 # now some error happened, likely we are out of disk space.
                 # free some space so we can expect borg to be able to work normally:
                 shutil.rmtree(reserve, ignore_errors=True)
-            rc, out = cmd(f'--repo={repo}', 'list')
+            rc, out = cmd(f'--repo={repo}', 'rlist')
             if rc != EXIT_SUCCESS:
-                print('list', rc, out)
+                print('rlist', rc, out)
             rc, out = cmd(f'--repo={repo}', 'check', '--repair')
             if rc != EXIT_SUCCESS:
                 print('check', rc, out)
@@ -400,7 +400,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('This archive: ', output)
         with changedir('output'):
             self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
-        list_output = self.cmd(f'--repo={self.repository_location}', 'list', '--short')
+        list_output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--short')
         self.assert_in('test', list_output)
         self.assert_in('test.2', list_output)
         expected = [
@@ -427,7 +427,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # remove the file we did not backup, so input and output become equal
             expected.remove('input/flagfile')  # this file is UF_NODUMP
             os.remove(os.path.join('input', 'flagfile'))
-        list_output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--short')
+        list_output = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--short')
         for name in expected:
             self.assert_in(name, list_output)
         self.assert_dirs_equal('input', 'output/input')
@@ -465,7 +465,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input', 'input')  # give input twice!
         # test if created archive has 'input' contents twice:
-        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--json-lines')
+        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--json-lines')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         # we have all fs items exactly once!
         assert sorted(paths) == ['input', 'input/a', 'input/a/hardlink', 'input/b', 'input/b/hardlink']
@@ -1096,7 +1096,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         input_data = b'\x00foo\n\nbar\n   \n'
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', '-', input=input_data)
-        item = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--json-lines'))
+        item = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--json-lines'))
         assert item['uid'] == 0
         assert item['gid'] == 0
         assert item['size'] == len(input_data)
@@ -1110,7 +1110,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         name = 'a/b/c'
         self.cmd(f'--repo={self.repository_location}', 'create', '--stdin-name', name, '--content-from-command',
                  'test', '--', 'echo', input_data)
-        item = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--json-lines'))
+        item = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--json-lines'))
         assert item['uid'] == 0
         assert item['gid'] == 0
         assert item['size'] == len(input_data) + 1  # `echo` adds newline
@@ -1123,7 +1123,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f'--repo={self.repository_location}', 'create', '--content-from-command', 'test',
                           '--', 'sh', '-c', 'exit 73;', exit_code=2)
         assert output.endswith("Command 'sh' exited with status 73\n")
-        archive_list = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--json'))
+        archive_list = json.loads(self.cmd(f'--repo={self.repository_location}', 'rlist', '--json'))
         assert archive_list['archives'] == []
 
     def test_create_content_from_command_missing_command(self):
@@ -1141,7 +1141,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         input_data = b'input/file1\0input/dir1\0input/file4'
         self.cmd(f'--repo={self.repository_location}', 'create', 'test',
                  '--paths-from-stdin', '--paths-delimiter', '\\0', input=input_data)
-        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--json-lines')
+        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--json-lines')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         assert paths == ['input/file1', 'input/dir1', 'input/file4']
 
@@ -1155,7 +1155,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         input_data = 'input/file1\ninput/file2\ninput/file3'
         self.cmd(f'--repo={self.repository_location}', 'create', '--paths-from-command', 'test',
                  '--', 'echo', input_data)
-        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--json-lines')
+        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--json-lines')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         assert paths == ['input/file1', 'input/file2', 'input/file3']
 
@@ -1164,7 +1164,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f'--repo={self.repository_location}', 'create', '--paths-from-command', 'test',
                           '--', 'sh', '-c', 'exit 73;', exit_code=2)
         assert output.endswith("Command 'sh' exited with status 73\n")
-        archive_list = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--json'))
+        archive_list = json.loads(self.cmd(f'--repo={self.repository_location}', 'rlist', '--json'))
         assert archive_list['archives'] == []
 
     def test_create_paths_from_command_missing_command(self):
@@ -1264,7 +1264,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # list the archive and verify that the "intermediate" folders appear before
         # their contents
-        out = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--format', '{type} {path}{NL}')
+        out = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--format', '{type} {path}{NL}')
         out_list = out.splitlines()
 
         self.assert_in('d x/a', out_list)
@@ -1453,7 +1453,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('input/dir1/dir2'):
             self.cmd(f'--repo={self.repository_location}', 'create', 'test',
                      '../../../input/dir1/../dir1/dir2/..')
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test')
+        output = self.cmd(f'--repo={self.repository_location}', 'list', 'test')
         self.assert_not_in('..', output)
         self.assert_in(' input/dir1/dir2/file', output)
 
@@ -1618,7 +1618,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test1', 'test2')
         self.cmd(f'--repo={self.repository_location}', 'extract', 'test3', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test3')
-        assert not self.cmd(f'--repo={self.repository_location}', 'list')
+        assert not self.cmd(f'--repo={self.repository_location}', 'rlist')
 
     def test_delete_repo(self):
         self.create_regular_file('file1', size=1024 * 80)
@@ -1650,7 +1650,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test', '--force')
         self.assert_in('deleted archive was corrupted', output)
         self.cmd(f'--repo={self.repository_location}', 'check', '--repair')
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_not_in('test', output)
 
     def test_delete_double_force(self):
@@ -1664,7 +1664,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             repository.commit(compact=False)
         self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test', '--force', '--force')
         self.cmd(f'--repo={self.repository_location}', 'check', '--repair')
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_not_in('test', output)
 
     def test_corrupted_repository(self):
@@ -1764,14 +1764,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with self.read_only(self.repository_path):
             # verify that command normally doesn't work with read-only repo
             if self.FORK_DEFAULT:
-                self.cmd(f'--repo={self.repository_location}', 'list', exit_code=EXIT_ERROR)
+                self.cmd(f'--repo={self.repository_location}', 'rlist', exit_code=EXIT_ERROR)
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    self.cmd(f'--repo={self.repository_location}', 'list')
+                    self.cmd(f'--repo={self.repository_location}', 'rlist')
                 if isinstance(excinfo.value, RemoteRepository.RPCError):
                     assert excinfo.value.exception_class == 'LockFailed'
             # verify that command works with read-only repo when using --bypass-lock
-            self.cmd(f'--repo={self.repository_location}', 'list', '--bypass-lock')
+            self.cmd(f'--repo={self.repository_location}', 'rlist', '--bypass-lock')
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_readonly_mount(self):
@@ -1847,7 +1847,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir('output'):
             self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'extract', 'test'])
 
-        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'list'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'rlist'])
         self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'info', '--name=test'])
 
     def test_unknown_feature_on_rename(self):
@@ -2093,7 +2093,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.symlink('somewhere does not exist', os.path.join(self.input_path, 'link'))
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', '--read-special', 'test', 'input')
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test')
+        output = self.cmd(f'--repo={self.repository_location}', 'list', 'test')
         assert 'input/link -> somewhere does not exist' in output
 
     # def test_cmdline_compatibility(self):
@@ -2117,14 +2117,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         # must keep the latest checkpoint archive:
         assert re.search(r'Keeping checkpoint archive:\s+test4.checkpoint', output)
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--consider-checkpoints')
         self.assert_in('test1', output)
         self.assert_in('test2', output)
         self.assert_in('test3.checkpoint', output)
         self.assert_in('test3.checkpoint.1', output)
         self.assert_in('test4.checkpoint', output)
         self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=1')
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--consider-checkpoints')
         self.assert_not_in('test1', output)
         # the latest non-checkpoint archive must be still there:
         self.assert_in('test2', output)
@@ -2135,7 +2135,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # now we supersede the latest checkpoint by a successful backup:
         self.cmd(f'--repo={self.repository_location}', 'create', 'test5', src_dir)
         self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=2')
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--consider-checkpoints')
         # all checkpoints should be gone now:
         self.assert_not_in('checkpoint', output)
         # the latest archive must be still there
@@ -2199,12 +2199,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert re.search(r'Keeping archive \(rule: monthly #' + str(i) + r'\):\s+test' + ("%02d" % (8-i)), output)
         for i in range(1, 15):
             assert re.search(r'Keeping archive \(rule: daily #' + str(i) + r'\):\s+test' + ("%02d" % (22-i)), output)
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         # Nothing pruned after dry run
         for i in range(1, 25):
             self.assert_in('test%02d' % i, output)
         self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=14', '--keep-monthly=6', '--keep-yearly=1')
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         # All matching backups plus oldest kept
         for i in range(1, 22):
             self.assert_in('test%02d' % i, output)
@@ -2243,11 +2243,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=1')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         assert re.search(r'Would prune:\s+test1', output)
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_in('test1', output)
         self.assert_in('test2', output)
         self.cmd(f'--repo={self.repository_location}', 'prune', '--save-space', '--keep-daily=1')
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
 
@@ -2260,13 +2260,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=1', '--prefix=foo-')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00', output)
         assert re.search(r'Would prune:\s+foo-2015-08-12-10:00', output)
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_in('foo-2015-08-12-10:00', output)
         self.assert_in('foo-2015-08-12-20:00', output)
         self.assert_in('bar-2015-08-12-10:00', output)
         self.assert_in('bar-2015-08-12-20:00', output)
         self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=1', '--prefix=foo-')
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_not_in('foo-2015-08-12-10:00', output)
         self.assert_in('foo-2015-08-12-20:00', output)
         self.assert_in('bar-2015-08-12-10:00', output)
@@ -2281,13 +2281,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f'--repo={self.repository_location}', 'prune', '--list', '--dry-run', '--keep-daily=1', '--glob-archives=2015-*-foo')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo', output)
         assert re.search(r'Would prune:\s+2015-08-12-10:00-foo', output)
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_in('2015-08-12-10:00-foo', output)
         self.assert_in('2015-08-12-20:00-foo', output)
         self.assert_in('2015-08-12-10:00-bar', output)
         self.assert_in('2015-08-12-20:00-bar', output)
         self.cmd(f'--repo={self.repository_location}', 'prune', '--keep-daily=1', '--glob-archives=2015-*-foo')
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_not_in('2015-08-12-10:00-foo', output)
         self.assert_in('2015-08-12-20:00-foo', output)
         self.assert_in('2015-08-12-10:00-bar', output)
@@ -2298,7 +2298,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test-1', src_dir)
         self.cmd(f'--repo={self.repository_location}', 'create', 'something-else-than-test-1', src_dir)
         self.cmd(f'--repo={self.repository_location}', 'create', 'test-2', src_dir)
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--prefix=test-')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--prefix=test-')
         self.assert_in('test-1', output)
         self.assert_in('test-2', output)
         self.assert_not_in('something-else', output)
@@ -2306,24 +2306,24 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_list_format(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', src_dir)
-        output_1 = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test')
-        output_2 = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--format', '{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}')
-        output_3 = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--format', '{mtime:%s} {path}{NL}')
+        output_1 = self.cmd(f'--repo={self.repository_location}', 'list', 'test')
+        output_2 = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--format', '{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}')
+        output_3 = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--format', '{mtime:%s} {path}{NL}')
         self.assertEqual(output_1, output_2)
         self.assertNotEqual(output_1, output_3)
 
-    def test_list_repository_format(self):
+    def test_archives_format(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', '--comment', 'comment 1', 'test-1', src_dir)
         self.cmd(f'--repo={self.repository_location}', 'create', '--comment', 'comment 2', 'test-2', src_dir)
-        output_1 = self.cmd(f'--repo={self.repository_location}', 'list')
-        output_2 = self.cmd(f'--repo={self.repository_location}', 'list', '--format', '{archive:<36} {time} [{id}]{NL}')
+        output_1 = self.cmd(f'--repo={self.repository_location}', 'rlist')
+        output_2 = self.cmd(f'--repo={self.repository_location}', 'rlist', '--format', '{archive:<36} {time} [{id}]{NL}')
         self.assertEqual(output_1, output_2)
-        output_1 = self.cmd(f'--repo={self.repository_location}', 'list', '--short')
+        output_1 = self.cmd(f'--repo={self.repository_location}', 'rlist', '--short')
         self.assertEqual(output_1, 'test-1\ntest-2\n')
-        output_1 = self.cmd(f'--repo={self.repository_location}', 'list', '--format', '{barchive}/')
+        output_1 = self.cmd(f'--repo={self.repository_location}', 'rlist', '--format', '{barchive}/')
         self.assertEqual(output_1, 'test-1/test-2/')
-        output_3 = self.cmd(f'--repo={self.repository_location}', 'list', '--format', '{name} {comment}{NL}')
+        output_3 = self.cmd(f'--repo={self.repository_location}', 'rlist', '--format', '{name} {comment}{NL}')
         self.assert_in('test-1 comment 1\n', output_3)
         self.assert_in('test-2 comment 2\n', output_3)
 
@@ -2332,7 +2332,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('amb', contents=b'a' * 1000000)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--format', '{sha256} {path}{NL}')
+        output = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--format', '{sha256} {path}{NL}')
         assert "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0 input/amb" in output
         assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
 
@@ -2342,11 +2342,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # these are not really a checkpoints, but they look like some:
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2.checkpoint', src_dir)
         self.cmd(f'--repo={self.repository_location}', 'create', 'test3.checkpoint.1', src_dir)
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         assert "test1" in output
         assert "test2.checkpoint" not in output
         assert "test3.checkpoint.1" not in output
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--consider-checkpoints')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--consider-checkpoints')
         assert "test1" in output
         assert "test2.checkpoint" in output
         assert "test3.checkpoint.1" in output
@@ -2359,7 +2359,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'baab' * 2000000)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--format', '{num_chunks} {unique_chunks} {path}{NL}')
+        output = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--format', '{num_chunks} {unique_chunks} {path}{NL}')
         assert "0 0 input/empty_file" in output
         assert "2 2 input/two_chunks" in output
 
@@ -2367,7 +2367,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('compressible_file', size=10000)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', '-C', 'lz4', 'test', 'input')
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--format', '{size} {path}{NL}')
+        output = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--format', '{size} {path}{NL}')
         size, path = output.split("\n")[1].split(" ")
         assert int(size) == 10000
 
@@ -2375,7 +2375,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        list_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'list', '--json'))
+        list_repo = json.loads(self.cmd(f'--repo={self.repository_location}', 'rlist', '--json'))
         repository = list_repo['repository']
         assert len(repository['id']) == 64
         assert datetime.strptime(repository['last_modified'], ISO_FORMAT)  # must not raise
@@ -2384,7 +2384,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         archive0 = list_repo['archives'][0]
         assert datetime.strptime(archive0['time'], ISO_FORMAT)  # must not raise
 
-        list_archive = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--json-lines')
+        list_archive = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--json-lines')
         items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
@@ -2392,17 +2392,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert file1['size'] == 81920
         assert datetime.strptime(file1['mtime'], ISO_FORMAT)  # must not raise
 
-        list_archive = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', '--json-lines', '--format={sha256}')
+        list_archive = self.cmd(f'--repo={self.repository_location}', 'list', 'test', '--json-lines', '--format={sha256}')
         items = [json.loads(s) for s in list_archive.splitlines()]
         assert len(items) == 2
         file1 = items[1]
         assert file1['path'] == 'input/file1'
         assert file1['sha256'] == 'b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b'
-
-    def test_list_json_args(self):
-        self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
-        self.cmd(f'--repo={self.repository_location}', 'list', '--json-lines', exit_code=2)
-        self.cmd(f'--repo={self.repository_location}', 'list', '--name=archive', '--json', exit_code=2)
 
     def test_log_json(self):
         self.create_test_files()
@@ -2448,7 +2443,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
         self.cmd(f'--repo={self.repository_location}', 'key', 'change-passphrase')
         os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
-        self.cmd(f'--repo={self.repository_location}', 'list')
+        self.cmd(f'--repo={self.repository_location}', 'rlist')
 
     def test_change_location_to_keyfile(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -2919,15 +2914,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.check_cache()
         self.cmd(f'--repo={self.repository_location}', 'create', 'test0', 'input')
         self.check_cache()
-        original_archive = self.cmd(f'--repo={self.repository_location}', 'list')
+        original_archive = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.cmd(f'--repo={self.repository_location}', 'recreate', 'test0', 'input/dir2',
                  '-e', 'input/dir2/file3', '--target=new-archive')
         self.check_cache()
-        archives = self.cmd(f'--repo={self.repository_location}', 'list')
+        archives = self.cmd(f'--repo={self.repository_location}', 'rlist')
         assert original_archive in archives
         assert 'new-archive' in archives
 
-        listing = self.cmd(f'--repo={self.repository_location}', 'list', '--name=new-archive', '--short')
+        listing = self.cmd(f'--repo={self.repository_location}', 'list', 'new-archive', '--short')
         assert 'file1' not in listing
         assert 'dir2/file2' in listing
         assert 'dir2/file3' not in listing
@@ -2939,7 +2934,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test0', 'input')
         self.cmd(f'--repo={self.repository_location}', 'recreate', 'test0', 'input/dir2', '-e', 'input/dir2/file3')
         self.check_cache()
-        listing = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test0', '--short')
+        listing = self.cmd(f'--repo={self.repository_location}', 'list', 'test0', '--short')
         assert 'file1' not in listing
         assert 'dir2/file2' in listing
         assert 'dir2/file3' not in listing
@@ -2968,7 +2963,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test1', 'input', '--chunker-params', '7,9,8,128')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2', 'input', '--files-cache=disabled')
-        list = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test1', 'input/large_file',
+        list = self.cmd(f'--repo={self.repository_location}', 'list', 'test1', 'input/large_file',
                         '--format', '{num_chunks} {unique_chunks}')
         num_chunks, unique_chunks = map(int, list.split(' '))
         # test1 and test2 do not deduplicate
@@ -2976,20 +2971,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'recreate', '--chunker-params', 'default')
         self.check_cache()
         # test1 and test2 do deduplicate after recreate
-        assert int(self.cmd(f'--repo={self.repository_location}', 'list', '--name=test1', 'input/large_file', '--format={size}'))
-        assert not int(self.cmd(f'--repo={self.repository_location}', 'list', '--name=test1', 'input/large_file',
+        assert int(self.cmd(f'--repo={self.repository_location}', 'list', 'test1', 'input/large_file', '--format={size}'))
+        assert not int(self.cmd(f'--repo={self.repository_location}', 'list', 'test1', 'input/large_file',
                                 '--format', '{unique_chunks}'))
 
     def test_recreate_recompress(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input', '-C', 'none')
-        file_list = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', 'input/compressible',
+        file_list = self.cmd(f'--repo={self.repository_location}', 'list', 'test', 'input/compressible',
                              '--format', '{size} {sha256}')
         size, sha256_before = file_list.split(' ')
         self.cmd(f'--repo={self.repository_location}', 'recreate', '-C', 'lz4', '--recompress')
         self.check_cache()
-        file_list = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test', 'input/compressible',
+        file_list = self.cmd(f'--repo={self.repository_location}', 'list', 'test', 'input/compressible',
                              '--format', '{size} {sha256}')
         size, sha256_after = file_list.split(' ')
         assert sha256_before == sha256_after
@@ -3011,10 +3006,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('compressible', size=10000)
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
-        archives_before = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test')
+        archives_before = self.cmd(f'--repo={self.repository_location}', 'list', 'test')
         self.cmd(f'--repo={self.repository_location}', 'recreate', '-n', '-e', 'input/compressible')
         self.check_cache()
-        archives_after = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test')
+        archives_after = self.cmd(f'--repo={self.repository_location}', 'list', 'test')
         assert archives_after == archives_before
 
     def test_recreate_skips_nothing_to_do(self):
@@ -3519,12 +3514,12 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         # The repo should still be readable
         repo_info = self.cmd(f'--repo={self.repository_location}', 'info')
         assert 'All archives:' in repo_info
-        repo_list = self.cmd(f'--repo={self.repository_location}', 'list')
+        repo_list = self.cmd(f'--repo={self.repository_location}', 'rlist')
         assert 'test' in repo_list
         # The archive should still be readable
         archive_info = self.cmd(f'--repo={self.repository_location}', 'info', '--name=test')
         assert 'Archive name: test\n' in archive_info
-        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', '--name=test')
+        archive_list = self.cmd(f'--repo={self.repository_location}', 'list', 'test')
         assert 'file1' in archive_list
         # Extracting the archive should work
         with changedir('output'):
@@ -3697,7 +3692,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
         self.assert_in('New missing file chunk detected', output)
         self.cmd(f'--repo={self.repository_location}', 'check', exit_code=0)
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=archive1', '--format={health}#{path}{LF}', exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'list', 'archive1', '--format={health}#{path}{LF}', exit_code=0)
         self.assert_in('broken#', output)
         # check that the file in the old archives has now a different chunk list without the killed chunk
         for archive_name in ('archive1', 'archive2'):
@@ -3728,7 +3723,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 else:
                     self.fail('should not happen')
         # list is also all-healthy again
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--name=archive1', '--format={health}#{path}{LF}', exit_code=0)
+        output = self.cmd(f'--repo={self.repository_location}', 'list', 'archive1', '--format={health}#{path}{LF}', exit_code=0)
         self.assert_not_in('broken#', output)
 
     def test_missing_archive_item_chunk(self):
@@ -3811,7 +3806,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             repository.commit(compact=False)
         self.cmd(f'--repo={self.repository_location}', 'check', exit_code=1)
         self.cmd(f'--repo={self.repository_location}', 'check', '--repair', exit_code=0)
-        output = self.cmd(f'--repo={self.repository_location}', 'list')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_in('archive1', output)
         self.assert_in('archive1.1', output)
         self.assert_in('archive2', output)
@@ -3887,7 +3882,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.commit(compact=False)
 
         with pytest.raises(TAMRequiredError):
-            self.cmd(f'--repo={self.repository_location}', 'list')
+            self.cmd(f'--repo={self.repository_location}', 'rlist')
 
     def test_not_required(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -3903,23 +3898,23 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             del manifest['tam']
             repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb(manifest)))
             repository.commit(compact=False)
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--debug')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--debug')
         assert 'archive1234' in output
         assert 'TAM not found and not required' in output
         # Run upgrade
         self.cmd(f'--repo={self.repository_location}', 'upgrade', '--tam')
         # Manifest must be authenticated now
-        output = self.cmd(f'--repo={self.repository_location}', 'list', '--debug')
+        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--debug')
         assert 'archive1234' in output
         assert 'TAM-verified manifest' in output
         # Try to spoof / modify pre-1.0.9
         self.spoof_manifest(repository)
         # Fails
         with pytest.raises(TAMRequiredError):
-            self.cmd(f'--repo={self.repository_location}', 'list')
+            self.cmd(f'--repo={self.repository_location}', 'rlist')
         # Force upgrade
         self.cmd(f'--repo={self.repository_location}', 'upgrade', '--tam', '--force')
-        self.cmd(f'--repo={self.repository_location}', 'list')
+        self.cmd(f'--repo={self.repository_location}', 'rlist')
 
     def test_disable(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -3927,7 +3922,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'upgrade', '--disable-tam')
         repository = Repository(self.repository_path, exclusive=True)
         self.spoof_manifest(repository)
-        assert not self.cmd(f'--repo={self.repository_location}', 'list')
+        assert not self.cmd(f'--repo={self.repository_location}', 'rlist')
 
     def test_disable2(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
@@ -3935,7 +3930,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         repository = Repository(self.repository_path, exclusive=True)
         self.spoof_manifest(repository)
         self.cmd(f'--repo={self.repository_location}', 'upgrade', '--disable-tam')
-        assert not self.cmd(f'--repo={self.repository_location}', 'list')
+        assert not self.cmd(f'--repo={self.repository_location}', 'rlist')
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):
@@ -4043,7 +4038,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
     def test_chunks_archive(self):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test1', 'input')
         # Find ID of test1 so we can corrupt it later :)
-        target_id = self.cmd(f'--repo={self.repository_location}', 'list', '--format={id}{LF}').strip()
+        target_id = self.cmd(f'--repo={self.repository_location}', 'rlist', '--format={id}{LF}').strip()
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2', 'input')
 
         # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d

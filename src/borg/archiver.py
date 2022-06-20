@@ -1700,19 +1700,7 @@ class Archiver:
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest, key):
-        """List archive or repository contents"""
-        if args.name:
-            if args.json:
-                self.print_error('The --json option is only valid for listing archives, not archive contents.')
-                return self.exit_code
-            return self._list_archive(args, repository, manifest, key)
-        else:
-            if args.json_lines:
-                self.print_error('The --json-lines option is only valid for listing archive contents, not archives.')
-                return self.exit_code
-            return self._list_repository(args, repository, manifest, key)
-
-    def _list_archive(self, args, repository, manifest, key):
+        """List archive contents"""
         matcher = self.build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
@@ -1738,7 +1726,9 @@ class Archiver:
 
         return self.exit_code
 
-    def _list_repository(self, args, repository, manifest, key):
+    @with_repository(compatibility=(Manifest.Operation.READ,))
+    def do_rlist(self, args, repository, manifest, key):
+        """List the archives contained in a repository"""
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -4686,7 +4676,7 @@ class Archiver:
 
         # borg list
         list_epilog = process_epilog("""
-        This command lists the contents of a repository or an archive.
+        This command lists the contents of an archive.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
@@ -4701,34 +4691,19 @@ class Archiver:
         Examples:
         ::
 
-            $ borg list --format '{archive}{NL}' /path/to/repo
-            ArchiveFoo
-            ArchiveBar
-            ...
-
-            # {VAR:NUMBER} - pad to NUMBER columns.
-            # Strings are left-aligned, numbers are right-aligned.
-            # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
-            $ borg list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
-            ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
-            $ borg list --format '{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}' /path/to/repo::ArchiveFoo
+            $ borg list --format '{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}' ArchiveFoo
             -rw-rw-r-- user   user       1024 Thu, 2021-12-09 10:22:17 file-foo
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg list --format '{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}' /path/to/repo::ArchiveFoo
+            $ borg list --format '{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}' ArchiveFoo
             -rw-rw-r--   user   user 1024     Thu, 2021-12-09 10:22:17 file-foo
             ...
 
         The following keys are always available:
 
-
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
-
-        Keys available only when listing archives in a repository:
-
-        """) + ArchiveFormatter.keys_help() + textwrap.dedent("""
 
         Keys available only when listing files in an archive:
 
@@ -4737,34 +4712,73 @@ class Archiver:
                                           description=self.do_list.__doc__,
                                           epilog=list_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='list archive or repository contents')
+                                          help='list archive contents')
         subparser.set_defaults(func=self.do_list)
-        subparser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
-                help='Show checkpoint archives in the repository contents list (default: hidden).')
         subparser.add_argument('--short', dest='short', action='store_true',
                                help='only print file/directory names, nothing else')
         subparser.add_argument('--format', metavar='FORMAT', dest='format',
-                               help='specify format for file or archive listing '
-                                    '(default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; '
-                                    'for archives: "{archive:<36} {time} [{id}]{NL}")')
-        subparser.add_argument('--json', action='store_true',
-                               help='Only valid for listing repository contents. Format output as JSON. '
-                                    'The form of ``--format`` is ignored, '
-                                    'but keys used in it are added to the JSON output. '
-                                    'Some keys are always present. Note: JSON can only represent text. '
-                                    'A "barchive" key is therefore not available.')
+                               help='specify format for file listing '
+                                    '(default: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")')
         subparser.add_argument('--json-lines', action='store_true',
-                               help='Only valid for listing archive contents. Format output as JSON Lines. '
+                               help='Format output as JSON Lines. '
                                     'The form of ``--format`` is ignored, '
                                     'but keys used in it are added to the JSON output. '
                                     'Some keys are always present. Note: JSON can only represent text. '
                                     'A "bpath" key is therefore not available.')
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
+        subparser.add_argument('name', metavar='NAME', type=NameSpec,
                                help='specify the archive name')
         subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
                                help='paths to list; patterns are supported')
-        define_archive_filters_group(subparser)
         define_exclusion_group(subparser)
+
+        # borg rlist
+        rlist_epilog = process_epilog("""
+        This command lists the archives contained in a repository.
+        .. man NOTES
+        The FORMAT specifier syntax
+        +++++++++++++++++++++++++++
+        The ``--format`` option uses python's `format string syntax
+        <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
+        Examples:
+        ::
+            $ borg rlist --format '{archive}{NL}'
+            ArchiveFoo
+            ArchiveBar
+            ...
+
+            # {VAR:NUMBER} - pad to NUMBER columns.
+            # Strings are left-aligned, numbers are right-aligned.
+            # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
+            $ borg rlist --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+            ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
+            ...
+
+        The following keys are always available:
+
+        """) + BaseFormatter.keys_help() + textwrap.dedent("""
+        Keys available only when listing archives in a repository:
+
+        """) + ArchiveFormatter.keys_help()
+        subparser = subparsers.add_parser('rlist', parents=[common_parser], add_help=False,
+                                          description=self.do_rlist.__doc__,
+                                          epilog=rlist_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='list repository contents')
+        subparser.set_defaults(func=self.do_rlist)
+        subparser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
+                               help='Show checkpoint archives in the repository contents list (default: hidden).')
+        subparser.add_argument('--short', dest='short', action='store_true',
+                               help='only print the archive names, nothing else')
+        subparser.add_argument('--format', metavar='FORMAT', dest='format',
+                               help='specify format for archive listing '
+                                    '(default: "{archive:<36} {time} [{id}]{NL}")')
+        subparser.add_argument('--json', action='store_true',
+                               help='Format output as JSON. '
+                                    'The form of ``--format`` is ignored, '
+                                    'but keys used in it are added to the JSON output. '
+                                    'Some keys are always present. Note: JSON can only represent text. '
+                                    'A "barchive" key is therefore not available.')
+        define_archive_filters_group(subparser)
 
         subparser = subparsers.add_parser('mount', parents=[common_parser], add_help=False,
                                         description=self.do_mount.__doc__,
@@ -5280,7 +5294,7 @@ class Archiver:
         if not getattr(args, 'lock', True):  # Option --bypass-lock sets args.lock = False
             bypass_allowed = {self.do_check, self.do_config, self.do_diff,
                               self.do_export_tar, self.do_extract, self.do_info,
-                              self.do_list, self.do_mount, self.do_umount}
+                              self.do_list, self.do_rlist, self.do_mount, self.do_umount}
             if func not in bypass_allowed:
                 raise Error('Not allowed to bypass locking mechanism for chosen command')
         if getattr(args, 'timestamp', None):

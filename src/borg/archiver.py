@@ -679,7 +679,7 @@ class Archiver:
             # now build files cache
             rc1 = self.do_create(self.parse_args([f'--repo={repo}', 'create', compression,
                                                   'borg-benchmark-crud2', path]))
-            rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud2']))
+            rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '-a', 'borg-benchmark-crud2']))
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
@@ -687,7 +687,7 @@ class Archiver:
                                                   'borg-benchmark-crud3', path]))
             t_end = time.monotonic()
             dt_update = t_end - t_start
-            rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud3']))
+            rc2 = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '-a', 'borg-benchmark-crud3']))
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
@@ -698,7 +698,7 @@ class Archiver:
             assert rc == 0
             # measure archive deletion (of LAST present archive with the data)
             t_start = time.monotonic()
-            rc = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '--name=borg-benchmark-crud1']))
+            rc = self.do_delete(self.parse_args([f'--repo={repo}', 'delete', '-a', 'borg-benchmark-crud1']))
             t_end = time.monotonic()
             dt_delete = t_end - t_start
             assert rc == 0
@@ -1515,35 +1515,80 @@ class Archiver:
         return self.exit_code
 
     @with_repository(exclusive=True, manifest=False)
-    def do_delete(self, args, repository):
-        """Delete an existing repository or archives"""
-        archive_filter_specified = any((args.first, args.last, args.prefix is not None, args.glob_archives))
-        explicit_archives_specified = args.name or args.archives
+    def do_rdelete(self, args, repository):
+        """Delete a repository"""
         self.output_list = args.output_list
-        if archive_filter_specified and explicit_archives_specified:
-            self.print_error('Mixing archive filters and explicitly named archives is not supported.')
-            return self.exit_code
-        if archive_filter_specified or explicit_archives_specified:
-            return self._delete_archives(args, repository)
-        else:
-            return self._delete_repository(args, repository)
-
-    def _delete_archives(self, args, repository):
-        """Delete archives"""
         dry_run = args.dry_run
+        keep_security_info = args.keep_security_info
 
-        manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        if not args.cache_only:
+            if args.forced == 0:  # without --force, we let the user see the archives list and confirm.
+                id = bin_to_hex(repository.id)
+                location = repository._location.canonical_path()
+                msg = []
+                try:
+                    manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+                    n_archives = len(manifest.archives)
+                    msg.append(f"You requested to completely DELETE the following repository "
+                               f"*including* {n_archives} archives it contains:")
+                except NoManifestError:
+                    n_archives = None
+                    msg.append("You requested to completely DELETE the following repository "
+                               "*including* all archives it may contain:")
 
-        if args.name or args.archives:
-            archives = list(args.archives)
-            if args.name:
-                archives.insert(0, args.name)
-            archive_names = tuple(archives)
+                msg.append(DASHES)
+                msg.append(f"Repository ID: {id}")
+                msg.append(f"Location: {location}")
+
+                if self.output_list:
+                    msg.append("")
+                    msg.append("Archives:")
+
+                    if n_archives is not None:
+                        if n_archives > 0:
+                            for archive_info in manifest.archives.list(sort_by=['ts']):
+                                msg.append(format_archive(archive_info))
+                        else:
+                            msg.append("This repository seems to not have any archives.")
+                    else:
+                        msg.append("This repository seems to have no manifest, so we can't "
+                                   "tell anything about its contents.")
+
+                msg.append(DASHES)
+                msg.append("Type 'YES' if you understand this and want to continue: ")
+                msg = '\n'.join(msg)
+                if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
+                           retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
+                    self.exit_code = EXIT_ERROR
+                    return self.exit_code
+            if not dry_run:
+                repository.destroy()
+                logger.info("Repository deleted.")
+                if not keep_security_info:
+                    SecurityManager.destroy(repository)
+            else:
+                logger.info("Would delete repository.")
+                logger.info("Would %s security info." % ("keep" if keep_security_info else "delete"))
+        if not dry_run:
+            Cache.destroy(repository)
+            logger.info("Cache deleted.")
         else:
-            args.consider_checkpoints = True
-            archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
-            if not archive_names:
-                return self.exit_code
+            logger.info("Would delete cache.")
+        return self.exit_code
+
+    @with_repository(exclusive=True, manifest=False)
+    def do_delete(self, args, repository):
+        """Delete archives"""
+        self.output_list = args.output_list
+        dry_run = args.dry_run
+        manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
+        if not archive_names:
+            return self.exit_code
+        if args.glob_archives is None and args.first == 0 and args.last == 0:
+            self.print_error("Aborting: if you really want to delete all archives, please use -a '*' "
+                             "or just delete the whole repository (might be much faster).")
+            return EXIT_ERROR
 
         if args.forced == 2:
             deleted = False
@@ -1603,66 +1648,6 @@ class Archiver:
                           str(cache),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
 
-        return self.exit_code
-
-    def _delete_repository(self, args, repository):
-        """Delete a repository"""
-        dry_run = args.dry_run
-        keep_security_info = args.keep_security_info
-
-        if not args.cache_only:
-            if args.forced == 0:  # without --force, we let the user see the archives list and confirm.
-                id = bin_to_hex(repository.id)
-                location = repository._location.canonical_path()
-                msg = []
-                try:
-                    manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-                    n_archives = len(manifest.archives)
-                    msg.append(f"You requested to completely DELETE the following repository "
-                               f"*including* {n_archives} archives it contains:")
-                except NoManifestError:
-                    n_archives = None
-                    msg.append("You requested to completely DELETE the following repository "
-                               "*including* all archives it may contain:")
-
-                msg.append(DASHES)
-                msg.append(f"Repository ID: {id}")
-                msg.append(f"Location: {location}")
-
-                if self.output_list:
-                    msg.append("")
-                    msg.append("Archives:")
-
-                    if n_archives is not None:
-                        if n_archives > 0:
-                            for archive_info in manifest.archives.list(sort_by=['ts']):
-                                msg.append(format_archive(archive_info))
-                        else:
-                            msg.append("This repository seems to not have any archives.")
-                    else:
-                        msg.append("This repository seems to have no manifest, so we can't "
-                                   "tell anything about its contents.")
-
-                msg.append(DASHES)
-                msg.append("Type 'YES' if you understand this and want to continue: ")
-                msg = '\n'.join(msg)
-                if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
-                           retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
-                    self.exit_code = EXIT_ERROR
-                    return self.exit_code
-            if not dry_run:
-                repository.destroy()
-                logger.info("Repository deleted.")
-                if not keep_security_info:
-                    SecurityManager.destroy(repository)
-            else:
-                logger.info("Would delete repository.")
-                logger.info("Would %s security info." % ("keep" if keep_security_info else "delete"))
-        if not dry_run:
-            Cache.destroy(repository)
-            logger.info("Cache deleted.")
-        else:
-            logger.info("Would delete cache.")
         return self.exit_code
 
     def do_mount(self, args):
@@ -4062,17 +4047,41 @@ class Archiver:
         subparser.add_argument('output', metavar='OUTPUT', type=argparse.FileType('wb'),
                                help='Output file')
 
-        # borg delete
-        delete_epilog = process_epilog("""
-        This command deletes an archive from the repository or the complete repository.
-
-        Important: When deleting archives, repository disk space is **not** freed until
-        you run ``borg compact``.
+        # borg rdelete
+        rdelete_epilog = process_epilog("""
+        This command deletes the complete repository.
 
         When you delete a complete repository, the security info and local cache for it
         (if any) are also deleted. Alternatively, you can delete just the local cache
         with the ``--cache-only`` option, or keep the security info with the
         ``--keep-security-info`` option.
+
+        Always first use ``--dry-run --list`` to see what would be deleted.
+        """)
+        subparser = subparsers.add_parser('rdelete', parents=[common_parser], add_help=False,
+                                          description=self.do_rdelete.__doc__,
+                                          epilog=rdelete_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='delete repository')
+        subparser.set_defaults(func=self.do_rdelete)
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                               help='do not change repository')
+        subparser.add_argument('--list', dest='output_list', action='store_true',
+                               help='output verbose list of archives')
+        subparser.add_argument('--force', dest='forced', action='count', default=0,
+                               help='force deletion of corrupted archives, '
+                                    'use ``--force --force`` in case ``--force`` does not work.')
+        subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
+                               help='delete only the local cache for the given repository')
+        subparser.add_argument('--keep-security-info', dest='keep_security_info', action='store_true',
+                               help='keep the local security info when deleting a repository')
+
+        # borg delete
+        delete_epilog = process_epilog("""
+        This command deletes archives from the repository.
+
+        Important: When deleting archives, repository disk space is **not** freed until
+        you run ``borg compact``.
 
         When in doubt, use ``--dry-run --list`` to see what would be deleted.
 
@@ -4087,9 +4096,7 @@ class Archiver:
         (for more info on these patterns, see :ref:`borg_patterns`). Note that these
         two options are mutually exclusive.
 
-        To avoid accidentally deleting archives, especially when using glob patterns,
-        it might be helpful to use the ``--dry-run`` to test out the command without
-        actually making any changes to the repository.
+        Always first use ``--dry-run --list`` to see what would be deleted.
         """)
         subparser = subparsers.add_parser('delete', parents=[common_parser], add_help=False,
                                           description=self.do_delete.__doc__,
@@ -4101,6 +4108,8 @@ class Archiver:
                                help='do not change repository')
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of archives')
+        subparser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
+                               help='consider checkpoint archives for deletion (default: not considered).')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
@@ -4112,10 +4121,6 @@ class Archiver:
                                help='keep the local security info when deleting a repository')
         subparser.add_argument('--save-space', dest='save_space', action='store_true',
                                help='work slower, but using less space')
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
-                               help='specify the archive name')
-        subparser.add_argument('archives', metavar='ARCHIVE', nargs='*',
-                               help='archives to delete')
         define_archive_filters_group(subparser)
 
         # borg transfer

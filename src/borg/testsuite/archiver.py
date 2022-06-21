@@ -710,7 +710,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=none')
         self._set_repository_id(self.repository_path, repository_id)
         self.assert_equal(repository_id, self._extract_repository_id(self.repository_path))
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}', 'rdelete', '--cache-only')
         if self.FORK_DEFAULT:
             self.cmd(f'--repo={self.repository_location}', 'create', 'test.2', 'input', exit_code=EXIT_ERROR)
         else:
@@ -723,8 +723,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         os.environ['BORG_PASSPHRASE'] = 'passphrase'
         self.cmd(f'--repo={self.repository_location}_encrypted', 'init', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}_encrypted', 'create', 'test', 'input')
-        self.cmd(f'--repo={self.repository_location}_unencrypted', 'delete', '--cache-only')
-        self.cmd(f'--repo={self.repository_location}_encrypted', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}_unencrypted', 'rdelete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}_encrypted', 'rdelete', '--cache-only')
         shutil.rmtree(self.repository_path + '_encrypted')
         os.rename(self.repository_path + '_unencrypted', self.repository_path + '_encrypted')
         if self.FORK_DEFAULT:
@@ -744,7 +744,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with environment_variable(BORG_PASSPHRASE=''):
             self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
             # Delete cache & security database, AKA switch to user perspective
-            self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+            self.cmd(f'--repo={self.repository_location}', 'rdelete', '--cache-only')
             shutil.rmtree(self.get_security_dir())
         with environment_variable(BORG_PASSPHRASE=None):
             # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
@@ -1276,7 +1276,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_create_no_cache_sync(self):
         self.create_test_files()
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}', 'rdelete', '--cache-only')
         create_json = json.loads(self.cmd(f'--repo={self.repository_location}', 'create',
                                           '--no-cache-sync', '--json', '--error',
                                           'test', 'input'))  # ignore experimental warning
@@ -1284,7 +1284,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         create_stats = create_json['cache']['stats']
         info_stats = info_json['cache']['stats']
         assert create_stats == info_stats
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}', 'rdelete', '--cache-only')
         self.cmd(f'--repo={self.repository_location}', 'create', '--no-cache-sync', 'test2', 'input')
         self.cmd(f'--repo={self.repository_location}', 'rinfo')
         self.cmd(f'--repo={self.repository_location}', 'check')
@@ -1601,9 +1601,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'extract', 'test.2', '--dry-run')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--prefix', 'another_')
         self.cmd(f'--repo={self.repository_location}', 'delete', '--last', '1')
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test')
         self.cmd(f'--repo={self.repository_location}', 'extract', 'test.2', '--dry-run')
-        output = self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test.2', '--stats')
+        output = self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test.2', '--stats')
         self.assert_in('Deleted data:', output)
         # Make sure all data except the manifest has been deleted
         with Repository(self.repository_path) as repository:
@@ -1615,9 +1615,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test1', 'input')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2', 'input')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test3', 'input')
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test1', 'test2')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test1')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test2')
         self.cmd(f'--repo={self.repository_location}', 'extract', 'test3', '--dry-run')
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test3')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test3')
         assert not self.cmd(f'--repo={self.repository_location}', 'rlist')
 
     def test_delete_repo(self):
@@ -1627,10 +1628,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test.2', 'input')
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'no'
-        self.cmd(f'--repo={self.repository_location}', 'delete', exit_code=2)
+        self.cmd(f'--repo={self.repository_location}', 'rdelete', exit_code=2)
         assert os.path.exists(self.repository_path)
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
-        self.cmd(f'--repo={self.repository_location}', 'delete')
+        self.cmd(f'--repo={self.repository_location}', 'rdelete')
         # Make sure the repo is gone
         self.assertFalse(os.path.exists(self.repository_path))
 
@@ -1647,7 +1648,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             else:
                 assert False  # missed the file
             repository.commit(compact=False)
-        output = self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test', '--force')
+        output = self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test', '--force')
         self.assert_in('deleted archive was corrupted', output)
         self.cmd(f'--repo={self.repository_location}', 'check', '--repair')
         output = self.cmd(f'--repo={self.repository_location}', 'rlist')
@@ -1662,7 +1663,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             id = archive.metadata.items[0]
             repository.put(id, b'corrupted items metadata stream chunk')
             repository.commit(compact=False)
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test', '--force', '--force')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test', '--force', '--force')
         self.cmd(f'--repo={self.repository_location}', 'check', '--repair')
         output = self.cmd(f'--repo={self.repository_location}', 'rlist')
         self.assert_not_in('test', output)
@@ -1831,7 +1832,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_unknown_feature_on_cache_sync(self):
         self.cmd(f'--repo={self.repository_location}', 'init', '--encryption=repokey')
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}', 'rdelete', '--cache-only')
         self.add_unknown_feature(Manifest.Operation.READ)
         self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'create', 'test', 'input'])
 
@@ -1861,10 +1862,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         self.add_unknown_feature(Manifest.Operation.DELETE)
         # delete of an archive raises
-        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'delete', '--name=test'])
+        self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'delete', '-a', 'test'])
         self.cmd_raises_unknown_feature([f'--repo={self.repository_location}', 'prune', '--keep-daily=3'])
         # delete of the whole repository ignores features
-        self.cmd(f'--repo={self.repository_location}', 'delete')
+        self.cmd(f'--repo={self.repository_location}', 'rdelete')
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_unknown_feature_on_mount(self):
@@ -2784,7 +2785,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         verify_uniqueness()
         self.cmd(f'--repo={self.repository_location}', 'create', 'test.2', 'input')
         verify_uniqueness()
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--name=test.2')
+        self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test.2')
         verify_uniqueness()
 
     def test_aes_counter_uniqueness_keyfile(self):
@@ -4042,7 +4043,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', 'test2', 'input')
 
         # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d
-        self.cmd(f'--repo={self.repository_location}', 'delete', '--cache-only')
+        self.cmd(f'--repo={self.repository_location}', 'rdelete', '--cache-only')
         self.cmd(f'--repo={self.repository_location}', 'rinfo', '--json')
 
         chunks_archive = os.path.join(self.cache_path, 'chunks.archive.d')

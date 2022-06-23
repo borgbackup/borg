@@ -18,6 +18,8 @@ Borg Documentation
    faq
    support
    changes
+   changes_1.x
+   changes_0.x
    internals
    development
    authors

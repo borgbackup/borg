@@ -7,7 +7,7 @@ The following sections will describe each command in detail.
 
 Commands, options, parameters, paths and such are ``set in fixed-width``.
 Option values are `underlined`. Borg has few options accepting a fixed set
-of values (e.g. ``--encryption`` of :ref:`borg_init`).
+of values (e.g. ``--encryption`` of :ref:`borg_rcreate`).
 
 .. container:: experimental
 
@@ -54,5 +54,5 @@ Examples
 ::
 
     # Create an archive and log: borg version, files list, return code
-    $ borg create --show-version --list --show-rc /path/to/repo::my-files files
+    $ borg -r /path/to/repo create --show-version --list --show-rc my-files files
 

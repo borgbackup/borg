@@ -6,21 +6,17 @@ borg key change-passphrase
 --------------------------
 .. code-block:: none
 
-    borg [common options] key change-passphrase [options] [REPOSITORY]
+    borg [common options] key change-passphrase [options]
 
 .. only:: html
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+----------------+--+
-    | **positional arguments**                                                  |
-    +-------------------------------------------------------+----------------+--+
-    |                                                       | ``REPOSITORY`` |  |
-    +-------------------------------------------------------+----------------+--+
-    | .. class:: borg-common-opt-ref                                            |
-    |                                                                           |
-    | :ref:`common_options`                                                     |
-    +-------------------------------------------------------+----------------+--+
+    +-------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                        |
+    |                                                       |
+    | :ref:`common_options`                                 |
+    +-------------------------------------------------------+
 
     .. raw:: html
 
@@ -31,8 +27,6 @@ borg key change-passphrase
         </script>
 
 .. only:: latex
-
-    REPOSITORY
 
 
 

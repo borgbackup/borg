@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-COMMON 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-common \- Common options of Borg commands
 .
 .nr rst2man-indent-level 0
 .
@@ -30,49 +27,52 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-COMMON" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-common \- Common options of Borg commands
 .SH SYNOPSIS
 .INDENT 0.0
 .TP
-.B \-h\fP,\fB  \-\-help
+.B  \-h\fP,\fB  \-\-help
 show this help message and exit
 .TP
-.B \-\-critical
+.B  \-\-critical
 work on log level CRITICAL
 .TP
-.B \-\-error
+.B  \-\-error
 work on log level ERROR
 .TP
-.B \-\-warning
+.B  \-\-warning
 work on log level WARNING (default)
 .TP
-.B \-\-info\fP,\fB  \-v\fP,\fB  \-\-verbose
+.B  \-\-info\fP,\fB  \-v\fP,\fB  \-\-verbose
 work on log level INFO
 .TP
-.B \-\-debug
+.B  \-\-debug
 enable debug output, work on log level DEBUG
 .TP
 .BI \-\-debug\-topic \ TOPIC
 enable TOPIC debugging (can be specified multiple times). The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.
 .TP
-.B \-p\fP,\fB  \-\-progress
+.B  \-p\fP,\fB  \-\-progress
 show progress information
 .TP
-.B \-\-iec
+.B  \-\-iec
 format using IEC units (1KiB = 1024B)
 .TP
-.B \-\-log\-json
+.B  \-\-log\-json
 Output one JSON object per log line instead of formatted text.
 .TP
 .BI \-\-lock\-wait \ SECONDS
 wait at most SECONDS for acquiring a repository/cache lock (default: 1).
 .TP
-.B \-\-bypass\-lock
+.B  \-\-bypass\-lock
 Bypass locking mechanism
 .TP
-.B \-\-show\-version
+.B  \-\-show\-version
 show/log the borg version
 .TP
-.B \-\-show\-rc
+.B  \-\-show\-rc
 show/log the return code (rc)
 .TP
 .BI \-\-umask \ M
@@ -93,7 +93,7 @@ deprecated, use \fB\-\-upload\-buffer\fP instead
 .BI \-\-upload\-buffer \ UPLOAD_BUFFER
 set network upload buffer size in MiB. (default: 0=no buffer)
 .TP
-.B \-\-consider\-part\-files
+.B  \-\-consider\-part\-files
 treat part files like normal files (e.g. to list/extract them)
 .TP
 .BI \-\-debug\-profile \ FILE
@@ -101,6 +101,9 @@ Write execution profile in Borg format into FILE. For local use a Python\-compat
 .TP
 .BI \-\-rsh \ RSH
 Use this command to connect to the \(aqborg serve\(aq process (default: \(aqssh\(aq)
+.TP
+.BI \-r \ REPO\fR,\fB \ \-\-repo \ REPO
+repository to use
 .UNINDENT
 .SH SEE ALSO
 .sp

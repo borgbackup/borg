@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CONFIG 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-config \- get, set, and delete values in a repository or cache config file
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-CONFIG" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-config \- get, set, and delete values in a repository or cache config file
 .SH SYNOPSIS
 .sp
-borg [common options] config [options] [REPOSITORY] [NAME] [VALUE]
+borg [common options] config [options] [NAME] [VALUE]
 .SH DESCRIPTION
 .sp
 This command gets and sets options in a local repository or cache config file.
@@ -53,9 +53,6 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B REPOSITORY
-repository to configure
-.TP
 .B NAME
 name of config key
 .TP
@@ -65,13 +62,13 @@ new value for key
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-c\fP,\fB  \-\-cache
+.B  \-c\fP,\fB  \-\-cache
 get and set values from the repo cache
 .TP
-.B \-d\fP,\fB  \-\-delete
+.B  \-d\fP,\fB  \-\-delete
 delete the key from the config file
 .TP
-.B \-l\fP,\fB  \-\-list
+.B  \-l\fP,\fB  \-\-list
 list the configuration of the repo
 .UNINDENT
 .SH EXAMPLES
@@ -90,13 +87,13 @@ making changes!
 .nf
 .ft C
 # find cache directory
-$ cd ~/.cache/borg/$(borg config /path/to/repo id)
+$ cd ~/.cache/borg/$(borg config id)
 
 # reserve some space
-$ borg config /path/to/repo additional_free_space 2G
+$ borg config additional_free_space 2G
 
 # make a repo append\-only
-$ borg config /path/to/repo append_only 1
+$ borg config append_only 1
 .ft P
 .fi
 .UNINDENT

@@ -6,7 +6,7 @@ borg key change-location
 ------------------------
 .. code-block:: none
 
-    borg [common options] key change-location [options] [REPOSITORY] KEY_LOCATION
+    borg [common options] key change-location [options] KEY_LOCATION
 
 .. only:: html
 
@@ -14,8 +14,6 @@ borg key change-location
 
     +-------------------------------------------------------+------------------+----------------------------------------------------------------+
     | **positional arguments**                                                                                                                  |
-    +-------------------------------------------------------+------------------+----------------------------------------------------------------+
-    |                                                       | ``REPOSITORY``   |                                                                |
     +-------------------------------------------------------+------------------+----------------------------------------------------------------+
     |                                                       | ``KEY_LOCATION`` | select key location                                            |
     +-------------------------------------------------------+------------------+----------------------------------------------------------------+
@@ -38,8 +36,6 @@ borg key change-location
 
 .. only:: latex
 
-    REPOSITORY
-
     KEY_LOCATION
         select key location
 
@@ -56,8 +52,10 @@ Description
 
 Change the location of a borg key. The key can be stored at different locations:
 
-keyfile: locally, usually in the home directory
-repokey: inside the repo (in the repo config)
+- keyfile: locally, usually in the home directory
+- repokey: inside the repo (in the repo config)
 
-Note: this command does NOT change the crypto algorithms, just the key location,
-      thus you must ONLY give the key location (keyfile or repokey).
+Please note:
+
+This command does NOT change the crypto algorithms, just the key location,
+thus you must ONLY give the key location (keyfile or repokey).

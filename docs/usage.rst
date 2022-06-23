@@ -36,7 +36,16 @@ Usage
 .. toctree::
    usage/general
 
-   usage/init
+   usage/rcreate
+   usage/rlist
+   usage/rinfo
+   usage/rdelete
+   usage/serve
+   usage/compact
+   usage/config
+   usage/lock
+   usage/key
+
    usage/create
    usage/extract
    usage/check
@@ -45,16 +54,13 @@ Usage
    usage/diff
    usage/delete
    usage/prune
-   usage/compact
    usage/info
    usage/mount
-   usage/key
-   usage/upgrade
    usage/recreate
    usage/tar
-   usage/serve
-   usage/config
-   usage/lock
+
+   usage/transfer
+   usage/upgrade
    usage/benchmark
 
    usage/help

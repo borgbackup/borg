@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-EXPORT 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-key-export \- Export the repository key for backup
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-KEY-EXPORT" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-key-export \- Export the repository key for backup
 .SH SYNOPSIS
 .sp
-borg [common options] key export [options] [REPOSITORY] [PATH]
+borg [common options] key export [options] [PATH]
 .SH DESCRIPTION
 .sp
 If repository encryption is used, the repository is inaccessible
@@ -78,8 +78,6 @@ borg key export \-\-qr\-html /path/to/repo encrypted\-key\-backup.html
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
-.sp
-REPOSITORY
 .INDENT 0.0
 .TP
 .B PATH
@@ -88,10 +86,10 @@ where to store the backup
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-paper
+.B  \-\-paper
 Create an export suitable for printing and later type\-in
 .TP
-.B \-\-qr\-html
+.B  \-\-qr\-html
 Create an html file suitable for printing and later type\-in or qr scan
 .UNINDENT
 .SH SEE ALSO

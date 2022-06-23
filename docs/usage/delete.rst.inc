@@ -6,24 +6,20 @@ borg delete
 -----------
 .. code-block:: none
 
-    borg [common options] delete [options] [REPOSITORY_OR_ARCHIVE] [ARCHIVE...]
+    borg [common options] delete [options]
 
 .. only:: html
 
     .. class:: borg-options-table
 
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **positional arguments**                                                                                                                                                                                                                                                     |
-    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``REPOSITORY_OR_ARCHIVE``             | repository or archive to delete                                                                                                                        |
-    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``ARCHIVE``                           | archives to delete                                                                                                                                     |
-    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **optional arguments**                                                                                                                                                                                                                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``-n``, ``--dry-run``                 | do not change repository                                                                                                                               |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--list``                            | output verbose list of archives                                                                                                                        |
+    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--consider-checkpoints``            | consider checkpoint archives for deletion (default: not considered).                                                                                   |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``-s``, ``--stats``                   | print statistics for the deleted archive                                                                                                               |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -62,15 +58,12 @@ borg delete
 
 .. only:: latex
 
-    REPOSITORY_OR_ARCHIVE
-        repository or archive to delete
-    ARCHIVE
-        archives to delete
 
 
     optional arguments
         -n, --dry-run    do not change repository
         --list          output verbose list of archives
+        --consider-checkpoints    consider checkpoint archives for deletion (default: not considered).
         -s, --stats     print statistics for the deleted archive
         --cache-only    delete only the local cache for the given repository
         --force         force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
@@ -92,15 +85,10 @@ borg delete
 Description
 ~~~~~~~~~~~
 
-This command deletes an archive from the repository or the complete repository.
+This command deletes archives from the repository.
 
 Important: When deleting archives, repository disk space is **not** freed until
 you run ``borg compact``.
-
-When you delete a complete repository, the security info and local cache for it
-(if any) are also deleted. Alternatively, you can delete just the local cache
-with the ``--cache-only`` option, or keep the security info with the
-``--keep-security-info`` option.
 
 When in doubt, use ``--dry-run --list`` to see what would be deleted.
 
@@ -115,6 +103,4 @@ pattern to match multiple archives using the ``--glob-archives GLOB`` option
 (for more info on these patterns, see :ref:`borg_patterns`). Note that these
 two options are mutually exclusive.
 
-To avoid accidentally deleting archives, especially when using glob patterns,
-it might be helpful to use the ``--dry-run`` to test out the command without
-actually making any changes to the repository.
+Always first use ``--dry-run --list`` to see what would be deleted.

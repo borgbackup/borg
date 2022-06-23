@@ -6,16 +6,12 @@ borg info
 ---------
 .. code-block:: none
 
-    borg [common options] info [options] [REPOSITORY_OR_ARCHIVE]
+    borg [common options] info [options]
 
 .. only:: html
 
     .. class:: borg-options-table
 
-    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **positional arguments**                                                                                                                                                                                                                                                     |
-    +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``REPOSITORY_OR_ARCHIVE``             | repository or archive to display information about                                                                                                     |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **optional arguments**                                                                                                                                                                                                                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -48,8 +44,6 @@ borg info
 
 .. only:: latex
 
-    REPOSITORY_OR_ARCHIVE
-        repository or archive to display information about
 
 
     optional arguments
@@ -70,7 +64,7 @@ borg info
 Description
 ~~~~~~~~~~~
 
-This command displays detailed information about the specified archive or repository.
+This command displays detailed information about the specified archive.
 
 Please note that the deduplicated sizes of the individual archives do not add
 up to the deduplicated size of the repository ("all archives"), because the two

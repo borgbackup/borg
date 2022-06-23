@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-SERVE 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-serve \- Start in server mode. This command is usually not used manually.
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-SERVE" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
 .sp
 borg [common options] serve [options]
@@ -48,7 +48,7 @@ restrict repository access to PATH. Can be specified multiple times to allow the
 .BI \-\-restrict\-to\-repository \ PATH
 restrict repository access. Only the repository located at PATH (no sub\-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP sub\-directories are not accessible; PATH needs to directly point at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
 .TP
-.B \-\-append\-only
+.B  \-\-append\-only
 only allow appending to repository segment files. Note that this only affects the low level structure of the repository, and running \fIdelete\fP or \fIprune\fP will still be allowed. See \fIappend_only_mode\fP in Additional Notes for more details.
 .TP
 .BI \-\-storage\-quota \ QUOTA

@@ -79,7 +79,7 @@ Normally the keys are computed like this::
 
   key = id = id_hash(unencrypted_data)
 
-The id_hash function depends on the :ref:`encryption mode <borg_init>`.
+The id_hash function depends on the :ref:`encryption mode <borg_rcreate>`.
 
 As the id / key is used for deduplication, id_hash must be a cryptographically
 strong hash or MAC.
@@ -736,7 +736,6 @@ The chunks cache is a key -> value mapping and contains:
 
   - reference count
   - size
-  - encrypted/compressed size
 
 The chunks cache is a HashIndex_. Due to some restrictions of HashIndex,
 the reference count of each given chunk is limited to a constant, MAX_VALUE
@@ -754,9 +753,9 @@ Here is the estimated memory usage of Borg - it's complicated::
   chunk_size ~= 2 ^ HASH_MASK_BITS  (for buzhash chunker, BLOCK_SIZE for fixed chunker)
   chunk_count ~= total_file_size / chunk_size
 
-  repo_index_usage = chunk_count * 40
+  repo_index_usage = chunk_count * 48
 
-  chunks_cache_usage = chunk_count * 44
+  chunks_cache_usage = chunk_count * 40
 
   files_cache_usage = total_file_count * 240 + chunk_count * 80
 

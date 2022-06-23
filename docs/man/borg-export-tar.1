@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXPORT-TAR 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-export-tar \- Export archive contents as a tarball
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-EXPORT-TAR" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-export-tar \- Export archive contents as a tarball
 .SH SYNOPSIS
 .sp
-borg [common options] export\-tar [options] ARCHIVE FILE [PATH...]
+borg [common options] export\-tar [options] NAME FILE [PATH...]
 .SH DESCRIPTION
 .sp
 This command creates a tarball from an archive.
@@ -115,8 +115,8 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B ARCHIVE
-archive to export
+.B NAME
+specify the archive name
 .TP
 .B FILE
 output tar file. "\-" to write to stdout instead.
@@ -127,10 +127,10 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-tar\-filter
+.B  \-\-tar\-filter
 filter program to pipe data through
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-tar\-format \ FMT

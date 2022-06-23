@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-WITH-LOCK 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-with-lock \- run a user specified command with the repository lock held
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-WITH-LOCK" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-with-lock \- run a user specified command with the repository lock held
 .SH SYNOPSIS
 .sp
-borg [common options] with\-lock [options] REPOSITORY COMMAND [ARGS...]
+borg [common options] with\-lock [options] COMMAND [ARGS...]
 .SH DESCRIPTION
 .sp
 This command runs a user\-specified command while the repository lock is held.
@@ -56,9 +56,6 @@ Borg is cautious and does not automatically remove stale locks made by a differe
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
-.TP
-.B REPOSITORY
-repository to lock
 .TP
 .B COMMAND
 command to run

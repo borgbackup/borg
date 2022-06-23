@@ -6,7 +6,7 @@ borg config
 -----------
 .. code-block:: none
 
-    borg [common options] config [options] [REPOSITORY] [NAME] [VALUE]
+    borg [common options] config [options] [NAME] [VALUE]
 
 .. only:: html
 
@@ -14,8 +14,6 @@ borg config
 
     +-------------------------------------------------------+----------------------+----------------------------------------+
     | **positional arguments**                                                                                              |
-    +-------------------------------------------------------+----------------------+----------------------------------------+
-    |                                                       | ``REPOSITORY``       | repository to configure                |
     +-------------------------------------------------------+----------------------+----------------------------------------+
     |                                                       | ``NAME``             | name of config key                     |
     +-------------------------------------------------------+----------------------+----------------------------------------+
@@ -44,8 +42,6 @@ borg config
 
 .. only:: latex
 
-    REPOSITORY
-        repository to configure
     NAME
         name of config key
     VALUE

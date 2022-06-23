@@ -6,7 +6,7 @@ borg create
 -----------
 .. code-block:: none
 
-    borg [common options] create [options] ARCHIVE [PATH...]
+    borg [common options] create [options] NAME [PATH...]
 
 .. only:: html
 
@@ -15,7 +15,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **positional arguments**                                                                                                                                                                                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``ARCHIVE``                                       | name of archive to create (must be also a valid directory name)                                                                                      |
+    |                                                       | ``NAME``                                          | specify the archive name                                                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``PATH``                                          | paths to archive                                                                                                                                     |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -37,7 +37,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-user USER``                             | set user USER in archive for stdin data (default: 'root')                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--stdin-group GROUP``                           | set group GROUP in archive for stdin data (default: 'root')                                                                                          |
+    |                                                       | ``--stdin-group GROUP``                           | set group GROUP in archive for stdin data (default: 'wheel')                                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-mode M``                                | set mode to M in archive for stdin data (default: 0660)                                                                                              |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -124,8 +124,8 @@ borg create
 
 .. only:: latex
 
-    ARCHIVE
-        name of archive to create (must be also a valid directory name)
+    NAME
+        specify the archive name
     PATH
         paths to archive
 
@@ -139,7 +139,7 @@ borg create
         --no-cache-sync    experimental: do not synchronize the cache. Implies not using the files cache.
         --stdin-name NAME    use NAME in archive for stdin data (default: 'stdin')
         --stdin-user USER    set user USER in archive for stdin data (default: 'root')
-        --stdin-group GROUP    set group GROUP in archive for stdin data (default: 'root')
+        --stdin-group GROUP    set group GROUP in archive for stdin data (default: 'wheel')
         --stdin-mode M    set mode to M in archive for stdin data (default: 0660)
         --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
         --paths-from-stdin    read DELIM-separated list of paths to backup from stdin. Will not recurse into directories.

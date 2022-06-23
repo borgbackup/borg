@@ -20,6 +20,7 @@ from ..platform import uid2user, gid2group
 def stats():
     stats = Statistics()
     stats.update(20, unique=True)
+    stats.nfiles = 1
     return stats
 
 
@@ -35,26 +36,29 @@ def tests_stats_progress(stats, monkeypatch, columns=80):
     monkeypatch.setenv('COLUMNS', str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
-    s = '20 B O 20 B U 0 N '
+    s = '20 B O 20 B U 1 N '
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
     out = StringIO()
     stats.update(10 ** 3, unique=False)
     stats.show_progress(item=Item(path='foo'), final=False, stream=out)
-    s = '1.02 kB O 20 B U 0 N foo'
+    s = '1.02 kB O 20 B U 1 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
     stats.show_progress(item=Item(path='foo'*40), final=False, stream=out)
-    s = '1.02 kB O 20 B U 0 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo'
+    s = '1.02 kB O 20 B U 1 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
 
 def test_stats_format(stats):
     assert str(stats) == """\
-This archive:                   20 B                 20 B"""
+Number of files: 1
+Original size: 20 B
+Deduplicated size: 20 B
+"""
     s = f"{stats.osize_fmt}"
     assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
@@ -72,7 +76,7 @@ def test_stats_progress_json(stats):
     assert result['finished'] is False
     assert result['path'] == 'foo'
     assert result['original_size'] == 20
-    assert result['nfiles'] == 0  # this counter gets updated elsewhere
+    assert result['nfiles'] == 1
 
     out = StringIO()
     stats.show_progress(stream=out, final=True)

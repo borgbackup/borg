@@ -397,7 +397,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'create', '--exclude-nodump', 'test', 'input')
         output = self.cmd(f'--repo={self.repository_location}', 'create', '--exclude-nodump', '--stats', 'test.2', 'input')
         self.assert_in('Archive name: test.2', output)
-        self.assert_in('This archive: ', output)
         with changedir('output'):
             self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
         list_output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--short')
@@ -1525,7 +1524,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'rcreate', '--encryption=repokey')
         self.cmd(f'--repo={self.repository_location}', 'create', 'test', 'input')
         info_repo = self.cmd(f'--repo={self.repository_location}', 'rinfo')
-        assert 'All archives:' in info_repo
+        assert 'Original size:' in info_repo
         info_archive = self.cmd(f'--repo={self.repository_location}', 'info', '-a', 'test')
         assert 'Archive name: test\n' in info_archive
         info_archive = self.cmd(f'--repo={self.repository_location}', 'info', '--first', '1')
@@ -1604,7 +1603,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test')
         self.cmd(f'--repo={self.repository_location}', 'extract', 'test.2', '--dry-run')
         output = self.cmd(f'--repo={self.repository_location}', 'delete', '-a', 'test.2', '--stats')
-        self.assert_in('Deleted data:', output)
+        self.assert_in('Original size: -', output)  # negative size == deleted data
         # Make sure all data except the manifest has been deleted
         with Repository(self.repository_path) as repository:
             self.assert_equal(len(repository), 1)
@@ -3514,7 +3513,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
         # The repo should still be readable
         repo_info = self.cmd(f'--repo={self.repository_location}', 'rinfo')
-        assert 'All archives:' in repo_info
+        assert 'Original size:' in repo_info
         repo_list = self.cmd(f'--repo={self.repository_location}', 'rlist')
         assert 'test' in repo_list
         # The archive should still be readable

@@ -213,6 +213,8 @@ PrefixSpec = replace_placeholders
 
 GlobSpec = replace_placeholders
 
+NameSpec = replace_placeholders
+
 CommentSpec = replace_placeholders
 
 
@@ -299,9 +301,7 @@ def parse_stringified_list(s):
 
 
 class Location:
-    """Object representing a repository / archive location
-    """
-    proto = user = _host = port = path = archive = None
+    """Object representing a repository location"""
 
     # user must not contain "@", ":" or "/".
     # Quoting adduser error message:
@@ -333,15 +333,6 @@ class Location:
         (?P<path>(/([^:]|(:(?!:)))+))                       # start with /, then any chars, but no "::"
         """
 
-    # optional ::archive_name at the end, archive name must not contain "/".
-    # borg mount's FUSE filesystem creates one level of directories from
-    # the archive names and of course "/" is not valid in a directory name.
-    optional_archive_re = r"""
-        (?:
-            ::                                              # "::" as separator
-            (?P<archive>[^/]+)                              # archive name must not contain "/"
-        )?$"""                                              # must match until the end
-
     # host NAME, or host IP ADDRESS (v4 or v6, v6 must be in square brackets)
     host_re = r"""
         (?P<host>(
@@ -356,23 +347,13 @@ class Location:
         (?P<proto>ssh)://                                       # ssh://
         """ + optional_user_re + host_re + r"""                 # user@  (optional), host name or address
         (?::(?P<port>\d+))?                                     # :port (optional)
-        """ + abs_path_re + optional_archive_re, re.VERBOSE)    # path or path::archive
+        """ + abs_path_re, re.VERBOSE)                          # path
 
     file_re = re.compile(r"""
         (?P<proto>file)://                                      # file://
-        """ + file_path_re + optional_archive_re, re.VERBOSE)   # servername/path, path or path::archive
+        """ + file_path_re, re.VERBOSE)                         # servername/path or path
 
-    local_re = re.compile(
-        local_path_re + optional_archive_re, re.VERBOSE)    # local path with optional archive
-
-    # get the repo from BORG_REPO env and the optional archive from param.
-    # if the syntax requires giving REPOSITORY (see "borg mount"),
-    # use "::" to let it use the env var.
-    # if REPOSITORY argument is optional, it'll automatically use the env.
-    env_re = re.compile(r"""                                # the repo part is fetched from BORG_REPO
-        (?:::$)                                             # just "::" is ok (when a pos. arg is required, no archive)
-        |                                                   # or
-        """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
+    local_re = re.compile(local_path_re, re.VERBOSE)            # local path
 
     win_file_re = re.compile(r"""
         (?:file://)?                                        # optional file protocol
@@ -380,31 +361,34 @@ class Location:
             (?:[a-zA-Z]:)?                                  # Drive letter followed by a colon (optional)
             (?:[^:]+)                                       # Anything which does not contain a :, at least one character
         )
-        """ + optional_archive_re, re.VERBOSE)              # archive name (optional, may be empty)
+        """, re.VERBOSE)
 
     def __init__(self, text='', overrides={}, other=False):
         self.repo_env_var = 'BORG_OTHER_REPO' if other else 'BORG_REPO'
-        if not self.parse(text, overrides):
-            raise ValueError('Invalid location format: "%s"' % self.processed)
+        self.valid = False
+        self.proto = None
+        self.user = None
+        self._host = None
+        self.port = None
+        self.path = None
+        self.raw = None
+        self.processed = None
+        self.parse(text, overrides)
 
     def parse(self, text, overrides={}):
+        if not text:
+            # we did not get a text to parse, so we try to fetch from the environment
+            text = os.environ.get(self.repo_env_var)
+            if text is None:
+                return
+
         self.raw = text  # as given by user, might contain placeholders
-        self.processed = text = replace_placeholders(text, overrides)  # after placeholder replacement
-        valid = self._parse(text)
+        self.processed = replace_placeholders(self.raw, overrides)  # after placeholder replacement
+        valid = self._parse(self.processed)
         if valid:
-            return True
-        m = self.env_re.match(text)
-        if not m:
-            return False
-        repo_raw = os.environ.get(self.repo_env_var)
-        if repo_raw is None:
-            return False
-        repo = replace_placeholders(repo_raw, overrides)
-        valid = self._parse(repo)
-        self.archive = m.group('archive')
-        self.raw = repo_raw if not self.archive else repo_raw + self.raw
-        self.processed = repo if not self.archive else f'{repo}::{self.archive}'
-        return valid
+            self.valid = True
+        else:
+            raise ValueError('Invalid location format: "%s"' % self.processed)
 
     def _parse(self, text):
         def normpath_special(p):
@@ -418,10 +402,9 @@ class Location:
             if m:
                 self.proto = 'file'
                 self.path = m.group('path')
-                self.archive = m.group('archive')
                 return True
 
-            # On windows we currently only support windows paths
+            # On windows we currently only support windows paths.
             return False
 
         m = self.ssh_re.match(text)
@@ -431,19 +414,16 @@ class Location:
             self._host = m.group('host')
             self.port = m.group('port') and int(m.group('port')) or None
             self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
             return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group('proto')
             self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
             return True
         m = self.local_re.match(text)
         if m:
-            self.path = normpath_special(m.group('path'))
-            self.archive = m.group('archive')
             self.proto = 'file'
+            self.path = normpath_special(m.group('path'))
             return True
         return False
 
@@ -454,7 +434,6 @@ class Location:
             'host=%r' % self.host,
             'port=%r' % self.port,
             'path=%r' % self.path,
-            'archive=%r' % self.archive,
         ]
         return ', '.join(items)
 
@@ -499,24 +478,13 @@ class Location:
             'utcnow': DatetimeWrapper(timestamp),
         })
 
-    def omit_archive(self):
-        loc = Location(self.raw)
-        loc.archive = None
-        loc.raw = loc.raw.split("::")[0]
-        loc.processed = loc.processed.split("::")[0]
-        return loc
 
-
-def location_validator(archive=None, proto=None, other=False):
+def location_validator(proto=None, other=False):
     def validator(text):
         try:
             loc = Location(text, other=other)
         except ValueError as err:
             raise argparse.ArgumentTypeError(str(err)) from None
-        if archive is True and not loc.archive:
-            raise argparse.ArgumentTypeError('"%s": No archive specified' % text)
-        elif archive is False and loc.archive:
-            raise argparse.ArgumentTypeError('"%s": No archive can be specified' % text)
         if proto is not None and loc.proto != proto:
             if proto == 'file':
                 raise argparse.ArgumentTypeError('"%s": Repository must be local' % text)

@@ -103,11 +103,13 @@ class Archives(abc.MutableMapping):
         """
         get a list of archives, considering --first/last/prefix/glob-archives/sort/consider-checkpoints cmdline args
         """
-        if args.location.archive:
-            raise Error('The options --first, --last, --prefix, and --glob-archives, and --consider-checkpoints can only be used on repository targets.')
+        name = getattr(args, 'name', None)
+        consider_checkpoints = getattr(args, 'consider_checkpoints', None)
+        if name is not None:
+            raise Error('Giving a specific name is incompatible with options --first, --last, --prefix, and --glob-archives, and --consider-checkpoints.')
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
-        return self.list(sort_by=args.sort_by.split(','), consider_checkpoints=args.consider_checkpoints, glob=args.glob_archives, first=args.first, last=args.last)
+        return self.list(sort_by=args.sort_by.split(','), consider_checkpoints=consider_checkpoints, glob=args.glob_archives, first=args.first, last=args.last)
 
     def set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""

@@ -35,7 +35,7 @@ from .crypto.low_level import blake2b_128
 from .archiver import Archiver
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, daemonizing, signal_handler, format_file_size, Error
+from .helpers import daemonize, daemonizing, signal_handler, format_file_size
 from .helpers import HardLinkManager
 from .helpers import msgpack
 from .item import Item
@@ -272,22 +272,16 @@ class FuseBackend:
 
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
-        if self._args.location.archive:
+        self.versions_index = FuseVersionsIndex()
+        for archive in self._manifest.archives.list_considering(self._args):
             if self.versions:
-                raise Error("for versions view, do not specify a single archive, "
-                            "but always give the repository as location.")
-            self._process_archive(self._args.location.archive)
-        else:
-            self.versions_index = FuseVersionsIndex()
-            for archive in self._manifest.archives.list_considering(self._args):
-                if self.versions:
-                    # process archives immediately
-                    self._process_archive(archive.name)
-                else:
-                    # lazily load archives, create archive placeholder inode
-                    archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
-                    self.contents[1][os.fsencode(archive.name)] = archive_inode
-                    self.pending_archives[archive_inode] = archive.name
+                # process archives immediately
+                self._process_archive(archive.name)
+            else:
+                # lazily load archives, create archive placeholder inode
+                archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
+                self.contents[1][os.fsencode(archive.name)] = archive_inode
+                self.pending_archives[archive_inode] = archive.name
 
     def get_item(self, inode):
         item = self._inode_cache.get(inode)

@@ -472,8 +472,8 @@ class Archiver:
 
     @with_repository(create=True, exclusive=True, manifest=False)
     @with_other_repository(key=True, compatibility=(Manifest.Operation.READ, ))
-    def do_init(self, args, repository, *, other_repository=None, other_key=None):
-        """Initialize an empty repository"""
+    def do_rcreate(self, args, repository, *, other_repository=None, other_key=None):
+        """Create a new, empty repository"""
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
         try:
@@ -4383,9 +4383,9 @@ class Archiver:
                                help='format output as JSON')
         define_archive_filters_group(subparser)
 
-        # borg init
-        init_epilog = process_epilog("""
-        This command initializes an empty repository. A repository is a filesystem
+        # borg rcreate
+        rcreate_epilog = process_epilog("""
+        This command creates a new, empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
 
         Encryption mode TLDR
@@ -4398,7 +4398,7 @@ class Archiver:
 
         ::
 
-            borg init --encryption repokey /path/to/repo
+            borg rcreate --encryption repokey /path/to/repo
 
         Borg will:
 
@@ -4507,11 +4507,11 @@ class Archiver:
         Neither is inherently linked to the key derivation function, but since we were going
         to break backwards compatibility anyway we took the opportunity to fix all 3 issues at once.
         """)
-        subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
-                                          description=self.do_init.__doc__, epilog=init_epilog,
+        subparser = subparsers.add_parser('rcreate', parents=[common_parser], add_help=False,
+                                          description=self.do_rcreate.__doc__, epilog=rcreate_epilog,
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='initialize empty repository')
-        subparser.set_defaults(func=self.do_init)
+                                          help='create a new, empty repository')
+        subparser.set_defaults(func=self.do_rcreate)
         subparser.add_argument('--other-repo', metavar='SRC_REPOSITORY', dest='other_location',
                                type=location_validator(other=True), default=Location(other=True),
                                help='reuse the key material from the other repository')

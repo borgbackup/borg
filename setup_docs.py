@@ -280,7 +280,7 @@ class build_man(Command):
         'recreate': ('patterns', 'placeholders', 'compression'),
         'list': ('info', 'diff', 'prune', 'patterns'),
         'info': ('list', 'diff'),
-        'init': ('create', 'delete', 'check', 'list', 'key-import', 'key-export', 'key-change-passphrase'),
+        'rcreate': ('rdelete', 'rlist', 'check', 'key-import', 'key-export', 'key-change-passphrase'),
         'key-import': ('key-export', ),
         'key-export': ('key-import', ),
         'mount': ('umount', 'extract'),  # Would be cooler if these two were on the same page

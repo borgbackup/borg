@@ -28,7 +28,7 @@ def repo_url(request, tmpdir, monkeypatch):
 
 @pytest.fixture(params=["none", "repokey"])
 def repo(request, cmd, repo_url):
-    cmd(f'--repo={repo_url}', 'init', '--encryption', request.param)
+    cmd(f'--repo={repo_url}', 'rcreate', '--encryption', request.param)
     return repo_url
 
 

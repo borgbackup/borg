@@ -84,10 +84,12 @@ class Statistics:
         stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
         return stats
 
-    summary = "{label:15} {stats.osize_fmt:>20s} {stats.usize_fmt:>20s}"
-
     def __str__(self):
-        return self.summary.format(stats=self, label='This archive:')
+        return """\
+Number of files: {stats.nfiles}
+Original size: {stats.osize_fmt}
+Deduplicated size: {stats.usize_fmt}
+""".format(stats=self)
 
     def __repr__(self):
         return "<{cls} object at {hash:#x} ({self.osize}, {self.usize})>".format(
@@ -538,7 +540,6 @@ Archive fingerprint: {0.fpr}
 Time (start): {start}
 Time (end):   {end}
 Duration: {0.duration}
-Number of files: {0.stats.nfiles}
 Utilization of max. archive size: {csize_max:.0%}
 '''.format(
             self,
@@ -2141,12 +2142,8 @@ class ArchiveRecreater:
         if self.stats:
             target.start = _start
             target.end = datetime.utcnow()
-            log_multi(DASHES,
-                      str(target),
-                      DASHES,
-                      str(target.stats),
-                      str(self.cache),
-                      DASHES)
+            log_multi(str(target),
+                      str(target.stats))
 
     def matcher_add_tagged_dirs(self, archive):
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""

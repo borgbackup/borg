@@ -993,13 +993,9 @@ class Archiver:
                                 'archive': archive,
                             }))
                         else:
-                            log_multi(DASHES,
-                                      str(archive),
-                                      DASHES,
-                                      STATS_HEADER,
+                            log_multi(str(archive),
                                       str(archive.stats),
-                                      str(cache),
-                                      DASHES, logger=logging.getLogger('borg.output.stats'))
+                                      logger=logging.getLogger('borg.output.stats'))
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -1643,11 +1639,8 @@ class Archiver:
                 repository.commit(compact=False, save_space=args.save_space)
                 cache.commit()
             if args.stats:
-                log_multi(DASHES,
-                          STATS_HEADER,
-                          stats.summary.format(label='Deleted data:', stats=stats),
-                          str(cache),
-                          DASHES, logger=logging.getLogger('borg.output.stats'))
+                log_multi(str(stats),
+                          logger=logging.getLogger('borg.output.stats'))
 
         return self.exit_code
 
@@ -1767,8 +1760,6 @@ class Archiver:
                 id=bin_to_hex(repository.id),
                 location=repository._location.canonical_path(),
                 **info))
-            print(DASHES)
-            print(STATS_HEADER)
             print(str(cache))
         return self.exit_code
 
@@ -1801,14 +1792,12 @@ class Archiver:
                 Time (start): {start}
                 Time (end): {end}
                 Duration: {duration}
-                Number of files: {stats[nfiles]}
                 Command line: {command_line}
                 Utilization of maximum supported archive size: {limits[max_archive_size]:.0%}
-                ------------------------------------------------------------------------------
-                                       Original size    Deduplicated size
-                This archive:   {stats[original_size]:>20s} {stats[deduplicated_size]:>20s}
-                {cache}
-                """).strip().format(cache=cache, **info))
+                Number of files: {stats[nfiles]}
+                Original size: {stats[original_size]}
+                Deduplicated size: {stats[deduplicated_size]}
+                """).strip().format(**info))
             if self.exit_code:
                 break
             if not args.json and len(archive_names) - i:
@@ -1899,11 +1888,8 @@ class Archiver:
                 repository.commit(compact=False, save_space=args.save_space)
                 cache.commit()
             if args.stats:
-                log_multi(DASHES,
-                          STATS_HEADER,
-                          stats.summary.format(label='Deleted data:', stats=stats),
-                          str(cache),
-                          DASHES, logger=logging.getLogger('borg.output.stats'))
+                log_multi(str(stats),
+                          logger=logging.getLogger('borg.output.stats'))
         return self.exit_code
 
     @with_repository(fake=('tam', 'disable_tam'), invert_fake=True, manifest=False, exclusive=True)
@@ -2066,13 +2052,9 @@ class Archiver:
                     'archive': archive,
                 }))
             else:
-                log_multi(DASHES,
-                          str(archive),
-                          DASHES,
-                          STATS_HEADER,
+                log_multi(str(archive),
                           str(archive.stats),
-                          str(archive.cache),
-                          DASHES, logger=logging.getLogger('borg.output.stats'))
+                          logger=logging.getLogger('borg.output.stats'))
 
     @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):

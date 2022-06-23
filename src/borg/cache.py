@@ -405,10 +405,11 @@ class Cache:
 
 class CacheStatsMixin:
     str_format = """\
-All archives:   {0.total_size:>20s} {0.unique_size:>20s}
-
-                       Unique chunks         Total chunks
-Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
+Original size: {0.total_size}
+Deduplicated size: {0.unique_size}
+Unique chunks: {0.total_unique_chunks}
+Total chunks: {0.total_chunks}
+"""
 
     def __init__(self, iec=False):
         self.iec = iec

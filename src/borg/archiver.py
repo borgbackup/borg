@@ -3242,6 +3242,8 @@ class Archiver:
                 group.add_argument('--last', metavar='N', dest='last', default=0, type=positive_int_validator,
                                    help='consider last N archives after other filters were applied')
 
+            return filters_group
+
         def define_borg_mount(parser):
             parser.set_defaults(func=self.do_mount)
             parser.add_argument('--consider-checkpoints', action='store_true', dest='consider_checkpoints',
@@ -4982,8 +4984,7 @@ class Archiver:
 
         define_exclusion_group(subparser, tag_files=True)
 
-        archive_group = subparser.add_argument_group('Archive options')
-        define_archive_filters_group(archive_group)
+        archive_group = define_archive_filters_group(subparser)
         archive_group.add_argument('--target', dest='target', metavar='TARGET', default=None,
                                    type=archivename_validator(),
                                    help='create a new archive with the name ARCHIVE, do not replace existing archive '

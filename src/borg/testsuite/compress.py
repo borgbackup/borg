@@ -188,11 +188,13 @@ def test_obfuscate():
     data = bytes(1000)
     compressed = compressor.compress(data)
     # N blocks + 2 id bytes obfuscator. 4 length bytes
-    assert 1000 + 6 <= len(compressed) <= 1000 + 6 + 1024
+    # The 'none' compressor also adds 2 id bytes
+    assert 6 + 2 + 1000 <= len(compressed) <= 6 + 2 + 1000 + 1024
     data = bytes(1100)
     compressed = compressor.compress(data)
     # N blocks + 2 id bytes obfuscator. 4 length bytes
-    assert 1100 + 6 <= len(compressed) <= 1100 + 6 + 1024
+    # The 'none' compressor also adds 2 id bytes
+    assert 6 + 2 + 1100 <= len(compressed) <= 6 + 2 + 1100 + 1024
 
 
 def test_compression_specs():

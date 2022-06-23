@@ -318,7 +318,7 @@ class Repository:
 
         if os.path.isfile(old_config_path):
             logger.warning("Old config file not securely erased on previous config update")
-            secure_erase(old_config_path)
+            secure_erase(old_config_path, avoid_collateral_damage=True)
 
         if os.path.isfile(config_path):
             link_error_msg = ("Failed to securely erase old repository config file (hardlinks not supported). "
@@ -345,7 +345,7 @@ class Repository:
                            "read-only repositories." % (e.strerror, e.filename))
 
         if os.path.isfile(old_config_path):
-            secure_erase(old_config_path)
+            secure_erase(old_config_path, avoid_collateral_damage=True)
 
     def save_key(self, keydata):
         assert self.config
@@ -1115,7 +1115,7 @@ class Repository:
             logger.info('Finished %s repository check, no problems found.', mode)
         return not error_found or repair
 
-    def scan_low_level(self):
+    def scan_low_level(self, segment=None, offset=None):
         """Very low level scan over all segment file entries.
 
         It does NOT care about what's committed and what not.
@@ -1124,13 +1124,21 @@ class Repository:
 
         This is intended as a last-resort way to get access to all repo contents of damaged repos,
         when there is uncommitted, but valuable data in there...
+
+        When segment or segment+offset is given, limit processing to this location only.
         """
-        for segment, filename in self.io.segment_iterator():
+        for current_segment, filename in self.io.segment_iterator(segment=segment):
+            if segment is not None and current_segment > segment:
+                break
             try:
-                for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
-                    yield key, data, tag, segment, offset
+                for tag, key, current_offset, data in self.io.iter_objects(segment=current_segment,
+                                                                           offset=offset or 0, include_data=True):
+                    if offset is not None and current_offset > offset:
+                        break
+                    yield key, data, tag, current_segment, current_offset
             except IntegrityError as err:
-                logger.error('Segment %d (%s) has IntegrityError(s) [%s] - skipping.' % (segment, filename, str(err)))
+                logger.error('Segment %d (%s) has IntegrityError(s) [%s] - skipping.' % (
+                             current_segment, filename, str(err)))
 
     def _rollback(self, *, cleanup):
         """

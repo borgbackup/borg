@@ -45,6 +45,12 @@ repository is only modified from one place. Also keep in mind that
 Borg will keep an exclusive lock on the repository while creating
 or deleting archives, which may make *simultaneous* backups fail.
 
+Can I back up to multiple, swapped backup targets?
+--------------------------------------------------
+
+It is possible to swap your backup disks if each backup medium is assigned its
+own repository by creating a new one with :ref:`borg_init`.
+
 Can I copy or synchronize my repo to another location?
 ------------------------------------------------------
 
@@ -430,7 +436,7 @@ Say you want to prune ``/var/log`` faster than the rest of
 archive *names* and then implement different prune policies for
 different prefixes. For example, you could have a script that does::
 
-    borg create --exclude /var/log $REPOSITORY:main-$(date +%Y-%m-%d) /
+    borg create --exclude var/log $REPOSITORY:main-$(date +%Y-%m-%d) /
     borg create $REPOSITORY:logs-$(date +%Y-%m-%d) /var/log
 
 Then you would have two different prune calls with different policies::

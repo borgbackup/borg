@@ -305,6 +305,10 @@ and maybe just were not noticed.
 
 Compatibility notes:
 
+- matching of path patterns has been aligned with borg storing relative paths.
+  Borg archives file paths without leading slashes. Previously, include/exclude
+  patterns could contain leading slashes. You should check your patterns and
+  remove leading slashes.
 - dropped support / testing for older Pythons, minimum requirement is 3.8.
   In case your OS does not provide Python >= 3.8, consider using our binary,
   which does not need an external Python interpreter. Or continue using
@@ -1079,6 +1083,152 @@ Other changes:
 
   - vagrant: new VMs for linux/bsd/darwin, most with OpenSSL 1.1 and py36
 
+
+Version 1.1.18 (2022-06-05)
+---------------------------
+
+Compatibility notes:
+
+- When upgrading from borg 1.0.x to 1.1.x, please note:
+
+  - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
+  - borg upgrade: you do not need to and you also should not run it.
+  - borg might ask some security-related questions once after upgrading.
+    You can answer them either manually or via environment variable.
+    One known case is if you use unencrypted repositories, then it will ask
+    about a unknown unencrypted repository one time.
+  - your first backup with 1.1.x might be significantly slower (it might
+    completely read, chunk, hash a lot files) - this is due to the
+    --files-cache mode change (and happens every time you change mode).
+    You can avoid the one-time slowdown by using the pre-1.1.0rc4-compatible
+    mode (but that is less safe for detecting changed files than the default).
+    See the --files-cache docs for details.
+- 1.1.11 removes WSL autodetection (Windows 10 Subsystem for Linux).
+  If WSL still has a problem with sync_file_range, you need to set
+  BORG_WORKAROUNDS=basesyncfile in the borg process environment to
+  work around the WSL issue.
+- 1.1.14 changes return codes due to a bug fix:
+  In case you have scripts expecting rc == 2 for a signal exit, you need to
+  update them to check for >= 128 (as documented since long).
+- 1.1.15 drops python 3.4 support, minimum requirement is 3.5 now.
+- 1.1.17 install_requires the "packaging" pypi package now.
+
+New features:
+
+- check --repair: significantly speed up search for next valid object in segment, #6022
+- create: add retry_erofs workaround for O_NOATIME issue on volume shadow copies in WSL1, #6024
+- key export: display key if path is '-' or not given, #6092
+- list --format: add command_line to format keys, #6108
+
+Fixes:
+
+- check: improve error handling for corrupt archive metadata block,
+  make robust_iterator more robust, #4777
+- diff: support presence change for blkdev, chrdev and fifo items, #6483
+- diff: reduce memory consumption, fix is_hardlink_master
+- init: disallow overwriting of existing keyfiles
+- info: fix authenticated mode repo to show "Encrypted: No", #6462
+- info: emit repo info even if repo has 0 archives, #6120
+- list: remove placeholders for shake_* hashes, #6082
+- mount -o versions: give clear error msg instead of crashing
+- show_progress: add finished=true/false to archive_progress json, #6570
+- fix hardlinkable file type check, #6037
+- do not show archive name in error msgs referring to the repository, #6023
+- prettier error msg (no stacktrace) if exclude file is missing, #5734
+- do not require BORG_CONFIG_DIR if BORG_{SECURITY,KEYS}_DIR are set, #5979
+- atomically create the CACHE_TAG file, #6028
+- deal with the SaveFile/SyncFile race, docs, see #6176 5c5b59bc9
+- avoid expanding path into LHS of formatting operation + tests, #6064 #6063
+- repository: quota / compactable computation fixes, #6119.
+  This is mainly to keep the repo code in sync with borg 1.2. As borg 1.1
+  compacts immediately, there was not really an issue with this in 1.1.
+- fix transaction rollback: use files cache filename as found in txn.active, #6353
+- do not load files cache for commands not using it, fixes #5673
+- fix scp repo url parsing for ip v6 addrs, #6526
+- repo::archive location placeholder expansion fixes, #5826, #5998
+
+  - use expanded location for log output
+  - support placeholder expansion for BORG_REPO env var
+- respect umask for created directory and file modes, #6400
+- safer truncate_and_unlink implementation
+
+Other changes:
+
+- upgrade bundled xxhash code to 0.8.1
+- fix xxh64 related build (setup.py and post-0.8.1 patch for static_assert).
+  The patch was required to build the bundled xxhash code on FreeBSD, see
+  https://github.com/Cyan4973/xxHash/pull/670
+- msgpack build: remove endianness macro, #6105
+- update and fix shell completions
+- fuse: remove unneeded version check and compat code
+- delete --force: do not ask when deleting a repo, #5941
+- delete: don't commit if nothing was deleted, avoid cache sync, #6060
+- delete: add repository id and location to prompt
+- compact segments: improve freeable / freed space log output, #5679
+- if ensure_dir() fails, give more informative error message, #5952
+- load_key: no key is same as empty key, #6441
+- better error msg for defect or unsupported repo configs, #6566
+- use hmac.compare_digest instead of ==, #6470
+- implement more standard hashindex.setdefault behaviour
+- remove stray punctuation from secure-erase message
+- add development.lock.txt, use a real python 3.5 to generate frozen reqs
+- setuptools 60.7.0 breaks pyinstaller, #6246
+- setup.py clean2 was added to work around some setuptools customizability limitation.
+- allow extra compiler flags for every extension build
+- C code: make switch fallthrough explicit
+- Cython code: fix "useless trailing comma" cython warnings
+- requirements.lock.txt: use the latest cython 0.29.30
+- fix compilation warnings: ‘PyUnicode_AsUnicode’ is deprecated
+- docs:
+
+  - ~/.config/borg/keys is not used for repokey keys, #6107
+  - excluded parent dir's metadata can't restore, #6062
+  - permissions note rewritten to make it less confusing, #5490
+  - add note about grandfather-father-son backup retention policy / rotation scheme
+  - clarify who starts the remote agent (borg serve)
+  - test/improve pull backup docs, #5903
+  - document the socat pull mode described in #900 #515ß
+  - borg serve: improve ssh forced commands docs, #6083
+  - improve docs for borg list --format, #6080
+  - fix the broken link to .nix file
+  - clarify pattern usage with commands, #5176
+  - clarify user_id vs uid for fuse, #5723
+  - fix binary build freebsd/macOS version, #5942
+  - FAQ: fix manifest-timestamp path, #6016
+  - remove duplicate faq entries, #5926
+  - fix sphinx warnings, #5919
+  - virtualisation speed tips
+  - fix values of TAG bytes, #6515
+  - recommend umask for passphrase file perms
+  - update link to ubuntu packages, #6485
+  - clarify on-disk order and size of log entry fields, #6357
+  - do not transform --/--- to unicode dashes
+  - improve linking inside docs, link to borg_placeholders, link to borg_patterns
+  - use same phrasing in misc. help texts
+  - borg init: explain the encryption modes better
+  - explain the difference between a path that ends with or without a slash, #6297
+  - clarify usage of patternfile roots, #6242
+  - borg key export: add examples
+  - updates about features not experimental any more: FUSE "versions" view, --pattern*, #6134
+  - fix/update cygwin package requirements
+  - impact of deleting path/to/repo/nonce, #5858
+  - warn about tampered server nonce
+  - mention BORG_FILES_CACHE_SUFFIX as alternative to BORG_FILES_CACHE_TTL, #5602
+  - add a troubleshooting note about "is not a valid repository" to the FAQ
+- vagrant / CI / testing:
+
+  - misc. fixes and updates, new python versions
+  - macOS on github: re-enable fuse2 testing by downgrading to older macOS, #6099
+  - fix OpenBSD symlink mode test failure, #2055
+  - use the generic/openbsd6 box
+  - strengthen the test: we can read data w/o nonces
+  - add tests for path/to/repo/nonce deletion
+  - darwin64: backport some tunings from master
+  - darwin64: remove fakeroot, #6314
+  - darwin64: fix vagrant scp, #5921
+  - darwin64: use macfuse instead of osxfuse
+  - add ubuntu "jammy" 22.04 LTS VM
+  - adapt memory for openindiana64 and darwin64
 
 
 Version 1.1.17 (2021-07-12)

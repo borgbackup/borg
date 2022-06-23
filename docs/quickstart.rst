@@ -182,14 +182,14 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
         --show-rc                       \
         --compression lz4               \
         --exclude-caches                \
-        --exclude '/home/*/.cache/*'    \
-        --exclude '/var/tmp/*'          \
+        --exclude 'home/*/.cache/*'     \
+        --exclude 'var/tmp/*'           \
                                         \
         ::'{hostname}-{now}'            \
         /etc                            \
         /home                           \
         /root                           \
-        /var                            \
+        /var
 
     backup_exit=$?
 
@@ -206,7 +206,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
         --show-rc                       \
         --keep-daily    7               \
         --keep-weekly   4               \
-        --keep-monthly  6               \
+        --keep-monthly  6
 
     prune_exit=$?
 
@@ -405,7 +405,7 @@ Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg init ssh://user@hostname/path/to/repo
+  $ borg init user@hostname:/path/to/repo
 
 Note: please see the usage chapter for a full documentation of repo URLs.
 

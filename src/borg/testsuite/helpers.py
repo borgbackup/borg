@@ -155,11 +155,6 @@ class TestLocationWithoutEnv:
             "Location(proto='file', user=None, host=None, port=None, path='/abs/path:with:colons')"
         assert Location('/abs/path:with:colons').to_key_filename() == keys_dir + 'abs_path_with_colons'
 
-    def test_user_parsing(self):
-        # see issue #1930
-        assert repr(Location('ssh://host/path')) == \
-            "Location(proto='ssh', user=None, host='host', port=None, path='/path')"
-
     def test_canonical_path(self, monkeypatch):
         monkeypatch.delenv('BORG_REPO', raising=False)
         locations = ['some/path', 'file://some/path', 'host:some/path',

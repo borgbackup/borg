@@ -12,7 +12,7 @@ logger = create_logger()
 
 files_cache_logger = create_logger('borg.debug.files_cache')
 
-from .constants import CACHE_README, DEFAULT_FILES_CACHE_MODE
+from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Location
 from .helpers import Error
@@ -371,7 +371,7 @@ class Cache:
             shutil.rmtree(path)
 
     def __new__(cls, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
-                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=DEFAULT_FILES_CACHE_MODE,
+                progress=False, lock_wait=None, permit_adhoc_cache=False, cache_mode=FILES_CACHE_MODE_DISABLED,
                 consider_part_files=False, iec=False):
 
         def local():
@@ -449,7 +449,7 @@ class LocalCache(CacheStatsMixin):
     """
 
     def __init__(self, repository, key, manifest, path=None, sync=True, warn_if_unencrypted=True,
-                 progress=False, lock_wait=None, cache_mode=DEFAULT_FILES_CACHE_MODE, consider_part_files=False,
+                 progress=False, lock_wait=None, cache_mode=FILES_CACHE_MODE_DISABLED, consider_part_files=False,
                  iec=False):
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository

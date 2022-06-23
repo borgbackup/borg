@@ -257,13 +257,23 @@ def scandir_inorder(*, path, fd=None):
     return sorted(os.scandir(arg), key=scandir_keyfunc)
 
 
-def secure_erase(path):
-    """Attempt to securely erase a file by writing random data over it before deleting it."""
+def secure_erase(path, *, avoid_collateral_damage):
+    """Attempt to securely erase a file by writing random data over it before deleting it.
+
+    If avoid_collateral_damage is True, we only secure erase if the total link count is 1,
+    otherwise we just do a normal "delete" (unlink) without first overwriting it with random.
+    This avoids other hardlinks pointing to same inode as <path> getting damaged, but might be less secure.
+    A typical scenario where this is useful are quick "hardlink copies" of bigger directories.
+
+    If avoid_collateral_damage is False, we always secure erase.
+    If there are hardlinks pointing to the same inode as <path>, they will contain random garbage afterwards.
+    """
     with open(path, 'r+b') as fd:
-        length = os.stat(fd.fileno()).st_size
-        fd.write(os.urandom(length))
-        fd.flush()
-        os.fsync(fd.fileno())
+        st = os.stat(fd.fileno())
+        if not (st.st_nlink > 1 and avoid_collateral_damage):
+            fd.write(os.urandom(st.st_size))
+            fd.flush()
+            os.fsync(fd.fileno())
     os.unlink(path)
 
 

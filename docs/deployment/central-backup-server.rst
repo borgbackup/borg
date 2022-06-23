@@ -81,7 +81,7 @@ The options which are added to the key will perform the following:
 Due to the ``cd`` command we use, the server automatically changes the current
 working directory. Then client doesn't need to have knowledge of the absolute
 or relative remote repository path and can directly access the repositories at
-``ssh://<user>@<host>/./<repo>``.
+``<user>@<host>:<repo>``.
 
 .. note:: The setup above ignores all client given commandline parameters
           which are normally appended to the `borg serve` command.
@@ -93,21 +93,21 @@ The client needs to initialize the `pictures` repository like this:
 
 ::
 
- borg init ssh://backup@backup01.srv.local/./pictures
+ borg init backup@backup01.srv.local:pictures
 
 Or with the full path (should actually never be used, as only for demonstrational purposes).
 The server should automatically change the current working directory to the `<client fqdn>` folder.
 
 ::
 
-  borg init ssh://backup@backup01.srv.local/home/backup/repos/johndoe.clnt.local/pictures
+  borg init backup@backup01.srv.local:/home/backup/repos/johndoe.clnt.local/pictures
 
 When `johndoe.clnt.local` tries to access a not restricted path the following error is raised.
 John Doe tries to backup into the Web 01 path:
 
 ::
 
-  borg init ssh://backup@backup01.srv.local/home/backup/repos/web01.srv.local/pictures
+  borg init backup@backup01.srv.local:/home/backup/repos/web01.srv.local/pictures
 
 ::
 

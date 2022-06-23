@@ -57,7 +57,7 @@ def testdata(request, tmpdir_factory):
 @pytest.fixture(params=['none', 'lz4'])
 def repo_archive(request, cmd, repo, testdata):
     archive = 'test'
-    cmd(f'--repo={repo}', 'create', f'{archive}', '--compression', request.param, testdata)
+    cmd(f'--repo={repo}', 'create', '--compression', request.param, archive, testdata)
     return repo, archive
 
 
@@ -82,19 +82,19 @@ def test_extract(benchmark, cmd, repo_archive, tmpdir):
 
 def test_delete(benchmark, cmd, repo_archive):
     repo, archive = repo_archive
-    result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'delete', '--name', archive))
+    result, out = benchmark.pedantic(cmd, (f'--repo={repo}', 'delete', '-a', archive))
     assert result == 0
 
 
 def test_list(benchmark, cmd, repo_archive):
     repo, archive = repo_archive
-    result, out = benchmark(cmd, f'--repo={repo}', 'list', '--name', archive)
+    result, out = benchmark(cmd, f'--repo={repo}', 'list', archive)
     assert result == 0
 
 
 def test_info(benchmark, cmd, repo_archive):
     repo, archive = repo_archive
-    result, out = benchmark(cmd, f'--repo={repo}', 'info', '--name', archive)
+    result, out = benchmark(cmd, f'--repo={repo}', 'info', '-a', archive)
     assert result == 0
 
 

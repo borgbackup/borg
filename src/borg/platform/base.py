@@ -239,13 +239,18 @@ class SaveFile:
             safe_unlink(self.tmp_fname)  # with-body has failed, clean up tmp file
             return  # continue processing the exception normally
 
-        # tempfile.mkstemp always uses owner-only file permissions for the temp file,
-        # but as we'll rename it to the non-temp permanent file now, we need to respect
-        # the umask and change the file mode to what a normally created file would have.
-        # thanks to the crappy os.umask api, we can't query the umask without setting it. :-(
-        umask = os.umask(UMASK_DEFAULT)
-        os.umask(umask)
-        os.chmod(self.tmp_fname, mode=0o666 & ~ umask)
+        try:
+            # tempfile.mkstemp always uses owner-only file permissions for the temp file,
+            # but as we'll rename it to the non-temp permanent file now, we need to respect
+            # the umask and change the file mode to what a normally created file would have.
+            # thanks to the crappy os.umask api, we can't query the umask without setting it. :-(
+            umask = os.umask(UMASK_DEFAULT)
+            os.umask(umask)
+            os.chmod(self.tmp_fname, mode=0o666 & ~ umask)
+        except OSError:
+            # chmod might fail if the fs does not support it.
+            # this is not harmful, the file will still have permissions for the owner.
+            pass
 
         try:
             os.replace(self.tmp_fname, self.path)  # POSIX: atomic rename

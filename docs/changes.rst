@@ -61,12 +61,12 @@ Compatibility notes:
 
       - borg create ARCHIVE ...
       - borg list ARCHIVE
+      - borg extract ARCHIVE ...
+      - borg diff ARCH1 ARCH2
+      - borg rename OLDNAME NEWNAME
       - borg info -a ARCH_GLOB
       - borg delete -a ARCH_GLOB
-      - borg diff ARCH1 ARCH2
-      - borg extract ARCHIVE ...
       - borg recreate -a ARCH_GLOB ...
-      - borg rename OLDNAME NEWNAME
       - borg mount -a ARCH_GLOB mountpoint ...
 
     For more details, please consult the docs or --help option output.
@@ -95,11 +95,15 @@ Changes:
   - symmetric hlid (all hardlinks pointing to same inode have same hlid)
   - all archived hardlinked regular files have a chunks list
 
-- borg init --other-repo=OTHER_REPO: reuse key material from OTHER_REPO, #6554
+- borg init --other-repo=OTHER_REPO: reuse key material from OTHER_REPO, #6554.
+  This is useful if you want to use borg transfer to transfer archives from an
+  existing borg 1.1/1.2 repo. If the chunker secret and the id key and algorithm
+  stay the same, the deduplication will also work between past and future backups.
+
 - borg transfer:
 
-  - efficiently copy archives from borg 1.1/1.2 repo to new repo. uses
-    deduplication and does not decompress/recompress file content data.
+  - efficiently copy archives from a borg 1.1/1.2 repo to a new repo.
+    uses deduplication and does not decompress/recompress file content data.
   - does some cleanups / fixes / conversions:
 
     - disallow None value for .user/group/chunks/chunks_healthy
@@ -111,9 +115,15 @@ Changes:
     - all hardlinks have chunks, maybe chunks_healty, hlid
     - remove the zlib type bytes hack
     - make sure items with chunks have precomputed size
+    - removes the csize element from the tuples in the Item.chunks list
     - clean item of attic 0.13 'acl' bug remnants
 
 - crypto: see 1.3.0a1 log entry
+- removed "borg upgrade" command (not needed any more)
+- compact: removed --cleanup-commits option
+- docs: fixed quickstart and usage docs with new cli command syntax
+- docs: removed the parts talking about AES-CTR mode issues (we will not
+  use that any more)
 
 
 Version 1.3.0a1 (2022-04-15)

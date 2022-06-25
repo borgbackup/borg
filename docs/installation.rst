@@ -177,8 +177,8 @@ following dependencies first:
 * optionally, if you wish to mount an archive as a FUSE filesystem, you need
   a FUSE implementation for Python:
 
-  - Either pyfuse3_ (preferably, newer and maintained) or llfuse_ (older,
-    unmaintained now). See also the BORG_FUSE_IMPL env variable.
+  - Either pyfuse3_ (preferably, newer) or llfuse_ (older).
+    See also the BORG_FUSE_IMPL env variable.
   - See setup.py about the version requirements.
 
 If you have troubles finding the right package names, have a look at the

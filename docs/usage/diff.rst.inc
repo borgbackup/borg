@@ -6,7 +6,7 @@ borg diff
 ---------
 .. code-block:: none
 
-    borg [common options] diff [options] REPO::ARCHIVE1 ARCHIVE2 [PATH...]
+    borg [common options] diff [options] ARCHIVE1 ARCHIVE2 [PATH...]
 
 .. only:: html
 
@@ -15,9 +15,9 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     | **positional arguments**                                                                                                                                              |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
-    |                                                       | ``REPO::ARCHIVE1``                    | repository location and ARCHIVE1 name                                 |
+    |                                                       | ``ARCHIVE1``                          | ARCHIVE1 name                                                         |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
-    |                                                       | ``ARCHIVE2``                          | ARCHIVE2 name (no repository location allowed)                        |
+    |                                                       | ``ARCHIVE2``                          | ARCHIVE2 name                                                         |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``PATH``                              | paths of items inside the archives to compare; patterns are supported |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
@@ -58,10 +58,10 @@ borg diff
 
 .. only:: latex
 
-    REPO::ARCHIVE1
-        repository location and ARCHIVE1 name
+    ARCHIVE1
+        ARCHIVE1 name
     ARCHIVE2
-        ARCHIVE2 name (no repository location allowed)
+        ARCHIVE2 name
     PATH
         paths of items inside the archives to compare; patterns are supported
 

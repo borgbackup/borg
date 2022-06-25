@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CHECK 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-check \- Check repository consistency
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-CHECK" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-check \- Check repository consistency
 .SH SYNOPSIS
 .sp
-borg [common options] check [options] [REPOSITORY_OR_ARCHIVE]
+borg [common options] check [options]
 .SH DESCRIPTION
 .sp
 The check command verifies the consistency of a repository and the corresponding archives.
@@ -126,28 +126,25 @@ slow.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS arguments
-.INDENT 0.0
-.TP
-.B REPOSITORY_OR_ARCHIVE
-repository or archive to check consistency of
-.UNINDENT
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-repository\-only
+.BI \-\-name \ NAME
+specify the archive name
+.TP
+.B  \-\-repository\-only
 only perform repository checks
 .TP
-.B \-\-archives\-only
+.B  \-\-archives\-only
 only perform archives checks
 .TP
-.B \-\-verify\-data
+.B  \-\-verify\-data
 perform cryptographic archive data integrity verification (conflicts with \fB\-\-repository\-only\fP)
 .TP
-.B \-\-repair
+.B  \-\-repair
 attempt to repair any inconsistencies found
 .TP
-.B \-\-save\-space
+.B  \-\-save\-space
 work slower, but using less space
 .TP
 .BI \-\-max\-duration \ SECONDS

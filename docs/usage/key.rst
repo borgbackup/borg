@@ -11,7 +11,7 @@ Examples
 ::
 
     # Create a key file protected repository
-    $ borg init --encryption=keyfile -v /path/to/repo
+    $ borg rcreate --encryption=keyfile -v
     Initializing repository at "/path/to/repo"
     Enter new passphrase:
     Enter same passphrase again:
@@ -23,7 +23,7 @@ Examples
     Done.
 
     # Change key file passphrase
-    $ borg key change-passphrase -v /path/to/repo
+    $ borg key change-passphrase -v
     Enter passphrase for key /root/.config/borg/keys/mnt_backup:
     Enter new passphrase:
     Enter same passphrase again:
@@ -33,15 +33,15 @@ Examples
     # Import a previously-exported key into the specified
     # key file (creating or overwriting the output key)
     # (keyfile repositories only)
-    $ BORG_KEY_FILE=/path/to/output-key borg key import /path/to/repo /path/to/exported
+    $ BORG_KEY_FILE=/path/to/output-key borg key import /path/to/exported
 
 Fully automated using environment variables:
 
 ::
 
-    $ BORG_NEW_PASSPHRASE=old borg init -e=repokey repo
+    $ BORG_NEW_PASSPHRASE=old borg rcreate -e=repokey
     # now "old" is the current passphrase.
-    $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change-passphrase repo
+    $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change-passphrase
     # now "new" is the current passphrase.
 
 

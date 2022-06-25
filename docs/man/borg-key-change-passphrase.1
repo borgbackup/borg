@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-CHANGE-PASSPHRASE 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-key-change-passphrase \- Change repository key file passphrase
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-KEY-CHANGE-PASSPHRASE" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-key-change-passphrase \- Change repository key file passphrase
 .SH SYNOPSIS
 .sp
-borg [common options] key change\-passphrase [options] [REPOSITORY]
+borg [common options] key change\-passphrase [options]
 .SH DESCRIPTION
 .sp
 The key files used for repository encryption are optionally passphrase
@@ -45,9 +45,6 @@ does not protect future (nor past) backups to the same repository.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS arguments
-.sp
-REPOSITORY
 .SH EXAMPLES
 .INDENT 0.0
 .INDENT 3.5
@@ -55,7 +52,7 @@ REPOSITORY
 .nf
 .ft C
 # Create a key file protected repository
-$ borg init \-\-encryption=keyfile \-v /path/to/repo
+$ borg rcreate \-\-encryption=keyfile \-v
 Initializing repository at "/path/to/repo"
 Enter new passphrase:
 Enter same passphrase again:
@@ -67,7 +64,7 @@ Archives: 0, w/ cached Idx: 0, w/ outdated Idx: 0, w/o cached Idx: 0.
 Done.
 
 # Change key file passphrase
-$ borg key change\-passphrase \-v /path/to/repo
+$ borg key change\-passphrase \-v
 Enter passphrase for key /root/.config/borg/keys/mnt_backup:
 Enter new passphrase:
 Enter same passphrase again:
@@ -77,7 +74,7 @@ Key updated
 # Import a previously\-exported key into the specified
 # key file (creating or overwriting the output key)
 # (keyfile repositories only)
-$ BORG_KEY_FILE=/path/to/output\-key borg key import /path/to/repo /path/to/exported
+$ BORG_KEY_FILE=/path/to/output\-key borg key import /path/to/exported
 .ft P
 .fi
 .UNINDENT
@@ -89,9 +86,9 @@ Fully automated using environment variables:
 .sp
 .nf
 .ft C
-$ BORG_NEW_PASSPHRASE=old borg init \-e=repokey repo
+$ BORG_NEW_PASSPHRASE=old borg rcreate \-e=repokey
 # now "old" is the current passphrase.
-$ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change\-passphrase repo
+$ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change\-passphrase
 # now "new" is the current passphrase.
 .ft P
 .fi

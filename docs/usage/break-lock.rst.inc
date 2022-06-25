@@ -6,21 +6,17 @@ borg break-lock
 ---------------
 .. code-block:: none
 
-    borg [common options] break-lock [options] [REPOSITORY]
+    borg [common options] break-lock [options]
 
 .. only:: html
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+----------------+-----------------------------------------+
-    | **positional arguments**                                                                                         |
-    +-------------------------------------------------------+----------------+-----------------------------------------+
-    |                                                       | ``REPOSITORY`` | repository for which to break the locks |
-    +-------------------------------------------------------+----------------+-----------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                   |
-    |                                                                                                                  |
-    | :ref:`common_options`                                                                                            |
-    +-------------------------------------------------------+----------------+-----------------------------------------+
+    +-------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                        |
+    |                                                       |
+    | :ref:`common_options`                                 |
+    +-------------------------------------------------------+
 
     .. raw:: html
 
@@ -32,8 +28,6 @@ borg break-lock
 
 .. only:: latex
 
-    REPOSITORY
-        repository for which to break the locks
 
 
     :ref:`common_options`

@@ -1,23 +1,21 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. _borg_init:
+.. _borg_rcreate:
 
-borg init
----------
+borg rcreate
+------------
 .. code-block:: none
 
-    borg [common options] init [options] [REPOSITORY]
+    borg [common options] rcreate [options]
 
 .. only:: html
 
     .. class:: borg-options-table
 
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **positional arguments**                                                                                                                                                                                                                                                                                                            |
-    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``REPOSITORY``                     | repository to create                                                                                                                                                                                                                   |
-    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **optional arguments**                                                                                                                                                                                                                                                                                                              |
+    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--other-repo SRC_REPOSITORY``    | reuse the key material from the other repository                                                                                                                                                                                       |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-e MODE``, ``--encryption MODE`` | select encryption key mode **(required)**                                                                                                                                                                                              |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -44,11 +42,10 @@ borg init
 
 .. only:: latex
 
-    REPOSITORY
-        repository to create
 
 
     optional arguments
+        --other-repo SRC_REPOSITORY    reuse the key material from the other repository
         -e MODE, --encryption MODE     select encryption key mode **(required)**
         --append-only                  create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details.
         --storage-quota QUOTA          Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
@@ -62,7 +59,7 @@ borg init
 Description
 ~~~~~~~~~~~
 
-This command initializes an empty repository. A repository is a filesystem
+This command creates a new, empty repository. A repository is a filesystem
 directory containing the deduplicated data from zero or more archives.
 
 Encryption mode TLDR
@@ -75,7 +72,7 @@ tips will come below):
 
 ::
 
-    borg init --encryption repokey /path/to/repo
+    borg rcreate --encryption repokey-aes-ocb
 
 Borg will:
 
@@ -137,13 +134,13 @@ in the upper part of the table, in the lower part is the old and/or unsafe(r) st
 +-----------------------------------+--------------+----------------+--------------------+---------+
 | Mode (K = keyfile or repokey)     | ID-Hash      | Encryption     | Authentication     | V >=    |
 +-----------------------------------+--------------+----------------+--------------------+---------+
-| K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           | 1.3     |
+| K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           | 2.0     |
 +-----------------------------------+--------------+----------------+--------------------+---------+
-| K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           | 1.3     |
+| K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           | 2.0     |
 +-----------------------------------+--------------+----------------+--------------------+---------+
-| K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         | 1.3     |
+| K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         | 2.0     |
 +-----------------------------------+--------------+----------------+--------------------+---------+
-| K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         | 1.3     |
+| K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         | 2.0     |
 +-----------------------------------+--------------+----------------+--------------------+---------+
 | K-blake2                          | BLAKE2b      | AES256-CTR     | BLAKE2b            | 1.1     |
 +-----------------------------------+--------------+----------------+--------------------+---------+
@@ -171,8 +168,6 @@ Key derivation functions
 - ``--key-algorithm argon2`` is the default and is recommended.
   The key encryption key is derived from your passphrase via argon2-id.
   Argon2 is considered more modern and secure than pbkdf2.
-
-- You can use ``--key-algorithm pbkdf2`` if you want to access your repo via old versions of borg.
 
 Our implementation of argon2-based key algorithm follows the cryptographic best practices:
 

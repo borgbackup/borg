@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-BENCHMARK-CRUD 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-benchmark-crud \- Benchmark Create, Read, Update, Delete for archives.
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-BENCHMARK-CRUD" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-benchmark-crud \- Benchmark Create, Read, Update, Delete for archives.
 .SH SYNOPSIS
 .sp
-borg [common options] benchmark crud [options] REPOSITORY PATH
+borg [common options] benchmark crud [options] PATH
 .SH DESCRIPTION
 .sp
 This command benchmarks borg CRUD (create, read, update, delete) operations.
@@ -87,9 +87,6 @@ Try multiple measurements and having a otherwise idle machine (and network, if y
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
-.TP
-.B REPOSITORY
-repository to use for benchmark (must exist)
 .TP
 .B PATH
 path were to create benchmark input data

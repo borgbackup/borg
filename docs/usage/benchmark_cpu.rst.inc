@@ -40,5 +40,6 @@ This command benchmarks misc. CPU bound borg operations.
 
 It creates input data in memory, runs the operation and then displays throughput.
 To reduce outside influence on the timings, please make sure to run this with:
+
 - an otherwise as idle as possible machine
 - enough free memory so there will be no slow down due to paging activity

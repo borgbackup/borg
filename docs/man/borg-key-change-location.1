@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-CHANGE-LOCATION 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-key-change-location \- Change repository key location
 .
 .nr rst2man-indent-level 0
 .
@@ -30,26 +27,30 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-KEY-CHANGE-LOCATION" 1 "2022-06-25" "" "borg backup tool"
+.SH NAME
+borg-key-change-location \- Change repository key location
 .SH SYNOPSIS
 .sp
-borg [common options] key change\-location [options] [REPOSITORY] KEY_LOCATION
+borg [common options] key change\-location [options] KEY_LOCATION
 .SH DESCRIPTION
 .sp
 Change the location of a borg key. The key can be stored at different locations:
-.sp
-keyfile: locally, usually in the home directory
-repokey: inside the repo (in the repo config)
 .INDENT 0.0
-.TP
-.B Note: this command does NOT change the crypto algorithms, just the key location,
-thus you must ONLY give the key location (keyfile or repokey).
+.IP \(bu 2
+keyfile: locally, usually in the home directory
+.IP \(bu 2
+repokey: inside the repo (in the repo config)
 .UNINDENT
+.sp
+Please note:
+.sp
+This command does NOT change the crypto algorithms, just the key location,
+thus you must ONLY give the key location (keyfile or repokey).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
-.sp
-REPOSITORY
 .INDENT 0.0
 .TP
 .B KEY_LOCATION
@@ -58,7 +59,7 @@ select key location
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-keep
+.B  \-\-keep
 keep the key also at the current location (default: remove it)
 .UNINDENT
 .SH SEE ALSO

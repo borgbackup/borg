@@ -2634,21 +2634,21 @@ class Archiver:
         Examples::
 
             # Exclude '/home/user/file.o' but not '/home/user/file.odt':
-            $ borg create -e '*.o' /path/to/repo::archive /
+            $ borg create -e '*.o' archive /
 
             # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
             # not '/home/user/importantjunk' or '/etc/junk':
-            $ borg create -e 'home/*/junk' /path/to/repo::archive /
+            $ borg create -e 'home/*/junk' archive /
 
             # Exclude the contents of '/home/user/cache' but not the directory itself:
-            $ borg create -e home/user/cache/ /path/to/repo::archive /
+            $ borg create -e home/user/cache/ archive /
 
             # The file '/home/user/cache/important' is *not* backed up:
-            $ borg create -e home/user/cache/ /path/to/repo::archive / /home/user/cache/important
+            $ borg create -e home/user/cache/ archive / /home/user/cache/important
 
             # The contents of directories in '/home' are not backed up when their name
             # ends in '.tmp'
-            $ borg create --exclude 're:^home/[^/]+\\.tmp/' /path/to/repo::archive /
+            $ borg create --exclude 're:^home/[^/]+\\.tmp/' archive /
 
             # Load exclusions from file
             $ cat >exclude.txt <<EOF
@@ -2661,7 +2661,7 @@ class Archiver:
             # Example with spaces, no need to escape as it is processed by borg
             some file with spaces.txt
             EOF
-            $ borg create --exclude-from exclude.txt /path/to/repo::archive /
+            $ borg create --exclude-from exclude.txt archive /
 
         A more general and easier to use way to define filename matching patterns
         exists with the ``--pattern`` and ``--patterns-from`` options. Using
@@ -2700,7 +2700,7 @@ class Archiver:
 
         **Tip: You can easily test your patterns with --dry-run and  --list**::
 
-            $ borg create --dry-run --list --patterns-from patterns.txt /path/to/repo::archive
+            $ borg create --dry-run --list --patterns-from patterns.txt archive
 
         This will list the considered files one per line, prefixed with a
         character that indicates the action (e.g. 'x' for excluding, see
@@ -2720,16 +2720,16 @@ class Archiver:
 
             # backup pics, but not the ones from 2018, except the good ones:
             # note: using = is essential to avoid cmdline argument parsing issues.
-            borg create --pattern=+pics/2018/good --pattern=-pics/2018 /path/to/repo::archive pics
+            borg create --pattern=+pics/2018/good --pattern=-pics/2018 archive pics
 
             # backup only JPG/JPEG files (case insensitive) in all home directories:
-            borg create --pattern '+ re:\\.jpe?g(?i)$' /path/to/repo::archive /home
+            borg create --pattern '+ re:\\.jpe?g(?i)$' archive /home
 
             # backup homes, but exclude big downloads (like .ISO files) or hidden files:
-            borg create --exclude 're:\\.iso(?i)$' --exclude 'sh:home/**/.*' /path/to/repo::archive /home
+            borg create --exclude 're:\\.iso(?i)$' --exclude 'sh:home/**/.*' archive /home
 
             # use a file with patterns (recursion root '/' via command line):
-            borg create --patterns-from patterns.lst /path/to/repo::archive /
+            borg create --patterns-from patterns.lst archive /
 
         The patterns.lst file could look like that::
 
@@ -2748,8 +2748,8 @@ class Archiver:
         You can specify recursion roots either on the command line or in a patternfile::
 
             # these two commands do the same thing
-            borg create --exclude home/bobby/junk /path/to/repo::archive /home/bobby /home/susan
-            borg create --patterns-from patternfile.lst /path/to/repo::archive
+            borg create --exclude home/bobby/junk archive /home/bobby /home/susan
+            borg create --patterns-from patternfile.lst archive
 
         patternfile.lst::
 
@@ -3397,6 +3397,7 @@ class Archiver:
 
         It creates input data in memory, runs the operation and then displays throughput.
         To reduce outside influence on the timings, please make sure to run this with:
+
         - an otherwise as idle as possible machine
         - enough free memory so there will be no slow down due to paging activity
         """)
@@ -4125,21 +4126,21 @@ class Archiver:
         transfer_epilog = process_epilog("""
         This command transfers archives from one repository to another repository.
 
-        Suggested use:
+        Suggested use::
 
-        # initialize DST_REPO reusing key material from SRC_REPO, so that
-        # chunking and chunk id generation will work in the same way as before.
-        borg --repo=DST_REPO init --other-repo=SRC_REPO --encryption=DST_ENC
+            # initialize DST_REPO reusing key material from SRC_REPO, so that
+            # chunking and chunk id generation will work in the same way as before.
+            borg --repo=DST_REPO init --other-repo=SRC_REPO --encryption=DST_ENC
 
-        # transfer archives from SRC_REPO to DST_REPO
-        borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check what it would do
-        borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
-        borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
+            # transfer archives from SRC_REPO to DST_REPO
+            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check what it would do
+            borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
+            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
         The default is to transfer all archives, including checkpoint archives.
 
         You could use the misc. archive filter options to limit which archives it will
-        transfer, e.g. using the --prefix option. This is recommended for big
+        transfer, e.g. using the -a option. This is recommended for big
         repositories with multiple data sets to keep the runtime per invocation lower.
         """)
         subparser = subparsers.add_parser('transfer', parents=[common_parser], add_help=False,
@@ -4396,7 +4397,7 @@ class Archiver:
 
         ::
 
-            borg rcreate --encryption repokey /path/to/repo
+            borg rcreate --encryption repokey-aes-ocb
 
         Borg will:
 
@@ -4458,13 +4459,13 @@ class Archiver:
         +-----------------------------------+--------------+----------------+--------------------+---------+
         | Mode (K = keyfile or repokey)     | ID-Hash      | Encryption     | Authentication     | V >=    |
         +-----------------------------------+--------------+----------------+--------------------+---------+
-        | K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           | 1.3     |
+        | K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           | 2.0     |
         +-----------------------------------+--------------+----------------+--------------------+---------+
-        | K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           | 1.3     |
+        | K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           | 2.0     |
         +-----------------------------------+--------------+----------------+--------------------+---------+
-        | K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         | 1.3     |
+        | K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         | 2.0     |
         +-----------------------------------+--------------+----------------+--------------------+---------+
-        | K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         | 1.3     |
+        | K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         | 2.0     |
         +-----------------------------------+--------------+----------------+--------------------+---------+
         | K-blake2                          | BLAKE2b      | AES256-CTR     | BLAKE2b            | 1.1     |
         +-----------------------------------+--------------+----------------+--------------------+---------+
@@ -4492,8 +4493,6 @@ class Archiver:
         - ``--key-algorithm argon2`` is the default and is recommended.
           The key encryption key is derived from your passphrase via argon2-id.
           Argon2 is considered more modern and secure than pbkdf2.
-
-        - You can use ``--key-algorithm pbkdf2`` if you want to access your repo via old versions of borg.
 
         Our implementation of argon2-based key algorithm follows the cryptographic best practices:
 
@@ -4633,11 +4632,13 @@ class Archiver:
         change_location_epilog = process_epilog("""
         Change the location of a borg key. The key can be stored at different locations:
 
-        keyfile: locally, usually in the home directory
-        repokey: inside the repo (in the repo config)
+        - keyfile: locally, usually in the home directory
+        - repokey: inside the repo (in the repo config)
 
-        Note: this command does NOT change the crypto algorithms, just the key location,
-              thus you must ONLY give the key location (keyfile or repokey).
+        Please note:
+
+        This command does NOT change the crypto algorithms, just the key location,
+        thus you must ONLY give the key location (keyfile or repokey).
         """)
         subparser = key_parsers.add_parser('change-location', parents=[common_parser], add_help=False,
                                           description=self.do_change_location.__doc__,
@@ -4750,13 +4751,18 @@ class Archiver:
         # borg rlist
         rlist_epilog = process_epilog("""
         This command lists the archives contained in a repository.
+
         .. man NOTES
+
         The FORMAT specifier syntax
         +++++++++++++++++++++++++++
+
         The ``--format`` option uses python's `format string syntax
         <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
+
         Examples:
         ::
+
             $ borg rlist --format '{archive}{NL}'
             ArchiveFoo
             ArchiveBar
@@ -4772,6 +4778,7 @@ class Archiver:
         The following keys are always available:
 
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
+
         Keys available only when listing archives in a repository:
 
         """) + ArchiveFormatter.keys_help()

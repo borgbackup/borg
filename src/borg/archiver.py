@@ -2093,7 +2093,7 @@ class Archiver:
         data = repository.get(Manifest.MANIFEST_ID)
         repository.put(Manifest.MANIFEST_ID, data)
         threshold = args.threshold / 100
-        repository.commit(compact=True, threshold=threshold, cleanup_commits=args.cleanup_commits)
+        repository.commit(compact=True, threshold=threshold)
         return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)
@@ -3536,11 +3536,6 @@ class Archiver:
         given by the ``--threshold`` option. If omitted, a threshold of 10% is used.
         When using ``--verbose``, borg will output an estimate of the freed space.
 
-        After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
-        to clean up the numerous 17byte commit-only segments that borg 1.1 did not clean up
-        due to a bug. It is enough to do that once per repository. After cleaning up the
-        commits, borg will also do a normal compaction.
-
         See :ref:`separate_compaction` in Additional Notes for more details.
         """)
         subparser = subparsers.add_parser('compact', parents=[common_parser], add_help=False,
@@ -3549,8 +3544,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='compact segment files / free space in repo')
         subparser.set_defaults(func=self.do_compact)
-        subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
-                               help='cleanup commit-only 17-byte segment files')
         subparser.add_argument('--threshold', metavar='PERCENT', dest='threshold',
                                type=int, default=10,
                                help='set minimum threshold for saved space in PERCENT (Default: 10)')

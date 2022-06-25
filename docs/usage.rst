@@ -60,7 +60,6 @@ Usage
    usage/tar
 
    usage/transfer
-   usage/upgrade
    usage/benchmark
 
    usage/help

@@ -153,7 +153,7 @@ class Repository:
         """{} does not have a valid configuration. Check repo config [{}]."""
 
     class AtticRepository(Error):
-        """Attic repository detected. Please use borg < 1.3 to run "borg upgrade {}"."""
+        """Attic repository detected. Please use borg <= 1.2 to run "borg upgrade {}"."""
 
     class CheckNeeded(ErrorWithTraceback):
         """Inconsistency detected. Please run "borg check {}"."""

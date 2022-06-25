@@ -490,16 +490,6 @@ class Archiver:
         if key.tam_required:
             tam_file = tam_required_file(repository)
             open(tam_file, 'w').close()
-            logger.warning(
-                '\n'
-                'By default repositories initialized with this version will produce security\n'
-                'errors if written to with an older version (up to and including Borg 1.0.8).\n'
-                '\n'
-                'If you want to use these older versions, you can disable the check by running:\n'
-                'borg upgrade --disable-tam %s\n'
-                '\n'
-                'See https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability '
-                'for details about the security implications.', shlex.quote(path))
 
         if key.NAME != 'plaintext':
             logger.warning(
@@ -1890,56 +1880,6 @@ class Archiver:
             if args.stats:
                 log_multi(str(stats),
                           logger=logging.getLogger('borg.output.stats'))
-        return self.exit_code
-
-    @with_repository(fake=('tam', 'disable_tam'), invert_fake=True, manifest=False, exclusive=True)
-    def do_upgrade(self, args, repository, manifest=None, key=None):
-        """upgrade a repository from a previous version"""
-        if args.tam:
-            manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
-
-            if not hasattr(key, 'change_passphrase'):
-                print('This repository is not encrypted, cannot enable TAM.')
-                return EXIT_ERROR
-
-            if not manifest.tam_verified or not manifest.config.get('tam_required', False):
-                # The standard archive listing doesn't include the archive ID like in borg 1.1.x
-                print('Manifest contents:')
-                for archive_info in manifest.archives.list(sort_by=['ts']):
-                    print(format_archive(archive_info), '[%s]' % bin_to_hex(archive_info.id))
-                manifest.config['tam_required'] = True
-                manifest.write()
-                repository.commit(compact=False)
-            if not key.tam_required:
-                key.tam_required = True
-                key.change_passphrase(key._passphrase)
-                print('Key updated')
-                if hasattr(key, 'find_key'):
-                    print('Key location:', key.find_key())
-            if not tam_required(repository):
-                tam_file = tam_required_file(repository)
-                open(tam_file, 'w').close()
-                print('Updated security database')
-        elif args.disable_tam:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK, force_tam_not_required=True)
-            if tam_required(repository):
-                os.unlink(tam_required_file(repository))
-            if key.tam_required:
-                key.tam_required = False
-                key.change_passphrase(key._passphrase)
-                print('Key updated')
-                if hasattr(key, 'find_key'):
-                    print('Key location:', key.find_key())
-            manifest.config['tam_required'] = False
-            manifest.write()
-            repository.commit(compact=False)
-        else:
-            # mainly for upgrades from borg 0.xx -> 1.0.
-            repo = BorgRepositoryUpgrader(args.location.path, create=False)
-            try:
-                repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
-            except NotImplementedError as e:
-                print("warning: %s" % e)
         return self.exit_code
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
@@ -5069,74 +5009,6 @@ class Archiver:
         subparser.set_defaults(func=self.do_umount)
         subparser.add_argument('mountpoint', metavar='MOUNTPOINT', type=str,
                                help='mountpoint of the filesystem to umount')
-
-        # borg upgrade
-        upgrade_epilog = process_epilog("""
-        Upgrade an existing, local Borg repository.
-
-        When you do not need borg upgrade
-        +++++++++++++++++++++++++++++++++
-
-        Not every change requires that you run ``borg upgrade``.
-
-        You do **not** need to run it when:
-
-        - moving your repository to a different place
-        - upgrading to another point release (like 1.0.x to 1.0.y),
-          except when noted otherwise in the changelog
-        - upgrading from 1.0.x to 1.1.x,
-          except when noted otherwise in the changelog
-
-        Borg 1.x.y upgrades
-        +++++++++++++++++++
-
-        Use ``borg upgrade --tam REPO`` to require manifest authentication
-        introduced with Borg 1.0.9 to address security issues. This means
-        that modifying the repository after doing this with a version prior
-        to 1.0.9 will raise a validation error, so only perform this upgrade
-        after updating all clients using the repository to 1.0.9 or newer.
-
-        This upgrade should be done on each client for safety reasons.
-
-        If a repository is accidentally modified with a pre-1.0.9 client after
-        this upgrade, use ``borg upgrade --tam --force REPO`` to remedy it.
-
-        If you routinely do this you might not want to enable this upgrade
-        (which will leave you exposed to the security issue). You can
-        reverse the upgrade by issuing ``borg upgrade --disable-tam REPO``.
-
-        See
-        https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability
-        for details.
-
-        Borg 0.xx to Borg 1.x
-        +++++++++++++++++++++
-
-        This currently supports converting Borg 0.xx to 1.0.
-
-        Currently, only LOCAL repositories can be upgraded (issue #465).
-
-        Please note that ``borg create`` (since 1.0.0) uses bigger chunks by
-        default than old borg did, so the new chunks won't deduplicate
-        with the old chunks in the upgraded repository.
-        See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.""")
-        subparser = subparsers.add_parser('upgrade', parents=[common_parser], add_help=False,
-                                          description=self.do_upgrade.__doc__,
-                                          epilog=upgrade_epilog,
-                                          formatter_class=argparse.RawDescriptionHelpFormatter,
-                                          help='upgrade repository format')
-        subparser.set_defaults(func=self.do_upgrade)
-        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
-                               help='do not change repository')
-        subparser.add_argument('--inplace', dest='inplace', action='store_true',
-                               help='rewrite repository in place, with no chance of going back '
-                                    'to older versions of the repository.')
-        subparser.add_argument('--force', dest='force', action='store_true',
-                               help='Force upgrade')
-        subparser.add_argument('--tam', dest='tam', action='store_true',
-                               help='Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).')
-        subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
-                               help='Disable manifest authentication (in key and cache).')
 
         # borg with-lock
         with_lock_epilog = process_epilog("""

@@ -3888,21 +3888,6 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         self.cmd(f'--repo={self.repository_location}', 'rcreate', '--encryption=repokey')
         self.create_src_archive('archive1234')
         repository = Repository(self.repository_path, exclusive=True)
-        with repository:
-            shutil.rmtree(get_security_dir(bin_to_hex(repository.id)))
-            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            key.tam_required = False
-            key.change_passphrase(key._passphrase)
-
-            manifest = msgpack.unpackb(key.decrypt(Manifest.MANIFEST_ID, repository.get(Manifest.MANIFEST_ID)))
-            del manifest['tam']
-            repository.put(Manifest.MANIFEST_ID, key.encrypt(Manifest.MANIFEST_ID, msgpack.packb(manifest)))
-            repository.commit(compact=False)
-        output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--debug')
-        assert 'archive1234' in output
-        assert 'TAM not found and not required' in output
-        # Run upgrade
-        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--tam')
         # Manifest must be authenticated now
         output = self.cmd(f'--repo={self.repository_location}', 'rlist', '--debug')
         assert 'archive1234' in output
@@ -3912,25 +3897,6 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         # Fails
         with pytest.raises(TAMRequiredError):
             self.cmd(f'--repo={self.repository_location}', 'rlist')
-        # Force upgrade
-        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--tam', '--force')
-        self.cmd(f'--repo={self.repository_location}', 'rlist')
-
-    def test_disable(self):
-        self.cmd(f'--repo={self.repository_location}', 'rcreate', '--encryption=repokey')
-        self.create_src_archive('archive1234')
-        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--disable-tam')
-        repository = Repository(self.repository_path, exclusive=True)
-        self.spoof_manifest(repository)
-        assert not self.cmd(f'--repo={self.repository_location}', 'rlist')
-
-    def test_disable2(self):
-        self.cmd(f'--repo={self.repository_location}', 'rcreate', '--encryption=repokey')
-        self.create_src_archive('archive1234')
-        repository = Repository(self.repository_path, exclusive=True)
-        self.spoof_manifest(repository)
-        self.cmd(f'--repo={self.repository_location}', 'upgrade', '--disable-tam')
-        assert not self.cmd(f'--repo={self.repository_location}', 'rlist')
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):

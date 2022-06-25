@@ -525,7 +525,8 @@ class Archiver:
                 return EXIT_ERROR
         if args.repo_only and any(
            (args.verify_data, args.first, args.last, args.prefix is not None, args.glob_archives)):
-            self.print_error("--repository-only contradicts --first, --last, --prefix and --verify-data arguments.")
+            self.print_error("--repository-only contradicts --first, --last, --prefix, --glob-archives "
+                             " and --verify-data arguments.")
             return EXIT_ERROR
         if args.repair and args.max_duration:
             self.print_error("--repair does not allow --max-duration argument.")
@@ -542,8 +543,7 @@ class Archiver:
                 return EXIT_WARNING
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
-        if not args.repo_only and not ArchiveChecker().check(
-                repository, repair=args.repair, archive=args.name,
+        if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair,
                 first=args.first, last=args.last, sort_by=args.sort_by or 'ts', glob=args.glob_archives,
                 verify_data=args.verify_data, save_space=args.save_space):
             return EXIT_WARNING
@@ -3501,8 +3501,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='verify repository')
         subparser.set_defaults(func=self.do_check)
-        subparser.add_argument('--name', dest='name', metavar='NAME', type=NameSpec,
-                               help='specify the archive name')
         subparser.add_argument('--repository-only', dest='repo_only', action='store_true',
                                help='only perform repository checks')
         subparser.add_argument('--archives-only', dest='archives_only', action='store_true',

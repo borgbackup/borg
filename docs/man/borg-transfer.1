@@ -93,10 +93,12 @@ consider last N archives after other filters were applied
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
-.TP
-.B ::
-# 0. Have borg 2.0 installed on client AND server, have a b12 repo copy for testing.
+.INDENT 3.5
 .sp
+.nf
+.ft C
+# 0. Have borg 2.0 installed on client AND server, have a b12 repo copy for testing.
+
 # 1. Create a new "related" repository:
 # here, the existing borg 1.2 repo used repokey\-blake2 (and aes\-ctr mode),
 # thus we use repokey\-blake2\-aes\-ocb for the new borg 2.0 repo.
@@ -106,43 +108,22 @@ consider last N archives after other filters were applied
 # the AEAD cipher does not matter (everything must be re\-encrypted and
 # re\-authenticated anyway), you could also choose repokey\-blake2\-chacha20\-poly1305.
 # in case your old borg repo did not use blake2, just remove the "\-blake2".
-$ borg \-\-repo       \fI\%ssh://borg2@borgbackup/./tests/b20\fP rcreate 
-.IP "System Message: ERROR/3 (docs/borg-transfer.rst:, line 88)"
-Unexpected indentation.
-.INDENT 7.0
-.INDENT 3.5
-\-\-other\-repo \fI\%ssh://borg2@borgbackup/./tests/b12\fP \-e repokey\-blake2\-aes\-ocb
-.UNINDENT
-.UNINDENT
-.sp
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 rcreate \e
+       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-e repokey\-blake2\-aes\-ocb
+
 # 2. Check what and how much it would transfer:
-$ borg \-\-repo       \fI\%ssh://borg2@borgbackup/./tests/b20\fP transfer 
-.IP "System Message: ERROR/3 (docs/borg-transfer.rst:, line 92)"
-Unexpected indentation.
-.INDENT 7.0
-.INDENT 3.5
-\-\-other\-repo \fI\%ssh://borg2@borgbackup/./tests/b12\fP \-\-dry\-run
-.UNINDENT
-.UNINDENT
-.sp
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \e
+       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
+
 # 3. Transfer (copy) archives from old repo into new repo (takes time and space!):
-$ borg \-\-repo       \fI\%ssh://borg2@borgbackup/./tests/b20\fP transfer 
-.IP "System Message: ERROR/3 (docs/borg-transfer.rst:, line 96)"
-Unexpected indentation.
-.INDENT 7.0
-.INDENT 3.5
-\-\-other\-repo \fI\%ssh://borg2@borgbackup/./tests/b12\fP
-.UNINDENT
-.UNINDENT
-.sp
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \e
+       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12
+
 # 4. Check if we have everything (same as 2.):
-$ borg \-\-repo       \fI\%ssh://borg2@borgbackup/./tests/b20\fP transfer 
-.IP "System Message: ERROR/3 (docs/borg-transfer.rst:, line 100)"
-Unexpected indentation.
-.INDENT 7.0
-.INDENT 3.5
-\-\-other\-repo \fI\%ssh://borg2@borgbackup/./tests/b12\fP \-\-dry\-run
-.UNINDENT
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \e
+       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
+.ft P
+.fi
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

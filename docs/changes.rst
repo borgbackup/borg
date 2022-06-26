@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0a2 (not released yet)
-----------------------------------
+Version 2.0.0a2 (2022-06-26)
+----------------------------
 
 Please note:
 
@@ -35,7 +35,8 @@ Compatibility notes:
 - command line syntax was changed, scripts and wrappers will need changes:
 
   - you will usually either export BORG_REPO=<MYREPO> into your environment or
-    call borg like: borg -r <MYREPO> command (-r ... usually omitted for brevity)
+    call borg like: "borg -r <MYREPO> <COMMAND>".
+    in the docs, we usually omit "-r ..." for brevity.
   - the scp-style REPO syntax was removed, please use ssh://..., #6697
   - differently than with borg 1.x you ONLY give the repo there, never a ::archive.
   - the archive name is either given as a positional parameter, like:
@@ -56,7 +57,6 @@ Compatibility notes:
       - borg rlist  # "repo list"
       - borg rinfo  # "repo info"
       - borg rdelete  # "repo delete"
-
     - borg 2 archive commands:
 
       - borg create ARCHIVE ...
@@ -78,28 +78,22 @@ Changes:
   - use -r or --repo or BORG_REPO env var to give the repository
   - use --other-repo or BORG_OTHER_REPO to give another repo (e.g. borg transfer)
   - use positional argument for archive name or `-a ARCH_GLOB`
-
 - remove support for scp-style repo specification, use ssh://...
 - simplify stats output: repo ops -> repo stats, archive ops -> archive stats
-
 - repository index: add payload size (==csize) and flags to NSIndex entries
 - repository index: set/query flags, iteration over flagged items (NSIndex)
 - repository: sync write file in get_fd
-
 - stats: deduplicated size now, was deduplicated compressed size in borg 1.x
 - remove csize support at most places in the code (chunks index, stats, get_size,
   Item.chunks)
-
 - replace problematic/ugly hardlink_master approach of borg 1.x by:
 
   - symmetric hlid (all hardlinks pointing to same inode have same hlid)
   - all archived hardlinked regular files have a chunks list
-
 - borg init --other-repo=OTHER_REPO: reuse key material from OTHER_REPO, #6554.
   This is useful if you want to use borg transfer to transfer archives from an
   existing borg 1.1/1.2 repo. If the chunker secret and the id key and algorithm
   stay the same, the deduplication will also work between past and future backups.
-
 - borg transfer:
 
   - efficiently copy archives from a borg 1.1/1.2 repo to a new repo.
@@ -117,13 +111,12 @@ Changes:
     - make sure items with chunks have precomputed size
     - removes the csize element from the tuples in the Item.chunks list
     - clean item of attic 0.13 'acl' bug remnants
-
 - crypto: see 1.3.0a1 log entry
 - removed "borg upgrade" command (not needed any more)
 - compact: removed --cleanup-commits option
 - docs: fixed quickstart and usage docs with new cli command syntax
-- docs: removed the parts talking about AES-CTR mode issues (we will not
-  use that any more)
+- docs: removed the parts talking about potential AES-CTR mode issues
+  (we will not use that any more).
 
 
 Version 1.3.0a1 (2022-04-15)

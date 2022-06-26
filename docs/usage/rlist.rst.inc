@@ -99,6 +99,7 @@ Examples:
     ...
 
 The following keys are always available:
+
 - NEWLINE: OS dependent line separator
 - NL: alias of NEWLINE
 - NUL: NUL character for creating print0 / xargs -0 like output, see barchive and bpath keys below

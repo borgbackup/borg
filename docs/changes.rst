@@ -90,7 +90,7 @@ Changes:
 
   - symmetric hlid (all hardlinks pointing to same inode have same hlid)
   - all archived hardlinked regular files have a chunks list
-- borg init --other-repo=OTHER_REPO: reuse key material from OTHER_REPO, #6554.
+- borg rcreate --other-repo=OTHER_REPO: reuse key material from OTHER_REPO, #6554.
   This is useful if you want to use borg transfer to transfer archives from an
   existing borg 1.1/1.2 repo. If the chunker secret and the id key and algorithm
   stay the same, the deduplication will also work between past and future backups.

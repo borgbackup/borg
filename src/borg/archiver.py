@@ -4653,6 +4653,7 @@ class Archiver:
 
         The following keys are always available:
 
+
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
 
         Keys available only when listing files in an archive:
@@ -4709,6 +4710,7 @@ class Archiver:
             ...
 
         The following keys are always available:
+
 
         """) + BaseFormatter.keys_help() + textwrap.dedent("""
 

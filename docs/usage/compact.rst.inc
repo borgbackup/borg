@@ -15,8 +15,6 @@ borg compact
     +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
     | **optional arguments**                                                                                                                           |
     +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
-    |                                                       | ``--cleanup-commits``   | cleanup commit-only 17-byte segment files                      |
-    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
     |                                                       | ``--threshold PERCENT`` | set minimum threshold for saved space in PERCENT (Default: 10) |
     +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                   |
@@ -37,7 +35,6 @@ borg compact
 
 
     optional arguments
-        --cleanup-commits       cleanup commit-only 17-byte segment files
         --threshold PERCENT     set minimum threshold for saved space in PERCENT (Default: 10)
 
 
@@ -62,10 +59,5 @@ so consider using the ``--progress`` option.
 A segment is compacted if the amount of saved space is above the percentage value
 given by the ``--threshold`` option. If omitted, a threshold of 10% is used.
 When using ``--verbose``, borg will output an estimate of the freed space.
-
-After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
-to clean up the numerous 17byte commit-only segments that borg 1.1 did not clean up
-due to a bug. It is enough to do that once per repository. After cleaning up the
-commits, borg will also do a normal compaction.
 
 See :ref:`separate_compaction` in Additional Notes for more details.

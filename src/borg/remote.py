@@ -905,9 +905,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     @api(since=parse_version('1.0.0'),
          compact={'since': parse_version('1.2.0a0'), 'previously': True, 'dontcare': True},
-         threshold={'since': parse_version('1.2.0a8'), 'previously': 0.1, 'dontcare': True},
-         cleanup_commits={'since': parse_version('1.2.0a0'), 'previously': False, 'dontcare': True})
-    def commit(self, save_space=False, compact=True, threshold=0.1, cleanup_commits=False):
+         threshold={'since': parse_version('1.2.0a8'), 'previously': 0.1, 'dontcare': True})
+    def commit(self, save_space=False, compact=True, threshold=0.1):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'))

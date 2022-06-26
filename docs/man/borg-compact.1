@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMPACT" 1 "2022-06-25" "" "borg backup tool"
+.TH "BORG-COMPACT" 1 "2022-06-26" "" "borg backup tool"
 .SH NAME
 borg-compact \- compact segment files in the repository
 .SH SYNOPSIS
@@ -51,20 +51,12 @@ A segment is compacted if the amount of saved space is above the percentage valu
 given by the \fB\-\-threshold\fP option. If omitted, a threshold of 10% is used.
 When using \fB\-\-verbose\fP, borg will output an estimate of the freed space.
 .sp
-After upgrading borg (server) to 1.2+, you can use \fBborg compact \-\-cleanup\-commits\fP
-to clean up the numerous 17byte commit\-only segments that borg 1.1 did not clean up
-due to a bug. It is enough to do that once per repository. After cleaning up the
-commits, borg will also do a normal compaction.
-.sp
 See \fIseparate_compaction\fP in Additional Notes for more details.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS optional arguments
 .INDENT 0.0
-.TP
-.B  \-\-cleanup\-commits
-cleanup commit\-only 17\-byte segment files
 .TP
 .BI \-\-threshold \ PERCENT
 set minimum threshold for saved space in PERCENT (Default: 10)

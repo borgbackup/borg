@@ -56,7 +56,7 @@ from ..repository import Repository
 from . import has_lchflags, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected
+from .platform import fakeroot_detected, is_darwin
 from . import key
 
 
@@ -505,8 +505,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(f'--repo={self.repository_location}', 'extract', 'test')
             assert os.readlink('input/link1') == 'somewhere'
 
-    @pytest.mark.skipif(not are_symlinks_supported() or not are_hardlinks_supported(),
-                        reason='symlinks or hardlinks not supported')
+    @pytest.mark.skipif(not are_symlinks_supported() or not are_hardlinks_supported() or is_darwin,
+                        reason='symlinks or hardlinks or hardlinked symlinks not supported')
     def test_hardlinked_symlinks_extract(self):
         self.create_regular_file('target', size=1024)
         with changedir('input'):

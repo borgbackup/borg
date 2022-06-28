@@ -88,7 +88,6 @@ try:
     from .remote import RepositoryServer, RemoteRepository, cache_if_remote
     from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
     from .selftest import selftest
-    from .upgrader import BorgRepositoryUpgrader
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
     # default behavior, see issue #4424.

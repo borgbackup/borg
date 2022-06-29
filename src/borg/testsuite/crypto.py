@@ -9,7 +9,7 @@ from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
 from ..crypto.low_level import AES, hmac_sha256
-from ..crypto.key import KeyfileKey, RepoKey, FlexiKey
+from ..crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey
 from ..helpers import msgpack
 
 from . import BaseTestCase
@@ -264,7 +264,7 @@ def test_decrypt_key_file_argon2_chacha20_poly1305():
         'algorithm': 'argon2 chacha20-poly1305',
         'data': envelope,
     })
-    key = KeyfileKey(None)
+    key = CHPOKeyfileKey(None)
 
     decrypted = key.decrypt_key_file(encrypted, "hello, pass phrase")
 
@@ -286,7 +286,7 @@ def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256():
         'data': data,
         'hash': hash,
     })
-    key = KeyfileKey(None)
+    key = CHPOKeyfileKey(None)
 
     decrypted = key.decrypt_key_file(encrypted, passphrase)
 
@@ -325,7 +325,7 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     repository = MagicMock(id=b'repository_id')
     getpass.return_value = "hello, pass phrase"
     monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')
-    RepoKey.create(repository, args=MagicMock(key_algorithm='argon2'))
+    AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm='argon2'))
     repository.load_key.return_value = repository.save_key.call_args.args[0]
 
-    RepoKey.detect(repository, manifest_data=None)
+    AESOCBRepoKey.detect(repository, manifest_data=None)

@@ -7,7 +7,7 @@ from hashlib import sha256
 from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, dash_open
 from ..repository import Repository
 
-from .key import KeyfileKey, KeyfileNotFoundError, RepoKeyNotFoundError, KeyBlobStorage, identify_key
+from .key import CHPOKeyfileKey, KeyfileNotFoundError, RepoKeyNotFoundError, KeyBlobStorage, identify_key
 
 
 class UnencryptedRepo(Error):
@@ -50,7 +50,7 @@ class KeyManager:
 
     def load_keyblob(self):
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:
-            k = KeyfileKey(self.repository)
+            k = CHPOKeyfileKey(self.repository)
             target = k.find_key()
             with open(target) as fd:
                 self.keyblob = ''.join(fd.readlines()[1:])
@@ -65,7 +65,7 @@ class KeyManager:
 
     def store_keyblob(self, args):
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:
-            k = KeyfileKey(self.repository)
+            k = CHPOKeyfileKey(self.repository)
             target = k.get_existing_or_new_target(args)
 
             self.store_keyfile(target)
@@ -73,7 +73,7 @@ class KeyManager:
             self.repository.save_key(self.keyblob.encode('utf-8'))
 
     def get_keyfile_data(self):
-        data = f'{KeyfileKey.FILE_ID} {bin_to_hex(self.repository.id)}\n'
+        data = f'{CHPOKeyfileKey.FILE_ID} {bin_to_hex(self.repository.id)}\n'
         data += self.keyblob
         if not self.keyblob.endswith('\n'):
             data += '\n'
@@ -136,7 +136,7 @@ class KeyManager:
             fd.write(export)
 
     def import_keyfile(self, args):
-        file_id = KeyfileKey.FILE_ID
+        file_id = CHPOKeyfileKey.FILE_ID
         first_line = file_id + ' ' + bin_to_hex(self.repository.id) + '\n'
         with dash_open(args.path, 'r') as fd:
             file_first_line = fd.read(len(first_line))

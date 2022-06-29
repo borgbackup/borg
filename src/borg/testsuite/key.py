@@ -396,8 +396,7 @@ def test_decrypt_key_file_v2_is_unsupported():
         key.decrypt_key_file(encrypted, "hello, pass phrase")
 
 
-@pytest.mark.parametrize('cli_argument, expected_algorithm', KEY_ALGORITHMS.items())
-def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
+def test_key_file_roundtrip(monkeypatch):
     def to_dict(key):
         extract = 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed'
         return {a: getattr(key, a) for a in extract}
@@ -405,10 +404,10 @@ def test_key_file_roundtrip(monkeypatch, cli_argument, expected_algorithm):
     repository = MagicMock(id=b'repository_id')
     monkeypatch.setenv('BORG_PASSPHRASE', "hello, pass phrase")
 
-    save_me = AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm=cli_argument))
+    save_me = AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm='argon2'))
     saved = repository.save_key.call_args.args[0]
     repository.load_key.return_value = saved
     load_me = AESOCBRepoKey.detect(repository, manifest_data=None)
 
     assert to_dict(load_me) == to_dict(save_me)
-    assert msgpack.unpackb(a2b_base64(saved))['algorithm'] == expected_algorithm
+    assert msgpack.unpackb(a2b_base64(saved))['algorithm'] == KEY_ALGORITHMS['argon2']

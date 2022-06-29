@@ -3472,53 +3472,24 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
         assert key['algorithm'] == 'argon2 chacha20-poly1305'
 
-    def test_init_with_explicit_key_algorithm(self):
-        """https://github.com/borgbackup/borg/issues/747#issuecomment-1076160401"""
-        self.cmd(f'--repo={self.repository_location}', 'rcreate', RK_ENCRYPTION, '--key-algorithm=pbkdf2')
-        with Repository(self.repository_path) as repository:
-            key = msgpack.unpackb(a2b_base64(repository.load_key()))
-        assert key['algorithm'] == 'sha256'
-
-    def verify_change_passphrase_does_not_change_algorithm(self, given_algorithm, expected_algorithm):
-        self.cmd(f'--repo={self.repository_location}', 'rcreate', RK_ENCRYPTION, '--key-algorithm', given_algorithm)
+    def test_change_passphrase_does_not_change_algorithm_argon2(self):
+        self.cmd(f'--repo={self.repository_location}', 'rcreate', RK_ENCRYPTION)
         os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
 
         self.cmd(f'--repo={self.repository_location}', 'key', 'change-passphrase')
 
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
-            assert key['algorithm'] == expected_algorithm
+            assert key['algorithm'] == 'argon2 chacha20-poly1305'
 
-    def test_change_passphrase_does_not_change_algorithm_argon2(self):
-        self.verify_change_passphrase_does_not_change_algorithm('argon2', 'argon2 chacha20-poly1305')
-
-    def test_change_passphrase_does_not_change_algorithm_pbkdf2(self):
-        self.verify_change_passphrase_does_not_change_algorithm('pbkdf2', 'sha256')
-
-    def verify_change_location_does_not_change_algorithm(self, given_algorithm, expected_algorithm):
-        self.cmd(f'--repo={self.repository_location}', 'rcreate', KF_ENCRYPTION, '--key-algorithm', given_algorithm)
+    def test_change_location_does_not_change_algorithm_argon2(self):
+        self.cmd(f'--repo={self.repository_location}', 'rcreate', KF_ENCRYPTION)
 
         self.cmd(f'--repo={self.repository_location}', 'key', 'change-location', 'repokey')
 
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
-            assert key['algorithm'] == expected_algorithm
-
-    def test_change_location_does_not_change_algorithm_argon2(self):
-        self.verify_change_location_does_not_change_algorithm('argon2', 'argon2 chacha20-poly1305')
-
-    def test_change_location_does_not_change_algorithm_pbkdf2(self):
-        self.verify_change_location_does_not_change_algorithm('pbkdf2', 'sha256')
-
-    def test_key_change_algorithm(self):
-        self.cmd(f'--repo={self.repository_location}', 'rcreate', RK_ENCRYPTION, '--key-algorithm=pbkdf2')
-
-        self.cmd(f'--repo={self.repository_location}', 'key', 'change-algorithm', 'argon2')
-
-        with Repository(self.repository_path) as repository:
-            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        assert key._encrypted_key_algorithm == 'argon2 chacha20-poly1305'
-        self.cmd(f'--repo={self.repository_location}', 'rinfo')
+            assert key['algorithm'] == 'argon2 chacha20-poly1305'
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

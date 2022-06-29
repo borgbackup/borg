@@ -620,7 +620,7 @@ class FlexiKey:
             passphrase = Passphrase.new(allow_empty=True)
         key.init_ciphers()
         target = key.get_new_target(args)
-        key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS[args.key_algorithm])
+        key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS['argon2'])
         logger.info('Key in "%s" created.' % target)
         logger.info('Keep this key safe. Your data will be inaccessible without it.')
         return key

@@ -198,6 +198,10 @@ class Repository:
         self.transaction_doomed = None
         self.check_segment_magic = check_segment_magic
         self.make_parent_dirs = make_parent_dirs
+        # v2 is the default repo version for borg 2.0
+        # v1 repos must only be used in a read-only way, e.g. for
+        # --other-repo=V1_REPO with borg init and borg transfer!
+        self.acceptable_repo_versions = (1, 2, )
 
     def __del__(self):
         if self.lock:
@@ -460,7 +464,7 @@ class Repository:
             self.close()
             raise self.InvalidRepositoryConfig(path, 'no repository section found')
         self.version = self.config.getint('repository', 'version')
-        if self.version not in (2, ):  # for now, only work on new repos
+        if self.version not in self.acceptable_repo_versions:
             self.close()
             raise self.InvalidRepositoryConfig(
                 path,

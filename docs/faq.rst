@@ -1261,6 +1261,44 @@ It may be useful to set ``BORG_RELOCATED_REPO_ACCESS_IS_OK=yes`` to avoid the
 prompts when renaming multiple repositories or in a non-interactive context
 such as a script. See :doc:`deployment` for an example.
 
+The repository quota size is reached, what can I do?
+----------------------------------------------------
+
+The simplest solution is to increase or disable the quota and resume the backup:
+
+::
+
+    borg config /path/to/repo storage_quota 0
+
+If you are bound to the quota, you have to free repository space. The first to
+try is running :ref:`borg_compact` to free unused backup space (see also
+:ref:`separate_compaction`):
+
+::
+
+    borg compact /path/to/repo
+
+If your repository is already compacted, run :ref:`borg_prune` or
+:ref:`borg_delete` to delete archives that you do not need anymore, and then run
+``borg compact`` again.
+
+My backup disk is full, what can I do?
+--------------------------------------
+
+Borg cannot work if you really have zero free space on the backup disk, so the
+first thing you must do is deleting some files to regain free disk space. See
+:ref:`about_free_space` for further details.
+
+Some Borg commands that do not change the repository might work under disk-full
+conditions, but generally this should be avoided. If your backup disk is already
+full when Borg starts a write command like `borg create`, it will abort
+immediately and the repository will stay as-is.
+
+If you run a backup that stops due to a disk running full, Borg will roll back,
+delete the new new segment file and thus freeing disk space automatically. There
+may be a checkpoint archive left that has been saved before the disk got full.
+You can keep it to speed up the next backup or delete it to get back more disk
+space.
 
 Miscellaneous
 #############

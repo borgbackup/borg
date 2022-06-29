@@ -26,6 +26,8 @@ repositories contain data blocks and a manifest tracking which blocks are in eac
 archive. If some data hasn't changed from one backup to another, Borg can simply
 reference an already uploaded data chunk (deduplication).
 
+.. _about_free_space:
+
 Important note about free space
 -------------------------------
 

@@ -98,7 +98,7 @@ def identify_key(manifest_data):
     if key_type == KeyType.PASSPHRASE:  # legacy, see comment in KeyType class.
         return RepoKey
 
-    for key in AVAILABLE_KEY_TYPES:
+    for key in LEGACY_KEY_TYPES + AVAILABLE_KEY_TYPES:
         if key.TYPE == key_type:
             return key
     else:
@@ -977,7 +977,7 @@ class CHPORepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
 class Blake2AESOCBKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
     TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
     TYPE = KeyType.BLAKE2AESOCBKEYFILE
-    NAME = 'key file Blake2b AES-OCB'
+    NAME = 'key file BLAKE2b AES-OCB'
     ARG_NAME = 'keyfile-blake2-aes-ocb'
     STORAGE = KeyBlobStorage.KEYFILE
     CIPHERSUITE = AES256_OCB
@@ -986,7 +986,7 @@ class Blake2AESOCBKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
 class Blake2AESOCBRepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
     TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
     TYPE = KeyType.BLAKE2AESOCBREPO
-    NAME = 'repokey Blake2b AES-OCB'
+    NAME = 'repokey BLAKE2b AES-OCB'
     ARG_NAME = 'repokey-blake2-aes-ocb'
     STORAGE = KeyBlobStorage.REPO
     CIPHERSUITE = AES256_OCB
@@ -995,7 +995,7 @@ class Blake2AESOCBRepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
 class Blake2CHPOKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
     TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
     TYPE = KeyType.BLAKE2CHPOKEYFILE
-    NAME = 'key file Blake2b ChaCha20-Poly1305'
+    NAME = 'key file BLAKE2b ChaCha20-Poly1305'
     ARG_NAME = 'keyfile-blake2-chacha20-poly1305'
     STORAGE = KeyBlobStorage.KEYFILE
     CIPHERSUITE = CHACHA20_POLY1305
@@ -1004,16 +1004,23 @@ class Blake2CHPOKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
 class Blake2CHPORepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
     TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
     TYPE = KeyType.BLAKE2CHPOREPO
-    NAME = 'repokey Blake2b ChaCha20-Poly1305'
+    NAME = 'repokey BLAKE2b ChaCha20-Poly1305'
     ARG_NAME = 'repokey-blake2-chacha20-poly1305'
     STORAGE = KeyBlobStorage.REPO
     CIPHERSUITE = CHACHA20_POLY1305
 
 
+LEGACY_KEY_TYPES = (
+    # legacy (AES-CTR based) crypto
+    KeyfileKey, RepoKey,
+    Blake2KeyfileKey, Blake2RepoKey,
+)
+
 AVAILABLE_KEY_TYPES = (
+    # these are available encryption modes for new repositories
+    # not encrypted modes
     PlaintextKey,
-    KeyfileKey, RepoKey, AuthenticatedKey,
-    Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey,
+    AuthenticatedKey, Blake2AuthenticatedKey,
     # new crypto
     AESOCBKeyfileKey, AESOCBRepoKey,
     CHPOKeyfileKey, CHPORepoKey,

@@ -48,6 +48,8 @@ try:
     from .compress import CompressionSpec, ZLIB, ZLIB_legacy, ObfuscateSize
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
     from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
+    from .crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
+    from .crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
@@ -503,28 +505,32 @@ class Archiver:
             return EXIT_ERROR
 
         if args.key_mode == 'keyfile':
-            if isinstance(key, RepoKey):
-                key_new = KeyfileKey(repository)
-            elif isinstance(key, Blake2RepoKey):
-                key_new = Blake2KeyfileKey(repository)
-            elif isinstance(key, (KeyfileKey, Blake2KeyfileKey)):
-                print(f"Location already is {args.key_mode}")
-                return EXIT_SUCCESS
+            if isinstance(key, AESOCBRepoKey):
+                key_new = AESOCBKeyfileKey(repository)
+            elif isinstance(key, CHPORepoKey):
+                key_new = CHPOKeyfileKey(repository)
+            elif isinstance(key, Blake2AESOCBRepoKey):
+                key_new = Blake2AESOCBKeyfileKey(repository)
+            elif isinstance(key, Blake2CHPORepoKey):
+                key_new = Blake2CHPOKeyfileKey(repository)
             else:
-                raise Error("Unsupported key type")
+                print("Change not needed or not supported.")
+                return EXIT_WARNING
         if args.key_mode == 'repokey':
-            if isinstance(key, KeyfileKey):
-                key_new = RepoKey(repository)
-            elif isinstance(key, Blake2KeyfileKey):
-                key_new = Blake2RepoKey(repository)
-            elif isinstance(key, (RepoKey, Blake2RepoKey)):
-                print(f"Location already is {args.key_mode}")
-                return EXIT_SUCCESS
+            if isinstance(key, AESOCBKeyfileKey):
+                key_new = AESOCBRepoKey(repository)
+            elif isinstance(key, CHPOKeyfileKey):
+                key_new = CHPORepoKey(repository)
+            elif isinstance(key, Blake2AESOCBKeyfileKey):
+                key_new = Blake2AESOCBRepoKey(repository)
+            elif isinstance(key, Blake2CHPOKeyfileKey):
+                key_new = Blake2CHPORepoKey(repository)
             else:
-                raise Error("Unsupported key type")
+                print("Change not needed or not supported.")
+                return EXIT_WARNING
 
         for name in ('repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed',
-                     'tam_required', 'nonce_manager', 'cipher'):
+                     'tam_required', 'sessionid', 'cipher'):
             value = getattr(key, name)
             setattr(key_new, name, value)
 

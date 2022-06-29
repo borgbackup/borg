@@ -3221,10 +3221,13 @@ class Archiver:
 
         # borg mount
         mount_epilog = process_epilog("""
-        This command mounts an archive as a FUSE filesystem. This can be useful for
-        browsing an archive or restoring individual files. Unless the ``--foreground``
-        option is given the command will run in the background until the filesystem
-        is ``umounted``.
+        This command mounts an archive as a FUSE filesystem. This can be useful
+        for browsing an archive or restoring individual files. When restoring,
+        take into account that the current FUSE implementation does not support
+        special fs flags and ACLs.
+
+        Unless the ``--foreground`` option is given the command will run in the
+        background until the filesystem is ``umounted``.
 
         The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
         used in fstab entries:

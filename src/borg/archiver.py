@@ -191,6 +191,9 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                                         args=args)
 
             with repository:
+                if repository.version not in (2, ):
+                    raise Error("This borg version only accepts version 2 repos for -r/--repo. "
+                                "You can use 'borg transfer' to copy archives from old to new repos.")
                 if manifest or cache:
                     kwargs['manifest'], kwargs['key'] = Manifest.load(repository, compatibility)
                     if 'compression' in args:
@@ -233,6 +236,8 @@ def with_other_repository(manifest=False, key=False, cache=False, compatibility=
                                         args=args)
 
             with repository:
+                if repository.version not in (1, 2, ):
+                    raise Error("This borg version only accepts version 1 or 2 repos for --other-repo.")
                 kwargs['other_repository'] = repository
                 if manifest or key or cache:
                     manifest_, key_ = Manifest.load(repository, compatibility)

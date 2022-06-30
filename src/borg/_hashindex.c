@@ -664,11 +664,11 @@ hashindex_compact(HashIndex *index)
     while(idx < index->num_buckets) {
         /* Phase 1: Find some empty slots */
         start_idx = idx;
-        while((BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx)) && idx < index->num_buckets) {
+        while((idx < index->num_buckets) && (BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx))) {
             idx++;
         }
 
-        /* everything from start_idx to idx is empty or deleted */
+        /* everything from start_idx to idx-1 (inclusive) is empty or deleted */
         count = empty_slot_count = idx - start_idx;
         begin_used_idx = idx;
 
@@ -682,7 +682,7 @@ hashindex_compact(HashIndex *index)
 
         /* Phase 2: Find some non-empty/non-deleted slots we can move to the compact tail */
 
-        while(!(BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx)) && empty_slot_count && idx < index->num_buckets) {
+        while(empty_slot_count && (idx < index->num_buckets) && !(BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx))) {
             idx++;
             empty_slot_count--;
         }

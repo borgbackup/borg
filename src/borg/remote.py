@@ -133,6 +133,7 @@ compatMap = {
     'break_lock': (),
     'negotiate': ('client_data', ),
     'open': ('path', 'create', 'lock_wait', 'lock', 'exclusive', 'append_only', ),
+    'info': (),
     'get_free_nonce': (),
     'commit_nonce_reservation': ('next_unreserved', 'start_nonce', ),
 }
@@ -150,6 +151,7 @@ class RepositoryServer:  # pragma: no cover
         'scan',
         'negotiate',
         'open',
+        'info',
         'put',
         'rollback',
         'save_key',
@@ -580,6 +582,9 @@ class RemoteRepository:
                 self.id = self.open(path=self.location.path, create=create, lock_wait=lock_wait,
                                     lock=lock, exclusive=exclusive, append_only=append_only,
                                     make_parent_dirs=make_parent_dirs)
+                info = self.info()
+                self.version = info['version']
+                self.append_only = info['append_only']
 
             if self.dictFormat:
                 do_open()
@@ -896,6 +901,10 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
          make_parent_dirs={'since': parse_version('1.1.9'), 'previously': False})
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False,
              make_parent_dirs=False):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version('2.0.0a3'))
+    def info(self):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version('1.0.0'),

@@ -1692,12 +1692,16 @@ class Archiver:
             print(textwrap.dedent("""
             Repository ID: {id}
             Location: {location}
+            Repository version: {version}
+            Append only: {append_only}
             {encryption}
             Cache: {cache.path}
             Security dir: {security_dir}
             """).strip().format(
                 id=bin_to_hex(repository.id),
                 location=repository._location.canonical_path(),
+                version=repository.version,
+                append_only=repository.append_only,
                 **info))
             print(str(cache))
         return self.exit_code

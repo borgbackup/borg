@@ -48,6 +48,8 @@ try:
     from .compress import CompressionSpec, ZLIB, ZLIB_legacy, ObfuscateSize
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
     from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
+    from .crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
+    from .crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
@@ -503,28 +505,32 @@ class Archiver:
             return EXIT_ERROR
 
         if args.key_mode == 'keyfile':
-            if isinstance(key, RepoKey):
-                key_new = KeyfileKey(repository)
-            elif isinstance(key, Blake2RepoKey):
-                key_new = Blake2KeyfileKey(repository)
-            elif isinstance(key, (KeyfileKey, Blake2KeyfileKey)):
-                print(f"Location already is {args.key_mode}")
-                return EXIT_SUCCESS
+            if isinstance(key, AESOCBRepoKey):
+                key_new = AESOCBKeyfileKey(repository)
+            elif isinstance(key, CHPORepoKey):
+                key_new = CHPOKeyfileKey(repository)
+            elif isinstance(key, Blake2AESOCBRepoKey):
+                key_new = Blake2AESOCBKeyfileKey(repository)
+            elif isinstance(key, Blake2CHPORepoKey):
+                key_new = Blake2CHPOKeyfileKey(repository)
             else:
-                raise Error("Unsupported key type")
+                print("Change not needed or not supported.")
+                return EXIT_WARNING
         if args.key_mode == 'repokey':
-            if isinstance(key, KeyfileKey):
-                key_new = RepoKey(repository)
-            elif isinstance(key, Blake2KeyfileKey):
-                key_new = Blake2RepoKey(repository)
-            elif isinstance(key, (RepoKey, Blake2RepoKey)):
-                print(f"Location already is {args.key_mode}")
-                return EXIT_SUCCESS
+            if isinstance(key, AESOCBKeyfileKey):
+                key_new = AESOCBRepoKey(repository)
+            elif isinstance(key, CHPOKeyfileKey):
+                key_new = CHPORepoKey(repository)
+            elif isinstance(key, Blake2AESOCBKeyfileKey):
+                key_new = Blake2AESOCBRepoKey(repository)
+            elif isinstance(key, Blake2CHPOKeyfileKey):
+                key_new = Blake2CHPORepoKey(repository)
             else:
-                raise Error("Unsupported key type")
+                print("Change not needed or not supported.")
+                return EXIT_WARNING
 
         for name in ('repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed',
-                     'tam_required', 'nonce_manager', 'cipher'):
+                     'tam_required', 'sessionid', 'cipher'):
             value = getattr(key, name)
             setattr(key_new, name, value)
 
@@ -4374,22 +4380,6 @@ class Archiver:
         If you do **not** want to encrypt the contents of your backups, but still want to detect
         malicious tampering use an `authenticated` mode. It's like `repokey` minus encryption.
 
-        Key derivation functions
-        ++++++++++++++++++++++++
-
-        - ``--key-algorithm argon2`` is the default and is recommended.
-          The key encryption key is derived from your passphrase via argon2-id.
-          Argon2 is considered more modern and secure than pbkdf2.
-
-        Our implementation of argon2-based key algorithm follows the cryptographic best practices:
-
-        - It derives two separate keys from your passphrase: one to encrypt your key and another one
-          to sign it. ``--key-algorithm pbkdf2`` uses the same key for both.
-
-        - It uses encrypt-then-mac instead of encrypt-and-mac used by ``--key-algorithm pbkdf2``
-
-        Neither is inherently linked to the key derivation function, but since we were going
-        to break backwards compatibility anyway we took the opportunity to fix all 3 issues at once.
         """)
         subparser = subparsers.add_parser('rcreate', parents=[common_parser], add_help=False,
                                           description=self.do_rcreate.__doc__, epilog=rcreate_epilog,
@@ -4412,8 +4402,6 @@ class Archiver:
                                help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
         subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
                                help='create the parent directories of the repository directory, if they are missing.')
-        subparser.add_argument('--key-algorithm', dest='key_algorithm', default='argon2', choices=list(KEY_ALGORITHMS),
-                               help='the algorithm we use to derive a key encryption key from your passphrase. Default: argon2')
 
         # borg key
         subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
@@ -4537,46 +4525,6 @@ class Archiver:
                                help='select key location')
         subparser.add_argument('--keep', dest='keep', action='store_true',
                                help='keep the key also at the current location (default: remove it)')
-
-        change_algorithm_epilog = process_epilog("""
-        Change the algorithm we use to encrypt and authenticate the borg key.
-
-        Important: In a `repokey` mode (e.g. repokey-blake2) all users share the same key.
-        In this mode upgrading to `argon2` will make it impossible to access the repo for users who use an old version of borg.
-        We recommend upgrading to the latest stable version.
-
-        Important: In a `keyfile` mode (e.g. keyfile-blake2) each user has their own key (in ``~/.config/borg/keys``).
-        In this mode this command will only change the key used by the current user.
-        If you want to upgrade to `argon2` to strengthen security, you will have to upgrade each user's key individually.
-
-        Your repository is encrypted and authenticated with a key that is randomly generated by ``borg init``.
-        The key is encrypted and authenticated with your passphrase.
-
-        We currently support two choices:
-
-        1. argon2 - recommended. This algorithm is used by default when initialising a new repository.
-           The key encryption key is derived from your passphrase via argon2-id.
-           Argon2 is considered more modern and secure than pbkdf2.
-        2. pbkdf2 - the legacy algorithm. Use this if you want to access your repo via old versions of borg.
-           The key encryption key is derived from your passphrase via PBKDF2-HMAC-SHA256.
-
-        Examples::
-
-            # Upgrade an existing key to argon2
-            borg key change-algorithm /path/to/repo argon2
-            # Downgrade to pbkdf2 - use this if upgrading borg is not an option
-            borg key change-algorithm /path/to/repo pbkdf2
-
-
-        """)
-        subparser = key_parsers.add_parser('change-algorithm', parents=[common_parser], add_help=False,
-                                           description=self.do_change_algorithm.__doc__,
-                                           epilog=change_algorithm_epilog,
-                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                           help='change key algorithm')
-        subparser.set_defaults(func=self.do_change_algorithm)
-        subparser.add_argument('algorithm', metavar='ALGORITHM', choices=list(KEY_ALGORITHMS),
-                               help='select key algorithm')
 
         # borg list
         list_epilog = process_epilog("""

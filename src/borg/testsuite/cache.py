@@ -10,7 +10,7 @@ from .key import TestKey
 from ..archive import Statistics
 from ..cache import AdHocCache
 from ..compress import CompressionSpec
-from ..crypto.key import RepoKey
+from ..crypto.key import AESOCBRepoKey
 from ..hashindex import ChunkIndex, CacheSynchronizer
 from ..helpers import Manifest
 from ..repository import Repository
@@ -218,7 +218,7 @@ class TestAdHocCache:
     @pytest.fixture
     def key(self, repository, monkeypatch):
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
-        key = RepoKey.create(repository, TestKey.MockArgs())
+        key = AESOCBRepoKey.create(repository, TestKey.MockArgs())
         key.compressor = CompressionSpec('none').compressor
         return key
 

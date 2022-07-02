@@ -90,12 +90,14 @@ progress_percent
         can have this property set to *true*.
     message
         A formatted progress message, this will include the percentage and perhaps other information
+        (absent for finished == true)
     current
-        Current value (always less-or-equal to *total*)
+        Current value (always less-or-equal to *total*, absent for finished == true)
     info
         Array that describes the current item, may be *null*, contents depend on *msgid*
+        (absent for finished == true)
     total
-        Total value
+        Total value (absent for finished == true)
     time
         Unix timestamp (float)
 

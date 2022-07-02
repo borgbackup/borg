@@ -464,8 +464,8 @@ class Archiver:
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
                 return EXIT_ERROR
         if args.repo_only and any(
-           (args.verify_data, args.first, args.last, args.prefix is not None, args.glob_archives)):
-            self.print_error("--repository-only contradicts --first, --last, --prefix, --glob-archives "
+           (args.verify_data, args.first, args.last, args.glob_archives)):
+            self.print_error("--repository-only contradicts --first, --last, -a / --glob-archives "
                              " and --verify-data arguments.")
             return EXIT_ERROR
         if args.repair and args.max_duration:
@@ -481,8 +481,6 @@ class Archiver:
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
                 return EXIT_WARNING
-        if args.prefix is not None:
-            args.glob_archives = args.prefix + '*'
         if not args.repo_only and not ArchiveChecker().check(repository, repair=args.repair,
                 first=args.first, last=args.last, sort_by=args.sort_by or 'ts', glob=args.glob_archives,
                 verify_data=args.verify_data, save_space=args.save_space):
@@ -1766,8 +1764,6 @@ class Archiver:
                              '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                              '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
             return self.exit_code
-        if args.prefix is not None:
-            args.glob_archives = args.prefix + '*'
         checkpoint_re = r'\.checkpoint(\.\d+)?'
         archives_checkpoints = manifest.archives.list(glob=args.glob_archives,
                                                       consider_checkpoints=True,
@@ -2661,7 +2657,7 @@ class Archiver:
         This allows you to share the same patterns between multiple repositories
         without needing to specify them on the command line.\n\n''')
     helptext['placeholders'] = textwrap.dedent('''
-        Repository URLs, ``--name``, ``--prefix``, ``--glob-archives``, ``--comment``
+        Repository URLs, ``--name``, ``-a`` / ``--glob-archives``, ``--comment``
         and ``--remote-path`` values support these placeholders:
 
         {hostname}
@@ -2707,7 +2703,7 @@ class Archiver:
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
-            borg prune --prefix '{hostname}-' ...
+            borg prune -a '{hostname}-*' ...
 
         .. note::
             systemd uses a difficult, non-standard syntax for command lines in unit files (refer to
@@ -3100,13 +3096,10 @@ class Archiver:
             filters_group = subparser.add_argument_group('Archive filters',
                                                          'Archive filters can be applied to repository targets.')
             group = filters_group.add_mutually_exclusive_group()
-            group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, action=Highlander,
-                               help='only consider archive names starting with this prefix.')
             group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
                                type=GlobSpec, action=Highlander,
                                help='only consider archive names matching the glob. '
-                                    'sh: rules apply, see "borg help patterns". '
-                                    '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
+                                    'sh: rules apply, see "borg help patterns".')
 
             if sort_by:
                 sort_by_default = 'timestamp'
@@ -3980,11 +3973,9 @@ class Archiver:
         that is how much your repository will shrink.
         Please note that the "All archives" stats refer to the state after deletion.
 
-        You can delete multiple archives by specifying their common prefix, if they
-        have one, using the ``--prefix PREFIX`` option. You can also specify a shell
-        pattern to match multiple archives using the ``--glob-archives GLOB`` option
-        (for more info on these patterns, see :ref:`borg_patterns`). Note that these
-        two options are mutually exclusive.
+        You can delete multiple archives by specifying a matching shell pattern,
+        using the ``--glob-archives GLOB`` option (for more info on these patterns,
+        see :ref:`borg_patterns`).
 
         Always first use ``--dry-run --list`` to see what would be deleted.
         """)

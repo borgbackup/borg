@@ -2833,7 +2833,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--remote-ratelimit', None, 'Warning: "--remote-ratelimit" has been deprecated. Use --upload-ratelimit instead.'),
             ('--remote-buffer', None, 'Warning: "--remote-buffer" has been deprecated. Use --upload-buffer instead.'),
         ]
         for i, arg in enumerate(args[:]):
@@ -3036,8 +3035,6 @@ class Archiver:
                               help='set umask to M (local only, default: %(default)04o)')
             add_common_option('--remote-path', metavar='PATH', dest='remote_path',
                               help='use PATH as borg executable on the remote (default: "borg")')
-            add_common_option('--remote-ratelimit', metavar='RATE', dest='upload_ratelimit', type=int,
-                              help='deprecated, use ``--upload-ratelimit`` instead')
             add_common_option('--upload-ratelimit', metavar='RATE', dest='upload_ratelimit', type=int,
                               help='set network upload rate limit in kiByte/s (default: 0=unlimited)')
             add_common_option('--remote-buffer', metavar='UPLOAD_BUFFER', dest='upload_buffer', type=int,

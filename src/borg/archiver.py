@@ -941,7 +941,7 @@ class Archiver:
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
-        self.noflags = args.nobsdflags or args.noflags
+        self.noflags = args.noflags
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
@@ -960,7 +960,7 @@ class Archiver:
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json, iec=args.iec)
                 metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
-                    noflags=args.nobsdflags or args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
+                    noflags=args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
                     numeric_ids=args.numeric_ids, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
@@ -2833,7 +2833,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--nobsdflags', None, 'Warning: "--nobsdflags" has been deprecated. Use --noflags instead.'),
             ('--numeric-owner', None, 'Warning: "--numeric-owner" has been deprecated. Use --numeric-ids instead.'),
             ('--remote-ratelimit', None, 'Warning: "--remote-ratelimit" has been deprecated. Use --upload-ratelimit instead.'),
             ('--remote-buffer', None, 'Warning: "--remote-buffer" has been deprecated. Use --upload-buffer instead.'),
@@ -3712,8 +3711,6 @@ class Archiver:
                               help='do not store ctime into archive')
         fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
                               help='do not store birthtime (creation date) into archive')
-        fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                              help='deprecated, use ``--noflags`` instead')
         fs_group.add_argument('--noflags', dest='noflags', action='store_true',
                               help='do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--noacls', dest='noacls', action='store_true',
@@ -4193,8 +4190,6 @@ class Archiver:
                                help='deprecated, use ``--numeric-ids`` instead')
         subparser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                help='only obey numeric user and group identifiers')
-        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                               help='deprecated, use ``--noflags`` instead')
         subparser.add_argument('--noflags', dest='noflags', action='store_true',
                                help='do not extract/set flags (e.g. NODUMP, IMMUTABLE)')
         subparser.add_argument('--noacls', dest='noacls', action='store_true',

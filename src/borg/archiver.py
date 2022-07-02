@@ -941,7 +941,7 @@ class Archiver:
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
-        self.noflags = args.nobsdflags or args.noflags
+        self.noflags = args.noflags
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
@@ -960,7 +960,7 @@ class Archiver:
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
                                   log_json=args.log_json, iec=args.iec)
                 metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
-                    noflags=args.nobsdflags or args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
+                    noflags=args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
                     numeric_ids=args.numeric_ids, nobirthtime=args.nobirthtime)
                 cp = ChunksProcessor(cache=cache, key=key,
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
@@ -2833,11 +2833,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--noatime', None, 'Warning: "--noatime" has been deprecated because it is the default now.'),
-            ('--nobsdflags', None, 'Warning: "--nobsdflags" has been deprecated. Use --noflags instead.'),
-            ('--numeric-owner', None, 'Warning: "--numeric-owner" has been deprecated. Use --numeric-ids instead.'),
-            ('--remote-ratelimit', None, 'Warning: "--remote-ratelimit" has been deprecated. Use --upload-ratelimit instead.'),
-            ('--remote-buffer', None, 'Warning: "--remote-buffer" has been deprecated. Use --upload-buffer instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -3039,12 +3034,8 @@ class Archiver:
                               help='set umask to M (local only, default: %(default)04o)')
             add_common_option('--remote-path', metavar='PATH', dest='remote_path',
                               help='use PATH as borg executable on the remote (default: "borg")')
-            add_common_option('--remote-ratelimit', metavar='RATE', dest='upload_ratelimit', type=int,
-                              help='deprecated, use ``--upload-ratelimit`` instead')
             add_common_option('--upload-ratelimit', metavar='RATE', dest='upload_ratelimit', type=int,
                               help='set network upload rate limit in kiByte/s (default: 0=unlimited)')
-            add_common_option('--remote-buffer', metavar='UPLOAD_BUFFER', dest='upload_buffer', type=int,
-                              help='deprecated, use ``--upload-buffer`` instead')
             add_common_option('--upload-buffer', metavar='UPLOAD_BUFFER', dest='upload_buffer', type=int,
                               help='set network upload buffer size in MiB. (default: 0=no buffer)')
             add_common_option('--consider-part-files', dest='consider_part_files', action='store_true',
@@ -3128,8 +3119,6 @@ class Archiver:
                                 help='stay in foreground, do not daemonize')
             parser.add_argument('-o', dest='options', type=str, action=Highlander,
                                 help='Extra mount options')
-            parser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                                  help='deprecated, use ``--numeric-ids`` instead')
             parser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                   help='use numeric user and group identifiers from archive(s)')
             define_archive_filters_group(parser)
@@ -3703,22 +3692,14 @@ class Archiver:
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
                               help='stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.')
-        fs_group.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                              help='deprecated, use ``--numeric-ids`` instead')
         fs_group.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                               help='only store numeric user and group identifiers')
-        # --noatime is the default now and the flag is deprecated. args.noatime is not used any more.
-        # use --atime if you want to store the atime (default behaviour before borg 1.2.0a7)..
-        fs_group.add_argument('--noatime', dest='noatime', action='store_true',
-                              help='do not store atime into archive')
         fs_group.add_argument('--atime', dest='atime', action='store_true',
                               help='do store atime into archive')
         fs_group.add_argument('--noctime', dest='noctime', action='store_true',
                               help='do not store ctime into archive')
         fs_group.add_argument('--nobirthtime', dest='nobirthtime', action='store_true',
                               help='do not store birthtime (creation date) into archive')
-        fs_group.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                              help='deprecated, use ``--noflags`` instead')
         fs_group.add_argument('--noflags', dest='noflags', action='store_true',
                               help='do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive')
         fs_group.add_argument('--noacls', dest='noacls', action='store_true',
@@ -4074,8 +4055,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='find differences in archive contents')
         subparser.set_defaults(func=self.do_diff)
-        subparser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                               help='deprecated, use ``--numeric-ids`` instead')
         subparser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                help='only consider numeric user and group identifiers')
         subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
@@ -4194,12 +4173,8 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not actually change any files')
-        subparser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                               help='deprecated, use ``--numeric-ids`` instead')
         subparser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                help='only obey numeric user and group identifiers')
-        subparser.add_argument('--nobsdflags', dest='nobsdflags', action='store_true',
-                               help='deprecated, use ``--noflags`` instead')
         subparser.add_argument('--noflags', dest='noflags', action='store_true',
                                help='do not extract/set flags (e.g. NODUMP, IMMUTABLE)')
         subparser.add_argument('--noacls', dest='noacls', action='store_true',

@@ -195,13 +195,13 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     info "Pruning repository"
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. The '{hostname}-' prefix is very important to
+    # archives of THIS machine. The '{hostname}-*' globbing is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machines' archives also:
 
     borg prune                          \
         --list                          \
-        --prefix '{hostname}-'          \
+        --glob-archives '{hostname}-*'  \
         --show-rc                       \
         --keep-daily    7               \
         --keep-weekly   4               \

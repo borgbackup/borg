@@ -106,9 +106,7 @@ class Archives(abc.MutableMapping):
         name = getattr(args, 'name', None)
         consider_checkpoints = getattr(args, 'consider_checkpoints', None)
         if name is not None:
-            raise Error('Giving a specific name is incompatible with options --first, --last, --prefix, and --glob-archives, and --consider-checkpoints.')
-        if args.prefix is not None:
-            args.glob_archives = args.prefix + '*'
+            raise Error('Giving a specific name is incompatible with options --first, --last, -a / --glob-archives, and --consider-checkpoints.')
         return self.list(sort_by=args.sort_by.split(','), consider_checkpoints=consider_checkpoints, glob=args.glob_archives, first=args.first, last=args.last)
 
     def set_raw_dict(self, d):

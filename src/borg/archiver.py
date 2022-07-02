@@ -2833,7 +2833,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--noatime', None, 'Warning: "--noatime" has been deprecated because it is the default now.'),
             ('--nobsdflags', None, 'Warning: "--nobsdflags" has been deprecated. Use --noflags instead.'),
             ('--numeric-owner', None, 'Warning: "--numeric-owner" has been deprecated. Use --numeric-ids instead.'),
             ('--remote-ratelimit', None, 'Warning: "--remote-ratelimit" has been deprecated. Use --upload-ratelimit instead.'),
@@ -3707,10 +3706,6 @@ class Archiver:
                               help='deprecated, use ``--numeric-ids`` instead')
         fs_group.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                               help='only store numeric user and group identifiers')
-        # --noatime is the default now and the flag is deprecated. args.noatime is not used any more.
-        # use --atime if you want to store the atime (default behaviour before borg 1.2.0a7)..
-        fs_group.add_argument('--noatime', dest='noatime', action='store_true',
-                              help='do not store atime into archive')
         fs_group.add_argument('--atime', dest='atime', action='store_true',
                               help='do store atime into archive')
         fs_group.add_argument('--noctime', dest='noctime', action='store_true',

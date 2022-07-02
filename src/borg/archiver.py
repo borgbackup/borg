@@ -2833,7 +2833,6 @@ class Archiver:
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
-            ('--numeric-owner', None, 'Warning: "--numeric-owner" has been deprecated. Use --numeric-ids instead.'),
             ('--remote-ratelimit', None, 'Warning: "--remote-ratelimit" has been deprecated. Use --upload-ratelimit instead.'),
             ('--remote-buffer', None, 'Warning: "--remote-buffer" has been deprecated. Use --upload-buffer instead.'),
         ]
@@ -3126,8 +3125,6 @@ class Archiver:
                                 help='stay in foreground, do not daemonize')
             parser.add_argument('-o', dest='options', type=str, action=Highlander,
                                 help='Extra mount options')
-            parser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                                  help='deprecated, use ``--numeric-ids`` instead')
             parser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                   help='use numeric user and group identifiers from archive(s)')
             define_archive_filters_group(parser)
@@ -3701,8 +3698,6 @@ class Archiver:
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
                               help='stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.')
-        fs_group.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                              help='deprecated, use ``--numeric-ids`` instead')
         fs_group.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                               help='only store numeric user and group identifiers')
         fs_group.add_argument('--atime', dest='atime', action='store_true',
@@ -4066,8 +4061,6 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='find differences in archive contents')
         subparser.set_defaults(func=self.do_diff)
-        subparser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                               help='deprecated, use ``--numeric-ids`` instead')
         subparser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                help='only consider numeric user and group identifiers')
         subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
@@ -4186,8 +4179,6 @@ class Archiver:
                                help='output verbose list of items (files, dirs, ...)')
         subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
                                help='do not actually change any files')
-        subparser.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
-                               help='deprecated, use ``--numeric-ids`` instead')
         subparser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                help='only obey numeric user and group identifiers')
         subparser.add_argument('--noflags', dest='noflags', action='store_true',

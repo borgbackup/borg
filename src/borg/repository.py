@@ -491,6 +491,14 @@ class Repository:
                 self.close()
                 raise self.AtticRepository(path)
 
+    def info(self):
+        """return some infos about the repo (must be opened first)"""
+        return dict(
+            id=self.id,
+            version=self.version,
+            append_only=self.append_only,
+        )
+
     def close(self):
         if self.lock:
             if self.io:

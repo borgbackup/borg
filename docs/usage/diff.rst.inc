@@ -23,8 +23,6 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     | **optional arguments**                                                                                                                                                |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
-    |                                                       | ``--numeric-owner``                   | deprecated, use ``--numeric-ids`` instead                             |
-    +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``--numeric-ids``                     | only consider numeric user and group identifiers                      |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``--same-chunker-params``             | Override check of chunker parameters.                                 |
@@ -67,7 +65,6 @@ borg diff
 
 
     optional arguments
-        --numeric-owner    deprecated, use ``--numeric-ids`` instead
         --numeric-ids    only consider numeric user and group identifiers
         --same-chunker-params    Override check of chunker parameters.
         --sort     Sort the output lines by file path.

@@ -12,7 +12,7 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0a2 (2022-06-26)
+Version 2.0.0a3 (2022-07-04)
 ----------------------------
 
 Please note:
@@ -38,6 +38,7 @@ Compatibility notes:
     call borg like: "borg -r <MYREPO> <COMMAND>".
     in the docs, we usually omit "-r ..." for brevity.
   - the scp-style REPO syntax was removed, please use ssh://..., #6697
+  - -P / --prefix option was removed, please use the similar -a / --glob-archives.
   - differently than with borg 1.x you ONLY give the repo there, never a ::archive.
   - the archive name is either given as a positional parameter, like:
 
@@ -70,6 +71,38 @@ Compatibility notes:
       - borg mount -a ARCH_GLOB mountpoint ...
 
     For more details, please consult the docs or --help option output.
+- some deprecated options were removed:
+
+  - removed --remote-ratelimit (use --upload-ratelimit)
+  - removed --numeric-owner (use --numeric-ids)
+  - removed --nobsdflags (use --noflags)
+  - removed --noatime (default now, see also --atime)
+
+Fixes:
+
+- check repo version, accept old repos only for --other-repo (e.g. rcreate/transfer).
+  v2 is the default repo version for borg 2.0. v1 repos must only be used in a
+  read-only way, e.g. for --other-repo=V1_REPO with borg init and borg transfer!
+
+New features:
+
+- transfer: --upgrader=NoOp is the default.
+  This is to support general-purpose transfer of archives between related borg2
+  repos.
+- transfer: --upgrader=From12To20 must be used to transfer (and convert) archives
+  from borg 1.2 repos to borg 2.0 repos.
+
+Other changes:
+
+- removed some deprecated options
+- removed -P (aka --prefix) option, #6806. The option -a (aka --glob-archives)
+  can be used for same purpose and is more powerful, e.g.: -a 'PREFIX*'
+- rcreate: always use argon2 kdf for new repos, #6820
+- rcreate: remove legacy encryption modes for new repos, #6490
+
+
+Version 2.0.0a2 (2022-06-26)
+----------------------------
 
 Changes:
 

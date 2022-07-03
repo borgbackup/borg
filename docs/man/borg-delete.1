@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2022-06-26" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2022-07-03" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -47,11 +47,9 @@ deleted \- the "Deleted data" deduplicated size there is most interesting as
 that is how much your repository will shrink.
 Please note that the "All archives" stats refer to the state after deletion.
 .sp
-You can delete multiple archives by specifying their common prefix, if they
-have one, using the \fB\-\-prefix PREFIX\fP option. You can also specify a shell
-pattern to match multiple archives using the \fB\-\-glob\-archives GLOB\fP option
-(for more info on these patterns, see \fIborg_patterns\fP). Note that these
-two options are mutually exclusive.
+You can delete multiple archives by specifying a matching shell pattern,
+using the \fB\-\-glob\-archives GLOB\fP option (for more info on these patterns,
+see \fIborg_patterns\fP).
 .sp
 Always first use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .SH OPTIONS
@@ -87,11 +85,8 @@ work slower, but using less space
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
-only consider archive names starting with this prefix.
-.TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -114,7 +109,7 @@ $ borg delete Monday
 $ borg compact
 
 # delete all archives whose names begin with the machine\(aqs hostname followed by "\-"
-$ borg delete \-\-prefix \(aq{hostname}\-\(aq
+$ borg delete \-a \(aq{hostname}\-*\(aq
 
 # delete all archives whose names contain "\-2012\-"
 $ borg delete \-a \(aq*\-2012\-*\(aq

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2022-06-26" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2022-07-03" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -210,14 +210,8 @@ exclude files flagged NODUMP
 .B  \-x\fP,\fB  \-\-one\-file\-system
 stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
 .TP
-.B  \-\-numeric\-owner
-deprecated, use \fB\-\-numeric\-ids\fP instead
-.TP
 .B  \-\-numeric\-ids
 only store numeric user and group identifiers
-.TP
-.B  \-\-noatime
-do not store atime into archive
 .TP
 .B  \-\-atime
 do store atime into archive
@@ -227,9 +221,6 @@ do not store ctime into archive
 .TP
 .B  \-\-nobirthtime
 do not store birthtime (creation date) into archive
-.TP
-.B  \-\-nobsdflags
-deprecated, use \fB\-\-noflags\fP instead
 .TP
 .B  \-\-noflags
 do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive

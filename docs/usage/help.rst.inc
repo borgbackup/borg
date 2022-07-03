@@ -246,7 +246,7 @@ borg help placeholders
 ~~~~~~~~~~~~~~~~~~~~~~
 
 
-Repository URLs, ``--name``, ``--prefix``, ``--glob-archives``, ``--comment``
+Repository URLs, ``--name``, ``-a`` / ``--glob-archives``, ``--comment``
 and ``--remote-path`` values support these placeholders:
 
 {hostname}
@@ -292,7 +292,7 @@ Examples::
 
     borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
     borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
-    borg prune --prefix '{hostname}-' ...
+    borg prune -a '{hostname}-*' ...
 
 .. note::
     systemd uses a difficult, non-standard syntax for command lines in unit files (refer to

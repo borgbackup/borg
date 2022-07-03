@@ -27,17 +27,18 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TRANSFER" 1 "2022-06-26" "" "borg backup tool"
+.TH "BORG-TRANSFER" 1 "2022-07-03" "" "borg backup tool"
 .SH NAME
-borg-transfer \- archives transfer from other repository
+borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
 .sp
 borg [common options] transfer [options]
 .SH DESCRIPTION
 .sp
 This command transfers archives from one repository to another repository.
+Optionally, it can also upgrade the transferred data.
 .sp
-Suggested use:
+Suggested use for general purpose archive transfer (not repo upgrades):
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -61,6 +62,19 @@ The default is to transfer all archives, including checkpoint archives.
 You could use the misc. archive filter options to limit which archives it will
 transfer, e.g. using the \-a option. This is recommended for big
 repositories with multiple data sets to keep the runtime per invocation lower.
+.sp
+For repository upgrades (e.g. from a borg 1.2 repo to a related borg 2.0 repo), usage is
+quite similar to the above:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-upgrader=From12To20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -72,15 +86,15 @@ do not change repository, just check
 .TP
 .BI \-\-other\-repo \ SRC_REPOSITORY
 transfer archives from the other repository
+.TP
+.BI \-\-upgrader \ UPGRADER
+use the upgrader to convert transferred data (default: no conversion)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
-only consider archive names starting with this prefix.
-.TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

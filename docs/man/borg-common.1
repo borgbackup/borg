@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMMON" 1 "2022-06-26" "" "borg backup tool"
+.TH "BORG-COMMON" 1 "2022-07-03" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .SH SYNOPSIS
@@ -81,14 +81,8 @@ set umask to M (local only, default: 0077)
 .BI \-\-remote\-path \ PATH
 use PATH as borg executable on the remote (default: "borg")
 .TP
-.BI \-\-remote\-ratelimit \ RATE
-deprecated, use \fB\-\-upload\-ratelimit\fP instead
-.TP
 .BI \-\-upload\-ratelimit \ RATE
 set network upload rate limit in kiByte/s (default: 0=unlimited)
-.TP
-.BI \-\-remote\-buffer \ UPLOAD_BUFFER
-deprecated, use \fB\-\-upload\-buffer\fP instead
 .TP
 .BI \-\-upload\-buffer \ UPLOAD_BUFFER
 set network upload buffer size in MiB. (default: 0=no buffer)

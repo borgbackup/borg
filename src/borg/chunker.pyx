@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 API_VERSION = '1.2_01'
 
 import errno

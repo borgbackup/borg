@@ -25,8 +25,6 @@ borg rcreate
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--make-parent-dirs``             | create the parent directories of the repository directory, if they are missing.                                                                                                                                                        |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--key-algorithm``                | the algorithm we use to derive a key encryption key from your passphrase. Default: argon2                                                                                                                                              |
-    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                      |
     |                                                                                                                                                                                                                                                                                                                                     |
     | :ref:`common_options`                                                                                                                                                                                                                                                                                                               |
@@ -50,7 +48,6 @@ borg rcreate
         --append-only                  create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details.
         --storage-quota QUOTA          Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
         --make-parent-dirs             create the parent directories of the repository directory, if they are missing.
-        --key-algorithm                the algorithm we use to derive a key encryption key from your passphrase. Default: argon2
 
 
     :ref:`common_options`
@@ -161,20 +158,3 @@ case of malicious activity in the repository.
 
 If you do **not** want to encrypt the contents of your backups, but still want to detect
 malicious tampering use an `authenticated` mode. It's like `repokey` minus encryption.
-
-Key derivation functions
-++++++++++++++++++++++++
-
-- ``--key-algorithm argon2`` is the default and is recommended.
-  The key encryption key is derived from your passphrase via argon2-id.
-  Argon2 is considered more modern and secure than pbkdf2.
-
-Our implementation of argon2-based key algorithm follows the cryptographic best practices:
-
-- It derives two separate keys from your passphrase: one to encrypt your key and another one
-  to sign it. ``--key-algorithm pbkdf2`` uses the same key for both.
-
-- It uses encrypt-then-mac instead of encrypt-and-mac used by ``--key-algorithm pbkdf2``
-
-Neither is inherently linked to the key derivation function, but since we were going
-to break backwards compatibility anyway we took the opportunity to fix all 3 issues at once.

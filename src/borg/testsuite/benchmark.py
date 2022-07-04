@@ -26,7 +26,7 @@ def repo_url(request, tmpdir, monkeypatch):
     tmpdir.remove(rec=1)
 
 
-@pytest.fixture(params=["none", "repokey"])
+@pytest.fixture(params=["none", "repokey-aes-ocb"])
 def repo(request, cmd, repo_url):
     cmd(f'--repo={repo_url}', 'rcreate', '--encryption', request.param)
     return repo_url

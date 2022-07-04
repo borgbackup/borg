@@ -20,7 +20,7 @@ logger = create_logger()
 from .errors import Error
 from .fs import get_keys_dir
 from .msgpack import Timestamp
-from .time import OutputTimestamp, format_time, to_localtime, safe_timestamp, safe_s
+from .time import OutputTimestamp, format_time, to_localtime, safe_timestamp
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA

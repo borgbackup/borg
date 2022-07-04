@@ -1,5 +1,4 @@
 import os
-import sys
 
 from .errors import Error
 from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin

@@ -1,4 +1,3 @@
-import configparser
 import hmac
 import os
 import textwrap
@@ -26,7 +25,7 @@ from ..item import Key, EncryptedKey, want_bytes
 from ..platform import SaveFile
 
 from .nonces import NonceManager
-from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
+from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
 from . import low_level
 

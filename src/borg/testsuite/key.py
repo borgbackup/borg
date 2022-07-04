@@ -1,5 +1,3 @@
-import getpass
-import os.path
 import re
 import tempfile
 from binascii import hexlify, unhexlify, a2b_base64
@@ -15,12 +13,10 @@ from ..crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPO
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
 from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError, UnsupportedManifestError, UnsupportedKeyFormatError
 from ..crypto.key import identify_key
-from ..crypto.low_level import bytes_to_long
 from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 from ..helpers import IntegrityError
 from ..helpers import Location
 from ..helpers import StableDict
-from ..helpers import get_security_dir
 from ..helpers import msgpack
 from ..constants import KEY_ALGORITHMS
 

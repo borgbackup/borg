@@ -7,7 +7,7 @@ from hashlib import sha256
 from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, dash_open
 from ..repository import Repository
 
-from .key import CHPOKeyfileKey, KeyfileNotFoundError, RepoKeyNotFoundError, KeyBlobStorage, identify_key
+from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_key
 
 
 class UnencryptedRepo(Error):

@@ -11,7 +11,7 @@ except ImportError:
     multiprocessing = None
 
 from setuptools.command.build_ext import build_ext
-from setuptools import setup, find_packages, Extension, Command
+from setuptools import setup, Extension, Command
 from setuptools.command.sdist import sdist
 
 try:

@@ -6,7 +6,7 @@ import errno
 import os
 from collections import namedtuple
 
-from .constants import CH_DATA, CH_ALLOC, CH_HOLE, MAX_DATA_SIZE, zeros
+from .constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 
 from libc.stdlib cimport free
 

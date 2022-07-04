@@ -40,7 +40,6 @@ from math import ceil
 
 from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
-from cpython.bytes cimport PyBytes_FromStringAndSize
 
 API_VERSION = '1.3_01'
 

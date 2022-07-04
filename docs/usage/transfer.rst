@@ -29,3 +29,4 @@ Examples
     # 4. Check if we have everything (same as 2.):
     $ borg --repo       ssh://borg2@borgbackup/./tests/b20 transfer \
            --other-repo ssh://borg2@borgbackup/./tests/b12 --dry-run
+

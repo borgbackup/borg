@@ -21,3 +21,4 @@ Examples
 
     # Restore a raw device (must not be active/in use/mounted at that time)
     $ borg extract --stdout my-sdx | dd of=/dev/sdx bs=10M
+

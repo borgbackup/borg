@@ -83,3 +83,4 @@ Examples
         --paths-from-stdin \
         --paths-delimiter "\0" \
         smallfiles-handle-newline
+

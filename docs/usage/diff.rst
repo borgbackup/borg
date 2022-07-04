@@ -15,3 +15,4 @@ Examples
     {"path": "file2", "changes": [{"type": "modified", "added": 135, "removed": 252}]}
     {"path": "file4", "changes": [{"type": "added", "size": 0}]}
     {"path": "file3", "changes": [{"type": "removed", "size": 0}]}
+

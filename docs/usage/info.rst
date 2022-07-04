@@ -18,3 +18,4 @@ Examples
     Number of files: 244
     Original size: 13.80 MB
     Deduplicated size: 531 B
+

@@ -15,7 +15,7 @@ def packages_debianoid(user)
     apt-get -y -qq update
     apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
-    apt install -y libssl-dev libacl1-dev libxxhash-dev libdeflate-dev liblz4-dev libzstd-dev pkg-config
+    apt install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev pkg-config
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true
@@ -29,7 +29,6 @@ def packages_debianoid(user)
     apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
     # older debian / ubuntu have no .pc file for these, so we need to point at the lib/header location:
     echo 'export BORG_LIBXXHASH_PREFIX=/usr' >> ~vagrant/.bash_profile
-    echo 'export BORG_LIBDEFLATE_PREFIX=/usr' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -40,7 +39,7 @@ def packages_freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
-    pkg install -y xxhash libdeflate liblz4 zstd pkgconf
+    pkg install -y xxhash liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
@@ -74,7 +73,6 @@ def packages_openbsd
     pkg_add bash
     chsh -s bash vagrant
     pkg_add xxhash
-    pkg_add libdeflate
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
@@ -119,7 +117,7 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline openssl@1.1 xxhash libdeflate zstd lz4 xz
+    brew install pkg-config readline openssl@1.1 xxhash zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile

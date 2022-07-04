@@ -715,21 +715,13 @@ class Archiver:
         ]:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
-        import zlib
-        from .checksums import crc32, deflate_crc32, xxh64
+        from .checksums import crc32, xxh64
         print("Non-cryptographic checksums / hashes ===========================")
         size = "1GB"
         tests = [
             ("xxh64", lambda: xxh64(random_10M)),
+            ("crc32 (zlib)", lambda: crc32(random_10M)),
         ]
-        if crc32 is zlib.crc32:
-            tests.insert(0, ("crc32 (zlib, used)", lambda: crc32(random_10M)))
-            tests.insert(1, ("crc32 (libdeflate)", lambda: deflate_crc32(random_10M)))
-        elif crc32 is deflate_crc32:
-            tests.insert(0, ("crc32 (libdeflate, used)", lambda: crc32(random_10M)))
-            tests.insert(1, ("crc32 (zlib)", lambda: zlib.crc32(random_10M)))
-        else:
-            raise Error("crc32 benchmarking code missing")
         for spec, func in tests:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 

@@ -2080,8 +2080,9 @@ class ArchiveRecreater:
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
             old_chunk = self.key.decrypt(chunk_id, self.repository.get(chunk_id), decompress=False)
-            if Compressor.detect(old_chunk).name == self.key.compressor.decide(data).name:
-                # Stored chunk has the same compression we wanted
+            compressor_cls, level = Compressor.detect(old_chunk)
+            if compressor_cls.name == self.key.compressor.decide(data).name and level == self.key.compressor.level:
+                # Stored chunk has the same compression method and level as we wanted
                 overwrite = False
         chunk_entry = self.cache.add_chunk(chunk_id, data, target.stats, overwrite=overwrite, wait=False)
         self.cache.repository.async_response(wait=False)

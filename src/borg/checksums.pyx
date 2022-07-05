@@ -33,31 +33,15 @@ cdef extern from "xxhash.h":
     XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src)
 
 
-cdef extern from "libdeflate.h":
-    uint32_t libdeflate_crc32(uint32_t crc, const void *buffer, size_t len)
-
-
 cdef Py_buffer ro_buffer(object data) except *:
     cdef Py_buffer view
     PyObject_GetBuffer(data, &view, PyBUF_SIMPLE)
     return view
 
 
-def deflate_crc32(data, value=0):
-    cdef Py_buffer data_buf = ro_buffer(data)
-    cdef uint32_t val = value
-    try:
-        return libdeflate_crc32(val, data_buf.buf, data_buf.len)
-    finally:
-        PyBuffer_Release(&data_buf)
-
-
-if is_darwin:
-    # macOS (darwin) has a highly optimized zlib.crc32 (Intel as well as Apple Silicon M1)
-    crc32 = zlib.crc32
-else:
-    # on Linux x64 (and maybe others), libdeflate_crc32 is faster than zlib.crc32
-    crc32 = deflate_crc32
+# borg 2.0's new repos do not compute crc32 over big amounts of data,
+# so speed does not matter much any more and we can just use zlib.crc32.
+crc32 = zlib.crc32
 
 
 def xxh64(data, seed=0):

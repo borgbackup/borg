@@ -11,7 +11,7 @@ except ImportError:
     multiprocessing = None
 
 from setuptools.command.build_ext import build_ext
-from setuptools import setup, find_packages, Extension, Command
+from setuptools import setup, Extension, Command
 from setuptools.command.sdist import sdist
 
 try:
@@ -224,9 +224,7 @@ if not on_rtd:
 
     if cythonize and cythonizing:
         cython_opts = dict(
-            # default language_level will be '3str' starting from Cython 3.0.0,
-            # but old cython versions (< 0.29) do not know that, thus we use 3 for now.
-            compiler_directives={'language_level': 3},
+            compiler_directives={'language_level': '3str'},
         )
         if not is_win32:
             # compile .pyx extensions to .c in parallel, does not work on windows

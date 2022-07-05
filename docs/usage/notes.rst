@@ -333,3 +333,4 @@ When running Borg using an automated script, ``ssh`` might still ask for a passw
 even if there is an SSH key for the target server. Use this to make scripts more robust::
 
     export BORG_RSH='ssh -oBatchMode=yes'
+

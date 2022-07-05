@@ -5,7 +5,6 @@ from traceback import format_exc
 
 import pytest
 
-from ..helpers import daemonize
 from ..platform import get_process_id, process_alive
 from ..locking import TimeoutTimer, ExclusiveLock, Lock, LockRoster, \
                       ADD, REMOVE, SHARED, EXCLUSIVE, LockTimeout, NotLocked, NotMyLock

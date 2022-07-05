@@ -1,6 +1,5 @@
 import functools
 import os
-import random
 import shutil
 import sys
 import tempfile

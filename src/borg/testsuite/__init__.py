@@ -12,7 +12,6 @@ import sys
 import sysconfig
 import tempfile
 import time
-import uuid
 import unittest
 
 from ..xattr import get_all

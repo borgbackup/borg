@@ -37,11 +37,11 @@ SSH access to safe operations only.
 
 .. warning::
 
-	If this file should be automatically updated (e.g. by a web console),
-	pay **utmost attention** to sanitizing user input. Strip all whitespace
-	around the user-supplied key, ensure that it **only** contains ASCII
-	with no control characters and that it consists of three parts separated
-	by a single space. Ensure that no newlines are contained within the key.
+    If this file should be automatically updated (e.g. by a web console),
+    pay **utmost attention** to sanitizing user input. Strip all whitespace
+    around the user-supplied key, ensure that it **only** contains ASCII
+    with no control characters and that it consists of three parts separated
+    by a single space. Ensure that no newlines are contained within the key.
 
 The ``restrict`` keyword enables all restrictions, i.e. disables port, agent
 and X11 forwarding, as well as disabling PTY allocation and execution of ~/.ssh/rc.
@@ -59,7 +59,7 @@ which allows for encryption.
 **Storage quotas** can be enabled by adding the ``--storage-quota`` option
 to the ``borg serve`` command line::
 
-	restrict,command="borg serve --storage-quota 20G ..." ...
+    restrict,command="borg serve --storage-quota 20G ..." ...
 
 The storage quotas of repositories are completely independent. If a
 client is able to access multiple repositories, each repository

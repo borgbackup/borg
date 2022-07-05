@@ -17,3 +17,4 @@ Examples
 
     # see what would be deleted if delete was run without --dry-run
     $ borg delete --list --dry-run -a '*-May-*'
+

@@ -9,7 +9,6 @@ import tempfile
 import zlib
 
 from ..hashindex import NSIndex, ChunkIndex, ChunkIndexEntry
-from .. import hashindex
 from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from . import BaseTestCase, unopened_tempfile
 

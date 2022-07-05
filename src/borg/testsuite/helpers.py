@@ -7,7 +7,6 @@ import sys
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
 from io import StringIO, BytesIO
-from time import sleep
 
 import pytest
 

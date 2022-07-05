@@ -1,7 +1,6 @@
 import base64
 import json
 import os
-import socket
 import stat
 import sys
 import time
@@ -32,7 +31,7 @@ from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
-from .helpers import parse_timestamp, to_localtime
+from .helpers import parse_timestamp
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, make_path_safe, remove_surrogates
 from .helpers import StableDict

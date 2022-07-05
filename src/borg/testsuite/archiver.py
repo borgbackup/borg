@@ -35,7 +35,6 @@ from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNIN
 from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
 from ..constants import *  # NOQA
-from ..crypto.low_level import bytes_to_long, num_cipher_blocks
 from ..crypto.key import FlexiKey, AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileKey, Passphrase, TAMRequiredError
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
@@ -43,7 +42,6 @@ from ..helpers import Location, get_security_dir
 from ..helpers import Manifest, MandatoryFeatureUnsupported
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
-from ..helpers import MAX_S
 from ..helpers import msgpack
 from ..helpers import flags_noatime, flags_normal
 from ..nanorst import RstToTextLazy, rst_to_terminal

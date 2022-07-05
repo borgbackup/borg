@@ -23,3 +23,4 @@ Examples
     $ borg rcreate --encryption=repokey-aes-ocb
     # keyfile: stores the (encrypted) key into ~/.config/borg/keys/
     $ borg rcreate --encryption=keyfile-aes-ocb
+

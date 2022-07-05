@@ -1,13 +1,8 @@
-# -*- coding: utf-8 -*-
 from collections import namedtuple
-import locale
-import os
 
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
-from libc.errno cimport errno
 from libc.string cimport memcpy
-from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_CheckExact, PyBytes_GET_SIZE, PyBytes_AS_STRING
 

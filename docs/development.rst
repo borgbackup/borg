@@ -349,11 +349,13 @@ Checklist:
     scripts/sdist-sign X.Y.Z
     scripts/upload-pypi X.Y.Z test
     scripts/upload-pypi X.Y.Z
+
 - Put binaries into dist/borg-OSNAME and sign them:
 
   ::
 
     scripts/sign-binaries 201912312359
+
 - Close the release milestone on GitHub.
 - `Update borgbackup.org
   <https://github.com/borgbackup/borgbackup.github.io/pull/53/files>`_ with the

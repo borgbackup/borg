@@ -24,7 +24,7 @@ Vagrant.configure("2") do |config|
 
     # In case we have skipped "record install"
     if [ ! -e /usr/local/bin/borg ] ; then
-      wget https://github.com/borgbackup/borg/releases/download/1.1.0b6/borg-linux64
+      wget https://github.com/borgbackup/borg/releases/download/1.2.1/borg-linux64
       install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
     fi
 
@@ -48,7 +48,7 @@ Vagrant.configure("2") do |config|
 
     # In case we have skipped "record install"
     if [ ! -e /usr/local/bin/borg ] ; then
-      wget https://github.com/borgbackup/borg/releases/download/1.1.0b6/borg-linux64
+      wget https://github.com/borgbackup/borg/releases/download/1.2.1/borg-linux64
       install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
     fi
 

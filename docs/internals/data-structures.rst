@@ -568,6 +568,7 @@ dictionary created by the ``Item`` class that contains:
 * gid
 * mode (item type + permissions)
 * source (for symlinks)
+* hlid (for hardlinks)
 * rdev (for device files)
 * mtime, atime, ctime in nanoseconds
 * xattrs
@@ -1246,3 +1247,28 @@ For example, using 1.1 on a repository, noticing corruption or similar issues an
 ``borg-1.0 check --repair``, which rewrites the index and hints, results in this situation.
 Borg 1.1 would erroneously report checksum errors in the hints and/or index files and trigger
 an automatic rebuild of these files.
+
+HardLinkManager and the hlid concept
+------------------------------------
+
+Dealing with hard links needs some extra care, implemented in borg within the HardLinkManager
+class:
+
+- At archive creation time, fs items with st_nlink > 1 indicate that they are a member of
+  a group of hardlinks all pointing to the same inode. For such fs items, the archived item
+  includes a hlid attribute (hardlink id), which is computed like H(st_dev, st_ino). Thus,
+  if archived items have the same hlid value, they pointed to the same inode and form a
+  group of hardlinks. Besides that, nothing special is done for any member of the group
+  of hardlinks, meaning that e.g. for regular files, each archived item will have a
+  chunks list.
+- At extraction time, the presence of a hlid attribute indicates that there might be more
+  hardlinks coming, pointing to the same content (inode), thus borg will remember the "hlid
+  to extracted path" mapping, so it will know the correct path for extracting (hardlinking)
+  the next hardlink of that group / with the same hlid.
+- This symmetric approach (each item has all the information, e.g. the chunks list)
+  simplifies dealing with such items a lot, especially for partial extraction, for the
+  FUSE filesystem, etc.
+- This is different from the asymmetric approach of old borg versions (< 2.0) and also from
+  tar which have the concept of a main item (first hardlink, has the content) and content-less
+  secondary items with by-name back references for each subsequent hardlink, causing lots
+  of complications when dealing with them.

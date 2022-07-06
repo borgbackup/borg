@@ -1,0 +1,75 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/bullseye64"
+  config.vm.provision "install dependencies", type: "shell", inline: <<-SHELL
+    apt-get update
+    apt-get install -y wget expect gpg asciinema ssh adduser fuse
+    mkdir -p /wallpaper
+    wget \
+        --user-agent="borgbackup demo screencast" \
+        --input-file=/vagrant/sample-wallpapers.txt \
+        --directory-prefix=/wallpaper
+  SHELL
+  config.vm.provision "record install", type: "shell", inline: <<-SHELL
+  	gpg --recv-keys "6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393"
+    asciinema rec -c 'expect /vagrant/install.tcl' --overwrite /vagrant/install.json < /dev/null
+  SHELL
+  config.vm.provision "record basic usage", type: "shell", inline: <<-SHELL
+    # `rm` below allows quick re-exec via:
+    # vagrant vagrant provision --provision-with "record basic usage"
+    # this is useful when testing changes
+    rm -r /media/backup/borgdemo || true
+    rm -r ~/.ssh/ || true
+    rm -r Wallpaper || true
+    deluser --remove-home borgdemo || true
+
+    # In case we have skipped "record install"
+    if [ ! -e /usr/local/bin/borg ] ; then
+      wget https://github.com/borgbackup/borg/releases/download/1.2.1/borg-linux64
+      install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
+    fi
+
+    mkdir -p /media/backup/borgdemo
+    mkdir Wallpaper
+    cp -r /wallpaper Wallpaper/bigcollection
+    cp /wallpaper/Trapper_cabin.jpg Wallpaper/deer.jpg
+
+    adduser --disabled-password borgdemo
+    echo '127.0.0.1 remoteserver.example' >> /etc/hosts
+    ssh-keygen -f ~/.ssh/id_rsa -N ''
+    ssh-keyscan remoteserver.example > ~/.ssh/known_hosts
+    runuser -u borgdemo mkdir ~borgdemo/.ssh
+    runuser -u borgdemo tee ~borgdemo/.ssh/authorized_keys < ~/.ssh/id_rsa.pub
+
+    asciinema rec -c 'expect /vagrant/basic.tcl' --overwrite /vagrant/basic.json < /dev/null
+  SHELL
+  config.vm.provision "record advanced usage", type: "shell", inline: <<-SHELL
+    rm -r /media/backup/borgdemo || true
+    rm -r Wallpaper || true
+
+    # In case we have skipped "record install"
+    if [ ! -e /usr/local/bin/borg ] ; then
+      wget https://github.com/borgbackup/borg/releases/download/1.2.1/borg-linux64
+      install --owner root --group root --mode 755 borg-linux64 /usr/local/bin/borg
+    fi
+
+    mkdir -p /media/backup/borgdemo
+    mkdir Wallpaper
+    cp -r /wallpaper Wallpaper/bigcollection
+    cp /wallpaper/Trapper_cabin.jpg Wallpaper/deer.jpg
+    mkdir -p ~/Downloads/big
+    dd if=/dev/zero of=loopbackfile.img bs=100M count=4
+    losetup /dev/loop0 loopbackfile.img
+
+	# Make it look as if the adv. usage screencast was recorded after basic usage
+    export BORG_PASSPHRASE='1234'
+    borg init --encryption=repokey /media/backup/borgdemo
+    borg create --compression lz4 /media/backup/borgdemo::backup1 Wallpaper
+    echo "new nice file" > Wallpaper/newfile.txt
+    borg create --compression lz4 /media/backup/borgdemo::backup2 Wallpaper
+    mv Wallpaper/bigcollection Wallpaper/bigcollection_NEW
+    borg create --compression lz4 /media/backup/borgdemo::backup3 Wallpaper
+    unset BORG_PASSPHRASE
+
+    asciinema rec -c 'expect /vagrant/advanced.tcl' --overwrite /vagrant/advanced.json < /dev/null
+  SHELL
+end

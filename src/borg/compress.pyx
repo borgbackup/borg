@@ -66,6 +66,7 @@ cdef class CompressorBase:
 
     def __init__(self, level=255, **kwargs):
         assert 0 <= level <= 255
+        self.level = level
         if self.ID is not None:
             self.id_level = self.ID + bytes((level, ))  # level 255 means "unknown level"
             assert len(self.id_level) == 2
@@ -539,7 +540,8 @@ class ObfuscateSize(CompressorBase):
         compr_size = self.header_fmt.unpack(obfuscated_data[0:self.header_len])[0]
         compressed_data = obfuscated_data[self.header_len:self.header_len+compr_size]
         if self.compressor is None:
-            self.compressor = Compressor.detect(compressed_data)()
+            compressor_cls = Compressor.detect(compressed_data)[0]
+            self.compressor = compressor_cls()
         return self.compressor.decompress(compressed_data)  # decompress data
 
 
@@ -578,15 +580,16 @@ class Compressor:
         return self.compressor.compress(data)
 
     def decompress(self, data):
-        compressor_cls = self.detect(data)
+        compressor_cls = self.detect(data)[0]
         return compressor_cls(**self.params).decompress(data)
 
     @staticmethod
     def detect(data):
         hdr = bytes(data[:2])  # detect() does not work with memoryview
+        level = hdr[1]  # usually the level, but not for zlib_legacy
         for cls in COMPRESSOR_LIST:
             if cls.detect(hdr):
-                return cls
+                return cls, (255 if cls.name == 'zlib_legacy' else level)
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])
 

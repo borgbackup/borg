@@ -1,5 +1,11 @@
+# Configuration for send -h
+# Tries to emulate a human typing
+# Tweak this if typing is too fast or too slow
+set send_human {.05 .1 1 .01 .2}
+
+set script {
 # For the pro users, here are some advanced features of borg, so you can impress your friends. ;)
-# Note: This screencast was made with borg version 1.1.0 – older or newer borg versions may behave differently.
+# Note: This screencast was made with __BORG_VERSION__ – older or newer borg versions may behave differently.
 
 # First of all, we can use several environment variables for borg.
 # E.g. we do not want to type in our repo path and password again and again…
@@ -27,13 +33,12 @@ borg info :: --last 1
 
 # So let's rename our last archive:
 borg rename ::specialbackup backup-block-device
-<up>
+
 borg info :: --last 1
 
 # A very important step if you choose keyfile mode (where the keyfile is only saved locally) is to export your keyfile and possibly print it, etc.
-borg key export :: --qr-code file.html # this creates a nice HTML, but when you want something simpler…
-< remove comment >
-< let there: borg check > --paper # this is a "manual input"-only backup (but it is also included in the --qr-code option)
+borg key export --qr-html :: file.html  # this creates a nice HTML, but when you want something simpler…
+borg key export --paper ::  # this is a "manual input"-only backup (but it is also included in the --qr-code option)
 
 ## MAINTENANCE ##
 # Sometimes backups get broken or we want a regular "checkup" that everything is okay…
@@ -63,3 +68,18 @@ ls -la /tmp/mount
 borg umount /tmp/mount
 
 # That's it, but of course there is more to explore, so have a look at the docs.
+}
+
+set script [string trim $script]
+set script [string map [list __BORG_VERSION__ [exec borg -V]] $script]
+set script [split $script \n]
+
+set ::env(PS1) "$ "
+set stty_init -echo
+spawn -noecho /bin/sh
+foreach line $script {
+	expect "$ "
+	send_user -h $line\n
+	send $line\n
+}
+expect "$ "

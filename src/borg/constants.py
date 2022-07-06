@@ -7,7 +7,7 @@ ITEM_KEYS = frozenset(['path', 'source', 'rdev', 'chunks', 'chunks_healthy', 'ha
 # fmt: on
 
 # this is the set of keys that are always present in items:
-REQUIRED_ITEM_KEYS = frozenset(['path', 'mtime', ])
+REQUIRED_ITEM_KEYS = frozenset(["path", "mtime"])
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 # fmt: off
@@ -19,7 +19,7 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'us
 # fmt: on
 
 # this is the set of keys that are always present in archives:
-REQUIRED_ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'time', ])
+REQUIRED_ARCHIVE_KEYS = frozenset(["version", "name", "items", "cmdline", "time"])
 
 # default umask, overridden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
@@ -28,8 +28,8 @@ UMASK_DEFAULT = 0o077
 # forcing to 0o100XXX later
 STDIN_MODE_DEFAULT = 0o660
 
-CACHE_TAG_NAME = 'CACHEDIR.TAG'
-CACHE_TAG_CONTENTS = b'Signature: 8a477f597d28d172789f06886806bc55'
+CACHE_TAG_NAME = "CACHEDIR.TAG"
+CACHE_TAG_CONTENTS = b"Signature: 8a477f597d28d172789f06886806bc55"
 
 # A large, but not unreasonably large segment size. Always less than 2 GiB (for legacy file systems). We choose
 # 500 MiB which means that no indirection from the inode is needed for typical Linux file systems.
@@ -48,7 +48,7 @@ MAX_DATA_SIZE = 20971479
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
 
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
-MAX_SEGMENT_SIZE_LIMIT = 2 ** 32 - MAX_OBJECT_SIZE
+MAX_SEGMENT_SIZE_LIMIT = 2**32 - MAX_OBJECT_SIZE
 
 # have one all-zero bytes object
 # we use it at all places where we need to detect or create all-zero buffers
@@ -71,12 +71,12 @@ FD_MAX_AGE = 4 * 60  # 4 minutes
 
 CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
-HASH_WINDOW_SIZE = 0xfff  # 4095B
+HASH_WINDOW_SIZE = 0xFFF  # 4095B
 HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 
 # chunker algorithms
-CH_BUZHASH = 'buzhash'
-CH_FIXED = 'fixed'
+CH_BUZHASH = "buzhash"
+CH_FIXED = "fixed"
 
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
@@ -88,8 +88,8 @@ ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)
 CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
 
 # operating mode of the files cache (for fast skipping of unchanged files)
-FILES_CACHE_MODE_UI_DEFAULT = 'ctime,size,inode'  # default for "borg create" command (CLI UI)
-FILES_CACHE_MODE_DISABLED = 'd'  # most borg commands do not use the files cache at all (disable)
+FILES_CACHE_MODE_UI_DEFAULT = "ctime,size,inode"  # default for "borg create" command (CLI UI)
+FILES_CACHE_MODE_DISABLED = "d"  # most borg commands do not use the files cache at all (disable)
 
 # return codes returned by borg command
 # when borg is killed by signal N, rc = 128 + N
@@ -101,30 +101,30 @@ EXIT_SIGNAL_BASE = 128  # terminated due to signal, rc = 128 + sig_no
 # never use datetime.isoformat(), it is evil. always use one of these:
 # datetime.strftime(ISO_FORMAT)  # output always includes .microseconds
 # datetime.strftime(ISO_FORMAT_NO_USECS)  # output never includes microseconds
-ISO_FORMAT_NO_USECS = '%Y-%m-%dT%H:%M:%S'
-ISO_FORMAT = ISO_FORMAT_NO_USECS + '.%f'
+ISO_FORMAT_NO_USECS = "%Y-%m-%dT%H:%M:%S"
+ISO_FORMAT = ISO_FORMAT_NO_USECS + ".%f"
 
-DASHES = '-' * 78
+DASHES = "-" * 78
 
 PBKDF2_ITERATIONS = 100000
 
 # https://www.rfc-editor.org/rfc/rfc9106.html#section-4-6.2
-ARGON2_ARGS = {'time_cost': 3, 'memory_cost': 2**16, 'parallelism': 4, 'type': 'id'}
+ARGON2_ARGS = {"time_cost": 3, "memory_cost": 2**16, "parallelism": 4, "type": "id"}
 ARGON2_SALT_BYTES = 16
 
 # Maps the CLI argument to our internal identifier for the format
 KEY_ALGORITHMS = {
     # encrypt-and-MAC, kdf: PBKDF2(HMAC−SHA256), encryption: AES256-CTR, authentication: HMAC-SHA256
-    'pbkdf2': 'sha256',
+    "pbkdf2": "sha256",
     # encrypt-then-MAC, kdf: argon2, encryption: chacha20, authentication: poly1305
-    'argon2': 'argon2 chacha20-poly1305',
+    "argon2": "argon2 chacha20-poly1305",
 }
 
 
 class KeyBlobStorage:
-    NO_STORAGE = 'no_storage'
-    KEYFILE = 'keyfile'
-    REPO = 'repository'
+    NO_STORAGE = "no_storage"
+    KEYFILE = "keyfile"
+    REPO = "repository"
 
 
 class KeyType:

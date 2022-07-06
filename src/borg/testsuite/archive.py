@@ -33,64 +33,66 @@ def test_stats_basic(stats):
 
 
 def tests_stats_progress(stats, monkeypatch, columns=80):
-    monkeypatch.setenv('COLUMNS', str(columns))
+    monkeypatch.setenv("COLUMNS", str(columns))
     out = StringIO()
     stats.show_progress(stream=out)
-    s = '20 B O 20 B U 1 N '
-    buf = ' ' * (columns - len(s))
+    s = "20 B O 20 B U 1 N "
+    buf = " " * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
     out = StringIO()
-    stats.update(10 ** 3, unique=False)
-    stats.show_progress(item=Item(path='foo'), final=False, stream=out)
-    s = '1.02 kB O 20 B U 1 N foo'
-    buf = ' ' * (columns - len(s))
+    stats.update(10**3, unique=False)
+    stats.show_progress(item=Item(path="foo"), final=False, stream=out)
+    s = "1.02 kB O 20 B U 1 N foo"
+    buf = " " * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
     out = StringIO()
-    stats.show_progress(item=Item(path='foo'*40), final=False, stream=out)
-    s = '1.02 kB O 20 B U 1 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo'
-    buf = ' ' * (columns - len(s))
+    stats.show_progress(item=Item(path="foo" * 40), final=False, stream=out)
+    s = "1.02 kB O 20 B U 1 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo"
+    buf = " " * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
 
 def test_stats_format(stats):
-    assert str(stats) == """\
+    assert (
+        str(stats)
+        == """\
 Number of files: 1
 Original size: 20 B
 Deduplicated size: 20 B
 """
+    )
     s = f"{stats.osize_fmt}"
     assert s == "20 B"
     # kind of redundant, but id is variable so we can't match reliably
-    assert repr(stats) == f'<Statistics object at {id(stats):#x} (20, 20)>'
+    assert repr(stats) == f"<Statistics object at {id(stats):#x} (20, 20)>"
 
 
 def test_stats_progress_json(stats):
     stats.output_json = True
 
     out = StringIO()
-    stats.show_progress(item=Item(path='foo'), stream=out)
+    stats.show_progress(item=Item(path="foo"), stream=out)
     result = json.loads(out.getvalue())
-    assert result['type'] == 'archive_progress'
-    assert isinstance(result['time'], float)
-    assert result['finished'] is False
-    assert result['path'] == 'foo'
-    assert result['original_size'] == 20
-    assert result['nfiles'] == 1
+    assert result["type"] == "archive_progress"
+    assert isinstance(result["time"], float)
+    assert result["finished"] is False
+    assert result["path"] == "foo"
+    assert result["original_size"] == 20
+    assert result["nfiles"] == 1
 
     out = StringIO()
     stats.show_progress(stream=out, final=True)
     result = json.loads(out.getvalue())
-    assert result['type'] == 'archive_progress'
-    assert isinstance(result['time'], float)
-    assert result['finished'] is True  # see #6570
-    assert 'path' not in result
-    assert 'original_size' not in result
-    assert 'nfiles' not in result
+    assert result["type"] == "archive_progress"
+    assert isinstance(result["time"], float)
+    assert result["finished"] is True  # see #6570
+    assert "path" not in result
+    assert "original_size" not in result
+    assert "nfiles" not in result
 
 
 class MockCache:
-
     class MockRepo:
         def async_response(self, wait=True):
             pass
@@ -105,30 +107,24 @@ class MockCache:
 
 
 class ArchiveTimestampTestCase(BaseTestCase):
-
     def _test_timestamp_parsing(self, isoformat, expected):
         repository = Mock()
         key = PlaintextKey(repository)
         manifest = Manifest(repository, key)
-        a = Archive(repository, key, manifest, 'test', create=True)
+        a = Archive(repository, key, manifest, "test", create=True)
         a.metadata = ArchiveItem(time=isoformat)
         self.assert_equal(a.ts, expected)
 
     def test_with_microseconds(self):
-        self._test_timestamp_parsing(
-            '1970-01-01T00:00:01.000001',
-            datetime(1970, 1, 1, 0, 0, 1, 1, timezone.utc))
+        self._test_timestamp_parsing("1970-01-01T00:00:01.000001", datetime(1970, 1, 1, 0, 0, 1, 1, timezone.utc))
 
     def test_without_microseconds(self):
-        self._test_timestamp_parsing(
-            '1970-01-01T00:00:01',
-            datetime(1970, 1, 1, 0, 0, 1, 0, timezone.utc))
+        self._test_timestamp_parsing("1970-01-01T00:00:01", datetime(1970, 1, 1, 0, 0, 1, 0, timezone.utc))
 
 
 class ChunkBufferTestCase(BaseTestCase):
-
     def test(self):
-        data = [Item(path='p1'), Item(path='p2')]
+        data = [Item(path="p1"), Item(path="p2")]
         cache = MockCache()
         key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)
@@ -144,7 +140,7 @@ class ChunkBufferTestCase(BaseTestCase):
 
     def test_partial(self):
         big = "0123456789abcdefghijklmnopqrstuvwxyz" * 25000
-        data = [Item(path='full', source=big), Item(path='partial', source=big)]
+        data = [Item(path="full", source=big), Item(path="partial", source=big)]
         cache = MockCache()
         key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)
@@ -165,12 +161,11 @@ class ChunkBufferTestCase(BaseTestCase):
 
 
 class RobustUnpackerTestCase(BaseTestCase):
-
     def make_chunks(self, items):
-        return b''.join(msgpack.packb({'path': item}) for item in items)
+        return b"".join(msgpack.packb({"path": item}) for item in items)
 
     def _validator(self, value):
-        return isinstance(value, dict) and value.get('path') in ('foo', 'bar', 'boo', 'baz')
+        return isinstance(value, dict) and value.get("path") in ("foo", "bar", "boo", "baz")
 
     def process(self, input):
         unpacker = RobustUnpacker(validator=self._validator, item_keys=ITEM_KEYS)
@@ -185,14 +180,14 @@ class RobustUnpackerTestCase(BaseTestCase):
         return result
 
     def test_extra_garbage_no_sync(self):
-        chunks = [(False, [self.make_chunks(['foo', 'bar'])]),
-                  (False, [b'garbage'] + [self.make_chunks(['boo', 'baz'])])]
+        chunks = [
+            (False, [self.make_chunks(["foo", "bar"])]),
+            (False, [b"garbage"] + [self.make_chunks(["boo", "baz"])]),
+        ]
         result = self.process(chunks)
-        self.assert_equal(result, [
-            {'path': 'foo'}, {'path': 'bar'},
-            103, 97, 114, 98, 97, 103, 101,
-            {'path': 'boo'},
-            {'path': 'baz'}])
+        self.assert_equal(
+            result, [{"path": "foo"}, {"path": "bar"}, 103, 97, 114, 98, 97, 103, 101, {"path": "boo"}, {"path": "baz"}]
+        )
 
     def split(self, left, length):
         parts = []
@@ -202,22 +197,22 @@ class RobustUnpackerTestCase(BaseTestCase):
         return parts
 
     def test_correct_stream(self):
-        chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 2)
+        chunks = self.split(self.make_chunks(["foo", "bar", "boo", "baz"]), 2)
         input = [(False, chunks)]
         result = self.process(input)
-        self.assert_equal(result, [{'path': 'foo'}, {'path': 'bar'}, {'path': 'boo'}, {'path': 'baz'}])
+        self.assert_equal(result, [{"path": "foo"}, {"path": "bar"}, {"path": "boo"}, {"path": "baz"}])
 
     def test_missing_chunk(self):
-        chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 4)
+        chunks = self.split(self.make_chunks(["foo", "bar", "boo", "baz"]), 4)
         input = [(False, chunks[:3]), (True, chunks[4:])]
         result = self.process(input)
-        self.assert_equal(result, [{'path': 'foo'}, {'path': 'boo'}, {'path': 'baz'}])
+        self.assert_equal(result, [{"path": "foo"}, {"path": "boo"}, {"path": "baz"}])
 
     def test_corrupt_chunk(self):
-        chunks = self.split(self.make_chunks(['foo', 'bar', 'boo', 'baz']), 4)
-        input = [(False, chunks[:3]), (True, [b'gar', b'bage'] + chunks[3:])]
+        chunks = self.split(self.make_chunks(["foo", "bar", "boo", "baz"]), 4)
+        input = [(False, chunks[:3]), (True, [b"gar", b"bage"] + chunks[3:])]
         result = self.process(input)
-        self.assert_equal(result, [{'path': 'foo'}, {'path': 'boo'}, {'path': 'baz'}])
+        self.assert_equal(result, [{"path": "foo"}, {"path": "boo"}, {"path": "baz"}])
 
 
 @pytest.fixture
@@ -225,12 +220,17 @@ def item_keys_serialized():
     return [msgpack.packb(name) for name in ITEM_KEYS]
 
 
-@pytest.mark.parametrize('packed',
-    [b'', b'x', b'foobar', ] +
-    [msgpack.packb(o) for o in (
-        [None, 0, 0.0, False, '', {}, [], ()] +
-        [42, 23.42, True, b'foobar', {b'foo': b'bar'}, [b'foo', b'bar'], (b'foo', b'bar')]
-    )])
+@pytest.mark.parametrize(
+    "packed",
+    [b"", b"x", b"foobar"]
+    + [
+        msgpack.packb(o)
+        for o in (
+            [None, 0, 0.0, False, "", {}, [], ()]
+            + [42, 23.42, True, b"foobar", {b"foo": b"bar"}, [b"foo", b"bar"], (b"foo", b"bar")]
+        )
+    ],
+)
 def test_invalid_msgpacked_item(packed, item_keys_serialized):
     assert not valid_msgpacked_dict(packed, item_keys_serialized)
 
@@ -239,20 +239,25 @@ def test_invalid_msgpacked_item(packed, item_keys_serialized):
 IK = sorted(list(ITEM_KEYS))
 
 
-@pytest.mark.parametrize('packed',
-    [msgpack.packb(o) for o in [
-        {'path': b'/a/b/c'},  # small (different msgpack mapping type!)
-        OrderedDict((k, b'') for k in IK),  # as big (key count) as it gets
-        OrderedDict((k, b'x' * 1000) for k in IK),  # as big (key count and volume) as it gets
-    ]])
+@pytest.mark.parametrize(
+    "packed",
+    [
+        msgpack.packb(o)
+        for o in [
+            {"path": b"/a/b/c"},  # small (different msgpack mapping type!)
+            OrderedDict((k, b"") for k in IK),  # as big (key count) as it gets
+            OrderedDict((k, b"x" * 1000) for k in IK),  # as big (key count and volume) as it gets
+        ]
+    ],
+)
 def test_valid_msgpacked_items(packed, item_keys_serialized):
     assert valid_msgpacked_dict(packed, item_keys_serialized)
 
 
 def test_key_length_msgpacked_items():
-    key = 'x' * 32  # 31 bytes is the limit for fixstr msgpack type
-    data = {key: b''}
-    item_keys_serialized = [msgpack.packb(key), ]
+    key = "x" * 32  # 31 bytes is the limit for fixstr msgpack type
+    data = {key: b""}
+    item_keys_serialized = [msgpack.packb(key)]
     assert valid_msgpacked_dict(msgpack.packb(data), item_keys_serialized)
 
 
@@ -277,7 +282,7 @@ def test_backup_io_iter():
 
     normal_iterator = Iterator(StopIteration)
     for _ in backup_io_iter(normal_iterator):
-        assert False, 'StopIteration handled incorrectly'
+        assert False, "StopIteration handled incorrectly"
 
 
 def test_get_item_uid_gid():
@@ -288,7 +293,7 @@ def test_get_item_uid_gid():
     user0, group0 = uid2user(0), gid2group(0)
 
     # this is intentionally a "strange" item, with not matching ids/names.
-    item = Item(path='filename', uid=1, gid=2, user=user0, group=group0)
+    item = Item(path="filename", uid=1, gid=2, user=user0, group=group0)
 
     uid, gid = get_item_uid_gid(item, numeric=False)
     # these are found via a name-to-id lookup
@@ -306,7 +311,7 @@ def test_get_item_uid_gid():
     assert gid == 4
 
     # item metadata broken, has negative ids.
-    item = Item(path='filename', uid=-1, gid=-2, user=user0, group=group0)
+    item = Item(path="filename", uid=-1, gid=-2, user=user0, group=group0)
 
     uid, gid = get_item_uid_gid(item, numeric=True)
     # use the uid/gid defaults (which both default to 0).
@@ -319,7 +324,7 @@ def test_get_item_uid_gid():
     assert gid == 6
 
     # item metadata broken, has negative ids and non-existing user/group names.
-    item = Item(path='filename', uid=-3, gid=-4, user='udoesnotexist', group='gdoesnotexist')
+    item = Item(path="filename", uid=-3, gid=-4, user="udoesnotexist", group="gdoesnotexist")
 
     uid, gid = get_item_uid_gid(item, numeric=False)
     # use the uid/gid defaults (which both default to 0).
@@ -332,7 +337,7 @@ def test_get_item_uid_gid():
     assert gid == 8
 
     # item metadata has valid uid/gid, but non-existing user/group names.
-    item = Item(path='filename', uid=9, gid=10, user='udoesnotexist', group='gdoesnotexist')
+    item = Item(path="filename", uid=9, gid=10, user="udoesnotexist", group="gdoesnotexist")
 
     uid, gid = get_item_uid_gid(item, numeric=False)
     # because user/group name does not exist here, use valid numeric ids from item metadata.

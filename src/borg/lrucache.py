@@ -10,8 +10,8 @@ class LRUCache:
 
     def __setitem__(self, key, value):
         assert key not in self._cache, (
-            "Unexpected attempt to replace a cached item,"
-            " without first deleting the old item.")
+            "Unexpected attempt to replace a cached item," " without first deleting the old item."
+        )
         self._lru.append(key)
         while len(self._lru) > self._capacity:
             del self[self._lru[0]]

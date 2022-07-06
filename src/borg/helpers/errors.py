@@ -5,6 +5,7 @@ from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 
 class Error(Exception):
     """Error: {}"""
+
     # Error base class
 
     # if we raise such an Error and it is only caught by the uppermost
@@ -26,6 +27,7 @@ class Error(Exception):
 
 class ErrorWithTraceback(Error):
     """Error: {}"""
+
     # like Error, but show a traceback also
     traceback = True
 

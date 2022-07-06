@@ -64,7 +64,7 @@ version = mp_version
 
 USE_BIN_TYPE = True
 RAW = False
-UNICODE_ERRORS = 'surrogateescape'
+UNICODE_ERRORS = "surrogateescape"
 
 
 class PackException(Exception):
@@ -76,13 +76,25 @@ class UnpackException(Exception):
 
 
 class Packer(mp_Packer):
-    def __init__(self, *, default=None, unicode_errors=UNICODE_ERRORS,
-                 use_single_float=False, autoreset=True, use_bin_type=USE_BIN_TYPE,
-                 strict_types=False):
+    def __init__(
+        self,
+        *,
+        default=None,
+        unicode_errors=UNICODE_ERRORS,
+        use_single_float=False,
+        autoreset=True,
+        use_bin_type=USE_BIN_TYPE,
+        strict_types=False
+    ):
         assert unicode_errors == UNICODE_ERRORS
-        super().__init__(default=default, unicode_errors=unicode_errors,
-                         use_single_float=use_single_float, autoreset=autoreset, use_bin_type=use_bin_type,
-                         strict_types=strict_types)
+        super().__init__(
+            default=default,
+            unicode_errors=unicode_errors,
+            use_single_float=use_single_float,
+            autoreset=autoreset,
+            use_bin_type=use_bin_type,
+            strict_types=strict_types,
+        )
 
     def pack(self, obj):
         try:
@@ -108,18 +120,36 @@ def pack(o, stream, *, use_bin_type=USE_BIN_TYPE, unicode_errors=UNICODE_ERRORS,
 
 
 class Unpacker(mp_Unpacker):
-    def __init__(self, file_like=None, *, read_size=0, use_list=True, raw=RAW,
-                 object_hook=None, object_pairs_hook=None, list_hook=None,
-                 unicode_errors=UNICODE_ERRORS, max_buffer_size=0,
-                 ext_hook=ExtType,
-                 strict_map_key=False):
+    def __init__(
+        self,
+        file_like=None,
+        *,
+        read_size=0,
+        use_list=True,
+        raw=RAW,
+        object_hook=None,
+        object_pairs_hook=None,
+        list_hook=None,
+        unicode_errors=UNICODE_ERRORS,
+        max_buffer_size=0,
+        ext_hook=ExtType,
+        strict_map_key=False
+    ):
         assert raw == RAW
         assert unicode_errors == UNICODE_ERRORS
-        kw = dict(file_like=file_like, read_size=read_size, use_list=use_list, raw=raw,
-                  object_hook=object_hook, object_pairs_hook=object_pairs_hook, list_hook=list_hook,
-                  unicode_errors=unicode_errors, max_buffer_size=max_buffer_size,
-                  ext_hook=ext_hook,
-                  strict_map_key=strict_map_key)
+        kw = dict(
+            file_like=file_like,
+            read_size=read_size,
+            use_list=use_list,
+            raw=raw,
+            object_hook=object_hook,
+            object_pairs_hook=object_pairs_hook,
+            list_hook=list_hook,
+            unicode_errors=unicode_errors,
+            max_buffer_size=max_buffer_size,
+            ext_hook=ext_hook,
+            strict_map_key=strict_map_key,
+        )
         super().__init__(**kw)
 
     def unpack(self):
@@ -141,28 +171,22 @@ class Unpacker(mp_Unpacker):
     next = __next__
 
 
-def unpackb(packed, *, raw=RAW, unicode_errors=UNICODE_ERRORS,
-            strict_map_key=False,
-            **kwargs):
+def unpackb(packed, *, raw=RAW, unicode_errors=UNICODE_ERRORS, strict_map_key=False, **kwargs):
     assert raw == RAW
     assert unicode_errors == UNICODE_ERRORS
     try:
-        kw = dict(raw=raw, unicode_errors=unicode_errors,
-                  strict_map_key=strict_map_key)
+        kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key)
         kw.update(kwargs)
         return mp_unpackb(packed, **kw)
     except Exception as e:
         raise UnpackException(e)
 
 
-def unpack(stream, *, raw=RAW, unicode_errors=UNICODE_ERRORS,
-           strict_map_key=False,
-           **kwargs):
+def unpack(stream, *, raw=RAW, unicode_errors=UNICODE_ERRORS, strict_map_key=False, **kwargs):
     assert raw == RAW
     assert unicode_errors == UNICODE_ERRORS
     try:
-        kw = dict(raw=raw, unicode_errors=unicode_errors,
-                  strict_map_key=strict_map_key)
+        kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key)
         kw.update(kwargs)
         return mp_unpack(stream, **kw)
     except Exception as e:
@@ -171,32 +195,34 @@ def unpack(stream, *, raw=RAW, unicode_errors=UNICODE_ERRORS,
 
 # msgpacking related utilities -----------------------------------------------
 
+
 def is_slow_msgpack():
     import msgpack
     import msgpack.fallback
+
     return msgpack.Packer is msgpack.fallback.Packer
 
 
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
     import msgpack
-    return (1, 0, 3) <= msgpack.version <= (1, 0, 4) and \
-           msgpack.version not in []  # < add bad releases here to deny list
+
+    return (1, 0, 3) <= msgpack.version <= (
+        1,
+        0,
+        4,
+    ) and msgpack.version not in []  # < add bad releases here to deny list
 
 
 def get_limited_unpacker(kind):
     """return a limited Unpacker because we should not trust msgpack data received from remote"""
     # Note: msgpack >= 0.6.1 auto-computes DoS-safe max values from len(data) for
     #       unpack(data) or from max_buffer_size for Unpacker(max_buffer_size=N).
-    args = dict(use_list=False,  # return tuples, not lists
-                max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE),
-                )
-    if kind in ('server', 'client'):
+    args = dict(use_list=False, max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE))  # return tuples, not lists
+    if kind in ("server", "client"):
         pass  # nothing special
-    elif kind in ('manifest', 'key'):
-        args.update(dict(use_list=True,  # default value
-                         object_hook=StableDict,
-                         ))
+    elif kind in ("manifest", "key"):
+        args.update(dict(use_list=True, object_hook=StableDict))  # default value
     else:
         raise ValueError('kind must be "server", "client", "manifest" or "key"')
     return Unpacker(**args)

@@ -6,7 +6,7 @@ import json
 import textwrap
 
 from ..archive import Archive
-from ..constants import *
+from ..constants import *  # NOQA
 from ..helpers import msgpack
 from ..helpers import sysinfo
 from ..helpers import bin_to_hex, prepare_dump_dict

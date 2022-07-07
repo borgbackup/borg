@@ -4,7 +4,7 @@ import textwrap
 
 import borg
 from ..archive import Archive
-from ..constants import *
+from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import Manifest

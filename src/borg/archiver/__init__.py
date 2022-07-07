@@ -10,7 +10,6 @@ try:
     import configparser
     import faulthandler
     import functools
-    import hashlib
     import inspect
     import itertools
     import json
@@ -25,46 +24,40 @@ try:
     import tarfile
     import textwrap
     import time
-    from binascii import unhexlify, hexlify
+    from binascii import unhexlify
     from contextlib import contextmanager
     from datetime import datetime, timedelta
     from io import TextIOWrapper
-    from struct import Struct
 
     from ..logger import create_logger, setup_logging
 
     logger = create_logger()
 
-    import borg
     from .common import with_repository, with_other_repository, with_archive
     from .. import __version__
     from .. import helpers
-    from ..checksums import crc32
     from ..archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
     from ..archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
     from ..archive import FilesystemObjectProcessors, TarfileObjectProcessors, MetadataCollector, ChunksProcessor
-    from ..archive import has_link
     from ..cache import Cache, assert_secure, SecurityManager
     from ..constants import *  # NOQA
-    from ..compress import CompressionSpec, ZLIB, ZLIB_legacy, ObfuscateSize
-    from ..crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
-    from ..crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
+    from ..compress import CompressionSpec
+    from ..crypto.key import FlexiKey, key_creator, key_argument_names, tam_required_file
     from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
     from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
     from ..crypto.keymanager import KeyManager
     from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from ..helpers import Error, NoManifestError, set_ec
     from ..helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
-    from ..helpers import PrefixSpec, GlobSpec, NameSpec, CommentSpec, SortBySpec, FilesCacheMode
+    from ..helpers import GlobSpec, NameSpec, CommentSpec, SortBySpec, FilesCacheMode
     from ..helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from ..helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from ..helpers import remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
+    from ..helpers import remove_surrogates, bin_to_hex, eval_escapes
     from ..helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from ..helpers import timestamp
     from ..helpers import get_cache_dir, os_stat
     from ..helpers import Manifest, AI_HUMAN_SORT_KEYS
     from ..helpers import HardLinkManager
-    from ..helpers import StableDict
     from ..helpers import check_python, check_extension_modules
     from ..helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
     from ..helpers import log_multi
@@ -72,9 +65,8 @@ try:
     from ..helpers import ErrorIgnoringTextIOWrapper
     from ..helpers import ProgressIndicatorPercent
     from ..helpers import basic_json_data, json_print
-    from ..helpers import replace_placeholders
     from ..helpers import ChunkIteratorFileWrapper
-    from ..helpers import popen_with_error_handling, prepare_subprocess_env, create_filter_process
+    from ..helpers import prepare_subprocess_env, create_filter_process
     from ..helpers import dash_open
     from ..helpers import umount
     from ..helpers import flags_root, flags_dir, flags_special_follow, flags_special
@@ -91,10 +83,9 @@ try:
     )
     from ..patterns import PatternMatcher
     from ..item import Item
-    from ..platform import get_flags, get_process_id, SyncFile
+    from ..platform import get_flags, SyncFile
     from ..platform import uid2user, gid2group
     from ..remote import RepositoryServer, RemoteRepository, cache_if_remote
-    from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
     from ..selftest import selftest
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's

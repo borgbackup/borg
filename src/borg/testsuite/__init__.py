@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import filecmp
 import functools
 import os
+
 try:
     import posix
 except ImportError:
@@ -25,14 +26,14 @@ from .. import platform
 from ..fuse_impl import llfuse, has_pyfuse3, has_llfuse
 
 # Does this version of llfuse support ns precision?
-have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, 'st_mtime_ns') if llfuse else False
+have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, "st_mtime_ns") if llfuse else False
 
 try:
     from pytest import raises
 except:  # noqa
     raises = None
 
-has_lchflags = hasattr(os, 'lchflags') or sys.platform.startswith('linux')
+has_lchflags = hasattr(os, "lchflags") or sys.platform.startswith("linux")
 try:
     with tempfile.NamedTemporaryFile() as file:
         platform.set_flags(file.name, stat.UF_NODUMP)
@@ -40,14 +41,14 @@ except OSError:
     has_lchflags = False
 
 # The mtime get/set precision varies on different OS and Python versions
-if posix and 'HAVE_FUTIMENS' in getattr(posix, '_have_functions', []):
+if posix and "HAVE_FUTIMENS" in getattr(posix, "_have_functions", []):
     st_mtime_ns_round = 0
-elif 'HAVE_UTIMES' in sysconfig.get_config_vars():
+elif "HAVE_UTIMES" in sysconfig.get_config_vars():
     st_mtime_ns_round = -6
 else:
     st_mtime_ns_round = -9
 
-if sys.platform.startswith('netbsd'):
+if sys.platform.startswith("netbsd"):
     st_mtime_ns_round = -4  # only >1 microsecond resolution here?
 
 
@@ -61,8 +62,8 @@ def unopened_tempfile():
 def are_symlinks_supported():
     with unopened_tempfile() as filepath:
         try:
-            os.symlink('somewhere', filepath)
-            if os.stat(filepath, follow_symlinks=False) and os.readlink(filepath) == 'somewhere':
+            os.symlink("somewhere", filepath)
+            if os.stat(filepath, follow_symlinks=False) and os.readlink(filepath) == "somewhere":
                 return True
         except OSError:
             pass
@@ -71,12 +72,12 @@ def are_symlinks_supported():
 
 @functools.lru_cache
 def are_hardlinks_supported():
-    if not hasattr(os, 'link'):
+    if not hasattr(os, "link"):
         # some pythons do not have os.link
         return False
 
     with unopened_tempfile() as file1path, unopened_tempfile() as file2path:
-        open(file1path, 'w').close()
+        open(file1path, "w").close()
         try:
             os.link(file1path, file2path)
             stat1 = os.stat(file1path)
@@ -108,9 +109,9 @@ def is_utime_fully_supported():
     with unopened_tempfile() as filepath:
         # Some filesystems (such as SSHFS) don't support utime on symlinks
         if are_symlinks_supported():
-            os.symlink('something', filepath)
+            os.symlink("something", filepath)
         else:
-            open(filepath, 'w').close()
+            open(filepath, "w").close()
         try:
             os.utime(filepath, (1000, 2000), follow_symlinks=False)
             new_stats = os.stat(filepath, follow_symlinks=False)
@@ -125,14 +126,14 @@ def is_utime_fully_supported():
 
 @functools.lru_cache
 def is_birthtime_fully_supported():
-    if not hasattr(os.stat_result, 'st_birthtime'):
+    if not hasattr(os.stat_result, "st_birthtime"):
         return False
     with unopened_tempfile() as filepath:
         # Some filesystems (such as SSHFS) don't support utime on symlinks
         if are_symlinks_supported():
-            os.symlink('something', filepath)
+            os.symlink("something", filepath)
         else:
-            open(filepath, 'w').close()
+            open(filepath, "w").close()
         try:
             birthtime, mtime, atime = 946598400, 946684800, 946771200
             os.utime(filepath, (atime, birthtime), follow_symlinks=False)
@@ -149,7 +150,7 @@ def is_birthtime_fully_supported():
 
 def no_selinux(x):
     # selinux fails our FUSE tests, thus ignore selinux xattrs
-    SELINUX_KEY = b'security.selinux'
+    SELINUX_KEY = b"security.selinux"
     if isinstance(x, dict):
         return {k: v for k, v in x.items() if k != SELINUX_KEY}
     if isinstance(x, list):
@@ -157,8 +158,8 @@ def no_selinux(x):
 
 
 class BaseTestCase(unittest.TestCase):
-    """
-    """
+    """ """
+
     assert_in = unittest.TestCase.assertIn
     assert_not_in = unittest.TestCase.assertNotIn
     assert_equal = unittest.TestCase.assertEqual
@@ -171,9 +172,9 @@ class BaseTestCase(unittest.TestCase):
 
     @contextmanager
     def assert_creates_file(self, path):
-        assert not os.path.exists(path), f'{path} should not exist'
+        assert not os.path.exists(path), f"{path} should not exist"
         yield
-        assert os.path.exists(path), f'{path} should exist'
+        assert os.path.exists(path), f"{path} should exist"
 
     def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)
@@ -191,10 +192,10 @@ class BaseTestCase(unittest.TestCase):
             s2 = os.stat(path2, follow_symlinks=False)
             # Assume path2 is on FUSE if st_dev is different
             fuse = s1.st_dev != s2.st_dev
-            attrs = ['st_uid', 'st_gid', 'st_rdev']
+            attrs = ["st_uid", "st_gid", "st_rdev"]
             if not fuse or not os.path.isdir(path1):
                 # dir nlink is always 1 on our FUSE filesystem
-                attrs.append('st_nlink')
+                attrs.append("st_nlink")
             d1 = [filename] + [getattr(s1, a) for a in attrs]
             d2 = [filename] + [getattr(s2, a) for a in attrs]
             d1.insert(1, oct(s1.st_mode))
@@ -225,7 +226,9 @@ class BaseTestCase(unittest.TestCase):
                 d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
-            self._assert_dirs_equal_cmp(sub_diff, ignore_flags=ignore_flags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)
+            self._assert_dirs_equal_cmp(
+                sub_diff, ignore_flags=ignore_flags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns
+            )
 
     @contextmanager
     def fuse_mount(self, location, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
@@ -247,7 +250,7 @@ class BaseTestCase(unittest.TestCase):
             mountpoint = tempfile.mkdtemp()
         else:
             os.mkdir(mountpoint)
-        args = [f'--repo={location}', 'mount', mountpoint] + list(options)
+        args = [f"--repo={location}", "mount", mountpoint] + list(options)
         if os_fork:
             # Do not spawn, but actually (OS) fork.
             if os.fork() == 0:
@@ -264,12 +267,11 @@ class BaseTestCase(unittest.TestCase):
                     # This should never be reached, since it daemonizes,
                     # and the grandchild process exits before cmd() returns.
                     # However, just in case...
-                    print('Fatal: borg mount did not daemonize properly. Force exiting.',
-                          file=sys.stderr, flush=True)
+                    print("Fatal: borg mount did not daemonize properly. Force exiting.", file=sys.stderr, flush=True)
                     os._exit(0)
         else:
             self.cmd(*args, fork=fork, **kwargs)
-            if kwargs.get('exit_code', EXIT_SUCCESS) == EXIT_ERROR:
+            if kwargs.get("exit_code", EXIT_SUCCESS) == EXIT_ERROR:
                 # If argument `exit_code = EXIT_ERROR`, then this call
                 # is testing the behavior of an unsuccessful mount and
                 # we must not continue, as there is no mount to work
@@ -292,7 +294,7 @@ class BaseTestCase(unittest.TestCase):
             if os.path.ismount(mountpoint) == mounted:
                 return
             time.sleep(0.1)
-        message = 'Waiting for {} of {}'.format('mount' if mounted else 'umount', mountpoint)
+        message = "Waiting for {} of {}".format("mount" if mounted else "umount", mountpoint)
         raise TimeoutError(message)
 
     @contextmanager
@@ -308,17 +310,17 @@ class BaseTestCase(unittest.TestCase):
         tests are running with root privileges. Instead, the folder is
         rendered immutable with chattr or chflags, respectively.
         """
-        if sys.platform.startswith('linux'):
+        if sys.platform.startswith("linux"):
             cmd_immutable = 'chattr +i "%s"' % path
             cmd_mutable = 'chattr -i "%s"' % path
-        elif sys.platform.startswith(('darwin', 'freebsd', 'netbsd', 'openbsd')):
+        elif sys.platform.startswith(("darwin", "freebsd", "netbsd", "openbsd")):
             cmd_immutable = 'chflags uchg "%s"' % path
             cmd_mutable = 'chflags nouchg "%s"' % path
-        elif sys.platform.startswith('sunos'):  # openindiana
+        elif sys.platform.startswith("sunos"):  # openindiana
             cmd_immutable = 'chmod S+vimmutable "%s"' % path
             cmd_mutable = 'chmod S-vimmutable "%s"' % path
         else:
-            message = 'Testing read-only repos is not supported on platform %s' % sys.platform
+            message = "Testing read-only repos is not supported on platform %s" % sys.platform
             self.skipTest(message)
         try:
             os.system('LD_PRELOAD= chmod -R ugo-w "%s"' % path)
@@ -365,12 +367,13 @@ class environment_variable:
 
 class FakeInputs:
     """Simulate multiple user inputs, can be used as input() replacement"""
+
     def __init__(self, inputs):
         self.inputs = inputs
 
     def __call__(self, prompt=None):
         if prompt is not None:
-            print(prompt, end='')
+            print(prompt, end="")
         try:
             return self.inputs.pop(0)
         except IndexError:

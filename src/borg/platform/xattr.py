@@ -18,7 +18,7 @@ def split_string0(buf):
     """split a list of zero-terminated strings into python not-zero-terminated bytes"""
     if isinstance(buf, bytearray):
         buf = bytes(buf)  # use a bytes object, so we return a list of bytes objects
-    return buf.split(b'\0')[:-1]
+    return buf.split(b"\0")[:-1]
 
 
 def split_lstring(buf):
@@ -27,8 +27,8 @@ def split_lstring(buf):
     mv = memoryview(buf)
     while mv:
         length = mv[0]
-        result.append(bytes(mv[1:1 + length]))
-        mv = mv[1 + length:]
+        result.append(bytes(mv[1 : 1 + length]))
+        mv = mv[1 + length :]
     return result
 
 
@@ -38,6 +38,7 @@ class BufferTooSmallError(Exception):
 
 def _check(rv, path=None, detect_buffer_too_small=False):
     from . import get_errno
+
     if rv < 0:
         e = get_errno()
         if detect_buffer_too_small and e == errno.ERANGE:
@@ -48,9 +49,9 @@ def _check(rv, path=None, detect_buffer_too_small=False):
             try:
                 msg = os.strerror(e)
             except ValueError:
-                msg = ''
+                msg = ""
             if isinstance(path, int):
-                path = '<FD %d>' % path
+                path = "<FD %d>" % path
             raise OSError(e, msg, path)
     if detect_buffer_too_small and rv >= len(buffer):
         # freebsd does not error with ERANGE if the buffer is too small,

@@ -16,6 +16,7 @@ from ..platformflags import is_win32
 from ..constants import *  # NOQA
 
 from ..logger import create_logger
+
 logger = create_logger()
 
 
@@ -50,32 +51,32 @@ def get_base_dir():
     - ~$USER, if USER is set
     - ~
     """
-    base_dir = os.environ.get('BORG_BASE_DIR') or os.environ.get('HOME')
+    base_dir = os.environ.get("BORG_BASE_DIR") or os.environ.get("HOME")
     # os.path.expanduser() behaves differently for '~' and '~someuser' as
     # parameters: when called with an explicit username, the possibly set
     # environment variable HOME is no longer respected. So we have to check if
     # it is set and only expand the user's home directory if HOME is unset.
     if not base_dir:
-        base_dir = os.path.expanduser('~%s' % os.environ.get('USER', ''))
+        base_dir = os.path.expanduser("~%s" % os.environ.get("USER", ""))
     return base_dir
 
 
 def get_keys_dir():
     """Determine where to repository keys and cache"""
-    keys_dir = os.environ.get('BORG_KEYS_DIR')
+    keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        keys_dir = os.path.join(get_config_dir(), 'keys')
+        keys_dir = os.path.join(get_config_dir(), "keys")
     ensure_dir(keys_dir)
     return keys_dir
 
 
 def get_security_dir(repository_id=None):
     """Determine where to store local security information."""
-    security_dir = os.environ.get('BORG_SECURITY_DIR')
+    security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = os.path.join(get_config_dir(), 'security')
+        security_dir = os.path.join(get_config_dir(), "security")
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     ensure_dir(security_dir)
@@ -85,22 +86,28 @@ def get_security_dir(repository_id=None):
 def get_cache_dir():
     """Determine where to repository keys and cache"""
     # Get cache home path
-    cache_home = os.path.join(get_base_dir(), '.cache')
+    cache_home = os.path.join(get_base_dir(), ".cache")
     # Try to use XDG_CACHE_HOME instead if BORG_BASE_DIR isn't explicitly set
-    if not os.environ.get('BORG_BASE_DIR'):
-        cache_home = os.environ.get('XDG_CACHE_HOME', cache_home)
+    if not os.environ.get("BORG_BASE_DIR"):
+        cache_home = os.environ.get("XDG_CACHE_HOME", cache_home)
     # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
-    cache_dir = os.environ.get('BORG_CACHE_DIR', os.path.join(cache_home, 'borg'))
+    cache_dir = os.environ.get("BORG_CACHE_DIR", os.path.join(cache_home, "borg"))
     # Create path if it doesn't exist yet
     ensure_dir(cache_dir)
     cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
     if not os.path.exists(cache_tag_fn):
-        cache_tag_contents = CACHE_TAG_CONTENTS + textwrap.dedent("""
+        cache_tag_contents = (
+            CACHE_TAG_CONTENTS
+            + textwrap.dedent(
+                """
         # This file is a cache directory tag created by Borg.
         # For information about cache directory tags, see:
         #       http://www.bford.info/cachedir/spec.html
-        """).encode('ascii')
+        """
+            ).encode("ascii")
+        )
         from ..platform import SaveFile
+
         with SaveFile(cache_tag_fn, binary=True) as fd:
             fd.write(cache_tag_contents)
     return cache_dir
@@ -109,12 +116,12 @@ def get_cache_dir():
 def get_config_dir():
     """Determine where to store whole config"""
     # Get config home path
-    config_home = os.path.join(get_base_dir(), '.config')
+    config_home = os.path.join(get_base_dir(), ".config")
     # Try to use XDG_CONFIG_HOME instead if BORG_BASE_DIR isn't explicitly set
-    if not os.environ.get('BORG_BASE_DIR'):
-        config_home = os.environ.get('XDG_CONFIG_HOME', config_home)
+    if not os.environ.get("BORG_BASE_DIR"):
+        config_home = os.environ.get("XDG_CONFIG_HOME", config_home)
     # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
-    config_dir = os.environ.get('BORG_CONFIG_DIR', os.path.join(config_home, 'borg'))
+    config_dir = os.environ.get("BORG_CONFIG_DIR", os.path.join(config_home, "borg"))
     # Create path if it doesn't exist yet
     ensure_dir(config_dir)
     return config_dir
@@ -130,7 +137,7 @@ def dir_is_cachedir(path):
     tag_path = os.path.join(path, CACHE_TAG_NAME)
     try:
         if os.path.exists(tag_path):
-            with open(tag_path, 'rb') as tag_file:
+            with open(tag_path, "rb") as tag_file:
                 tag_data = tag_file.read(len(CACHE_TAG_CONTENTS))
                 if tag_data == CACHE_TAG_CONTENTS:
                     return True
@@ -157,13 +164,12 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
     return tag_names
 
 
-_safe_re = re.compile(r'^((\.\.)?/+)+')
+_safe_re = re.compile(r"^((\.\.)?/+)+")
 
 
 def make_path_safe(path):
-    """Make path safe by making it relative and local
-    """
-    return _safe_re.sub('', path) or '.'
+    """Make path safe by making it relative and local"""
+    return _safe_re.sub("", path) or "."
 
 
 class HardLinkManager:
@@ -189,6 +195,7 @@ class HardLinkManager:
        For better hardlink support (including the very first hardlink item for each group of same-target hardlinks),
        we would need a 2-pass processing, which is not yet implemented.
     """
+
     def __init__(self, *, id_type, info_type):
         self._map = {}
         self.id_type = id_type
@@ -198,21 +205,21 @@ class HardLinkManager:
         return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
 
     def borg1_hardlink_master(self, item):  # legacy
-        return item.get('hardlink_master', True) and 'source' not in item and self.borg1_hardlinkable(item.mode)
+        return item.get("hardlink_master", True) and "source" not in item and self.borg1_hardlinkable(item.mode)
 
     def borg1_hardlink_slave(self, item):  # legacy
-        return 'source' in item and self.borg1_hardlinkable(item.mode)
+        return "source" in item and self.borg1_hardlinkable(item.mode)
 
     def hardlink_id_from_path(self, path):
         """compute a hardlink id from a path"""
         assert isinstance(path, str)
-        return hashlib.sha256(path.encode('utf-8', errors='surrogateescape')).digest()
+        return hashlib.sha256(path.encode("utf-8", errors="surrogateescape")).digest()
 
     def hardlink_id_from_inode(self, *, ino, dev):
         """compute a hardlink id from an inode"""
         assert isinstance(ino, int)
         assert isinstance(dev, int)
-        return hashlib.sha256(f'{ino}/{dev}'.encode()).digest()
+        return hashlib.sha256(f"{ino}/{dev}".encode()).digest()
 
     def remember(self, *, id, info):
         """
@@ -243,7 +250,7 @@ def scandir_keyfunc(dirent):
         return (0, dirent.inode())
     except OSError as e:
         # maybe a permission denied error while doing a stat() on the dirent
-        logger.debug('scandir_inorder: Unable to stat %s: %s', dirent.path, e)
+        logger.debug("scandir_inorder: Unable to stat %s: %s", dirent.path, e)
         # order this dirent after all the others lexically by file name
         # we may not break the whole scandir just because of an exception in one dirent
         # ignore the exception for now, since another stat will be done later anyways
@@ -268,7 +275,7 @@ def secure_erase(path, *, avoid_collateral_damage):
     If avoid_collateral_damage is False, we always secure erase.
     If there are hardlinks pointing to the same inode as <path>, they will contain random garbage afterwards.
     """
-    with open(path, 'r+b') as fd:
+    with open(path, "r+b") as fd:
         st = os.stat(fd.fileno())
         if not (st.st_nlink > 1 and avoid_collateral_damage):
             fd.write(os.urandom(st.st_size))
@@ -303,7 +310,7 @@ def safe_unlink(path):
         # no other hardlink! try to recover free space by truncating this file.
         try:
             # Do not create *path* if it does not exist, open for truncation in r+b mode (=O_RDWR|O_BINARY).
-            with open(path, 'r+b') as fd:
+            with open(path, "r+b") as fd:
                 fd.truncate()
         except OSError:
             # truncate didn't work, so we still have the original unlink issue - give up:
@@ -314,10 +321,10 @@ def safe_unlink(path):
 
 
 def dash_open(path, mode):
-    assert '+' not in mode  # the streams are either r or w, but never both
-    if path == '-':
-        stream = sys.stdin if 'r' in mode else sys.stdout
-        return stream.buffer if 'b' in mode else stream
+    assert "+" not in mode  # the streams are either r or w, but never both
+    if path == "-":
+        stream = sys.stdin if "r" in mode else sys.stdout
+        return stream.buffer if "b" in mode else stream
     else:
         return open(path, mode)
 
@@ -325,17 +332,17 @@ def dash_open(path, mode):
 def O_(*flags):
     result = 0
     for flag in flags:
-        result |= getattr(os, 'O_' + flag, 0)
+        result |= getattr(os, "O_" + flag, 0)
     return result
 
 
-flags_base = O_('BINARY', 'NOCTTY', 'RDONLY')
-flags_special = flags_base | O_('NOFOLLOW')  # BLOCK == wait when reading devices or fifos
+flags_base = O_("BINARY", "NOCTTY", "RDONLY")
+flags_special = flags_base | O_("NOFOLLOW")  # BLOCK == wait when reading devices or fifos
 flags_special_follow = flags_base  # BLOCK == wait when reading symlinked devices or fifos
-flags_normal = flags_base | O_('NONBLOCK', 'NOFOLLOW')
-flags_noatime = flags_normal | O_('NOATIME')
-flags_root = O_('RDONLY')
-flags_dir = O_('DIRECTORY', 'RDONLY', 'NOFOLLOW')
+flags_normal = flags_base | O_("NONBLOCK", "NOFOLLOW")
+flags_noatime = flags_normal | O_("NOATIME")
+flags_root = O_("RDONLY")
+flags_dir = O_("DIRECTORY", "RDONLY", "NOFOLLOW")
 
 
 def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
@@ -362,7 +369,7 @@ def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
         return None
     _flags_normal = flags
     if noatime:
-        _flags_noatime = _flags_normal | O_('NOATIME')
+        _flags_noatime = _flags_normal | O_("NOATIME")
         try:
             # if we have O_NOATIME, this likely will succeed if we are root or owner of file:
             fd = os.open(fname, _flags_noatime, dir_fd=parent_fd)
@@ -375,7 +382,8 @@ def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
         except OSError as exc:
             # O_NOATIME causes EROFS when accessing a volume shadow copy in WSL1
             from . import workarounds
-            if 'retry_erofs' in workarounds and exc.errno == errno.EROFS and _flags_noatime != _flags_normal:
+
+            if "retry_erofs" in workarounds and exc.errno == errno.EROFS and _flags_noatime != _flags_normal:
                 fd = os.open(fname, _flags_normal, dir_fd=parent_fd)
             else:
                 raise
@@ -407,6 +415,6 @@ def os_stat(*, path=None, parent_fd=None, name=None, follow_symlinks=False):
 def umount(mountpoint):
     env = prepare_subprocess_env(system=True)
     try:
-        return subprocess.call(['fusermount', '-u', mountpoint], env=env)
+        return subprocess.call(["fusermount", "-u", mountpoint], env=env)
     except FileNotFoundError:
-        return subprocess.call(['umount', mountpoint], env=env)
+        return subprocess.call(["umount", mountpoint], env=env)

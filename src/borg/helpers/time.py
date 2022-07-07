@@ -12,7 +12,7 @@ def to_localtime(ts):
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string"""
-    fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS
+    fmt = ISO_FORMAT if "." in timestamp else ISO_FORMAT_NO_USECS
     dt = datetime.strptime(timestamp, fmt)
     if tzinfo is not None:
         dt = dt.replace(tzinfo=tzinfo)
@@ -27,11 +27,16 @@ def timestamp(s):
         return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
         # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
-        for format in ('%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S+00:00',
-                       '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S',
-                       '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M',
-                       '%Y-%m-%d', '%Y-%j',
-                       ):
+        for format in (
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S+00:00",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d",
+            "%Y-%j",
+        ):
             try:
                 return datetime.strptime(s, format).replace(tzinfo=timezone.utc)
             except ValueError:
@@ -54,7 +59,7 @@ if SUPPORT_32BIT_PLATFORMS:
     # subtract last 48h to avoid any issues that could be caused by tz calculations.
     # this is in the year 2038, so it is also less than y9999 (which is a datetime internal limit).
     # msgpack can pack up to uint64.
-    MAX_S = 2**31-1 - 48*3600
+    MAX_S = 2**31 - 1 - 48 * 3600
     MAX_NS = MAX_S * 1000000000
 else:
     # nanosecond timestamps will fit into a signed int64.
@@ -62,7 +67,7 @@ else:
     # this is in the year 2262, so it is also less than y9999 (which is a datetime internal limit).
     # round down to 1e9 multiple, so MAX_NS corresponds precisely to a integer MAX_S.
     # msgpack can pack up to uint64.
-    MAX_NS = (2**63-1 - 48*3600*1000000000) // 1000000000 * 1000000000
+    MAX_NS = (2**63 - 1 - 48 * 3600 * 1000000000) // 1000000000 * 1000000000
     MAX_S = MAX_NS // 1000000000
 
 
@@ -89,11 +94,11 @@ def safe_timestamp(item_timestamp_ns):
     return datetime.fromtimestamp(t_ns / 1e9)
 
 
-def format_time(ts: datetime, format_spec=''):
+def format_time(ts: datetime, format_spec=""):
     """
     Convert *ts* to a human-friendly format with textual weekday.
     """
-    return ts.strftime('%a, %Y-%m-%d %H:%M:%S' if format_spec == '' else format_spec)
+    return ts.strftime("%a, %Y-%m-%d %H:%M:%S" if format_spec == "" else format_spec)
 
 
 def isoformat_time(ts: datetime):
@@ -105,19 +110,18 @@ def isoformat_time(ts: datetime):
 
 
 def format_timedelta(td):
-    """Format timedelta in a human friendly format
-    """
+    """Format timedelta in a human friendly format"""
     ts = td.total_seconds()
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24
-    txt = '%.2f seconds' % s
+    txt = "%.2f seconds" % s
     if m:
-        txt = '%d minutes %s' % (m, txt)
+        txt = "%d minutes %s" % (m, txt)
     if h:
-        txt = '%d hours %s' % (h, txt)
+        txt = "%d hours %s" % (h, txt)
     if td.days:
-        txt = '%d days %s' % (td.days, txt)
+        txt = "%d days %s" % (td.days, txt)
     return txt
 
 
@@ -131,7 +135,7 @@ class OutputTimestamp:
         return format_time(self.ts, format_spec=format_spec)
 
     def __str__(self):
-        return f'{self}'
+        return f"{self}"
 
     def isoformat(self):
         return isoformat_time(self.ts)

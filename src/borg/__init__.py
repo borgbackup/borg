@@ -9,11 +9,13 @@ __version_tuple__ = _v._version.release
 # assert that all semver components are integers
 # this is mainly to show errors when people repackage poorly
 # and setuptools_scm determines a 0.1.dev... version
-assert all(isinstance(v, int) for v in __version_tuple__), \
+assert all(isinstance(v, int) for v in __version_tuple__), (
     """\
 broken borgbackup version metadata: %r
 
 version metadata is obtained dynamically on installation via setuptools_scm,
 please ensure your git repo has the correct tags or you provide the version
 using SETUPTOOLS_SCM_PRETEND_VERSION in your build script.
-""" % __version__
+"""
+    % __version__
+)

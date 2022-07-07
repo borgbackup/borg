@@ -29,7 +29,7 @@ class RepositoryTestCaseBase(BaseTestCase):
     def open(self, create=False, exclusive=UNSPECIFIED):
         if exclusive is UNSPECIFIED:
             exclusive = self.exclusive
-        return Repository(os.path.join(self.tmppath, 'repository'), exclusive=exclusive, create=create)
+        return Repository(os.path.join(self.tmppath, "repository"), exclusive=exclusive, create=create)
 
     def setUp(self):
         self.tmppath = tempfile.mkdtemp()
@@ -46,19 +46,19 @@ class RepositoryTestCaseBase(BaseTestCase):
         self.repository = self.open(exclusive=exclusive)
 
     def add_keys(self):
-        self.repository.put(H(0), b'foo')
-        self.repository.put(H(1), b'bar')
-        self.repository.put(H(3), b'bar')
+        self.repository.put(H(0), b"foo")
+        self.repository.put(H(1), b"bar")
+        self.repository.put(H(3), b"bar")
         self.repository.commit(compact=False)
-        self.repository.put(H(1), b'bar2')
-        self.repository.put(H(2), b'boo')
+        self.repository.put(H(1), b"bar2")
+        self.repository.put(H(2), b"boo")
         self.repository.delete(H(3))
 
     def repo_dump(self, label=None):
-        label = label + ': ' if label is not None else ''
+        label = label + ": " if label is not None else ""
         H_trans = {H(i): i for i in range(10)}
         H_trans[None] = -1  # key == None appears in commits
-        tag_trans = {TAG_PUT2: 'put2', TAG_PUT: 'put', TAG_DELETE: 'del', TAG_COMMIT: 'comm'}
+        tag_trans = {TAG_PUT2: "put2", TAG_PUT: "put", TAG_DELETE: "del", TAG_COMMIT: "comm"}
         for segment, fn in self.repository.io.segment_iterator():
             for tag, key, offset, size in self.repository.io.iter_objects(segment):
                 print("%s%s H(%d) -> %s[%d..+%d]" % (label, tag_trans[tag], H_trans[key], fn, offset, size))
@@ -66,12 +66,11 @@ class RepositoryTestCaseBase(BaseTestCase):
 
 
 class RepositoryTestCase(RepositoryTestCaseBase):
-
     def test1(self):
         for x in range(100):
-            self.repository.put(H(x), b'SOMEDATA')
+            self.repository.put(H(x), b"SOMEDATA")
         key50 = H(50)
-        self.assert_equal(self.repository.get(key50), b'SOMEDATA')
+        self.assert_equal(self.repository.get(key50), b"SOMEDATA")
         self.repository.delete(key50)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
         self.repository.commit(compact=False)
@@ -81,59 +80,55 @@ class RepositoryTestCase(RepositoryTestCaseBase):
             for x in range(100):
                 if x == 50:
                     continue
-                self.assert_equal(repository2.get(H(x)), b'SOMEDATA')
+                self.assert_equal(repository2.get(H(x)), b"SOMEDATA")
 
     def test2(self):
-        """Test multiple sequential transactions
-        """
-        self.repository.put(H(0), b'foo')
-        self.repository.put(H(1), b'foo')
+        """Test multiple sequential transactions"""
+        self.repository.put(H(0), b"foo")
+        self.repository.put(H(1), b"foo")
         self.repository.commit(compact=False)
         self.repository.delete(H(0))
-        self.repository.put(H(1), b'bar')
+        self.repository.put(H(1), b"bar")
         self.repository.commit(compact=False)
-        self.assert_equal(self.repository.get(H(1)), b'bar')
+        self.assert_equal(self.repository.get(H(1)), b"bar")
 
     def test_consistency(self):
-        """Test cache consistency
-        """
-        self.repository.put(H(0), b'foo')
-        self.assert_equal(self.repository.get(H(0)), b'foo')
-        self.repository.put(H(0), b'foo2')
-        self.assert_equal(self.repository.get(H(0)), b'foo2')
-        self.repository.put(H(0), b'bar')
-        self.assert_equal(self.repository.get(H(0)), b'bar')
+        """Test cache consistency"""
+        self.repository.put(H(0), b"foo")
+        self.assert_equal(self.repository.get(H(0)), b"foo")
+        self.repository.put(H(0), b"foo2")
+        self.assert_equal(self.repository.get(H(0)), b"foo2")
+        self.repository.put(H(0), b"bar")
+        self.assert_equal(self.repository.get(H(0)), b"bar")
         self.repository.delete(H(0))
         self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(H(0)))
 
     def test_consistency2(self):
-        """Test cache consistency2
-        """
-        self.repository.put(H(0), b'foo')
-        self.assert_equal(self.repository.get(H(0)), b'foo')
+        """Test cache consistency2"""
+        self.repository.put(H(0), b"foo")
+        self.assert_equal(self.repository.get(H(0)), b"foo")
         self.repository.commit(compact=False)
-        self.repository.put(H(0), b'foo2')
-        self.assert_equal(self.repository.get(H(0)), b'foo2')
+        self.repository.put(H(0), b"foo2")
+        self.assert_equal(self.repository.get(H(0)), b"foo2")
         self.repository.rollback()
-        self.assert_equal(self.repository.get(H(0)), b'foo')
+        self.assert_equal(self.repository.get(H(0)), b"foo")
 
     def test_overwrite_in_same_transaction(self):
-        """Test cache consistency2
-        """
-        self.repository.put(H(0), b'foo')
-        self.repository.put(H(0), b'foo2')
+        """Test cache consistency2"""
+        self.repository.put(H(0), b"foo")
+        self.repository.put(H(0), b"foo2")
         self.repository.commit(compact=False)
-        self.assert_equal(self.repository.get(H(0)), b'foo2')
+        self.assert_equal(self.repository.get(H(0)), b"foo2")
 
     def test_single_kind_transactions(self):
         # put
-        self.repository.put(H(0), b'foo')
+        self.repository.put(H(0), b"foo")
         self.repository.commit(compact=False)
         self.repository.close()
         # replace
         self.repository = self.open()
         with self.repository:
-            self.repository.put(H(0), b'bar')
+            self.repository.put(H(0), b"bar")
             self.repository.commit(compact=False)
         # delete
         self.repository = self.open()
@@ -143,7 +138,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
 
     def test_list(self):
         for x in range(100):
-            self.repository.put(H(x), b'SOMEDATA')
+            self.repository.put(H(x), b"SOMEDATA")
         self.repository.commit(compact=False)
         all = self.repository.list()
         self.assert_equal(len(all), 100)
@@ -157,7 +152,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
 
     def test_scan(self):
         for x in range(100):
-            self.repository.put(H(x), b'SOMEDATA')
+            self.repository.put(H(x), b"SOMEDATA")
         self.repository.commit(compact=False)
         all = self.repository.scan()
         assert len(all) == 100
@@ -173,11 +168,10 @@ class RepositoryTestCase(RepositoryTestCaseBase):
             assert all[x] == H(x)
 
     def test_max_data_size(self):
-        max_data = b'x' * MAX_DATA_SIZE
+        max_data = b"x" * MAX_DATA_SIZE
         self.repository.put(H(0), max_data)
         self.assert_equal(self.repository.get(H(0)), max_data)
-        self.assert_raises(IntegrityError,
-                           lambda: self.repository.put(H(1), max_data + b'x'))
+        self.assert_raises(IntegrityError, lambda: self.repository.put(H(1), max_data + b"x"))
 
 
 class LocalRepositoryTestCase(RepositoryTestCaseBase):
@@ -194,21 +188,21 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         assert self.repository.compact[0] == 41 + 8 + 9
 
     def test_sparse1(self):
-        self.repository.put(H(0), b'foo')
-        self.repository.put(H(1), b'123456789')
+        self.repository.put(H(0), b"foo")
+        self.repository.put(H(1), b"123456789")
         self.repository.commit(compact=False)
-        self.repository.put(H(1), b'bar')
+        self.repository.put(H(1), b"bar")
         self._assert_sparse()
 
     def test_sparse2(self):
-        self.repository.put(H(0), b'foo')
-        self.repository.put(H(1), b'123456789')
+        self.repository.put(H(0), b"foo")
+        self.repository.put(H(1), b"123456789")
         self.repository.commit(compact=False)
         self.repository.delete(H(1))
         self._assert_sparse()
 
     def test_sparse_delete(self):
-        self.repository.put(H(0), b'1245')
+        self.repository.put(H(0), b"1245")
         self.repository.delete(H(0))
         self.repository.io._write_fd.sync()
 
@@ -224,27 +218,26 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
     def test_uncommitted_garbage(self):
         # uncommitted garbage should be no problem, it is cleaned up automatically.
         # we just have to be careful with invalidation of cached FDs in LoggedIO.
-        self.repository.put(H(0), b'foo')
+        self.repository.put(H(0), b"foo")
         self.repository.commit(compact=False)
         # write some crap to a uncommitted segment file
         last_segment = self.repository.io.get_latest_segment()
-        with open(self.repository.io.segment_filename(last_segment + 1), 'wb') as f:
-            f.write(MAGIC + b'crapcrapcrap')
+        with open(self.repository.io.segment_filename(last_segment + 1), "wb") as f:
+            f.write(MAGIC + b"crapcrapcrap")
         self.repository.close()
         # usually, opening the repo and starting a transaction should trigger a cleanup.
         self.repository = self.open()
         with self.repository:
-            self.repository.put(H(0), b'bar')  # this may trigger compact_segments()
+            self.repository.put(H(0), b"bar")  # this may trigger compact_segments()
             self.repository.commit(compact=True)
         # the point here is that nothing blows up with an exception.
 
 
 class RepositoryCommitTestCase(RepositoryTestCaseBase):
-
     def test_replay_of_missing_index(self):
         self.add_keys()
         for name in os.listdir(self.repository.path):
-            if name.startswith('index.'):
+            if name.startswith("index."):
                 os.unlink(os.path.join(self.repository.path, name))
         self.reopen()
         with self.repository:
@@ -278,9 +271,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
     def test_replay_lock_upgrade_old(self):
         self.add_keys()
         for name in os.listdir(self.repository.path):
-            if name.startswith('index.'):
+            if name.startswith("index."):
                 os.unlink(os.path.join(self.repository.path, name))
-        with patch.object(Lock, 'upgrade', side_effect=LockFailed) as upgrade:
+        with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
             self.reopen(exclusive=None)  # simulate old client that always does lock upgrades
             with self.repository:
                 # the repo is only locked by a shared read lock, but to replay segments,
@@ -291,9 +284,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
     def test_replay_lock_upgrade(self):
         self.add_keys()
         for name in os.listdir(self.repository.path):
-            if name.startswith('index.'):
+            if name.startswith("index."):
                 os.unlink(os.path.join(self.repository.path, name))
-        with patch.object(Lock, 'upgrade', side_effect=LockFailed) as upgrade:
+        with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
             self.reopen(exclusive=False)  # current client usually does not do lock upgrade, except for replay
             with self.repository:
                 # the repo is only locked by a shared read lock, but to replay segments,
@@ -322,13 +315,13 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             assert not io.is_committed_segment(io.get_latest_segment())
 
     def test_moved_deletes_are_tracked(self):
-        self.repository.put(H(1), b'1')
-        self.repository.put(H(2), b'2')
+        self.repository.put(H(1), b"1")
+        self.repository.put(H(2), b"2")
         self.repository.commit(compact=False)
-        self.repo_dump('p1 p2 c')
+        self.repo_dump("p1 p2 c")
         self.repository.delete(H(1))
         self.repository.commit(compact=True)
-        self.repo_dump('d1 cc')
+        self.repo_dump("d1 cc")
         last_segment = self.repository.io.get_latest_segment() - 1
         num_deletes = 0
         for tag, key, offset, size in self.repository.io.iter_objects(last_segment):
@@ -337,9 +330,9 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
                 num_deletes += 1
         assert num_deletes == 1
         assert last_segment in self.repository.compact
-        self.repository.put(H(3), b'3')
+        self.repository.put(H(3), b"3")
         self.repository.commit(compact=True)
-        self.repo_dump('p3 cc')
+        self.repo_dump("p3 cc")
         assert last_segment not in self.repository.compact
         assert not self.repository.io.segment_exists(last_segment)
         for segment, _ in self.repository.io.segment_iterator():
@@ -352,7 +345,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
     def test_shadowed_entries_are_preserved(self):
         get_latest_segment = self.repository.io.get_latest_segment
-        self.repository.put(H(1), b'1')
+        self.repository.put(H(1), b"1")
         # This is the segment with our original PUT of interest
         put_segment = get_latest_segment()
         self.repository.commit(compact=False)
@@ -360,7 +353,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         # We now delete H(1), and force this segment to not be compacted, which can happen
         # if it's not sparse enough (symbolized by H(2) here).
         self.repository.delete(H(1))
-        self.repository.put(H(2), b'1')
+        self.repository.put(H(2), b"1")
         delete_segment = get_latest_segment()
 
         # We pretend these are mostly dense (not sparse) and won't be compacted
@@ -380,33 +373,33 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         # Basic case, since the index survived this must be ok
         assert H(1) not in self.repository
         # Nuke index, force replay
-        os.unlink(os.path.join(self.repository.path, 'index.%d' % get_latest_segment()))
+        os.unlink(os.path.join(self.repository.path, "index.%d" % get_latest_segment()))
         # Must not reappear
         assert H(1) not in self.repository
 
     def test_shadow_index_rollback(self):
-        self.repository.put(H(1), b'1')
+        self.repository.put(H(1), b"1")
         self.repository.delete(H(1))
         assert self.repository.shadow_index[H(1)] == [0]
         self.repository.commit(compact=True)
-        self.repo_dump('p1 d1 cc')
+        self.repo_dump("p1 d1 cc")
         # note how an empty list means that nothing is shadowed for sure
         assert self.repository.shadow_index[H(1)] == []  # because the delete is considered unstable
-        self.repository.put(H(1), b'1')
+        self.repository.put(H(1), b"1")
         self.repository.delete(H(1))
-        self.repo_dump('p1 d1')
+        self.repo_dump("p1 d1")
         # 0 put/delete; 1 commit; 2 compacted; 3 commit; 4 put/delete
         assert self.repository.shadow_index[H(1)] == [4]
         self.repository.rollback()
-        self.repo_dump('r')
-        self.repository.put(H(2), b'1')
+        self.repo_dump("r")
+        self.repository.put(H(2), b"1")
         # After the rollback segment 4 shouldn't be considered anymore
         assert self.repository.shadow_index[H(1)] == []  # because the delete is considered unstable
 
 
 class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def open(self, create=False):
-        return Repository(os.path.join(self.tmppath, 'repository'), exclusive=True, create=create, append_only=True)
+        return Repository(os.path.join(self.tmppath, "repository"), exclusive=True, create=create, append_only=True)
 
     def test_destroy_append_only(self):
         # Can't destroy append only repo (via the API)
@@ -417,19 +410,20 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
     def test_append_only(self):
         def segments_in_repository():
             return len(list(self.repository.io.segment_iterator()))
-        self.repository.put(H(0), b'foo')
+
+        self.repository.put(H(0), b"foo")
         self.repository.commit(compact=False)
 
         self.repository.append_only = False
         assert segments_in_repository() == 2
-        self.repository.put(H(0), b'foo')
+        self.repository.put(H(0), b"foo")
         self.repository.commit(compact=True)
         # normal: compact squashes the data together, only one segment
         assert segments_in_repository() == 2
 
         self.repository.append_only = True
         assert segments_in_repository() == 2
-        self.repository.put(H(0), b'foo')
+        self.repository.put(H(0), b"foo")
         self.repository.commit(compact=False)
         # append only: does not compact, only new segments written
         assert segments_in_repository() == 4
@@ -438,12 +432,12 @@ class RepositoryAppendOnlyTestCase(RepositoryTestCaseBase):
 class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
     def test_additional_free_space(self):
         self.add_keys()
-        self.repository.config.set('repository', 'additional_free_space', '1000T')
-        self.repository.save_key(b'shortcut to save_config')
+        self.repository.config.set("repository", "additional_free_space", "1000T")
+        self.repository.save_key(b"shortcut to save_config")
         self.reopen()
 
         with self.repository:
-            self.repository.put(H(0), b'foobar')
+            self.repository.put(H(0), b"foobar")
             with pytest.raises(Repository.InsufficientFreeSpaceError):
                 self.repository.commit(compact=False)
         assert os.path.exists(self.repository.path)
@@ -469,7 +463,7 @@ class QuotaTestCase(RepositoryTestCaseBase):
         self.reopen()
         with self.repository:
             # Open new transaction; hints and thus quota data is not loaded unless needed.
-            self.repository.put(H(3), b'')
+            self.repository.put(H(3), b"")
             self.repository.delete(H(3))
             assert self.repository.storage_quota_use == 1234 + 5678 + 3 * (41 + 8)  # we have not compacted yet
             self.repository.commit(compact=True)
@@ -478,11 +472,11 @@ class QuotaTestCase(RepositoryTestCaseBase):
     def test_exceed_quota(self):
         assert self.repository.storage_quota_use == 0
         self.repository.storage_quota = 80
-        self.repository.put(H(1), b'')
+        self.repository.put(H(1), b"")
         assert self.repository.storage_quota_use == 41 + 8
         self.repository.commit(compact=False)
         with pytest.raises(Repository.StorageQuotaExceeded):
-            self.repository.put(H(2), b'')
+            self.repository.put(H(2), b"")
         assert self.repository.storage_quota_use == (41 + 8) * 2
         with pytest.raises(Repository.StorageQuotaExceeded):
             self.repository.commit(compact=False)
@@ -491,8 +485,10 @@ class QuotaTestCase(RepositoryTestCaseBase):
         with self.repository:
             self.repository.storage_quota = 150
             # Open new transaction; hints and thus quota data is not loaded unless needed.
-            self.repository.put(H(1), b'')
-            assert self.repository.storage_quota_use == (41 + 8) * 2  # we have 2 puts for H(1) here and not yet compacted.
+            self.repository.put(H(1), b"")
+            assert (
+                self.repository.storage_quota_use == (41 + 8) * 2
+            )  # we have 2 puts for H(1) here and not yet compacted.
             self.repository.commit(compact=True)
             assert self.repository.storage_quota_use == 41 + 8  # now we have compacted.
 
@@ -542,54 +538,54 @@ class NonceReservation(RepositoryTestCaseBase):
 class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
     def setUp(self):
         super().setUp()
-        self.repository.put(H(0), b'foo')
+        self.repository.put(H(0), b"foo")
         self.repository.commit(compact=False)
         self.repository.close()
 
     def do_commit(self):
         with self.repository:
-            self.repository.put(H(0), b'fox')
+            self.repository.put(H(0), b"fox")
             self.repository.commit(compact=False)
 
     def test_corrupted_hints(self):
-        with open(os.path.join(self.repository.path, 'hints.1'), 'ab') as fd:
-            fd.write(b'123456789')
+        with open(os.path.join(self.repository.path, "hints.1"), "ab") as fd:
+            fd.write(b"123456789")
         self.do_commit()
 
     def test_deleted_hints(self):
-        os.unlink(os.path.join(self.repository.path, 'hints.1'))
+        os.unlink(os.path.join(self.repository.path, "hints.1"))
         self.do_commit()
 
     def test_deleted_index(self):
-        os.unlink(os.path.join(self.repository.path, 'index.1'))
+        os.unlink(os.path.join(self.repository.path, "index.1"))
         self.do_commit()
 
     def test_unreadable_hints(self):
-        hints = os.path.join(self.repository.path, 'hints.1')
+        hints = os.path.join(self.repository.path, "hints.1")
         os.unlink(hints)
         os.mkdir(hints)
         with self.assert_raises(OSError):
             self.do_commit()
 
     def test_index(self):
-        with open(os.path.join(self.repository.path, 'index.1'), 'wb') as fd:
-            fd.write(b'123456789')
+        with open(os.path.join(self.repository.path, "index.1"), "wb") as fd:
+            fd.write(b"123456789")
         self.do_commit()
 
     def test_index_outside_transaction(self):
-        with open(os.path.join(self.repository.path, 'index.1'), 'wb') as fd:
-            fd.write(b'123456789')
+        with open(os.path.join(self.repository.path, "index.1"), "wb") as fd:
+            fd.write(b"123456789")
         with self.repository:
             assert len(self.repository) == 1
 
     def _corrupt_index(self):
         # HashIndex is able to detect incorrect headers and file lengths,
         # but on its own it can't tell if the data is correct.
-        index_path = os.path.join(self.repository.path, 'index.1')
-        with open(index_path, 'r+b') as fd:
+        index_path = os.path.join(self.repository.path, "index.1")
+        with open(index_path, "r+b") as fd:
             index_data = fd.read()
             # Flip one bit in a key stored in the index
-            corrupted_key = (int.from_bytes(H(0), 'little') ^ 1).to_bytes(32, 'little')
+            corrupted_key = (int.from_bytes(H(0), "little") ^ 1).to_bytes(32, "little")
             corrupted_index_data = index_data.replace(H(0), corrupted_key)
             assert corrupted_index_data != index_data
             assert len(corrupted_index_data) == len(index_data)
@@ -604,11 +600,11 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             # Data corruption is detected due to mismatching checksums
             # and fixed by rebuilding the index.
             assert len(self.repository) == 1
-            assert self.repository.get(H(0)) == b'foo'
+            assert self.repository.get(H(0)) == b"foo"
 
     def test_index_corrupted_without_integrity(self):
         self._corrupt_index()
-        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        integrity_path = os.path.join(self.repository.path, "integrity.1")
         os.unlink(integrity_path)
         with self.repository:
             # Since the corrupted key is not noticed, the repository still thinks
@@ -619,7 +615,7 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
                 self.repository.get(H(0))
 
     def test_unreadable_index(self):
-        index = os.path.join(self.repository.path, 'index.1')
+        index = os.path.join(self.repository.path, "index.1")
         os.unlink(index)
         os.mkdir(index)
         with self.assert_raises(OSError):
@@ -627,36 +623,39 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
 
     def test_unknown_integrity_version(self):
         # For now an unknown integrity data version is ignored and not an error.
-        integrity_path = os.path.join(self.repository.path, 'integrity.1')
-        with open(integrity_path, 'r+b') as fd:
-            msgpack.pack({
-                # Borg only understands version 2
-                b'version': 4.7,
-            }, fd)
+        integrity_path = os.path.join(self.repository.path, "integrity.1")
+        with open(integrity_path, "r+b") as fd:
+            msgpack.pack(
+                {
+                    # Borg only understands version 2
+                    b"version": 4.7
+                },
+                fd,
+            )
             fd.truncate()
         with self.repository:
             # No issues accessing the repository
             assert len(self.repository) == 1
-            assert self.repository.get(H(0)) == b'foo'
+            assert self.repository.get(H(0)) == b"foo"
 
     def _subtly_corrupted_hints_setup(self):
         with self.repository:
             self.repository.append_only = True
             assert len(self.repository) == 1
-            assert self.repository.get(H(0)) == b'foo'
-            self.repository.put(H(1), b'bar')
-            self.repository.put(H(2), b'baz')
+            assert self.repository.get(H(0)) == b"foo"
+            self.repository.put(H(1), b"bar")
+            self.repository.put(H(2), b"baz")
             self.repository.commit(compact=False)
-            self.repository.put(H(2), b'bazz')
+            self.repository.put(H(2), b"bazz")
             self.repository.commit(compact=False)
 
-        hints_path = os.path.join(self.repository.path, 'hints.5')
-        with open(hints_path, 'r+b') as fd:
+        hints_path = os.path.join(self.repository.path, "hints.5")
+        with open(hints_path, "r+b") as fd:
             hints = msgpack.unpack(fd)
             fd.seek(0)
             # Corrupt segment refcount
-            assert hints['segments'][2] == 1
-            hints['segments'][2] = 0
+            assert hints["segments"][2] == 1
+            hints["segments"][2] = 0
             msgpack.pack(hints, fd)
             fd.truncate()
 
@@ -664,37 +663,40 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         self._subtly_corrupted_hints_setup()
         with self.repository:
             self.repository.append_only = False
-            self.repository.put(H(3), b'1234')
+            self.repository.put(H(3), b"1234")
             # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
             self.repository.commit(compact=True)
 
             assert len(self.repository) == 4
-            assert self.repository.get(H(0)) == b'foo'
-            assert self.repository.get(H(1)) == b'bar'
-            assert self.repository.get(H(2)) == b'bazz'
+            assert self.repository.get(H(0)) == b"foo"
+            assert self.repository.get(H(1)) == b"bar"
+            assert self.repository.get(H(2)) == b"bazz"
 
     def test_subtly_corrupted_hints_without_integrity(self):
         self._subtly_corrupted_hints_setup()
-        integrity_path = os.path.join(self.repository.path, 'integrity.5')
+        integrity_path = os.path.join(self.repository.path, "integrity.5")
         os.unlink(integrity_path)
         with self.repository:
             self.repository.append_only = False
-            self.repository.put(H(3), b'1234')
+            self.repository.put(H(3), b"1234")
             # Do a compaction run. Fails, since the corrupted refcount was not detected and leads to an assertion failure.
             with pytest.raises(AssertionError) as exc_info:
                 self.repository.commit(compact=True)
-            assert 'Corrupted segment reference count' in str(exc_info.value)
+            assert "Corrupted segment reference count" in str(exc_info.value)
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):
-
     def list_indices(self):
-        return [name for name in os.listdir(os.path.join(self.tmppath, 'repository')) if name.startswith('index.')]
+        return [name for name in os.listdir(os.path.join(self.tmppath, "repository")) if name.startswith("index.")]
 
     def check(self, repair=False, status=True):
         self.assert_equal(self.repository.check(repair=repair), status)
         # Make sure no tmp files are left behind
-        self.assert_equal([name for name in os.listdir(os.path.join(self.tmppath, 'repository')) if 'tmp' in name], [], 'Found tmp files')
+        self.assert_equal(
+            [name for name in os.listdir(os.path.join(self.tmppath, "repository")) if "tmp" in name],
+            [],
+            "Found tmp files",
+        )
 
     def get_objects(self, *ids):
         for id_ in ids:
@@ -703,31 +705,35 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
     def add_objects(self, segments):
         for ids in segments:
             for id_ in ids:
-                self.repository.put(H(id_), b'data')
+                self.repository.put(H(id_), b"data")
             self.repository.commit(compact=False)
 
     def get_head(self):
-        return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, 'repository', 'data', '0')) if n.isdigit())[-1]
+        return sorted(int(n) for n in os.listdir(os.path.join(self.tmppath, "repository", "data", "0")) if n.isdigit())[
+            -1
+        ]
 
     def open_index(self):
-        return NSIndex.read(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'))
+        return NSIndex.read(os.path.join(self.tmppath, "repository", f"index.{self.get_head()}"))
 
     def corrupt_object(self, id_):
         idx = self.open_index()
         segment, offset, _ = idx[H(id_)]
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)), 'r+b') as fd:
+        with open(os.path.join(self.tmppath, "repository", "data", "0", str(segment)), "r+b") as fd:
             fd.seek(offset)
-            fd.write(b'BOOM')
+            fd.write(b"BOOM")
 
     def delete_segment(self, segment):
-        os.unlink(os.path.join(self.tmppath, 'repository', 'data', '0', str(segment)))
+        os.unlink(os.path.join(self.tmppath, "repository", "data", "0", str(segment)))
 
     def delete_index(self):
-        os.unlink(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'))
+        os.unlink(os.path.join(self.tmppath, "repository", f"index.{self.get_head()}"))
 
     def rename_index(self, new_name):
-        os.rename(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'),
-                  os.path.join(self.tmppath, 'repository', new_name))
+        os.rename(
+            os.path.join(self.tmppath, "repository", f"index.{self.get_head()}"),
+            os.path.join(self.tmppath, "repository", new_name),
+        )
 
     def list_objects(self):
         return {int(key) for key in self.repository.list()}
@@ -765,9 +771,9 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_corrupted_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '3'), 'r+b') as fd:
+        with open(os.path.join(self.tmppath, "repository", "data", "0", "3"), "r+b") as fd:
             fd.seek(-1, os.SEEK_END)
-            fd.write(b'X')
+            fd.write(b"X")
         self.assert_raises(Repository.ObjectNotFound, lambda: self.get_objects(4))
         self.check(status=True)
         self.get_objects(3)
@@ -775,15 +781,15 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_no_commits(self):
         self.add_objects([[1, 2, 3]])
-        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
+        with open(os.path.join(self.tmppath, "repository", "data", "0", "1"), "r+b") as fd:
             fd.seek(-1, os.SEEK_END)
-            fd.write(b'X')
+            fd.write(b"X")
         self.assert_raises(Repository.CheckNeeded, lambda: self.get_objects(4))
         self.check(status=False)
         self.check(status=False)
-        self.assert_equal(self.list_indices(), ['index.1'])
+        self.assert_equal(self.list_indices(), ["index.1"])
         self.check(repair=True, status=True)
-        self.assert_equal(self.list_indices(), ['index.2'])
+        self.assert_equal(self.list_indices(), ["index.2"])
         self.check(status=True)
         self.get_objects(3)
         self.assert_equal({1, 2, 3}, self.list_objects())
@@ -797,30 +803,29 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
 
     def test_repair_index_too_new(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
-        self.assert_equal(self.list_indices(), ['index.3'])
-        self.rename_index('index.100')
+        self.assert_equal(self.list_indices(), ["index.3"])
+        self.rename_index("index.100")
         self.check(status=True)
-        self.assert_equal(self.list_indices(), ['index.3'])
+        self.assert_equal(self.list_indices(), ["index.3"])
         self.get_objects(4)
         self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
 
     def test_crash_before_compact(self):
-        self.repository.put(H(0), b'data')
-        self.repository.put(H(0), b'data2')
+        self.repository.put(H(0), b"data")
+        self.repository.put(H(0), b"data2")
         # Simulate a crash before compact
-        with patch.object(Repository, 'compact_segments') as compact:
+        with patch.object(Repository, "compact_segments") as compact:
             self.repository.commit(compact=True)
             compact.assert_called_once_with(0.1)
         self.reopen()
         with self.repository:
             self.check(repair=True)
-            self.assert_equal(self.repository.get(H(0)), b'data2')
+            self.assert_equal(self.repository.get(H(0)), b"data2")
 
 
 class RepositoryHintsTestCase(RepositoryTestCaseBase):
-
     def test_hints_persistence(self):
-        self.repository.put(H(0), b'data')
+        self.repository.put(H(0), b"data")
         self.repository.delete(H(0))
         self.repository.commit(compact=False)
         shadow_index_expected = self.repository.shadow_index
@@ -831,7 +836,7 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
         self.reopen()
         with self.repository:
             # see also do_compact()
-            self.repository.put(H(42), b'foobar')  # this will call prepare_txn() and load the hints data
+            self.repository.put(H(42), b"foobar")  # this will call prepare_txn() and load the hints data
             # check if hints persistence worked:
             self.assert_equal(shadow_index_expected, self.repository.shadow_index)
             self.assert_equal(compact_expected, self.repository.compact)
@@ -839,7 +844,7 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
             self.assert_equal(segments_expected, self.repository.segments)
 
     def test_hints_behaviour(self):
-        self.repository.put(H(0), b'data')
+        self.repository.put(H(0), b"data")
         self.assert_equal(self.repository.shadow_index, {})
         assert len(self.repository.compact) == 0
         self.repository.delete(H(0))
@@ -848,7 +853,7 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
         self.assert_in(H(0), self.repository.shadow_index)
         self.assert_equal(len(self.repository.shadow_index[H(0)]), 1)
         self.assert_in(0, self.repository.compact)  # segment 0 can be compacted
-        self.repository.put(H(42), b'foobar')  # see also do_compact()
+        self.repository.put(H(42), b"foobar")  # see also do_compact()
         self.repository.commit(compact=True, threshold=0.0)  # compact completely!
         # nothing to compact any more! no info left about stuff that does not exist any more:
         self.assert_not_in(H(0), self.repository.shadow_index)
@@ -861,12 +866,13 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
     repository = None  # type: RemoteRepository
 
     def open(self, create=False):
-        return RemoteRepository(Location('ssh://__testsuite__' + os.path.join(self.tmppath, 'repository')),
-                                exclusive=True, create=create)
+        return RemoteRepository(
+            Location("ssh://__testsuite__" + os.path.join(self.tmppath, "repository")), exclusive=True, create=create
+        )
 
     def _get_mock_args(self):
         class MockArgs:
-            remote_path = 'borg'
+            remote_path = "borg"
             umask = 0o077
             debug_topics = []
             rsh = None
@@ -878,111 +884,122 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         return MockArgs()
 
     def test_invalid_rpc(self):
-        self.assert_raises(InvalidRPCMethod, lambda: self.repository.call('__init__', {}))
+        self.assert_raises(InvalidRPCMethod, lambda: self.repository.call("__init__", {}))
 
     def test_rpc_exception_transport(self):
-        s1 = 'test string'
+        s1 = "test string"
 
         try:
-            self.repository.call('inject_exception', {'kind': 'DoesNotExist'})
+            self.repository.call("inject_exception", {"kind": "DoesNotExist"})
         except Repository.DoesNotExist as e:
             assert len(e.args) == 1
             assert e.args[0] == self.repository.location.processed
 
         try:
-            self.repository.call('inject_exception', {'kind': 'AlreadyExists'})
+            self.repository.call("inject_exception", {"kind": "AlreadyExists"})
         except Repository.AlreadyExists as e:
             assert len(e.args) == 1
             assert e.args[0] == self.repository.location.processed
 
         try:
-            self.repository.call('inject_exception', {'kind': 'CheckNeeded'})
+            self.repository.call("inject_exception", {"kind": "CheckNeeded"})
         except Repository.CheckNeeded as e:
             assert len(e.args) == 1
             assert e.args[0] == self.repository.location.processed
 
         try:
-            self.repository.call('inject_exception', {'kind': 'IntegrityError'})
+            self.repository.call("inject_exception", {"kind": "IntegrityError"})
         except IntegrityError as e:
             assert len(e.args) == 1
             assert e.args[0] == s1
 
         try:
-            self.repository.call('inject_exception', {'kind': 'PathNotAllowed'})
+            self.repository.call("inject_exception", {"kind": "PathNotAllowed"})
         except PathNotAllowed as e:
             assert len(e.args) == 1
-            assert e.args[0] == 'foo'
+            assert e.args[0] == "foo"
 
         try:
-            self.repository.call('inject_exception', {'kind': 'ObjectNotFound'})
+            self.repository.call("inject_exception", {"kind": "ObjectNotFound"})
         except Repository.ObjectNotFound as e:
             assert len(e.args) == 2
             assert e.args[0] == s1
             assert e.args[1] == self.repository.location.processed
 
         try:
-            self.repository.call('inject_exception', {'kind': 'InvalidRPCMethod'})
+            self.repository.call("inject_exception", {"kind": "InvalidRPCMethod"})
         except InvalidRPCMethod as e:
             assert len(e.args) == 1
             assert e.args[0] == s1
 
         try:
-            self.repository.call('inject_exception', {'kind': 'divide'})
+            self.repository.call("inject_exception", {"kind": "divide"})
         except RemoteRepository.RPCError as e:
             assert e.unpacked
-            assert e.get_message() == 'ZeroDivisionError: integer division or modulo by zero\n'
-            assert e.exception_class == 'ZeroDivisionError'
+            assert e.get_message() == "ZeroDivisionError: integer division or modulo by zero\n"
+            assert e.exception_class == "ZeroDivisionError"
             assert len(e.exception_full) > 0
 
     def test_ssh_cmd(self):
         args = self._get_mock_args()
         self.repository._args = args
-        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', 'example.com']
-        assert self.repository.ssh_cmd(Location('ssh://user@example.com/foo')) == ['ssh', 'user@example.com']
-        assert self.repository.ssh_cmd(Location('ssh://user@example.com:1234/foo')) == ['ssh', '-p', '1234', 'user@example.com']
-        os.environ['BORG_RSH'] = 'ssh --foo'
-        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', '--foo', 'example.com']
+        assert self.repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "example.com"]
+        assert self.repository.ssh_cmd(Location("ssh://user@example.com/foo")) == ["ssh", "user@example.com"]
+        assert self.repository.ssh_cmd(Location("ssh://user@example.com:1234/foo")) == [
+            "ssh",
+            "-p",
+            "1234",
+            "user@example.com",
+        ]
+        os.environ["BORG_RSH"] = "ssh --foo"
+        assert self.repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "--foo", "example.com"]
 
     def test_borg_cmd(self):
-        assert self.repository.borg_cmd(None, testing=True) == [sys.executable, '-m', 'borg.archiver', 'serve']
+        assert self.repository.borg_cmd(None, testing=True) == [sys.executable, "-m", "borg.archiver", "serve"]
         args = self._get_mock_args()
         # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
         logging.getLogger().setLevel(logging.INFO)
         # note: test logger is on info log level, so --info gets added automagically
-        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--info']
-        args.remote_path = 'borg-0.28.2'
-        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--info']
-        args.debug_topics = ['something_client_side', 'repository_compaction']
-        assert self.repository.borg_cmd(args, testing=False) == ['borg-0.28.2', 'serve', '--info',
-                                                                 '--debug-topic=borg.debug.repository_compaction']
+        assert self.repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
+        args.remote_path = "borg-0.28.2"
+        assert self.repository.borg_cmd(args, testing=False) == ["borg-0.28.2", "serve", "--info"]
+        args.debug_topics = ["something_client_side", "repository_compaction"]
+        assert self.repository.borg_cmd(args, testing=False) == [
+            "borg-0.28.2",
+            "serve",
+            "--info",
+            "--debug-topic=borg.debug.repository_compaction",
+        ]
         args = self._get_mock_args()
         args.storage_quota = 0
-        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--info']
+        assert self.repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
         args.storage_quota = 314159265
-        assert self.repository.borg_cmd(args, testing=False) == ['borg', 'serve', '--info',
-                                                                 '--storage-quota=314159265']
-        args.rsh = 'ssh -i foo'
+        assert self.repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info", "--storage-quota=314159265"]
+        args.rsh = "ssh -i foo"
         self.repository._args = args
-        assert self.repository.ssh_cmd(Location('ssh://example.com/foo')) == ['ssh', '-i', 'foo', 'example.com']
+        assert self.repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
 
 
 class RemoteLegacyFree(RepositoryTestCaseBase):
     # Keep testing this so we can someday safely remove the legacy tuple format.
 
     def open(self, create=False):
-        with patch.object(RemoteRepository, 'dictFormat', True):
-            return RemoteRepository(Location('ssh://__testsuite__' + os.path.join(self.tmppath, 'repository')),
-                                    exclusive=True, create=create)
+        with patch.object(RemoteRepository, "dictFormat", True):
+            return RemoteRepository(
+                Location("ssh://__testsuite__" + os.path.join(self.tmppath, "repository")),
+                exclusive=True,
+                create=create,
+            )
 
     def test_legacy_free(self):
         # put
-        self.repository.put(H(0), b'foo')
+        self.repository.put(H(0), b"foo")
         self.repository.commit(compact=False)
         self.repository.close()
         # replace
         self.repository = self.open()
         with self.repository:
-            self.repository.put(H(0), b'bar')
+            self.repository.put(H(0), b"bar")
             self.repository.commit(compact=False)
         # delete
         self.repository = self.open()
@@ -992,10 +1009,10 @@ class RemoteLegacyFree(RepositoryTestCaseBase):
 
 
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
-
     def open(self, create=False):
-        return RemoteRepository(Location('ssh://__testsuite__' + os.path.join(self.tmppath, 'repository')),
-                                exclusive=True, create=create)
+        return RemoteRepository(
+            Location("ssh://__testsuite__" + os.path.join(self.tmppath, "repository")), exclusive=True, create=create
+        )
 
     def test_crash_before_compact(self):
         # skip this test, we can't mock-patch a Repository class in another process!
@@ -1007,8 +1024,8 @@ class RemoteLoggerTestCase(BaseTestCase):
         self.stream = io.StringIO()
         self.handler = logging.StreamHandler(self.stream)
         logging.getLogger().handlers[:] = [self.handler]
-        logging.getLogger('borg.repository').handlers[:] = []
-        logging.getLogger('borg.repository.foo').handlers[:] = []
+        logging.getLogger("borg.repository").handlers[:] = []
+        logging.getLogger("borg.repository.foo").handlers[:] = []
         # capture stderr
         sys.stderr.flush()
         self.old_stderr = sys.stderr
@@ -1019,31 +1036,31 @@ class RemoteLoggerTestCase(BaseTestCase):
 
     def test_stderr_messages(self):
         handle_remote_line("unstructured stderr message\n")
-        self.assert_equal(self.stream.getvalue(), '')
+        self.assert_equal(self.stream.getvalue(), "")
         # stderr messages don't get an implicit newline
-        self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr message\n')
+        self.assert_equal(self.stderr.getvalue(), "Remote: unstructured stderr message\n")
 
     def test_stderr_progress_messages(self):
         handle_remote_line("unstructured stderr progress message\r")
-        self.assert_equal(self.stream.getvalue(), '')
+        self.assert_equal(self.stream.getvalue(), "")
         # stderr messages don't get an implicit newline
-        self.assert_equal(self.stderr.getvalue(), 'Remote: unstructured stderr progress message\r')
+        self.assert_equal(self.stderr.getvalue(), "Remote: unstructured stderr progress message\r")
 
     def test_pre11_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
         handle_remote_line("$LOG INFO Remote: borg < 1.1 format message\n")
-        self.assert_equal(self.stream.getvalue(), 'Remote: borg < 1.1 format message\n')
-        self.assert_equal(self.stderr.getvalue(), '')
+        self.assert_equal(self.stream.getvalue(), "Remote: borg < 1.1 format message\n")
+        self.assert_equal(self.stderr.getvalue(), "")
 
     def test_post11_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
         handle_remote_line("$LOG INFO borg.repository Remote: borg >= 1.1 format message\n")
-        self.assert_equal(self.stream.getvalue(), 'Remote: borg >= 1.1 format message\n')
-        self.assert_equal(self.stderr.getvalue(), '')
+        self.assert_equal(self.stream.getvalue(), "Remote: borg >= 1.1 format message\n")
+        self.assert_equal(self.stderr.getvalue(), "")
 
     def test_remote_messages_screened(self):
         # default borg config for root logger
@@ -1051,12 +1068,12 @@ class RemoteLoggerTestCase(BaseTestCase):
         logging.getLogger().setLevel(logging.WARNING)
 
         handle_remote_line("$LOG INFO borg.repository Remote: new format info message\n")
-        self.assert_equal(self.stream.getvalue(), '')
-        self.assert_equal(self.stderr.getvalue(), '')
+        self.assert_equal(self.stream.getvalue(), "")
+        self.assert_equal(self.stderr.getvalue(), "")
 
     def test_info_to_correct_local_child(self):
-        logging.getLogger('borg.repository').setLevel(logging.INFO)
-        logging.getLogger('borg.repository.foo').setLevel(logging.INFO)
+        logging.getLogger("borg.repository").setLevel(logging.INFO)
+        logging.getLogger("borg.repository.foo").setLevel(logging.INFO)
         # default borg config for root logger
         self.handler.setLevel(logging.WARNING)
         logging.getLogger().setLevel(logging.WARNING)
@@ -1064,14 +1081,14 @@ class RemoteLoggerTestCase(BaseTestCase):
         child_stream = io.StringIO()
         child_handler = logging.StreamHandler(child_stream)
         child_handler.setLevel(logging.INFO)
-        logging.getLogger('borg.repository').handlers[:] = [child_handler]
+        logging.getLogger("borg.repository").handlers[:] = [child_handler]
         foo_stream = io.StringIO()
         foo_handler = logging.StreamHandler(foo_stream)
         foo_handler.setLevel(logging.INFO)
-        logging.getLogger('borg.repository.foo').handlers[:] = [foo_handler]
+        logging.getLogger("borg.repository.foo").handlers[:] = [foo_handler]
 
         handle_remote_line("$LOG INFO borg.repository Remote: new format child message\n")
-        self.assert_equal(foo_stream.getvalue(), '')
-        self.assert_equal(child_stream.getvalue(), 'Remote: new format child message\n')
-        self.assert_equal(self.stream.getvalue(), '')
-        self.assert_equal(self.stderr.getvalue(), '')
+        self.assert_equal(foo_stream.getvalue(), "")
+        self.assert_equal(child_stream.getvalue(), "Remote: new format child message\n")
+        self.assert_equal(self.stream.getvalue(), "")
+        self.assert_equal(self.stderr.getvalue(), "")

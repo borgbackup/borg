@@ -50,16 +50,16 @@ class SelfTestResult(TestResult):
 
     def log_results(self, logger):
         for test, failure in self.errors + self.failures + self.unexpectedSuccesses:
-            logger.error('self test %s FAILED:\n%s', self.test_name(test), failure)
+            logger.error("self test %s FAILED:\n%s", self.test_name(test), failure)
         for test, reason in self.skipped:
-            logger.warning('self test %s skipped: %s', self.test_name(test), reason)
+            logger.warning("self test %s skipped: %s", self.test_name(test), reason)
 
     def successful_test_count(self):
         return len(self.successes)
 
 
 def selftest(logger):
-    if os.environ.get('BORG_SELFTEST') == 'disabled':
+    if os.environ.get("BORG_SELFTEST") == "disabled":
         logger.debug("borg selftest disabled via BORG_SELFTEST env variable")
         return
     selftest_started = time.perf_counter()
@@ -69,7 +69,7 @@ def selftest(logger):
         module = sys.modules[test_case.__module__]
         # a normal borg user does not have pytest installed, we must not require it in the test modules used here.
         # note: this only detects the usual toplevel import
-        assert 'pytest' not in dir(module), "pytest must not be imported in %s" % module.__name__
+        assert "pytest" not in dir(module), "pytest must not be imported in %s" % module.__name__
         test_suite.addTest(defaultTestLoader.loadTestsFromTestCase(test_case))
     test_suite.run(result)
     result.log_results(logger)
@@ -77,12 +77,17 @@ def selftest(logger):
     count_mismatch = successful_tests != SELFTEST_COUNT
     if result.wasSuccessful() and count_mismatch:
         # only print this if all tests succeeded
-        logger.error("self test count (%d != %d) mismatch, either test discovery is broken or a test was added "
-                     "without updating borg.selftest",
-                     successful_tests, SELFTEST_COUNT)
+        logger.error(
+            "self test count (%d != %d) mismatch, either test discovery is broken or a test was added "
+            "without updating borg.selftest",
+            successful_tests,
+            SELFTEST_COUNT,
+        )
     if not result.wasSuccessful() or count_mismatch:
-        logger.error("self test failed\n"
-                     "Could be a bug either in Borg, the package / distribution you use, your OS or your hardware.")
+        logger.error(
+            "self test failed\n"
+            "Could be a bug either in Borg, the package / distribution you use, your OS or your hardware."
+        )
         sys.exit(2)
         assert False, "sanity assertion failed: ran beyond sys.exit()"
     selftest_elapsed = time.perf_counter() - selftest_started

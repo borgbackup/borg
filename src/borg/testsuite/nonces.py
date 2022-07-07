@@ -10,10 +10,9 @@ from ..remote import InvalidRPCMethod
 
 
 class TestNonceManager:
-
     class MockRepository:
         class _Location:
-            orig = '/some/place'
+            orig = "/some/place"
 
         _location = _Location()
         id = bytes(32)
@@ -37,15 +36,15 @@ class TestNonceManager:
         self.repository = None
 
     def cache_nonce(self):
-        with open(os.path.join(get_security_dir(self.repository.id_str), 'nonce')) as fd:
+        with open(os.path.join(get_security_dir(self.repository.id_str), "nonce")) as fd:
             return fd.read()
 
     def set_cache_nonce(self, nonce):
-        with open(os.path.join(get_security_dir(self.repository.id_str), 'nonce'), "w") as fd:
+        with open(os.path.join(get_security_dir(self.repository.id_str), "nonce"), "w") as fd:
             assert fd.write(nonce)
 
     def test_empty_cache_and_old_server(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockOldRepository()
         manager = NonceManager(self.repository, 0x2000)
@@ -55,7 +54,7 @@ class TestNonceManager:
         assert self.cache_nonce() == "0000000000002033"
 
     def test_empty_cache(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockRepository()
         self.repository.next_free = 0x2000
@@ -66,7 +65,7 @@ class TestNonceManager:
         assert self.cache_nonce() == "0000000000002033"
 
     def test_empty_nonce(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockRepository()
         self.repository.next_free = None
@@ -99,10 +98,10 @@ class TestNonceManager:
         next_nonce = manager.ensure_reservation(0x2043, 64)
         assert next_nonce == 0x2063
         assert self.cache_nonce() == "00000000000020c3"
-        assert self.repository.next_free == 0x20c3
+        assert self.repository.next_free == 0x20C3
 
     def test_sync_nonce(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockRepository()
         self.repository.next_free = 0x2000
@@ -116,7 +115,7 @@ class TestNonceManager:
         assert self.repository.next_free == 0x2033
 
     def test_server_just_upgraded(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockRepository()
         self.repository.next_free = None
@@ -130,7 +129,7 @@ class TestNonceManager:
         assert self.repository.next_free == 0x2033
 
     def test_transaction_abort_no_cache(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockRepository()
         self.repository.next_free = 0x2000
@@ -143,7 +142,7 @@ class TestNonceManager:
         assert self.repository.next_free == 0x2033
 
     def test_transaction_abort_old_server(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockOldRepository()
         self.set_cache_nonce("0000000000002000")
@@ -155,7 +154,7 @@ class TestNonceManager:
         assert self.cache_nonce() == "0000000000002033"
 
     def test_transaction_abort_on_other_client(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockRepository()
         self.repository.next_free = 0x2000
@@ -169,7 +168,7 @@ class TestNonceManager:
         assert self.repository.next_free == 0x2033
 
     def test_interleaved(self, monkeypatch):
-        monkeypatch.setattr(nonces, 'NONCE_SPACE_RESERVATION', 0x20)
+        monkeypatch.setattr(nonces, "NONCE_SPACE_RESERVATION", 0x20)
 
         self.repository = self.MockRepository()
         self.repository.next_free = 0x2000
@@ -192,7 +191,7 @@ class TestNonceManager:
         assert self.repository.next_free == 0x4000
 
         # spans reservation boundary
-        next_nonce = manager.ensure_reservation(0x201f, 21)
+        next_nonce = manager.ensure_reservation(0x201F, 21)
         assert next_nonce == 0x4000
         assert self.cache_nonce() == "0000000000004035"
         assert self.repository.next_free == 0x4035

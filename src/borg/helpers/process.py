@@ -13,6 +13,7 @@ from .. import __version__
 
 from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
 from ..logger import create_logger
+
 logger = create_logger()
 
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_SIGNAL_BASE, Error
@@ -21,6 +22,7 @@ from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_SIGNAL_BASE, Error
 @contextlib.contextmanager
 def _daemonize():
     from ..platform import get_process_id
+
     old_id = get_process_id()
     pid = os.fork()
     if pid:
@@ -30,13 +32,13 @@ def _daemonize():
         except _ExitCodeException as e:
             exit_code = e.exit_code
         finally:
-            logger.debug('Daemonizing: Foreground process (%s, %s, %s) is now dying.' % old_id)
+            logger.debug("Daemonizing: Foreground process (%s, %s, %s) is now dying." % old_id)
             os._exit(exit_code)
     os.setsid()
     pid = os.fork()
     if pid:
         os._exit(0)
-    os.chdir('/')
+    os.chdir("/")
     os.close(0)
     os.close(1)
     fd = os.open(os.devnull, os.O_RDWR)
@@ -78,12 +80,12 @@ def daemonizing(*, timeout=5):
     with _daemonize() as (old_id, new_id):
         if new_id is None:
             # The original / parent process, waiting for a signal to die.
-            logger.debug('Daemonizing: Foreground process (%s, %s, %s) is waiting for background process...' % old_id)
+            logger.debug("Daemonizing: Foreground process (%s, %s, %s) is waiting for background process..." % old_id)
             exit_code = EXIT_SUCCESS
             # Indeed, SIGHUP and SIGTERM handlers should have been set on archiver.run(). Just in case...
-            with signal_handler('SIGINT', raising_signal_handler(KeyboardInterrupt)), \
-                 signal_handler('SIGHUP', raising_signal_handler(SigHup)), \
-                 signal_handler('SIGTERM', raising_signal_handler(SigTerm)):
+            with signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)), signal_handler(
+                "SIGHUP", raising_signal_handler(SigHup)
+            ), signal_handler("SIGTERM", raising_signal_handler(SigTerm)):
                 try:
                     if timeout > 0:
                         time.sleep(timeout)
@@ -96,15 +98,17 @@ def daemonizing(*, timeout=5):
                     exit_code = EXIT_WARNING
                 except KeyboardInterrupt:
                     # Manual termination.
-                    logger.debug('Daemonizing: Foreground process (%s, %s, %s) received SIGINT.' % old_id)
+                    logger.debug("Daemonizing: Foreground process (%s, %s, %s) received SIGINT." % old_id)
                     exit_code = EXIT_SIGNAL_BASE + 2
                 except BaseException as e:
                     # Just in case...
-                    logger.warning('Daemonizing: Foreground process received an exception while waiting:\n' +
-                                   ''.join(traceback.format_exception(e.__class__, e, e.__traceback__)))
+                    logger.warning(
+                        "Daemonizing: Foreground process received an exception while waiting:\n"
+                        + "".join(traceback.format_exception(e.__class__, e, e.__traceback__))
+                    )
                     exit_code = EXIT_WARNING
                 else:
-                    logger.warning('Daemonizing: Background process did not respond (timeout). Is it alive?')
+                    logger.warning("Daemonizing: Background process did not respond (timeout). Is it alive?")
                     exit_code = EXIT_WARNING
                 finally:
                     # Don't call with-body, but die immediately!
@@ -113,22 +117,26 @@ def daemonizing(*, timeout=5):
 
         # The background / grandchild process.
         sig_to_foreground = signal.SIGTERM
-        logger.debug('Daemonizing: Background process (%s, %s, %s) is starting...' % new_id)
+        logger.debug("Daemonizing: Background process (%s, %s, %s) is starting..." % new_id)
         try:
             yield old_id, new_id
         except BaseException as e:
             sig_to_foreground = signal.SIGHUP
-            logger.warning('Daemonizing: Background process raised an exception while starting:\n' +
-                           ''.join(traceback.format_exception(e.__class__, e, e.__traceback__)))
+            logger.warning(
+                "Daemonizing: Background process raised an exception while starting:\n"
+                + "".join(traceback.format_exception(e.__class__, e, e.__traceback__))
+            )
             raise e
         else:
-            logger.debug('Daemonizing: Background process (%s, %s, %s) has started.' % new_id)
+            logger.debug("Daemonizing: Background process (%s, %s, %s) has started." % new_id)
         finally:
             try:
                 os.kill(old_id[1], sig_to_foreground)
             except BaseException as e:
-                logger.error('Daemonizing: Trying to kill the foreground process raised an exception:\n' +
-                             ''.join(traceback.format_exception(e.__class__, e, e.__traceback__)))
+                logger.error(
+                    "Daemonizing: Trying to kill the foreground process raised an exception:\n"
+                    + "".join(traceback.format_exception(e.__class__, e, e.__traceback__))
+                )
 
 
 class _ExitCodeException(BaseException):
@@ -187,7 +195,7 @@ class SigIntManager:
         self._sig_int_triggered = False
         self._action_triggered = False
         self._action_done = False
-        self.ctx = signal_handler('SIGINT', self.handler)
+        self.ctx = signal_handler("SIGINT", self.handler)
 
     def __bool__(self):
         # this will be True (and stay True) after the first Ctrl-C/SIGINT
@@ -228,7 +236,7 @@ class SigIntManager:
 sig_int = SigIntManager()
 
 
-def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
+def popen_with_error_handling(cmd_line: str, log_prefix="", **kwargs):
     """
     Handle typical errors raised by subprocess.Popen. Return None if an error occurred,
     otherwise return the Popen object.
@@ -240,27 +248,27 @@ def popen_with_error_handling(cmd_line: str, log_prefix='', **kwargs):
 
     Does not change the exit code.
     """
-    assert not kwargs.get('shell'), 'Sorry pal, shell mode is a no-no'
+    assert not kwargs.get("shell"), "Sorry pal, shell mode is a no-no"
     try:
         command = shlex.split(cmd_line)
         if not command:
-            raise ValueError('an empty command line is not permitted')
+            raise ValueError("an empty command line is not permitted")
     except ValueError as ve:
-        logger.error('%s%s', log_prefix, ve)
+        logger.error("%s%s", log_prefix, ve)
         return
-    logger.debug('%scommand line: %s', log_prefix, command)
+    logger.debug("%scommand line: %s", log_prefix, command)
     try:
         return subprocess.Popen(command, **kwargs)
     except FileNotFoundError:
-        logger.error('%sexecutable not found: %s', log_prefix, command[0])
+        logger.error("%sexecutable not found: %s", log_prefix, command[0])
         return
     except PermissionError:
-        logger.error('%spermission denied: %s', log_prefix, command[0])
+        logger.error("%spermission denied: %s", log_prefix, command[0])
         return
 
 
 def is_terminal(fd=sys.stdout):
-    return hasattr(fd, 'isatty') and fd.isatty() and (not is_win32 or 'ANSICON' in os.environ)
+    return hasattr(fd, "isatty") and fd.isatty() and (not is_win32 or "ANSICON" in os.environ)
 
 
 def prepare_subprocess_env(system, env=None):
@@ -278,8 +286,8 @@ def prepare_subprocess_env(system, env=None):
         # but we do not want that system binaries (like ssh or other) pick up
         # (non-matching) libraries from there.
         # thus we install the original LDLP, before pyinstaller has modified it:
-        lp_key = 'LD_LIBRARY_PATH'
-        lp_orig = env.get(lp_key + '_ORIG')  # pyinstaller >= 20160820 / v3.2.1 has this
+        lp_key = "LD_LIBRARY_PATH"
+        lp_orig = env.get(lp_key + "_ORIG")  # pyinstaller >= 20160820 / v3.2.1 has this
         if lp_orig is not None:
             env[lp_key] = lp_orig
         else:
@@ -292,12 +300,12 @@ def prepare_subprocess_env(system, env=None):
             #    in this case, we must kill LDLP.
             #    We can recognize this via sys.frozen and sys._MEIPASS being set.
             lp = env.get(lp_key)
-            if lp is not None and getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            if lp is not None and getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
                 env.pop(lp_key)
     # security: do not give secrets to subprocess
-    env.pop('BORG_PASSPHRASE', None)
+    env.pop("BORG_PASSPHRASE", None)
     # for information, give borg version to the subprocess
-    env['BORG_VERSION'] = __version__
+    env["BORG_VERSION"] = __version__
     return env
 
 
@@ -314,13 +322,15 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
         # communication with the process is a one-way road, i.e. the process can never block
         # for us to do something while we block on the process for something different.
         if inbound:
-            proc = popen_with_error_handling(cmd, stdout=subprocess.PIPE, stdin=filter_stream,
-                                             log_prefix='filter-process: ', env=env)
+            proc = popen_with_error_handling(
+                cmd, stdout=subprocess.PIPE, stdin=filter_stream, log_prefix="filter-process: ", env=env
+            )
         else:
-            proc = popen_with_error_handling(cmd, stdin=subprocess.PIPE, stdout=filter_stream,
-                                             log_prefix='filter-process: ', env=env)
+            proc = popen_with_error_handling(
+                cmd, stdin=subprocess.PIPE, stdout=filter_stream, log_prefix="filter-process: ", env=env
+            )
         if not proc:
-            raise Error(f'filter {cmd}: process creation failed')
+            raise Error(f"filter {cmd}: process creation failed")
         stream = proc.stdout if inbound else proc.stdin
         # inbound: do not close the pipe (this is the task of the filter process [== writer])
         # outbound: close the pipe, otherwise the filter process would not notice when we are done.
@@ -331,7 +341,7 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
 
     except Exception:
         # something went wrong with processing the stream by borg
-        logger.debug('Exception, killing the filter...')
+        logger.debug("Exception, killing the filter...")
         if cmd:
             proc.kill()
         borg_succeeded = False
@@ -343,11 +353,11 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
             stream.close()
 
         if cmd:
-            logger.debug('Done, waiting for filter to die...')
+            logger.debug("Done, waiting for filter to die...")
             rc = proc.wait()
-            logger.debug('filter cmd exited with code %d', rc)
+            logger.debug("filter cmd exited with code %d", rc)
             if filter_stream_close:
                 filter_stream.close()
             if borg_succeeded and rc:
                 # if borg did not succeed, we know that we killed the filter process
-                raise Error('filter %s failed, rc=%d' % (cmd, rc))
+                raise Error("filter %s failed, rc=%d" % (cmd, rc))

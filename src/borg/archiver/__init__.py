@@ -10,7 +10,6 @@ try:
     import configparser
     import faulthandler
     import functools
-    import hashlib
     import inspect
     import itertools
     import json
@@ -25,76 +24,69 @@ try:
     import tarfile
     import textwrap
     import time
-    from binascii import unhexlify, hexlify
+    from binascii import unhexlify
     from contextlib import contextmanager
     from datetime import datetime, timedelta
     from io import TextIOWrapper
-    from struct import Struct
 
-    from .logger import create_logger, setup_logging
+    from ..logger import create_logger, setup_logging
 
     logger = create_logger()
 
-    import borg
-    from . import __version__
-    from . import helpers
-    from .checksums import crc32
-    from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
-    from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
-    from .archive import FilesystemObjectProcessors, TarfileObjectProcessors, MetadataCollector, ChunksProcessor
-    from .archive import has_link
-    from .cache import Cache, assert_secure, SecurityManager
-    from .constants import *  # NOQA
-    from .compress import CompressionSpec, ZLIB, ZLIB_legacy, ObfuscateSize
-    from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required
-    from .crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey, FlexiKey
-    from .crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
-    from .crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
-    from .crypto.keymanager import KeyManager
-    from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
-    from .helpers import Error, NoManifestError, set_ec
-    from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
-    from .helpers import PrefixSpec, GlobSpec, NameSpec, CommentSpec, SortBySpec, FilesCacheMode
-    from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
-    from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from .helpers import remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
-    from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
-    from .helpers import timestamp
-    from .helpers import get_cache_dir, os_stat
-    from .helpers import Manifest, AI_HUMAN_SORT_KEYS
-    from .helpers import HardLinkManager
-    from .helpers import StableDict
-    from .helpers import check_python, check_extension_modules
-    from .helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
-    from .helpers import log_multi
-    from .helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
-    from .helpers import ErrorIgnoringTextIOWrapper
-    from .helpers import ProgressIndicatorPercent
-    from .helpers import basic_json_data, json_print
-    from .helpers import replace_placeholders
-    from .helpers import ChunkIteratorFileWrapper
-    from .helpers import popen_with_error_handling, prepare_subprocess_env, create_filter_process
-    from .helpers import dash_open
-    from .helpers import umount
-    from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
-    from .helpers import msgpack
-    from .helpers import sig_int
-    from .helpers import iter_separated
-    from .helpers import get_tar_filter
-    from .nanorst import rst_to_terminal
-    from .patterns import (
+    from .common import with_repository, with_other_repository, with_archive, Highlander
+    from .. import __version__
+    from .. import helpers
+    from ..archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
+    from ..archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
+    from ..archive import FilesystemObjectProcessors, TarfileObjectProcessors, MetadataCollector, ChunksProcessor
+    from ..cache import Cache, assert_secure, SecurityManager
+    from ..constants import *  # NOQA
+    from ..compress import CompressionSpec
+    from ..crypto.key import FlexiKey, key_creator, key_argument_names, tam_required_file
+    from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
+    from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
+    from ..crypto.keymanager import KeyManager
+    from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
+    from ..helpers import Error, NoManifestError, set_ec
+    from ..helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
+    from ..helpers import GlobSpec, NameSpec, CommentSpec, SortBySpec, FilesCacheMode
+    from ..helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
+    from ..helpers import format_timedelta, format_file_size, parse_file_size, format_archive
+    from ..helpers import remove_surrogates, bin_to_hex, eval_escapes
+    from ..helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
+    from ..helpers import timestamp
+    from ..helpers import get_cache_dir, os_stat
+    from ..helpers import Manifest, AI_HUMAN_SORT_KEYS
+    from ..helpers import HardLinkManager
+    from ..helpers import check_python, check_extension_modules
+    from ..helpers import dir_is_tagged, is_slow_msgpack, is_supported_msgpack, yes, sysinfo
+    from ..helpers import log_multi
+    from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
+    from ..helpers import ErrorIgnoringTextIOWrapper
+    from ..helpers import ProgressIndicatorPercent
+    from ..helpers import basic_json_data, json_print
+    from ..helpers import ChunkIteratorFileWrapper
+    from ..helpers import prepare_subprocess_env, create_filter_process
+    from ..helpers import dash_open
+    from ..helpers import umount
+    from ..helpers import flags_root, flags_dir, flags_special_follow, flags_special
+    from ..helpers import msgpack
+    from ..helpers import sig_int
+    from ..helpers import iter_separated
+    from ..helpers import get_tar_filter
+    from ..nanorst import rst_to_terminal
+    from ..patterns import (
         ArgparsePatternAction,
         ArgparseExcludeFileAction,
         ArgparsePatternFileAction,
         parse_exclude_pattern,
     )
-    from .patterns import PatternMatcher
-    from .item import Item
-    from .platform import get_flags, get_process_id, SyncFile
-    from .platform import uid2user, gid2group
-    from .remote import RepositoryServer, RemoteRepository, cache_if_remote
-    from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
-    from .selftest import selftest
+    from ..patterns import PatternMatcher
+    from ..item import Item
+    from ..platform import get_flags, SyncFile
+    from ..platform import uid2user, gid2group
+    from ..remote import RepositoryServer, RemoteRepository, cache_if_remote
+    from ..selftest import selftest
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
     # default behavior, see issue #4424.
@@ -108,249 +100,6 @@ assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND excep
 STATS_HEADER = "                       Original size    Deduplicated size"
 
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
-
-
-def argument(args, str_or_bool):
-    """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
-    if isinstance(str_or_bool, str):
-        return getattr(args, str_or_bool)
-    if isinstance(str_or_bool, (list, tuple)):
-        return any(getattr(args, item) for item in str_or_bool)
-    return str_or_bool
-
-
-def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args):
-    if location.proto == "ssh":
-        repository = RemoteRepository(
-            location,
-            create=create,
-            exclusive=exclusive,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            make_parent_dirs=make_parent_dirs,
-            args=args,
-        )
-
-    else:
-        repository = Repository(
-            location.path,
-            create=create,
-            exclusive=exclusive,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            make_parent_dirs=make_parent_dirs,
-            storage_quota=storage_quota,
-        )
-    return repository
-
-
-def compat_check(*, create, manifest, key, cache, compatibility, decorator_name):
-    if not create and (manifest or key or cache):
-        if compatibility is None:
-            raise AssertionError(f"{decorator_name} decorator used without compatibility argument")
-        if type(compatibility) is not tuple:
-            raise AssertionError(f"{decorator_name} decorator compatibility argument must be of type tuple")
-    else:
-        if compatibility is not None:
-            raise AssertionError(
-                f"{decorator_name} called with compatibility argument, " f"but would not check {compatibility!r}"
-            )
-        if create:
-            compatibility = Manifest.NO_OPERATION_CHECK
-    return compatibility
-
-
-def with_repository(
-    fake=False,
-    invert_fake=False,
-    create=False,
-    lock=True,
-    exclusive=False,
-    manifest=True,
-    cache=False,
-    secure=True,
-    compatibility=None,
-):
-    """
-    Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
-
-    If a parameter (where allowed) is a str the attribute named of args is used instead.
-    :param fake: (str or bool) use None instead of repository, don't do anything else
-    :param create: create repository
-    :param lock: lock repository
-    :param exclusive: (str or bool) lock repository exclusively (for writing)
-    :param manifest: load manifest and key, pass them as keyword arguments
-    :param cache: open cache, pass it as keyword argument (implies manifest)
-    :param secure: do assert_secure after loading manifest
-    :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory feature categories to check
-    """
-    # Note: with_repository decorator does not have a "key" argument (yet?)
-    compatibility = compat_check(
-        create=create,
-        manifest=manifest,
-        key=manifest,
-        cache=cache,
-        compatibility=compatibility,
-        decorator_name="with_repository",
-    )
-
-    # To process the `--bypass-lock` option if specified, we need to
-    # modify `lock` inside `wrapper`. Therefore we cannot use the
-    # `nonlocal` statement to access `lock` as modifications would also
-    # affect the scope outside of `wrapper`. Subsequent calls would
-    # only see the overwritten value of `lock`, not the original one.
-    # The solution is to define a place holder variable `_lock` to
-    # propagate the value into `wrapper`.
-    _lock = lock
-
-    def decorator(method):
-        @functools.wraps(method)
-        def wrapper(self, args, **kwargs):
-            location = getattr(args, "location")
-            if not location.valid:  # location always must be given
-                raise Error("missing repository, please use --repo or BORG_REPO env var!")
-            lock = getattr(args, "lock", _lock)
-            append_only = getattr(args, "append_only", False)
-            storage_quota = getattr(args, "storage_quota", None)
-            make_parent_dirs = getattr(args, "make_parent_dirs", False)
-            if argument(args, fake) ^ invert_fake:
-                return method(self, args, repository=None, **kwargs)
-
-            repository = get_repository(
-                location,
-                create=create,
-                exclusive=argument(args, exclusive),
-                lock_wait=self.lock_wait,
-                lock=lock,
-                append_only=append_only,
-                make_parent_dirs=make_parent_dirs,
-                storage_quota=storage_quota,
-                args=args,
-            )
-
-            with repository:
-                if repository.version not in (2,):
-                    raise Error(
-                        "This borg version only accepts version 2 repos for -r/--repo. "
-                        "You can use 'borg transfer' to copy archives from old to new repos."
-                    )
-                if manifest or cache:
-                    kwargs["manifest"], kwargs["key"] = Manifest.load(repository, compatibility)
-                    if "compression" in args:
-                        kwargs["key"].compressor = args.compression.compressor
-                    if secure:
-                        assert_secure(repository, kwargs["manifest"], self.lock_wait)
-                if cache:
-                    with Cache(
-                        repository,
-                        kwargs["key"],
-                        kwargs["manifest"],
-                        progress=getattr(args, "progress", False),
-                        lock_wait=self.lock_wait,
-                        cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
-                        consider_part_files=getattr(args, "consider_part_files", False),
-                        iec=getattr(args, "iec", False),
-                    ) as cache_:
-                        return method(self, args, repository=repository, cache=cache_, **kwargs)
-                else:
-                    return method(self, args, repository=repository, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-def with_other_repository(manifest=False, key=False, cache=False, compatibility=None):
-    """
-    this is a simplified version of "with_repository", just for the "other location".
-
-    the repository at the "other location" is intended to get used as a **source** (== read operations).
-    """
-
-    compatibility = compat_check(
-        create=False,
-        manifest=manifest,
-        key=key,
-        cache=cache,
-        compatibility=compatibility,
-        decorator_name="with_other_repository",
-    )
-
-    def decorator(method):
-        @functools.wraps(method)
-        def wrapper(self, args, **kwargs):
-            location = getattr(args, "other_location")
-            if not location.valid:  # nothing to do
-                return method(self, args, **kwargs)
-
-            repository = get_repository(
-                location,
-                create=False,
-                exclusive=True,
-                lock_wait=self.lock_wait,
-                lock=True,
-                append_only=False,
-                make_parent_dirs=False,
-                storage_quota=None,
-                args=args,
-            )
-
-            with repository:
-                if repository.version not in (1, 2):
-                    raise Error("This borg version only accepts version 1 or 2 repos for --other-repo.")
-                kwargs["other_repository"] = repository
-                if manifest or key or cache:
-                    manifest_, key_ = Manifest.load(repository, compatibility)
-                    assert_secure(repository, manifest_, self.lock_wait)
-                    if manifest:
-                        kwargs["other_manifest"] = manifest_
-                    if key:
-                        kwargs["other_key"] = key_
-                if cache:
-                    with Cache(
-                        repository,
-                        key_,
-                        manifest_,
-                        progress=False,
-                        lock_wait=self.lock_wait,
-                        cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
-                        consider_part_files=getattr(args, "consider_part_files", False),
-                        iec=getattr(args, "iec", False),
-                    ) as cache_:
-                        kwargs["other_cache"] = cache_
-                        return method(self, args, **kwargs)
-                else:
-                    return method(self, args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-def with_archive(method):
-    @functools.wraps(method)
-    def wrapper(self, args, repository, key, manifest, **kwargs):
-        archive_name = getattr(args, "name", None)
-        assert archive_name is not None
-        archive = Archive(
-            repository,
-            key,
-            manifest,
-            archive_name,
-            numeric_ids=getattr(args, "numeric_ids", False),
-            noflags=getattr(args, "nobsdflags", False) or getattr(args, "noflags", False),
-            noacls=getattr(args, "noacls", False),
-            noxattrs=getattr(args, "noxattrs", False),
-            cache=kwargs.get("cache"),
-            consider_part_files=args.consider_part_files,
-            log_json=args.log_json,
-            iec=args.iec,
-        )
-        return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
-
-    return wrapper
 
 
 def parse_storage_quota(storage_quota):
@@ -372,16 +121,10 @@ def get_func(args):
     raise Exception("expected func attributes not found")
 
 
-class Highlander(argparse.Action):
-    """make sure some option is only given once"""
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if getattr(namespace, self.dest, None) != self.default:
-            raise argparse.ArgumentError(self, "There can be only one.")
-        setattr(namespace, self.dest, values)
+from .debug import DebugMixIn
 
 
-class Archiver:
+class Archiver(DebugMixIn):
     def __init__(self, lock_wait=None, prog=None):
         self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait
@@ -1850,7 +1593,7 @@ class Archiver:
         """Mount archive or an entire repository as a FUSE filesystem"""
         # Perform these checks before opening the repository and asking for a passphrase.
 
-        from .fuse_impl import llfuse, BORG_FUSE_IMPL
+        from ..fuse_impl import llfuse, BORG_FUSE_IMPL
 
         if llfuse is None:
             self.print_error("borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s." % BORG_FUSE_IMPL)
@@ -1864,7 +1607,7 @@ class Archiver:
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def _do_mount(self, args, repository, manifest, key):
-        from .fuse import FuseOperations
+        from ..fuse import FuseOperations
 
         with cache_if_remote(repository, decrypted_cache=key) as cached_repo:
             operations = FuseOperations(key, repository, manifest, args, cached_repo)
@@ -2432,309 +2175,6 @@ class Archiver:
             if args.cache:
                 cache.close()
 
-    def do_debug_info(self, args):
-        """display system information for debugging / bug reports"""
-        print(sysinfo())
-
-        # Additional debug information
-        print("CRC implementation:", crc32.__name__)
-        print("Process ID:", get_process_id())
-        return EXIT_SUCCESS
-
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_dump_archive_items(self, args, repository, manifest, key):
-        """dump (decrypted, decompressed) archive items metadata (not: data)"""
-        archive = Archive(repository, key, manifest, args.name, consider_part_files=args.consider_part_files)
-        for i, item_id in enumerate(archive.metadata.items):
-            data = key.decrypt(item_id, repository.get(item_id))
-            filename = "%06d_%s.items" % (i, bin_to_hex(item_id))
-            print("Dumping", filename)
-            with open(filename, "wb") as fd:
-                fd.write(data)
-        print("Done.")
-        return EXIT_SUCCESS
-
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_dump_archive(self, args, repository, manifest, key):
-        """dump decoded archive metadata (not: data)"""
-
-        try:
-            archive_meta_orig = manifest.archives.get_raw_dict()[args.name]
-        except KeyError:
-            raise Archive.DoesNotExist(args.name)
-
-        indent = 4
-
-        def do_indent(d):
-            return textwrap.indent(json.dumps(d, indent=indent), prefix=" " * indent)
-
-        def output(fd):
-            # this outputs megabytes of data for a modest sized archive, so some manual streaming json output
-            fd.write("{\n")
-            fd.write('    "_name": ' + json.dumps(args.name) + ",\n")
-            fd.write('    "_manifest_entry":\n')
-            fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
-            fd.write(",\n")
-
-            data = key.decrypt(archive_meta_orig["id"], repository.get(archive_meta_orig["id"]))
-            archive_org_dict = msgpack.unpackb(data, object_hook=StableDict)
-
-            fd.write('    "_meta":\n')
-            fd.write(do_indent(prepare_dump_dict(archive_org_dict)))
-            fd.write(",\n")
-            fd.write('    "_items": [\n')
-
-            unpacker = msgpack.Unpacker(use_list=False, object_hook=StableDict)
-            first = True
-            for item_id in archive_org_dict["items"]:
-                data = key.decrypt(item_id, repository.get(item_id))
-                unpacker.feed(data)
-                for item in unpacker:
-                    item = prepare_dump_dict(item)
-                    if first:
-                        first = False
-                    else:
-                        fd.write(",\n")
-                    fd.write(do_indent(item))
-
-            fd.write("\n")
-            fd.write("    ]\n}\n")
-
-        with dash_open(args.path, "w") as fd:
-            output(fd)
-        return EXIT_SUCCESS
-
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_dump_manifest(self, args, repository, manifest, key):
-        """dump decoded repository manifest"""
-
-        data = key.decrypt(manifest.MANIFEST_ID, repository.get(manifest.MANIFEST_ID))
-
-        meta = prepare_dump_dict(msgpack.unpackb(data, object_hook=StableDict))
-
-        with dash_open(args.path, "w") as fd:
-            json.dump(meta, fd, indent=4)
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False)
-    def do_debug_dump_repo_objs(self, args, repository):
-        """dump (decrypted, decompressed) repo objects, repo index MUST be current/correct"""
-        from .crypto.key import key_factory
-
-        def decrypt_dump(i, id, cdata, tag=None, segment=None, offset=None):
-            if cdata is not None:
-                data = key.decrypt(id, cdata)
-            else:
-                data = b""
-            tag_str = "" if tag is None else "_" + tag
-            segment_str = "_" + str(segment) if segment is not None else ""
-            offset_str = "_" + str(offset) if offset is not None else ""
-            id_str = "_" + bin_to_hex(id) if id is not None else ""
-            filename = "%08d%s%s%s%s.obj" % (i, segment_str, offset_str, tag_str, id_str)
-            print("Dumping", filename)
-            with open(filename, "wb") as fd:
-                fd.write(data)
-
-        if args.ghost:
-            # dump ghosty stuff from segment files: not yet committed objects, deleted / superseded objects, commit tags
-
-            # set up the key without depending on a manifest obj
-            for id, cdata, tag, segment, offset in repository.scan_low_level():
-                if tag == TAG_PUT:
-                    key = key_factory(repository, cdata)
-                    break
-            i = 0
-            for id, cdata, tag, segment, offset in repository.scan_low_level(segment=args.segment, offset=args.offset):
-                if tag == TAG_PUT:
-                    decrypt_dump(i, id, cdata, tag="put", segment=segment, offset=offset)
-                elif tag == TAG_DELETE:
-                    decrypt_dump(i, id, None, tag="del", segment=segment, offset=offset)
-                elif tag == TAG_COMMIT:
-                    decrypt_dump(i, None, None, tag="commit", segment=segment, offset=offset)
-                i += 1
-        else:
-            # set up the key without depending on a manifest obj
-            ids = repository.list(limit=1, marker=None)
-            cdata = repository.get(ids[0])
-            key = key_factory(repository, cdata)
-            marker = None
-            i = 0
-            while True:
-                result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
-                if not result:
-                    break
-                marker = result[-1]
-                for id in result:
-                    cdata = repository.get(id)
-                    decrypt_dump(i, id, cdata)
-                    i += 1
-        print("Done.")
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False)
-    def do_debug_search_repo_objs(self, args, repository):
-        """search for byte sequences in repo objects, repo index MUST be current/correct"""
-        context = 32
-
-        def print_finding(info, wanted, data, offset):
-            before = data[offset - context : offset]
-            after = data[offset + len(wanted) : offset + len(wanted) + context]
-            print(
-                "{}: {} {} {} == {!r} {!r} {!r}".format(
-                    info, before.hex(), wanted.hex(), after.hex(), before, wanted, after
-                )
-            )
-
-        wanted = args.wanted
-        try:
-            if wanted.startswith("hex:"):
-                wanted = unhexlify(wanted[4:])
-            elif wanted.startswith("str:"):
-                wanted = wanted[4:].encode()
-            else:
-                raise ValueError("unsupported search term")
-        except (ValueError, UnicodeEncodeError):
-            wanted = None
-        if not wanted:
-            self.print_error("search term needs to be hex:123abc or str:foobar style")
-            return EXIT_ERROR
-
-        from .crypto.key import key_factory
-
-        # set up the key without depending on a manifest obj
-        ids = repository.list(limit=1, marker=None)
-        cdata = repository.get(ids[0])
-        key = key_factory(repository, cdata)
-
-        marker = None
-        last_data = b""
-        last_id = None
-        i = 0
-        while True:
-            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
-            if not result:
-                break
-            marker = result[-1]
-            for id in result:
-                cdata = repository.get(id)
-                data = key.decrypt(id, cdata)
-
-                # try to locate wanted sequence crossing the border of last_data and data
-                boundary_data = last_data[-(len(wanted) - 1) :] + data[: len(wanted) - 1]
-                if wanted in boundary_data:
-                    boundary_data = last_data[-(len(wanted) - 1 + context) :] + data[: len(wanted) - 1 + context]
-                    offset = boundary_data.find(wanted)
-                    info = "%d %s | %s" % (i, last_id.hex(), id.hex())
-                    print_finding(info, wanted, boundary_data, offset)
-
-                # try to locate wanted sequence in data
-                count = data.count(wanted)
-                if count:
-                    offset = data.find(wanted)  # only determine first occurrence's offset
-                    info = "%d %s #%d" % (i, id.hex(), count)
-                    print_finding(info, wanted, data, offset)
-
-                last_id, last_data = id, data
-                i += 1
-                if i % 10000 == 0:
-                    print("%d objects processed." % i)
-        print("Done.")
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False)
-    def do_debug_get_obj(self, args, repository):
-        """get object contents from the repository and write it into file"""
-        hex_id = args.id
-        try:
-            id = unhexlify(hex_id)
-        except ValueError:
-            print("object id %s is invalid." % hex_id)
-        else:
-            try:
-                data = repository.get(id)
-            except Repository.ObjectNotFound:
-                print("object %s not found." % hex_id)
-            else:
-                with open(args.path, "wb") as f:
-                    f.write(data)
-                print("object %s fetched." % hex_id)
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False, exclusive=True)
-    def do_debug_put_obj(self, args, repository):
-        """put file(s) contents into the repository"""
-        for path in args.paths:
-            with open(path, "rb") as f:
-                data = f.read()
-            h = hashlib.sha256(data)  # XXX hardcoded
-            repository.put(h.digest(), data)
-            print("object %s put." % h.hexdigest())
-        repository.commit(compact=False)
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False, exclusive=True)
-    def do_debug_delete_obj(self, args, repository):
-        """delete the objects with the given IDs from the repo"""
-        modified = False
-        for hex_id in args.ids:
-            try:
-                id = unhexlify(hex_id)
-            except ValueError:
-                print("object id %s is invalid." % hex_id)
-            else:
-                try:
-                    repository.delete(id)
-                    modified = True
-                    print("object %s deleted." % hex_id)
-                except Repository.ObjectNotFound:
-                    print("object %s not found." % hex_id)
-        if modified:
-            repository.commit(compact=False)
-        print("Done.")
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_refcount_obj(self, args, repository, manifest, key, cache):
-        """display refcounts for the objects with the given IDs"""
-        for hex_id in args.ids:
-            try:
-                id = unhexlify(hex_id)
-            except ValueError:
-                print("object id %s is invalid." % hex_id)
-            else:
-                try:
-                    refcount = cache.chunks[id][0]
-                    print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
-                except KeyError:
-                    print("object %s not found [info from chunks cache]." % hex_id)
-        return EXIT_SUCCESS
-
-    @with_repository(manifest=False, exclusive=True)
-    def do_debug_dump_hints(self, args, repository):
-        """dump repository hints"""
-        if not repository._active_txn:
-            repository.prepare_txn(repository.get_transaction_id())
-        try:
-            hints = dict(
-                segments=repository.segments,
-                compact=repository.compact,
-                storage_quota_use=repository.storage_quota_use,
-                shadow_index={hexlify(k).decode(): v for k, v in repository.shadow_index.items()},
-            )
-            with dash_open(args.path, "w") as fd:
-                json.dump(hints, fd, indent=4)
-        finally:
-            repository.rollback()
-        return EXIT_SUCCESS
-
-    def do_debug_convert_profile(self, args):
-        """convert Borg profile to Python profile"""
-        import marshal
-
-        with args.output, args.input:
-            marshal.dump(msgpack.unpack(args.input, use_list=False, raw=False), args.output)
-        return EXIT_SUCCESS
-
     @with_repository(lock=False, manifest=False)
     def do_break_lock(self, args, repository):
         """Break the repository lock (e.g. in case it was left by a dead borg."""
@@ -3298,31 +2738,8 @@ class Archiver:
                 setattr(args, dest, option_value)
 
     def build_parser(self):
-        # You can use :ref:`xyz` in the following usage pages. However, for plain-text view,
-        # e.g. through "borg ... --help", define a substitution for the reference here.
-        # It will replace the entire :ref:`foo` verbatim.
-        rst_plain_text_references = {
-            "a_status_oddity": '"I am seeing ‘A’ (added) status for a unchanged file!?"',
-            "separate_compaction": '"Separate compaction"',
-            "list_item_flags": '"Item flags"',
-            "borg_patterns": '"borg help patterns"',
-            "borg_placeholders": '"borg help placeholders"',
-            "key_files": "Internals -> Data structures and file formats -> Key files",
-            "borg_key_export": "borg key export --help",
-        }
 
-        def process_epilog(epilog):
-            epilog = textwrap.dedent(epilog).splitlines()
-            try:
-                mode = borg.doc_mode
-            except AttributeError:
-                mode = "command-line"
-            if mode in ("command-line", "build_usage"):
-                epilog = [line for line in epilog if not line.startswith(".. man")]
-            epilog = "\n".join(epilog)
-            if mode == "command-line":
-                epilog = rst_to_terminal(epilog, rst_plain_text_references)
-            return epilog
+        from .common import process_epilog
 
         def define_common_options(add_common_option):
             add_common_option("-h", "--help", action="help", help="show this help message and exit")
@@ -4391,267 +3808,7 @@ class Archiver:
         subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
         subparser.add_argument("paths", metavar="PATH", nargs="*", type=str, help="paths to archive")
 
-        # borg debug
-        debug_epilog = process_epilog(
-            """
-        These commands are not intended for normal use and potentially very
-        dangerous if used incorrectly.
-
-        They exist to improve debugging capabilities without direct system access, e.g.
-        in case you ever run into some severe malfunction. Use them only if you know
-        what you are doing or if a trusted developer tells you what to do."""
-        )
-
-        subparser = subparsers.add_parser(
-            "debug",
-            parents=[mid_common_parser],
-            add_help=False,
-            description="debugging command (not intended for normal use)",
-            epilog=debug_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="debugging command (not intended for normal use)",
-        )
-
-        debug_parsers = subparser.add_subparsers(title="required arguments", metavar="<command>")
-        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
-
-        debug_info_epilog = process_epilog(
-            """
-        This command displays some system information that might be useful for bug
-        reports and debugging problems. If a traceback happens, this information is
-        already appended at the end of the traceback.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "info",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_info.__doc__,
-            epilog=debug_info_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show system infos for debugging / bug reports (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_info)
-
-        debug_dump_archive_items_epilog = process_epilog(
-            """
-        This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "dump-archive-items",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_dump_archive_items.__doc__,
-            epilog=debug_dump_archive_items_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump archive items (metadata) (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
-
-        debug_dump_archive_epilog = process_epilog(
-            """
-        This command dumps all metadata of an archive in a decoded form to a file.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "dump-archive",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_dump_archive.__doc__,
-            epilog=debug_dump_archive_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump decoded archive metadata (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_dump_archive)
-        subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
-
-        debug_dump_manifest_epilog = process_epilog(
-            """
-        This command dumps manifest metadata of a repository in a decoded form to a file.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "dump-manifest",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_dump_manifest.__doc__,
-            epilog=debug_dump_manifest_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump decoded repository metadata (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_dump_manifest)
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
-
-        debug_dump_repo_objs_epilog = process_epilog(
-            """
-        This command dumps raw (but decrypted and decompressed) repo objects to files.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "dump-repo-objs",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_dump_repo_objs.__doc__,
-            epilog=debug_dump_repo_objs_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump repo objects (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
-        subparser.add_argument(
-            "--ghost",
-            dest="ghost",
-            action="store_true",
-            help="dump all segment file contents, including deleted/uncommitted objects and commits.",
-        )
-        subparser.add_argument(
-            "--segment",
-            metavar="SEG",
-            dest="segment",
-            default=None,
-            type=positive_int_validator,
-            help="used together with --ghost: limit processing to given segment.",
-        )
-        subparser.add_argument(
-            "--offset",
-            metavar="OFFS",
-            dest="offset",
-            default=None,
-            type=positive_int_validator,
-            help="used together with --ghost: limit processing to given offset.",
-        )
-
-        debug_search_repo_objs_epilog = process_epilog(
-            """
-        This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "search-repo-objs",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_search_repo_objs.__doc__,
-            epilog=debug_search_repo_objs_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="search repo objects (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_search_repo_objs)
-        subparser.add_argument(
-            "wanted",
-            metavar="WANTED",
-            type=str,
-            help="term to search the repo for, either 0x1234abcd hex term or a string",
-        )
-
-        debug_get_obj_epilog = process_epilog(
-            """
-        This command gets an object from the repository.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "get-obj",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_get_obj.__doc__,
-            epilog=debug_get_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="get object from repository (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_get_obj)
-        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to write object data into")
-
-        debug_put_obj_epilog = process_epilog(
-            """
-        This command puts objects into the repository.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "put-obj",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_put_obj.__doc__,
-            epilog=debug_put_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="put object to repository (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_put_obj)
-        subparser.add_argument(
-            "paths", metavar="PATH", nargs="+", type=str, help="file(s) to read and create object(s) from"
-        )
-
-        debug_delete_obj_epilog = process_epilog(
-            """
-        This command deletes objects from the repository.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "delete-obj",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_delete_obj.__doc__,
-            epilog=debug_delete_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="delete object from repository (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_delete_obj)
-        subparser.add_argument(
-            "ids", metavar="IDs", nargs="+", type=str, help="hex object ID(s) to delete from the repo"
-        )
-
-        debug_refcount_obj_epilog = process_epilog(
-            """
-        This command displays the reference count for objects from the repository.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "refcount-obj",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_refcount_obj.__doc__,
-            epilog=debug_refcount_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show refcount for object from repository (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_refcount_obj)
-        subparser.add_argument("ids", metavar="IDs", nargs="+", type=str, help="hex object ID(s) to show refcounts for")
-
-        debug_dump_hints_epilog = process_epilog(
-            """
-        This command dumps the repository hints data.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "dump-hints",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_dump_hints.__doc__,
-            epilog=debug_dump_hints_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump repo hints (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_dump_hints)
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
-
-        debug_convert_profile_epilog = process_epilog(
-            """
-        Convert a Borg profile to a Python cProfile compatible profile.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "convert-profile",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_convert_profile.__doc__,
-            epilog=debug_convert_profile_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="convert Borg profile to Python profile (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_convert_profile)
-        subparser.add_argument("input", metavar="INPUT", type=argparse.FileType("rb"), help="Borg profile")
-        subparser.add_argument("output", metavar="OUTPUT", type=argparse.FileType("wb"), help="Output file")
+        self.build_parser_debug(subparsers, common_parser, mid_common_parser)
 
         # borg rdelete
         rdelete_epilog = process_epilog(

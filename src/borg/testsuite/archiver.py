@@ -73,7 +73,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
     if fork:
         try:
             if exe is None:
-                borg = (sys.executable, "-m", "borg.archiver")
+                borg = (sys.executable, "-m", "borg")
             elif isinstance(exe, str):
                 borg = (exe,)
             elif not isinstance(exe, tuple):
@@ -3524,7 +3524,6 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     def test_debug_info(self):
         output = self.cmd("debug", "info")
-        assert "CRC implementation" in output
         assert "Python" in output
 
     def test_benchmark_crud(self):

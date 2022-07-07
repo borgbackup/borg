@@ -727,7 +727,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 opts.append("--storage-quota=%s" % args.storage_quota)
         env_vars = []
         if testing:
-            return env_vars + [sys.executable, "-m", "borg.archiver", "serve"] + opts + self.extra_test_args
+            return env_vars + [sys.executable, "-m", "borg", "serve"] + opts + self.extra_test_args
         else:  # pragma: no cover
             remote_path = args.remote_path or os.environ.get("BORG_REMOTE_PATH", "borg")
             remote_path = replace_placeholders(remote_path)

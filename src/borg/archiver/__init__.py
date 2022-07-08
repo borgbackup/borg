@@ -2254,6 +2254,7 @@ class Archiver(ConfigMixIn, DebugMixIn, TarMixIn, BenchmarkMixIn, KeysMixIn, Loc
 
         self.build_parser_config(subparsers, common_parser, mid_common_parser)
         self.build_parser_debug(subparsers, common_parser, mid_common_parser)
+        self.build_parser_help(subparsers, common_parser, mid_common_parser, parser)
 
         # borg rdelete
         rdelete_epilog = process_epilog(
@@ -2495,13 +2496,6 @@ class Archiver(ConfigMixIn, DebugMixIn, TarMixIn, BenchmarkMixIn, KeysMixIn, Loc
             "paths", metavar="PATH", nargs="*", type=str, help="paths to extract; patterns are supported"
         )
         define_exclusion_group(subparser, strip_components=True)
-
-        # borg help
-        subparser = subparsers.add_parser("help", parents=[common_parser], add_help=False, description="Extra help")
-        subparser.add_argument("--epilog-only", dest="epilog_only", action="store_true")
-        subparser.add_argument("--usage-only", dest="usage_only", action="store_true")
-        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
-        subparser.add_argument("topic", metavar="TOPIC", type=str, nargs="?", help="additional help on TOPIC")
 
         # borg rinfo
         rinfo_epilog = process_epilog(

@@ -108,7 +108,9 @@ from .tar import TarMixIn
 from .transfer import TransferMixIn
 
 
-class Archiver(ConfigMixIn, DebugMixIn, TarMixIn, BenchmarkMixIn, KeysMixIn, LocksMixIn, PruneMixIn, HelpMixIn, TransferMixIn):
+class Archiver(
+    ConfigMixIn, DebugMixIn, TarMixIn, BenchmarkMixIn, KeysMixIn, LocksMixIn, PruneMixIn, HelpMixIn, TransferMixIn
+):
     def __init__(self, lock_wait=None, prog=None):
         self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait

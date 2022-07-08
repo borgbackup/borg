@@ -99,6 +99,7 @@ from .keys import KeysMixIn
 from .locks import LocksMixIn
 from .mount import MountMixIn
 from .prune import PruneMixIn
+from .rename import RenameMixIn
 from .rcreate import RCreateMixIn
 from .rdelete import RDeleteMixIn
 from .serve import ServeMixIn
@@ -119,6 +120,7 @@ class Archiver(
     MountMixIn,
     PruneMixIn,
     HelpMixIn,
+    RenameMixIn,
     RCreateMixIn,
     RDeleteMixIn,
     ServeMixIn,
@@ -693,16 +695,6 @@ class Archiver(
         if pi:
             # clear progress output
             pi.finish()
-        return self.exit_code
-
-    @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
-    @with_archive
-    def do_rename(self, args, repository, manifest, key, cache, archive):
-        """Rename an existing archive"""
-        archive.rename(args.newname)
-        manifest.write()
-        repository.commit(compact=False)
-        cache.commit()
         return self.exit_code
 
     @with_repository(exclusive=True, manifest=False)
@@ -2202,29 +2194,7 @@ class Archiver(
             "paths", metavar="PATH", nargs="*", type=str, help="paths to recreate; patterns are supported"
         )
 
-        # borg rename
-        rename_epilog = process_epilog(
-            """
-        This command renames an archive in the repository.
-
-        This results in a different archive ID.
-        """
-        )
-        subparser = subparsers.add_parser(
-            "rename",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_rename.__doc__,
-            epilog=rename_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="rename archive",
-        )
-        subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument("name", metavar="OLDNAME", type=archivename_validator(), help="specify the archive name")
-        subparser.add_argument(
-            "newname", metavar="NEWNAME", type=archivename_validator(), help="specify the new archive name"
-        )
-
+        self.build_parser_rename(subparsers, common_parser, mid_common_parser)
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
 

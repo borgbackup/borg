@@ -5,7 +5,6 @@ import traceback
 
 try:
     import argparse
-    import base64
     import collections
     import configparser
     import faulthandler

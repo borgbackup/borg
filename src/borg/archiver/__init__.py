@@ -16,9 +16,8 @@ try:
     import signal
     import stat
     import subprocess
-    import textwrap
     import time
-    from datetime import datetime, timedelta
+    from datetime import datetime
     from io import TextIOWrapper
 
     from ..logger import create_logger, setup_logging
@@ -38,7 +37,7 @@ try:
     from ..helpers import Error, set_ec
     from ..helpers import location_validator, archivename_validator, ChunkerParams, Location
     from ..helpers import NameSpec, CommentSpec, FilesCacheMode
-    from ..helpers import format_timedelta, format_file_size
+    from ..helpers import format_file_size
     from ..helpers import remove_surrogates, eval_escapes
     from ..helpers import timestamp
     from ..helpers import get_cache_dir, os_stat
@@ -95,6 +94,7 @@ from .debug import DebugMixIn
 from .delete import DeleteMixIn
 from .diff import DiffMixIn
 from .help import HelpMixIn
+from .info import InfoMixIn
 from .keys import KeysMixIn
 from .list_cmd import ListMixIn
 from .locks import LocksMixIn
@@ -125,6 +125,7 @@ class Archiver(
     MountMixIn,
     PruneMixIn,
     HelpMixIn,
+    InfoMixIn,
     RenameMixIn,
     RCreateMixIn,
     RInfoMixIn,
@@ -702,64 +703,6 @@ class Archiver(
         if pi:
             # clear progress output
             pi.finish()
-        return self.exit_code
-
-    @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
-    def do_info(self, args, repository, manifest, key, cache):
-        """Show archive details such as disk space used"""
-
-        def format_cmdline(cmdline):
-            return remove_surrogates(" ".join(shlex.quote(x) for x in cmdline))
-
-        args.consider_checkpoints = True
-        archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
-
-        output_data = []
-
-        for i, archive_name in enumerate(archive_names, 1):
-            archive = Archive(
-                repository,
-                key,
-                manifest,
-                archive_name,
-                cache=cache,
-                consider_part_files=args.consider_part_files,
-                iec=args.iec,
-            )
-            info = archive.info()
-            if args.json:
-                output_data.append(info)
-            else:
-                info["duration"] = format_timedelta(timedelta(seconds=info["duration"]))
-                info["command_line"] = format_cmdline(info["command_line"])
-                print(
-                    textwrap.dedent(
-                        """
-                Archive name: {name}
-                Archive fingerprint: {id}
-                Comment: {comment}
-                Hostname: {hostname}
-                Username: {username}
-                Time (start): {start}
-                Time (end): {end}
-                Duration: {duration}
-                Command line: {command_line}
-                Utilization of maximum supported archive size: {limits[max_archive_size]:.0%}
-                Number of files: {stats[nfiles]}
-                Original size: {stats[original_size]}
-                Deduplicated size: {stats[deduplicated_size]}
-                """
-                    )
-                    .strip()
-                    .format(**info)
-                )
-            if self.exit_code:
-                break
-            if not args.json and len(archive_names) - i:
-                print()
-
-        if args.json:
-            json_print(basic_json_data(manifest, cache=cache, extra={"archives": output_data}))
         return self.exit_code
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
@@ -1584,39 +1527,7 @@ class Archiver(
         )
         define_exclusion_group(subparser, strip_components=True)
 
-        # borg info
-        info_epilog = process_epilog(
-            """
-        This command displays detailed information about the specified archive.
-
-        Please note that the deduplicated sizes of the individual archives do not add
-        up to the deduplicated size of the repository ("all archives"), because the two
-        are meaning different things:
-
-        This archive / deduplicated size = amount of data stored ONLY for this archive
-        = unique chunks of this archive.
-        All archives / deduplicated size = amount of data stored in the repo
-        = all chunks in the repository.
-
-        Borg archives can only contain a limited amount of file metadata.
-        The size of an archive relative to this limit depends on a number of factors,
-        mainly the number of files, the lengths of paths and other metadata stored for files.
-        This is shown as *utilization of maximum supported archive size*.
-        """
-        )
-        subparser = subparsers.add_parser(
-            "info",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_info.__doc__,
-            epilog=info_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show repository or archive information",
-        )
-        subparser.set_defaults(func=self.do_info)
-        subparser.add_argument("--json", action="store_true", help="format output as JSON")
-        define_archive_filters_group(subparser)
-
+        self.build_parser_info(subparsers, common_parser, mid_common_parser)
         self.build_parser_keys(subparsers, common_parser, mid_common_parser)
         self.build_parser_rcreate(subparsers, common_parser, mid_common_parser)
 

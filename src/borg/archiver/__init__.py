@@ -97,7 +97,7 @@ from .delete import DeleteMixIn
 from .diff import DiffMixIn
 from .help import HelpMixIn
 from .keys import KeysMixIn
-from .list import ListMixIn
+from .list_cmd import ListMixIn
 from .locks import LocksMixIn
 from .mount import MountMixIn
 from .prune import PruneMixIn

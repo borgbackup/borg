@@ -7,7 +7,8 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
-from ..helpers import Manifest
+from ..helpers import Manifest, AI_HUMAN_SORT_KEYS
+from ..helpers import GlobSpec, SortBySpec, positive_int_validator
 from ..remote import RemoteRepository
 from ..repository import Repository
 from ..nanorst import rst_to_terminal
@@ -17,6 +18,7 @@ from ..patterns import (
     ArgparsePatternFileAction,
     parse_exclude_pattern,
 )
+
 
 from ..logger import create_logger
 
@@ -368,3 +370,53 @@ def define_exclusion_group(subparser, **kwargs):
     exclude_group = subparser.add_argument_group("Exclusion options")
     define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
     return exclude_group
+
+
+def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
+    filters_group = subparser.add_argument_group(
+        "Archive filters", "Archive filters can be applied to repository targets."
+    )
+    group = filters_group.add_mutually_exclusive_group()
+    group.add_argument(
+        "-a",
+        "--glob-archives",
+        metavar="GLOB",
+        dest="glob_archives",
+        type=GlobSpec,
+        action=Highlander,
+        help="only consider archive names matching the glob. " 'sh: rules apply, see "borg help patterns".',
+    )
+
+    if sort_by:
+        sort_by_default = "timestamp"
+        filters_group.add_argument(
+            "--sort-by",
+            metavar="KEYS",
+            dest="sort_by",
+            type=SortBySpec,
+            default=sort_by_default,
+            help="Comma-separated list of sorting keys; valid keys are: {}; default is: {}".format(
+                ", ".join(AI_HUMAN_SORT_KEYS), sort_by_default
+            ),
+        )
+
+    if first_last:
+        group = filters_group.add_mutually_exclusive_group()
+        group.add_argument(
+            "--first",
+            metavar="N",
+            dest="first",
+            default=0,
+            type=positive_int_validator,
+            help="consider first N archives after other filters were applied",
+        )
+        group.add_argument(
+            "--last",
+            metavar="N",
+            dest="last",
+            default=0,
+            type=positive_int_validator,
+            help="consider last N archives after other filters were applied",
+        )
+
+    return filters_group

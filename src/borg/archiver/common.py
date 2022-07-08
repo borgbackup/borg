@@ -10,8 +10,13 @@ from ..helpers import Error
 from ..helpers import Manifest
 from ..remote import RemoteRepository
 from ..repository import Repository
-
 from ..nanorst import rst_to_terminal
+from ..patterns import (
+    ArgparsePatternAction,
+    ArgparseExcludeFileAction,
+    ArgparsePatternFileAction,
+    parse_exclude_pattern,
+)
 
 from ..logger import create_logger
 
@@ -296,3 +301,70 @@ def process_epilog(epilog):
     if mode == "command-line":
         epilog = rst_to_terminal(epilog, rst_plain_text_references)
     return epilog
+
+
+def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components=False):
+    add_option(
+        "-e",
+        "--exclude",
+        metavar="PATTERN",
+        dest="patterns",
+        type=parse_exclude_pattern,
+        action="append",
+        help="exclude paths matching PATTERN",
+    )
+    add_option(
+        "--exclude-from",
+        metavar="EXCLUDEFILE",
+        action=ArgparseExcludeFileAction,
+        help="read exclude patterns from EXCLUDEFILE, one per line",
+    )
+    add_option(
+        "--pattern", metavar="PATTERN", action=ArgparsePatternAction, help="include/exclude paths matching PATTERN"
+    )
+    add_option(
+        "--patterns-from",
+        metavar="PATTERNFILE",
+        action=ArgparsePatternFileAction,
+        help="read include/exclude patterns from PATTERNFILE, one per line",
+    )
+
+    if tag_files:
+        add_option(
+            "--exclude-caches",
+            dest="exclude_caches",
+            action="store_true",
+            help="exclude directories that contain a CACHEDIR.TAG file " "(http://www.bford.info/cachedir/spec.html)",
+        )
+        add_option(
+            "--exclude-if-present",
+            metavar="NAME",
+            dest="exclude_if_present",
+            action="append",
+            type=str,
+            help="exclude directories that are tagged by containing a filesystem object with " "the given NAME",
+        )
+        add_option(
+            "--keep-exclude-tags",
+            dest="keep_exclude_tags",
+            action="store_true",
+            help="if tag objects are specified with ``--exclude-if-present``, "
+            "don't omit the tag objects themselves from the backup archive",
+        )
+
+    if strip_components:
+        add_option(
+            "--strip-components",
+            metavar="NUMBER",
+            dest="strip_components",
+            type=int,
+            default=0,
+            help="Remove the specified number of leading path elements. "
+            "Paths with fewer elements will be silently skipped.",
+        )
+
+
+def define_exclusion_group(subparser, **kwargs):
+    exclude_group = subparser.add_argument_group("Exclusion options")
+    define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
+    return exclude_group

@@ -32,7 +32,7 @@ try:
 
     logger = create_logger()
 
-    from .common import with_repository, with_other_repository, with_archive
+    from .common import with_repository, with_other_repository, with_archive, Highlander
     from .. import __version__
     from .. import helpers
     from ..archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
@@ -109,15 +109,6 @@ def get_func(args):
         if func is not None:
             return func
     raise Exception("expected func attributes not found")
-
-
-class Highlander(argparse.Action):
-    """make sure some option is only given once"""
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if getattr(namespace, self.dest, None) != self.default:
-            raise argparse.ArgumentError(self, "There can be only one.")
-        setattr(namespace, self.dest, values)
 
 
 from .debug import DebugMixIn

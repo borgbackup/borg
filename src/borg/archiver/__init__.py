@@ -2604,29 +2604,6 @@ class Archiver(
             "repository as well. Default: no quota.",
         )
 
-        # borg umount
-        umount_epilog = process_epilog(
-            """
-        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
-
-        This is a convenience wrapper that just calls the platform-specific shell
-        command - usually this is either umount or fusermount -u.
-        """
-        )
-        subparser = subparsers.add_parser(
-            "umount",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_umount.__doc__,
-            epilog=umount_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="umount repository",
-        )
-        subparser.set_defaults(func=self.do_umount)
-        subparser.add_argument(
-            "mountpoint", metavar="MOUNTPOINT", type=str, help="mountpoint of the filesystem to umount"
-        )
-
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
 
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)

@@ -18,7 +18,6 @@ logger = create_logger()
 
 
 class PruneMixIn:
-
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""

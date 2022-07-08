@@ -39,7 +39,7 @@ try:
     from ..helpers import location_validator, archivename_validator, ChunkerParams, Location
     from ..helpers import NameSpec, CommentSpec, FilesCacheMode
     from ..helpers import format_timedelta, format_file_size
-    from ..helpers import remove_surrogates, bin_to_hex, eval_escapes
+    from ..helpers import remove_surrogates, eval_escapes
     from ..helpers import timestamp
     from ..helpers import get_cache_dir, os_stat
     from ..helpers import Manifest
@@ -102,6 +102,7 @@ from .mount import MountMixIn
 from .prune import PruneMixIn
 from .rename import RenameMixIn
 from .rcreate import RCreateMixIn
+from .rinfo import RInfoMixIn
 from .rdelete import RDeleteMixIn
 from .rlist import RListMixIn
 from .serve import ServeMixIn
@@ -126,6 +127,7 @@ class Archiver(
     HelpMixIn,
     RenameMixIn,
     RCreateMixIn,
+    RInfoMixIn,
     RDeleteMixIn,
     RListMixIn,
     ServeMixIn,
@@ -700,47 +702,6 @@ class Archiver(
         if pi:
             # clear progress output
             pi.finish()
-        return self.exit_code
-
-    @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
-    def do_rinfo(self, args, repository, manifest, key, cache):
-        """Show repository infos"""
-        info = basic_json_data(manifest, cache=cache, extra={"security_dir": cache.security_manager.dir})
-
-        if args.json:
-            json_print(info)
-        else:
-            encryption = "Encrypted: "
-            if key.NAME in ("plaintext", "authenticated"):
-                encryption += "No"
-            else:
-                encryption += "Yes (%s)" % key.NAME
-            if key.NAME.startswith("key file"):
-                encryption += "\nKey file: %s" % key.find_key()
-            info["encryption"] = encryption
-
-            print(
-                textwrap.dedent(
-                    """
-            Repository ID: {id}
-            Location: {location}
-            Repository version: {version}
-            Append only: {append_only}
-            {encryption}
-            Cache: {cache.path}
-            Security dir: {security_dir}
-            """
-                )
-                .strip()
-                .format(
-                    id=bin_to_hex(repository.id),
-                    location=repository._location.canonical_path(),
-                    version=repository.version,
-                    append_only=repository.append_only,
-                    **info,
-                )
-            )
-            print(str(cache))
         return self.exit_code
 
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
@@ -1551,6 +1512,7 @@ class Archiver(
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)
         self.build_parser_help(subparsers, common_parser, mid_common_parser, parser)
         self.build_parser_rdelete(subparsers, common_parser, mid_common_parser, parser)
+        self.build_parser_rinfo(subparsers, common_parser, mid_common_parser)
         self.build_parser_rlist(subparsers, common_parser, mid_common_parser)
 
         # borg extract
@@ -1621,33 +1583,6 @@ class Archiver(
             "paths", metavar="PATH", nargs="*", type=str, help="paths to extract; patterns are supported"
         )
         define_exclusion_group(subparser, strip_components=True)
-
-        # borg rinfo
-        rinfo_epilog = process_epilog(
-            """
-        This command displays detailed information about the repository.
-
-        Please note that the deduplicated sizes of the individual archives do not add
-        up to the deduplicated size of the repository ("all archives"), because the two
-        are meaning different things:
-
-        This archive / deduplicated size = amount of data stored ONLY for this archive
-        = unique chunks of this archive.
-        All archives / deduplicated size = amount of data stored in the repo
-        = all chunks in the repository.
-        """
-        )
-        subparser = subparsers.add_parser(
-            "rinfo",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_rinfo.__doc__,
-            epilog=rinfo_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show repository information",
-        )
-        subparser.set_defaults(func=self.do_rinfo)
-        subparser.add_argument("--json", action="store_true", help="format output as JSON")
 
         # borg info
         info_epilog = process_epilog(

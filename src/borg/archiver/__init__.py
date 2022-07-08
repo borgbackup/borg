@@ -37,7 +37,7 @@ try:
     from .. import helpers
     from ..archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
     from ..archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
-    from ..archive import FilesystemObjectProcessors, TarfileObjectProcessors, MetadataCollector, ChunksProcessor
+    from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
     from ..cache import Cache, assert_secure, SecurityManager
     from ..constants import *  # NOQA
     from ..compress import CompressionSpec
@@ -64,20 +64,13 @@ try:
     from ..helpers import ErrorIgnoringTextIOWrapper
     from ..helpers import ProgressIndicatorPercent
     from ..helpers import basic_json_data, json_print
-    from ..helpers import prepare_subprocess_env, create_filter_process
-    from ..helpers import dash_open
+    from ..helpers import prepare_subprocess_env
     from ..helpers import umount
     from ..helpers import flags_root, flags_dir, flags_special_follow, flags_special
     from ..helpers import msgpack
     from ..helpers import sig_int
     from ..helpers import iter_separated
     from ..nanorst import rst_to_terminal
-    from ..patterns import (
-        ArgparsePatternAction,
-        ArgparseExcludeFileAction,
-        ArgparsePatternFileAction,
-        parse_exclude_pattern,
-    )
     from ..patterns import PatternMatcher
     from ..item import Item
     from ..platform import get_flags, SyncFile

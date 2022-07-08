@@ -18,7 +18,6 @@ logger = create_logger()
 
 
 class ConfigMixIn:
-
     @with_repository(exclusive=True, manifest=False)
     def do_config(self, args, repository):
         """get, set, and delete values in a repository or cache config file"""

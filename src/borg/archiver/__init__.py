@@ -40,7 +40,7 @@ try:
     from ..helpers import location_validator, archivename_validator, ChunkerParams, Location
     from ..helpers import NameSpec, CommentSpec, FilesCacheMode
     from ..helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
-    from ..helpers import format_timedelta, format_file_size, parse_file_size, format_archive
+    from ..helpers import format_timedelta, format_file_size, format_archive, parse_storage_quota
     from ..helpers import remove_surrogates, bin_to_hex, eval_escapes
     from ..helpers import timestamp
     from ..helpers import get_cache_dir, os_stat
@@ -60,7 +60,7 @@ try:
     from ..patterns import PatternMatcher
     from ..platform import get_flags
     from ..platform import uid2user, gid2group
-    from ..remote import RepositoryServer, RemoteRepository
+    from ..remote import RemoteRepository
     from ..selftest import selftest
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
@@ -75,13 +75,6 @@ assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND excep
 STATS_HEADER = "                       Original size    Deduplicated size"
 
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
-
-
-def parse_storage_quota(storage_quota):
-    parsed = parse_file_size(storage_quota)
-    if parsed < parse_file_size("10M"):
-        raise argparse.ArgumentTypeError("quota is too small (%s). At least 10M are required." % storage_quota)
-    return parsed
 
 
 def get_func(args):
@@ -107,6 +100,7 @@ from .keys import KeysMixIn
 from .locks import LocksMixIn
 from .mount import MountMixIn
 from .prune import PruneMixIn
+from .serve import ServeMixIn
 from .tar import TarMixIn
 from .transfer import TransferMixIn
 
@@ -124,6 +118,7 @@ class Archiver(
     MountMixIn,
     PruneMixIn,
     HelpMixIn,
+    ServeMixIn,
     TransferMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
@@ -158,16 +153,6 @@ class Archiver(
         matcher.add_inclexcl(inclexcl_patterns)
         matcher.add_includepaths(include_paths)
         return matcher
-
-    def do_serve(self, args):
-        """Start in server mode. This command is usually not used manually."""
-        RepositoryServer(
-            restrict_to_paths=args.restrict_to_paths,
-            restrict_to_repositories=args.restrict_to_repositories,
-            append_only=args.append_only,
-            storage_quota=args.storage_quota,
-        ).serve()
-        return EXIT_SUCCESS
 
     @with_repository(create=True, exclusive=True, manifest=False)
     @with_other_repository(key=True, compatibility=(Manifest.Operation.READ,))
@@ -2546,64 +2531,7 @@ class Archiver(
             "newname", metavar="NEWNAME", type=archivename_validator(), help="specify the new archive name"
         )
 
-        # borg serve
-        serve_epilog = process_epilog(
-            """
-        This command starts a repository server process. This command is usually not used manually.
-        """
-        )
-        subparser = subparsers.add_parser(
-            "serve",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_serve.__doc__,
-            epilog=serve_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="start repository server process",
-        )
-        subparser.set_defaults(func=self.do_serve)
-        subparser.add_argument(
-            "--restrict-to-path",
-            metavar="PATH",
-            dest="restrict_to_paths",
-            action="append",
-            help="restrict repository access to PATH. "
-            "Can be specified multiple times to allow the client access to several directories. "
-            "Access to all sub-directories is granted implicitly; PATH doesn't need to directly point to a repository.",
-        )
-        subparser.add_argument(
-            "--restrict-to-repository",
-            metavar="PATH",
-            dest="restrict_to_repositories",
-            action="append",
-            help="restrict repository access. Only the repository located at PATH "
-            "(no sub-directories are considered) is accessible. "
-            "Can be specified multiple times to allow the client access to several repositories. "
-            "Unlike ``--restrict-to-path`` sub-directories are not accessible; "
-            "PATH needs to directly point at a repository location. "
-            "PATH may be an empty directory or the last element of PATH may not exist, in which case "
-            "the client may initialize a repository there.",
-        )
-        subparser.add_argument(
-            "--append-only",
-            dest="append_only",
-            action="store_true",
-            help="only allow appending to repository segment files. Note that this only "
-            "affects the low level structure of the repository, and running `delete` "
-            "or `prune` will still be allowed. See :ref:`append_only_mode` in Additional "
-            "Notes for more details.",
-        )
-        subparser.add_argument(
-            "--storage-quota",
-            metavar="QUOTA",
-            dest="storage_quota",
-            type=parse_storage_quota,
-            default=None,
-            help="Override storage quota of the repository (e.g. 5G, 1.5T). "
-            "When a new repository is initialized, sets the storage quota on the new "
-            "repository as well. Default: no quota.",
-        )
-
+        self.build_parser_serve(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
 
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)

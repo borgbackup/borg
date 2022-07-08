@@ -98,6 +98,7 @@ def get_func(args):
 
 
 from .benchmarks import BenchmarkMixIn
+from .compact import CompactMixIn
 from .config import ConfigMixIn
 from .debug import DebugMixIn
 from .diff import DiffMixIn
@@ -111,6 +112,7 @@ from .transfer import TransferMixIn
 
 class Archiver(
     ConfigMixIn,
+    CompactMixIn,
     DebugMixIn,
     DiffMixIn,
     TarMixIn,
@@ -1177,16 +1179,6 @@ class Archiver(
             cache.commit()
         return self.exit_code
 
-    @with_repository(manifest=False, exclusive=True)
-    def do_compact(self, args, repository):
-        """compact segment files in the repository"""
-        # see the comment in do_with_lock about why we do it like this:
-        data = repository.get(Manifest.MANIFEST_ID)
-        repository.put(Manifest.MANIFEST_ID, data)
-        threshold = args.threshold / 100
-        repository.commit(compact=True, threshold=threshold)
-        return EXIT_SUCCESS
-
     def preprocess_args(self, args):
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
@@ -1593,6 +1585,7 @@ class Archiver(
         subparsers = parser.add_subparsers(title="required arguments", metavar="<command>")
 
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
+        self.build_parser_compact(subparsers, common_parser, mid_common_parser)
         self.build_parser_diff(subparsers, common_parser, mid_common_parser)
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_prune(subparsers, common_parser, mid_common_parser)
@@ -1711,47 +1704,6 @@ class Archiver(
             help="do only a partial repo check for max. SECONDS seconds (Default: unlimited)",
         )
         define_archive_filters_group(subparser)
-
-        # borg compact
-        compact_epilog = process_epilog(
-            """
-        This command frees repository space by compacting segments.
-
-        Use this regularly to avoid running out of space - you do not need to use this
-        after each borg command though. It is especially useful after deleting archives,
-        because only compaction will really free repository space.
-
-        borg compact does not need a key, so it is possible to invoke it from the
-        client or also from the server.
-
-        Depending on the amount of segments that need compaction, it may take a while,
-        so consider using the ``--progress`` option.
-
-        A segment is compacted if the amount of saved space is above the percentage value
-        given by the ``--threshold`` option. If omitted, a threshold of 10% is used.
-        When using ``--verbose``, borg will output an estimate of the freed space.
-
-        See :ref:`separate_compaction` in Additional Notes for more details.
-        """
-        )
-        subparser = subparsers.add_parser(
-            "compact",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_compact.__doc__,
-            epilog=compact_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="compact segment files / free space in repo",
-        )
-        subparser.set_defaults(func=self.do_compact)
-        subparser.add_argument(
-            "--threshold",
-            metavar="PERCENT",
-            dest="threshold",
-            type=int,
-            default=10,
-            help="set minimum threshold for saved space in PERCENT (Default: 10)",
-        )
 
         # borg create
         create_epilog = process_epilog(

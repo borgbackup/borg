@@ -26,6 +26,7 @@ from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
 
 from .common import with_repository, with_archive, Highlander, define_exclusion_group
+from .common import build_matcher, build_filter
 
 from ..logger import create_logger
 
@@ -68,14 +69,14 @@ class TarMixIn:
         return self.exit_code
 
     def _export_tar(self, args, archive, tarstream):
-        matcher = self.build_matcher(args.patterns, args.paths)
+        matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress
         output_list = args.output_list
         strip_components = args.strip_components
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        filter = self.build_filter(matcher, strip_components)
+        filter = build_filter(matcher, strip_components)
 
         # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
         # where it never seeks on the passed fileobj.

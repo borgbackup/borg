@@ -1,5 +1,6 @@
 import argparse
 import functools
+import os
 import textwrap
 
 import borg
@@ -9,6 +10,7 @@ from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import Manifest, AI_HUMAN_SORT_KEYS
 from ..helpers import GlobSpec, SortBySpec, positive_int_validator
+from ..patterns import PatternMatcher
 from ..remote import RemoteRepository
 from ..repository import Repository
 from ..nanorst import rst_to_terminal
@@ -420,3 +422,26 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
         )
 
     return filters_group
+
+
+def build_matcher(inclexcl_patterns, include_paths):
+    matcher = PatternMatcher()
+    matcher.add_inclexcl(inclexcl_patterns)
+    matcher.add_includepaths(include_paths)
+    return matcher
+
+
+def build_filter(matcher, strip_components):
+    if strip_components:
+
+        def item_filter(item):
+            matched = matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
+            return matched
+
+    else:
+
+        def item_filter(item):
+            matched = matcher.match(item.path)
+            return matched
+
+    return item_filter

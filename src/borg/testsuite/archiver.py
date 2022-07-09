@@ -32,6 +32,7 @@ import borg.helpers.errors
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
+from ..archiver.common import build_filter, build_matcher
 from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
 from ..constants import *  # NOQA
@@ -4573,19 +4574,19 @@ class TestBuildFilter:
     def test_basic(self):
         matcher = PatternMatcher()
         matcher.add([parse_pattern("included")], IECommand.Include)
-        filter = Archiver.build_filter(matcher, 0)
+        filter = build_filter(matcher, 0)
         assert filter(Item(path="included"))
         assert filter(Item(path="included/file"))
         assert not filter(Item(path="something else"))
 
     def test_empty(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, 0)
+        filter = build_filter(matcher, 0)
         assert filter(Item(path="anything"))
 
     def test_strip_components(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, strip_components=1)
+        filter = build_filter(matcher, strip_components=1)
         assert not filter(Item(path="shallow"))
         assert not filter(Item(path="shallow/"))  # can this even happen? paths are normalized...
         assert filter(Item(path="deep enough/file"))

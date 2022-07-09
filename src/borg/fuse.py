@@ -35,7 +35,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .crypto.low_level import blake2b_128
-from .archiver import Archiver
+from .archiver.common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, daemonizing, signal_handler, format_file_size
@@ -338,10 +338,10 @@ class FuseBackend:
             consider_part_files=self._args.consider_part_files,
         )
         strip_components = self._args.strip_components
-        matcher = Archiver.build_matcher(self._args.patterns, self._args.paths)
+        matcher = build_matcher(self._args.patterns, self._args.paths)
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        filter = Archiver.build_filter(matcher, strip_components)
+        filter = build_filter(matcher, strip_components)
         for item_inode, item in self.cache.iter_archive_items(
             archive.metadata.items, filter=filter, consider_part_files=self._args.consider_part_files
         ):

@@ -25,6 +25,7 @@ try:
     logger = create_logger()
 
     from .common import with_repository, with_archive, Highlander
+    from .common import build_filter, build_matcher
     from .. import __version__
     from .. import helpers
     from ..archive import Archive, ArchiveRecreater, is_special
@@ -159,13 +160,6 @@ class Archiver(
                 )
             else:
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))
-
-    @staticmethod
-    def build_matcher(inclexcl_patterns, include_paths):
-        matcher = PatternMatcher()
-        matcher.add_inclexcl(inclexcl_patterns)
-        matcher.add_includepaths(include_paths)
-        return matcher
 
     @with_repository(fake="dry_run", exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest=None, key=None):
@@ -601,22 +595,6 @@ class Archiver(
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
 
-    @staticmethod
-    def build_filter(matcher, strip_components):
-        if strip_components:
-
-            def item_filter(item):
-                matched = matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
-                return matched
-
-        else:
-
-            def item_filter(item):
-                matched = matcher.match(item.path)
-                return matched
-
-        return item_filter
-
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
     def do_extract(self, args, repository, manifest, key, archive):
@@ -631,7 +609,7 @@ class Archiver(
                     "Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8"
                 )
 
-        matcher = self.build_matcher(args.patterns, args.paths)
+        matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress
         output_list = args.output_list
@@ -642,7 +620,7 @@ class Archiver(
         dirs = []
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        filter = self.build_filter(matcher, strip_components)
+        filter = build_filter(matcher, strip_components)
         if progress:
             pi = ProgressIndicatorPercent(msg="%5.1f%% Extracting: %s", step=0.1, msgid="extract")
             pi.output("Calculating total archive size for the progress indicator (might take long for large archives)")
@@ -708,7 +686,7 @@ class Archiver(
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, key, cache):
         """Re-create archives"""
-        matcher = self.build_matcher(args.patterns, args.paths)
+        matcher = build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
         recompress = args.recompress != "never"

@@ -1,7 +1,7 @@
 import argparse
 import json
 
-from .common import with_repository, with_archive
+from .common import with_repository, with_archive, build_matcher
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
@@ -40,7 +40,7 @@ class DiffMixIn:
                 "to override this check."
             )
 
-        matcher = self.build_matcher(args.patterns, args.paths)
+        matcher = build_matcher(args.patterns, args.paths)
 
         diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids)
         # Conversion to string and filtering for diff.equal to save memory if sorting

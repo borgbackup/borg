@@ -2,7 +2,7 @@ import argparse
 import textwrap
 import sys
 
-from .common import with_repository
+from .common import with_repository, build_matcher
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -18,7 +18,7 @@ class ListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest, key):
         """List archive contents"""
-        matcher = self.build_matcher(args.patterns, args.paths)
+        matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
         elif args.short:

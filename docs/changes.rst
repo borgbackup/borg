@@ -12,7 +12,7 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0a3 (2022-07-04)
+Version 2.0.0a4 (2022-07-xx)
 ----------------------------
 
 Please note:
@@ -77,6 +77,23 @@ Compatibility notes:
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
+
+
+New features:
+
+- recreate: consider level for recompression, #6698, #3622
+
+Other changes:
+
+- stop using libdeflate
+- split up archiver module, transform it into a package
+- use Black for automated code formatting
+- use language_level = 3str for cython (this will be the default in cython 3)
+- docs: document HardLinkManager and hlid, #2388
+
+
+Version 2.0.0a3 (2022-07-04)
+----------------------------
 
 Fixes:
 

@@ -2643,6 +2643,7 @@ class Archiver:
             ('--numeric-owner', None, 'Warning: "--numeric-owner" has been deprecated. Use --numeric-ids instead.'),
             ('--remote-ratelimit', None, 'Warning: "--remote-ratelimit" has been deprecated. Use --upload-ratelimit instead.'),
             ('--remote-buffer', None, 'Warning: "--remote-buffer" has been deprecated. Use --upload-buffer instead.'),
+            ('--prefix', None, 'Warning: "--prefix" has been deprecated. Use "--glob-archives \'yourprefix*\'" (-a) instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:

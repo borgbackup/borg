@@ -955,7 +955,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "--foo", "example.com"]
 
     def test_borg_cmd(self):
-        assert self.repository.borg_cmd(None, testing=True) == [sys.executable, "-m", "borg.archiver", "serve"]
+        assert self.repository.borg_cmd(None, testing=True) == [sys.executable, "-m", "borg", "serve"]
         args = self._get_mock_args()
         # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
         logging.getLogger().setLevel(logging.INFO)

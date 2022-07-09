@@ -257,6 +257,13 @@ def parse_file_size(s):
     return int(float(s) * factor)
 
 
+def parse_storage_quota(storage_quota):
+    parsed = parse_file_size(storage_quota)
+    if parsed < parse_file_size("10M"):
+        raise argparse.ArgumentTypeError("quota is too small (%s). At least 10M are required." % storage_quota)
+    return parsed
+
+
 def sizeof_fmt(num, suffix="B", units=None, power=None, sep="", precision=2, sign=False):
     sign = "+" if sign and num > 0 else ""
     fmt = "{0:{1}.{2}f}{3}{4}{5}"

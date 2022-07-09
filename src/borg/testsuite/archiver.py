@@ -31,7 +31,8 @@ import borg
 import borg.helpers.errors
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
-from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
+from ..archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
+from ..archiver.common import build_filter, build_matcher
 from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
 from ..constants import *  # NOQA
@@ -43,6 +44,7 @@ from ..helpers import Manifest, MandatoryFeatureUnsupported
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import msgpack
+from ..helpers import parse_storage_quota
 from ..helpers import flags_noatime, flags_normal
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
@@ -73,7 +75,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
     if fork:
         try:
             if exe is None:
-                borg = (sys.executable, "-m", "borg.archiver")
+                borg = (sys.executable, "-m", "borg")
             elif isinstance(exe, str):
                 borg = (exe,)
             elif not isinstance(exe, tuple):
@@ -3524,7 +3526,6 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     def test_debug_info(self):
         output = self.cmd("debug", "info")
-        assert "CRC implementation" in output
         assert "Python" in output
 
     def test_benchmark_crud(self):
@@ -4573,19 +4574,19 @@ class TestBuildFilter:
     def test_basic(self):
         matcher = PatternMatcher()
         matcher.add([parse_pattern("included")], IECommand.Include)
-        filter = Archiver.build_filter(matcher, 0)
+        filter = build_filter(matcher, 0)
         assert filter(Item(path="included"))
         assert filter(Item(path="included/file"))
         assert not filter(Item(path="something else"))
 
     def test_empty(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, 0)
+        filter = build_filter(matcher, 0)
         assert filter(Item(path="anything"))
 
     def test_strip_components(self):
         matcher = PatternMatcher(fallback=True)
-        filter = Archiver.build_filter(matcher, strip_components=1)
+        filter = build_filter(matcher, strip_components=1)
         assert not filter(Item(path="shallow"))
         assert not filter(Item(path="shallow/"))  # can this even happen? paths are normalized...
         assert filter(Item(path="deep enough/file"))

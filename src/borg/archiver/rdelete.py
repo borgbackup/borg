@@ -90,7 +90,7 @@ class RDeleteMixIn:
             logger.info("Would delete cache.")
         return self.exit_code
 
-    def build_parser_rdelete(self, subparsers, common_parser, mid_common_parser, parser):
+    def build_parser_rdelete(self, subparsers, common_parser, mid_common_parser):
 
         from .common import process_epilog
 

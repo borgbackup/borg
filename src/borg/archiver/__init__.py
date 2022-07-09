@@ -90,30 +90,30 @@ from .transfer import TransferMixIn
 
 
 class Archiver(
+    BenchmarkMixIn,
     CheckMixIn,
-    ConfigMixIn,
     CompactMixIn,
+    ConfigMixIn,
     CreateMixIn,
     DebugMixIn,
     DeleteMixIn,
     DiffMixIn,
     ExtractMixIn,
-    TarMixIn,
-    BenchmarkMixIn,
+    HelpMixIn,
+    InfoMixIn,
     KeysMixIn,
     ListMixIn,
     LocksMixIn,
     MountMixIn,
     PruneMixIn,
-    HelpMixIn,
-    InfoMixIn,
     RecreateMixIn,
     RenameMixIn,
     RCreateMixIn,
-    RInfoMixIn,
     RDeleteMixIn,
+    RInfoMixIn,
     RListMixIn,
     ServeMixIn,
+    TarMixIn,
     TransferMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
@@ -450,32 +450,28 @@ class Archiver(
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)
+        self.build_parser_config(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
+        self.build_parser_debug(subparsers, common_parser, mid_common_parser)
+        self.build_parser_delete(subparsers, common_parser, mid_common_parser)
         self.build_parser_diff(subparsers, common_parser, mid_common_parser)
+        self.build_parser_extract(subparsers, common_parser, mid_common_parser)
+        self.build_parser_help(subparsers, common_parser, mid_common_parser, parser)
+        self.build_parser_info(subparsers, common_parser, mid_common_parser)
+        self.build_parser_keys(subparsers, common_parser, mid_common_parser)
         self.build_parser_list(subparsers, common_parser, mid_common_parser)
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)
         self.build_parser_prune(subparsers, common_parser, mid_common_parser)
-
-        self.build_parser_config(subparsers, common_parser, mid_common_parser)
-        self.build_parser_debug(subparsers, common_parser, mid_common_parser)
-        self.build_parser_delete(subparsers, common_parser, mid_common_parser)
-        self.build_parser_extract(subparsers, common_parser, mid_common_parser)
-        self.build_parser_help(subparsers, common_parser, mid_common_parser, parser)
-        self.build_parser_rdelete(subparsers, common_parser, mid_common_parser, parser)
+        self.build_parser_rcreate(subparsers, common_parser, mid_common_parser)
+        self.build_parser_rdelete(subparsers, common_parser, mid_common_parser)
         self.build_parser_rinfo(subparsers, common_parser, mid_common_parser)
         self.build_parser_rlist(subparsers, common_parser, mid_common_parser)
-        self.build_parser_info(subparsers, common_parser, mid_common_parser)
-        self.build_parser_keys(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rcreate(subparsers, common_parser, mid_common_parser)
-
         self.build_parser_recreate(subparsers, common_parser, mid_common_parser)
         self.build_parser_rename(subparsers, common_parser, mid_common_parser)
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
-
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
-
         return parser
 
     def get_args(self, argv, cmd):

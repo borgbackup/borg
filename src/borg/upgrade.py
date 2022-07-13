@@ -102,7 +102,7 @@ class UpgraderFrom12To20:
         def upgrade_zlib_and_level(chunk):
             if ZLIB_legacy.detect(chunk):
                 ctype = ZLIB.ID
-                chunk = ctype + level + bytes(chunk)  # get rid of the attic legacy: prepend separate type/level bytes
+                chunk = ctype + level + bytes(chunk)  # get rid of the legacy: prepend separate type/level bytes
             else:
                 ctype = bytes(chunk[0:1])
                 chunk = ctype + level + bytes(chunk[2:])  # keep type same, but set level

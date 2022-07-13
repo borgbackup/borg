@@ -898,21 +898,6 @@ class LocalCache(CacheStatsMixin):
             logger.info("Done.")
             return chunk_idx
 
-        def legacy_cleanup():
-            """bring old cache dirs into the desired state (cleanup and adapt)"""
-            try:
-                os.unlink(os.path.join(self.path, "chunks.archive"))
-            except:
-                pass
-            try:
-                os.unlink(os.path.join(self.path, "chunks.archive.tmp"))
-            except:
-                pass
-            try:
-                os.mkdir(archive_path)
-            except:
-                pass
-
         # The cache can be used by a command that e.g. only checks against Manifest.Operation.WRITE,
         # which does not have to include all flags from Manifest.Operation.READ.
         # Since the sync will attempt to read archives, check compatibility with Manifest.Operation.READ.
@@ -920,7 +905,6 @@ class LocalCache(CacheStatsMixin):
 
         self.begin_txn()
         with cache_if_remote(self.repository, decrypted_cache=self.key) as decrypted_repository:
-            legacy_cleanup()
             # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
             # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
             self.do_cache = os.path.isdir(archive_path)

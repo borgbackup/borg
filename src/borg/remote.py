@@ -332,15 +332,10 @@ class RepositoryServer:  # pragma: no cover
     def _resolve_path(self, path):
         if isinstance(path, bytes):
             path = os.fsdecode(path)
-        # Leading slash is always present with URI (ssh://), but not with short-form (who@host:path).
         if path.startswith("/~/"):  # /~/x = path x relative to home dir
             path = os.path.join(get_base_dir(), path[3:])
-        elif path.startswith("~/"):
-            path = os.path.join(get_base_dir(), path[2:])
         elif path.startswith("/~"):  # /~username/x = relative to "user" home dir
             path = os.path.expanduser(path[1:])
-        elif path.startswith("~"):
-            path = os.path.expanduser(path)
         elif path.startswith("/./"):  # /./x = path x relative to cwd
             path = path[3:]
         return os.path.realpath(path)

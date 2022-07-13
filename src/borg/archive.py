@@ -1080,7 +1080,7 @@ class MetadataCollector:
 
     def stat_simple_attrs(self, st):
         attrs = dict(mode=st.st_mode, uid=st.st_uid, gid=st.st_gid, mtime=safe_ns(st.st_mtime_ns))
-        # borg can work with archives only having mtime (older attic archives do not have
+        # borg can work with archives only having mtime (very old borg archives do not have
         # atime/ctime). it can be useful to omit atime/ctime, if they change without the
         # file content changing - e.g. to get better metadata deduplication.
         if not self.noatime:

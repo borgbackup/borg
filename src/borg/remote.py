@@ -791,11 +791,6 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise IntegrityError("(not available)")
                 else:
                     raise IntegrityError(args[0])
-            elif error == "AtticRepository":
-                if old_server:
-                    raise Repository.AtticRepository("(not available)")
-                else:
-                    raise Repository.AtticRepository(args[0])
             elif error == "PathNotAllowed":
                 if old_server:
                     raise PathNotAllowed("(unknown)")

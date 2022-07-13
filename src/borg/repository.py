@@ -32,8 +32,6 @@ logger = create_logger(__name__)
 
 MAGIC = b"BORG_SEG"
 MAGIC_LEN = len(MAGIC)
-ATTIC_MAGIC = b"ATTICSEG"
-assert len(ATTIC_MAGIC) == MAGIC_LEN
 
 TAG_PUT = 0
 TAG_DELETE = 1
@@ -152,9 +150,6 @@ class Repository:
     class InvalidRepositoryConfig(Error):
         """{} does not have a valid configuration. Check repo config [{}]."""
 
-    class AtticRepository(Error):
-        """Attic repository detected. Please use borg <= 1.2 to run "borg upgrade {}"."""
-
     class CheckNeeded(ErrorWithTraceback):
         """Inconsistency detected. Please run "borg check {}"."""
 
@@ -181,7 +176,6 @@ class Repository:
         lock=True,
         append_only=False,
         storage_quota=None,
-        check_segment_magic=True,
         make_parent_dirs=False,
     ):
         self.path = os.path.abspath(path)
@@ -205,7 +199,6 @@ class Repository:
         self.storage_quota = storage_quota
         self.storage_quota_use = 0
         self.transaction_doomed = None
-        self.check_segment_magic = check_segment_magic
         self.make_parent_dirs = make_parent_dirs
         # v2 is the default repo version for borg 2.0
         # v1 repos must only be used in a read-only way, e.g. for
@@ -498,12 +491,6 @@ class Repository:
             self.storage_quota = parse_file_size(self.config.get("repository", "storage_quota", fallback=0))
         self.id = unhexlify(self.config.get("repository", "id").strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
-        if self.check_segment_magic:
-            # read a segment and check whether we are dealing with a non-upgraded Attic repository
-            segment = self.io.get_latest_segment()
-            if segment is not None and self.io.get_segment_magic(segment) == ATTIC_MAGIC:
-                self.close()
-                raise self.AtticRepository(path)
 
     def info(self):
         """return some infos about the repo (must be opened first)"""

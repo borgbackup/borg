@@ -34,7 +34,7 @@ class CryptoTestCase(BaseTestCase):
         self.assert_equal(got_data, data)
 
     def test_AES256_CTR_HMAC_SHA256(self):
-        # this tests the layout as in attic / borg < 1.2 (1 type byte, no aad)
+        # this tests the layout as in borg < 1.2 (1 type byte, no aad)
         mac_key = b"Y" * 32
         enc_key = b"X" * 32
         iv = 0

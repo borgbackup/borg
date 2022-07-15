@@ -206,11 +206,6 @@ class TestLocationWithoutEnv:
             == "Location(proto='ssh', user='user', host='host', port=None, path='/~/some/path')"
         )
         assert Location("ssh://user@host/~/some/path").to_key_filename() == keys_dir + "host__some_path"
-        assert (
-            repr(Location("ssh://user@host/~user/some/path"))
-            == "Location(proto='ssh', user='user', host='host', port=None, path='/~user/some/path')"
-        )
-        assert Location("ssh://user@host/~user/some/path").to_key_filename() == keys_dir + "host__user_some_path"
 
     def test_with_colons(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)

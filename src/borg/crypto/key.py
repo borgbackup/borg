@@ -153,7 +153,7 @@ class KeyBase:
     STORAGE = KeyBlobStorage.NO_STORAGE
 
     # Seed for the buzhash chunker (borg.algorithms.chunker.Chunker)
-    # type: int
+    # type is int
     chunk_seed = None
 
     # Whether this *particular instance* is encrypted from a practical point of view,

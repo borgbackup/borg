@@ -45,12 +45,15 @@ jobs:
         pip install flake8
         flake8 src scripts conftest.py
 
-  pytest:
+  tox:
 
     needs: lint
     strategy:
       matrix:
         include:
+            - os: ubuntu-20.04
+              python-version: '3.9'
+              toxenv: mypy
             - os: ubuntu-20.04
               python-version: '3.9'
               toxenv: py39-fuse2
@@ -117,7 +120,7 @@ jobs:
       run: |
         # pip install -e .
         python setup.py -v develop
-    - name: run pytest via tox
+    - name: run tox env
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"

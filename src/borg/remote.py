@@ -495,7 +495,7 @@ def api(*, since, **kwargs_decorator):
 
 
 class RemoteRepository:
-    extra_test_args = []
+    extra_test_args = []  # type: ignore
 
     class RPCError(Exception):
         def __init__(self, unpacked):

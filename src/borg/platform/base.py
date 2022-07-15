@@ -82,7 +82,7 @@ def acl_set(path, item, numeric_ids=False, fd=None):
 
 
 try:
-    from os import lchflags
+    from os import lchflags  # type: ignore[attr-defined]
 
     def set_flags(path, bsd_flags, fd=None):
         lchflags(path, bsd_flags)
@@ -323,15 +323,3 @@ def get_process_id():
     thread_id = 0
     pid = os.getpid()
     return hostid, pid, thread_id
-
-
-def process_alive(host, pid, thread):
-    """
-    Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
-    """
-    raise NotImplementedError
-
-
-def local_pid_alive(pid):
-    """Return whether *pid* is alive."""
-    raise NotImplementedError

@@ -5,6 +5,7 @@ import re
 from collections import abc, namedtuple
 from datetime import datetime, timedelta
 from operator import attrgetter
+from typing import Sequence, FrozenSet
 
 from .errors import Error
 
@@ -158,9 +159,9 @@ class Manifest:
         # count and the need to be able to find all (directly and indirectly) referenced chunks of a given archive.
         DELETE = "delete"
 
-    NO_OPERATION_CHECK = tuple()
+    NO_OPERATION_CHECK: Sequence[Operation] = tuple()
 
-    SUPPORTED_REPO_FEATURES = frozenset([])
+    SUPPORTED_REPO_FEATURES: FrozenSet[str] = frozenset([])
 
     MANIFEST_ID = b"\0" * 32
 

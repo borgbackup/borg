@@ -1109,7 +1109,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    files = None
+    files = None  # type: ignore
     cache_mode = "d"
 
     def file_known_and_unchanged(self, hashed_path, path_hash, st):

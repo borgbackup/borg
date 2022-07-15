@@ -135,7 +135,64 @@ def find_parent_module():
         return __name__
 
 
-def create_logger(name=None):
+class LazyLogger:
+    def __init__(self, name=None):
+        self.__name = name or find_parent_module()
+        self.__real_logger = None
+
+    @property
+    def __logger(self):
+        if self.__real_logger is None:
+            if not configured:
+                raise Exception("tried to call a logger before setup_logging() was called")
+            self.__real_logger = logging.getLogger(self.__name)
+            if self.__name.startswith("borg.debug.") and self.__real_logger.level == logging.NOTSET:
+                self.__real_logger.setLevel("WARNING")
+        return self.__real_logger
+
+    def getChild(self, suffix):
+        return LazyLogger(self.__name + "." + suffix)
+
+    def setLevel(self, *args, **kw):
+        return self.__logger.setLevel(*args, **kw)
+
+    def log(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.log(*args, **kw)
+
+    def exception(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.exception(*args, **kw)
+
+    def debug(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.debug(*args, **kw)
+
+    def info(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.info(*args, **kw)
+
+    def warning(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.warning(*args, **kw)
+
+    def error(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.error(*args, **kw)
+
+    def critical(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.critical(*args, **kw)
+
+
+def create_logger(name: str = None) -> LazyLogger:
     """lazily create a Logger object with the proper path, which is returned by
     find_parent_module() by default, or is provided via the commandline
 
@@ -151,62 +208,6 @@ def create_logger(name=None):
     be careful not to call any logger methods before the setup_logging() call.
     If you try, you'll get an exception.
     """
-
-    class LazyLogger:
-        def __init__(self, name=None):
-            self.__name = name or find_parent_module()
-            self.__real_logger = None
-
-        @property
-        def __logger(self):
-            if self.__real_logger is None:
-                if not configured:
-                    raise Exception("tried to call a logger before setup_logging() was called")
-                self.__real_logger = logging.getLogger(self.__name)
-                if self.__name.startswith("borg.debug.") and self.__real_logger.level == logging.NOTSET:
-                    self.__real_logger.setLevel("WARNING")
-            return self.__real_logger
-
-        def getChild(self, suffix):
-            return LazyLogger(self.__name + "." + suffix)
-
-        def setLevel(self, *args, **kw):
-            return self.__logger.setLevel(*args, **kw)
-
-        def log(self, *args, **kw):
-            if "msgid" in kw:
-                kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
-            return self.__logger.log(*args, **kw)
-
-        def exception(self, *args, **kw):
-            if "msgid" in kw:
-                kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
-            return self.__logger.exception(*args, **kw)
-
-        def debug(self, *args, **kw):
-            if "msgid" in kw:
-                kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
-            return self.__logger.debug(*args, **kw)
-
-        def info(self, *args, **kw):
-            if "msgid" in kw:
-                kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
-            return self.__logger.info(*args, **kw)
-
-        def warning(self, *args, **kw):
-            if "msgid" in kw:
-                kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
-            return self.__logger.warning(*args, **kw)
-
-        def error(self, *args, **kw):
-            if "msgid" in kw:
-                kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
-            return self.__logger.error(*args, **kw)
-
-        def critical(self, *args, **kw):
-            if "msgid" in kw:
-                kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
-            return self.__logger.critical(*args, **kw)
 
     return LazyLogger(name)
 

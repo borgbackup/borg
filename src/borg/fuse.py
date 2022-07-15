@@ -706,7 +706,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     # note: we can't have a generator (with yield) and not a generator (async) in the same method
     if has_pyfuse3:
 
-        async def readdir(self, fh, off, token):
+        async def readdir(self, fh, off, token):  # type: ignore[misc]
             entries = [(b".", fh), (b"..", self.parent[fh])]
             entries.extend(self.contents[fh].items())
             for i, (name, inode) in enumerate(entries[off:], off):
@@ -716,7 +716,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
 
     else:
 
-        def readdir(self, fh, off):
+        def readdir(self, fh, off):  # type: ignore[misc]
             entries = [(b".", fh), (b"..", self.parent[fh])]
             entries.extend(self.contents[fh].items())
             for i, (name, inode) in enumerate(entries[off:], off):

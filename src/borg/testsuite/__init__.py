@@ -168,7 +168,7 @@ class BaseTestCase(unittest.TestCase):
     if raises:
         assert_raises = staticmethod(raises)
     else:
-        assert_raises = unittest.TestCase.assertRaises
+        assert_raises = unittest.TestCase.assertRaises  # type: ignore
 
     @contextmanager
     def assert_creates_file(self, path):

@@ -38,7 +38,7 @@ other::r--
     "ascii"
 )
 
-_acls_working = None
+# _acls_working = None
 
 
 def fakeroot_detected():

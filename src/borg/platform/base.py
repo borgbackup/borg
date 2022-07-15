@@ -82,7 +82,7 @@ def acl_set(path, item, numeric_ids=False, fd=None):
 
 
 try:
-    from os import lchflags
+    from os import lchflags  # type: ignore[attr-defined]
 
     def set_flags(path, bsd_flags, fd=None):
         lchflags(path, bsd_flags)

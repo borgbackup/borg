@@ -3,7 +3,7 @@ import os
 import textwrap
 from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, pbkdf2_hmac
-from typing import Literal
+from typing import Literal, Callable, Sequence
 
 from ..logger import create_logger
 
@@ -139,9 +139,9 @@ def uses_same_id_hash(other_key, key):
 
 class KeyBase:
     # Numeric key type ID, must fit in one byte.
-    TYPE = None  # override in subclasses
+    TYPE: int = None  # override in subclasses
     # set of key type IDs the class can handle as input
-    TYPES_ACCEPTABLE = None  # override in subclasses
+    TYPES_ACCEPTABLE: set[int] = None  # override in subclasses
 
     # Human-readable name
     NAME = "UNDEFINED"
@@ -154,7 +154,7 @@ class KeyBase:
 
     # Seed for the buzhash chunker (borg.algorithms.chunker.Chunker)
     # type is int
-    chunk_seed = None
+    chunk_seed: int = None
 
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then
@@ -356,7 +356,7 @@ class AESKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 32 + 8  # TYPE + HMAC + NONCE
 
-    CIPHERSUITE = None  # override in derived class
+    CIPHERSUITE: Callable = None  # override in derived class
 
     logically_encrypted = True
 
@@ -839,7 +839,7 @@ class AEADKeyBase(KeyBase):
 
     PAYLOAD_OVERHEAD = 1 + 1 + 6 + 24 + 16  # [bytes], see Layout
 
-    CIPHERSUITE = None  # override in subclass
+    CIPHERSUITE: Callable = None  # override in subclass
 
     logically_encrypted = True
 

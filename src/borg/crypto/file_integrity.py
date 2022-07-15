@@ -3,6 +3,7 @@ import io
 import json
 import os
 from hmac import compare_digest
+from typing import Callable
 
 from ..helpers import IntegrityError
 from ..logger import create_logger
@@ -54,8 +55,8 @@ class FileHashingWrapper(FileLikeWrapper):
     are illegal.
     """
 
-    ALGORITHM = None
-    FACTORY = None
+    ALGORITHM: str = None
+    FACTORY: Callable = None
 
     def __init__(self, backing_fd, write):
         self.fd = backing_fd

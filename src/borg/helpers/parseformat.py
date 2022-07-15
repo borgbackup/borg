@@ -694,7 +694,7 @@ class ArchiveFormatter(BaseFormatter):
 class ItemFormatter(BaseFormatter):
     # we provide the hash algos from python stdlib (except shake_*) and additionally xxh64.
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
-    hash_algorithms = hashlib.algorithms_guaranteed.union({"xxh64"}).difference({"shake_128", "shake_256"})
+    hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
         "bpath": "verbatim POSIX path, can contain any character except NUL",
         "path": "path interpreted as text (might be missing non-text characters, see bpath)",

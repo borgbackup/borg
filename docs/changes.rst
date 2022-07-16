@@ -12,7 +12,7 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0a4 (2022-07-xx)
+Version 2.0.0a4 (2022-07-17)
 ----------------------------
 
 Please note:
@@ -38,6 +38,8 @@ Compatibility notes:
     call borg like: "borg -r <MYREPO> <COMMAND>".
     in the docs, we usually omit "-r ..." for brevity.
   - the scp-style REPO syntax was removed, please use ssh://..., #6697
+  - ssh:// URLs: removed support for /~otheruser/, #6855.
+    If you used this, just replace it by: ssh://user@host:port/home/otheruser/
   - -P / --prefix option was removed, please use the similar -a / --glob-archives.
   - differently than with borg 1.x you ONLY give the repo there, never a ::archive.
   - the archive name is either given as a positional parameter, like:
@@ -86,8 +88,13 @@ New features:
 Other changes:
 
 - stop using libdeflate
-- split up archiver module, transform it into a package
-- use Black for automated code formatting
+- CI: add mypy (if we add type hints, it can do type checking)
+- big changes to the source code:
+
+  - split up archiver module, transform it into a package
+  - use Black for automated code formatting
+  - remove some legacy code
+  - adapt/fix code for mypy
 - use language_level = 3str for cython (this will be the default in cython 3)
 - docs: document HardLinkManager and hlid, #2388
 

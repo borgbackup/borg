@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" 1 "2022-07-03" "" "borg backup tool"
+.TH "BORG-RECREATE" 1 "2022-07-17" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -56,8 +56,7 @@ incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
 .sp
 \fB\-\-chunker\-params\fP will re\-chunk all files in the archive, this can be
-used to have upgraded Borg 0.xx or Attic archives deduplicate with
-Borg 1.x archives.
+used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 .sp
 \fBUSE WITH CAUTION.\fP
 Depending on the PATHs and patterns given, recreate can be used to permanently
@@ -164,7 +163,7 @@ manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss form
 select compression algorithm, see the output of the "borg help compression" command for details.
 .TP
 .BI \-\-recompress \ MODE
-recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm (the level is not considered); \fIalways\fP: recompress even if current compression is with the same compression algorithm (use this to change the compression level); and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to "\-\-recompress never".
+recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm or different level; \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to "\-\-recompress never".
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: buzhash,19,23,21,4095

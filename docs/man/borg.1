@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2022-07-03" "" "borg backup tool"
+.TH "BORG" 1 "2022-07-17" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -237,8 +237,6 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 \fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
 .sp
 \fBssh://user@host:port/~/path/to/repo\fP \- path relative to user\(aqs home directory
-.sp
-\fBssh://user@host:port/~other/path/to/repo\fP \- path relative to other\(aqs home directory
 .sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:

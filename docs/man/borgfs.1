@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORGFS" 1 "2022-07-03" "" "borg backup tool"
+.TH "BORGFS" 1 "2022-07-17" "" "borg backup tool"
 .SH NAME
 borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -35,66 +35,7 @@ borgfs \- Mount archive or an entire repository as a FUSE filesystem
 borgfs [options] MOUNTPOINT [PATH...]
 .SH DESCRIPTION
 .sp
-This command mounts an archive as a FUSE filesystem. This can be useful
-for browsing an archive or restoring individual files. When restoring,
-take into account that the current FUSE implementation does not support
-special fs flags and ACLs.
-.sp
-Unless the \fB\-\-foreground\fP option is given the command will run in the
-background until the filesystem is \fBumounted\fP\&.
-.sp
-The command \fBborgfs\fP provides a wrapper for \fBborg mount\fP\&. This can also be
-used in fstab entries:
-\fB/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0\fP
-.sp
-To allow a regular user to use fstab entries, add the \fBuser\fP option:
-\fB/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0\fP
-.sp
-For FUSE configuration and mount options, see the mount.fuse(8) manual page.
-.sp
-Borg\(aqs default behavior is to use the archived user and group names of each
-file and map them to the system\(aqs respective user and group ids.
-Alternatively, using \fBnumeric\-ids\fP will instead use the archived user and
-group ids without any mapping.
-.sp
-The \fBuid\fP and \fBgid\fP mount options (implemented by Borg) can be used to
-override the user and group ids of all files (i.e., \fBborg mount \-o
-uid=1000,gid=1000\fP).
-.sp
-The man page references \fBuser_id\fP and \fBgroup_id\fP mount options
-(implemented by fuse) which specify the user and group id of the mount owner
-(aka, the user who does the mounting). It is set automatically by libfuse (or
-the filesystem if libfuse is not used). However, you should not specify these
-manually. Unlike the \fBuid\fP and \fBgid\fP mount options which affect all files,
-\fBuser_id\fP and \fBgroup_id\fP affect the user and group id of the mounted
-(base) directory.
-.sp
-Additional mount options supported by borg:
-.INDENT 0.0
-.IP \(bu 2
-versions: when used with a repository mount, this gives a merged, versioned
-view of the files in the archives. EXPERIMENTAL, layout may change in future.
-.IP \(bu 2
-allow_damaged_files: by default damaged files (where missing chunks were
-replaced with runs of zeros by borg check \fB\-\-repair\fP) are not readable and
-return EIO (I/O error). Set this option to read such files.
-.IP \(bu 2
-ignore_permissions: for security reasons the "default_permissions" mount
-option is internally enforced by borg. "ignore_permissions" can be given to
-not enforce "default_permissions".
-.UNINDENT
-.sp
-The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
-to tweak the performance. It sets the number of cached data chunks; additional
-memory usage can be up to ~8 MiB times this number. The default is the number
-of CPU cores.
-.sp
-When the daemonized process receives a signal or crashes, it does not unmount.
-Unmounting in these cases could cause an active rsync or similar process
-to unintentionally delete data.
-.sp
-When running in the foreground ^C/SIGINT unmounts cleanly, but other
-signals or crashes do not.
+For more information, see borg mount \-\-help.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

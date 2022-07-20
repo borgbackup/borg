@@ -180,8 +180,6 @@ Decryption::
 
     decompressed = decompress(decrypted)
 
-    ASSERT( CONSTANT-TIME-COMPARISON( chunk-id, MAC(id_key, decompressed) ) )
-
 Notable:
 
 - More modern and often faster AEAD ciphers instead of self-assembled stuff.

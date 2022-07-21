@@ -256,6 +256,27 @@ class TestKey:
         with pytest.raises(IntegrityError):
             key.assert_id(id, plaintext_changed)
 
+    def test_getting_wrong_chunk_fails(self, key):
+        # for the new AEAD crypto, we provide the chunk id as AAD when encrypting/authenticating,
+        # we provide the id **we want** as AAD when authenticating/decrypting the data we got from the repo.
+        # only if the id used for encrypting matches the id we want, the AEAD crypto authentication will succeed.
+        # thus, there is no need any more for calling self._assert_id() for the new crypto.
+        # the old crypto as well as plaintext and authenticated modes still need to call self._assert_id().
+        plaintext_wanted = b"123456789"
+        id_wanted = key.id_hash(plaintext_wanted)
+        ciphertext_wanted = key.encrypt(id_wanted, plaintext_wanted)
+        plaintext_other = b"xxxxxxxxx"
+        id_other = key.id_hash(plaintext_other)
+        ciphertext_other = key.encrypt(id_other, plaintext_other)
+        # both ciphertexts are authentic and decrypting them should succeed:
+        key.decrypt(id_wanted, ciphertext_wanted)
+        key.decrypt(id_other, ciphertext_other)
+        # but if we wanted the one and got the other, it must fail.
+        # the new crypto will fail due to AEAD auth failure,
+        # the old crypto and plaintext, authenticated modes will fail due to ._assert_id() check failing:
+        with pytest.raises(IntegrityErrorBase):
+            key.decrypt(id_wanted, ciphertext_other)
+
     def test_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
         key = AuthenticatedKey.create(self.MockRepository(), self.MockArgs())

@@ -871,7 +871,10 @@ class AEADKeyBase(KeyBase):
         if not decompress:
             return payload
         data = self.decompress(memoryview(payload))
-        self.assert_id(id, data)
+        # note: calling self.assert_id(id, data) is not needed any more for the new AEAD crypto.
+        # we put the id into AAD when storing the chunk, so it gets into the authentication tag computation.
+        # when decrypting, we provide the id we **want** as AAD for the auth tag verification, so
+        # decrypting only succeeds if we got the ciphertext we wrote **for that chunk id**.
         return data
 
     def init_from_given_data(self, *, enc_key, enc_hmac_key, id_key, chunk_seed):

@@ -17,4 +17,4 @@ python setup.py sdist
 
 D=dist/borgbackup-$R.tar.gz
 
-$GPG --detach-sign --local-user "Thomas Waldmann" --armor --output $D.asc $D
+$GPG --detach-sign --local-user "Thomas Waldmann" --armor --output "$D.asc" "$D"

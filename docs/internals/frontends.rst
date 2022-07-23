@@ -458,7 +458,7 @@ Archive Differencing
 ++++++++++++++++++++
 
 Each archive difference item (file contents, user/group/mode) output by :ref:`borg_diff` is represented by an *ItemDiff* object.
-The propertiese of an *ItemDiff* object are:
+The properties of an *ItemDiff* object are:
 
 path:
     The filename/path of the *Item* (file, directory, symlink).

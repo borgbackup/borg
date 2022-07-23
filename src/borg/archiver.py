@@ -2653,7 +2653,7 @@ class Archiver:
         The first matching pattern is used, so if an include pattern matches
         before an exclude pattern, the file is backed up. Note that a no-recurse
         exclude stops examination of subdirectories so that potential includes
-        will not match - use normal exludes for such use cases.
+        will not match - use normal excludes for such use cases.
 
         **Tip: You can easily test your patterns with --dry-run and  --list**::
 

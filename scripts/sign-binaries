@@ -14,7 +14,7 @@ else
 fi
 
 for file in dist/borg-*; do
-    $GPG --local-user "Thomas Waldmann" --armor --detach-sign --output $file.asc $file
+    $GPG --local-user "Thomas Waldmann" --armor --detach-sign --output "$file.asc" "$file"
 done
 
-touch -t $D dist/*
+touch -t "$D" dist/*

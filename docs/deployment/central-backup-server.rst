@@ -95,7 +95,7 @@ The client needs to initialize the `pictures` repository like this:
 
  borg init backup@backup01.srv.local:pictures
 
-Or with the full path (should actually never be used, as only for demonstrational purposes).
+Or with the full path (should actually never be used, as only for demonstration purposes).
 The server should automatically change the current working directory to the `<client fqdn>` folder.
 
 ::

@@ -8,7 +8,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import format_archive
 from ..helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
-from ..helpers import Manifest
+from ..helpers import Manifest, sig_int
 from ..helpers import log_multi
 from ..helpers import ProgressIndicatorPercent
 
@@ -68,12 +68,21 @@ class PruneMixIn:
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics(iec=args.iec)
         with Cache(repository, key, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
+
+            def checkpoint_func():
+                manifest.write()
+                repository.commit(compact=False, save_space=args.save_space)
+                cache.commit()
+
             list_logger = logging.getLogger("borg.output.list")
             # set up counters for the progress display
             to_delete_len = len(to_delete)
             archives_deleted = 0
+            uncommitted_deletes = 0
             pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
             for archive in archives_checkpoints:
+                if sig_int and sig_int.action_done():
+                    break
                 if archive in to_delete:
                     pi.show()
                     if args.dry_run:
@@ -85,6 +94,10 @@ class PruneMixIn:
                             repository, key, manifest, archive.name, cache, consider_part_files=args.consider_part_files
                         )
                         archive.delete(stats, forced=args.forced)
+                        checkpointed = self.maybe_checkpoint(
+                            checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval
+                        )
+                        uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
                 else:
                     if is_checkpoint(archive.name):
                         log_message = "Keeping checkpoint archive:"
@@ -97,10 +110,11 @@ class PruneMixIn:
                         "{message:<40} {archive}".format(message=log_message, archive=format_archive(archive))
                     )
             pi.finish()
-            if to_delete and not args.dry_run:
-                manifest.write()
-                repository.commit(compact=False, save_space=args.save_space)
-                cache.commit()
+            if sig_int:
+                # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
+                self.print_error("Got Ctrl-C / SIGINT.")
+            elif uncommitted_deletes > 0:
+                checkpoint_func()
             if args.stats:
                 log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
         return self.exit_code
@@ -226,4 +240,13 @@ class PruneMixIn:
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument(
             "--save-space", dest="save_space", action="store_true", help="work slower, but using less space"
+        )
+        subparser.add_argument(
+            "-c",
+            "--checkpoint-interval",
+            metavar="SECONDS",
+            dest="checkpoint_interval",
+            type=int,
+            default=1800,
+            help="write checkpoint every SECONDS seconds (Default: 1800)",
         )

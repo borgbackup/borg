@@ -5,7 +5,7 @@ from .common import with_repository
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import Manifest
+from ..helpers import Manifest, sig_int
 from ..helpers import log_multi, format_archive
 
 from ..logger import create_logger
@@ -57,11 +57,19 @@ class DeleteMixIn:
 
         stats = Statistics(iec=args.iec)
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
+
+            def checkpoint_func():
+                manifest.write()
+                repository.commit(compact=False, save_space=args.save_space)
+                cache.commit()
+
             msg_delete = "Would delete archive: {} ({}/{})" if dry_run else "Deleting archive: {} ({}/{})"
             msg_not_found = "Archive {} not found ({}/{})."
             logger_list = logging.getLogger("borg.output.list")
-            delete_count = 0
+            uncommitted_deletes = 0
             for i, archive_name in enumerate(archive_names, 1):
+                if sig_int and sig_int.action_done():
+                    break
                 try:
                     archive_info = manifest.archives[archive_name]
                 except KeyError:
@@ -80,12 +88,15 @@ class DeleteMixIn:
                             consider_part_files=args.consider_part_files,
                         )
                         archive.delete(stats, progress=args.progress, forced=args.forced)
-                        delete_count += 1
-            if delete_count > 0:
-                # only write/commit if we actually changed something, see #6060.
-                manifest.write()
-                repository.commit(compact=False, save_space=args.save_space)
-                cache.commit()
+                        checkpointed = self.maybe_checkpoint(
+                            checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval
+                        )
+                        uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
+            if sig_int:
+                # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
+                self.print_error("Got Ctrl-C / SIGINT.")
+            elif uncommitted_deletes > 0:
+                checkpoint_func()
             if args.stats:
                 log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
 
@@ -159,5 +170,14 @@ class DeleteMixIn:
         )
         subparser.add_argument(
             "--save-space", dest="save_space", action="store_true", help="work slower, but using less space"
+        )
+        subparser.add_argument(
+            "-c",
+            "--checkpoint-interval",
+            metavar="SECONDS",
+            dest="checkpoint_interval",
+            type=int,
+            default=1800,
+            help="write checkpoint every SECONDS seconds (Default: 1800)",
         )
         define_archive_filters_group(subparser)

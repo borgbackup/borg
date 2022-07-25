@@ -358,8 +358,8 @@ activating your virtual environment::
     pip install -U borgbackup  # or ... borgbackup[llfuse/pyfuse3]
 
 When doing manual pip installation, man pages are not automatically
-installed (this is likely handled by your package manager). You can run
-these commands to install the man pages locally::
+installed.  You can run these commands to install the man pages
+locally::
 
     # get borg from github
     git clone https://github.com/borgbackup/borg.git borg

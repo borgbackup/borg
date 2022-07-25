@@ -50,17 +50,20 @@ archive_progress
     The following keys exist, each represents the current progress.
 
     original_size
-        Original size of data processed so far (before compression and deduplication)
+        Original size of data processed so far (before compression and deduplication, may be empty/absent)
     compressed_size
-        Compressed size
+        Compressed size (may be empty/absent)
     deduplicated_size
-        Deduplicated size
+        Deduplicated size (may be empty/absent)
     nfiles
-        Number of (regular) files processed so far
+        Number of (regular) files processed so far (may be empty/absent)
     path
-        Current path
+        Current path (may be empty/absent)
     time
         Unix timestamp (float)
+    finished
+        boolean indicating whether the operation has finished, only the last object for an *operation*
+        can have this property set to *true*.
 
 progress_message
     A message-based progress information with no concrete progress information, just a message
@@ -497,26 +500,26 @@ added:
 
 removed:
     See **added** property.
-    
+
 old_mode:
     If **type** == '*mode*', then **old_mode** and **new_mode** provide the mode and permissions changes.
 
 new_mode:
     See **old_mode** property.
- 
+
 old_user:
     If **type** == '*owner*', then **old_user**, **new_user**, **old_group** and **new_group** provide the user
     and group ownership changes.
 
 old_group:
     See **old_user** property.
- 
+
 new_user:
     See **old_user** property.
- 
+
 new_group:
     See **old_user** property.
-    
+
 
 Example (excerpt) of ``borg diff --json-lines``::
 

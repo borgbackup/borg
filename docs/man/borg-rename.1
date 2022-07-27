@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RENAME 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-rename \- Rename an existing archive
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-RENAME" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-rename \- Rename an existing archive
 .SH SYNOPSIS
 .sp
-borg [common options] rename [options] ARCHIVE NEWNAME
+borg [common options] rename [options] OLDNAME NEWNAME
 .SH DESCRIPTION
 .sp
 This command renames an archive in the repository.
@@ -44,11 +44,11 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B ARCHIVE
-archive to rename
+.B OLDNAME
+specify the archive name
 .TP
 .B NEWNAME
-the new archive name to use
+specify the new archive name
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -56,12 +56,12 @@ the new archive name to use
 .sp
 .nf
 .ft C
-$ borg create /path/to/repo::archivename ~
-$ borg list /path/to/repo
+$ borg create archivename ~
+$ borg rlist
 archivename                          Mon, 2016\-02\-15 19:50:19
 
-$ borg rename /path/to/repo::archivename newname
-$ borg list /path/to/repo
+$ borg rename archivename newname
+$ borg rlist
 newname                              Mon, 2016\-02\-15 19:50:19
 .ft P
 .fi

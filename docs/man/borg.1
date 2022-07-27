@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg \- deduplicating and encrypting backup tool
 .
 .nr rst2man-indent-level 0
 .
@@ -30,6 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
 .sp
 borg [common options] <command> [options] [arguments]
@@ -60,7 +60,7 @@ Before a backup can be made a repository has to be initialized:
 .sp
 .nf
 .ft C
-$ borg init \-\-encryption=repokey /path/to/repo
+$ borg \-r /path/to/repo rcreate \-\-encryption=repokey\-aes\-ocb
 .ft P
 .fi
 .UNINDENT
@@ -73,7 +73,7 @@ Backup the \fB~/src\fP and \fB~/Documents\fP directories into an archive called
 .sp
 .nf
 .ft C
-$ borg create /path/to/repo::Monday ~/src ~/Documents
+$ borg \-r /path/to/repo create Monday ~/src ~/Documents
 .ft P
 .fi
 .UNINDENT
@@ -85,7 +85,7 @@ The next day create a new archive called \fITuesday\fP:
 .sp
 .nf
 .ft C
-$ borg create \-\-stats /path/to/repo::Tuesday ~/src ~/Documents
+$ borg \-r /path/to/repo create \-\-stats Tuesday ~/src ~/Documents
 .ft P
 .fi
 .UNINDENT
@@ -93,29 +93,23 @@ $ borg create \-\-stats /path/to/repo::Tuesday ~/src ~/Documents
 .sp
 This backup will be a lot quicker and a lot smaller since only new never
 before seen data is stored. The \fB\-\-stats\fP option causes Borg to
-output statistics about the newly created archive such as the amount of unique
-data (not shared with other archives):
+output statistics about the newly created archive such as the deduplicated
+size (the amount of unique data not shared with other archives):
 .INDENT 3.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+Repository: /path/to/repo
 Archive name: Tuesday
-Archive fingerprint: bd31004d58f51ea06ff735d2e5ac49376901b21d58035f8fb05dbf866566e3c2
-Time (start): Tue, 2016\-02\-16 18:15:11
-Time (end):   Tue, 2016\-02\-16 18:15:11
-
-Duration: 0.19 seconds
-Number of files: 127
-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
-                      Original size      Compressed size    Deduplicated size
-This archive:                4.16 MB              4.17 MB             26.78 kB
-All archives:                8.33 MB              8.34 MB              4.19 MB
-
-                      Unique chunks         Total chunks
-Chunk index:                     132                  261
-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+Archive fingerprint: bcd1b53f9b4991b7afc2b339f851b7ffe3c6d030688936fe4552eccc1877718d
+Time (start): Sat, 2022\-06\-25 20:21:43
+Time (end):   Sat, 2022\-06\-25 20:21:43
+Duration: 0.07 seconds
+Utilization of max. archive size: 0%
+Number of files: 699
+Original size: 31.14 MB
+Deduplicated size: 502 B
 .ft P
 .fi
 .UNINDENT
@@ -127,9 +121,9 @@ List all archives in the repository:
 .sp
 .nf
 .ft C
-$ borg list /path/to/repo
-Monday                               Mon, 2016\-02\-15 19:14:44
-Tuesday                              Tue, 2016\-02\-16 19:15:11
+$ borg \-r /path/to/repo rlist
+Monday                               Sat, 2022\-06\-25 20:21:14 [b80e24d2...b179f298]
+Tuesday                              Sat, 2022\-06\-25 20:21:43 [bcd1b53f...1877718d]
 .ft P
 .fi
 .UNINDENT
@@ -141,7 +135,7 @@ List the contents of the \fIMonday\fP archive:
 .sp
 .nf
 .ft C
-$ borg list /path/to/repo::Monday
+$ borg \-r /path/to/repo list Monday
 drwxr\-xr\-x user   group          0 Mon, 2016\-02\-15 18:22:30 home/user/Documents
 \-rw\-r\-\-r\-\- user   group       7961 Mon, 2016\-02\-15 18:22:30 home/user/Documents/Important.doc
 \&...
@@ -156,7 +150,7 @@ Restore the \fIMonday\fP archive by extracting the files relative to the current
 .sp
 .nf
 .ft C
-$ borg extract /path/to/repo::Monday
+$ borg \-r /path/to/repo extract Monday
 .ft P
 .fi
 .UNINDENT
@@ -168,11 +162,16 @@ Delete the \fIMonday\fP archive (please note that this does \fBnot\fP free repo 
 .sp
 .nf
 .ft C
-$ borg delete /path/to/repo::Monday
+$ borg \-r /path/to/repo delete \-a Monday
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
+.sp
+Please note the \fB\-a\fP option here (short for \fB\-\-glob\-archives\fP) which enables you
+to give a globbing pattern to delete multiple archives, like \fB\-a \(aqoldcrap\-*\(aq\fP\&.
+You can also combine this with \fB\-\-first\fP, \fB\-\-last\fP and \fB\-\-sort\-by\fP\&.
+Be careful, always first use with \fB\-\-dry\-run\fP and \fB\-\-list\fP!
 .IP 8. 3
 Recover disk space by compacting the segment files in the repo:
 .INDENT 3.0
@@ -180,7 +179,7 @@ Recover disk space by compacting the segment files in the repo:
 .sp
 .nf
 .ft C
-$ borg compact /path/to/repo
+$ borg \-r /path/to/repo compact
 .ft P
 .fi
 .UNINDENT
@@ -208,10 +207,10 @@ in the example), but not in between them:
 .sp
 .nf
 .ft C
-borg create \-s \-\-progress repo::archive path  # good and preferred
-borg create repo::archive path \-s \-\-progress  # also works
-borg create \-s repo::archive path \-\-progress  # works, but ugly
-borg create repo::archive \-s \-\-progress path  # BAD
+borg create \-s \-\-progress archive path  # good and preferred
+borg create archive path \-s \-\-progress  # also works
+borg create \-s archive path \-\-progress  # works, but ugly
+borg create archive \-s \-\-progress path  # BAD
 .ft P
 .fi
 .UNINDENT
@@ -233,28 +232,11 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 .sp
 \fBRemote repositories\fP accessed via ssh \fI\%user@host\fP:
 .sp
-\fBuser@host:/path/to/repo\fP \- remote repo, absolute path
-.sp
-\fBssh://user@host:port/path/to/repo\fP \- same, alternative syntax, port can be given
-.sp
-\fBRemote repositories with relative paths\fP can be given using this syntax:
-.sp
-\fBuser@host:path/to/repo\fP \- path relative to current directory
-.sp
-\fBuser@host:~/path/to/repo\fP \- path relative to user\(aqs home directory
-.sp
-\fBuser@host:~other/path/to/repo\fP \- path relative to other\(aqs home directory
-.sp
-Note: giving \fBuser@host:/./path/to/repo\fP or \fBuser@host:/~/path/to/repo\fP or
-\fBuser@host:/~other/path/to/repo\fP is also supported, but not required here.
-.sp
-\fBRemote repositories with relative paths, alternative syntax with port\fP:
+\fBssh://user@host:port/path/to/repo\fP \- absolute path\(ga
 .sp
 \fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
 .sp
 \fBssh://user@host:port/~/path/to/repo\fP \- path relative to user\(aqs home directory
-.sp
-\fBssh://user@host:port/~other/path/to/repo\fP \- path relative to other\(aqs home directory
 .sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:
@@ -269,23 +251,21 @@ export BORG_REPO=\(aqssh://user@host:port/path/to/repo\(aq
 .UNINDENT
 .UNINDENT
 .sp
-Then just leave away the repo URL if only a repo URL is needed and you want
+Then just leave away the \fB\-\-repo\fP option if you want
 to use the default \- it will be read from BORG_REPO then.
+.SS Repository Locations / Archive names
 .sp
-Use \fB::\fP syntax to give the repo URL when syntax requires giving a positional
-argument for the repo (e.g. \fBborg mount :: /mnt\fP).
-.SS Repository / Archive Locations
+Many commands need to know the repository location, give it via \fB\-r\fP / \fB\-\-repo\fP
+or use the \fBBORG_REPO\fP environment variable.
 .sp
-Many commands want either a repository (just give the repo URL, see above) or
-an archive location, which is a repo URL followed by \fB::archive_name\fP\&.
+Commands needing one or two archive names usually get them as positional argument.
+.sp
+Commands working with an arbitrary amount of archives, usually take \fB\-a ARCH_GLOB\fP\&.
 .sp
 Archive names must not contain the \fB/\fP (slash) character. For simplicity,
 maybe also avoid blanks or other characters that have special meaning on the
 shell or in a filesystem (borg mount will use the archive name as directory
 name).
-.sp
-If you have set BORG_REPO (see above) and an archive location is needed, use
-\fB::archive_name\fP \- the repo URL part is then read from BORG_REPO.
 .SS Logging
 .sp
 Borg writes all log output to stderr by default. But please note that something
@@ -391,9 +371,11 @@ Borg uses some environment variables for automation:
 .INDENT 7.0
 .TP
 .B BORG_REPO
-When set, use the value to give the default repository location. If a command needs an archive
-parameter, you can abbreviate as \fB::archive\fP\&. If a command needs a repository parameter, you
-can either leave it away or abbreviate as \fB::\fP, if a positional parameter is required.
+When set, use the value to give the default repository location.
+Use this so you do not need to type \fB\-\-repo /path/to/my/repo\fP all the time.
+.TP
+.B BORG_OTHER_REPO
+Similar to BORG_REPO, but gives the default for \fB\-\-other\-repo\fP\&.
 .TP
 .B BORG_PASSPHRASE
 When set, use the value to answer the passphrase question for encrypted repositories.
@@ -614,7 +596,8 @@ know a list of affected hardware.
 If you are suspicious whether your Borg repository is still consistent
 and readable after one of the failures mentioned above occurred, run
 \fBborg check \-\-verify\-data\fP to make sure it is consistent.
-Requirements for Borg repository file systems.INDENT 0.0
+Requirements for Borg repository file systems
+.INDENT 0.0
 .IP \(bu 2
 Long file names
 .IP \(bu 2
@@ -630,7 +613,6 @@ it should be a move (not a copy) operation, and in case of a directory
 it should fail if the destination exists and is not an empty directory,
 since this is used for locking.
 .IP \(bu 2
-Hardlinks are needed for \fIborg_upgrade\fP (if \fB\-\-inplace\fP option is not used).
 Also hardlinks are used for more safe and secure file updating (e.g. of the repo
 config file), but the code tries to work also if hardlinks are not supported.
 .UNINDENT
@@ -772,7 +754,7 @@ special file \fIcontents\fP can be backed up in \fB\-\-read\-special\fP mode.
 By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
 .UNINDENT
 .IP \(bu 2
-hardlinked regular files, devices, FIFOs (considering all items in the same archive)
+hardlinked regular files, devices, symlinks, FIFOs (considering all items in the same archive)
 .IP \(bu 2
 timestamps in nanosecond precision: mtime, atime, ctime
 .IP \(bu 2
@@ -907,10 +889,10 @@ The BSDs define additional flags.
 .sp
 \fIborg\-common(1)\fP for common command line options
 .sp
-\fIborg\-init(1)\fP,
+\fIborg\-rcreate(1)\fP, \fIborg\-rdelete(1)\fP, \fIborg\-rlist(1)\fP, \fIborg\-rinfo(1)\fP,
 \fIborg\-create(1)\fP, \fIborg\-mount(1)\fP, \fIborg\-extract(1)\fP,
 \fIborg\-list(1)\fP, \fIborg\-info(1)\fP,
-\fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP,
+\fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-compact(1)\fP,
 \fIborg\-recreate(1)\fP
 .sp
 \fIborg\-compression(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP

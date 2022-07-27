@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-LIST 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-list \- List archive or repository contents
 .
 .nr rst2man-indent-level 0
 .
@@ -30,12 +27,15 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-LIST" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-list \- List archive contents
 .SH SYNOPSIS
 .sp
-borg [common options] list [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
+borg [common options] list [options] NAME [PATH...]
 .SH DESCRIPTION
 .sp
-This command lists the contents of a repository or an archive.
+This command lists the contents of an archive.
 .sp
 For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .SH OPTIONS
@@ -44,8 +44,8 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B REPOSITORY_OR_ARCHIVE
-repository or archive to list contents of
+.B NAME
+specify the archive name
 .TP
 .B PATH
 paths to list; patterns are supported
@@ -53,38 +53,14 @@ paths to list; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-consider\-checkpoints
-Show checkpoint archives in the repository contents list (default: hidden).
-.TP
-.B \-\-short
+.B  \-\-short
 only print file/directory names, nothing else
 .TP
 .BI \-\-format \ FORMAT
-specify format for file or archive listing (default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; for archives: "{archive:<36} {time} [{id}]{NL}")
+specify format for file listing (default: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
 .TP
-.B \-\-json
-Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
-.TP
-.B \-\-json\-lines
-Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
-.UNINDENT
-.SS Archive filters
-.INDENT 0.0
-.TP
-.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
-only consider archive names starting with this prefix.
-.TP
-.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
-.TP
-.BI \-\-sort\-by \ KEYS
-Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
-.TP
-.BI \-\-first \ N
-consider first N archives after other filters were applied
-.TP
-.BI \-\-last \ N
-consider last N archives after other filters were applied
+.B  \-\-json\-lines
+Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -107,14 +83,7 @@ read include/exclude patterns from PATTERNFILE, one per line
 .sp
 .nf
 .ft C
-$ borg list /path/to/repo
-Monday                               Mon, 2016\-02\-15 19:15:11
-repo                                 Mon, 2016\-02\-15 19:26:54
-root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
-newname                              Mon, 2016\-02\-15 19:50:19
-\&...
-
-$ borg list /path/to/repo::root\-2016\-02\-15
+$ borg list root\-2016\-02\-15
 drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
 drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
 \-rwxr\-xr\-x root   root    1029624 Thu, 2014\-11\-13 00:08:51 bin/bash
@@ -122,14 +91,14 @@ lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdif
 \-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
 \&...
 
-$ borg list /path/to/repo::root\-2016\-02\-15 \-\-pattern "\- bin/ba*"
+$ borg list root\-2016\-02\-15 \-\-pattern "\- bin/ba*"
 drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
 drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
 lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdiff
 \-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
 \&...
 
-$ borg list /path/to/repo::archiveA \-\-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+$ borg list archiveA \-\-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 .
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
@@ -137,11 +106,11 @@ drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...
 
-$ borg list /path/to/repo/::archiveA \-\-pattern \(aqre:\e.ext$\(aq
+$ borg list archiveA \-\-pattern \(aqre:\e.ext$\(aq
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \&...
 
-$ borg list /path/to/repo/::archiveA \-\-pattern \(aqre:.ext$\(aq
+$ borg list archiveA \-\-pattern \(aqre:.ext$\(aq
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...
@@ -160,23 +129,13 @@ Examples:
 .sp
 .nf
 .ft C
-$ borg list \-\-format \(aq{archive}{NL}\(aq /path/to/repo
-ArchiveFoo
-ArchiveBar
-\&...
-
-# {VAR:NUMBER} \- pad to NUMBER columns.
-# Strings are left\-aligned, numbers are right\-aligned.
-# Note: time columns except \(ga\(gaisomtime\(ga\(ga, \(ga\(gaisoctime\(ga\(ga and \(ga\(gaisoatime\(ga\(ga cannot be padded.
-$ borg list \-\-format \(aq{archive:36} {time} [{id}]{NL}\(aq /path/to/repo
-ArchiveFoo                           Thu, 2021\-12\-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
-$ borg list \-\-format \(aq{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}\(aq /path/to/repo::ArchiveFoo
+$ borg list \-\-format \(aq{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}\(aq ArchiveFoo
 \-rw\-rw\-r\-\- user   user       1024 Thu, 2021\-12\-09 10:22:17 file\-foo
 \&...
 
 # {VAR:<NUMBER} \- pad to NUMBER columns left\-aligned.
 # {VAR:>NUMBER} \- pad to NUMBER columns right\-aligned.
-$ borg list \-\-format \(aq{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}\(aq /path/to/repo::ArchiveFoo
+$ borg list \-\-format \(aq{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}\(aq ArchiveFoo
 \-rw\-rw\-r\-\-   user   user 1024     Thu, 2021\-12\-09 10:22:17 file\-foo
 \&...
 .ft P
@@ -202,34 +161,6 @@ CR
 LF
 .UNINDENT
 .sp
-Keys available only when listing archives in a repository:
-.INDENT 0.0
-.IP \(bu 2
-archive: archive name interpreted as text (might be missing non\-text characters, see barchive)
-.IP \(bu 2
-name: alias of "archive"
-.IP \(bu 2
-barchive: verbatim archive name, can contain any character except NUL
-.IP \(bu 2
-comment: archive comment interpreted as text (might be missing non\-text characters, see bcomment)
-.IP \(bu 2
-bcomment: verbatim archive comment, can contain any character except NUL
-.IP \(bu 2
-id: internal ID of the archive
-.IP \(bu 2
-start: time (start) of creation of the archive
-.IP \(bu 2
-time: alias of "start"
-.IP \(bu 2
-end: time (end) of creation of the archive
-.IP \(bu 2
-command_line: command line which was used to create the archive
-.IP \(bu 2
-hostname: hostname of host on which this archive was created
-.IP \(bu 2
-username: username of user who created this archive
-.UNINDENT
-.sp
 Keys available only when listing files in an archive:
 .INDENT 0.0
 .IP \(bu 2
@@ -249,19 +180,17 @@ path: path interpreted as text (might be missing non\-text characters, see bpath
 .IP \(bu 2
 bpath: verbatim POSIX path, can contain any character except NUL
 .IP \(bu 2
-source: link target for links (identical to linktarget)
+source: link target for symlinks (identical to linktarget)
 .IP \(bu 2
 linktarget
+.IP \(bu 2
+hlid: hard link identity (same if hardlinking same fs object)
 .IP \(bu 2
 flags
 .IP \(bu 2
 size
 .IP \(bu 2
-csize: compressed size
-.IP \(bu 2
 dsize: deduplicated size
-.IP \(bu 2
-dcsize: deduplicated compressed size
 .IP \(bu 2
 num_chunks: number of chunks in this file
 .IP \(bu 2

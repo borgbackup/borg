@@ -4,10 +4,11 @@ Examples
 ~~~~~~~~
 ::
 
-    $ borg create /path/to/repo::archivename ~
-    $ borg list /path/to/repo
+    $ borg create archivename ~
+    $ borg rlist
     archivename                          Mon, 2016-02-15 19:50:19
 
-    $ borg rename /path/to/repo::archivename newname
-    $ borg list /path/to/repo
+    $ borg rename archivename newname
+    $ borg rlist
     newname                              Mon, 2016-02-15 19:50:19
+

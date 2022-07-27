@@ -20,7 +20,9 @@ if has_pyfuse3:
         @functools.wraps(fn)
         async def wrapper(*args, **kwargs):
             return fn(*args, **kwargs)
+
         return wrapper
+
 else:
     trio = None
 
@@ -29,13 +31,15 @@ else:
 
 
 from .logger import create_logger
+
 logger = create_logger()
 
 from .crypto.low_level import blake2b_128
-from .archiver import Archiver
+from .archiver.common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, daemonizing, hardlinkable, signal_handler, format_file_size, Error
+from .helpers import daemonize, daemonizing, signal_handler, format_file_size
+from .helpers import HardLinkManager
 from .helpers import msgpack
 from .item import Item
 from .lrucache import LRUCache
@@ -78,7 +82,7 @@ class ItemCache:
     # to resize it in the first place; that's free).
     GROW_META_BY = 2 * 1024 * 1024
 
-    indirect_entry_struct = struct.Struct('=cII')
+    indirect_entry_struct = struct.Struct("=cII")
     assert indirect_entry_struct.size == 9
 
     def __init__(self, decrypted_repository):
@@ -104,7 +108,7 @@ class ItemCache:
         # These are items that span more than one chunk and thus cannot be efficiently cached
         # by the object cache (self.decrypted_repository), which would require variable-length structures;
         # possible but not worth the effort, see iter_archive_items.
-        self.fd = tempfile.TemporaryFile(prefix='borg-tmp')
+        self.fd = tempfile.TemporaryFile(prefix="borg-tmp")
 
         # A small LRU cache for chunks requested by ItemCache.get() from the object cache,
         # this significantly speeds up directory traversal and similar operations which
@@ -122,12 +126,12 @@ class ItemCache:
     def get(self, inode):
         offset = inode - self.offset
         if offset < 0:
-            raise ValueError('ItemCache.get() called with an invalid inode number')
-        if self.meta[offset] == ord(b'I'):
+            raise ValueError("ItemCache.get() called with an invalid inode number")
+        if self.meta[offset] == ord(b"I"):
             _, chunk_id_relative_offset, chunk_offset = self.indirect_entry_struct.unpack_from(self.meta, offset)
             chunk_id_offset = offset - chunk_id_relative_offset
             # bytearray slices are bytearrays as well, explicitly convert to bytes()
-            chunk_id = bytes(self.meta[chunk_id_offset:chunk_id_offset + 32])
+            chunk_id = bytes(self.meta[chunk_id_offset : chunk_id_offset + 32])
             chunk = self.chunks.get(chunk_id)
             if not chunk:
                 csize, chunk = next(self.decrypted_repository.get_many([chunk_id]))
@@ -136,12 +140,12 @@ class ItemCache:
             unpacker = msgpack.Unpacker()
             unpacker.feed(data)
             return Item(internal_dict=next(unpacker))
-        elif self.meta[offset] == ord(b'S'):
-            fd_offset = int.from_bytes(self.meta[offset + 1:offset + 9], 'little')
+        elif self.meta[offset] == ord(b"S"):
+            fd_offset = int.from_bytes(self.meta[offset + 1 : offset + 9], "little")
             self.fd.seek(fd_offset, io.SEEK_SET)
             return Item(internal_dict=next(msgpack.Unpacker(self.fd, read_size=1024)))
         else:
-            raise ValueError('Invalid entry type in self.meta')
+            raise ValueError("Invalid entry type in self.meta")
 
     def iter_archive_items(self, archive_item_ids, filter=None, consider_part_files=False):
         unpacker = msgpack.Unpacker()
@@ -152,7 +156,7 @@ class ItemCache:
         chunk_begin = 0
         # Length of the chunk preceding the current chunk
         last_chunk_length = 0
-        msgpacked_bytes = b''
+        msgpacked_bytes = b""
 
         write_offset = self.write_offset
         meta = self.meta
@@ -162,7 +166,7 @@ class ItemCache:
             # Store the chunk ID in the meta-array
             if write_offset + 32 >= len(meta):
                 self.meta = meta = meta + bytes(self.GROW_META_BY)
-            meta[write_offset:write_offset + 32] = key
+            meta[write_offset : write_offset + 32] = key
             current_id_offset = write_offset
             write_offset += 32
 
@@ -181,7 +185,7 @@ class ItemCache:
                 # tell() is not helpful for the need_more_data case, but we know it is the remainder
                 # of the data in that case. in the other case, tell() works as expected.
                 length = (len(data) - start) if need_more_data else (unpacker.tell() - stream_offset)
-                msgpacked_bytes += data[start:start+length]
+                msgpacked_bytes += data[start : start + length]
                 stream_offset += length
 
                 if need_more_data:
@@ -189,14 +193,14 @@ class ItemCache:
                     break
 
                 item = Item(internal_dict=item)
-                if filter and not filter(item) or not consider_part_files and 'part' in item:
-                    msgpacked_bytes = b''
+                if filter and not filter(item) or not consider_part_files and "part" in item:
+                    msgpacked_bytes = b""
                     continue
 
                 current_item = msgpacked_bytes
                 current_item_length = len(current_item)
                 current_spans_chunks = stream_offset - current_item_length < chunk_begin
-                msgpacked_bytes = b''
+                msgpacked_bytes = b""
 
                 if write_offset + 9 >= len(meta):
                     self.meta = meta = meta + bytes(self.GROW_META_BY)
@@ -220,11 +224,11 @@ class ItemCache:
                 if current_spans_chunks:
                     pos = self.fd.seek(0, io.SEEK_END)
                     self.fd.write(current_item)
-                    meta[write_offset:write_offset + 9] = b'S' + pos.to_bytes(8, 'little')
+                    meta[write_offset : write_offset + 9] = b"S" + pos.to_bytes(8, "little")
                     self.direct_items += 1
                 else:
                     item_offset = stream_offset - current_item_length - chunk_begin
-                    pack_indirect_into(meta, write_offset, b'I', write_offset - current_id_offset, item_offset)
+                    pack_indirect_into(meta, write_offset, b"I", write_offset - current_id_offset, item_offset)
                     self.indirect_items += 1
                 inode = write_offset + self.offset
                 write_offset += 9
@@ -235,8 +239,7 @@ class ItemCache:
 
 
 class FuseBackend:
-    """Virtual filesystem based on archive(s) to provide information to fuse
-    """
+    """Virtual filesystem based on archive(s) to provide information to fuse"""
 
     def __init__(self, key, manifest, repository, args, decrypted_repository):
         self.repository_uncached = repository
@@ -271,22 +274,16 @@ class FuseBackend:
 
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
-        if self._args.location.archive:
+        self.versions_index = FuseVersionsIndex()
+        for archive in self._manifest.archives.list_considering(self._args):
             if self.versions:
-                raise Error("for versions view, do not specify a single archive, "
-                            "but always give the repository as location.")
-            self._process_archive(self._args.location.archive)
-        else:
-            self.versions_index = FuseVersionsIndex()
-            for archive in self._manifest.archives.list_considering(self._args):
-                if self.versions:
-                    # process archives immediately
-                    self._process_archive(archive.name)
-                else:
-                    # lazily load archives, create archive placeholder inode
-                    archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
-                    self.contents[1][os.fsencode(archive.name)] = archive_inode
-                    self.pending_archives[archive_inode] = archive.name
+                # process archives immediately
+                self._process_archive(archive.name)
+            else:
+                # lazily load archives, create archive placeholder inode
+                archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
+                self.contents[1][os.fsencode(archive.name)] = archive_inode
+                self.pending_archives[archive_inode] = archive.name
 
     def get_item(self, inode):
         item = self._inode_cache.get(inode)
@@ -312,8 +309,7 @@ class FuseBackend:
         return self.inode_count
 
     def _create_dir(self, parent, mtime=None):
-        """Create directory
-        """
+        """Create directory"""
         ino = self._allocate_inode()
         if mtime is not None:
             self._items[ino] = Item(internal_dict=self.default_dir.as_dict())
@@ -324,32 +320,31 @@ class FuseBackend:
         return ino
 
     def find_inode(self, path, prefix=[]):
-        segments = prefix + path.split(b'/')
+        segments = prefix + path.split(b"/")
         inode = 1
         for segment in segments:
             inode = self.contents[inode][segment]
         return inode
 
     def _process_archive(self, archive_name, prefix=[]):
-        """Build FUSE inode hierarchy from archive metadata
-        """
+        """Build FUSE inode hierarchy from archive metadata"""
         self.file_versions = {}  # for versions mode: original path -> version
         t0 = time.perf_counter()
-        archive = Archive(self.repository_uncached, self.key, self._manifest, archive_name,
-                          consider_part_files=self._args.consider_part_files)
+        archive = Archive(
+            self.repository_uncached,
+            self.key,
+            self._manifest,
+            archive_name,
+            consider_part_files=self._args.consider_part_files,
+        )
         strip_components = self._args.strip_components
-        matcher = Archiver.build_matcher(self._args.patterns, self._args.paths)
-        partial_extract = not matcher.empty() or strip_components
-        hardlink_masters = {} if partial_extract else None
+        matcher = build_matcher(self._args.patterns, self._args.paths)
+        hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
-        def peek_and_store_hardlink_masters(item, matched):
-            if (partial_extract and not matched and hardlinkable(item.mode) and
-                    item.get('hardlink_master', True) and 'source' not in item):
-                hardlink_masters[item.get('path')] = (item.get('chunks'), None)
-
-        filter = Archiver.build_filter(matcher, peek_and_store_hardlink_masters, strip_components)
-        for item_inode, item in self.cache.iter_archive_items(archive.metadata.items, filter=filter,
-                                                              consider_part_files=self._args.consider_part_files):
+        filter = build_filter(matcher, strip_components)
+        for item_inode, item in self.cache.iter_archive_items(
+            archive.metadata.items, filter=filter, consider_part_files=self._args.consider_part_files
+        ):
             if strip_components:
                 item.path = os.sep.join(item.path.split(os.sep)[strip_components:])
             path = os.fsencode(item.path)
@@ -365,26 +360,24 @@ class FuseBackend:
                 else:
                     self._items[inode] = item
                     continue
-            segments = prefix + path.split(b'/')
+            segments = prefix + path.split(b"/")
             parent = 1
             for segment in segments[:-1]:
                 parent = self._process_inner(segment, parent)
-            self._process_leaf(segments[-1], item, parent, prefix, is_dir, item_inode,
-                               hardlink_masters, strip_components)
+            self._process_leaf(segments[-1], item, parent, prefix, is_dir, item_inode, hlm)
         duration = time.perf_counter() - t0
-        logger.debug('fuse: _process_archive completed in %.1f s for archive %s', duration, archive.name)
+        logger.debug("fuse: _process_archive completed in %.1f s for archive %s", duration, archive.name)
 
-    def _process_leaf(self, name, item, parent, prefix, is_dir, item_inode, hardlink_masters, stripped_components):
+    def _process_leaf(self, name, item, parent, prefix, is_dir, item_inode, hlm):
         path = item.path
         del item.path  # save some space
-        hardlink_masters = hardlink_masters or {}
 
         def file_version(item, path):
-            if 'chunks' in item:
+            if "chunks" in item:
                 file_id = blake2b_128(path)
                 current_version, previous_id = self.versions_index.get(file_id, (0, None))
 
-                contents_id = blake2b_128(b''.join(chunk_id for chunk_id, _, _ in item.chunks))
+                contents_id = blake2b_128(b"".join(chunk_id for chunk_id, _ in item.chunks))
 
                 if contents_id != previous_id:
                     current_version += 1
@@ -395,17 +388,16 @@ class FuseBackend:
         def make_versioned_name(name, version, add_dir=False):
             if add_dir:
                 # add intermediate directory with same name as filename
-                path_fname = name.rsplit(b'/', 1)
-                name += b'/' + path_fname[-1]
+                path_fname = name.rsplit(b"/", 1)
+                name += b"/" + path_fname[-1]
             # keep original extension at end to avoid confusing tools
             name, ext = os.path.splitext(name)
-            version_enc = os.fsencode('.%05d' % version)
+            version_enc = os.fsencode(".%05d" % version)
             return name + version_enc + ext
 
-        if 'source' in item and hardlinkable(item.mode):
-            source = os.sep.join(item.source.split(os.sep)[stripped_components:])
-            chunks, link_target = hardlink_masters.get(item.source, (None, source))
-            if link_target:
+        if "hlid" in item:
+            link_target = hlm.retrieve(id=item.hlid, default=None)
+            if link_target is not None:
                 # Hard link was extracted previously, just link
                 link_target = os.fsencode(link_target)
                 if self.versions:
@@ -415,19 +407,16 @@ class FuseBackend:
                 try:
                     inode = self.find_inode(link_target, prefix)
                 except KeyError:
-                    logger.warning('Skipping broken hard link: %s -> %s', path, source)
+                    logger.warning("Skipping broken hard link: %s -> %s", path, link_target)
                     return
                 item = self.get_item(inode)
-                item.nlink = item.get('nlink', 1) + 1
+                item.nlink = item.get("nlink", 1) + 1
                 self._items[inode] = item
-            elif chunks is not None:
-                # assign chunks to this item, since the item which had the chunks was not extracted
-                item.chunks = chunks
+            else:
                 inode = item_inode
                 self._items[inode] = item
-                if hardlink_masters:
-                    # Update master entry with extracted item path, so that following hardlinks don't extract twice.
-                    hardlink_masters[item.source] = (None, path)
+                # remember extracted item path, so that following hardlinks don't extract twice.
+                hlm.remember(id=item.hlid, info=path)
         else:
             inode = item_inode
 
@@ -436,7 +425,7 @@ class FuseBackend:
             enc_path = os.fsencode(path)
             version = file_version(item, enc_path)
             if version is not None:
-                # regular file, with contents - maybe a hardlink master
+                # regular file, with contents
                 name = make_versioned_name(name, version)
                 self.file_versions[enc_path] = version
 
@@ -456,31 +445,41 @@ class FuseBackend:
 
 
 class FuseOperations(llfuse.Operations, FuseBackend):
-    """Export archive as a FUSE filesystem
-    """
+    """Export archive as a FUSE filesystem"""
 
     def __init__(self, key, repository, manifest, args, decrypted_repository):
         llfuse.Operations.__init__(self)
         FuseBackend.__init__(self, key, manifest, repository, args, decrypted_repository)
         self.decrypted_repository = decrypted_repository
-        data_cache_capacity = int(os.environ.get('BORG_MOUNT_DATA_CACHE_ENTRIES', os.cpu_count() or 1))
-        logger.debug('mount data cache capacity: %d chunks', data_cache_capacity)
+        data_cache_capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
+        logger.debug("mount data cache capacity: %d chunks", data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
         self._last_pos = LRUCache(capacity=FILES, dispose=lambda _: None)
 
     def sig_info_handler(self, sig_no, stack):
-        logger.debug('fuse: %d synth inodes, %d edges (%s)',
-                     self.inode_count, len(self.parent),
-                     # getsizeof is the size of the dict itself; key and value are two small-ish integers,
-                     # which are shared due to code structure (this has been verified).
-                     format_file_size(sys.getsizeof(self.parent) + len(self.parent) * sys.getsizeof(self.inode_count)))
-        logger.debug('fuse: %d pending archives', len(self.pending_archives))
-        logger.debug('fuse: ItemCache %d entries (%d direct, %d indirect), meta-array size %s, direct items size %s',
-                     self.cache.direct_items + self.cache.indirect_items, self.cache.direct_items, self.cache.indirect_items,
-                     format_file_size(sys.getsizeof(self.cache.meta)),
-                     format_file_size(os.stat(self.cache.fd.fileno()).st_size))
-        logger.debug('fuse: data cache: %d/%d entries, %s', len(self.data_cache.items()), self.data_cache._capacity,
-                     format_file_size(sum(len(chunk) for key, chunk in self.data_cache.items())))
+        logger.debug(
+            "fuse: %d synth inodes, %d edges (%s)",
+            self.inode_count,
+            len(self.parent),
+            # getsizeof is the size of the dict itself; key and value are two small-ish integers,
+            # which are shared due to code structure (this has been verified).
+            format_file_size(sys.getsizeof(self.parent) + len(self.parent) * sys.getsizeof(self.inode_count)),
+        )
+        logger.debug("fuse: %d pending archives", len(self.pending_archives))
+        logger.debug(
+            "fuse: ItemCache %d entries (%d direct, %d indirect), meta-array size %s, direct items size %s",
+            self.cache.direct_items + self.cache.indirect_items,
+            self.cache.direct_items,
+            self.cache.indirect_items,
+            format_file_size(sys.getsizeof(self.cache.meta)),
+            format_file_size(os.stat(self.cache.fd.fileno()).st_size),
+        )
+        logger.debug(
+            "fuse: data cache: %d/%d entries, %s",
+            len(self.data_cache.items()),
+            self.data_cache._capacity,
+            format_file_size(sum(len(chunk) for key, chunk in self.data_cache.items())),
+        )
         self.decrypted_repository.log_instrumentation()
 
     def mount(self, mountpoint, mount_options, foreground=False):
@@ -492,25 +491,25 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                 if option == key:
                     options.pop(idx)
                     return present
-                if option.startswith(key + '='):
+                if option.startswith(key + "="):
                     options.pop(idx)
-                    value = option.split('=', 1)[1]
+                    value = option.split("=", 1)[1]
                     if wanted_type is bool:
                         v = value.lower()
-                        if v in ('y', 'yes', 'true', '1'):
+                        if v in ("y", "yes", "true", "1"):
                             return True
-                        if v in ('n', 'no', 'false', '0'):
+                        if v in ("n", "no", "false", "0"):
                             return False
-                        raise ValueError('unsupported value in option: %s' % option)
+                        raise ValueError("unsupported value in option: %s" % option)
                     if wanted_type is int:
                         try:
                             return int(value, base=int_base)
                         except ValueError:
-                            raise ValueError('unsupported value in option: %s' % option) from None
+                            raise ValueError("unsupported value in option: %s" % option) from None
                     try:
                         return wanted_type(value)
                     except ValueError:
-                        raise ValueError('unsupported value in option: %s' % option) from None
+                        raise ValueError("unsupported value in option: %s" % option) from None
             else:
                 return not_present
 
@@ -519,20 +518,20 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         # cause security issues if used with allow_other mount option.
         # When not using allow_other or allow_root, access is limited to the
         # mounting user anyway.
-        options = ['fsname=borgfs', 'ro', 'default_permissions']
+        options = ["fsname=borgfs", "ro", "default_permissions"]
         if mount_options:
-            options.extend(mount_options.split(','))
-        ignore_permissions = pop_option(options, 'ignore_permissions', True, False, bool)
+            options.extend(mount_options.split(","))
+        ignore_permissions = pop_option(options, "ignore_permissions", True, False, bool)
         if ignore_permissions:
             # in case users have a use-case that requires NOT giving "default_permissions",
             # this is enabled by the custom "ignore_permissions" mount option which just
             # removes "default_permissions" again:
-            pop_option(options, 'default_permissions', True, False, bool)
-        self.allow_damaged_files = pop_option(options, 'allow_damaged_files', True, False, bool)
-        self.versions = pop_option(options, 'versions', True, False, bool)
-        self.uid_forced = pop_option(options, 'uid', None, None, int)
-        self.gid_forced = pop_option(options, 'gid', None, None, int)
-        self.umask = pop_option(options, 'umask', 0, 0, int, int_base=8)  # umask is octal, e.g. 222 or 0222
+            pop_option(options, "default_permissions", True, False, bool)
+        self.allow_damaged_files = pop_option(options, "allow_damaged_files", True, False, bool)
+        self.versions = pop_option(options, "versions", True, False, bool)
+        self.uid_forced = pop_option(options, "uid", None, None, int)
+        self.gid_forced = pop_option(options, "gid", None, None, int)
+        self.umask = pop_option(options, "umask", 0, 0, int, int_base=8)  # umask is octal, e.g. 222 or 0222
         dir_uid = self.uid_forced if self.uid_forced is not None else self.default_uid
         dir_gid = self.gid_forced if self.gid_forced is not None else self.default_gid
         dir_user = uid2user(dir_uid)
@@ -540,8 +539,9 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         assert isinstance(dir_user, str)
         assert isinstance(dir_group, str)
         dir_mode = 0o40755 & ~self.umask
-        self.default_dir = Item(mode=dir_mode, mtime=int(time.time() * 1e9),
-                                user=dir_user, group=dir_group, uid=dir_uid, gid=dir_gid)
+        self.default_dir = Item(
+            mode=dir_mode, mtime=int(time.time() * 1e9), user=dir_user, group=dir_group, uid=dir_uid, gid=dir_gid
+        )
         self._create_filesystem()
         llfuse.init(self, mountpoint, options)
         if not foreground:
@@ -550,7 +550,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             else:
                 with daemonizing() as (old_id, new_id):
                     # local repo: the locking process' PID is changing, migrate it:
-                    logger.debug('fuse: mount local repo, going to background: migrating lock.')
+                    logger.debug("fuse: mount local repo, going to background: migrating lock.")
                     self.repository_uncached.migrate_lock(old_id, new_id)
 
         # If the file system crashes, we do not want to umount because in that
@@ -560,11 +560,10 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         # mirror.
         umount = False
         try:
-            with signal_handler('SIGUSR1', self.sig_info_handler), \
-                 signal_handler('SIGINFO', self.sig_info_handler):
+            with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
                 signal = fuse_main()
             # no crash and no signal (or it's ^C and we're in the foreground) -> umount request
-            umount = (signal is None or (signal == SIGINT and foreground))
+            umount = signal is None or (signal == SIGINT and foreground)
         finally:
             llfuse.close(umount)
 
@@ -590,19 +589,24 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         entry.entry_timeout = 300
         entry.attr_timeout = 300
         entry.st_mode = item.mode & ~self.umask
-        entry.st_nlink = item.get('nlink', 1)
-        entry.st_uid, entry.st_gid = get_item_uid_gid(item, numeric=self.numeric_ids,
-                                                      uid_default=self.default_uid, gid_default=self.default_gid,
-                                                      uid_forced=self.uid_forced, gid_forced=self.gid_forced)
-        entry.st_rdev = item.get('rdev', 0)
+        entry.st_nlink = item.get("nlink", 1)
+        entry.st_uid, entry.st_gid = get_item_uid_gid(
+            item,
+            numeric=self.numeric_ids,
+            uid_default=self.default_uid,
+            gid_default=self.default_gid,
+            uid_forced=self.uid_forced,
+            gid_forced=self.gid_forced,
+        )
+        entry.st_rdev = item.get("rdev", 0)
         entry.st_size = item.get_size()
         entry.st_blksize = 512
         entry.st_blocks = (entry.st_size + entry.st_blksize - 1) // entry.st_blksize
         # note: older archives only have mtime (not atime nor ctime)
         entry.st_mtime_ns = mtime_ns = item.mtime
-        entry.st_atime_ns = item.get('atime', mtime_ns)
-        entry.st_ctime_ns = item.get('ctime', mtime_ns)
-        entry.st_birthtime_ns = item.get('birthtime', mtime_ns)
+        entry.st_atime_ns = item.get("atime", mtime_ns)
+        entry.st_ctime_ns = item.get("ctime", mtime_ns)
+        entry.st_birthtime_ns = item.get("birthtime", mtime_ns)
         return entry
 
     @async_wrapper
@@ -612,22 +616,22 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     @async_wrapper
     def listxattr(self, inode, ctx=None):
         item = self.get_item(inode)
-        return item.get('xattrs', {}).keys()
+        return item.get("xattrs", {}).keys()
 
     @async_wrapper
     def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
         try:
-            return item.get('xattrs', {})[name] or b''
+            return item.get("xattrs", {})[name] or b""
         except KeyError:
             raise llfuse.FUSEError(llfuse.ENOATTR) from None
 
     @async_wrapper
     def lookup(self, parent_inode, name, ctx=None):
         self.check_pending_archive(parent_inode)
-        if name == b'.':
+        if name == b".":
             inode = parent_inode
-        elif name == b'..':
+        elif name == b"..":
             inode = self.parent[parent_inode]
         else:
             inode = self.contents[parent_inode].get(name)
@@ -639,12 +643,14 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     def open(self, inode, flags, ctx=None):
         if not self.allow_damaged_files:
             item = self.get_item(inode)
-            if 'chunks_healthy' in item:
+            if "chunks_healthy" in item:
                 # Processed archive items don't carry the path anymore; for converting the inode
                 # to the path we'd either have to store the inverse of the current structure,
                 # or search the entire archive. So we just don't print it. It's easy to correlate anyway.
-                logger.warning('File has damaged (all-zero) chunks. Try running borg check --repair. '
-                               'Mount with allow_damaged_files to read damaged files.')
+                logger.warning(
+                    "File has damaged (all-zero) chunks. Try running borg check --repair. "
+                    "Mount with allow_damaged_files to read damaged files."
+                )
                 raise llfuse.FUSEError(errno.EIO)
         return llfuse.FileInfo(fh=inode) if has_pyfuse3 else inode
 
@@ -669,7 +675,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         chunks = item.chunks
         # note: using index iteration to avoid frequently copying big (sub)lists by slicing
         for idx in range(chunk_no, len(chunks)):
-            id, s, csize = chunks[idx]
+            id, s = chunks[idx]
             if s < offset:
                 offset -= s
                 chunk_offset += s
@@ -686,7 +692,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data
-            parts.append(data[offset:offset + n])
+            parts.append(data[offset : offset + n])
             offset = 0
             size -= n
             if not size:
@@ -695,12 +701,13 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                 else:
                     self._last_pos[fh] = (chunk_no, chunk_offset)
                 break
-        return b''.join(parts)
+        return b"".join(parts)
 
     # note: we can't have a generator (with yield) and not a generator (async) in the same method
     if has_pyfuse3:
-        async def readdir(self, fh, off, token):
-            entries = [(b'.', fh), (b'..', self.parent[fh])]
+
+        async def readdir(self, fh, off, token):  # type: ignore[misc]
+            entries = [(b".", fh), (b"..", self.parent[fh])]
             entries.extend(self.contents[fh].items())
             for i, (name, inode) in enumerate(entries[off:], off):
                 attrs = self._getattr(inode)
@@ -708,8 +715,9 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     break
 
     else:
-        def readdir(self, fh, off):
-            entries = [(b'.', fh), (b'..', self.parent[fh])]
+
+        def readdir(self, fh, off):  # type: ignore[misc]
+            entries = [(b".", fh), (b"..", self.parent[fh])]
             entries.extend(self.contents[fh].items())
             for i, (name, inode) in enumerate(entries[off:], off):
                 attrs = self._getattr(inode)

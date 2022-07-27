@@ -5,9 +5,10 @@ Borg uses some environment variables for automation:
 
 General:
     BORG_REPO
-        When set, use the value to give the default repository location. If a command needs an archive
-        parameter, you can abbreviate as ``::archive``. If a command needs a repository parameter, you
-        can either leave it away or abbreviate as ``::``, if a positional parameter is required.
+        When set, use the value to give the default repository location.
+        Use this so you do not need to type ``--repo /path/to/my/repo`` all the time.
+    BORG_OTHER_REPO
+        Similar to BORG_REPO, but gives the default for ``--other-repo``.
     BORG_PASSPHRASE
         When set, use the value to answer the passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new

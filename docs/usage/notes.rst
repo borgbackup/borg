@@ -155,18 +155,18 @@ After the backup has completed, you remove the snapshots again.
 
     $ # create snapshots here
     $ lvdisplay > lvdisplay.txt
-    $ borg create --read-special /path/to/repo::arch lvdisplay.txt /dev/vg0/*-snapshot
+    $ borg create --read-special arch lvdisplay.txt /dev/vg0/*-snapshot
     $ # remove snapshots here
 
 Now, let's see how to restore some LVs from such a backup.
 
 ::
 
-    $ borg extract /path/to/repo::arch lvdisplay.txt
+    $ borg extract arch lvdisplay.txt
     $ # create empty LVs with correct sizes here (look into lvdisplay.txt).
     $ # we assume that you created an empty root and home LV and overwrite it now:
-    $ borg extract --stdout /path/to/repo::arch dev/vg0/root-snapshot > /dev/vg0/root
-    $ borg extract --stdout /path/to/repo::arch dev/vg0/home-snapshot > /dev/vg0/home
+    $ borg extract --stdout arch dev/vg0/root-snapshot > /dev/vg0/root
+    $ borg extract --stdout arch dev/vg0/home-snapshot > /dev/vg0/home
 
 
 .. _separate_compaction:
@@ -219,7 +219,7 @@ To activate append-only mode, set ``append_only`` to 1 in the repository config:
 
 ::
 
-    borg config /path/to/repo append_only 1
+    borg config append_only 1
 
 Note that you can go back-and-forth between normal and append-only operation with
 ``borg config``; it's not a "one way trip."
@@ -237,7 +237,7 @@ in ``.ssh/authorized_keys``:
     command="borg serve ..." ssh-rsa <key used for backup management>
 
 Running ``borg init`` via a ``borg serve --append-only`` server will *not* create
-an append-only repository. Running ``borg init --append-only`` creates an append-only
+an append-only repository. Running ``borg rcreate --append-only`` creates an append-only
 repository regardless of server settings.
 
 Example
@@ -282,7 +282,7 @@ than what you actually have in the repository now, after the rollback.
 
 Thus, you need to clear the cache::
 
-    borg delete --cache-only repo
+    borg rdelete --cache-only
 
 The cache will get rebuilt automatically. Depending on repo size and archive
 count, it may take a while.
@@ -307,7 +307,7 @@ mode, this is reversible, but ``borg check`` should be run before a writing/prun
 operation on an append-only repository to catch accidental or malicious corruption::
 
     # run without append-only mode
-    borg check --verify-data repo && borg compact repo
+    borg check --verify-data && borg compact
 
 Aside from checking repository & archive integrity you may want to also manually check
 backups to ensure their content seems correct.
@@ -333,3 +333,4 @@ When running Borg using an automated script, ``ssh`` might still ask for a passw
 even if there is an SSH key for the target server. Use this to make scripts more robust::
 
     export BORG_RSH='ssh -oBatchMode=yes'
+

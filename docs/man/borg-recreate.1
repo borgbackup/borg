@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-RECREATE 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-recreate \- Re-create archives
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-RECREATE" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-recreate \- Re-create archives
 .SH SYNOPSIS
 .sp
-borg [common options] recreate [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
+borg [common options] recreate [options] [PATH...]
 .SH DESCRIPTION
 .sp
 Recreate the contents of existing archives.
@@ -56,8 +56,7 @@ incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
 .sp
 \fB\-\-chunker\-params\fP will re\-chunk all files in the archive, this can be
-used to have upgraded Borg 0.xx or Attic archives deduplicate with
-Borg 1.x archives.
+used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 .sp
 \fBUSE WITH CAUTION.\fP
 Depending on the PATHs and patterns given, recreate can be used to permanently
@@ -91,25 +90,22 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B REPOSITORY_OR_ARCHIVE
-repository or archive to recreate
-.TP
 .B PATH
 paths to recreate; patterns are supported
 .UNINDENT
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters (listed in borg create \-\-help)
 .TP
-.B \-n\fP,\fB  \-\-dry\-run
+.B  \-n\fP,\fB  \-\-dry\-run
 do not change anything
 .TP
-.B \-s\fP,\fB  \-\-stats
+.B  \-s\fP,\fB  \-\-stats
 print statistics at end
 .UNINDENT
 .SS Exclusion options
@@ -127,17 +123,29 @@ include/exclude paths matching PATTERN
 .BI \-\-patterns\-from \ PATTERNFILE
 read include/exclude patterns from PATTERNFILE, one per line
 .TP
-.B \-\-exclude\-caches
+.B  \-\-exclude\-caches
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.bford.info/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
-.B \-\-keep\-exclude\-tags
+.B  \-\-keep\-exclude\-tags
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
 .UNINDENT
-.SS Archive options
+.SS Archive filters
 .INDENT 0.0
+.TP
+.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
+.TP
+.BI \-\-sort\-by \ KEYS
+Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+.TP
+.BI \-\-first \ N
+consider first N archives after other filters were applied
+.TP
+.BI \-\-last \ N
+consider last N archives after other filters were applied
 .TP
 .BI \-\-target \ TARGET
 create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
@@ -155,7 +163,7 @@ manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss form
 select compression algorithm, see the output of the "borg help compression" command for details.
 .TP
 .BI \-\-recompress \ MODE
-recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm (the level is not considered); \fIalways\fP: recompress even if current compression is with the same compression algorithm (use this to change the compression level); and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to "\-\-recompress never".
+recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm or different level; \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to "\-\-recompress never".
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: buzhash,19,23,21,4095
@@ -166,30 +174,25 @@ specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BI
 .sp
 .nf
 .ft C
-# Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives.
-# Archives created with Borg 1.1+ and the default chunker params are skipped
-# (archive ID stays the same).
-$ borg recreate /mnt/backup \-\-chunker\-params default \-\-progress
-
 # Create a backup with little but fast compression
-$ borg create /mnt/backup::archive /some/files \-\-compression lz4
+$ borg create archive /some/files \-\-compression lz4
 # Then compress it \- this might take longer, but the backup has already completed,
 # so no inconsistencies from a long\-running backup job.
-$ borg recreate /mnt/backup::archive \-\-recompress \-\-compression zlib,9
+$ borg recreate \-a archive \-\-recompress \-\-compression zlib,9
 
 # Remove unwanted files from all archives in a repository.
 # Note the relative path for the \-\-exclude option \- archives only contain relative paths.
-$ borg recreate /mnt/backup \-\-exclude home/icke/Pictures/drunk_photos
+$ borg recreate \-\-exclude home/icke/Pictures/drunk_photos
 
 # Change archive comment
-$ borg create \-\-comment "This is a comment" /mnt/backup::archivename ~
-$ borg info /mnt/backup::archivename
+$ borg create \-\-comment "This is a comment" archivename ~
+$ borg info \-a archivename
 Name: archivename
 Fingerprint: ...
 Comment: This is a comment
 \&...
-$ borg recreate \-\-comment "This is a better comment" /mnt/backup::archivename
-$ borg info /mnt/backup::archivename
+$ borg recreate \-\-comment "This is a better comment" \-a archivename
+$ borg info \-a archivename
 Name: archivename
 Fingerprint: ...
 Comment: This is a better comment

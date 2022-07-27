@@ -2,10 +2,9 @@ import stat
 from collections import namedtuple
 
 from .constants import ITEM_KEYS, ARCHIVE_KEYS
-from .helpers import safe_encode, safe_decode
-from .helpers import bigint_to_int, int_to_bigint
 from .helpers import StableDict
 from .helpers import format_file_size
+from .helpers.msgpack import timestamp_to_int, int_to_timestamp, Timestamp
 
 
 cdef extern from "_item.c":
@@ -14,6 +13,102 @@ cdef extern from "_item.c":
 
 
 API_VERSION = '1.2_01'
+
+
+def fix_key(data, key, *, errors='strict'):
+    """if k is a bytes-typed key, migrate key/value to a str-typed key in dict data"""
+    if isinstance(key, bytes):
+        value = data.pop(key)
+        key = key.decode('utf-8', errors=errors)
+        data[key] = value
+    assert isinstance(key, str)
+    return key
+
+
+def fix_str_value(data, key, errors='surrogateescape'):
+    """makes sure that data[key] is a str (decode if it is bytes)"""
+    assert isinstance(key, str)  # fix_key must be called first
+    value = data[key]
+    value = want_str(value, errors=errors)
+    data[key] = value
+    return value
+
+
+def fix_bytes_value(data, key):
+    """makes sure that data[key] is bytes (encode if it is str)"""
+    assert isinstance(key, str)  # fix_key must be called first
+    value = data[key]
+    value = want_bytes(value)
+    data[key] = value
+    return value
+
+
+def fix_list_of_str(v):
+    """make sure we have a list of str"""
+    assert isinstance(v, (tuple, list))
+    return [want_str(e) for e in v]
+
+
+def fix_list_of_bytes(v):
+    """make sure we have a list of bytes"""
+    assert isinstance(v, (tuple, list))
+    return [want_bytes(e) for e in v]
+
+
+def fix_list_of_chunkentries(v):
+    """make sure we have a list of correct chunkentries"""
+    assert isinstance(v, (tuple, list))
+    chunks = []
+    for ce in v:
+        assert isinstance(ce, (tuple, list))
+        assert len(ce) in (2, 3)  # id, size[, csize]
+        assert isinstance(ce[1], int)
+        assert len(ce) == 2 or isinstance(ce[2], int)
+        ce_fixed = [want_bytes(ce[0]), ce[1]]  # list! id, size only, drop csize
+        chunks.append(ce_fixed)  # create a list of lists
+    return chunks
+
+
+def fix_tuple_of_str(v):
+    """make sure we have a tuple of str"""
+    assert isinstance(v, (tuple, list))
+    return tuple(want_str(e) for e in v)
+
+
+def fix_tuple_of_str_and_int(v):
+    """make sure we have a tuple of str"""
+    assert isinstance(v, (tuple, list))
+    t = tuple(e.decode() if isinstance(e, bytes) else e for e in v)
+    assert all(isinstance(e, (str, int)) for e in t), repr(t)
+    return t
+
+
+def fix_timestamp(v):
+    """make sure v is a Timestamp"""
+    if isinstance(v, Timestamp):
+        return v
+    # legacy support
+    if isinstance(v, bytes):  # was: bigint_to_int()
+        v = int.from_bytes(v, 'little', signed=True)
+    assert isinstance(v, int)
+    return int_to_timestamp(v)
+
+
+def want_bytes(v, *, errors='surrogateescape'):
+    """we know that we want bytes and the value should be bytes"""
+    # legacy support: it being str can be caused by msgpack unpack decoding old data that was packed with use_bin_type=False
+    if isinstance(v, str):
+        v = v.encode('utf-8', errors=errors)
+    assert isinstance(v, bytes), f'not a bytes object, but {v!r}'
+    return v
+
+
+def want_str(v, *, errors='surrogateescape'):
+    """we know that we want str and the value should be str"""
+    if isinstance(v, bytes):
+        v = v.decode('utf-8', errors=errors)
+    assert isinstance(v, str), f'not a str object, but {v!r}'
+    return v
 
 
 class PropDict:
@@ -112,6 +207,8 @@ class PropDict:
                 raise AttributeError(attr_error_msg) from None
             if decode is not None:
                 value = decode(value)
+            if not isinstance(value, value_type):
+                raise TypeError(type_error_msg)
             return value
 
         def _set(self, value):
@@ -130,7 +227,7 @@ class PropDict:
         return property(_get, _set, _del, doc=doc)
 
 
-ChunkListEntry = namedtuple('ChunkListEntry', 'id size csize')
+ChunkListEntry = namedtuple('ChunkListEntry', 'id size')
 
 class Item(PropDict):
     """
@@ -139,14 +236,9 @@ class Item(PropDict):
     Items are created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to Item(internal_dict=d) and use item.key_name later.
-    msgpack gives us byte-typed values for stuff that should be str, we automatically decode when getting
-    such a property and encode when setting it.
+    msgpack unpacker gives us a dict, just give it to Item(internal_dict=d) and use item.key_name later.
 
     If an Item shall be serialized, give as_dict() method output to msgpack packer.
-
-    A bug in Attic up to and including release 0.13 added a (meaningless) 'acl' key to every item.
-    We must never re-use this key. See test_attic013_acl_bug for details.
     """
 
     VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys
@@ -155,10 +247,10 @@ class Item(PropDict):
 
     # properties statically defined, so that IDEs can know their names:
 
-    path = PropDict._make_property('path', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    source = PropDict._make_property('source', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    user = PropDict._make_property('user', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
-    group = PropDict._make_property('group', (str, type(None)), 'surrogate-escaped str or None', encode=safe_encode, decode=safe_decode)
+    path = PropDict._make_property('path', str, 'surrogate-escaped str')
+    source = PropDict._make_property('source', str, 'surrogate-escaped str')
+    user = PropDict._make_property('user', str, 'surrogate-escaped str')
+    group = PropDict._make_property('group', str, 'surrogate-escaped str')
 
     acl_access = PropDict._make_property('acl_access', bytes)
     acl_default = PropDict._make_property('acl_default', bytes)
@@ -171,20 +263,19 @@ class Item(PropDict):
     rdev = PropDict._make_property('rdev', int)
     bsdflags = PropDict._make_property('bsdflags', int)
 
-    # note: we need to keep the bigint conversion for compatibility with borg 1.0 archives.
-    atime = PropDict._make_property('atime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    ctime = PropDict._make_property('ctime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    mtime = PropDict._make_property('mtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
-    birthtime = PropDict._make_property('birthtime', int, 'bigint', encode=int_to_bigint, decode=bigint_to_int)
+    atime = PropDict._make_property('atime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    ctime = PropDict._make_property('ctime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    mtime = PropDict._make_property('mtime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    birthtime = PropDict._make_property('birthtime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
 
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
-    # compatibility note: this is a new feature, in old archives size will be missing.
     size = PropDict._make_property('size', int)
 
-    hardlink_master = PropDict._make_property('hardlink_master', bool)
+    hlid = PropDict._make_property('hlid', bytes)  # hard link id: same value means same hard link.
+    hardlink_master = PropDict._make_property('hardlink_master', bool)  # legacy
 
-    chunks = PropDict._make_property('chunks', (list, type(None)), 'list or None')
-    chunks_healthy = PropDict._make_property('chunks_healthy', (list, type(None)), 'list or None')
+    chunks = PropDict._make_property('chunks', list, 'list')
+    chunks_healthy = PropDict._make_property('chunks_healthy', list, 'list')
 
     xattrs = PropDict._make_property('xattrs', StableDict)
 
@@ -193,19 +284,15 @@ class Item(PropDict):
 
     part = PropDict._make_property('part', int)
 
-    def get_size(self, hardlink_masters=None, memorize=False, compressed=False, from_chunks=False, consider_ids=None):
+    def get_size(self, *, memorize=False, from_chunks=False, consider_ids=None):
         """
-        Determine the (uncompressed or compressed) size of this item.
+        Determine the uncompressed size of this item.
 
-        :param hardlink_masters: If given, the size of hardlink slaves is computed via the hardlink master's chunk list,
-        otherwise size will be returned as 0.
         :param memorize: Whether the computed size value will be stored into the item.
-        :param compressed: Whether the compressed or uncompressed size will be returned.
         :param from_chunks: If true, size is computed from chunks even if a precomputed value is available.
         :param consider_ids: Returns the size of the given ids only.
         """
-        attr = 'csize' if compressed else 'size'
-        assert not (compressed and memorize), 'Item does not have a csize field.'
+        attr = 'size'
         assert not (consider_ids is not None and memorize), "Can't store size when considering only certain ids"
         try:
             if from_chunks or consider_ids is not None:
@@ -214,36 +301,18 @@ class Item(PropDict):
         except AttributeError:
             if stat.S_ISLNK(self.mode):
                 # get out of here quickly. symlinks have no own chunks, their fs size is the length of the target name.
-                # also, there is the dual-use issue of .source (#2343), so don't confuse it with a hardlink slave.
                 return len(self.source)
             # no precomputed (c)size value available, compute it:
             try:
                 chunks = getattr(self, 'chunks')
-                having_chunks = True
             except AttributeError:
-                having_chunks = False
-                # this item has no (own) chunks list, but if this is a hardlink slave
-                # and we know the master, we can still compute the size.
-                if hardlink_masters is None:
-                    chunks = None
-                else:
-                    try:
-                        master = getattr(self, 'source')
-                    except AttributeError:
-                        # not a hardlink slave, likely a directory or special file w/o chunks
-                        chunks = None
-                    else:
-                        # hardlink slave, try to fetch hardlink master's chunks list
-                        # todo: put precomputed size into hardlink_masters' values and use it, if present
-                        chunks, _ = hardlink_masters.get(master, (None, None))
-                if chunks is None:
-                    return 0
+                return 0
             if consider_ids is not None:
                 size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks if chunk.id in consider_ids)
             else:
                 size = sum(getattr(ChunkListEntry(*chunk), attr) for chunk in chunks)
             # if requested, memorize the precomputed (c)size for items that have an own chunks list:
-            if memorize and having_chunks:
+            if memorize:
                 setattr(self, attr, size)
         return size
 
@@ -291,6 +360,31 @@ class Item(PropDict):
         except AttributeError:
             return False
 
+    def update_internal(self, d):
+        # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str),
+        # also need to fix old timestamp data types.
+        for k, v in list(d.items()):
+            k = fix_key(d, k)
+            if k in ('path', 'source', 'user', 'group'):
+                v = fix_str_value(d, k)
+            if k in ('chunks', 'chunks_healthy'):
+                v = fix_list_of_chunkentries(v)
+            if k in ('atime', 'ctime', 'mtime', 'birthtime'):
+                v = fix_timestamp(v)
+            if k in ('acl_access', 'acl_default', 'acl_extended', 'acl_nfs4'):
+                v = fix_bytes_value(d, k)
+            if k == 'xattrs':
+                if not isinstance(v, StableDict):
+                    v = StableDict(v)
+                v_new = StableDict()
+                for xk, xv in list(v.items()):
+                    xk = want_bytes(xk)
+                    # old borg used to store None instead of a b'' value
+                    xv = b'' if xv is None else want_bytes(xv)
+                    v_new[xk] = xv
+                v = v_new  # xattrs is a StableDict(bytes keys -> bytes values)
+            self._dict[k] = v
+
 
 class EncryptedKey(PropDict):
     """
@@ -299,18 +393,18 @@ class EncryptedKey(PropDict):
     A EncryptedKey is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to EncryptedKey(d) and use enc_key.xxx later.
+    msgpack unpacker gives us a dict, just give it to EncryptedKey(d) and use enc_key.xxx later.
 
     If a EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = { 'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
-                   'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type' }
+    VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
+                  'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type'}
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     version = PropDict._make_property('version', int)
-    algorithm = PropDict._make_property('algorithm', str, encode=str.encode, decode=bytes.decode)
+    algorithm = PropDict._make_property('algorithm', str)
     iterations = PropDict._make_property('iterations', int)
     salt = PropDict._make_property('salt', bytes)
     hash = PropDict._make_property('hash', bytes)
@@ -318,7 +412,19 @@ class EncryptedKey(PropDict):
     argon2_time_cost = PropDict._make_property('argon2_time_cost', int)
     argon2_memory_cost = PropDict._make_property('argon2_memory_cost', int)
     argon2_parallelism = PropDict._make_property('argon2_parallelism', int)
-    argon2_type = PropDict._make_property('argon2_type', str, encode=str.encode, decode=bytes.decode)
+    argon2_type = PropDict._make_property('argon2_type', str)
+
+    def update_internal(self, d):
+        # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
+        for k, v in list(d.items()):
+            k = fix_key(d, k)
+            if k == 'version':
+                assert isinstance(v, int)
+            if k in ('algorithm', 'argon2_type'):
+                v = fix_str_value(d, k)
+            if k in ('salt', 'hash', 'data'):
+                v = fix_bytes_value(d, k)
+            self._dict[k] = v
 
 
 class Key(PropDict):
@@ -328,7 +434,7 @@ class Key(PropDict):
     A Key is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to Key(d) and use key.xxx later.
+    msgpack unpacker gives us a dict, just give it to Key(d) and use key.xxx later.
 
     If a Key shall be serialized, give as_dict() method output to msgpack packer.
     """
@@ -345,17 +451,15 @@ class Key(PropDict):
     chunk_seed = PropDict._make_property('chunk_seed', int)
     tam_required = PropDict._make_property('tam_required', bool)
 
-
-def tuple_encode(t):
-    """encode a tuple that might contain str items"""
-    # we have str, but want to give bytes to msgpack.pack
-    return tuple(safe_encode(e) if isinstance(e, str) else e for e in t)
-
-
-def tuple_decode(t):
-    """decode a tuple that might contain bytes items"""
-    # we get bytes objects from msgpack.unpack, but want str
-    return tuple(safe_decode(e) if isinstance(e, bytes) else e for e in t)
+    def update_internal(self, d):
+        # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
+        for k, v in list(d.items()):
+            k = fix_key(d, k)
+            if k == 'version':
+                assert isinstance(v, int)
+            if k in ('repository_id', 'enc_key', 'enc_hmac_key', 'id_key'):
+                v = fix_bytes_value(d, k)
+            self._dict[k] = v
 
 
 class ArchiveItem(PropDict):
@@ -365,7 +469,7 @@ class ArchiveItem(PropDict):
     An ArchiveItem is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to ArchiveItem(d) and use arch.xxx later.
+    msgpack unpacker gives us a dict, just give it to ArchiveItem(d) and use arch.xxx later.
 
     If a ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
     """
@@ -375,26 +479,42 @@ class ArchiveItem(PropDict):
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     version = PropDict._make_property('version', int)
-    name = PropDict._make_property('name', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    name = PropDict._make_property('name', str, 'surrogate-escaped str')
     items = PropDict._make_property('items', list)
     cmdline = PropDict._make_property('cmdline', list)  # list of s-e-str
-    hostname = PropDict._make_property('hostname', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    username = PropDict._make_property('username', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    time = PropDict._make_property('time', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    time_end = PropDict._make_property('time_end', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    comment = PropDict._make_property('comment', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
-    chunker_params = PropDict._make_property('chunker_params', tuple, 'chunker-params tuple', encode=tuple_encode, decode=tuple_decode)
+    hostname = PropDict._make_property('hostname', str, 'surrogate-escaped str')
+    username = PropDict._make_property('username', str, 'surrogate-escaped str')
+    time = PropDict._make_property('time', str)
+    time_end = PropDict._make_property('time_end', str)
+    comment = PropDict._make_property('comment', str, 'surrogate-escaped str')
+    chunker_params = PropDict._make_property('chunker_params', tuple)
     recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
     # recreate_source_id, recreate_args, recreate_partial_chunks were used in 1.1.0b1 .. b2
     recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
     recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
     recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
     size = PropDict._make_property('size', int)
-    csize = PropDict._make_property('csize', int)
     nfiles = PropDict._make_property('nfiles', int)
     size_parts = PropDict._make_property('size_parts', int)
-    csize_parts = PropDict._make_property('csize_parts', int)
     nfiles_parts = PropDict._make_property('nfiles_parts', int)
+
+    def update_internal(self, d):
+        # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
+        for k, v in list(d.items()):
+            k = fix_key(d, k)
+            if k == 'version':
+                assert isinstance(v, int)
+            if k in ('name', 'hostname', 'username', 'comment'):
+                v = fix_str_value(d, k)
+            if k in ('time', 'time_end'):
+                v = fix_str_value(d, k, 'replace')
+            if k == 'chunker_params':
+                v = fix_tuple_of_str_and_int(v)
+            if k in ('cmdline', 'recreate_cmdline'):
+                v = fix_list_of_str(v)
+            if k == 'items':
+                v = fix_list_of_bytes(v)
+            self._dict[k] = v
 
 
 class ManifestItem(PropDict):
@@ -404,7 +524,7 @@ class ManifestItem(PropDict):
     A ManifestItem is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
-    msgpack gives us a dict with bytes-typed keys, just give it to ManifestItem(d) and use manifest.xxx later.
+    msgpack unpacker gives us a dict, just give it to ManifestItem(d) and use manifest.xxx later.
 
     If a ManifestItem shall be serialized, give as_dict() method output to msgpack packer.
     """
@@ -414,10 +534,54 @@ class ManifestItem(PropDict):
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     version = PropDict._make_property('version', int)
-    archives = PropDict._make_property('archives', dict)  # name -> dict
-    timestamp = PropDict._make_property('timestamp', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
+    archives = PropDict._make_property('archives', dict, 'dict of str -> dict')  # name -> dict
+    timestamp = PropDict._make_property('timestamp', str)
     config = PropDict._make_property('config', dict)
-    item_keys = PropDict._make_property('item_keys', tuple)
+    item_keys = PropDict._make_property('item_keys', tuple, 'tuple of str')
+
+    def update_internal(self, d):
+        # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
+        for k, v in list(d.items()):
+            k = fix_key(d, k)
+            if k == 'version':
+                assert isinstance(v, int)
+            if k == 'archives':
+                ad = v
+                assert isinstance(ad, dict)
+                for ak, av in list(ad.items()):
+                    ak = fix_key(ad, ak, errors='surrogateescape')
+                    assert isinstance(av, dict)
+                    for ik, iv in list(av.items()):
+                        ik = fix_key(av, ik)
+                        if ik == 'id':
+                            fix_bytes_value(av, 'id')
+                        if ik == 'time':
+                            fix_str_value(av, 'time')
+                    assert set(av) == {'id', 'time'}
+            if k == 'timestamp':
+                v = fix_str_value(d, k, 'replace')
+            if k == 'config':
+                cd = v
+                assert isinstance(cd, dict)
+                for ck, cv in list(cd.items()):
+                    ck = fix_key(cd, ck)
+                    if ck == 'tam_required':
+                        assert isinstance(cv, bool)
+                    if ck == 'feature_flags':
+                        assert isinstance(cv, dict)
+                        ops = {'read', 'check', 'write', 'delete'}
+                        for op, specs in list(cv.items()):
+                            op = fix_key(cv, op)
+                            assert op in ops
+                            for speck, specv in list(specs.items()):
+                                speck = fix_key(specs, speck)
+                                if speck == 'mandatory':
+                                    specs[speck] = fix_tuple_of_str(specv)
+                        assert set(cv).issubset(ops)
+            if k == 'item_keys':
+                v = fix_tuple_of_str(v)
+            self._dict[k] = v
+
 
 class ItemDiff:
     """

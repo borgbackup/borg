@@ -1,13 +1,8 @@
-# -*- coding: utf-8 -*-
 from collections import namedtuple
-import locale
-import os
 
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
-from libc.errno cimport errno
 from libc.string cimport memcpy
-from cpython.exc cimport PyErr_SetFromErrnoWithFilename
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_CheckExact, PyBytes_GET_SIZE, PyBytes_AS_STRING
 
@@ -49,8 +44,6 @@ cdef extern from "cache_sync/cache_sync.c":
     uint64_t cache_sync_num_files_parts(const CacheSyncCtx *ctx)
     uint64_t cache_sync_size_totals(const CacheSyncCtx *ctx)
     uint64_t cache_sync_size_parts(const CacheSyncCtx *ctx)
-    uint64_t cache_sync_csize_totals(const CacheSyncCtx *ctx)
-    uint64_t cache_sync_csize_parts(const CacheSyncCtx *ctx)
     int cache_sync_feed(CacheSyncCtx *ctx, void *data, uint32_t length)
     void cache_sync_free(CacheSyncCtx *ctx)
 
@@ -77,6 +70,20 @@ AssertionError is raised instead.
 assert UINT32_MAX == 2**32-1
 
 assert _MAX_VALUE % 2 == 1
+
+
+def hashindex_variant(fn):
+    """peek into an index file and find out what it is"""
+    with open(fn, 'rb') as f:
+        hh = f.read(18)  # len(HashHeader)
+    magic = hh[0:8]
+    if magic == b'BORG_IDX':
+        key_size = hh[16]
+        value_size = hh[17]
+        return f'k{key_size}_v{value_size}'
+    if magic == b'12345678':  # used by unit tests
+        return 'k32_v16'  # just return the current variant
+    raise ValueError(f'unknown hashindex format, magic: {magic!r}')
 
 
 @cython.internal
@@ -198,7 +205,114 @@ cdef class FuseVersionsIndex(IndexBase):
         return hashindex_get(self.index, <unsigned char *>key) != NULL
 
 
+NSIndexEntry = namedtuple('NSIndexEntry', 'segment offset size')
+
+
 cdef class NSIndex(IndexBase):
+
+    value_size = 16
+
+    def __getitem__(self, key):
+        assert len(key) == self.key_size
+        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
+        if not data:
+            raise KeyError(key)
+        cdef uint32_t segment = _le32toh(data[0])
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return NSIndexEntry(segment, _le32toh(data[1]), _le32toh(data[2]))
+
+    def __setitem__(self, key, value):
+        assert len(key) == self.key_size
+        cdef uint32_t[4] data
+        cdef uint32_t segment = value[0]
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        data[0] = _htole32(segment)
+        data[1] = _htole32(value[1])
+        data[2] = _htole32(value[2])
+        data[3] = 0  # init flags to all cleared
+        if not hashindex_set(self.index, <unsigned char *>key, data):
+            raise Exception('hashindex_set failed')
+
+    def __contains__(self, key):
+        cdef uint32_t segment
+        assert len(key) == self.key_size
+        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
+        if data != NULL:
+            segment = _le32toh(data[0])
+            assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return data != NULL
+
+    def iteritems(self, marker=None, mask=0, value=0):
+        """iterate over all items or optionally only over items having specific flag values"""
+        cdef const unsigned char *key
+        assert isinstance(mask, int)
+        assert isinstance(value, int)
+        iter = NSKeyIterator(self.key_size, mask, value)
+        iter.idx = self
+        iter.index = self.index
+        if marker:
+            key = hashindex_get(self.index, <unsigned char *>marker)
+            if marker is None:
+                raise IndexError
+            iter.key = key - self.key_size
+        return iter
+
+    def flags(self, key, mask=0xFFFFFFFF, value=None):
+        """query and optionally set flags"""
+        assert len(key) == self.key_size
+        assert isinstance(mask, int)
+        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
+        if not data:
+            raise KeyError(key)
+        flags = _le32toh(data[3])
+        if isinstance(value, int):
+            new_flags = flags & ~mask  # clear masked bits
+            new_flags |= value & mask  # set value bits
+            data[3] = _htole32(new_flags)
+        return flags & mask # always return previous flags value
+
+
+cdef class NSKeyIterator:
+    cdef NSIndex idx
+    cdef HashIndex *index
+    cdef const unsigned char *key
+    cdef int key_size
+    cdef int exhausted
+    cdef int flag_mask
+    cdef int flag_value
+
+    def __cinit__(self, key_size, mask, value):
+        self.key = NULL
+        self.key_size = key_size
+        # note: mask and value both default to 0, so they will match all entries
+        self.flag_mask = _htole32(mask)
+        self.flag_value = _htole32(value)
+        self.exhausted = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef uint32_t *value
+        if self.exhausted:
+            raise StopIteration
+        while True:
+            self.key = hashindex_next_key(self.index, <unsigned char *>self.key)
+            if not self.key:
+                self.exhausted = 1
+                raise StopIteration
+            value = <uint32_t *> (self.key + self.key_size)
+            if value[3] & self.flag_mask == self.flag_value:
+                # we found a matching entry!
+                break
+
+        cdef uint32_t segment = _le32toh(value[0])
+        assert segment <= _MAX_VALUE, "maximum number of segments reached"
+        return ((<char *>self.key)[:self.key_size],
+                NSIndexEntry(segment, _le32toh(value[1]), _le32toh(value[2])))
+
+
+cdef class NSIndex1(IndexBase):  # legacy borg 1.x
 
     value_size = 8
 
@@ -232,7 +346,7 @@ cdef class NSIndex(IndexBase):
 
     def iteritems(self, marker=None):
         cdef const unsigned char *key
-        iter = NSKeyIterator(self.key_size)
+        iter = NSKeyIterator1(self.key_size)
         iter.idx = self
         iter.index = self.index
         if marker:
@@ -243,8 +357,8 @@ cdef class NSIndex(IndexBase):
         return iter
 
 
-cdef class NSKeyIterator:
-    cdef NSIndex idx
+cdef class NSKeyIterator1:  # legacy borg 1.x
+    cdef NSIndex1 idx
     cdef HashIndex *index
     cdef const unsigned char *key
     cdef int key_size
@@ -271,12 +385,12 @@ cdef class NSKeyIterator:
         return (<char *>self.key)[:self.key_size], (segment, _le32toh(value[1]))
 
 
-ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size csize')
+ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size')
 
 
 cdef class ChunkIndex(IndexBase):
     """
-    Mapping of 32 byte keys to (refcount, size, csize), which are all 32-bit unsigned.
+    Mapping of 32 byte keys to (refcount, size), which are all 32-bit unsigned.
 
     The reference count cannot overflow. If an overflow would occur, the refcount
     is fixed to MAX_VALUE and will neither increase nor decrease by incref(), decref()
@@ -291,7 +405,7 @@ cdef class ChunkIndex(IndexBase):
     Assigning refcounts in this reserved range is an invalid operation and raises AssertionError.
     """
 
-    value_size = 12
+    value_size = 8
 
     def __getitem__(self, key):
         assert len(key) == self.key_size
@@ -300,16 +414,15 @@ cdef class ChunkIndex(IndexBase):
             raise KeyError(key)
         cdef uint32_t refcount = _le32toh(data[0])
         assert refcount <= _MAX_VALUE, "invalid reference count"
-        return ChunkIndexEntry(refcount, _le32toh(data[1]), _le32toh(data[2]))
+        return ChunkIndexEntry(refcount, _le32toh(data[1]))
 
     def __setitem__(self, key, value):
         assert len(key) == self.key_size
-        cdef uint32_t[3] data
+        cdef uint32_t[2] data
         cdef uint32_t refcount = value[0]
         assert refcount <= _MAX_VALUE, "invalid reference count"
         data[0] = _htole32(refcount)
         data[1] = _htole32(value[1])
-        data[2] = _htole32(value[2])
         if not hashindex_set(self.index, <unsigned char *>key, data):
             raise Exception('hashindex_set failed')
 
@@ -321,7 +434,7 @@ cdef class ChunkIndex(IndexBase):
         return data != NULL
 
     def incref(self, key):
-        """Increase refcount for 'key', return (refcount, size, csize)"""
+        """Increase refcount for 'key', return (refcount, size)"""
         assert len(key) == self.key_size
         data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
         if not data:
@@ -331,10 +444,10 @@ cdef class ChunkIndex(IndexBase):
         if refcount != _MAX_VALUE:
             refcount += 1
         data[0] = _htole32(refcount)
-        return refcount, _le32toh(data[1]), _le32toh(data[2])
+        return refcount, _le32toh(data[1])
 
     def decref(self, key):
-        """Decrease refcount for 'key', return (refcount, size, csize)"""
+        """Decrease refcount for 'key', return (refcount, size)"""
         assert len(key) == self.key_size
         data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
         if not data:
@@ -345,7 +458,7 @@ cdef class ChunkIndex(IndexBase):
         if refcount != _MAX_VALUE:
             refcount -= 1
         data[0] = _htole32(refcount)
-        return refcount, _le32toh(data[1]), _le32toh(data[2])
+        return refcount, _le32toh(data[1])
 
     def iteritems(self, marker=None):
         cdef const unsigned char *key
@@ -360,7 +473,7 @@ cdef class ChunkIndex(IndexBase):
         return iter
 
     def summarize(self):
-        cdef uint64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
+        cdef uint64_t size = 0, unique_size = 0, chunks = 0, unique_chunks = 0
         cdef uint32_t *values
         cdef uint32_t refcount
         cdef unsigned char *key = NULL
@@ -375,11 +488,9 @@ cdef class ChunkIndex(IndexBase):
             assert refcount <= _MAX_VALUE, "invalid reference count"
             chunks += refcount
             unique_size += _le32toh(values[1])
-            unique_csize += _le32toh(values[2])
             size += <uint64_t> _le32toh(values[1]) * _le32toh(values[0])
-            csize += <uint64_t> _le32toh(values[2]) * _le32toh(values[0])
 
-        return size, csize, unique_size, unique_csize, unique_chunks, chunks
+        return size, unique_size, unique_chunks, chunks
 
     def stats_against(self, ChunkIndex master_index):
         """
@@ -391,10 +502,10 @@ cdef class ChunkIndex(IndexBase):
         This index must be a subset of *master_index*.
 
         Return the same statistics tuple as summarize:
-        size, csize, unique_size, unique_csize, unique_chunks, chunks.
+        size, unique_size, unique_chunks, chunks.
         """
-        cdef uint64_t size = 0, csize = 0, unique_size = 0, unique_csize = 0, chunks = 0, unique_chunks = 0
-        cdef uint32_t our_refcount, chunk_size, chunk_csize
+        cdef uint64_t size = 0, unique_size = 0, chunks = 0, unique_chunks = 0
+        cdef uint32_t our_refcount, chunk_size
         cdef const uint32_t *our_values
         cdef const uint32_t *master_values
         cdef const unsigned char *key = NULL
@@ -410,25 +521,21 @@ cdef class ChunkIndex(IndexBase):
                 raise ValueError('stats_against: key contained in self but not in master_index.')
             our_refcount = _le32toh(our_values[0])
             chunk_size = _le32toh(master_values[1])
-            chunk_csize = _le32toh(master_values[2])
 
             chunks += our_refcount
             size += <uint64_t> chunk_size * our_refcount
-            csize += <uint64_t> chunk_csize * our_refcount
             if our_values[0] == master_values[0]:
                 # our refcount equals the master's refcount, so this chunk is unique to us
                 unique_chunks += 1
                 unique_size += chunk_size
-                unique_csize += chunk_csize
 
-        return size, csize, unique_size, unique_csize, unique_chunks, chunks
+        return size, unique_size, unique_chunks, chunks
 
-    def add(self, key, refs, size, csize):
+    def add(self, key, refs, size):
         assert len(key) == self.key_size
-        cdef uint32_t[3] data
+        cdef uint32_t[2] data
         data[0] = _htole32(refs)
         data[1] = _htole32(size)
-        data[2] = _htole32(csize)
         self._add(<unsigned char*> key, data)
 
     cdef _add(self, unsigned char *key, uint32_t *data):
@@ -442,7 +549,6 @@ cdef class ChunkIndex(IndexBase):
             result64 = refcount1 + refcount2
             values[0] = _htole32(min(result64, _MAX_VALUE))
             values[1] = data[1]
-            values[2] = data[2]
         else:
             if not hashindex_set(self.index, key, data):
                 raise Exception('hashindex_set failed')
@@ -455,22 +561,6 @@ cdef class ChunkIndex(IndexBase):
             if not key:
                 break
             self._add(key, <uint32_t*> (key + self.key_size))
-
-    def zero_csize_ids(self):
-        cdef unsigned char *key = NULL
-        cdef uint32_t *values
-        entries = []
-        while True:
-            key = hashindex_next_key(self.index, key)
-            if not key:
-                break
-            values = <uint32_t*> (key + self.key_size)
-            refcount = _le32toh(values[0])
-            assert refcount <= _MAX_VALUE, "invalid reference count"
-            if _le32toh(values[2]) == 0:
-                # csize == 0
-                entries.append(PyBytes_FromStringAndSize(<char*> key, self.key_size))
-        return entries
 
 
 cdef class ChunkKeyIterator:
@@ -498,7 +588,7 @@ cdef class ChunkKeyIterator:
         cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
         cdef uint32_t refcount = _le32toh(value[0])
         assert refcount <= _MAX_VALUE, "invalid reference count"
-        return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]), _le32toh(value[2]))
+        return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]))
 
 
 cdef Py_buffer ro_buffer(object data) except *:
@@ -546,11 +636,3 @@ cdef class CacheSynchronizer:
     @property
     def size_parts(self):
         return cache_sync_size_parts(self.sync)
-
-    @property
-    def csize_totals(self):
-        return cache_sync_csize_totals(self.sync)
-
-    @property
-    def csize_parts(self):
-        return cache_sync_csize_parts(self.sync)

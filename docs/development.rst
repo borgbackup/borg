@@ -119,14 +119,29 @@ Code is stored on GitHub, in the `Borgbackup organization
 <https://github.com/borgbackup/borg/pulls>`_ should be sent there as
 well. See also the :ref:`support` section for more details.
 
-Style guide
------------
+Style guide / Automated Code Formatting
+---------------------------------------
 
-We generally follow `pep8
-<https://www.python.org/dev/peps/pep-0008/>`_, with 120 columns
-instead of 79. We do *not* use form-feed (``^L``) characters to
-separate sections either. Compliance is tested automatically when
-you run the tests.
+We use `black`_ for automatically formatting the code.
+
+If you work on the code, it is recommended that you run black **before each commit**
+(so that new code is always using the desired formatting and no additional commits
+are required to fix the formatting).
+
+::
+
+    pip install -r requirements.d/codestyle.txt     # everybody use same black version
+    black --check .                                 # only check, don't change
+    black .                                         # reformat the code
+
+
+The CI workflows will check the code formatting and will fail if it is not formatted correctly.
+
+When (mass-)reformatting existing code, we need to avoid ruining `git blame`, so please
+follow their `guide about avoiding ruining git blame`_:
+
+.. _black: https://black.readthedocs.io/
+.. _guide about avoiding ruining git blame: https://black.readthedocs.io/en/stable/guides/introducing_black_to_your_project.html#avoiding-ruining-git-blame
 
 Continuous Integration
 ----------------------
@@ -349,11 +364,13 @@ Checklist:
     scripts/sdist-sign X.Y.Z
     scripts/upload-pypi X.Y.Z test
     scripts/upload-pypi X.Y.Z
+
 - Put binaries into dist/borg-OSNAME and sign them:
 
   ::
 
     scripts/sign-binaries 201912312359
+
 - Close the release milestone on GitHub.
 - `Update borgbackup.org
   <https://github.com/borgbackup/borgbackup.github.io/pull/53/files>`_ with the

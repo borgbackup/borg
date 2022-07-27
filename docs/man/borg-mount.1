@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-MOUNT 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .
 .nr rst2man-indent-level 0
 .
@@ -30,15 +27,21 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-MOUNT" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
 .sp
-borg [common options] mount [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT [PATH...]
+borg [common options] mount [options] MOUNTPOINT [PATH...]
 .SH DESCRIPTION
 .sp
-This command mounts an archive as a FUSE filesystem. This can be useful for
-browsing an archive or restoring individual files. Unless the \fB\-\-foreground\fP
-option is given the command will run in the background until the filesystem
-is \fBumounted\fP\&.
+This command mounts an archive as a FUSE filesystem. This can be useful
+for browsing an archive or restoring individual files. When restoring,
+take into account that the current FUSE implementation does not support
+special fs flags and ACLs.
+.sp
+Unless the \fB\-\-foreground\fP option is given the command will run in the
+background until the filesystem is \fBumounted\fP\&.
 .sp
 The command \fBborgfs\fP provides a wrapper for \fBborg mount\fP\&. This can also be
 used in fstab entries:
@@ -98,9 +101,6 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B REPOSITORY_OR_ARCHIVE
-repository or archive to mount
-.TP
 .B MOUNTPOINT
 where to mount filesystem
 .TP
@@ -110,29 +110,23 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-consider\-checkpoints
+.B  \-\-consider\-checkpoints
 Show checkpoint archives in the repository contents list (default: hidden).
 .TP
-.B \-f\fP,\fB  \-\-foreground
+.B  \-f\fP,\fB  \-\-foreground
 stay in foreground, do not daemonize
 .TP
-.B \-o
+.B  \-o
 Extra mount options
 .TP
-.B \-\-numeric\-owner
-deprecated, use \fB\-\-numeric\-ids\fP instead
-.TP
-.B \-\-numeric\-ids
+.B  \-\-numeric\-ids
 use numeric user and group identifiers from archive(s)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
-only consider archive names starting with this prefix.
-.TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

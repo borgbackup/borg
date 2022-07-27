@@ -3,6 +3,7 @@ from .errors import Error
 
 class StableDict(dict):
     """A dict subclass with stable items() ordering"""
+
     def items(self):
         return sorted(super().items())
 
@@ -20,8 +21,8 @@ class Buffer:
         Initialize the buffer: use allocator(size) call to allocate a buffer.
         Optionally, set the upper <limit> for the buffer size.
         """
-        assert callable(allocator), 'must give alloc(size) function as first param'
-        assert limit is None or size <= limit, 'initial size must be <= limit'
+        assert callable(allocator), "must give alloc(size) function as first param"
+        assert limit is None or size <= limit, "initial size must be <= limit"
         self.allocator = allocator
         self.limit = limit
         self.resize(size, init=True)

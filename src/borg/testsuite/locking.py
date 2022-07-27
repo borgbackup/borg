@@ -5,10 +5,20 @@ from traceback import format_exc
 
 import pytest
 
-from ..helpers import daemonize
 from ..platform import get_process_id, process_alive
-from ..locking import TimeoutTimer, ExclusiveLock, Lock, LockRoster, \
-                      ADD, REMOVE, SHARED, EXCLUSIVE, LockTimeout, NotLocked, NotMyLock
+from ..locking import (
+    TimeoutTimer,
+    ExclusiveLock,
+    Lock,
+    LockRoster,
+    ADD,
+    REMOVE,
+    SHARED,
+    EXCLUSIVE,
+    LockTimeout,
+    NotLocked,
+    NotMyLock,
+)
 
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2
@@ -46,7 +56,7 @@ class TestTimeoutTimer:
 
 @pytest.fixture()
 def lockpath(tmpdir):
-    return str(tmpdir.join('lock'))
+    return str(tmpdir.join("lock"))
 
 
 class TestExclusiveLock:
@@ -68,7 +78,7 @@ class TestExclusiveLock:
     def test_kill_stale(self, lockpath, free_pid):
         host, pid, tid = our_id = get_process_id()
         dead_id = host, free_pid, tid
-        cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
+        cant_know_if_dead_id = "foo.bar.example.net", 1, 2
 
         dead_lock = ExclusiveLock(lockpath, id=dead_id).acquire()
         with ExclusiveLock(lockpath, id=our_id):
@@ -95,9 +105,7 @@ class TestExclusiveLock:
         assert old_unique_name != new_unique_name  # locking filename is different now
 
     def test_race_condition(self, lockpath):
-
         class SynchronizedCounter:
-
             def __init__(self, count=0):
                 self.lock = ThreadingLock()
                 self.count = count
@@ -127,44 +135,77 @@ class TestExclusiveLock:
             with print_lock:
                 print(msg)
 
-        def acquire_release_loop(id, timeout, thread_id, lock_owner_counter, exception_counter, print_lock, last_thread=None):
-            print_locked("Thread %2d: Starting acquire_release_loop(id=%s, timeout=%d); lockpath=%s" % (thread_id, id, timeout, lockpath))
+        def acquire_release_loop(
+            id, timeout, thread_id, lock_owner_counter, exception_counter, print_lock, last_thread=None
+        ):
+            print_locked(
+                "Thread %2d: Starting acquire_release_loop(id=%s, timeout=%d); lockpath=%s"
+                % (thread_id, id, timeout, lockpath)
+            )
             timer = TimeoutTimer(timeout, -1).start()
             cycle = 0
 
             while not timer.timed_out():
                 cycle += 1
                 try:
-                    with ExclusiveLock(lockpath, id=id, timeout=timeout/20, sleep=-1):  # This timeout is only for not exceeding the given timeout by more than 5%. With sleep<0 it's constantly polling anyway.
+                    with ExclusiveLock(
+                        lockpath, id=id, timeout=timeout / 20, sleep=-1
+                    ):  # This timeout is only for not exceeding the given timeout by more than 5%. With sleep<0 it's constantly polling anyway.
                         lock_owner_count = lock_owner_counter.incr()
-                        print_locked("Thread %2d: Acquired the lock. It's my %d. loop cycle. I am the %d. who has the lock concurrently." % (thread_id, cycle, lock_owner_count))
+                        print_locked(
+                            "Thread %2d: Acquired the lock. It's my %d. loop cycle. I am the %d. who has the lock concurrently."
+                            % (thread_id, cycle, lock_owner_count)
+                        )
                         time.sleep(0.005)
                         lock_owner_count = lock_owner_counter.decr()
-                        print_locked("Thread %2d: Releasing the lock, finishing my %d. loop cycle. Currently, %d colleagues still have the lock." % (thread_id, cycle, lock_owner_count))
+                        print_locked(
+                            "Thread %2d: Releasing the lock, finishing my %d. loop cycle. Currently, %d colleagues still have the lock."
+                            % (thread_id, cycle, lock_owner_count)
+                        )
                 except LockTimeout:
                     print_locked("Thread %2d: Got LockTimeout, finishing my %d. loop cycle." % (thread_id, cycle))
                 except:
                     exception_count = exception_counter.incr()
                     e = format_exc()
-                    print_locked("Thread %2d: Exception thrown, finishing my %d. loop cycle. It's the %d. exception seen until now: %s" % (thread_id, cycle, exception_count, e))
+                    print_locked(
+                        "Thread %2d: Exception thrown, finishing my %d. loop cycle. It's the %d. exception seen until now: %s"
+                        % (thread_id, cycle, exception_count, e)
+                    )
 
             print_locked("Thread %2d: Loop timed out--terminating after %d loop cycles." % (thread_id, cycle))
             if last_thread is not None:  # joining its predecessor, if any
                 last_thread.join()
 
-        print('')
+        print("")
         lock_owner_counter = SynchronizedCounter()
         exception_counter = SynchronizedCounter()
         print_lock = ThreadingLock()
         thread = None
         for thread_id in range(RACE_TEST_NUM_THREADS):
-            thread = Thread(target=acquire_release_loop, args=(('foo', thread_id, 0), RACE_TEST_DURATION, thread_id, lock_owner_counter, exception_counter, print_lock, thread))
+            thread = Thread(
+                target=acquire_release_loop,
+                args=(
+                    ("foo", thread_id, 0),
+                    RACE_TEST_DURATION,
+                    thread_id,
+                    lock_owner_counter,
+                    exception_counter,
+                    print_lock,
+                    thread,
+                ),
+            )
             thread.start()
         thread.join()  # joining the last thread
 
-        assert lock_owner_counter.maxvalue() > 0, 'Never gained the lock? Something went wrong here...'
-        assert lock_owner_counter.maxvalue() <= 1, "Maximal number of concurrent lock holders was %d. So exclusivity is broken." % (lock_owner_counter.maxvalue())
-        assert exception_counter.value() == 0, "ExclusiveLock threw %d exceptions due to unclean concurrency handling." % (exception_counter.value())
+        assert lock_owner_counter.maxvalue() > 0, "Never gained the lock? Something went wrong here..."
+        assert (
+            lock_owner_counter.maxvalue() <= 1
+        ), "Maximal number of concurrent lock holders was %d. So exclusivity is broken." % (
+            lock_owner_counter.maxvalue()
+        )
+        assert (
+            exception_counter.value() == 0
+        ), "ExclusiveLock threw %d exceptions due to unclean concurrency handling." % (exception_counter.value())
 
 
 class TestLock:
@@ -229,7 +270,7 @@ class TestLock:
     def test_kill_stale(self, lockpath, free_pid):
         host, pid, tid = our_id = get_process_id()
         dead_id = host, free_pid, tid
-        cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
+        cant_know_if_dead_id = "foo.bar.example.net", 1, 2
 
         dead_lock = Lock(lockpath, id=dead_id, exclusive=True).acquire()
         roster = dead_lock._roster
@@ -264,7 +305,7 @@ class TestLock:
 
 @pytest.fixture()
 def rosterpath(tmpdir):
-    return str(tmpdir.join('roster'))
+    return str(tmpdir.join("roster"))
 
 
 class TestLockRoster:
@@ -278,13 +319,13 @@ class TestLockRoster:
         roster1 = LockRoster(rosterpath, id=ID1)
         assert roster1.get(SHARED) == set()
         roster1.modify(SHARED, ADD)
-        assert roster1.get(SHARED) == {ID1, }
+        assert roster1.get(SHARED) == {ID1}
         roster2 = LockRoster(rosterpath, id=ID2)
         roster2.modify(SHARED, ADD)
-        assert roster2.get(SHARED) == {ID1, ID2, }
+        assert roster2.get(SHARED) == {ID1, ID2}
         roster1 = LockRoster(rosterpath, id=ID1)
         roster1.modify(SHARED, REMOVE)
-        assert roster1.get(SHARED) == {ID2, }
+        assert roster1.get(SHARED) == {ID2}
         roster2 = LockRoster(rosterpath, id=ID2)
         roster2.modify(SHARED, REMOVE)
         assert roster2.get(SHARED) == set()
@@ -301,7 +342,7 @@ class TestLockRoster:
         assert roster1.get(SHARED) == {dead_id}
 
         # put a unknown-state remote process lock into roster
-        cant_know_if_dead_id = 'foo.bar.example.net', 1, 2
+        cant_know_if_dead_id = "foo.bar.example.net", 1, 2
         roster1 = LockRoster(rosterpath, id=cant_know_if_dead_id)
         roster1.kill_stale_locks = False
         assert roster1.get(SHARED) == {dead_id}

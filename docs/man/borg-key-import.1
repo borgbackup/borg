@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-KEY-IMPORT 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-key-import \- Import the repository key from backup
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-KEY-IMPORT" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-key-import \- Import the repository key from backup
 .SH SYNOPSIS
 .sp
-borg [common options] key import [options] [REPOSITORY] [PATH]
+borg [common options] key import [options] [PATH]
 .SH DESCRIPTION
 .sp
 This command restores a key previously backed up with the export command.
@@ -53,8 +53,6 @@ key import\fP creates a new key file in \fB$BORG_KEYS_DIR\fP\&.
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
-.sp
-REPOSITORY
 .INDENT 0.0
 .TP
 .B PATH
@@ -63,7 +61,7 @@ path to the backup (\(aq\-\(aq to read from stdin)
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-paper
+.B  \-\-paper
 interactively import from a backup done with \fB\-\-paper\fP
 .UNINDENT
 .SH SEE ALSO

@@ -40,7 +40,6 @@ from math import ceil
 
 from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
-from cpython.bytes cimport PyBytes_FromStringAndSize
 
 API_VERSION = '1.3_01'
 
@@ -613,7 +612,7 @@ cdef class CHACHA20_POLY1305(_AEAD_BASE):
         super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
 
 
-cdef class AES:
+cdef class AES:  # legacy
     """A thin wrapper around the OpenSSL EVP cipher API - for legacy code, like key file encryption"""
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx

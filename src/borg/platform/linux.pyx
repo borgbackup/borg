@@ -1,7 +1,6 @@
 import os
 import re
 import stat
-import subprocess
 
 from .posix import posix_acl_use_stored_uid_gid
 from .posix import user2uid, group2gid
@@ -17,7 +16,6 @@ except ImportError:
     SYNC_FILE_RANGE_LOADED = False
 
 from libc cimport errno
-from libc.stdint cimport int64_t
 
 API_VERSION = '1.2_05'
 

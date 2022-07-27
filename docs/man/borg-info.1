@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-INFO 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-info \- Show archive details such as disk space used
 .
 .nr rst2man-indent-level 0
 .
@@ -30,12 +27,15 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-INFO" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-info \- Show archive details such as disk space used
 .SH SYNOPSIS
 .sp
-borg [common options] info [options] [REPOSITORY_OR_ARCHIVE]
+borg [common options] info [options]
 .SH DESCRIPTION
 .sp
-This command displays detailed information about the specified archive or repository.
+This command displays detailed information about the specified archive.
 .sp
 Please note that the deduplicated sizes of the individual archives do not add
 up to the deduplicated size of the repository ("all archives"), because the two
@@ -53,26 +53,17 @@ This is shown as \fIutilization of maximum supported archive size\fP\&.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS arguments
-.INDENT 0.0
-.TP
-.B REPOSITORY_OR_ARCHIVE
-repository or archive to display information about
-.UNINDENT
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-json
+.B  \-\-json
 format output as JSON
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
-only consider archive names starting with this prefix.
-.TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -89,58 +80,20 @@ consider last N archives after other filters were applied
 .sp
 .nf
 .ft C
-$ borg info /path/to/repo::2017\-06\-29T11:00\-srv
-Archive name: 2017\-06\-29T11:00\-srv
-Archive fingerprint: b2f1beac2bd553b34e06358afa45a3c1689320d39163890c5bbbd49125f00fe5
+$ borg info Tuesday2022\-06\-25T20:51:39
+Archive name: Tuesday2022\-06\-25T20:51:39
+Archive fingerprint: f7dea0788dfc026cc2be1c0f5b94beb4e4084eb3402fc40c38d8719b1bf2d943
 Comment:
-Hostname: myhostname
-Username: root
-Time (start): Thu, 2017\-06\-29 11:03:07
-Time (end): Thu, 2017\-06\-29 11:03:13
-Duration: 5.66 seconds
-Number of files: 17037
-Command line: /usr/sbin/borg create /path/to/repo::2017\-06\-29T11:00\-srv /srv
-Utilization of max. archive size: 0%
-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
-                       Original size      Compressed size    Deduplicated size
-This archive:               12.53 GB             12.49 GB              1.62 kB
-All archives:              121.82 TB            112.41 TB            215.42 GB
-
-                       Unique chunks         Total chunks
-Chunk index:                 1015213            626934122
-
-$ borg info /path/to/repo \-\-last 1
-Archive name: 2017\-06\-29T11:00\-srv
-Archive fingerprint: b2f1beac2bd553b34e06358afa45a3c1689320d39163890c5bbbd49125f00fe5
-Comment:
-Hostname: myhostname
-Username: root
-Time (start): Thu, 2017\-06\-29 11:03:07
-Time (end): Thu, 2017\-06\-29 11:03:13
-Duration: 5.66 seconds
-Number of files: 17037
-Command line: /usr/sbin/borg create /path/to/repo::2017\-06\-29T11:00\-srv /srv
-Utilization of max. archive size: 0%
-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
-                       Original size      Compressed size    Deduplicated size
-This archive:               12.53 GB             12.49 GB              1.62 kB
-All archives:              121.82 TB            112.41 TB            215.42 GB
-
-                       Unique chunks         Total chunks
-Chunk index:                 1015213            626934122
-
-$ borg info /path/to/repo
-Repository ID: d857ce5788c51272c61535062e89eac4e8ef5a884ffbe976e0af9d8765dedfa5
-Location: /path/to/repo
-Encrypted: Yes (repokey)
-Cache: /root/.cache/borg/d857ce5788c51272c61535062e89eac4e8ef5a884ffbe976e0af9d8765dedfa5
-Security dir: /root/.config/borg/security/d857ce5788c51272c61535062e89eac4e8ef5a884ffbe976e0af9d8765dedfa5
-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
-                       Original size      Compressed size    Deduplicated size
-All archives:              121.82 TB            112.41 TB            215.42 GB
-
-                       Unique chunks         Total chunks
-Chunk index:                 1015213            626934122
+Hostname: mba2020
+Username: tw
+Time (start): Sat, 2022\-06\-25 20:51:40
+Time (end): Sat, 2022\-06\-25 20:51:40
+Duration: 0.03 seconds
+Command line: /Users/tw/w/borg\-env/bin/borg \-r path/to/repo create \-\-stats \(aqTuesday{now}\(aq src \-\-progress
+Utilization of maximum supported archive size: 0%
+Number of files: 244
+Original size: 13.80 MB
+Deduplicated size: 531 B
 .ft P
 .fi
 .UNINDENT

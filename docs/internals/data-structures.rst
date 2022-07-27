@@ -79,7 +79,7 @@ Normally the keys are computed like this::
 
   key = id = id_hash(unencrypted_data)
 
-The id_hash function depends on the :ref:`encryption mode <borg_init>`.
+The id_hash function depends on the :ref:`encryption mode <borg_rcreate>`.
 
 As the id / key is used for deduplication, id_hash must be a cryptographically
 strong hash or MAC.
@@ -329,17 +329,17 @@ or modified. It looks like this:
 .. code-block:: python
 
     {
-        b'version': 1,
-        b'timestamp': b'2017-05-05T12:42:23.042864',
-        b'item_keys': [b'acl_access', b'acl_default', ...],
-        b'config': {},
-        b'archives': {
-            b'2017-05-05-system-backup': {
-                b'id': b'<32 byte binary object ID>',
-                b'time': b'2017-05-05T12:42:22.942864',
+        'version': 1,
+        'timestamp': '2017-05-05T12:42:23.042864',
+        'item_keys': ['acl_access', 'acl_default', ...],
+        'config': {},
+        'archives': {
+            '2017-05-05-system-backup': {
+                'id': b'<32 byte binary object ID>',
+                'time': '2017-05-05T12:42:22.942864',
             },
         },
-        b'tam': ...,
+        'tam': ...,
     }
 
 The *version* field can be either 1 or 2. The versions differ in the
@@ -393,15 +393,15 @@ The *config* key stores the feature flags enabled on a repository:
 .. code-block:: python
 
     config = {
-        b'feature_flags': {
-            b'read': {
-                b'mandatory': [b'some_feature'],
+        'feature_flags': {
+            'read': {
+                'mandatory': ['some_feature'],
             },
-            b'check': {
-                b'mandatory': [b'other_feature'],
+            'check': {
+                'mandatory': ['other_feature'],
             }
-            b'write': ...,
-            b'delete': ...
+            'write': ...,
+            'delete': ...
         },
     }
 
@@ -567,7 +567,8 @@ dictionary created by the ``Item`` class that contains:
 * uid
 * gid
 * mode (item type + permissions)
-* source (for symlinks, and for hardlinks within one archive)
+* source (for symlinks)
+* hlid (for hardlinks)
 * rdev (for device files)
 * mtime, atime, ctime in nanoseconds
 * xattrs
@@ -736,7 +737,6 @@ The chunks cache is a key -> value mapping and contains:
 
   - reference count
   - size
-  - encrypted/compressed size
 
 The chunks cache is a HashIndex_. Due to some restrictions of HashIndex,
 the reference count of each given chunk is limited to a constant, MAX_VALUE
@@ -754,9 +754,9 @@ Here is the estimated memory usage of Borg - it's complicated::
   chunk_size ~= 2 ^ HASH_MASK_BITS  (for buzhash chunker, BLOCK_SIZE for fixed chunker)
   chunk_count ~= total_file_size / chunk_size
 
-  repo_index_usage = chunk_count * 40
+  repo_index_usage = chunk_count * 48
 
-  chunks_cache_usage = chunk_count * 44
+  chunks_cache_usage = chunk_count * 40
 
   files_cache_usage = total_file_count * 240 + chunk_count * 80
 
@@ -1220,9 +1220,9 @@ transaction ID in the file names. Integrity data is stored in a third file
 .. code-block:: python
 
     {
-        b'version': 2,
-        b'hints': b'{"algorithm": "XXH64", "digests": {"final": "411208db2aa13f1a"}}',
-        b'index': b'{"algorithm": "XXH64", "digests": {"HashHeader": "846b7315f91b8e48", "final": "cb3e26cadc173e40"}}'
+        'version': 2,
+        'hints': '{"algorithm": "XXH64", "digests": {"final": "411208db2aa13f1a"}}',
+        'index': '{"algorithm": "XXH64", "digests": {"HashHeader": "846b7315f91b8e48", "final": "cb3e26cadc173e40"}}'
     }
 
 The *version* key started at 2, the same version used for the hints. Since Borg has
@@ -1247,3 +1247,28 @@ For example, using 1.1 on a repository, noticing corruption or similar issues an
 ``borg-1.0 check --repair``, which rewrites the index and hints, results in this situation.
 Borg 1.1 would erroneously report checksum errors in the hints and/or index files and trigger
 an automatic rebuild of these files.
+
+HardLinkManager and the hlid concept
+------------------------------------
+
+Dealing with hard links needs some extra care, implemented in borg within the HardLinkManager
+class:
+
+- At archive creation time, fs items with st_nlink > 1 indicate that they are a member of
+  a group of hardlinks all pointing to the same inode. For such fs items, the archived item
+  includes a hlid attribute (hardlink id), which is computed like H(st_dev, st_ino). Thus,
+  if archived items have the same hlid value, they pointed to the same inode and form a
+  group of hardlinks. Besides that, nothing special is done for any member of the group
+  of hardlinks, meaning that e.g. for regular files, each archived item will have a
+  chunks list.
+- At extraction time, the presence of a hlid attribute indicates that there might be more
+  hardlinks coming, pointing to the same content (inode), thus borg will remember the "hlid
+  to extracted path" mapping, so it will know the correct path for extracting (hardlinking)
+  the next hardlink of that group / with the same hlid.
+- This symmetric approach (each item has all the information, e.g. the chunks list)
+  simplifies dealing with such items a lot, especially for partial extraction, for the
+  FUSE filesystem, etc.
+- This is different from the asymmetric approach of old borg versions (< 2.0) and also from
+  tar which have the concept of a main item (first hardlink, has the content) and content-less
+  secondary items with by-name back references for each subsequent hardlink, causing lots
+  of complications when dealing with them.

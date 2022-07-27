@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-IMPORT-TAR 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-import-tar \- Create a backup archive from a tarball
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-IMPORT-TAR" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
 .sp
-borg [common options] import\-tar [options] ARCHIVE TARFILE
+borg [common options] import\-tar [options] NAME TARFILE
 .SH DESCRIPTION
 .sp
 This command creates a backup archive from a tarball.
@@ -86,8 +86,8 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B ARCHIVE
-name of archive to create (must be also a valid directory name)
+.B NAME
+specify the archive name
 .TP
 .B TARFILE
 input tar file. "\-" to read from stdin instead.
@@ -95,19 +95,19 @@ input tar file. "\-" to read from stdin instead.
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-tar\-filter
+.B  \-\-tar\-filter
 filter program to pipe data through
 .TP
-.B \-s\fP,\fB  \-\-stats
+.B  \-s\fP,\fB  \-\-stats
 print statistics for the created archive
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters
 .TP
-.B \-\-json
+.B  \-\-json
 output stats as JSON (implies \-\-stats)
 .UNINDENT
 .SS Archive options
@@ -135,25 +135,25 @@ select compression algorithm, see the output of the "borg help compression" comm
 .nf
 .ft C
 # export as uncompressed tar
-$ borg export\-tar /path/to/repo::Monday Monday.tar
+$ borg export\-tar Monday Monday.tar
 
 # import an uncompressed tar
-$ borg import\-tar /path/to/repo::Monday Monday.tar
+$ borg import\-tar Monday Monday.tar
 
 # exclude some file types, compress using gzip
-$ borg export\-tar /path/to/repo::Monday Monday.tar.gz \-\-exclude \(aq*.so\(aq
+$ borg export\-tar Monday Monday.tar.gz \-\-exclude \(aq*.so\(aq
 
 # use higher compression level with gzip
-$ borg export\-tar \-\-tar\-filter="gzip \-9" repo::Monday Monday.tar.gz
+$ borg export\-tar \-\-tar\-filter="gzip \-9" Monday Monday.tar.gz
 
 # copy an archive from repoA to repoB
-$ borg export\-tar \-\-tar\-format=BORG repoA::archive \- | borg import\-tar repoB::archive \-
+$ borg \-r repoA export\-tar \-\-tar\-format=BORG archive \- | borg \-r repoB import\-tar archive \-
 
 # export a tar, but instead of storing it on disk, upload it to remote site using curl
-$ borg export\-tar /path/to/repo::Monday \- | curl \-\-data\-binary @\- https://somewhere/to/POST
+$ borg export\-tar Monday \- | curl \-\-data\-binary @\- https://somewhere/to/POST
 
 # remote extraction via "tarpipe"
-$ borg export\-tar /path/to/repo::Monday \- | ssh somewhere "cd extracted; tar x"
+$ borg export\-tar Monday \- | ssh somewhere "cd extracted; tar x"
 .ft P
 .fi
 .UNINDENT
@@ -166,9 +166,9 @@ Outputs a script that copies all archives from repo1 to repo2:
 .sp
 .nf
 .ft C
-for A T in \(gaborg list \-\-format=\(aq{archive} {time:%Y\-%m\-%dT%H:%M:%S}{LF}\(aq repo1\(ga
+for A T in \(gaborg list \-\-format=\(aq{archive} {time:%Y\-%m\-%dT%H:%M:%S}{LF}\(aq\(ga
 do
-  echo "borg export\-tar \-\-tar\-format=BORG repo1::$A \- | borg import\-tar \-\-timestamp=$T repo2::$A \-"
+  echo "borg \-r repo1 export\-tar \-\-tar\-format=BORG $A \- | borg \-r repo2 import\-tar \-\-timestamp=$T $A \-"
 done
 .ft P
 .fi

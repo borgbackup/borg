@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-EXTRACT 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-extract \- Extract archive contents
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-EXTRACT" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-extract \- Extract archive contents
 .SH SYNOPSIS
 .sp
-borg [common options] extract [options] ARCHIVE [PATH...]
+borg [common options] extract [options] NAME [PATH...]
 .SH DESCRIPTION
 .sp
 This command extracts the contents of an archive. By default the entire
@@ -66,8 +66,8 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B ARCHIVE
-archive to extract
+.B NAME
+specify the archive name
 .TP
 .B PATH
 paths to extract; patterns are supported
@@ -75,34 +75,28 @@ paths to extract; patterns are supported
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
-.B \-n\fP,\fB  \-\-dry\-run
+.B  \-n\fP,\fB  \-\-dry\-run
 do not actually change any files
 .TP
-.B \-\-numeric\-owner
-deprecated, use \fB\-\-numeric\-ids\fP instead
-.TP
-.B \-\-numeric\-ids
+.B  \-\-numeric\-ids
 only obey numeric user and group identifiers
 .TP
-.B \-\-nobsdflags
-deprecated, use \fB\-\-noflags\fP instead
-.TP
-.B \-\-noflags
+.B  \-\-noflags
 do not extract/set flags (e.g. NODUMP, IMMUTABLE)
 .TP
-.B \-\-noacls
+.B  \-\-noacls
 do not extract/set ACLs
 .TP
-.B \-\-noxattrs
+.B  \-\-noxattrs
 do not extract/set xattrs
 .TP
-.B \-\-stdout
+.B  \-\-stdout
 write all extracted data to stdout
 .TP
-.B \-\-sparse
+.B  \-\-sparse
 create holes in output sparse file from all\-zero chunks
 .UNINDENT
 .SS Exclusion options
@@ -130,22 +124,22 @@ Remove the specified number of leading path elements. Paths with fewer elements 
 .nf
 .ft C
 # Extract entire archive
-$ borg extract /path/to/repo::my\-files
+$ borg extract my\-files
 
 # Extract entire archive and list files while processing
-$ borg extract \-\-list /path/to/repo::my\-files
+$ borg extract \-\-list my\-files
 
 # Verify whether an archive could be successfully extracted, but do not write files to disk
-$ borg extract \-\-dry\-run /path/to/repo::my\-files
+$ borg extract \-\-dry\-run my\-files
 
 # Extract the "src" directory
-$ borg extract /path/to/repo::my\-files home/USERNAME/src
+$ borg extract my\-files home/USERNAME/src
 
 # Extract the "src" directory but exclude object files
-$ borg extract /path/to/repo::my\-files home/USERNAME/src \-\-exclude \(aq*.o\(aq
+$ borg extract my\-files home/USERNAME/src \-\-exclude \(aq*.o\(aq
 
 # Restore a raw device (must not be active/in use/mounted at that time)
-$ borg extract \-\-stdout /path/to/repo::my\-sdx | dd of=/dev/sdx bs=10M
+$ borg extract \-\-stdout my\-sdx | dd of=/dev/sdx bs=10M
 .ft P
 .fi
 .UNINDENT

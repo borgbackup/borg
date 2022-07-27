@@ -23,11 +23,11 @@ policies = [
     # which growth factor to use when growing a hashtable of size < upto
     # grow fast (*2.0) at the start so we do not have to resize too often (expensive).
     # grow slow (*1.1) for huge hash tables (do not jump too much in memory usage)
-    Policy(256*K, 2.0),
-    Policy(2*M, 1.7),
-    Policy(16*M, 1.4),
-    Policy(128*M, 1.2),
-    Policy(2*G-1, 1.1),
+    Policy(256 * K, 2.0),
+    Policy(2 * M, 1.7),
+    Policy(16 * M, 1.4),
+    Policy(128 * M, 1.2),
+    Policy(2 * G - 1, 1.1),
 ]
 
 
@@ -92,12 +92,15 @@ def main():
         sizes.append(p)
         i = int(i * grow_factor)
 
-    print("""\
+    print(
+        """\
 static int hash_sizes[] = {
     %s
 };
-""" % ', '.join(str(size) for size in sizes))
+"""
+        % ", ".join(str(size) for size in sizes)
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

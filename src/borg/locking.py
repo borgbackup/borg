@@ -8,8 +8,8 @@ from . import platform
 from .helpers import Error, ErrorWithTraceback
 from .logger import create_logger
 
-ADD, REMOVE = 'add', 'remove'
-SHARED, EXCLUSIVE = 'shared', 'exclusive'
+ADD, REMOVE = "add", "remove"
+SHARED, EXCLUSIVE = "shared", "exclusive"
 
 logger = create_logger(__name__)
 
@@ -20,6 +20,7 @@ class TimeoutTimer:
     It can also compute and optionally execute a reasonable sleep time (e.g. to avoid
     polling too often or to support thread/process rescheduling).
     """
+
     def __init__(self, timeout=None, sleep=None):
         """
         Initialize a timer.
@@ -43,8 +44,8 @@ class TimeoutTimer:
 
     def __repr__(self):
         return "<{}: start={!r} end={!r} timeout={!r} sleep={!r}>".format(
-            self.__class__.__name__, self.start_time, self.end_time,
-            self.timeout_interval, self.sleep_interval)
+            self.__class__.__name__, self.start_time, self.end_time, self.timeout_interval, self.sleep_interval
+        )
 
     def start(self):
         self.start_time = time.time()
@@ -102,6 +103,7 @@ class ExclusiveLock:
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
+
     def __init__(self, path, timeout=None, sleep=None, id=None):
         self.timeout = timeout
         self.sleep = sleep
@@ -129,7 +131,7 @@ class ExclusiveLock:
         unique_base_name = os.path.basename(self.unique_name)
         temp_path = None
         try:
-            temp_path = tempfile.mkdtemp(".tmp", base_name + '.', parent_path)
+            temp_path = tempfile.mkdtemp(".tmp", base_name + ".", parent_path)
             temp_unique_name = os.path.join(temp_path, unique_base_name)
             with open(temp_unique_name, "wb"):
                 pass
@@ -192,8 +194,8 @@ class ExclusiveLock:
         else:
             for name in names:
                 try:
-                    host_pid, thread_str = name.rsplit('-', 1)
-                    host, pid_str = host_pid.rsplit('.', 1)
+                    host_pid, thread_str = name.rsplit("-", 1)
+                    host, pid_str = host_pid.rsplit(".", 1)
                     pid = int(pid_str)
                     thread = int(thread_str)
                 except ValueError:
@@ -207,17 +209,19 @@ class ExclusiveLock:
                 if not self.kill_stale_locks:
                     if not self.stale_warning_printed:
                         # Log this at warning level to hint the user at the ability
-                        logger.warning("Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name)
+                        logger.warning(
+                            "Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name
+                        )
                         self.stale_warning_printed = True
                     return False
 
                 try:
                     os.unlink(os.path.join(self.path, name))
-                    logger.warning('Killed stale lock %s.', name)
+                    logger.warning("Killed stale lock %s.", name)
                 except OSError as err:
                     if not self.stale_warning_printed:
                         # This error will bubble up and likely result in locking failure
-                        logger.error('Found stale lock %s, but cannot delete due to %s', name, str(err))
+                        logger.error("Found stale lock %s, but cannot delete due to %s", name, str(err))
                         self.stale_warning_printed = True
                     return False
 
@@ -228,7 +232,7 @@ class ExclusiveLock:
                 # Directory is not empty or doesn't exist any more = we lost the race to somebody else--which is ok.
                 return False
             # EACCES or EIO or ... = we cannot operate anyway
-            logger.error('Failed to remove lock dir: %s', str(err))
+            logger.error("Failed to remove lock dir: %s", str(err))
             return False
 
         return True
@@ -257,6 +261,7 @@ class LockRoster:
     Note: you usually should call the methods with an exclusive lock held,
     to avoid conflicting access by multiple threads/processes/machines.
     """
+
     def __init__(self, path, id=None):
         self.path = path
         self.id = id or platform.get_process_id()
@@ -279,8 +284,9 @@ class LockRoster:
                         if platform.process_alive(host, pid, thread):
                             elements.add((host, pid, thread))
                         else:
-                            logger.warning('Removed stale %s roster lock for host %s pid %d thread %d.',
-                                           key, host, pid, thread)
+                            logger.warning(
+                                "Removed stale %s roster lock for host %s pid %d thread %d.", key, host, pid, thread
+                            )
                     data[key] = list(elements)
         except (FileNotFoundError, ValueError):
             # no or corrupt/empty roster file?
@@ -315,7 +321,7 @@ class LockRoster:
         elif op == REMOVE:
             elements.remove(self.id)
         else:
-            raise ValueError('Unknown LockRoster op %r' % op)
+            raise ValueError("Unknown LockRoster op %r" % op)
         roster[key] = list(list(e) for e in elements)
         self.save(roster)
 
@@ -354,6 +360,7 @@ class Lock:
     This makes sure the lock is released again if the block is left, no
     matter how (e.g. if an exception occurred).
     """
+
     def __init__(self, path, exclusive=False, sleep=None, timeout=None, id=None):
         self.path = path
         self.is_exclusive = exclusive
@@ -361,11 +368,11 @@ class Lock:
         self.timeout = timeout
         self.id = id or platform.get_process_id()
         # globally keeping track of shared and exclusive lockers:
-        self._roster = LockRoster(path + '.roster', id=id)
+        self._roster = LockRoster(path + ".roster", id=id)
         # an exclusive lock, used for:
         # - holding while doing roster queries / updates
         # - holding while the Lock itself is exclusive
-        self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
+        self._lock = ExclusiveLock(path + ".exclusive", id=id, timeout=timeout)
 
     def __enter__(self):
         return self.acquire()

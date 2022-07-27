@@ -53,7 +53,7 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
     logger.warning(msg)
 
 
-def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', level='info', is_serve=False, json=False):
+def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, json=False):
     """setup logging module according to the arguments provided
 
     if conf_fname is given (or the config file name can be determined via
@@ -80,7 +80,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
-            borg_logger = logging.getLogger('borg')
+            borg_logger = logging.getLogger("borg")
             borg_logger.json = json
             logger.debug(f'using logging configuration read from "{conf_fname}"')
             warnings.showwarning = _log_warning
@@ -88,15 +88,15 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
         except Exception as err:  # XXX be more precise
             err_msg = str(err)
     # if we did not / not successfully load a logging configuration, fallback to this:
-    logger = logging.getLogger('')
+    logger = logging.getLogger("")
     handler = logging.StreamHandler(stream)
     if is_serve and not json:
-        fmt = '$LOG %(levelname)s %(name)s Remote: %(message)s'
+        fmt = "$LOG %(levelname)s %(name)s Remote: %(message)s"
     else:
-        fmt = '%(message)s'
+        fmt = "%(message)s"
     formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
     handler.setFormatter(formatter)
-    borg_logger = logging.getLogger('borg')
+    borg_logger = logging.getLogger("borg")
     borg_logger.formatter = formatter
     borg_logger.json = json
     if configured and logger.handlers:
@@ -111,7 +111,7 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
     logger = logging.getLogger(__name__)
     if err_msg:
         logger.warning(f'setup_logging for "{conf_fname}" failed with "{err_msg}".')
-    logger.debug('using builtin fallback logging configuration')
+    logger.debug("using builtin fallback logging configuration")
     warnings.showwarning = _log_warning
     return handler
 
@@ -135,7 +135,64 @@ def find_parent_module():
         return __name__
 
 
-def create_logger(name=None):
+class LazyLogger:
+    def __init__(self, name=None):
+        self.__name = name or find_parent_module()
+        self.__real_logger = None
+
+    @property
+    def __logger(self):
+        if self.__real_logger is None:
+            if not configured:
+                raise Exception("tried to call a logger before setup_logging() was called")
+            self.__real_logger = logging.getLogger(self.__name)
+            if self.__name.startswith("borg.debug.") and self.__real_logger.level == logging.NOTSET:
+                self.__real_logger.setLevel("WARNING")
+        return self.__real_logger
+
+    def getChild(self, suffix):
+        return LazyLogger(self.__name + "." + suffix)
+
+    def setLevel(self, *args, **kw):
+        return self.__logger.setLevel(*args, **kw)
+
+    def log(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.log(*args, **kw)
+
+    def exception(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.exception(*args, **kw)
+
+    def debug(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.debug(*args, **kw)
+
+    def info(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.info(*args, **kw)
+
+    def warning(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.warning(*args, **kw)
+
+    def error(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.error(*args, **kw)
+
+    def critical(self, *args, **kw):
+        if "msgid" in kw:
+            kw.setdefault("extra", {})["msgid"] = kw.pop("msgid")
+        return self.__logger.critical(*args, **kw)
+
+
+def create_logger(name: str = None) -> LazyLogger:
     """lazily create a Logger object with the proper path, which is returned by
     find_parent_module() by default, or is provided via the commandline
 
@@ -151,72 +208,17 @@ def create_logger(name=None):
     be careful not to call any logger methods before the setup_logging() call.
     If you try, you'll get an exception.
     """
-    class LazyLogger:
-        def __init__(self, name=None):
-            self.__name = name or find_parent_module()
-            self.__real_logger = None
-
-        @property
-        def __logger(self):
-            if self.__real_logger is None:
-                if not configured:
-                    raise Exception("tried to call a logger before setup_logging() was called")
-                self.__real_logger = logging.getLogger(self.__name)
-                if self.__name.startswith('borg.debug.') and self.__real_logger.level == logging.NOTSET:
-                    self.__real_logger.setLevel('WARNING')
-            return self.__real_logger
-
-        def getChild(self, suffix):
-            return LazyLogger(self.__name + '.' + suffix)
-
-        def setLevel(self, *args, **kw):
-            return self.__logger.setLevel(*args, **kw)
-
-        def log(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.log(*args, **kw)
-
-        def exception(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.exception(*args, **kw)
-
-        def debug(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.debug(*args, **kw)
-
-        def info(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.info(*args, **kw)
-
-        def warning(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.warning(*args, **kw)
-
-        def error(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.error(*args, **kw)
-
-        def critical(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.critical(*args, **kw)
 
     return LazyLogger(name)
 
 
 class JsonFormatter(logging.Formatter):
     RECORD_ATTRIBUTES = (
-        'levelname',
-        'name',
-        'message',
+        "levelname",
+        "name",
+        "message",
         # msgid is an attribute we made up in Borg to expose a non-changing handle for log messages
-        'msgid',
+        "msgid",
     )
 
     # Other attributes that are not very useful but do exist:
@@ -229,12 +231,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record):
         super().format(record)
-        data = {
-            'type': 'log_message',
-            'time': record.created,
-            'message': '',
-            'levelname': 'CRITICAL',
-        }
+        data = {"type": "log_message", "time": record.created, "message": "", "levelname": "CRITICAL"}
         for attr in self.RECORD_ATTRIBUTES:
             value = getattr(record, attr, None)
             if value:

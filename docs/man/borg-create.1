@@ -1,8 +1,5 @@
 .\" Man page generated from reStructuredText.
 .
-.TH BORG-CREATE 1 "2022-04-14" "" "borg backup tool"
-.SH NAME
-borg-create \- Create new archive
 .
 .nr rst2man-indent-level 0
 .
@@ -30,9 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.TH "BORG-CREATE" 1 "2022-07-17" "" "borg backup tool"
+.SH NAME
+borg-create \- Create new archive
 .SH SYNOPSIS
 .sp
-borg [common options] create [options] ARCHIVE [PATH...]
+borg [common options] create [options] NAME [PATH...]
 .SH DESCRIPTION
 .sp
 This command creates a backup archive containing all files found while recursively
@@ -126,8 +126,8 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
 .TP
-.B ARCHIVE
-name of archive to create (must be also a valid directory name)
+.B NAME
+specify the archive name
 .TP
 .B PATH
 paths to archive
@@ -135,22 +135,22 @@ paths to archive
 .SS optional arguments
 .INDENT 0.0
 .TP
-.B \-n\fP,\fB  \-\-dry\-run
+.B  \-n\fP,\fB  \-\-dry\-run
 do not create a backup archive
 .TP
-.B \-s\fP,\fB  \-\-stats
+.B  \-s\fP,\fB  \-\-stats
 print statistics for the created archive
 .TP
-.B \-\-list
+.B  \-\-list
 output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters (see description)
 .TP
-.B \-\-json
+.B  \-\-json
 output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
-.B \-\-no\-cache\-sync
+.B  \-\-no\-cache\-sync
 experimental: do not synchronize the cache. Implies not using the files cache.
 .TP
 .BI \-\-stdin\-name \ NAME
@@ -160,18 +160,18 @@ use NAME in archive for stdin data (default: \(aqstdin\(aq)
 set user USER in archive for stdin data (default: \(aqroot\(aq)
 .TP
 .BI \-\-stdin\-group \ GROUP
-set group GROUP in archive for stdin data (default: \(aqroot\(aq)
+set group GROUP in archive for stdin data (default: \(aqwheel\(aq)
 .TP
 .BI \-\-stdin\-mode \ M
 set mode to M in archive for stdin data (default: 0660)
 .TP
-.B \-\-content\-from\-command
+.B  \-\-content\-from\-command
 interpret PATH as command and store its stdout. See also section Reading from stdin below.
 .TP
-.B \-\-paths\-from\-stdin
+.B  \-\-paths\-from\-stdin
 read DELIM\-separated list of paths to backup from stdin. Will not recurse into directories.
 .TP
-.B \-\-paths\-from\-command
+.B  \-\-paths\-from\-command
 interpret PATH as command and treat its output as \fB\-\-paths\-from\-stdin\fP
 .TP
 .BI \-\-paths\-delimiter \ DELIM
@@ -192,61 +192,52 @@ include/exclude paths matching PATTERN
 .BI \-\-patterns\-from \ PATTERNFILE
 read include/exclude patterns from PATTERNFILE, one per line
 .TP
-.B \-\-exclude\-caches
+.B  \-\-exclude\-caches
 exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.bford.info/cachedir/spec.html\fP)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
-.B \-\-keep\-exclude\-tags
+.B  \-\-keep\-exclude\-tags
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
 .TP
-.B \-\-exclude\-nodump
+.B  \-\-exclude\-nodump
 exclude files flagged NODUMP
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
 .TP
-.B \-x\fP,\fB  \-\-one\-file\-system
+.B  \-x\fP,\fB  \-\-one\-file\-system
 stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
 .TP
-.B \-\-numeric\-owner
-deprecated, use \fB\-\-numeric\-ids\fP instead
-.TP
-.B \-\-numeric\-ids
+.B  \-\-numeric\-ids
 only store numeric user and group identifiers
 .TP
-.B \-\-noatime
-do not store atime into archive
-.TP
-.B \-\-atime
+.B  \-\-atime
 do store atime into archive
 .TP
-.B \-\-noctime
+.B  \-\-noctime
 do not store ctime into archive
 .TP
-.B \-\-nobirthtime
+.B  \-\-nobirthtime
 do not store birthtime (creation date) into archive
 .TP
-.B \-\-nobsdflags
-deprecated, use \fB\-\-noflags\fP instead
-.TP
-.B \-\-noflags
+.B  \-\-noflags
 do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive
 .TP
-.B \-\-noacls
+.B  \-\-noacls
 do not read and store ACLs into archive
 .TP
-.B \-\-noxattrs
+.B  \-\-noxattrs
 do not read and store xattrs into archive
 .TP
-.B \-\-sparse
+.B  \-\-sparse
 detect sparse holes in input (supported only by fixed chunker)
 .TP
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode
 .TP
-.B \-\-read\-special
+.B  \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 .UNINDENT
 .SS Archive options
@@ -274,86 +265,84 @@ select compression algorithm, see the output of the "borg help compression" comm
 .nf
 .ft C
 # Backup ~/Documents into an archive named "my\-documents"
-$ borg create /path/to/repo::my\-documents ~/Documents
+$ borg create my\-documents ~/Documents
 
 # same, but list all files as we process them
-$ borg create \-\-list /path/to/repo::my\-documents ~/Documents
+$ borg create \-\-list my\-documents ~/Documents
 
 # Backup ~/Documents and ~/src but exclude pyc files
-$ borg create /path/to/repo::my\-files \e
+$ borg create my\-files                \e
     ~/Documents                       \e
     ~/src                             \e
     \-\-exclude \(aq*.pyc\(aq
 
 # Backup home directories excluding image thumbnails (i.e. only
 # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
-$ borg create /path/to/repo::my\-files /home \e
-    \-\-exclude \(aqsh:/home/*/.thumbnails\(aq
+$ borg create my\-files /home \-\-exclude \(aqsh:home/*/.thumbnails\(aq
 
 # Backup the root filesystem into an archive named "root\-YYYY\-MM\-DD"
 # use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
-$ borg create \-C zlib,6 \-\-one\-file\-system /path/to/repo::root\-{now:%Y\-%m\-%d} /
+$ borg create \-C zlib,6 \-\-one\-file\-system root\-{now:%Y\-%m\-%d} /
 
-# Backup onto a remote host ("push" style) via ssh to port 2222,
-# logging in as user "borg" and storing into /path/to/repo
-$ borg create ssh://borg@backup.example.org:2222/path/to/repo::{fqdn}\-root\-{now} /
+# Backup into an archive name like FQDN\-root\-TIMESTAMP
+$ borg create \(aq{fqdn}\-root\-{now}\(aq /
 
 # Backup a remote host locally ("pull" style) using sshfs
 $ mkdir sshfs\-mount
 $ sshfs root@example.com:/ sshfs\-mount
 $ cd sshfs\-mount
-$ borg create /path/to/repo::example.com\-root\-{now:%Y\-%m\-%d} .
+$ borg create example.com\-root\-{now:%Y\-%m\-%d} .
 $ cd ..
 $ fusermount \-u sshfs\-mount
 
 # Make a big effort in fine granular deduplication (big chunk management
 # overhead, needs a lot of RAM and disk space, see formula in internals
 # docs \- same parameters as borg < 1.0 or attic):
-$ borg create \-\-chunker\-params buzhash,10,23,16,4095 /path/to/repo::small /smallstuff
+$ borg create \-\-chunker\-params buzhash,10,23,16,4095 small /smallstuff
 
 # Backup a raw device (must not be active/in use/mounted at that time)
-$ borg create \-\-read\-special \-\-chunker\-params fixed,4194304 /path/to/repo::my\-sdx /dev/sdX
+$ borg create \-\-read\-special \-\-chunker\-params fixed,4194304 my\-sdx /dev/sdX
 
 # Backup a sparse disk image (must not be active/in use/mounted at that time)
-$ borg create \-\-sparse \-\-chunker\-params fixed,4194304 /path/to/repo::my\-disk my\-disk.raw
+$ borg create \-\-sparse \-\-chunker\-params fixed,4194304 my\-disk my\-disk.raw
 
 # No compression (none)
-$ borg create \-\-compression none /path/to/repo::arch ~
+$ borg create \-\-compression none arch ~
 
 # Super fast, low compression (lz4, default)
-$ borg create /path/to/repo::arch ~
+$ borg create arch ~
 
 # Less fast, higher compression (zlib, N = 0..9)
-$ borg create \-\-compression zlib,N /path/to/repo::arch ~
+$ borg create \-\-compression zlib,N arch ~
 
 # Even slower, even higher compression (lzma, N = 0..9)
-$ borg create \-\-compression lzma,N /path/to/repo::arch ~
+$ borg create \-\-compression lzma,N arch ~
 
 # Only compress compressible data with lzma,N (N = 0..9)
-$ borg create \-\-compression auto,lzma,N /path/to/repo::arch ~
+$ borg create \-\-compression auto,lzma,N arch ~
 
 # Use short hostname, user name and current time in archive name
-$ borg create /path/to/repo::{hostname}\-{user}\-{now} ~
+$ borg create \(aq{hostname}\-{user}\-{now}\(aq ~
 # Similar, use the same datetime format that is default as of borg 1.1
-$ borg create /path/to/repo::{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S} ~
+$ borg create \(aq{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S}\(aq ~
 # As above, but add nanoseconds
-$ borg create /path/to/repo::{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f} ~
+$ borg create \(aq{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f}\(aq ~
 
 # Backing up relative paths by moving into the correct directory first
 $ cd /home/user/Documents
 # The root directory of the archive will be "projectA"
-$ borg create /path/to/repo::daily\-projectA\-{now:%Y\-%m\-%d} projectA
+$ borg create \(aqdaily\-projectA\-{now:%Y\-%m\-%d}\(aq projectA
 
 # Use external command to determine files to archive
 # Use \-\-paths\-from\-stdin with find to only backup files less than 1MB in size
-$ find ~ \-size \-1000k | borg create \-\-paths\-from\-stdin /path/to/repo::small\-files\-only
+$ find ~ \-size \-1000k | borg create \-\-paths\-from\-stdin small\-files\-only
 # Use \-\-paths\-from\-command with find to only backup files from a given user
-$ borg create \-\-paths\-from\-command /path/to/repo::joes\-files \-\- find /srv/samba/shared \-user joe
+$ borg create \-\-paths\-from\-command joes\-files \-\- find /srv/samba/shared \-user joe
 # Use \-\-paths\-from\-stdin with \-\-paths\-delimiter (for example, for filenames with newlines in them)
 $ find ~ \-size \-1000k \-print0 | borg create \e
     \-\-paths\-from\-stdin \e
     \-\-paths\-delimiter "\e0" \e
-    /path/to/repo::smallfiles\-handle\-newline
+    smallfiles\-handle\-newline
 .ft P
 .fi
 .UNINDENT

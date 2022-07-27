@@ -7,25 +7,25 @@ Examples
 ::
 
     # export as uncompressed tar
-    $ borg export-tar /path/to/repo::Monday Monday.tar
+    $ borg export-tar Monday Monday.tar
 
     # import an uncompressed tar
-    $ borg import-tar /path/to/repo::Monday Monday.tar
+    $ borg import-tar Monday Monday.tar
 
     # exclude some file types, compress using gzip
-    $ borg export-tar /path/to/repo::Monday Monday.tar.gz --exclude '*.so'
+    $ borg export-tar Monday Monday.tar.gz --exclude '*.so'
 
     # use higher compression level with gzip
-    $ borg export-tar --tar-filter="gzip -9" repo::Monday Monday.tar.gz
+    $ borg export-tar --tar-filter="gzip -9" Monday Monday.tar.gz
 
     # copy an archive from repoA to repoB
-    $ borg export-tar --tar-format=BORG repoA::archive - | borg import-tar repoB::archive -
+    $ borg -r repoA export-tar --tar-format=BORG archive - | borg -r repoB import-tar archive -
 
     # export a tar, but instead of storing it on disk, upload it to remote site using curl
-    $ borg export-tar /path/to/repo::Monday - | curl --data-binary @- https://somewhere/to/POST
+    $ borg export-tar Monday - | curl --data-binary @- https://somewhere/to/POST
 
     # remote extraction via "tarpipe"
-    $ borg export-tar /path/to/repo::Monday - | ssh somewhere "cd extracted; tar x"
+    $ borg export-tar Monday - | ssh somewhere "cd extracted; tar x"
 
 Archives transfer script
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -34,9 +34,9 @@ Outputs a script that copies all archives from repo1 to repo2:
 
 ::
 
-    for A T in `borg list --format='{archive} {time:%Y-%m-%dT%H:%M:%S}{LF}' repo1`
+    for A T in `borg list --format='{archive} {time:%Y-%m-%dT%H:%M:%S}{LF}'`
     do
-      echo "borg export-tar --tar-format=BORG repo1::$A - | borg import-tar --timestamp=$T repo2::$A -"
+      echo "borg -r repo1 export-tar --tar-format=BORG $A - | borg -r repo2 import-tar --timestamp=$T $A -"
     done
 
 Kept:

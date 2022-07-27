@@ -41,7 +41,7 @@ on file systems which do not support this mechanism (e.g. XFS) we recommend to r
 some space in Borg itself just to be safe by adjusting the ``additional_free_space``
 setting (a good starting point is ``2G``)::
 
-    borg config /path/to/repo additional_free_space 2G
+    borg config additional_free_space 2G
 
 If Borg runs out of disk space, it tries to free as much space as it
 can while aborting the current operation safely, which allows the user to free more space
@@ -49,8 +49,7 @@ by deleting/pruning archives. This mechanism is not bullet-proof in some
 circumstances [1]_.
 
 If you *really* run out of disk space, it can be hard or impossible to free space,
-because Borg needs free space to operate - even to delete backup
-archives.
+because Borg needs free space to operate - even to delete backup archives.
 
 You can use some monitoring process or just include the free space information
 in your backup log files (you check them regularly anyway, right?).
@@ -187,7 +186,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
         --exclude 'home/*/.cache/*'     \
         --exclude 'var/tmp/*'           \
                                         \
-        ::'{hostname}-{now}'            \
+        '{hostname}-{now}'              \
         /etc                            \
         /home                           \
         /root                           \
@@ -198,13 +197,13 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     info "Pruning repository"
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. The '{hostname}-' prefix is very important to
+    # archives of THIS machine. The '{hostname}-*' globbing is very important to
     # limit prune's operation to this machine's archives and not apply to
     # other machines' archives also:
 
     borg prune                          \
         --list                          \
-        --prefix '{hostname}-'          \
+        --glob-archives '{hostname}-*'  \
         --show-rc                       \
         --keep-daily    7               \
         --keep-weekly   4               \
@@ -317,30 +316,29 @@ You can use zstd for a wide range from high speed (and relatively low
 compression) using N=1 to high compression (and lower speed) using N=22.
 
 zstd is a modern compression algorithm and might be preferable over zlib and
-lzma, except if you need compatibility to older borg versions (< 1.1.4) that
-did not yet offer zstd.::
+lzma.::
 
-    $ borg create --compression zstd,N /path/to/repo::arch ~
+    $ borg create --compression zstd,N arch ~
 
 Other options are:
 
 If you have a fast repo storage and you want minimum CPU usage, no compression::
 
-    $ borg create --compression none /path/to/repo::arch ~
+    $ borg create --compression none arch ~
 
 If you have a less fast repo storage and you want a bit more compression (N=0..9,
 0 means no compression, 9 means high compression):
 
 ::
 
-    $ borg create --compression zlib,N /path/to/repo::arch ~
+    $ borg create --compression zlib,N arch ~
 
 If you have a very slow repo storage and you want high compression (N=0..9, 0 means
 low compression, 9 means high compression):
 
 ::
 
-    $ borg create --compression lzma,N /path/to/repo::arch ~
+    $ borg create --compression lzma,N arch ~
 
 You'll need to experiment a bit to find the best compression for your use case.
 Keep an eye on CPU load and throughput.
@@ -352,10 +350,10 @@ Repository encryption
 
 You can choose the repository encryption mode at repository creation time::
 
-    $ borg init --encryption=MODE PATH
+    $ borg rcreate --encryption=MODE
 
 For a list of available encryption MODEs and their descriptions, please refer
-to :ref:`borg_init`.
+to :ref:`borg_rcreate`.
 
 If you use encryption, all data is encrypted on the client before being written
 to the repository.
@@ -389,13 +387,6 @@ For automated backups the passphrase can be specified using the
     A backup inside of the backup that is encrypted with that key/passphrase
     won't help you with that, of course.
 
-    Only applies to repos using legacy encryption modes:
-    In case you lose your repository and the security information, but have an
-    older copy of it to restore from, don't use that later for creating new
-    backups – you would run into security issues (reuse of nonce counter
-    values). It is better to initialize a new Borg repository. See also:
-    :ref:`faq_corrupt_repo`
-
 .. _template: paperkey.html
 
 .. _remote_repos:
@@ -407,7 +398,7 @@ Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg init user@hostname:/path/to/repo
+  $ borg -r ssh://user@hostname:port/path/to/repo rcreate ...
 
 Note: please see the usage chapter for a full documentation of repo URLs.
 
@@ -423,7 +414,7 @@ it is still possible to use the remote host to store a repository by
 mounting the remote filesystem, for example, using sshfs::
 
   $ sshfs user@hostname:/path/to /path/to
-  $ borg init /path/to/repo
+  $ borg -r /path/to/repo rcreate ...
   $ fusermount -u /path/to
 
 You can also use other remote filesystems in a similar way. Just be careful,
@@ -519,13 +510,13 @@ Example with **borg mount**:
     # open a new, separate terminal (this terminal will be blocked until umount)
 
     # now we find out the archive names we have in the repo:
-    borg list /mnt/backup/borg_repo
+    borg rlist
 
     # mount one archive from a borg repo:
-    borg mount /mnt/backup/borg_repo::myserver-system-2019-08-11 /mnt/borg
+    borg mount -a myserver-system-2019-08-11 /mnt/borg
 
     # alternatively, mount all archives from a borg repo (slower):
-    borg mount /mnt/backup/borg_repo /mnt/borg
+    borg mount /mnt/borg
 
     # it may take a while until you will see stuff in /mnt/borg.
 
@@ -545,16 +536,16 @@ Example with **borg extract**:
     cd borg_restore
 
     # now we find out the archive names we have in the repo:
-    borg list /mnt/backup/borg_repo
+    borg rlist
 
     # we could find out the archive contents, esp. the path layout:
-    borg list /mnt/backup/borg_repo::myserver-system-2019-08-11
+    borg list myserver-system-2019-08-11
 
     # we extract only some specific path (note: no leading / !):
-    borg extract /mnt/backup/borg_repo::myserver-system-2019-08-11 path/to/extract
+    borg extract myserver-system-2019-08-11 path/to/extract
 
     # alternatively, we could fully extract the archive:
-    borg extract /mnt/backup/borg_repo::myserver-system-2019-08-11
+    borg extract myserver-system-2019-08-11
 
     # now move the files to the correct place...
 
@@ -576,6 +567,6 @@ case if unattended, automated backups were done).
 
 ::
 
-    borg mount ssh://borg@backup.example.org:2222/path/to/repo /mnt/borg
+    borg -r ssh://borg@backup.example.org:2222/path/to/repo mount /mnt/borg
     # or
-    borg extract ssh://borg@backup.example.org:2222/path/to/repo
+    borg -r ssh://borg@backup.example.org:2222/path/to/repo extract archive

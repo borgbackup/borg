@@ -11,12 +11,12 @@ Examples
 ::
 
     # find cache directory
-    $ cd ~/.cache/borg/$(borg config /path/to/repo id)
+    $ cd ~/.cache/borg/$(borg config id)
 
     # reserve some space
-    $ borg config /path/to/repo additional_free_space 2G
+    $ borg config additional_free_space 2G
 
     # make a repo append-only
-    $ borg config /path/to/repo append_only 1
+    $ borg config append_only 1
 
 

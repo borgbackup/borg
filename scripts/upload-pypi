@@ -15,4 +15,4 @@ fi
 
 D=dist/borgbackup-$R.tar.gz
 
-twine upload $D.asc $D
+twine upload "$D.asc" "$D"

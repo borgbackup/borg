@@ -50,17 +50,20 @@ archive_progress
     The following keys exist, each represents the current progress.
 
     original_size
-        Original size of data processed so far (before compression and deduplication)
+        Original size of data processed so far (before compression and deduplication, may be empty/absent)
     compressed_size
-        Compressed size
+        Compressed size (may be empty/absent)
     deduplicated_size
-        Deduplicated size
+        Deduplicated size (may be empty/absent)
     nfiles
-        Number of (regular) files processed so far
+        Number of (regular) files processed so far (may be empty/absent)
     path
-        Current path
+        Current path (may be empty/absent)
     time
         Unix timestamp (float)
+    finished
+        boolean indicating whether the operation has finished, only the last object for an *operation*
+        can have this property set to *true*.
 
 progress_message
     A message-based progress information with no concrete progress information, just a message
@@ -450,7 +453,7 @@ Archive Differencing
 ++++++++++++++++++++
 
 Each archive difference item (file contents, user/group/mode) output by :ref:`borg_diff` is represented by an *ItemDiff* object.
-The propertiese of an *ItemDiff* object are:
+The properties of an *ItemDiff* object are:
 
 path:
     The filename/path of the *Item* (file, directory, symlink).

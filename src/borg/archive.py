@@ -21,7 +21,7 @@ logger = create_logger()
 from . import xattr
 from .chunker import get_chunker, Chunk
 from .cache import ChunkListEntry
-from .crypto.key import key_factory, AEADKeyBase
+from .crypto.key import key_factory, UnsupportedPayloadError, AEADKeyBase
 from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -1630,7 +1630,7 @@ class ArchiveChecker:
         if not self.chunks:
             logger.error("Repository contains no apparent data at all, cannot continue check/repair.")
             return False
-        self.key = self.identify_key(repository)
+        self.key = self.make_key(repository)
         if verify_data:
             self.verify_data()
         if Manifest.MANIFEST_ID not in self.chunks:
@@ -1670,14 +1670,24 @@ class ArchiveChecker:
             for id_ in result:
                 self.chunks[id_] = init_entry
 
-    def identify_key(self, repository):
-        try:
-            some_chunkid, _ = next(self.chunks.iteritems())
-        except StopIteration:
-            # repo is completely empty, no chunks
-            return None
-        cdata = repository.get(some_chunkid)
-        return key_factory(repository, cdata)
+    def make_key(self, repository):
+        attempt = 0
+        for chunkid, _ in self.chunks.iteritems():
+            attempt += 1
+            if attempt > 999:
+                # we did a lot of attempts, but could not create the key via key_factory, give up.
+                break
+            cdata = repository.get(chunkid)
+            try:
+                return key_factory(repository, cdata)
+            except UnsupportedPayloadError:
+                # we get here, if the cdata we got has a corrupted key type byte
+                pass  # ignore it, just try the next chunk
+        if attempt == 0:
+            msg = "make_key: repository has no chunks at all!"
+        else:
+            msg = "make_key: failed to create the key (tried %d chunks)" % attempt
+        raise IntegrityError(msg)
 
     def verify_data(self):
         logger.info("Starting cryptographic data integrity verification...")

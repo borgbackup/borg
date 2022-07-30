@@ -217,8 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-
-Version 1.2.1 (2022-06-06)
+Version 1.2.2 (2022-07-xx)
 --------------------------
 
 Upgrade notes:
@@ -268,6 +267,7 @@ Compatibility notes:
 - mount: the default for --numeric-ids is False now (same as borg extract)
 - borg create --noatime is deprecated. Not storing atime is the default behaviour
   now (use --atime if you want to store the atime).
+- --prefix is deprecated, use -a / --glob-archives, see #6806
 - list: corrected mix-up of "isomtime" and "mtime" formats.
   Previously, "isomtime" was the default but produced a verbose human format,
   while "mtime" produced a ISO-8601-like format.
@@ -296,6 +296,38 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+Fixes:
+
+- SaveFile: avoid chmod OSError: operation not supported - the chmod is optional, #6786
+  (some filesystems like cifs/smbfs do not support chmod, just ignore if it is failing)
+- hashindex_compact: fix eval order (check idx before use), #5899
+- create --paths-from-(stdin|command): normalize paths, #6778
+- secure_erase: avoid collateral damage, #6768
+  (if a hardlink copy of a repo was made and a new repo config shall be saved,
+  do NOT fill in random garbage before deleting the previous repo config,
+  because that would damage the hardlink copy).
+
+Other changes:
+
+- deprecate --prefix, use -a / --glob-archives, see #6806
+- fix pyproject.toml to create a fixed _version.py file, compatible with both
+  old and new setuptools_scm version, #6875
+- automate asciinema screencasts
+- CI: test on macOS 12 without fuse / fuse tests
+  (too troublesome on github CI due to kernel extensions needed by macFUSE)
+- tests: fix test_obfuscate byte accounting
+- docs:
+
+  - add info on man page installation, #6894
+  - update archive_progress json description about "finished", #6570
+  - json progress_percent: some values are optional, #4074
+  - FAQ: full quota / full disk, #5960
+  - correct shell syntax for installation using git
+
+
+Version 1.2.1 (2022-06-06)
+--------------------------
 
 Fixes:
 

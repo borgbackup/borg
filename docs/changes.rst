@@ -297,6 +297,10 @@ Compatibility notes:
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
 
+New features:
+
+- prune/delete --checkpoint-interval=1800 and ctrl-c/SIGINT support, #6284
+
 Fixes:
 
 - SaveFile: avoid chmod OSError: operation not supported - the chmod is optional, #6786
@@ -307,6 +311,8 @@ Fixes:
   (if a hardlink copy of a repo was made and a new repo config shall be saved,
   do NOT fill in random garbage before deleting the previous repo config,
   because that would damage the hardlink copy).
+- list: fix {flags:<WIDTH>} formatting, #6081
+- check: try harder to create the key, #5719
 
 Other changes:
 

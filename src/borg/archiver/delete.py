@@ -163,12 +163,6 @@ class DeleteMixIn:
             help="force deletion of corrupted archives, " "use ``--force --force`` in case ``--force`` does not work.",
         )
         subparser.add_argument(
-            "--keep-security-info",
-            dest="keep_security_info",
-            action="store_true",
-            help="keep the local security info when deleting a repository",
-        )
-        subparser.add_argument(
             "--save-space", dest="save_space", action="store_true", help="work slower, but using less space"
         )
         subparser.add_argument(

@@ -121,18 +121,35 @@ def tam_required(repository):
     return os.path.isfile(file)
 
 
+def uses_same_chunker_secret(other_key, key):
+    """is the chunker secret the same?"""
+    # avoid breaking the deduplication by a different chunker secret
+    same_chunker_secret = other_key.chunk_seed == key.chunk_seed
+    return same_chunker_secret
+
+
 def uses_same_id_hash(other_key, key):
     """other_key -> key upgrade: is the id hash the same?"""
     # avoid breaking the deduplication by changing the id hash
-    old_hmac_sha256_ids = (RepoKey, KeyfileKey)
-    new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey)
-    old_blake2_ids = (Blake2RepoKey, Blake2KeyfileKey)
-    new_blake2_ids = (Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey)
+    old_sha256_ids = (PlaintextKey,)
+    new_sha256_ids = (PlaintextKey,)
+    old_hmac_sha256_ids = (RepoKey, KeyfileKey, AuthenticatedKey)
+    new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey, AuthenticatedKey)
+    old_blake2_ids = (Blake2RepoKey, Blake2KeyfileKey, Blake2AuthenticatedKey)
+    new_blake2_ids = (
+        Blake2AESOCBRepoKey,
+        Blake2AESOCBKeyfileKey,
+        Blake2CHPORepoKey,
+        Blake2CHPOKeyfileKey,
+        Blake2AuthenticatedKey,
+    )
     same_ids = (
         isinstance(other_key, old_hmac_sha256_ids + new_hmac_sha256_ids)
         and isinstance(key, new_hmac_sha256_ids)
         or isinstance(other_key, old_blake2_ids + new_blake2_ids)
         and isinstance(key, new_blake2_ids)
+        or isinstance(other_key, old_sha256_ids + new_sha256_ids)
+        and isinstance(key, new_sha256_ids)
     )
     return same_ids
 

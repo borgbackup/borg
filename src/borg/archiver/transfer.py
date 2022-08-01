@@ -3,6 +3,7 @@ import argparse
 from .common import with_repository, with_other_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
+from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import EXIT_SUCCESS, EXIT_ERROR
 from ..helpers import location_validator, Location
 from ..helpers import format_file_size
@@ -20,6 +21,18 @@ class TransferMixIn:
         self, args, *, repository, manifest, key, cache, other_repository=None, other_manifest=None, other_key=None
     ):
         """archives transfer from other repository, optionally upgrade data format"""
+        if not uses_same_id_hash(other_key, key):
+            self.print_error(
+                "You must keep the same ID hash ([HMAC-]SHA256 or BLAKE2b) or deduplication will break. "
+                "Use a related repository!"
+            )
+            return EXIT_ERROR
+        if not uses_same_chunker_secret(other_key, key):
+            self.print_error(
+                "You must use the same chunker secret or deduplication will break. " "Use a related repository!"
+            )
+            return EXIT_ERROR
+
         dry_run = args.dry_run
         args.consider_checkpoints = True
         archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
@@ -106,7 +119,7 @@ class TransferMixIn:
 
             # initialize DST_REPO reusing key material from SRC_REPO, so that
             # chunking and chunk id generation will work in the same way as before.
-            borg --repo=DST_REPO init --other-repo=SRC_REPO --encryption=DST_ENC
+            borg --repo=DST_REPO rcreate --other-repo=SRC_REPO --encryption=DST_ENC
 
             # transfer archives from SRC_REPO to DST_REPO
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check what it would do

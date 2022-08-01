@@ -130,6 +130,14 @@ partial/uncommitted transaction.
 The size of individual segments is limited to 4 GiB, since the offset of entries
 within segments is stored in a 32-bit unsigned integer in the repository index.
 
+Objects
+~~~~~~~
+
+All objects (the manifest, archives, archive item streams chunks and file data
+chunks) are encrypted and/or compressed. See :ref:`data-encryption` for a
+graphic outlining the anatomy of an object in Borg. The `type` for compression
+is explained in :ref:`data-compression`.
+
 Index, hints and integrity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -869,6 +877,8 @@ HashIndex is implemented in C and wrapped with Cython in a class-based interface
 The Cython wrapper checks every passed value against these reserved values and
 raises an AssertionError if they are used.
 
+.. _data-encryption:
+
 Encryption
 ----------
 
@@ -998,18 +1008,25 @@ key file, wrapped using the standard ``textwrap`` module with a header.
 The header is a single line with a MAGIC string, a space and a hexadecimal
 representation of the repository id.
 
+.. _data-compression:
+
 Compression
 -----------
 
-Borg supports the following compression methods:
+Borg supports the following compression methods, each identified by a type
+byte:
 
-- none (no compression, pass through data 1:1)
-- lz4 (low compression, but super fast)
+- none (no compression, pass through data 1:1), identified by 0x00
+- lz4 (low compression, but super fast), identified by 0x01
 - zstd (level 1-22 offering a wide range: level 1 is lower compression and high
-  speed, level 22 is higher compression and lower speed) - since borg 1.1.4
+  speed, level 22 is higher compression and lower speed) - since borg 1.1.4,
+  identified by 0x03
 - zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
-  level 1 is low, level 9 is high compression)
-- lzma (level 0-9, level 0 is low, level 9 is high compression).
+  level 1 is low, level 9 is high compression), identified by 0x05
+- lzma (level 0-9, level 0 is low, level 9 is high compression), identified
+  by 0x02.
+
+The type byte is followed by a byte indicating the compression level.
 
 Speed:  none > lz4 > zlib > lzma, lz4 > zstd
 Compression: lzma > zlib > lz4 > none, zstd > lz4

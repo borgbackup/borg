@@ -66,6 +66,15 @@ typedef unsigned int _msgpack_atomic_counter_t;
 #endif
 
 #if !defined(__LITTLE_ENDIAN__) && !defined(__BIG_ENDIAN__)
+/*
+ * __BYTE_ORDER, __LITTLE_ENDIAN and __BIG_ENDIAN are nonstandard and not
+ * always available. In those cases, fallback to common compiler defines.
+ */
+#if !defined(__BYTE_ORDER)
+#define __BYTE_ORDER __BYTE_ORDER__
+#define __LITTLE_ENDIAN __ORDER_LITTLE_ENDIAN__
+#define __BIG_ENDIAN __ORDER_BIG_ENDIAN__
+#endif
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define __LITTLE_ENDIAN__
 #elif __BYTE_ORDER == __BIG_ENDIAN

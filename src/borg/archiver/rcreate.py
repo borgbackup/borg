@@ -21,6 +21,8 @@ class RCreateMixIn:
         """Create a new, empty repository"""
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
+        if other_key is not None:
+            other_key.copy_ae_key = args.copy_ae_key
         try:
             key = key_creator(repository, args, other_key=other_key)
         except (EOFError, KeyboardInterrupt):
@@ -205,4 +207,10 @@ class RCreateMixIn:
             dest="make_parent_dirs",
             action="store_true",
             help="create the parent directories of the repository directory, if they are missing.",
+        )
+        subparser.add_argument(
+            "--copy-ae-key",
+            dest="copy_ae_key",
+            action="store_true",
+            help="copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).",
         )

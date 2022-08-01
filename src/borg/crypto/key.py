@@ -191,6 +191,7 @@ class KeyBase:
         self.compressor = Compressor("lz4")
         self.decompress = self.compressor.decompress
         self.tam_required = True
+        self.copy_ae_key = False
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key"""
@@ -605,11 +606,17 @@ class FlexiKey:
                 raise Error("Copying key material to an AES-CTR based mode is insecure and unsupported.")
             if not uses_same_id_hash(other_key, key):
                 raise Error("You must keep the same ID hash (HMAC-SHA256 or BLAKE2b) or deduplication will break.")
+            if other_key.copy_ae_key:
+                # give the user the option to use the same authenticated encryption (AE) key
+                enc_key = other_key.enc_key
+                enc_hmac_key = other_key.enc_hmac_key
+            else:
+                # borg transfer re-encrypts all data anyway, thus we can default to a new, random AE key
+                data = os.urandom(64)
+                enc_key = data[0:32]
+                enc_hmac_key = data[32:64]
             key.init_from_given_data(
-                enc_key=other_key.enc_key,
-                enc_hmac_key=other_key.enc_hmac_key,
-                id_key=other_key.id_key,
-                chunk_seed=other_key.chunk_seed,
+                enc_key=enc_key, enc_hmac_key=enc_hmac_key, id_key=other_key.id_key, chunk_seed=other_key.chunk_seed
             )
             passphrase = other_key._passphrase
         else:

@@ -439,14 +439,13 @@ class Key(PropDict):
     If a Key shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'repository_id', 'enc_key', 'enc_hmac_key', 'id_key', 'chunk_seed', 'tam_required'}  # str-typed keys
+    VALID_KEYS = {'version', 'repository_id', 'crypt_key', 'id_key', 'chunk_seed', 'tam_required'}  # str-typed keys
 
     __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
 
     version = PropDict._make_property('version', int)
     repository_id = PropDict._make_property('repository_id', bytes)
-    enc_key = PropDict._make_property('enc_key', bytes)
-    enc_hmac_key = PropDict._make_property('enc_hmac_key', bytes)
+    crypt_key = PropDict._make_property('crypt_key', bytes)
     id_key = PropDict._make_property('id_key', bytes)
     chunk_seed = PropDict._make_property('chunk_seed', int)
     tam_required = PropDict._make_property('tam_required', bool)
@@ -457,10 +456,14 @@ class Key(PropDict):
             k = fix_key(d, k)
             if k == 'version':
                 assert isinstance(v, int)
-            if k in ('repository_id', 'enc_key', 'enc_hmac_key', 'id_key'):
+            if k in ('repository_id', 'crypt_key', 'id_key'):
                 v = fix_bytes_value(d, k)
             self._dict[k] = v
-
+        if 'crypt_key' not in self._dict:  # legacy, we're loading an old key
+            k = fix_bytes_value(d, 'enc_key') + fix_bytes_value(d, 'enc_hmac_key')
+            assert isinstance(k, bytes), "k == %r" % k
+            assert len(k) in (32 + 32, 32 + 128)  # 256+256 or 256+1024 bits
+            self._dict['crypt_key'] = k
 
 class ArchiveItem(PropDict):
     """

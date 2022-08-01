@@ -5,8 +5,7 @@
 Quick Start
 ===========
 
-This chapter will get you started with Borg and covers
-various use cases.
+This chapter will get you started with Borg and covers various use cases.
 
 A step by step example
 ----------------------
@@ -83,7 +82,7 @@ root, just run it as your normal user.
 
 For a local repository just always use the same user to invoke borg.
 
-For a remote repository: always use e.g. borg@remote_host. You can use this
+For a remote repository: always use e.g. ssh://borg@remote_host. You can use this
 from different local users, the remote user running borg and accessing the
 repo will always be `borg`.
 
@@ -113,7 +112,7 @@ common techniques to achieve this.
 
 - Dump databases or stop the database servers.
 
-- Shut down virtual machines before backing up their images.
+- Shut down virtual machines before backing up their disk image files.
 
 - Shut down containers before backing up their storage volumes.
 
@@ -144,7 +143,7 @@ After the backup this script also uses the :ref:`borg_prune` subcommand to keep
 only a certain number of old archives and deletes the others.
 
 Finally, it uses the :ref:`borg_compact` subcommand to remove deleted objects
-from the segment files in the repository to preserve disk space.
+from the segment files in the repository to free disk space.
 
 Before running, make sure that the repository is initialized as documented in
 :ref:`remote_repos` and that the script has the correct permissions to be executable

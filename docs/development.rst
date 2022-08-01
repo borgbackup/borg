@@ -53,7 +53,7 @@ requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup mailing list to the maintainers).
 
 Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
-the maintenance branch of the 1.0.x series is ``1.0-maint``.
+the maintenance branch of the 1.2.x series is ``1.2-maint``.
 
 Most PRs should be filed against the ``master`` branch. Only if an
 issue affects **only** a particular maintenance branch a PR should be

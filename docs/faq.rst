@@ -51,43 +51,26 @@ Can I copy or synchronize my repo to another location?
 If you want to have redundant backup repositories (preferably at separate
 locations), the recommended way to do that is like this:
 
-- ``borg rcreate repo1``
-- ``borg rcreate repo2``
+- ``borg rcreate repo1 --encryption=X``
+- ``borg rcreate repo2 --encryption=X --other-repo=repo1``
+- maybe do a snapshot to have stable and same input data for both borg create.
 - client machine ---borg create---> repo1
 - client machine ---borg create---> repo2
 
-This will create distinct repositories (separate repo ID, separate
-keys) and nothing bad happening in repo1 will influence repo2.
+This will create distinct (different repo ID), but related repositories.
+Related means using the same chunker secret and the same id_key, thus producing
+the same chunks / the same chunk ids if the input data is the same.
 
-Some people decide against above recommendation and create identical
-copies of a repo (using some copy / sync / clone tool).
+The 2 independent borg create invocations mean that there is no error propagation
+from repo1 to repo2 when done like that.
 
-While this might be better than having no redundancy at all, you have
-to be very careful about how you do that and what you may / must not
-do with the result (if you decide against our recommendation).
+An alternative way would be to use ``borg transfer`` to copy backup archives
+from repo1 to repo2. Likely a bit more efficient and the archives would be identical,
+but suffering from potential error propagation.
 
-What you would get with this is:
-
-- client machine ---borg create---> repo
-- repo ---copy/sync---> copy-of-repo
-
-There is no special borg command to do the copying, you could just
-use any reliable tool that creates an identical copy (cp, rsync, rclone
-might be options).
-
-But think about whether that is really what you want. If something goes
-wrong in repo, you will have the same issue in copy-of-repo.
-
-Make sure you do the copy/sync while no backup is running, see
-:ref:`borg_with-lock` about how to do that.
-
-Also, you must not run borg against multiple instances of the same repo
-(like repo and copy-of-repo) as that would create severe issues:
-
-- Data loss: they have the same repository ID, so the borg client will
-  think they are identical and e.g. use the same local cache for them
-  (which is an issue if they happen to be not the same).
-  See :issue:`4272` for an example.
+Warning: using borg with multiple repositories with identical repository ID (like when
+creating 1:1 repository copies) is not supported and can lead to all sorts of issues,
+like e.g. cache coherency issues, malfunction, data corruption.
 
 "this is either an attack or unsafe" warning
 --------------------------------------------
@@ -192,7 +175,13 @@ that option under any normal circumstances.
 How can I backup huge file(s) over a unstable connection?
 ---------------------------------------------------------
 
-This is not a problem anymore.
+Yes. For more details, see :ref:`checkpoints_parts`.
+
+How can I restore huge file(s) over an unstable connection?
+-----------------------------------------------------------
+
+If you cannot manage to extract the whole big file in one go, you can extract
+all the part files and manually concatenate them together.
 
 For more details, see :ref:`checkpoints_parts`.
 
@@ -203,20 +192,11 @@ You could do that (via borg config REPO append_only 0/1), but using different
 ssh keys and different entries in ``authorized_keys`` is much easier and also
 maybe has less potential of things going wrong somehow.
 
-
 My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------
 
-When backing up your data over the network, your machine should not go to sleep.
+While backing up your data over the network, your machine should not go to sleep.
 On macOS you can use `caffeinate` to avoid that.
-
-How can I restore huge file(s) over an unstable connection?
------------------------------------------------------------
-
-If you cannot manage to extract the whole big file in one go, you can extract
-all the part files and manually concatenate them together.
-
-For more details, see :ref:`checkpoints_parts`.
 
 How can I compare contents of an archive to my local filesystem?
 -----------------------------------------------------------------
@@ -385,9 +365,9 @@ Why is the time elapsed in the archive stats different from wall clock time?
 ----------------------------------------------------------------------------
 
 Borg needs to write the time elapsed into the archive metadata before finalizing
-the archive, compacting the segments, and committing the repo & cache. This means
-when Borg is run with e.g. the ``time`` command, the duration shown in the archive
-stats may be shorter than the full time the command runs for.
+the archive and committing the repo & cache.
+This means when Borg is run with e.g. the ``time`` command, the duration shown
+in the archive stats may be shorter than the full time the command runs for.
 
 How do I configure different prune policies for different directories?
 ----------------------------------------------------------------------
@@ -810,13 +790,12 @@ and disk space on subsequent runs. Here what Borg does when you run ``borg creat
   fast). If so, the processing of the chunk is completed here. Otherwise it needs to
   process the chunk:
 - Compresses (the default lz4 is super fast)
-- Encrypts (AES, usually fast if your CPU has AES acceleration as usual
-  since about 10y)
-- Authenticates ("signs") using hmac-sha256 or blake2b (see above),
+- Encrypts and authenticates (AES-OCB, usually fast if your CPU has AES acceleration as usual
+  since about 10y, or chacha20-poly1305, fast pure-software crypto)
 - Transmits to repo. If the repo is remote, this usually involves an SSH connection
   (does its own encryption / authentication).
 - Stores the chunk into a key/value store (the key is the chunk id, the value
-  is the data). While doing that, it computes a CRC32 of the data (repo low-level
+  is the data). While doing that, it computes CRC32 / XXH64 of the data (repo low-level
   checksum, used by borg check --repository) and also updates the repo index
   (another hashtable).
 
@@ -859,13 +838,6 @@ If you feel your Borg backup is too slow somehow, here is what you can do:
 - If you don’t need additional file attributes, you can disable them with ``--noflags``,
   ``--noacls``, ``--noxattrs``. This can lead to noticeable performance improvements
   when your backup consists of many small files.
-
-If you feel that Borg "freezes" on a file, it could be in the middle of processing a
-large file (like ISOs or VM images). Borg < 1.2 announces file names *after* finishing
-with the file. This can lead to displaying the name of a small file, while processing the
-next (larger) file. For very big files this can lead to the progress display show some
-previous short file for a long time while it processes the big one. With Borg 1.2 this
-was changed to announcing the filename before starting to process it.
 
 To see what files have changed and take more time processing, you can also add
 ``--list --filter=AME --stats`` to your ``borg create`` call to produce more log output,

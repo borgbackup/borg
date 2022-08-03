@@ -15,6 +15,7 @@ Examples
     $ borg rcreate --encryption=repokey-blake2-chacha20-poly1305
     # no encryption, not recommended
     $ borg rcreate --encryption=authenticated
+    $ borg rcreate --encryption=authenticated-blake2
     $ borg rcreate --encryption=none
 
     # Remote repository (accesses a remote borg via ssh)

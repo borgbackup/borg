@@ -11,7 +11,7 @@ Examples
 ::
 
     # Create a key file protected repository
-    $ borg rcreate --encryption=keyfile -v
+    $ borg rcreate --encryption=keyfile-aes-ocb -v
     Initializing repository at "/path/to/repo"
     Enter new passphrase:
     Enter same passphrase again:

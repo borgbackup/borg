@@ -117,7 +117,7 @@ class TransferMixIn:
 
         Suggested use for general purpose archive transfer (not repo upgrades)::
 
-            # initialize DST_REPO reusing key material from SRC_REPO, so that
+            # create a related DST_REPO (reusing key material from SRC_REPO), so that
             # chunking and chunk id generation will work in the same way as before.
             borg --repo=DST_REPO rcreate --other-repo=SRC_REPO --encryption=DST_ENC
 

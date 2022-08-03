@@ -315,7 +315,6 @@ class build_man(Command):
         "key_change-location": "key",
         "key_export": "key",
         "key_import": "key",
-        "key_migrate-to-repokey": "key",
         "export-tar": "tar",
         "import-tar": "tar",
         "benchmark_crud": "benchmark",

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2022-07-17" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2022-08-03" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -76,11 +76,11 @@ delete only the local cache for the given repository
 .B  \-\-force
 force deletion of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
 .TP
-.B  \-\-keep\-security\-info
-keep the local security info when deleting a repository
-.TP
 .B  \-\-save\-space
 work slower, but using less space
+.TP
+.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
+write checkpoint every SECONDS seconds (Default: 1800)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

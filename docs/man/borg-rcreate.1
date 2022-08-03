@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RCREATE" 1 "2022-07-17" "" "borg backup tool"
+.TH "BORG-RCREATE" 1 "2022-08-03" "" "borg backup tool"
 .SH NAME
 borg-rcreate \- Create a new, empty repository
 .SH SYNOPSIS
@@ -72,7 +72,7 @@ Encrypt and sign your backups to prevent anyone from reading or forging them unl
 have the key and know the passphrase. Make sure to keep a backup of
 your key \fBoutside\fP the repository \- do not lock yourself out by
 "leaving your keys inside your car" (see \fIborg_key_export\fP).
-For remote backups the encryption is done locally \- the remote machine
+The encryption is done locally \- if you use a remote repository, the remote machine
 never sees your passphrase, your unencrypted key or your unencrypted files.
 Chunking and id generation are also based on your key to improve
 your privacy.
@@ -119,7 +119,7 @@ in the upper part of the table, in the lower part is the old and/or unsafe(r) st
 .
 .TS
 center;
-|l|l|l|l|l|.
+|l|l|l|l|.
 _
 T{
 Mode (K = keyfile or repokey)
@@ -129,8 +129,6 @@ T}	T{
 Encryption
 T}	T{
 Authentication
-T}	T{
-V >=
 T}
 _
 T{
@@ -141,8 +139,6 @@ T}	T{
 CHACHA20
 T}	T{
 POLY1305
-T}	T{
-2.0
 T}
 _
 T{
@@ -153,8 +149,6 @@ T}	T{
 CHACHA20
 T}	T{
 POLY1305
-T}	T{
-2.0
 T}
 _
 T{
@@ -165,8 +159,6 @@ T}	T{
 AES256\-OCB
 T}	T{
 AES256\-OCB
-T}	T{
-2.0
 T}
 _
 T{
@@ -177,32 +169,6 @@ T}	T{
 AES256\-OCB
 T}	T{
 AES256\-OCB
-T}	T{
-2.0
-T}
-_
-T{
-K\-blake2
-T}	T{
-BLAKE2b
-T}	T{
-AES256\-CTR
-T}	T{
-BLAKE2b
-T}	T{
-1.1
-T}
-_
-T{
-K
-T}	T{
-HMAC\-SHA\-256
-T}	T{
-AES256\-CTR
-T}	T{
-HMAC\-SHA256
-T}	T{
-any
 T}
 _
 T{
@@ -213,8 +179,6 @@ T}	T{
 none
 T}	T{
 BLAKE2b
-T}	T{
-1.1
 T}
 _
 T{
@@ -225,8 +189,6 @@ T}	T{
 none
 T}	T{
 HMAC\-SHA256
-T}	T{
-1.1
 T}
 _
 T{
@@ -237,8 +199,6 @@ T}	T{
 none
 T}	T{
 none
-T}	T{
-any
 T}
 _
 .TE
@@ -251,6 +211,18 @@ case of malicious activity in the repository.
 .sp
 If you do \fBnot\fP want to encrypt the contents of your backups, but still want to detect
 malicious tampering use an \fIauthenticated\fP mode. It\(aqs like \fIrepokey\fP minus encryption.
+.SS Creating a related repository
+.sp
+A related repository uses same secret key material as the other/original repository.
+.sp
+By default, only the ID key and chunker secret will be the same (these are important
+for deduplication) and the AE crypto keys will be newly generated random keys.
+.sp
+Optionally, if you use \fB\-\-copy\-ae\-key\fP you can also keep the same AE crypto keys
+(used for authenticated encryption). Might be desired e.g. if you want to have less
+keys to manage.
+.sp
+Creating related repositories is useful e.g. if you want to use \fBborg transfer\fP later.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -271,6 +243,9 @@ Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .TP
 .B  \-\-make\-parent\-dirs
 create the parent directories of the repository directory, if they are missing.
+.TP
+.B  \-\-copy\-ae\-key
+copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -287,6 +262,7 @@ $ borg rcreate \-\-encryption=repokey\-blake2\-aes\-ocb
 $ borg rcreate \-\-encryption=repokey\-blake2\-chacha20\-poly1305
 # no encryption, not recommended
 $ borg rcreate \-\-encryption=authenticated
+$ borg rcreate \-\-encryption=authenticated\-blake2
 $ borg rcreate \-\-encryption=none
 
 # Remote repository (accesses a remote borg via ssh)

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-CHANGE-PASSPHRASE" 1 "2022-07-17" "" "borg backup tool"
+.TH "BORG-KEY-CHANGE-PASSPHRASE" 1 "2022-08-03" "" "borg backup tool"
 .SH NAME
 borg-key-change-passphrase \- Change repository key file passphrase
 .SH SYNOPSIS
@@ -52,7 +52,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .nf
 .ft C
 # Create a key file protected repository
-$ borg rcreate \-\-encryption=keyfile \-v
+$ borg rcreate \-\-encryption=keyfile\-aes\-ocb \-v
 Initializing repository at "/path/to/repo"
 Enter new passphrase:
 Enter same passphrase again:

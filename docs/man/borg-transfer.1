@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TRANSFER" 1 "2022-07-17" "" "borg backup tool"
+.TH "BORG-TRANSFER" 1 "2022-08-03" "" "borg backup tool"
 .SH NAME
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -44,9 +44,9 @@ Suggested use for general purpose archive transfer (not repo upgrades):
 .sp
 .nf
 .ft C
-# initialize DST_REPO reusing key material from SRC_REPO, so that
+# create a related DST_REPO (reusing key material from SRC_REPO), so that
 # chunking and chunk id generation will work in the same way as before.
-borg \-\-repo=DST_REPO init \-\-other\-repo=SRC_REPO \-\-encryption=DST_ENC
+borg \-\-repo=DST_REPO rcreate \-\-other\-repo=SRC_REPO \-\-encryption=DST_ENC
 
 # transfer archives from SRC_REPO to DST_REPO
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-dry\-run  # check what it would do
@@ -126,15 +126,15 @@ $ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 rcreate \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-e repokey\-blake2\-aes\-ocb
 
 # 2. Check what and how much it would transfer:
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \e
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
 
 # 3. Transfer (copy) archives from old repo into new repo (takes time and space!):
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \e
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12
 
 # 4. Check if we have everything (same as 2.):
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \e
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
 .ft P
 .fi

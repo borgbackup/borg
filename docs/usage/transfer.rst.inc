@@ -72,9 +72,9 @@ Optionally, it can also upgrade the transferred data.
 
 Suggested use for general purpose archive transfer (not repo upgrades)::
 
-    # initialize DST_REPO reusing key material from SRC_REPO, so that
+    # create a related DST_REPO (reusing key material from SRC_REPO), so that
     # chunking and chunk id generation will work in the same way as before.
-    borg --repo=DST_REPO init --other-repo=SRC_REPO --encryption=DST_ENC
+    borg --repo=DST_REPO rcreate --other-repo=SRC_REPO --encryption=DST_ENC
 
     # transfer archives from SRC_REPO to DST_REPO
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check what it would do

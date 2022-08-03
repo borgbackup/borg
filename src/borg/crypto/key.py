@@ -461,8 +461,8 @@ class FlexiKey:
         if data:
             data = msgpack.unpackb(data)
             key = Key(internal_dict=data)
-            if key.version != 1:
-                raise IntegrityError("Invalid key file header")
+            if key.version not in (1, 2):  # legacy: item.Key can still process v1 keys
+                raise UnsupportedKeyFormatError()
             self.repository_id = key.repository_id
             self.crypt_key = key.crypt_key
             self.id_key = key.id_key
@@ -575,7 +575,7 @@ class FlexiKey:
 
     def _save(self, passphrase, algorithm):
         key = Key(
-            version=1,
+            version=2,
             repository_id=self.repository_id,
             crypt_key=self.crypt_key,
             id_key=self.id_key,

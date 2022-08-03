@@ -933,7 +933,7 @@ in the configuration file.
 The internal data structure is as follows:
 
 version
-  currently always an integer, 1
+  currently always an integer, 2
 
 repository_id
   the ``id`` field in the ``config`` ``INI`` file of the repository.

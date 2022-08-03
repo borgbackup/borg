@@ -459,7 +459,7 @@ class Key(PropDict):
             if k in ('repository_id', 'crypt_key', 'id_key'):
                 v = fix_bytes_value(d, k)
             self._dict[k] = v
-        if 'crypt_key' not in self._dict:  # legacy, we're loading an old key
+        if 'crypt_key' not in self._dict:  # legacy, we're loading an old v1 key
             k = fix_bytes_value(d, 'enc_key') + fix_bytes_value(d, 'enc_hmac_key')
             assert isinstance(k, bytes), "k == %r" % k
             assert len(k) in (32 + 32, 32 + 128)  # 256+256 or 256+1024 bits

@@ -3347,7 +3347,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         backup_key = AESOCBKeyfileKey(key.TestKey.MockRepository())
         backup_key.load(export_file, Passphrase.env_passphrase())
 
-        assert repo_key.enc_key == backup_key.enc_key
+        assert repo_key.crypt_key == backup_key.crypt_key
 
         with Repository(self.repository_path) as repository:
             repository.save_key(b"")
@@ -3358,7 +3358,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             repo_key2 = AESOCBRepoKey(repository)
             repo_key2.load(None, Passphrase.env_passphrase())
 
-        assert repo_key2.enc_key == repo_key2.enc_key
+        assert repo_key2.crypt_key == repo_key2.crypt_key
 
     def test_key_export_qr(self):
         export_file = self.output_path + "/exported.html"

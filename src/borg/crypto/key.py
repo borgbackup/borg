@@ -216,7 +216,7 @@ class KeyBase:
 
     def _tam_key(self, salt, context):
         return hkdf_hmac_sha512(
-            ikm=self.id_key + self.enc_key + self.enc_hmac_key,
+            ikm=self.id_key + self.crypt_key,
             salt=salt,
             info=b"borg-metadata-authentication-" + context,
             output_length=64,
@@ -345,7 +345,9 @@ class ID_BLAKE2b_256:
 
     def init_from_random_data(self):
         super().init_from_random_data()
-        self.enc_hmac_key = random_blake2b_256_key()
+        enc_key = os.urandom(32)
+        enc_hmac_key = random_blake2b_256_key()
+        self.crypt_key = enc_key + enc_hmac_key
         self.id_key = random_blake2b_256_key()
 
 
@@ -396,13 +398,11 @@ class AESKeyBase(KeyBase):
         self.assert_id(id, data)
         return data
 
-    def init_from_given_data(self, *, enc_key, enc_hmac_key, id_key, chunk_seed):
-        assert len(enc_key) >= 32
-        assert len(enc_hmac_key) >= 32
-        assert len(id_key) >= 32
+    def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
+        assert len(crypt_key) in (32 + 32, 32 + 128)
+        assert len(id_key) in (32, 128)
         assert isinstance(chunk_seed, int)
-        self.enc_key = enc_key
-        self.enc_hmac_key = enc_hmac_key
+        self.crypt_key = crypt_key
         self.id_key = id_key
         self.chunk_seed = chunk_seed
 
@@ -412,12 +412,11 @@ class AESKeyBase(KeyBase):
         # Convert to signed int32
         if chunk_seed & 0x80000000:
             chunk_seed = chunk_seed - 0xFFFFFFFF - 1
-        self.init_from_given_data(
-            enc_key=data[0:32], enc_hmac_key=data[32:64], id_key=data[64:96], chunk_seed=chunk_seed
-        )
+        self.init_from_given_data(crypt_key=data[0:64], id_key=data[64:96], chunk_seed=chunk_seed)
 
     def init_ciphers(self, manifest_data=None):
-        self.cipher = self.CIPHERSUITE(mac_key=self.enc_hmac_key, enc_key=self.enc_key, header_len=1, aad_offset=1)
+        enc_key, enc_hmac_key = self.crypt_key[0:32], self.crypt_key[32:]
+        self.cipher = self.CIPHERSUITE(mac_key=enc_hmac_key, enc_key=enc_key, header_len=1, aad_offset=1)
         if manifest_data is None:
             nonce = 0
         else:
@@ -462,11 +461,10 @@ class FlexiKey:
         if data:
             data = msgpack.unpackb(data)
             key = Key(internal_dict=data)
-            if key.version != 1:
-                raise IntegrityError("Invalid key file header")
+            if key.version not in (1, 2):  # legacy: item.Key can still process v1 keys
+                raise UnsupportedKeyFormatError()
             self.repository_id = key.repository_id
-            self.enc_key = key.enc_key
-            self.enc_hmac_key = key.enc_hmac_key
+            self.crypt_key = key.crypt_key
             self.id_key = key.id_key
             self.chunk_seed = key.chunk_seed
             self.tam_required = key.get("tam_required", tam_required(self.repository))
@@ -577,10 +575,9 @@ class FlexiKey:
 
     def _save(self, passphrase, algorithm):
         key = Key(
-            version=1,
+            version=2,
             repository_id=self.repository_id,
-            enc_key=self.enc_key,
-            enc_hmac_key=self.enc_hmac_key,
+            crypt_key=self.crypt_key,
             id_key=self.id_key,
             chunk_seed=self.chunk_seed,
             tam_required=self.tam_required,
@@ -608,16 +605,11 @@ class FlexiKey:
                 raise Error("You must keep the same ID hash (HMAC-SHA256 or BLAKE2b) or deduplication will break.")
             if other_key.copy_ae_key:
                 # give the user the option to use the same authenticated encryption (AE) key
-                enc_key = other_key.enc_key
-                enc_hmac_key = other_key.enc_hmac_key
+                crypt_key = other_key.crypt_key
             else:
                 # borg transfer re-encrypts all data anyway, thus we can default to a new, random AE key
-                data = os.urandom(64)
-                enc_key = data[0:32]
-                enc_hmac_key = data[32:64]
-            key.init_from_given_data(
-                enc_key=enc_key, enc_hmac_key=enc_hmac_key, id_key=other_key.id_key, chunk_seed=other_key.chunk_seed
-            )
+                crypt_key = os.urandom(64)
+            key.init_from_given_data(crypt_key=crypt_key, id_key=other_key.id_key, chunk_seed=other_key.chunk_seed)
             passphrase = other_key._passphrase
         else:
             key.init_from_random_data()
@@ -901,13 +893,11 @@ class AEADKeyBase(KeyBase):
         # decrypting only succeeds if we got the ciphertext we wrote **for that chunk id**.
         return data
 
-    def init_from_given_data(self, *, enc_key, enc_hmac_key, id_key, chunk_seed):
-        assert len(enc_key) >= 32
-        assert len(enc_hmac_key) >= 32
-        assert len(id_key) >= 32
+    def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
+        assert len(crypt_key) in (32 + 32, 32 + 128)
+        assert len(id_key) in (32, 128)
         assert isinstance(chunk_seed, int)
-        self.enc_key = enc_key
-        self.enc_hmac_key = enc_hmac_key
+        self.crypt_key = crypt_key
         self.id_key = id_key
         self.chunk_seed = chunk_seed
 
@@ -917,14 +907,12 @@ class AEADKeyBase(KeyBase):
         # Convert to signed int32
         if chunk_seed & 0x80000000:
             chunk_seed = chunk_seed - 0xFFFFFFFF - 1
-        self.init_from_given_data(
-            enc_key=data[0:32], enc_hmac_key=data[32:64], id_key=data[64:96], chunk_seed=chunk_seed
-        )
+        self.init_from_given_data(crypt_key=data[0:64], id_key=data[64:96], chunk_seed=chunk_seed)
 
     def _get_session_key(self, sessionid):
         assert len(sessionid) == 24  # 192bit
         key = hkdf_hmac_sha512(
-            ikm=self.enc_key + self.enc_hmac_key,
+            ikm=self.crypt_key,
             salt=sessionid,
             info=b"borg-session-key-" + self.CIPHERSUITE.__name__.encode(),
             output_length=32,

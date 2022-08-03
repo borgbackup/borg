@@ -157,7 +157,7 @@ class TestKey:
         key2 = KeyfileKey.detect(self.MockRepository(), manifest)
         assert key2.cipher.next_iv() >= iv + key2.cipher.block_count(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
         # Key data sanity check
-        assert len({key2.id_key, key2.enc_key, key2.enc_hmac_key}) == 3
+        assert len({key2.id_key, key2.crypt_key}) == 2
         assert key2.chunk_seed != 0
         chunk = b"foo"
         id = key.id_hash(chunk)
@@ -414,7 +414,7 @@ def test_decrypt_key_file_v2_is_unsupported():
 
 def test_key_file_roundtrip(monkeypatch):
     def to_dict(key):
-        extract = "repository_id", "enc_key", "enc_hmac_key", "id_key", "chunk_seed"
+        extract = "repository_id", "crypt_key", "id_key", "chunk_seed"
         return {a: getattr(key, a) for a in extract}
 
     repository = MagicMock(id=b"repository_id")

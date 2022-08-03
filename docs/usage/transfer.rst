@@ -19,14 +19,14 @@ Examples
            --other-repo ssh://borg2@borgbackup/./tests/b12 -e repokey-blake2-aes-ocb
 
     # 2. Check what and how much it would transfer:
-    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 transfer \
+    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 transfer --upgrader=From12To20 \
            --other-repo ssh://borg2@borgbackup/./tests/b12 --dry-run
 
     # 3. Transfer (copy) archives from old repo into new repo (takes time and space!):
-    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 transfer \
+    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 transfer --upgrader=From12To20 \
            --other-repo ssh://borg2@borgbackup/./tests/b12
 
     # 4. Check if we have everything (same as 2.):
-    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 transfer \
+    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 transfer --upgrader=From12To20 \
            --other-repo ssh://borg2@borgbackup/./tests/b12 --dry-run
 

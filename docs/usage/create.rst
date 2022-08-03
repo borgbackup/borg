@@ -37,7 +37,7 @@ Examples
 
     # Make a big effort in fine granular deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space, see formula in internals
-    # docs - same parameters as borg < 1.0 or attic):
+    # docs - same parameters as borg < 1.0):
     $ borg create --chunker-params buzhash,10,23,16,4095 small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)

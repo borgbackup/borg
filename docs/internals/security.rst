@@ -152,7 +152,7 @@ each encrypted message.
 Session::
 
     sessionid = os.urandom(24)
-    ikm = enc_key || enc_hmac_key
+    ikm = crypt_key
     salt = "borg-session-key-CIPHERNAME"
     sessionkey = HKDF(ikm, sessionid, salt)
     message_iv = 0
@@ -216,32 +216,23 @@ For offline storage of the encryption keys they are encrypted with a
 user-chosen passphrase.
 
 A 256 bit key encryption key (KEK) is derived from the passphrase
-using PBKDF2-HMAC-SHA256 with a random 256 bit salt which is then used
-to Encrypt-*and*-MAC (unlike the Encrypt-*then*-MAC approach used
-otherwise) a packed representation of the keys with AES-256-CTR with a
-constant initialization vector of 0. A HMAC-SHA256 of the plaintext is
-generated using the same KEK and is stored alongside the ciphertext,
-which is converted to base64 in its entirety.
+using argon2_ with a random 256 bit salt. The KEK is then used
+to Encrypt-*then*-MAC a packed representation of the keys using the
+chacha20-poly1305 AEAD cipher and a constant IV == 0.
+The ciphertext is then converted to base64.
 
 This base64 blob (commonly referred to as *keyblob*) is then stored in
 the key file or in the repository config (keyfile and repokey modes
 respectively).
 
-This scheme, and specifically the use of a constant IV with the CTR
-mode, is secure because an identical passphrase will result in a
-different derived KEK for every key encryption due to the salt.
-
-The use of Encrypt-and-MAC instead of Encrypt-then-MAC is seen as
-uncritical (but not ideal) here, since it is combined with AES-CTR mode,
-which is not vulnerable to padding attacks.
+The use of a constant IV is secure because an identical passphrase will
+result in a different derived KEK for every key encryption due to the salt.
 
 
 .. seealso::
 
    Refer to the :ref:`key_files` section for details on the format.
 
-   Refer to issue :issue:`747` for suggested improvements of the encryption
-   scheme and password-based key derivation.
 
 Implementations used
 --------------------
@@ -249,27 +240,18 @@ Implementations used
 We do not implement cryptographic primitives ourselves, but rely
 on widely used libraries providing them:
 
-- AES-CTR, AES-OCB, CHACHA20-POLY1305 and HMAC-SHA-256 from OpenSSL 1.1 are used,
+- AES-OCB and CHACHA20-POLY1305 from OpenSSL 1.1 are used,
   which is also linked into the static binaries we provide.
   We think this is not an additional risk, since we don't ever
   use OpenSSL's networking, TLS or X.509 code, but only their
   primitives implemented in libcrypto.
 - SHA-256, SHA-512 and BLAKE2b from Python's hashlib_ standard library module are used.
-  Borg requires a Python built with OpenSSL support (due to PBKDF2), therefore
-  these functions are delegated to OpenSSL by Python.
-- HMAC, PBKDF2 and a constant-time comparison from Python's hmac_ standard
-  library module is used. While the HMAC implementation is written in Python,
-  the PBKDF2 implementation is provided by OpenSSL. The constant-time comparison
-  (``compare_digest``) is written in C and part of Python.
+- HMAC and a constant-time comparison from Python's hmac_ standard library module are used.
+- argon2 is used via argon2-cffi.
 
 Implemented cryptographic constructions are:
 
-- AEAD modes: AES-OCB and CHACHA20-POLY1305 are straight from OpenSSL.
-- Legacy modes: Encrypt-then-MAC based on AES-256-CTR and either HMAC-SHA-256
-  or keyed BLAKE2b256 as described above under Encryption_.
-- Encrypt-and-MAC based on AES-256-CTR and HMAC-SHA-256
-  as described above under `Offline key security`_.
-- HKDF_-SHA-512
+- HKDF_-SHA-512 (using ``hmac.digest`` from Python's hmac_ standard library module)
 
 .. _Horton principle: https://en.wikipedia.org/wiki/Horton_Principle
 .. _HKDF: https://tools.ietf.org/html/rfc5869

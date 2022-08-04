@@ -388,6 +388,11 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
             u->expect = expect_map_item_end;
         }
         break;
+    default:
+        if(u->inside_chunks) {
+            SET_LAST_ERROR("Unexpected raw in chunks structure");
+            return -1;
+        }
     }
     return 0;
 }

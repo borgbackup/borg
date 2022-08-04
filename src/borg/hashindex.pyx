@@ -278,8 +278,8 @@ cdef class NSKeyIterator:
     cdef const unsigned char *key
     cdef int key_size
     cdef int exhausted
-    cdef int flag_mask
-    cdef int flag_value
+    cdef unsigned int flag_mask
+    cdef unsigned int flag_value
 
     def __cinit__(self, key_size, mask, value):
         self.key = NULL

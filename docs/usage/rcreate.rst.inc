@@ -25,6 +25,8 @@ borg rcreate
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--make-parent-dirs``             | create the parent directories of the repository directory, if they are missing.                                                                                                                                                        |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--copy-ae-key``                  | copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).                                                                                                                                   |
+    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                      |
     |                                                                                                                                                                                                                                                                                                                                     |
     | :ref:`common_options`                                                                                                                                                                                                                                                                                                               |
@@ -48,6 +50,7 @@ borg rcreate
         --append-only                  create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details.
         --storage-quota QUOTA          Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
         --make-parent-dirs             create the parent directories of the repository directory, if they are missing.
+        --copy-ae-key                  copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).
 
 
     :ref:`common_options`
@@ -83,7 +86,7 @@ Borg will:
    have the key and know the passphrase. Make sure to keep a backup of
    your key **outside** the repository - do not lock yourself out by
    "leaving your keys inside your car" (see :ref:`borg_key_export`).
-   For remote backups the encryption is done locally - the remote machine
+   The encryption is done locally - if you use a remote repository, the remote machine
    never sees your passphrase, your unencrypted key or your unencrypted files.
    Chunking and id generation are also based on your key to improve
    your privacy.
@@ -128,27 +131,23 @@ in the upper part of the table, in the lower part is the old and/or unsafe(r) st
 
 .. nanorst: inline-fill
 
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| Mode (K = keyfile or repokey)     | ID-Hash      | Encryption     | Authentication     | V >=    |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           | 2.0     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           | 2.0     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         | 2.0     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         | 2.0     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| K-blake2                          | BLAKE2b      | AES256-CTR     | BLAKE2b            | 1.1     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| K                                 | HMAC-SHA-256 | AES256-CTR     | HMAC-SHA256        | any     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| authenticated-blake2              | BLAKE2b      | none           | BLAKE2b            | 1.1     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| authenticated                     | HMAC-SHA-256 | none           | HMAC-SHA256        | 1.1     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
-| none                              | SHA-256      | none           | none               | any     |
-+-----------------------------------+--------------+----------------+--------------------+---------+
++-----------------------------------+--------------+----------------+--------------------+
+| Mode (K = keyfile or repokey)     | ID-Hash      | Encryption     | Authentication     |
++-----------------------------------+--------------+----------------+--------------------+
+| K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           |
++-----------------------------------+--------------+----------------+--------------------+
+| K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           |
++-----------------------------------+--------------+----------------+--------------------+
+| K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         |
++-----------------------------------+--------------+----------------+--------------------+
+| K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         |
++-----------------------------------+--------------+----------------+--------------------+
+| authenticated-blake2              | BLAKE2b      | none           | BLAKE2b            |
++-----------------------------------+--------------+----------------+--------------------+
+| authenticated                     | HMAC-SHA-256 | none           | HMAC-SHA256        |
++-----------------------------------+--------------+----------------+--------------------+
+| none                              | SHA-256      | none           | none               |
++-----------------------------------+--------------+----------------+--------------------+
 
 .. nanorst: inline-replace
 
@@ -158,3 +157,17 @@ case of malicious activity in the repository.
 
 If you do **not** want to encrypt the contents of your backups, but still want to detect
 malicious tampering use an `authenticated` mode. It's like `repokey` minus encryption.
+
+Creating a related repository
++++++++++++++++++++++++++++++
+
+A related repository uses same secret key material as the other/original repository.
+
+By default, only the ID key and chunker secret will be the same (these are important
+for deduplication) and the AE crypto keys will be newly generated random keys.
+
+Optionally, if you use ``--copy-ae-key`` you can also keep the same AE crypto keys
+(used for authenticated encryption). Might be desired e.g. if you want to have less
+keys to manage.
+
+Creating related repositories is useful e.g. if you want to use ``borg transfer`` later.

@@ -83,7 +83,7 @@ authentication keys and calculating the HMAC of the metadata to authenticate [#]
     # RANDOM(n) returns n random bytes
     salt = RANDOM(64)
 
-    ikm = id_key || enc_key || enc_hmac_key
+    ikm = id_key || crypt_key
     # *context* depends on the operation, for manifest authentication it is
     # the ASCII string "borg-metadata-authentication-manifest".
     tam_key = HKDF-SHA-512(ikm, salt, context)

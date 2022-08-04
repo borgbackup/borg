@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2022-07-17" "" "borg backup tool"
+.TH "BORG-PRUNE" 1 "2022-08-03" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -132,6 +132,9 @@ number of yearly archives to keep
 .TP
 .B  \-\-save\-space
 work slower, but using less space
+.TP
+.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
+write checkpoint every SECONDS seconds (Default: 1800)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

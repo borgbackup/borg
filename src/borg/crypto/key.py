@@ -191,7 +191,7 @@ class KeyBase:
         self.compressor = Compressor("lz4")
         self.decompress = self.compressor.decompress
         self.tam_required = True
-        self.copy_ae_key = False
+        self.copy_crypt_key = False
 
     def id_hash(self, data):
         """Return HMAC hash using the "id" HMAC key"""
@@ -603,7 +603,7 @@ class FlexiKey:
                 raise Error("Copying key material to an AES-CTR based mode is insecure and unsupported.")
             if not uses_same_id_hash(other_key, key):
                 raise Error("You must keep the same ID hash (HMAC-SHA256 or BLAKE2b) or deduplication will break.")
-            if other_key.copy_ae_key:
+            if other_key.copy_crypt_key:
                 # give the user the option to use the same authenticated encryption (AE) key
                 crypt_key = other_key.crypt_key
             else:

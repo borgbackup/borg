@@ -22,7 +22,7 @@ class RCreateMixIn:
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
         if other_key is not None:
-            other_key.copy_ae_key = args.copy_ae_key
+            other_key.copy_crypt_key = args.copy_crypt_key
         try:
             key = key_creator(repository, args, other_key=other_key)
         except (EOFError, KeyboardInterrupt):
@@ -160,7 +160,7 @@ class RCreateMixIn:
         By default, only the ID key and chunker secret will be the same (these are important
         for deduplication) and the AE crypto keys will be newly generated random keys.
 
-        Optionally, if you use ``--copy-ae-key`` you can also keep the same AE crypto keys
+        Optionally, if you use ``--copy-crypt-key`` you can also keep the same crypt_key
         (used for authenticated encryption). Might be desired e.g. if you want to have less
         keys to manage.
 
@@ -218,8 +218,9 @@ class RCreateMixIn:
             help="create the parent directories of the repository directory, if they are missing.",
         )
         subparser.add_argument(
-            "--copy-ae-key",
-            dest="copy_ae_key",
+            "--copy-crypt-key",
+            dest="copy_crypt_key",
             action="store_true",
-            help="copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).",
+            help="copy the crypt_key (used for authenticated encryption) from the key of the other repo "
+            "(default: new random key).",
         )

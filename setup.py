@@ -11,7 +11,7 @@ except ImportError:
     multiprocessing = None
 
 from setuptools.command.build_ext import build_ext
-from setuptools import setup, find_packages, Extension, Command
+from setuptools import setup, find_namespace_packages, Extension, Command
 from setuptools.command.sdist import sdist
 
 try:
@@ -292,7 +292,7 @@ setup(
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],
-    packages=find_packages('src'),
+    packages=find_namespace_packages('src'),
     package_dir={'': 'src'},
     zip_safe=False,
     entry_points={

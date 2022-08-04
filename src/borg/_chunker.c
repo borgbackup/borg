@@ -154,8 +154,6 @@ static int
 chunker_fill(Chunker *c)
 {
     ssize_t n;
-    off_t offset, length;
-    int overshoot;
     PyObject *data;
     PyThreadState *thread_state;
 
@@ -169,7 +167,10 @@ chunker_fill(Chunker *c)
     if(c->fh >= 0) {
         thread_state = PyEval_SaveThread();
 
-        offset = c->bytes_read;
+        #if ( ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L ) && defined(POSIX_FADV_DONTNEED) )
+        off_t offset = c->bytes_read;
+        #endif
+
         // if we have a os-level file descriptor, use os-level API
         n = read(c->fh, c->data + c->position + c->remaining, n);
         if(n > 0) {
@@ -186,8 +187,8 @@ chunker_fill(Chunker *c)
             PyErr_SetFromErrno(PyExc_OSError);
             return 0;
         }
-        length = c->bytes_read - offset;
         #if ( ( _XOPEN_SOURCE >= 600 || _POSIX_C_SOURCE >= 200112L ) && defined(POSIX_FADV_DONTNEED) )
+        off_t length = c->bytes_read - offset;
 
         // Only do it once per run.
         if (pagemask == 0)
@@ -200,6 +201,7 @@ chunker_fill(Chunker *c)
         // for the OS or other processes.
         // We rollback the initial offset back to the start of the page,
         // to avoid it not being truncated as a partial page request.
+        int overshoot;
         if (length > 0) {
             // All Linux kernels (at least up to and including 4.6(.0)) have a bug where
             // they truncate last partial page of POSIX_FADV_DONTNEED request, so we need

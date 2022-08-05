@@ -2554,7 +2554,7 @@ def _mkstemp_inner(dir, pre, suf, flags, output_type, mode=0o600):
     for seq in range(TMP_MAX):
         name = next(names)
         file = _os.path.join(dir, pre + name + suf)
-        _sys.audit("tempfile.mkstemp", file)
+        # _sys.audit("tempfile.mkstemp", file)  # no .audit in sys module of python 3.5
         try:
             fd = _os.open(file, flags, mode)
         except FileExistsError:

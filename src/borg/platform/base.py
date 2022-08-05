@@ -1,10 +1,8 @@
 import errno
 import os
 import socket
-import tempfile
 import uuid
 
-from ..constants import UMASK_DEFAULT
 from ..helpers import safe_unlink
 from ..platformflags import is_win32
 
@@ -232,8 +230,9 @@ class SaveFile:
 
     def __enter__(self):
         from .. import platform
+        from ..helpers.fs import mkstemp_mode
 
-        self.tmp_fd, self.tmp_fname = tempfile.mkstemp(prefix=self.tmp_prefix, suffix=".tmp", dir=self.dir)
+        self.tmp_fd, self.tmp_fname = mkstemp_mode(prefix=self.tmp_prefix, suffix=".tmp", dir=self.dir, mode=0o666)
         self.f = platform.SyncFile(self.tmp_fname, fd=self.tmp_fd, binary=self.binary)
         return self.f
 
@@ -245,19 +244,6 @@ class SaveFile:
         if exc_type is not None:
             safe_unlink(self.tmp_fname)  # with-body has failed, clean up tmp file
             return  # continue processing the exception normally
-
-        try:
-            # tempfile.mkstemp always uses owner-only file permissions for the temp file,
-            # but as we'll rename it to the non-temp permanent file now, we need to respect
-            # the umask and change the file mode to what a normally created file would have.
-            # thanks to the crappy os.umask api, we can't query the umask without setting it. :-(
-            umask = os.umask(UMASK_DEFAULT)
-            os.umask(umask)
-            os.chmod(self.tmp_fname, mode=0o666 & ~umask)
-        except OSError:
-            # chmod might fail if the fs does not support it.
-            # this is not harmful, the file will still have permissions for the owner.
-            pass
 
         try:
             os.replace(self.tmp_fname, self.path)  # POSIX: atomic rename

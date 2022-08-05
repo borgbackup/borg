@@ -418,3 +418,73 @@ def umount(mountpoint):
         return subprocess.call(["fusermount", "-u", mountpoint], env=env)
     except FileNotFoundError:
         return subprocess.call(["umount", mountpoint], env=env)
+
+
+# below is a slightly modified tempfile.mkstemp that has an additional mode parameter.
+# see https://github.com/borgbackup/borg/issues/6933 and https://github.com/borgbackup/borg/issues/6400
+
+import os as _os  # NOQA
+import sys as _sys  # NOQA
+import errno as _errno  # NOQA
+from tempfile import _sanitize_params, _get_candidate_names  # type: ignore[attr-defined] # NOQA
+from tempfile import TMP_MAX, _text_openflags, _bin_openflags  # type: ignore[attr-defined] # NOQA
+
+
+def _mkstemp_inner(dir, pre, suf, flags, output_type, mode=0o600):
+    """Code common to mkstemp, TemporaryFile, and NamedTemporaryFile."""
+
+    dir = _os.path.abspath(dir)
+    names = _get_candidate_names()
+    if output_type is bytes:
+        names = map(_os.fsencode, names)
+
+    for seq in range(TMP_MAX):
+        name = next(names)
+        file = _os.path.join(dir, pre + name + suf)
+        _sys.audit("tempfile.mkstemp", file)
+        try:
+            fd = _os.open(file, flags, mode)
+        except FileExistsError:
+            continue  # try again
+        except PermissionError:
+            # This exception is thrown when a directory with the chosen name
+            # already exists on windows.
+            if _os.name == "nt" and _os.path.isdir(dir) and _os.access(dir, _os.W_OK):
+                continue
+            else:
+                raise
+        return fd, file
+
+    raise FileExistsError(_errno.EEXIST, "No usable temporary file name found")
+
+
+def mkstemp_mode(suffix=None, prefix=None, dir=None, text=False, mode=0o600):
+    """User-callable function to create and return a unique temporary
+    file.  The return value is a pair (fd, name) where fd is the
+    file descriptor returned by os.open, and name is the filename.
+    If 'suffix' is not None, the file name will end with that suffix,
+    otherwise there will be no suffix.
+    If 'prefix' is not None, the file name will begin with that prefix,
+    otherwise a default prefix is used.
+    If 'dir' is not None, the file will be created in that directory,
+    otherwise a default directory is used.
+    If 'text' is specified and true, the file is opened in text
+    mode.  Else (the default) the file is opened in binary mode.
+    If any of 'suffix', 'prefix' and 'dir' are not None, they must be the
+    same type.  If they are bytes, the returned name will be bytes; str
+    otherwise.
+    The file is readable and writable only by the creating user ID.
+    If the operating system uses permission bits to indicate whether a
+    file is executable, the file is executable by no one. The file
+    descriptor is not inherited by children of this process.
+    Caller is responsible for deleting the file when done with it.
+    """
+
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+
+    if text:
+        flags = _text_openflags
+    else:
+        flags = _bin_openflags
+
+    return _mkstemp_inner(dir, prefix, suffix, flags, output_type, mode)

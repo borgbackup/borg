@@ -775,8 +775,16 @@ class LocalCache(CacheStatsMixin):
             archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
             if archive.version not in (1, 2):  # legacy
                 raise Exception("Unknown archive metadata version")
+            if archive.version == 1:
+                items = archive.items
+            elif archive.version == 2:
+                items = []
+                for chunk_id, (csize, data) in zip(archive.item_ptrs, decrypted_repository.get_many(archive.item_ptrs)):
+                    chunk_idx.add(chunk_id, 1, len(data))
+                    ids = msgpack.unpackb(data)
+                    items.extend(ids)
             sync = CacheSynchronizer(chunk_idx)
-            for item_id, (csize, data) in zip(archive.items, decrypted_repository.get_many(archive.items)):
+            for item_id, (csize, data) in zip(items, decrypted_repository.get_many(items)):
                 chunk_idx.add(item_id, 1, len(data))
                 processed_item_metadata_bytes += len(data)
                 processed_item_metadata_chunks += 1

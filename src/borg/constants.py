@@ -11,7 +11,9 @@ REQUIRED_ITEM_KEYS = frozenset(["path", "mtime"])
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 # fmt: off
-ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'username', 'time', 'time_end',
+ARCHIVE_KEYS = frozenset(['version', 'name', 'cmdline', 'hostname', 'username', 'time', 'time_end',
+                          'items',  # legacy v1 archives
+                          'item_ptrs',  # v2+ archives
                           'comment', 'chunker_params',
                           'recreate_cmdline',
                           'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',  # used in 1.1.0b1 .. b2
@@ -19,7 +21,7 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'items', 'cmdline', 'hostname', 'us
 # fmt: on
 
 # this is the set of keys that are always present in archives:
-REQUIRED_ARCHIVE_KEYS = frozenset(["version", "name", "items", "cmdline", "time"])
+REQUIRED_ARCHIVE_KEYS = frozenset(["version", "name", "item_ptrs", "cmdline", "time"])
 
 # default umask, overridden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077
@@ -46,6 +48,9 @@ MAX_DATA_SIZE = 20971479
 # note: for borg >= 1.3, this makes the MAX_OBJECT_SIZE grow slightly over the precise 20MiB used by
 # borg < 1.3, but this is not expected to cause any issues.
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
+
+# how many metadata stream chunk ids do we store into a "pointer chunk" of the ArchiveItem.item_ptrs list?
+IDS_PER_CHUNK = 3  # MAX_DATA_SIZE // 40
 
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
 MAX_SEGMENT_SIZE_LIMIT = 2**32 - MAX_OBJECT_SIZE

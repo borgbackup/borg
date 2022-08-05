@@ -483,7 +483,8 @@ class ArchiveItem(PropDict):
 
     version = PropDict._make_property('version', int)
     name = PropDict._make_property('name', str, 'surrogate-escaped str')
-    items = PropDict._make_property('items', list)
+    items = PropDict._make_property('items', list)  # list of chunk ids of item metadata stream (only in memory)
+    item_ptrs = PropDict._make_property('item_ptrs', list)  # list of blocks with list of chunk ids of ims, arch v2
     cmdline = PropDict._make_property('cmdline', list)  # list of s-e-str
     hostname = PropDict._make_property('hostname', str, 'surrogate-escaped str')
     username = PropDict._make_property('username', str, 'surrogate-escaped str')
@@ -515,7 +516,9 @@ class ArchiveItem(PropDict):
                 v = fix_tuple_of_str_and_int(v)
             if k in ('cmdline', 'recreate_cmdline'):
                 v = fix_list_of_str(v)
-            if k == 'items':
+            if k == 'items':  # legacy
+                v = fix_list_of_bytes(v)
+            if k == 'item_ptrs':
                 v = fix_list_of_bytes(v)
             self._dict[k] = v
 

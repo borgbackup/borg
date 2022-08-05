@@ -115,15 +115,6 @@ Which file types, attributes, etc. are *not* preserved?
 Are there other known limitations?
 ----------------------------------
 
-- A single archive can only reference a limited volume of file/dir metadata,
-  usually corresponding to tens or hundreds of millions of files/dirs.
-  When trying to go beyond that limit, you will get a fatal IntegrityError
-  exception telling that the (archive) object is too big.
-  An easy workaround is to create multiple archives with fewer items each.
-  See also the :ref:`archive_limitation` and :issue:`1452`.
-
-  :ref:`borg_info` shows how large (relative to the maximum size) existing
-  archives are.
 - borg extract only supports restoring into an empty destination. After that,
   the destination will exactly have the contents of the extracted archive.
   If you extract into a non-empty destination, borg will (for example) not

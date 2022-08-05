@@ -511,7 +511,8 @@ The archive object itself further contains some metadata:
   When :ref:`borg_check` rebuilds the manifest (e.g. if it was corrupted) and finds
   more than one archive object with the same name, it adds a counter to the name
   in the manifest, but leaves the *name* field of the archives as it was.
-* *items*, a list of chunk IDs containing item metadata (size: count * ~34B)
+* *item_ptrs*, a list of "pointer chunk" IDs.
+  Each "pointer chunk" contains a list of chunk IDs of item metadata.
 * *cmdline*, the command line which was used to create the archive
 * *hostname*
 * *username*
@@ -520,34 +521,6 @@ The archive object itself further contains some metadata:
 * *chunker_params* are the :ref:`chunker-params <chunker-params>` used for creating the archive.
   This is used by :ref:`borg_recreate` to determine whether a given archive needs rechunking.
 * Some other pieces of information related to recreate.
-
-.. _archive_limitation:
-
-.. rubric:: Note about archive limitations
-
-The archive is currently stored as a single object in the repository
-and thus limited in size to MAX_OBJECT_SIZE (20MiB).
-
-As one chunk list entry is ~40B, that means we can reference ~500.000 item
-metadata stream chunks per archive.
-
-Each item metadata stream chunk is ~128kiB (see hardcoded ITEMS_CHUNKER_PARAMS).
-
-So that means the whole item metadata stream is limited to ~64GiB chunks.
-If compression is used, the amount of storable metadata is bigger - by the
-compression factor.
-
-If the medium size of an item entry is 100B (small size file, no ACLs/xattrs),
-that means a limit of ~640 million files/directories per archive.
-
-If the medium size of an item entry is 2kB (~100MB size files or more
-ACLs/xattrs), the limit will be ~32 million files/directories per archive.
-
-If one tries to create an archive object bigger than MAX_OBJECT_SIZE, a fatal
-IntegrityError will be raised.
-
-A workaround is to create multiple archives with fewer items each, see
-also :issue:`1452`.
 
 .. _item:
 

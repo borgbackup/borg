@@ -331,11 +331,6 @@ stats
         Deduplicated size (against the current repository, not when the archive was created)
     nfiles
         Number of regular files in the archive
-limits
-    Object describing the utilization of Borg limits
-
-    max_archive_size
-        Float between 0 and 1 describing how large this archive is relative to the maximum size allowed by Borg
 command_line
     Array of strings of the command line that created the archive
 
@@ -405,9 +400,6 @@ The same archive with more information (``borg info --last 1 --json``)::
                 "end": "2017-02-27T12:27:20.789123",
                 "hostname": "host",
                 "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
-                "limits": {
-                    "max_archive_size": 0.0001330855110409714
-                },
                 "name": "host-system-backup-2017-02-27",
                 "start": "2017-02-27T12:27:20.789123",
                 "stats": {

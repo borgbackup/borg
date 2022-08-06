@@ -336,11 +336,21 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
         # for us to do something while we block on the process for something different.
         if inbound:
             proc = popen_with_error_handling(
-                cmd, stdout=subprocess.PIPE, stdin=filter_stream, log_prefix="filter-process: ", env=env
+                cmd,
+                stdout=subprocess.PIPE,
+                stdin=filter_stream,
+                log_prefix="filter-process: ",
+                env=env,
+                preexec_fn=ignore_sigint,
             )
         else:
             proc = popen_with_error_handling(
-                cmd, stdin=subprocess.PIPE, stdout=filter_stream, log_prefix="filter-process: ", env=env
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=filter_stream,
+                log_prefix="filter-process: ",
+                env=env,
+                preexec_fn=ignore_sigint,
             )
         if not proc:
             raise Error(f"filter {cmd}: process creation failed")

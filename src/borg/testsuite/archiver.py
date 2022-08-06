@@ -3981,7 +3981,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             archive = msgpack.packb(
                 {
                     "cmdline": [],
-                    "items": [],
+                    "item_ptrs": [],
                     "hostname": "foo",
                     "username": "bar",
                     "name": "archive1",

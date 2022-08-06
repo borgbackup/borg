@@ -303,26 +303,30 @@ New features:
 
 Fixes:
 
-- SaveFile: avoid chmod OSError: operation not supported - the chmod is optional, #6786
-  (some filesystems like cifs/smbfs do not support chmod, just ignore if it is failing)
+- SaveFile: use a custom mkstemp with mode support, #6933, #6400, #6786.
+  This fixes umask/mode/ACL issues (and also "chmod not supported" exceptions
+  seen in 1.2.1) of files updated using SaveFile, e.g. the repo config.
 - hashindex_compact: fix eval order (check idx before use), #5899
 - create --paths-from-(stdin|command): normalize paths, #6778
-- secure_erase: avoid collateral damage, #6768
-  (if a hardlink copy of a repo was made and a new repo config shall be saved,
+- secure_erase: avoid collateral damage, #6768.
+  If a hardlink copy of a repo was made and a new repo config shall be saved,
   do NOT fill in random garbage before deleting the previous repo config,
-  because that would damage the hardlink copy).
+  because that would damage the hardlink copy.
 - list: fix {flags:<WIDTH>} formatting, #6081
 - check: try harder to create the key, #5719
 
 Other changes:
 
 - deprecate --prefix, use -a / --glob-archives, see #6806
+- make setuptools happy ("package would be ignored"), #6874
 - fix pyproject.toml to create a fixed _version.py file, compatible with both
   old and new setuptools_scm version, #6875
 - automate asciinema screencasts
 - CI: test on macOS 12 without fuse / fuse tests
   (too troublesome on github CI due to kernel extensions needed by macFUSE)
 - tests: fix test_obfuscate byte accounting
+- repository: add debug logging for issue #6687
+- _chunker.c: fix warnings on macOS
 - docs:
 
   - add info on man page installation, #6894

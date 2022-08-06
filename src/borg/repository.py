@@ -863,7 +863,8 @@ class Repository:
                     # If the key is in the shadow index and there is any segment with an older PUT of this
                     # key, we have a shadowed put.
                     shadowed_put_exists = key_not_in_shadow_index or any(
-                        shadowed < segment for shadowed in self.shadow_index[key])
+                        shadowed < segment for shadowed in self.shadow_index[key]
+                    )
                     delete_is_not_stable = index_transaction_id is None or segment > index_transaction_id
 
                     if shadowed_put_exists or delete_is_not_stable:
@@ -908,10 +909,16 @@ class Repository:
                         self.compact[new_segment] += size
                         segments.setdefault(new_segment, 0)
                     else:
-                        logger.debug('dropping DEL for id %s - seg %d, iti %r, knisi %r, spe %r, dins %r, si %r',
-                                     bin_to_hex(key), segment, index_transaction_id,
-                                     key_not_in_shadow_index, shadowed_put_exists, delete_is_not_stable,
-                                     self.shadow_index.get(key))
+                        logger.debug(
+                            "dropping DEL for id %s - seg %d, iti %r, knisi %r, spe %r, dins %r, si %r",
+                            bin_to_hex(key),
+                            segment,
+                            index_transaction_id,
+                            key_not_in_shadow_index,
+                            shadowed_put_exists,
+                            delete_is_not_stable,
+                            self.shadow_index.get(key),
+                        )
                         # we did not keep the delete tag for key (see if-branch)
                         if not self.shadow_index[key]:
                             # shadowed segments list is empty -> remove it

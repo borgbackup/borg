@@ -1,3 +1,5 @@
+.. include:: ../global.rst.inc
+
 .. somewhat surprisingly the "bash" highlighter gives nice results with
    the pseudo-code notation used in the "Encryption" section.
 

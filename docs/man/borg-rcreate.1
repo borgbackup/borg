@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RCREATE" 1 "2022-08-03" "" "borg backup tool"
+.TH "BORG-RCREATE" 1 "2022-08-07" "" "borg backup tool"
 .SH NAME
 borg-rcreate \- Create a new, empty repository
 .SH SYNOPSIS
@@ -218,7 +218,7 @@ A related repository uses same secret key material as the other/original reposit
 By default, only the ID key and chunker secret will be the same (these are important
 for deduplication) and the AE crypto keys will be newly generated random keys.
 .sp
-Optionally, if you use \fB\-\-copy\-ae\-key\fP you can also keep the same AE crypto keys
+Optionally, if you use \fB\-\-copy\-crypt\-key\fP you can also keep the same crypt_key
 (used for authenticated encryption). Might be desired e.g. if you want to have less
 keys to manage.
 .sp
@@ -244,8 +244,8 @@ Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .B  \-\-make\-parent\-dirs
 create the parent directories of the repository directory, if they are missing.
 .TP
-.B  \-\-copy\-ae\-key
-copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).
+.B  \-\-copy\-crypt\-key
+copy the crypt_key (used for authenticated encryption) from the key of the other repo (default: new random key).
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

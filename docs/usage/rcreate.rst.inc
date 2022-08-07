@@ -25,7 +25,7 @@ borg rcreate
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--make-parent-dirs``             | create the parent directories of the repository directory, if they are missing.                                                                                                                                                        |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--copy-ae-key``                  | copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).                                                                                                                                   |
+    |                                                       | ``--copy-crypt-key``               | copy the crypt_key (used for authenticated encryption) from the key of the other repo (default: new random key).                                                                                                                       |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                      |
     |                                                                                                                                                                                                                                                                                                                                     |
@@ -50,7 +50,7 @@ borg rcreate
         --append-only                  create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details.
         --storage-quota QUOTA          Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
         --make-parent-dirs             create the parent directories of the repository directory, if they are missing.
-        --copy-ae-key                  copy the authenticated encryption (AE) key from the key of the other repo (default: new random key).
+        --copy-crypt-key               copy the crypt_key (used for authenticated encryption) from the key of the other repo (default: new random key).
 
 
     :ref:`common_options`
@@ -166,7 +166,7 @@ A related repository uses same secret key material as the other/original reposit
 By default, only the ID key and chunker secret will be the same (these are important
 for deduplication) and the AE crypto keys will be newly generated random keys.
 
-Optionally, if you use ``--copy-ae-key`` you can also keep the same AE crypto keys
+Optionally, if you use ``--copy-crypt-key`` you can also keep the same crypt_key
 (used for authenticated encryption). Might be desired e.g. if you want to have less
 keys to manage.
 

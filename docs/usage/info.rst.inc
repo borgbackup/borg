@@ -71,8 +71,3 @@ This archive / deduplicated size = amount of data stored ONLY for this archive
 = unique chunks of this archive.
 All archives / deduplicated size = amount of data stored in the repo
 = all chunks in the repository.
-
-Borg archives can only contain a limited amount of file metadata.
-The size of an archive relative to this limit depends on a number of factors,
-mainly the number of files, the lengths of paths and other metadata stored for files.
-This is shown as *utilization of maximum supported archive size*.

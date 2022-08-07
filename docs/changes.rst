@@ -12,7 +12,7 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b1 (2022-08-xx)
+Version 2.0.0b1 (2022-08-08)
 ----------------------------
 
 Please note:

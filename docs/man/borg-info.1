@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INFO" 1 "2022-08-03" "" "borg backup tool"
+.TH "BORG-INFO" 1 "2022-08-07" "" "borg backup tool"
 .SH NAME
 borg-info \- Show archive details such as disk space used
 .SH SYNOPSIS
@@ -45,11 +45,6 @@ This archive / deduplicated size = amount of data stored ONLY for this archive
 = unique chunks of this archive.
 All archives / deduplicated size = amount of data stored in the repo
 = all chunks in the repository.
-.sp
-Borg archives can only contain a limited amount of file metadata.
-The size of an archive relative to this limit depends on a number of factors,
-mainly the number of files, the lengths of paths and other metadata stored for files.
-This is shown as \fIutilization of maximum supported archive size\fP\&.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

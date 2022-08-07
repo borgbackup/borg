@@ -10,6 +10,7 @@
 .. _HMAC-SHA256: https://en.wikipedia.org/wiki/HMAC
 .. _SHA256: https://en.wikipedia.org/wiki/SHA-256
 .. _PBKDF2: https://en.wikipedia.org/wiki/PBKDF2
+.. _argon2: https://en.wikipedia.org/wiki/Argon2
 .. _ACL: https://en.wikipedia.org/wiki/Access_control_list
 .. _libacl: https://savannah.nongnu.org/projects/acl/
 .. _libattr: https://savannah.nongnu.org/projects/attr/

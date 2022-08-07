@@ -97,6 +97,7 @@ def packages_netbsd
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
     pkg_add python39 py39-sqlite3 py39-pip py39-virtualenv py39-expat
+    pkg_add py310-sqlite3 py310-pip py310-virtualenv py310-expat
     ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python
     ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python3
     ln -s /usr/pkg/bin/pip3.9 /usr/pkg/bin/pip
@@ -160,7 +161,7 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.10.0  # tests, version supporting openssl 1.1
+    pyenv install 3.10.2  # tests, version supporting openssl 1.1
     pyenv install 3.9.13  # tests, version supporting openssl 1.1, binary build
     pyenv rehash
   EOF
@@ -227,8 +228,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.13 3.10.0
-      pyenv local 3.9.13 3.10.0
+      pyenv global 3.9.13 3.10.2
+      pyenv local 3.9.13 3.10.2
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

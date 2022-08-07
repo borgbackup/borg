@@ -12,12 +12,12 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0a4 (2022-07-17)
+Version 2.0.0b1 (2022-08-xx)
 ----------------------------
 
 Please note:
 
-This is an alpha release, only for testing - do not use for production repos.
+This is a beta release, only for testing - do not use for production repos.
 
 Compatibility notes:
 
@@ -80,6 +80,39 @@ Compatibility notes:
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
 
+New features:
+
+- massively increase archive metadata stream size limit, #1473.
+  currently rather testing the code, scalability will improve later, see #6945.
+- rcreate --copy-crypt-key: copy crypt_key from key of other repo, #6710.
+  default: create new, random authenticated encryption key.
+- prune/delete --checkpoint-interval=1800 and ctrl-c/SIGINT support, #6284
+
+Fixes:
+
+- ctrl-c must not kill important subprocesses, #6912
+- transfer: check whether ID hash method and chunker secret are same.
+  add PlaintextKey and AuthenticatedKey support to uses_same_id_hash function.
+- check: try harder to create the key, #5719
+- SaveFile: use a custom mkstemp with mode support, #6933, #6400
+- make setuptools happy, #6874
+- fix misc. compiler warnings
+- list: fix {flags:<WIDTH>} formatting, #6081
+
+Other changes:
+
+- new crypto does not need to call ._assert_id(), update code and docs.
+  https://github.com/borgbackup/borg/pull/6463#discussion_r925436156
+- check: --verify-data does not need to decompress with new crypto modes
+- Key: crypt_key instead of enc_key + enc_hmac_key, #6611
+- misc. docs updates and improvements
+- CI: test on macOS 12 without fuse / fuse tests
+- repository: add debug logging for issue #6687
+- _version.py: remove trailing blank, add LF at EOF (make pep8 checker happy)
+
+
+Version 2.0.0a4 (2022-07-17)
+----------------------------
 
 New features:
 

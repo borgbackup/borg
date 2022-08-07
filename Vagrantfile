@@ -161,7 +161,7 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.10.0  # tests, version supporting openssl 1.1
+    pyenv install 3.10.2  # tests, version supporting openssl 1.1
     pyenv install 3.9.13  # tests, version supporting openssl 1.1, binary build
     pyenv rehash
   EOF
@@ -228,8 +228,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.13 3.10.0
-      pyenv local 3.9.13 3.10.0
+      pyenv global 3.9.13 3.10.2
+      pyenv local 3.9.13 3.10.2
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

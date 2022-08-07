@@ -236,6 +236,19 @@ class SigIntManager:
 sig_int = SigIntManager()
 
 
+def ignore_sigint():
+    """
+    Ignore SIGINT, see also issue #6912.
+
+    Ctrl-C will send a SIGINT to both the main process (borg) and subprocesses
+    (e.g. ssh for remote ssh:// repos), but often we do not want the subprocess
+    getting killed (e.g. because it is still needed to cleanly shut down borg).
+
+    To avoid that: Popen(..., preexec_fn=ignore_sigint)
+    """
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
 def popen_with_error_handling(cmd_line: str, log_prefix="", **kwargs):
     """
     Handle typical errors raised by subprocess.Popen. Return None if an error occurred,
@@ -323,11 +336,21 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
         # for us to do something while we block on the process for something different.
         if inbound:
             proc = popen_with_error_handling(
-                cmd, stdout=subprocess.PIPE, stdin=filter_stream, log_prefix="filter-process: ", env=env
+                cmd,
+                stdout=subprocess.PIPE,
+                stdin=filter_stream,
+                log_prefix="filter-process: ",
+                env=env,
+                preexec_fn=ignore_sigint,
             )
         else:
             proc = popen_with_error_handling(
-                cmd, stdin=subprocess.PIPE, stdout=filter_stream, log_prefix="filter-process: ", env=env
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=filter_stream,
+                log_prefix="filter-process: ",
+                env=env,
+                preexec_fn=ignore_sigint,
             )
         if not proc:
             raise Error(f"filter {cmd}: process creation failed")

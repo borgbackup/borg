@@ -89,15 +89,6 @@ class KeysMixIn:
 
         return EXIT_SUCCESS
 
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.CHECK,))
-    def do_change_algorithm(self, args, repository, manifest, key):
-        """Change repository key algorithm"""
-        if not hasattr(key, "change_passphrase"):
-            print("This repository is not encrypted, cannot change the algorithm.")
-            return EXIT_ERROR
-        key.save(key.target, key._passphrase, algorithm=KEY_ALGORITHMS[args.algorithm])
-        return EXIT_SUCCESS
-
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
         """Export the repository key for backup"""

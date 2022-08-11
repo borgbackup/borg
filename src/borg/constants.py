@@ -30,15 +30,6 @@ UMASK_DEFAULT = 0o077
 # forcing to 0o100XXX later
 STDIN_MODE_DEFAULT = 0o660
 
-CACHE_TAG_NAME = "CACHEDIR.TAG"
-CACHE_TAG_CONTENTS = b"Signature: 8a477f597d28d172789f06886806bc55"
-
-# A large, but not unreasonably large segment size. Always less than 2 GiB (for legacy file systems). We choose
-# 500 MiB which means that no indirection from the inode is needed for typical Linux file systems.
-# Note that this is a soft-limit and can be exceeded (worst case) by a full maximum chunk size and some metadata
-# bytes. That's why it's 500 MiB instead of 512 MiB.
-DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
-
 # in borg < 1.3, this has been defined like this:
 # 20 MiB minus 41 bytes for a PUT header (because the "size" field in the Repository includes
 # the header, and the total size was set to precisely 20 MiB for borg < 1.3).
@@ -49,11 +40,20 @@ MAX_DATA_SIZE = 20971479
 # borg < 1.3, but this is not expected to cause any issues.
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
 
-# how many metadata stream chunk ids do we store into a "pointer chunk" of the ArchiveItem.item_ptrs list?
-IDS_PER_CHUNK = 3  # MAX_DATA_SIZE // 40
+# How many segment files borg puts into a single directory by default.
+DEFAULT_SEGMENTS_PER_DIR = 1000
+
+# A large, but not unreasonably large segment size. Always less than 2 GiB (for legacy file systems). We choose
+# 500 MiB which means that no indirection from the inode is needed for typical Linux file systems.
+# Note that this is a soft-limit and can be exceeded (worst case) by a full maximum chunk size and some metadata
+# bytes. That's why it's 500 MiB instead of 512 MiB.
+DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
 MAX_SEGMENT_SIZE_LIMIT = 2**32 - MAX_OBJECT_SIZE
+
+# how many metadata stream chunk ids do we store into a "pointer chunk" of the ArchiveItem.item_ptrs list?
+IDS_PER_CHUNK = 3  # MAX_DATA_SIZE // 40
 
 # have one all-zero bytes object
 # we use it at all places where we need to detect or create all-zero buffers
@@ -70,18 +70,17 @@ MAX_ARCHIVES = 400000
 # repo.list() / .scan() result count limit the borg client uses
 LIST_SCAN_LIMIT = 100000
 
-DEFAULT_SEGMENTS_PER_DIR = 1000
-
 FD_MAX_AGE = 4 * 60  # 4 minutes
-
-CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
-CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
-HASH_WINDOW_SIZE = 0xFFF  # 4095B
-HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 
 # chunker algorithms
 CH_BUZHASH = "buzhash"
 CH_FIXED = "fixed"
+
+# buzhash chunker params
+CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
+CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
+HASH_WINDOW_SIZE = 0xFFF  # 4095B
+HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
@@ -158,6 +157,9 @@ class KeyType:
     BLAKE2CHPOKEYFILE = 0x40
     BLAKE2CHPOREPO = 0x41
 
+
+CACHE_TAG_NAME = "CACHEDIR.TAG"
+CACHE_TAG_CONTENTS = b"Signature: 8a477f597d28d172789f06886806bc55"
 
 REPOSITORY_README = """This is a Borg Backup repository.
 See https://borgbackup.readthedocs.io/

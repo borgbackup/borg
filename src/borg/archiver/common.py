@@ -81,7 +81,6 @@ def compat_check(*, create, manifest, key, cache, compatibility, decorator_name)
 
 def with_repository(
     fake=False,
-    invert_fake=False,
     create=False,
     lock=True,
     exclusive=False,
@@ -133,7 +132,7 @@ def with_repository(
             append_only = getattr(args, "append_only", False)
             storage_quota = getattr(args, "storage_quota", None)
             make_parent_dirs = getattr(args, "make_parent_dirs", False)
-            if argument(args, fake) ^ invert_fake:
+            if argument(args, fake):
                 return method(self, args, repository=None, **kwargs)
 
             repository = get_repository(

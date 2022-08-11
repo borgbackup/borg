@@ -97,7 +97,7 @@ def with_repository(
     :param fake: (str or bool) use None instead of repository, don't do anything else
     :param create: create repository
     :param lock: lock repository
-    :param exclusive: (str or bool) lock repository exclusively (for writing)
+    :param exclusive: (bool) lock repository exclusively (for writing)
     :param manifest: load manifest and key, pass them as keyword arguments
     :param cache: open cache, pass it as keyword argument (implies manifest)
     :param secure: do assert_secure after loading manifest
@@ -128,6 +128,7 @@ def with_repository(
             location = getattr(args, "location")
             if not location.valid:  # location always must be given
                 raise Error("missing repository, please use --repo or BORG_REPO env var!")
+            assert isinstance(exclusive, bool)
             lock = getattr(args, "lock", _lock)
             append_only = getattr(args, "append_only", False)
             storage_quota = getattr(args, "storage_quota", None)
@@ -138,7 +139,7 @@ def with_repository(
             repository = get_repository(
                 location,
                 create=create,
-                exclusive=argument(args, exclusive),
+                exclusive=exclusive,
                 lock_wait=self.lock_wait,
                 lock=lock,
                 append_only=append_only,

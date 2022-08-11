@@ -8,7 +8,7 @@ import time
 from binascii import hexlify, unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import partial
 from itertools import islice
 
@@ -657,7 +657,7 @@ class Repository:
             with open(os.path.join(self.path, "transactions"), "a") as log:
                 print(
                     "transaction %d, UTC time %s"
-                    % (transaction_id, datetime.utcnow().isoformat(timespec="microseconds")),
+                    % (transaction_id, datetime.now(tz=timezone.utc).isoformat(timespec="microseconds")),
                     file=log,
                 )
 

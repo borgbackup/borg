@@ -6,7 +6,7 @@ import sys
 import time
 from collections import OrderedDict
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from functools import partial
 from getpass import getuser
 from io import BytesIO
@@ -479,13 +479,13 @@ class Archive:
             start_monotonic is None
         ), "Logic error: if start is given, start_monotonic must be given as well and vice versa."
         if start is None:
-            start = datetime.utcnow()
+            start = datetime.now().astimezone()  # local time with local timezone
             start_monotonic = time.monotonic()
         self.chunker_params = chunker_params
         self.start = start
         self.start_monotonic = start_monotonic
         if end is None:
-            end = datetime.utcnow()
+            end = datetime.now().astimezone()  # local time with local timezone
         self.end = end
         self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.key)
@@ -549,8 +549,8 @@ class Archive:
     def info(self):
         if self.create:
             stats = self.stats
-            start = self.start.replace(tzinfo=timezone.utc)
-            end = self.end.replace(tzinfo=timezone.utc)
+            start = self.start
+            end = self.end
         else:
             stats = self.calc_stats(self.cache)
             start = self.ts
@@ -587,8 +587,8 @@ Time (end):   {end}
 Duration: {0.duration}
 """.format(
             self,
-            start=OutputTimestamp(self.start.replace(tzinfo=timezone.utc)),
-            end=OutputTimestamp(self.end.replace(tzinfo=timezone.utc)),
+            start=OutputTimestamp(self.start),
+            end=OutputTimestamp(self.end),
             location=self.repository._location.canonical_path(),
         )
 
@@ -629,11 +629,11 @@ Duration: {0.duration}
         item_ptrs = archive_put_items(self.items_buffer.chunks, key=self.key, cache=self.cache, stats=self.stats)
         duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
-            end = datetime.utcnow()
+            end = datetime.now().astimezone()  # local time with local timezone
             start = end - duration
         else:
-            end = timestamp + duration
             start = timestamp
+            end = start + duration
         self.start = start
         self.end = end
         metadata = {
@@ -2314,7 +2314,7 @@ class ArchiveRecreater:
             target.rename(archive.name)
         if self.stats:
             target.start = _start
-            target.end = datetime.utcnow()
+            target.end = datetime.now().astimezone()  # local time with local timezone
             log_multi(str(target), str(target.stats))
 
     def matcher_add_tagged_dirs(self, archive):

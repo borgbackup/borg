@@ -18,9 +18,7 @@ import time
 import unittest
 from binascii import unhexlify, b2a_base64, a2b_base64
 from configparser import ConfigParser
-from datetime import datetime
-from datetime import timezone
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
 from unittest.mock import patch
@@ -251,7 +249,7 @@ def test_disk_full(cmd):
 
 def checkts(ts):
     # check if the timestamp is in the expected format
-    assert datetime.strptime(ts, ISO_FORMAT)  # must not raise
+    assert datetime.strptime(ts, ISO_FORMAT + "%z")  # must not raise
 
 
 class ArchiverTestCaseBase(BaseTestCase):
@@ -2596,7 +2594,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         file1 = items[1]
         assert file1["path"] == "input/file1"
         assert file1["size"] == 81920
-        checkts(file1["mtime"])
 
         list_archive = self.cmd(
             f"--repo={self.repository_location}", "list", "test", "--json-lines", "--format={sha256}"
@@ -4063,7 +4060,9 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                             "version": 1,
                             "archives": {},
                             "config": {},
-                            "timestamp": (datetime.utcnow() + timedelta(days=1)).isoformat(timespec="microseconds"),
+                            "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
+                                timespec="microseconds"
+                            ),
                         }
                     ),
                 ),
@@ -4083,7 +4082,9 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                         {
                             "version": 1,
                             "archives": {},
-                            "timestamp": (datetime.utcnow() + timedelta(days=1)).isoformat(timespec="microseconds"),
+                            "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
+                                timespec="microseconds"
+                            ),
                         }
                     ),
                 ),

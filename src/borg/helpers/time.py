@@ -1,17 +1,11 @@
 import os
-import time
 from datetime import datetime, timezone
-
-
-def to_localtime(ts):
-    """Convert datetime object from UTC to local time zone"""
-    return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string"""
     dt = datetime.fromisoformat(timestamp)
-    if tzinfo is not None:
+    if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tzinfo)
     return dt
 
@@ -24,10 +18,7 @@ def timestamp(s):
         return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
         # didn't work, try parsing as a ISO timestamp. if no TZ is given, we assume UTC.
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
+        return parse_timestamp(s)
 
 
 # Not too rarely, we get crappy timestamps from the fs, that overflow some computations.
@@ -84,15 +75,7 @@ def format_time(ts: datetime, format_spec=""):
     """
     Convert *ts* to a human-friendly format with textual weekday.
     """
-    return ts.strftime("%a, %Y-%m-%d %H:%M:%S" if format_spec == "" else format_spec)
-
-
-def isoformat_time(ts: datetime):
-    """
-    Format *ts* according to ISO 8601.
-    """
-    # note: first make all datetime objects tz aware before adding %z here.
-    return ts.isoformat(timespec="microseconds")
+    return ts.strftime("%a, %Y-%m-%d %H:%M:%S %z" if format_spec == "" else format_spec)
 
 
 def format_timedelta(td):
@@ -113,8 +96,6 @@ def format_timedelta(td):
 
 class OutputTimestamp:
     def __init__(self, ts: datetime):
-        if ts.tzinfo == timezone.utc:
-            ts = to_localtime(ts)
         self.ts = ts
 
     def __format__(self, format_spec):
@@ -124,6 +105,6 @@ class OutputTimestamp:
         return f"{self}"
 
     def isoformat(self):
-        return isoformat_time(self.ts)
+        return self.ts.isoformat(timespec="microseconds")
 
     to_json = isoformat

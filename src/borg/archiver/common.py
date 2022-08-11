@@ -27,15 +27,6 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def argument(args, str_or_bool):
-    """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
-    if isinstance(str_or_bool, str):
-        return getattr(args, str_or_bool)
-    if isinstance(str_or_bool, (list, tuple)):
-        return any(getattr(args, item) for item in str_or_bool)
-    return str_or_bool
-
-
 def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args):
     if location.proto == "ssh":
         repository = RemoteRepository(
@@ -80,24 +71,15 @@ def compat_check(*, create, manifest, key, cache, compatibility, decorator_name)
 
 
 def with_repository(
-    fake=False,
-    invert_fake=False,
-    create=False,
-    lock=True,
-    exclusive=False,
-    manifest=True,
-    cache=False,
-    secure=True,
-    compatibility=None,
+    create=False, lock=True, exclusive=False, manifest=True, cache=False, secure=True, compatibility=None
 ):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
     If a parameter (where allowed) is a str the attribute named of args is used instead.
-    :param fake: (str or bool) use None instead of repository, don't do anything else
     :param create: create repository
     :param lock: lock repository
-    :param exclusive: (str or bool) lock repository exclusively (for writing)
+    :param exclusive: (bool) lock repository exclusively (for writing)
     :param manifest: load manifest and key, pass them as keyword arguments
     :param cache: open cache, pass it as keyword argument (implies manifest)
     :param secure: do assert_secure after loading manifest
@@ -128,17 +110,16 @@ def with_repository(
             location = getattr(args, "location")
             if not location.valid:  # location always must be given
                 raise Error("missing repository, please use --repo or BORG_REPO env var!")
+            assert isinstance(exclusive, bool)
             lock = getattr(args, "lock", _lock)
             append_only = getattr(args, "append_only", False)
             storage_quota = getattr(args, "storage_quota", None)
             make_parent_dirs = getattr(args, "make_parent_dirs", False)
-            if argument(args, fake) ^ invert_fake:
-                return method(self, args, repository=None, **kwargs)
 
             repository = get_repository(
                 location,
                 create=create,
-                exclusive=argument(args, exclusive),
+                exclusive=exclusive,
                 lock_wait=self.lock_wait,
                 lock=lock,
                 append_only=append_only,
@@ -257,7 +238,7 @@ def with_archive(method):
             manifest,
             archive_name,
             numeric_ids=getattr(args, "numeric_ids", False),
-            noflags=getattr(args, "nobsdflags", False) or getattr(args, "noflags", False),
+            noflags=getattr(args, "noflags", False),
             noacls=getattr(args, "noacls", False),
             noxattrs=getattr(args, "noxattrs", False),
             cache=kwargs.get("cache"),

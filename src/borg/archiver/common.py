@@ -257,7 +257,7 @@ def with_archive(method):
             manifest,
             archive_name,
             numeric_ids=getattr(args, "numeric_ids", False),
-            noflags=getattr(args, "nobsdflags", False) or getattr(args, "noflags", False),
+            noflags=getattr(args, "noflags", False),
             noacls=getattr(args, "noacls", False),
             noxattrs=getattr(args, "noxattrs", False),
             cache=kwargs.get("cache"),

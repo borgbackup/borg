@@ -27,15 +27,6 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def argument(args, str_or_bool):
-    """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
-    if isinstance(str_or_bool, str):
-        return getattr(args, str_or_bool)
-    if isinstance(str_or_bool, (list, tuple)):
-        return any(getattr(args, item) for item in str_or_bool)
-    return str_or_bool
-
-
 def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args):
     if location.proto == "ssh":
         repository = RemoteRepository(

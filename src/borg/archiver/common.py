@@ -71,13 +71,7 @@ def compat_check(*, create, manifest, key, cache, compatibility, decorator_name)
 
 
 def with_repository(
-    create=False,
-    lock=True,
-    exclusive=False,
-    manifest=True,
-    cache=False,
-    secure=True,
-    compatibility=None,
+    create=False, lock=True, exclusive=False, manifest=True, cache=False, secure=True, compatibility=None
 ):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)

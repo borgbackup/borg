@@ -38,7 +38,7 @@ logger = create_logger()
 
 
 class CreateMixIn:
-    @with_repository(fake="dry_run", exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest=None, key=None):
         """Create new archive"""
         matcher = PatternMatcher(fallback=True)

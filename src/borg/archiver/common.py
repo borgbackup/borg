@@ -80,7 +80,6 @@ def compat_check(*, create, manifest, key, cache, compatibility, decorator_name)
 
 
 def with_repository(
-    fake=False,
     create=False,
     lock=True,
     exclusive=False,
@@ -93,7 +92,6 @@ def with_repository(
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
     If a parameter (where allowed) is a str the attribute named of args is used instead.
-    :param fake: (str or bool) use None instead of repository, don't do anything else
     :param create: create repository
     :param lock: lock repository
     :param exclusive: (bool) lock repository exclusively (for writing)
@@ -132,8 +130,6 @@ def with_repository(
             append_only = getattr(args, "append_only", False)
             storage_quota = getattr(args, "storage_quota", None)
             make_parent_dirs = getattr(args, "make_parent_dirs", False)
-            if argument(args, fake):
-                return method(self, args, repository=None, **kwargs)
 
             repository = get_repository(
                 location,

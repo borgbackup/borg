@@ -65,7 +65,7 @@ class Archives(abc.MutableMapping):
         id, ts = info
         assert isinstance(id, bytes)
         if isinstance(ts, datetime):
-            ts = ts.replace(tzinfo=None).strftime(ISO_FORMAT)
+            ts = ts.replace(tzinfo=None).isoformat(timespec="microseconds")
         assert isinstance(ts, str)
         self._archives[name] = {"id": id, "time": ts}
 
@@ -254,11 +254,11 @@ class Manifest:
             self.config["tam_required"] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().strftime(ISO_FORMAT)
+            self.timestamp = datetime.utcnow().isoformat(timespec="microseconds")
         else:
             prev_ts = self.last_timestamp
-            incremented = (prev_ts + timedelta(microseconds=1)).strftime(ISO_FORMAT)
-            self.timestamp = max(incremented, datetime.utcnow().strftime(ISO_FORMAT))
+            incremented = (prev_ts + timedelta(microseconds=1)).isoformat(timespec="microseconds")
+            self.timestamp = max(incremented, datetime.utcnow().isoformat(timespec="microseconds"))
         # include checks for limits as enforced by limited unpacker (used by load())
         assert len(self.archives) <= MAX_ARCHIVES
         assert all(len(name) <= 255 for name in self.archives)

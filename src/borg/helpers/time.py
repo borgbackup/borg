@@ -2,8 +2,6 @@ import os
 import time
 from datetime import datetime, timezone
 
-from ..constants import ISO_FORMAT, ISO_FORMAT_NO_USECS
-
 
 def to_localtime(ts):
     """Convert datetime object from UTC to local time zone"""
@@ -12,8 +10,7 @@ def to_localtime(ts):
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string"""
-    fmt = ISO_FORMAT if "." in timestamp else ISO_FORMAT_NO_USECS
-    dt = datetime.strptime(timestamp, fmt)
+    dt = datetime.fromisoformat(timestamp)
     if tzinfo is not None:
         dt = dt.replace(tzinfo=tzinfo)
     return dt
@@ -26,22 +23,11 @@ def timestamp(s):
         ts = safe_s(os.stat(s).st_mtime)
         return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
-        # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
-        for format in (
-            "%Y-%m-%dT%H:%M:%SZ",
-            "%Y-%m-%dT%H:%M:%S+00:00",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d",
-            "%Y-%j",
-        ):
-            try:
-                return datetime.strptime(s, format).replace(tzinfo=timezone.utc)
-            except ValueError:
-                continue
-        raise ValueError
+        # didn't work, try parsing as a ISO timestamp. if no TZ is given, we assume UTC.
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
 
 
 # Not too rarely, we get crappy timestamps from the fs, that overflow some computations.
@@ -106,7 +92,7 @@ def isoformat_time(ts: datetime):
     Format *ts* according to ISO 8601.
     """
     # note: first make all datetime objects tz aware before adding %z here.
-    return ts.strftime(ISO_FORMAT)
+    return ts.isoformat(timespec="microseconds")
 
 
 def format_timedelta(td):

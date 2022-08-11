@@ -644,8 +644,8 @@ Duration: {0.duration}
             "cmdline": sys.argv,
             "hostname": hostname,
             "username": getuser(),
-            "time": start.strftime(ISO_FORMAT),
-            "time_end": end.strftime(ISO_FORMAT),
+            "time": start.isoformat(timespec="microseconds"),
+            "time_end": end.isoformat(timespec="microseconds"),
             "chunker_params": self.chunker_params,
         }
         if stats is not None:

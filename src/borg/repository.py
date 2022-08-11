@@ -656,7 +656,9 @@ class Repository:
         if self.append_only:
             with open(os.path.join(self.path, "transactions"), "a") as log:
                 print(
-                    "transaction %d, UTC time %s" % (transaction_id, datetime.utcnow().strftime(ISO_FORMAT)), file=log
+                    "transaction %d, UTC time %s"
+                    % (transaction_id, datetime.utcnow().isoformat(timespec="microseconds")),
+                    file=log,
                 )
 
         # Write hints file

@@ -1,5 +1,8 @@
 import argparse
+from collections import OrderedDict
+from datetime import datetime, timezone, timedelta
 import logging
+from operator import attrgetter
 import re
 
 from .common import with_repository
@@ -7,7 +10,7 @@ from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import format_archive
-from ..helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
+from ..helpers import interval
 from ..helpers import Manifest, sig_int
 from ..helpers import log_multi
 from ..helpers import ProgressIndicatorPercent
@@ -15,6 +18,58 @@ from ..helpers import ProgressIndicatorPercent
 from ..logger import create_logger
 
 logger = create_logger()
+
+
+def prune_within(archives, hours, kept_because):
+    target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
+    kept_counter = 0
+    result = []
+    for a in archives:
+        if a.ts > target:
+            kept_counter += 1
+            kept_because[a.id] = ("within", kept_counter)
+            result.append(a)
+    return result
+
+
+PRUNING_PATTERNS = OrderedDict(
+    [
+        ("secondly", "%Y-%m-%d %H:%M:%S"),
+        ("minutely", "%Y-%m-%d %H:%M"),
+        ("hourly", "%Y-%m-%d %H"),
+        ("daily", "%Y-%m-%d"),
+        ("weekly", "%G-%V"),
+        ("monthly", "%Y-%m"),
+        ("yearly", "%Y"),
+    ]
+)
+
+
+def prune_split(archives, rule, n, kept_because=None):
+    last = None
+    keep = []
+    pattern = PRUNING_PATTERNS[rule]
+    if kept_because is None:
+        kept_because = {}
+    if n == 0:
+        return keep
+
+    a = None
+    for a in sorted(archives, key=attrgetter("ts"), reverse=True):
+        # we compute the pruning in local time zone
+        period = a.ts.astimezone().strftime(pattern)
+        if period != last:
+            last = period
+            if a.id not in kept_because:
+                keep.append(a)
+                kept_because[a.id] = (rule, len(keep))
+                if len(keep) == n:
+                    break
+    # Keep oldest archive if we didn't reach the target retention count
+    if a is not None and len(keep) < n and a.id not in kept_because:
+        keep.append(a)
+        kept_because[a.id] = (rule + "[oldest]", len(keep))
+    return keep
 
 
 class PruneMixIn:

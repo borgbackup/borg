@@ -10,6 +10,7 @@ from io import StringIO, BytesIO
 
 import pytest
 
+from ..archiver.prune import prune_within, prune_split
 from .. import platform
 from ..constants import MAX_DATA_SIZE
 from ..helpers import Location
@@ -24,7 +25,7 @@ from ..helpers import (
     replace_placeholders,
 )
 from ..helpers import make_path_safe, clean_lines
-from ..helpers import interval, prune_within, prune_split
+from ..helpers import interval
 from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import msgpack

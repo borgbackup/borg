@@ -7,7 +7,7 @@ from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import EXIT_SUCCESS, EXIT_ERROR
 from ..helpers import location_validator, Location
 from ..helpers import format_file_size
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

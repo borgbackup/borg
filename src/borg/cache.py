@@ -16,7 +16,6 @@ from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Location
 from .helpers import Error
-from .helpers import Manifest
 from .helpers import get_cache_dir, get_security_dir
 from .helpers import bin_to_hex, parse_stringified_list
 from .helpers import format_file_size
@@ -32,6 +31,7 @@ from .item import ArchiveItem, ChunkListEntry
 from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, DetachedIntegrityCheckedFile, FileIntegrityError
 from .locking import Lock
+from .manifest import Manifest
 from .platform import SaveFile
 from .remote import cache_if_remote
 from .repository import LIST_SCAN_LIMIT

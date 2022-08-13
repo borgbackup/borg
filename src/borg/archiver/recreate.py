@@ -8,7 +8,7 @@ from ..compress import CompressionSpec
 from ..helpers import archivename_validator, ChunkerParams
 from ..helpers import CommentSpec
 from ..helpers import timestamp
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

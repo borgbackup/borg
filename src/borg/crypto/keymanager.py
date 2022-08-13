@@ -4,7 +4,8 @@ import textwrap
 from binascii import unhexlify, a2b_base64, b2a_base64
 from hashlib import sha256
 
-from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, dash_open
+from ..helpers import Error, yes, bin_to_hex, dash_open
+from ..manifest import Manifest, NoManifestError
 from ..repository import Repository
 
 from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_key

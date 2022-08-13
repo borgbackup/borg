@@ -21,13 +21,13 @@ from ..helpers import NameSpec, CommentSpec, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp
 from ..helpers import get_cache_dir, os_stat
-from ..helpers import Manifest
 from ..helpers import dir_is_tagged
 from ..helpers import log_multi
 from ..helpers import basic_json_data, json_print
 from ..helpers import flags_root, flags_dir, flags_special_follow, flags_special
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
+from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import get_flags
 from ..platform import uid2user, gid2group

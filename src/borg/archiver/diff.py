@@ -5,7 +5,7 @@ from .common import with_repository, with_archive, build_matcher
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

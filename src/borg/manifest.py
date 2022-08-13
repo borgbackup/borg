@@ -7,17 +7,16 @@ from datetime import datetime, timedelta, timezone
 from operator import attrgetter
 from typing import Sequence, FrozenSet
 
-from .errors import Error
-
-from ..logger import create_logger
+from .logger import create_logger
 
 logger = create_logger()
 
-from .datastruct import StableDict
-from .parseformat import bin_to_hex
-from .time import parse_timestamp
-from .. import shellpattern
-from ..constants import *  # NOQA
+from .helpers import shellpattern
+from .constants import *  # NOQA
+from .helpers.datastruct import StableDict
+from .helpers.parseformat import bin_to_hex
+from .helpers.time import parse_timestamp
+from .helpers.errors import Error
 
 
 class NoManifestError(Error):
@@ -184,9 +183,9 @@ class Manifest:
 
     @classmethod
     def load(cls, repository, operations, key=None, force_tam_not_required=False):
-        from ..item import ManifestItem
-        from ..crypto.key import key_factory, tam_required_file, tam_required
-        from ..repository import Repository
+        from .item import ManifestItem
+        from .crypto.key import key_factory, tam_required_file, tam_required
+        from .repository import Repository
 
         try:
             cdata = repository.get(cls.MANIFEST_ID)
@@ -248,7 +247,7 @@ class Manifest:
         return result
 
     def write(self):
-        from ..item import ManifestItem
+        from .item import ManifestItem
 
         if self.key.tam_required:
             self.config["tam_required"] = True

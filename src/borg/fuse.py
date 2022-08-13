@@ -41,8 +41,8 @@ from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, daemonizing, signal_handler, format_file_size
 from .helpers import HardLinkManager
 from .helpers import msgpack
+from .helpers.lrucache import LRUCache
 from .item import Item
-from .lrucache import LRUCache
 from .platform import uid2user, gid2group
 from .remote import RemoteRepository
 

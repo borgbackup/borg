@@ -10,10 +10,10 @@ from ..constants import *  # NOQA
 from ..helpers import msgpack
 from ..helpers import sysinfo
 from ..helpers import bin_to_hex, prepare_dump_dict
-from ..helpers import Manifest
 from ..helpers import dash_open
 from ..helpers import StableDict
 from ..helpers import positive_int_validator, NameSpec
+from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
 

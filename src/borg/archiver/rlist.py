@@ -4,8 +4,8 @@ import sys
 
 from .common import with_repository
 from ..constants import *  # NOQA
-from ..helpers import Manifest
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

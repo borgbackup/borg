@@ -3,7 +3,7 @@ import argparse
 from .common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import EXIT_SUCCESS
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

@@ -10,9 +10,9 @@ from ..archive import BackupError, BackupOSError
 from ..constants import *  # NOQA
 from ..helpers import NameSpec
 from ..helpers import remove_surrogates
-from ..helpers import Manifest
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

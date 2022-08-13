@@ -4,11 +4,10 @@ from .common import with_repository
 from ..cache import Cache, SecurityManager
 from ..constants import *  # NOQA
 from ..helpers import EXIT_ERROR
-from ..helpers import NoManifestError
 from ..helpers import format_archive
 from ..helpers import bin_to_hex
-from ..helpers import Manifest
 from ..helpers import yes
+from ..manifest import Manifest, NoManifestError
 
 from ..logger import create_logger
 

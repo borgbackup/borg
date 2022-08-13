@@ -10,9 +10,9 @@ from . import BaseTestCase
 from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
-from ..helpers import Manifest
 from ..helpers import msgpack
 from ..item import Item, ArchiveItem
+from ..manifest import Manifest
 from ..platform import uid2user, gid2group
 
 

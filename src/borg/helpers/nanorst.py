@@ -1,7 +1,7 @@
 import io
 import sys
 
-from .helpers import is_terminal
+from . import is_terminal
 
 
 class TextPecker:

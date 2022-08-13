@@ -9,11 +9,8 @@ from .common import with_repository
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import format_archive
-from ..helpers import interval
-from ..helpers import Manifest, sig_int
-from ..helpers import log_multi
-from ..helpers import ProgressIndicatorPercent
+from ..helpers import format_archive, interval, sig_int, log_multi, ProgressIndicatorPercent
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

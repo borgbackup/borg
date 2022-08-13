@@ -4,8 +4,8 @@ import subprocess
 from .common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import Manifest
 from ..helpers import prepare_subprocess_env
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

@@ -1,6 +1,6 @@
 import pytest
 
-from ..nanorst import rst_to_text
+from ..helpers.nanorst import rst_to_text
 
 
 def test_inline():

@@ -1,7 +1,7 @@
 import argparse
 import textwrap
 
-from .common import with_repository
+from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, json_print, basic_json_data
 from ..manifest import Manifest
@@ -54,7 +54,7 @@ class RInfoMixIn:
         return self.exit_code
 
     def build_parser_rinfo(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog
+        from ._common import process_epilog
 
         rinfo_epilog = process_epilog(
             """

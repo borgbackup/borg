@@ -62,31 +62,31 @@ def get_func(args):
     raise Exception("expected func attributes not found")
 
 
-from .benchmarks import BenchmarkMixIn
-from .check import CheckMixIn
-from .compact import CompactMixIn
-from .config import ConfigMixIn
-from .create import CreateMixIn
-from .debug import DebugMixIn
-from .delete import DeleteMixIn
-from .diff import DiffMixIn
-from .extract import ExtractMixIn
-from .help import HelpMixIn
-from .info import InfoMixIn
-from .keys import KeysMixIn
+from .benchmark_cmd import BenchmarkMixIn
+from .check_cmd import CheckMixIn
+from .compact_cmd import CompactMixIn
+from .config_cmd import ConfigMixIn
+from .create_cmd import CreateMixIn
+from .debug_cmd import DebugMixIn
+from .delete_cmd import DeleteMixIn
+from .diff_cmd import DiffMixIn
+from .extract_cmd import ExtractMixIn
+from .help_cmd import HelpMixIn
+from .info_cmd import InfoMixIn
+from .key_cmds import KeysMixIn
 from .list_cmd import ListMixIn
-from .locks import LocksMixIn
-from .mount import MountMixIn
-from .prune import PruneMixIn
-from .recreate import RecreateMixIn
-from .rename import RenameMixIn
-from .rcreate import RCreateMixIn
-from .rinfo import RInfoMixIn
-from .rdelete import RDeleteMixIn
-from .rlist import RListMixIn
-from .serve import ServeMixIn
-from .tar import TarMixIn
-from .transfer import TransferMixIn
+from .lock_cmds import LocksMixIn
+from .mount_cmds import MountMixIn
+from .prune_cmd import PruneMixIn
+from .recreate_cmd import RecreateMixIn
+from .rename_cmd import RenameMixIn
+from .rcreate_cmd import RCreateMixIn
+from .rinfo_cmd import RInfoMixIn
+from .rdelete_cmd import RDeleteMixIn
+from .rlist_cmd import RListMixIn
+from .serve_cmd import ServeMixIn
+from .tar_cmds import TarMixIn
+from .transfer_cmd import TransferMixIn
 
 
 class Archiver(
@@ -284,7 +284,7 @@ class Archiver(
                 setattr(args, dest, option_value)
 
     def build_parser(self):
-        from .common import define_common_options
+        from ._common import define_common_options
 
         parser = argparse.ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
         # paths and patterns must have an empty list as default everywhere

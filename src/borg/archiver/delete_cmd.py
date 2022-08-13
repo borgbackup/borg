@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from .common import with_repository
+from ._common import with_repository
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -103,7 +103,7 @@ class DeleteMixIn:
         return self.exit_code
 
     def build_parser_delete(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog, define_archive_filters_group
+        from ._common import process_epilog, define_archive_filters_group
 
         delete_epilog = process_epilog(
             """

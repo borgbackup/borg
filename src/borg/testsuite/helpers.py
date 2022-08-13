@@ -10,7 +10,7 @@ from io import StringIO, BytesIO
 
 import pytest
 
-from ..archiver.prune import prune_within, prune_split
+from ..archiver.prune_cmd import prune_within, prune_split
 from .. import platform
 from ..constants import MAX_DATA_SIZE
 from ..helpers import Location

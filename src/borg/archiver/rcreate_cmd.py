@@ -1,6 +1,6 @@
 import argparse
 
-from .common import with_repository, with_other_repository
+from ._common import with_repository, with_other_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names, tam_required_file
@@ -49,7 +49,7 @@ class RCreateMixIn:
         return self.exit_code
 
     def build_parser_rcreate(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog
+        from ._common import process_epilog
 
         rcreate_epilog = process_epilog(
             """

@@ -22,7 +22,7 @@ class ServeMixIn:
         return EXIT_SUCCESS
 
     def build_parser_serve(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog
+        from ._common import process_epilog
 
         serve_epilog = process_epilog(
             """

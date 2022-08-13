@@ -2,7 +2,7 @@ import argparse
 import textwrap
 import sys
 
-from .common import with_repository
+from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
 from ..manifest import Manifest
@@ -38,7 +38,7 @@ class RListMixIn:
         return self.exit_code
 
     def build_parser_rlist(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog, define_archive_filters_group
+        from ._common import process_epilog, define_archive_filters_group
 
         rlist_epilog = (
             process_epilog(

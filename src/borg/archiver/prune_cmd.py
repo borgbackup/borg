@@ -5,7 +5,7 @@ import logging
 from operator import attrgetter
 import re
 
-from .common import with_repository
+from ._common import with_repository
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -173,8 +173,8 @@ class PruneMixIn:
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
-        from .common import define_archive_filters_group
+        from ._common import process_epilog
+        from ._common import define_archive_filters_group
 
         prune_epilog = process_epilog(
             """

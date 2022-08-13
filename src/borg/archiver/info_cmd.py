@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from .common import with_repository
+from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import remove_surrogates, format_timedelta, json_print, basic_json_data
@@ -73,7 +73,7 @@ class InfoMixIn:
         return self.exit_code
 
     def build_parser_info(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog, define_archive_filters_group
+        from ._common import process_epilog, define_archive_filters_group
 
         info_epilog = process_epilog(
             """

@@ -35,7 +35,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from .crypto.low_level import blake2b_128
-from .archiver.common import build_matcher, build_filter
+from .archiver._common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
 from .helpers import daemonize, daemonizing, signal_handler, format_file_size

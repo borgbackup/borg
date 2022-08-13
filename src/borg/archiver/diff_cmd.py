@@ -1,7 +1,7 @@
 import argparse
 import json
 
-from .common import with_repository, with_archive, build_matcher
+from ._common import with_repository, with_archive, build_matcher
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
@@ -59,8 +59,8 @@ class DiffMixIn:
 
     def build_parser_diff(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
-        from .common import define_exclusion_group
+        from ._common import process_epilog
+        from ._common import define_exclusion_group
 
         diff_epilog = process_epilog(
             """

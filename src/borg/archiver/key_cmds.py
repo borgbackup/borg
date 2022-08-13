@@ -8,7 +8,7 @@ from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKe
 from ..crypto.keymanager import KeyManager
 from ..manifest import Manifest
 
-from .common import with_repository
+from ._common import with_repository
 
 from ..logger import create_logger
 
@@ -128,7 +128,7 @@ class KeysMixIn:
 
     def build_parser_keys(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
+        from ._common import process_epilog
 
         subparser = subparsers.add_parser(
             "key",

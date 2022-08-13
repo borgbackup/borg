@@ -1,6 +1,6 @@
 import argparse
 
-from .common import with_repository
+from ._common import with_repository
 from ..cache import Cache, SecurityManager
 from ..constants import *  # NOQA
 from ..helpers import EXIT_ERROR
@@ -91,7 +91,7 @@ class RDeleteMixIn:
 
     def build_parser_rdelete(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
+        from ._common import process_epilog
 
         rdelete_epilog = process_epilog(
             """

@@ -1,6 +1,6 @@
 import argparse
 
-from .common import with_repository, with_other_repository
+from ._common import with_repository, with_other_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
@@ -107,8 +107,8 @@ class TransferMixIn:
 
     def build_parser_transfer(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
-        from .common import define_archive_filters_group
+        from ._common import process_epilog
+        from ._common import define_archive_filters_group
 
         transfer_epilog = process_epilog(
             """

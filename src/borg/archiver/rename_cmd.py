@@ -1,6 +1,6 @@
 import argparse
 
-from .common import with_repository, with_archive
+from ._common import with_repository, with_archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
 from ..manifest import Manifest
@@ -22,7 +22,7 @@ class RenameMixIn:
         return self.exit_code
 
     def build_parser_rename(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog
+        from ._common import process_epilog
 
         rename_epilog = process_epilog(
             """

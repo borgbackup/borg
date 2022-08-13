@@ -1,21 +1,27 @@
 import os
-import time
 from datetime import datetime, timezone
-
-from ..constants import ISO_FORMAT, ISO_FORMAT_NO_USECS
-
-
-def to_localtime(ts):
-    """Convert datetime object from UTC to local time zone"""
-    return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
-    """Parse a ISO 8601 timestamp string"""
-    fmt = ISO_FORMAT if "." in timestamp else ISO_FORMAT_NO_USECS
-    dt = datetime.strptime(timestamp, fmt)
-    if tzinfo is not None:
+    """Parse a ISO 8601 timestamp string.
+
+    For naive/unaware dt, assume it is in tzinfo timezone (default: UTC).
+    """
+    dt = datetime.fromisoformat(timestamp)
+    if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tzinfo)
+    return dt
+
+
+def parse_local_timestamp(timestamp, tzinfo=None):
+    """Parse a ISO 8601 timestamp string.
+
+    For naive/unaware dt, assume it is in local timezone.
+    Convert to tzinfo timezone (the default None means: local timezone).
+    """
+    dt = datetime.fromisoformat(timestamp)
+    if dt.tzinfo is None:
+        dt = dt.astimezone(tz=tzinfo)
     return dt
 
 
@@ -26,22 +32,8 @@ def timestamp(s):
         ts = safe_s(os.stat(s).st_mtime)
         return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
-        # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
-        for format in (
-            "%Y-%m-%dT%H:%M:%SZ",
-            "%Y-%m-%dT%H:%M:%S+00:00",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d",
-            "%Y-%j",
-        ):
-            try:
-                return datetime.strptime(s, format).replace(tzinfo=timezone.utc)
-            except ValueError:
-                continue
-        raise ValueError
+        # didn't work, try parsing as a ISO timestamp. if no TZ is given, we assume local timezone.
+        return parse_local_timestamp(s)
 
 
 # Not too rarely, we get crappy timestamps from the fs, that overflow some computations.
@@ -98,15 +90,7 @@ def format_time(ts: datetime, format_spec=""):
     """
     Convert *ts* to a human-friendly format with textual weekday.
     """
-    return ts.strftime("%a, %Y-%m-%d %H:%M:%S" if format_spec == "" else format_spec)
-
-
-def isoformat_time(ts: datetime):
-    """
-    Format *ts* according to ISO 8601.
-    """
-    # note: first make all datetime objects tz aware before adding %z here.
-    return ts.strftime(ISO_FORMAT)
+    return ts.strftime("%a, %Y-%m-%d %H:%M:%S %z" if format_spec == "" else format_spec)
 
 
 def format_timedelta(td):
@@ -127,8 +111,6 @@ def format_timedelta(td):
 
 class OutputTimestamp:
     def __init__(self, ts: datetime):
-        if ts.tzinfo == timezone.utc:
-            ts = to_localtime(ts)
         self.ts = ts
 
     def __format__(self, format_spec):
@@ -138,6 +120,6 @@ class OutputTimestamp:
         return f"{self}"
 
     def isoformat(self):
-        return isoformat_time(self.ts)
+        return self.ts.isoformat(timespec="microseconds")
 
     to_json = isoformat

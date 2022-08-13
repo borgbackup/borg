@@ -21,7 +21,7 @@ logger = create_logger()
 from .errors import Error
 from .fs import get_keys_dir
 from .msgpack import Timestamp
-from .time import OutputTimestamp, format_time, to_localtime, safe_timestamp
+from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
@@ -196,7 +196,7 @@ def replace_placeholders(text, overrides={}):
         "fqdn": fqdn,
         "reverse-fqdn": ".".join(reversed(fqdn.split("."))),
         "hostname": hostname,
-        "now": DatetimeWrapper(current_time.astimezone(None)),
+        "now": DatetimeWrapper(current_time.astimezone()),
         "utcnow": DatetimeWrapper(current_time),
         "user": getosusername(),
         "uuid4": str(uuid.uuid4()),
@@ -303,7 +303,7 @@ def sizeof_fmt_decimal(num, suffix="B", sep="", precision=2, sign=False):
 
 
 def format_archive(archive):
-    return "%-36s %s [%s]" % (archive.name, format_time(to_localtime(archive.ts)), bin_to_hex(archive.id))
+    return "%-36s %s [%s]" % (archive.name, format_time(archive.ts), bin_to_hex(archive.id))
 
 
 def parse_stringified_list(s):
@@ -500,9 +500,13 @@ class Location:
             )
 
     def with_timestamp(self, timestamp):
+        # note: this only affects the repository URL/path, not the archive name!
         return Location(
             self.raw,
-            overrides={"now": DatetimeWrapper(timestamp.astimezone(None)), "utcnow": DatetimeWrapper(timestamp)},
+            overrides={
+                "now": DatetimeWrapper(timestamp),
+                "utcnow": DatetimeWrapper(timestamp.astimezone(timezone.utc)),
+            },
         )
 
 
@@ -973,7 +977,7 @@ def basic_json_data(manifest, *, cache=None, extra=None):
     key = manifest.key
     data = extra or {}
     data.update({"repository": BorgJsonEncoder().default(manifest.repository), "encryption": {"mode": key.ARG_NAME}})
-    data["repository"]["last_modified"] = OutputTimestamp(manifest.last_timestamp.replace(tzinfo=timezone.utc))
+    data["repository"]["last_modified"] = OutputTimestamp(manifest.last_timestamp)
     if key.NAME.startswith("key file"):
         data["encryption"]["keyfile"] = key.find_key()
     if cache:

@@ -1,5 +1,4 @@
 import argparse
-import dateutil.tz
 import errno
 import io
 import json
@@ -18,9 +17,7 @@ import time
 import unittest
 from binascii import unhexlify, b2a_base64, a2b_base64
 from configparser import ConfigParser
-from datetime import datetime
-from datetime import timezone
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
 from unittest.mock import patch
@@ -247,6 +244,11 @@ def test_disk_full(cmd):
             if rc != EXIT_SUCCESS:
                 print("check", rc, out)
             assert rc == EXIT_SUCCESS
+
+
+def checkts(ts):
+    # check if the timestamp is in the expected format
+    assert datetime.strptime(ts, ISO_FORMAT + "%z")  # must not raise
 
 
 class ArchiverTestCaseBase(BaseTestCase):
@@ -1682,7 +1684,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repository = info_repo["repository"]
         assert len(repository["id"]) == 64
         assert "last_modified" in repository
-        assert datetime.strptime(repository["last_modified"], ISO_FORMAT)  # must not raise
+        checkts(repository["last_modified"])
         assert info_repo["encryption"]["mode"] == RK_ENCRYPTION[13:]
         assert "keyfile" not in info_repo["encryption"]
         cache = info_repo["cache"]
@@ -1701,8 +1703,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert isinstance(archive["duration"], float)
         assert len(archive["id"]) == 64
         assert "stats" in archive
-        assert datetime.strptime(archive["start"], ISO_FORMAT)
-        assert datetime.strptime(archive["end"], ISO_FORMAT)
+        checkts(archive["start"])
+        checkts(archive["end"])
 
     def test_info_json_of_empty_archive(self):
         """See https://github.com/borgbackup/borg/issues/6120"""
@@ -2298,18 +2300,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the latest archive must be still there
         self.assert_in("test5", output)
 
-    # Given a date and time in local tz, create a UTC timestamp string suitable
-    # for create --timestamp command line option
-    def _to_utc_timestamp(self, year, month, day, hour, minute, second):
-        dtime = datetime(year, month, day, hour, minute, second, 0, dateutil.tz.gettz())
-        return dtime.astimezone(dateutil.tz.UTC).strftime("%Y-%m-%dT%H:%M:%S")
-
     def _create_archive_ts(self, name, y, m, d, H=0, M=0, S=0):
         self.cmd(
             f"--repo={self.repository_location}",
             "create",
             "--timestamp",
-            self._to_utc_timestamp(y, m, d, H, M, S),
+            datetime(y, m, d, H, M, S, 0).strftime(ISO_FORMAT_NO_USECS),  # naive == local time / local tz
             name,
             src_dir,
         )
@@ -2579,11 +2575,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         list_repo = json.loads(self.cmd(f"--repo={self.repository_location}", "rlist", "--json"))
         repository = list_repo["repository"]
         assert len(repository["id"]) == 64
-        assert datetime.strptime(repository["last_modified"], ISO_FORMAT)  # must not raise
+        checkts(repository["last_modified"])
         assert list_repo["encryption"]["mode"] == RK_ENCRYPTION[13:]
         assert "keyfile" not in list_repo["encryption"]
         archive0 = list_repo["archives"][0]
-        assert datetime.strptime(archive0["time"], ISO_FORMAT)  # must not raise
+        checkts(archive0["time"])
 
         list_archive = self.cmd(f"--repo={self.repository_location}", "list", "test", "--json-lines")
         items = [json.loads(s) for s in list_archive.splitlines()]
@@ -2591,7 +2587,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         file1 = items[1]
         assert file1["path"] == "input/file1"
         assert file1["size"] == 81920
-        assert datetime.strptime(file1["mtime"], ISO_FORMAT)  # must not raise
 
         list_archive = self.cmd(
             f"--repo={self.repository_location}", "list", "test", "--json-lines", "--format={sha256}"
@@ -4058,7 +4053,9 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                             "version": 1,
                             "archives": {},
                             "config": {},
-                            "timestamp": (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
+                            "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
+                                timespec="microseconds"
+                            ),
                         }
                     ),
                 ),
@@ -4078,7 +4075,9 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                         {
                             "version": 1,
                             "archives": {},
-                            "timestamp": (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
+                            "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
+                                timespec="microseconds"
+                            ),
                         }
                     ),
                 ),

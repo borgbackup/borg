@@ -238,7 +238,7 @@ class TarMixIn:
         return self.exit_code
 
     def _import_tar(self, args, repository, manifest, key, cache, tarstream):
-        t0 = datetime.utcnow()
+        t0 = datetime.now().astimezone()  # local time with local timezone
         t0_monotonic = time.monotonic()
 
         archive = Archive(
@@ -485,8 +485,8 @@ class TarMixIn:
             type=timestamp,
             default=None,
             metavar="TIMESTAMP",
-            help="manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). "
-            "alternatively, give a reference file/directory.",
+            help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
+            "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
         )
         archive_group.add_argument(
             "-c",

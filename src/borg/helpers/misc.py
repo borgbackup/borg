@@ -13,7 +13,6 @@ from ..logger import create_logger
 
 logger = create_logger()
 
-from .time import to_localtime
 from . import msgpack
 from .. import __version__ as borg_version
 from .. import chunker
@@ -55,7 +54,8 @@ def prune_split(archives, rule, n, kept_because=None):
 
     a = None
     for a in sorted(archives, key=attrgetter("ts"), reverse=True):
-        period = to_localtime(a.ts).strftime(pattern)
+        # we compute the pruning in local time zone
+        period = a.ts.astimezone().strftime(pattern)
         if period != last:
             last = period
             if a.id not in kept_because:

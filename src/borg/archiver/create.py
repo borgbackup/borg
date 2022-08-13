@@ -204,7 +204,7 @@ class CreateMixIn:
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
-        t0 = datetime.utcnow()
+        t0 = datetime.now().astimezone()  # local time with local timezone
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.processed)
         if not dry_run:
@@ -821,8 +821,8 @@ class CreateMixIn:
             dest="timestamp",
             type=timestamp,
             default=None,
-            help="manually specify the archive creation date/time (UTC, yyyy-mm-ddThh:mm:ss format). "
-            "Alternatively, give a reference file/directory.",
+            help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
+            "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
         )
         archive_group.add_argument(
             "-c",

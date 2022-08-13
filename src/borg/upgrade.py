@@ -130,16 +130,11 @@ class UpgraderFrom12To20:
         new_metadata = {}
         # keep all metadata except archive version and stats. also do not keep
         # recreate_source_id, recreate_args, recreate_partial_chunks which were used only in 1.1.0b1 .. b2.
-        for attr in (
-            "cmdline",
-            "hostname",
-            "username",
-            "time",
-            "time_end",
-            "comment",
-            "chunker_params",
-            "recreate_cmdline",
-        ):
+        for attr in ("cmdline", "hostname", "username", "comment", "chunker_params", "recreate_cmdline"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
+        # old borg used UTC timestamps, but did not have the explicit tz offset in them.
+        for attr in ("time", "time_end"):
+            if hasattr(metadata, attr):
+                new_metadata[attr] = getattr(metadata, attr) + "+00:00"
         return new_metadata

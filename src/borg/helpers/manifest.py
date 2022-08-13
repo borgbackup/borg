@@ -3,7 +3,7 @@ import os
 import os.path
 import re
 from collections import abc, namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from operator import attrgetter
 from typing import Sequence, FrozenSet
 
@@ -65,7 +65,7 @@ class Archives(abc.MutableMapping):
         id, ts = info
         assert isinstance(id, bytes)
         if isinstance(ts, datetime):
-            ts = ts.replace(tzinfo=None).strftime(ISO_FORMAT)
+            ts = ts.isoformat(timespec="microseconds")
         assert isinstance(ts, str)
         self._archives[name] = {"id": id, "time": ts}
 
@@ -180,7 +180,7 @@ class Manifest:
 
     @property
     def last_timestamp(self):
-        return parse_timestamp(self.timestamp, tzinfo=None)
+        return parse_timestamp(self.timestamp)
 
     @classmethod
     def load(cls, repository, operations, key=None, force_tam_not_required=False):
@@ -254,11 +254,12 @@ class Manifest:
             self.config["tam_required"] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().strftime(ISO_FORMAT)
+            self.timestamp = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds")
         else:
-            prev_ts = self.last_timestamp
-            incremented = (prev_ts + timedelta(microseconds=1)).strftime(ISO_FORMAT)
-            self.timestamp = max(incremented, datetime.utcnow().strftime(ISO_FORMAT))
+            incremented_ts = self.last_timestamp + timedelta(microseconds=1)
+            now_ts = datetime.now(tz=timezone.utc)
+            max_ts = max(incremented_ts, now_ts)
+            self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())
         assert len(self.archives) <= MAX_ARCHIVES
         assert all(len(name) <= 255 for name in self.archives)

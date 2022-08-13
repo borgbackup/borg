@@ -102,9 +102,6 @@ EXIT_WARNING = 1  # reached normal end of operation, but there were issues
 EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
 EXIT_SIGNAL_BASE = 128  # terminated due to signal, rc = 128 + sig_no
 
-# never use datetime.isoformat(), it is evil. always use one of these:
-# datetime.strftime(ISO_FORMAT)  # output always includes .microseconds
-# datetime.strftime(ISO_FORMAT_NO_USECS)  # output never includes microseconds
 ISO_FORMAT_NO_USECS = "%Y-%m-%dT%H:%M:%S"
 ISO_FORMAT = ISO_FORMAT_NO_USECS + ".%f"
 

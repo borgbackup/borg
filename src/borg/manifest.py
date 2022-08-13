@@ -11,7 +11,7 @@ from .logger import create_logger
 
 logger = create_logger()
 
-from . import shellpattern
+from .helpers import shellpattern
 from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex

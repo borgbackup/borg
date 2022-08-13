@@ -7,8 +7,7 @@ import unicodedata
 from collections import namedtuple
 from enum import Enum
 
-from . import shellpattern
-from .helpers import clean_lines
+from .helpers import clean_lines, shellpattern
 from .helpers.errors import Error
 
 

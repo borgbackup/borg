@@ -178,7 +178,7 @@ class RecreateMixIn:
             type=timestamp,
             default=None,
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
-            "(+|-)HH:MM is the UTC offset, default: +00:00). Alternatively, give a reference file/directory.",
+            "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
         )
         archive_group.add_argument(
             "-C",

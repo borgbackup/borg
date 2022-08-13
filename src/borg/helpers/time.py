@@ -3,10 +3,25 @@ from datetime import datetime, timezone
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
-    """Parse a ISO 8601 timestamp string"""
+    """Parse a ISO 8601 timestamp string.
+
+    For naive/unaware dt, assume it is in tzinfo timezone (default: UTC).
+    """
     dt = datetime.fromisoformat(timestamp)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tzinfo)
+    return dt
+
+
+def parse_local_timestamp(timestamp, tzinfo=None):
+    """Parse a ISO 8601 timestamp string.
+
+    For naive/unaware dt, assume it is in local timezone.
+    Convert to tzinfo timezone (the default None means: local timezone).
+    """
+    dt = datetime.fromisoformat(timestamp)
+    if dt.tzinfo is None:
+        dt = dt.astimezone(tz=tzinfo)
     return dt
 
 
@@ -17,8 +32,8 @@ def timestamp(s):
         ts = safe_s(os.stat(s).st_mtime)
         return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
-        # didn't work, try parsing as a ISO timestamp. if no TZ is given, we assume UTC.
-        return parse_timestamp(s)
+        # didn't work, try parsing as a ISO timestamp. if no TZ is given, we assume local timezone.
+        return parse_local_timestamp(s)
 
 
 # Not too rarely, we get crappy timestamps from the fs, that overflow some computations.

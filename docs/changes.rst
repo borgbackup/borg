@@ -12,9 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b1 (2022-08-08)
+Version 2.0.0b2 (2022-xx-xx)
 ----------------------------
-
 Please note:
 
 This is a beta release, only for testing - do not use for production repos.
@@ -73,12 +72,29 @@ Compatibility notes:
       - borg mount -a ARCH_GLOB mountpoint ...
 
     For more details, please consult the docs or --help option output.
+  - create/recreate/import-tar --timestamp: defaults to local timezone
+    now (was: UTC)
 - some deprecated options were removed:
 
   - removed --remote-ratelimit (use --upload-ratelimit)
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
+
+New features:
+
+- support archive timestamps with utc offsets, adapt them when using
+  borg transfer to transfer from borg 1.x repos (append +00:00 for UTC).
+- create/recreate/import-tar --timestamp: accept giving timezone via
+  its utc offset. defaults to local timezone, if no utc offset is given.
+
+Other changes:
+
+- restructured source code
+- update diagrams to odg format, #6928
+
+Version 2.0.0b1 (2022-08-08)
+----------------------------
 
 New features:
 

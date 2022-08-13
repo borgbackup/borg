@@ -2,7 +2,7 @@ from tempfile import TemporaryFile
 
 import pytest
 
-from ..lrucache import LRUCache
+from ..helpers.lrucache import LRUCache
 
 
 class TestLRUCache:

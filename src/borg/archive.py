@@ -13,7 +13,7 @@ from io import BytesIO
 from itertools import groupby, zip_longest
 from shutil import get_terminal_size
 
-from .platformflags import is_win32, is_linux, is_freebsd, is_darwin
+from .platformflags import is_win32
 from .logger import create_logger
 
 logger = create_logger()
@@ -41,7 +41,7 @@ from .helpers import os_open, flags_normal, flags_dir
 from .helpers import os_stat
 from .helpers import msgpack
 from .helpers import sig_int
-from .lrucache import LRUCache
+from .helpers.lrucache import LRUCache
 from .manifest import Manifest
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff

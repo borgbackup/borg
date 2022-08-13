@@ -17,7 +17,7 @@ from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, umount
 from .fs import O_, flags_root, flags_dir, flags_special_follow, flags_special, flags_base, flags_normal, flags_noatime
 from .fs import HardLinkManager
 from .manifest import Manifest, NoManifestError, MandatoryFeatureUnsupported, AI_HUMAN_SORT_KEYS
-from .misc import prune_within, prune_split, PRUNING_PATTERNS, sysinfo, log_multi, consume, get_tar_filter
+from .misc import sysinfo, log_multi, consume, get_tar_filter
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
 from .parseformat import bin_to_hex, safe_encode, safe_decode
 from .parseformat import remove_surrogates, eval_escapes, decode_dict, positive_int_validator, interval

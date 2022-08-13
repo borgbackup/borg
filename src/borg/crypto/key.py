@@ -3,7 +3,7 @@ import os
 import textwrap
 from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, pbkdf2_hmac
-from typing import Literal, Callable, Sequence
+from typing import Literal, Callable
 
 from ..logger import create_logger
 
@@ -20,8 +20,8 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
 from ..helpers import msgpack
-from ..helpers.manifest import Manifest
 from ..item import Key, EncryptedKey, want_bytes
+from ..manifest import Manifest
 from ..platform import SaveFile
 
 from .nonces import NonceManager

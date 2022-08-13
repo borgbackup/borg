@@ -6,8 +6,8 @@ from .common import with_repository, build_matcher
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import Manifest
 from ..helpers import ItemFormatter, BaseFormatter, NameSpec
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

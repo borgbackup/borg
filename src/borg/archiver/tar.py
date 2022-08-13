@@ -10,7 +10,6 @@ import time
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
 from ..compress import CompressionSpec
 from ..constants import *  # NOQA
-from ..helpers import Manifest
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import dash_open
@@ -23,6 +22,7 @@ from ..helpers import remove_surrogates
 from ..helpers import timestamp
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
+from ..manifest import Manifest
 
 from .common import with_repository, with_archive, Highlander, define_exclusion_group
 from .common import build_matcher, build_filter

@@ -10,7 +10,7 @@ from ..helpers import EXIT_SUCCESS, EXIT_WARNING
 from ..helpers import Error
 from ..helpers import Location
 from ..helpers import parse_file_size
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

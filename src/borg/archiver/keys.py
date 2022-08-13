@@ -6,7 +6,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
 from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
 from ..crypto.keymanager import KeyManager
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from .common import with_repository
 

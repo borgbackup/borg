@@ -5,7 +5,6 @@ import os
 import os.path
 import re
 import shlex
-import socket
 import stat
 import uuid
 from binascii import hexlify
@@ -219,7 +218,7 @@ CommentSpec = replace_placeholders
 
 
 def SortBySpec(text):
-    from .manifest import AI_HUMAN_SORT_KEYS
+    from ..manifest import AI_HUMAN_SORT_KEYS
 
     for token in text.split(","):
         if token not in AI_HUMAN_SORT_KEYS:
@@ -591,7 +590,7 @@ class ArchiveFormatter(BaseFormatter):
 
     @classmethod
     def available_keys(cls):
-        from .manifest import ArchiveInfo
+        from ..manifest import ArchiveInfo
 
         fake_archive_info = ArchiveInfo("archivename", b"\1" * 32, datetime(1970, 1, 1, tzinfo=timezone.utc))
         formatter = cls("", None, None, None)

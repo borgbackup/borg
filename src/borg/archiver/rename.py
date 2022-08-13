@@ -3,7 +3,7 @@ import argparse
 from .common import with_repository, with_archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

@@ -19,11 +19,11 @@ from .helpers import Location
 from .helpers import ProgressIndicatorPercent
 from .helpers import bin_to_hex
 from .helpers import secure_erase, safe_unlink
-from .helpers import Manifest
 from .helpers import msgpack
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
+from .manifest import Manifest
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
 from .checksums import crc32, StreamingXXH64
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError

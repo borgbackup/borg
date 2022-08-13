@@ -5,8 +5,8 @@ from .common import with_repository
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import Manifest, sig_int
-from ..helpers import log_multi, format_archive
+from ..helpers import log_multi, format_archive, sig_int
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

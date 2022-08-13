@@ -4,8 +4,8 @@ import os
 from .common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import EXIT_ERROR
-from ..helpers import Manifest
 from ..helpers import umount
+from ..manifest import Manifest
 from ..remote import cache_if_remote
 
 from ..logger import create_logger

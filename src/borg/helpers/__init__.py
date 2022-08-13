@@ -16,7 +16,6 @@ from .fs import dir_is_tagged, dir_is_cachedir, make_path_safe, scandir_inorder
 from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, umount
 from .fs import O_, flags_root, flags_dir, flags_special_follow, flags_special, flags_base, flags_normal, flags_noatime
 from .fs import HardLinkManager
-from .manifest import Manifest, NoManifestError, MandatoryFeatureUnsupported, AI_HUMAN_SORT_KEYS
 from .misc import sysinfo, log_multi, consume
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
 from .parseformat import bin_to_hex, safe_encode, safe_decode

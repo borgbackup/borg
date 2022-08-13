@@ -12,7 +12,7 @@ from ..cache import AdHocCache
 from ..compress import CompressionSpec
 from ..crypto.key import AESOCBRepoKey
 from ..hashindex import ChunkIndex, CacheSynchronizer
-from ..helpers import Manifest
+from ..manifest import Manifest
 from ..repository import Repository
 
 

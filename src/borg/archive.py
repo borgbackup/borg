@@ -26,7 +26,6 @@ from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
-from .helpers import Manifest
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
@@ -43,6 +42,7 @@ from .helpers import os_stat
 from .helpers import msgpack
 from .helpers import sig_int
 from .lrucache import LRUCache
+from .manifest import Manifest
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname

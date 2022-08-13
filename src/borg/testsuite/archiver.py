@@ -37,12 +37,12 @@ from ..crypto.key import FlexiKey, AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileK
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
-from ..helpers import Manifest, MandatoryFeatureUnsupported
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import msgpack
 from ..helpers import parse_storage_quota
 from ..helpers import flags_noatime, flags_normal
+from ..manifest import Manifest, MandatoryFeatureUnsupported
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff, chunks_contents_equal

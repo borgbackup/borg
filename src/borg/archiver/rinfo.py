@@ -3,8 +3,8 @@ import textwrap
 
 from .common import with_repository
 from ..constants import *  # NOQA
-from ..helpers import Manifest
 from ..helpers import bin_to_hex, json_print, basic_json_data
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

@@ -7,7 +7,7 @@ from ..crypto.key import key_creator, key_argument_names, tam_required_file
 from ..helpers import EXIT_WARNING
 from ..helpers import location_validator, Location
 from ..helpers import parse_storage_quota
-from ..helpers import Manifest
+from ..manifest import Manifest
 
 from ..logger import create_logger
 

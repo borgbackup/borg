@@ -10,4 +10,3 @@ pytest-cov==3.0.0
 pytest-benchmark==3.4.1
 Cython==0.29.30
 twine==3.8.0
-python-dateutil==2.8.2

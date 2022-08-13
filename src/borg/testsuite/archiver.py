@@ -1,5 +1,4 @@
 import argparse
-import dateutil.tz
 import errno
 import io
 import json
@@ -2304,8 +2303,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     # Given a date and time in local tz, create a UTC timestamp string suitable
     # for create --timestamp command line option
     def _to_utc_timestamp(self, year, month, day, hour, minute, second):
-        dtime = datetime(year, month, day, hour, minute, second, 0, dateutil.tz.gettz())
-        return dtime.astimezone(dateutil.tz.UTC).strftime("%Y-%m-%dT%H:%M:%S")
+        dtime = datetime(year, month, day, hour, minute, second, 0).astimezone()  # local time with local timezone
+        return dtime.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
     def _create_archive_ts(self, name, y, m, d, H=0, M=0, S=0):
         self.cmd(

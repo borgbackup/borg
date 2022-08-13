@@ -3,7 +3,7 @@ import functools
 import textwrap
 
 from ..constants import *  # NOQA
-from ..nanorst import rst_to_terminal
+from ..helpers.nanorst import rst_to_terminal
 
 
 class HelpMixIn:

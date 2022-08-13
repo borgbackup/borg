@@ -9,11 +9,11 @@ from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import GlobSpec, SortBySpec, positive_int_validator, location_validator, Location
+from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
 from ..remote import RemoteRepository
 from ..repository import Repository
-from ..nanorst import rst_to_terminal
 from ..patterns import (
     ArgparsePatternAction,
     ArgparseExcludeFileAction,

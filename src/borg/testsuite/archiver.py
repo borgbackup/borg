@@ -29,7 +29,7 @@ import borg.helpers.errors
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
-from ..archiver.common import build_filter, build_matcher
+from ..archiver.common import build_filter
 from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
 from ..constants import *  # NOQA
@@ -42,10 +42,10 @@ from ..helpers import bin_to_hex
 from ..helpers import msgpack
 from ..helpers import parse_storage_quota
 from ..helpers import flags_noatime, flags_normal
+from ..helpers.nanorst import RstToTextLazy, rst_to_terminal
 from ..manifest import Manifest, MandatoryFeatureUnsupported
-from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
-from ..item import Item, ItemDiff, chunks_contents_equal
+from ..item import Item, chunks_contents_equal
 from ..locking import LockFailed
 from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed

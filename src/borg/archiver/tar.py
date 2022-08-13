@@ -13,7 +13,6 @@ from ..constants import *  # NOQA
 from ..helpers import Manifest
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
-from ..helpers import get_tar_filter
 from ..helpers import dash_open
 from ..helpers import msgpack
 from ..helpers import create_filter_process
@@ -31,6 +30,24 @@ from .common import build_matcher, build_filter
 from ..logger import create_logger
 
 logger = create_logger(__name__)
+
+
+def get_tar_filter(fname, decompress):
+    # Note that filter is None if fname is '-'.
+    if fname.endswith((".tar.gz", ".tgz")):
+        filter = "gzip -d" if decompress else "gzip"
+    elif fname.endswith((".tar.bz2", ".tbz")):
+        filter = "bzip2 -d" if decompress else "bzip2"
+    elif fname.endswith((".tar.xz", ".txz")):
+        filter = "xz -d" if decompress else "xz"
+    elif fname.endswith((".tar.lz4",)):
+        filter = "lz4 -d" if decompress else "lz4"
+    elif fname.endswith((".tar.zstd",)):
+        filter = "zstd -d" if decompress else "zstd"
+    else:
+        filter = None
+    logger.debug("Automatically determined tar filter: %s", filter)
+    return filter
 
 
 class TarMixIn:

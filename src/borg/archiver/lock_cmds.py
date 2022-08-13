@@ -1,7 +1,7 @@
 import argparse
 import subprocess
 
-from .common import with_repository
+from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import prepare_subprocess_env
@@ -52,7 +52,7 @@ class LocksMixIn:
 
     def build_parser_locks(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
+        from ._common import process_epilog
 
         break_lock_epilog = process_epilog(
             """

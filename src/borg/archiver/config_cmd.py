@@ -3,7 +3,7 @@ import argparse
 import configparser
 from binascii import unhexlify
 
-from .common import with_repository
+from ._common import with_repository
 from ..cache import Cache, assert_secure
 from ..constants import *  # NOQA
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING
@@ -151,7 +151,7 @@ class ConfigMixIn:
 
     def build_parser_config(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
+        from ._common import process_epilog
 
         config_epilog = process_epilog(
             """

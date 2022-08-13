@@ -17,8 +17,8 @@ from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
 
-from .common import with_repository
-from .common import process_epilog
+from ._common import with_repository
+from ._common import process_epilog
 
 
 class DebugMixIn:

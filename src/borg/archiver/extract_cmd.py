@@ -4,8 +4,8 @@ import logging
 import os
 import stat
 
-from .common import with_repository, with_archive
-from .common import build_filter, build_matcher
+from ._common import with_repository, with_archive
+from ._common import build_filter, build_matcher
 from ..archive import BackupError, BackupOSError
 from ..constants import *  # NOQA
 from ..helpers import NameSpec
@@ -110,8 +110,8 @@ class ExtractMixIn:
 
     def build_parser_extract(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
-        from .common import define_exclusion_group
+        from ._common import process_epilog
+        from ._common import define_exclusion_group
 
         extract_epilog = process_epilog(
             """

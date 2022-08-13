@@ -1,6 +1,6 @@
 import argparse
 
-from .common import with_repository
+from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import EXIT_SUCCESS
 from ..manifest import Manifest
@@ -23,7 +23,7 @@ class CompactMixIn:
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
+        from ._common import process_epilog
 
         compact_epilog = process_epilog(
             """

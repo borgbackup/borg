@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from io import TextIOWrapper
 
-from .common import with_repository, Highlander
+from ._common import with_repository, Highlander
 from .. import helpers
 from ..archive import Archive, is_special
 from ..archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
@@ -473,8 +473,8 @@ class CreateMixIn:
             self.print_file_status(status, path)
 
     def build_parser_create(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog
-        from .common import define_exclusion_group
+        from ._common import process_epilog
+        from ._common import define_exclusion_group
 
         create_epilog = process_epilog(
             """

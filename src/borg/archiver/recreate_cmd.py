@@ -1,7 +1,7 @@
 import argparse
 
-from .common import with_repository, Highlander
-from .common import build_matcher
+from ._common import with_repository, Highlander
+from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
@@ -63,8 +63,8 @@ class RecreateMixIn:
         return self.exit_code
 
     def build_parser_recreate(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog
-        from .common import define_exclusion_group, define_archive_filters_group
+        from ._common import process_epilog
+        from ._common import define_exclusion_group, define_archive_filters_group
 
         recreate_epilog = process_epilog(
             """

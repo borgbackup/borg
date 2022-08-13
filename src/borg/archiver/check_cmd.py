@@ -1,5 +1,5 @@
 import argparse
-from .common import with_repository
+from ._common import with_repository
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
@@ -64,8 +64,8 @@ class CheckMixIn:
 
     def build_parser_check(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
-        from .common import define_archive_filters_group
+        from ._common import process_epilog
+        from ._common import define_archive_filters_group
 
         check_epilog = process_epilog(
             """

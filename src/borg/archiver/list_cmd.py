@@ -2,7 +2,7 @@ import argparse
 import textwrap
 import sys
 
-from .common import with_repository, build_matcher
+from ._common import with_repository, build_matcher
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -45,7 +45,7 @@ class ListMixIn:
         return self.exit_code
 
     def build_parser_list(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog, define_exclusion_group
+        from ._common import process_epilog, define_exclusion_group
 
         list_epilog = (
             process_epilog(

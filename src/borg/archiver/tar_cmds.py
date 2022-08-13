@@ -24,8 +24,8 @@ from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
 from ..manifest import Manifest
 
-from .common import with_repository, with_archive, Highlander, define_exclusion_group
-from .common import build_matcher, build_filter
+from ._common import with_repository, with_archive, Highlander, define_exclusion_group
+from ._common import build_matcher, build_filter
 
 from ..logger import create_logger
 
@@ -336,7 +336,7 @@ class TarMixIn:
 
     def build_parser_tar(self, subparsers, common_parser, mid_common_parser):
 
-        from .common import process_epilog
+        from ._common import process_epilog
 
         export_tar_epilog = process_epilog(
             """

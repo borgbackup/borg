@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from .common import with_repository, Highlander
+from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import EXIT_ERROR
 from ..helpers import umount
@@ -49,7 +49,7 @@ class MountMixIn:
         return umount(args.mountpoint)
 
     def build_parser_mount_umount(self, subparsers, common_parser, mid_common_parser):
-        from .common import process_epilog
+        from ._common import process_epilog
 
         mount_epilog = process_epilog(
             """
@@ -154,7 +154,7 @@ class MountMixIn:
         return parser
 
     def _define_borg_mount(self, parser):
-        from .common import define_exclusion_group, define_archive_filters_group
+        from ._common import define_exclusion_group, define_archive_filters_group
 
         parser.set_defaults(func=self.do_mount)
         parser.add_argument(

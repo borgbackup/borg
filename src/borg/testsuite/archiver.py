@@ -29,7 +29,7 @@ import borg.helpers.errors
 from .. import xattr, helpers, platform
 from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
-from ..archiver.common import build_filter
+from ..archiver._common import build_filter
 from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
 from ..constants import *  # NOQA

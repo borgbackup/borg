@@ -3195,7 +3195,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert sha256_before == sha256_after
 
     def test_recreate_timestamp(self):
-        local_timezone = datetime.now(timezone(timedelta(0))).astimezone().tzinfo
         self.create_test_files()
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.cmd(f"--repo={self.repository_location}", "create", "test0", "input")
@@ -3209,8 +3208,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "test",
         )
         info = self.cmd(f"--repo={self.repository_location}", "info", "-a", "test0").splitlines()
-        dtime = datetime(1970, 1, 2) + local_timezone.utcoffset(None)
-        s_time = dtime.strftime("%Y-%m-%d")
+        dtime = datetime(1970, 1, 2, 0, 0, 0).astimezone()  # local time in local timezone
+        s_time = dtime.strftime("%Y-%m-%d %H:%M:.. %z").replace("+", r"\+")
         assert any([re.search(r"Time \(start\).+ %s" % s_time, item) for item in info])
         assert any([re.search(r"Time \(end\).+ %s" % s_time, item) for item in info])
 

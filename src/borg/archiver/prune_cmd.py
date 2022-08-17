@@ -193,16 +193,17 @@ class PruneMixIn:
         archive (and thus still needed). Checkpoint archives are not considered when
         comparing archive counts against the retention limits (``--keep-X``).
 
-        If a prefix is set with -P, then only archives that start with the prefix are
+        If you use --glob-archives (-a), then only archives that match the GLOB are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
         There is no automatic distinction between archives representing different
-        contents. These need to be distinguished by specifying matching prefixes.
+        contents. These need to be distinguished by specifying matching globs.
 
         If you have multiple sequences of archives with different data sets (e.g.
         from different machines) in one shared repository, use one prune call per
-        data set that matches only the respective archives using the -P option.
+        data set that matches only the respective archives using the --glob-archives
+        (-a) option.
 
         The ``--keep-within`` option takes an argument of the form "<int><char>",
         where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means

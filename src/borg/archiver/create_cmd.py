@@ -196,6 +196,7 @@ class CreateMixIn:
                             json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
                         else:
                             log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
+                        print(f"Files status: {fso.stats.files_stats}")
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list

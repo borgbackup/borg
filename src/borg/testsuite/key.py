@@ -69,8 +69,9 @@ class TestKey:
         qkPqtDDxs2j/T7+ndmVyc2lvbgE=""".strip()
 
     keyfile_blake2_cdata = bytes.fromhex(
-        "04fdf9475cf2323c0ba7a99ddc011064f2e7d039f539f2e448" "0e6f5fc6ff9993d604040404040404098c8cee1c6db8c28947"
+        "04424c071f900a289f1fe394c872983c69c43b89c563598b433d77b28276f133b8040404040404040d6efbb2732c313313ec86131f13"
     )
+
     # Verified against b2sum. Entire string passed to BLAKE2, including the padded 64 byte key contained in
     # keyfile_blake2_key_file above is
     # 19280471de95185ec27ecb6fc9edbb4f4db26974c315ede1cd505fab4250ce7cd0d081ea66946c
@@ -286,7 +287,7 @@ class TestKey:
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
         # 0x07 is the key TYPE, \x00ff identifies no compression / unknown level.
-        assert authenticated == b"\x07\x00\xff" + plaintext
+        assert authenticated == b"\x07\x00\xff\x09\x00\x00\x00" + plaintext
 
     def test_blake2_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
@@ -297,7 +298,7 @@ class TestKey:
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
         # 0x06 is the key TYPE, 0x00ff identifies no compression / unknown level.
-        assert authenticated == b"\x06\x00\xff" + plaintext
+        assert authenticated == b"\x06\x00\xff\x09\x00\x00\x00" + plaintext
 
 
 class TestTAM:

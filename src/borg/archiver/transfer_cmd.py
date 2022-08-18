@@ -70,7 +70,7 @@ class TransferMixIn:
                                     cdata = other_repository.get(chunk_id)
                                     # keep compressed payload same, avoid decompression / recompression
                                     data = other_key.decrypt(chunk_id, cdata, decompress=False)
-                                    data = upgrader.upgrade_compressed_chunk(chunk=data)
+                                    data = upgrader.upgrade_compressed_chunk(chunk=data, size=size)
                                     chunk_entry = cache.add_chunk(
                                         chunk_id, data, archive.stats, wait=False, compress=False, size=size
                                     )

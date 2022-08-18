@@ -98,30 +98,29 @@ class UpgraderFrom12To20:
         assert all(key in new_item for key in REQUIRED_ITEM_KEYS)
         return new_item
 
-    def upgrade_compressed_chunk(self, *, chunk):
+    def upgrade_compressed_chunk(self, *, chunk, size):
         def upgrade_zlib_and_level(chunk):
+            h = Struct("<BBI")  # compr type, level, size
             if ZLIB_legacy.detect(chunk):
-                ctype = ZLIB.ID
-                chunk = ctype + level + bytes(chunk)  # get rid of the legacy: prepend separate type/level bytes
+                ctype = ZLIB.ID[0]
+                chunk = h.pack(ctype, level, size) + bytes(
+                    chunk
+                )  # get rid of the legacy: prepend header bytes (no headerless zlib!)
             else:
-                ctype = bytes(chunk[0:1])
-                chunk = ctype + level + bytes(chunk[2:])  # keep type same, but set level
+                ctype = chunk[0]
+                chunk = h.pack(ctype, level, size) + bytes(chunk[2:])  # keep type same, but set level
             return chunk
 
-        ctype = chunk[0:1]
-        level = b"\xFF"  # FF means unknown compression level
+        ctype = chunk[0]
+        level = 0xFF  # FF means unknown compression level
 
-        if ctype == ObfuscateSize.ID:
-            # in older borg, we used unusual byte order
-            old_header_fmt = Struct(">I")
-            new_header_fmt = ObfuscateSize.header_fmt
-            length = ObfuscateSize.header_len
-            size_bytes = chunk[2 : 2 + length]
-            size = old_header_fmt.unpack(size_bytes)
-            size_bytes = new_header_fmt.pack(size)
-            compressed = chunk[2 + length :]
+        if ctype == ObfuscateSize.ID[0]:
+            old_header_fmt = Struct(">BBI")  # in older borg, we used unusual byte order
+            new_header_fmt = Struct("<BBII")
+            ctype, _, csize = old_header_fmt.unpack(chunk[: old_header_fmt.size])
+            compressed = chunk[old_header_fmt.size :]
             compressed = upgrade_zlib_and_level(compressed)
-            chunk = ctype + level + size_bytes + compressed
+            chunk = new_header_fmt.pack(ctype, level, size, csize) + compressed
         else:
             chunk = upgrade_zlib_and_level(chunk)
         return chunk

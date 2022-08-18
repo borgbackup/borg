@@ -188,7 +188,7 @@ class TestRepositoryCache:
         list(decrypted_cache.get_many([H1, H2, H3]))
 
         iterator = decrypted_cache.get_many([H1, H2, H3])
-        assert next(iterator) == (7, b"1234")
+        assert next(iterator) == (11, b"1234")
 
         with open(decrypted_cache.key_filename(H2), "a+b") as fd:
             fd.seek(-1, io.SEEK_END)
@@ -198,4 +198,4 @@ class TestRepositoryCache:
             fd.truncate()
 
         with pytest.raises(IntegrityError):
-            assert next(iterator) == (7, b"5678")
+            assert next(iterator) == (11, b"5678")

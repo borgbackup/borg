@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" 1 "2022-06-05" "" "borg backup tool"
+.TH "BORG-RECREATE" 1 "2022-08-20" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -43,7 +43,7 @@ recreate is a potentially dangerous function and might lead to data loss
 Important: Repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
 .sp
 \fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP
-and PATH have the exact same semantics as in \(dqborg create\(dq, but they only check
+and PATH have the exact same semantics as in "borg create", but they only check
 for files in the archives and not in the local file system. If PATHs are specified,
 the resulting archives will only contain files from these PATHs.
 .sp
@@ -67,7 +67,7 @@ interpreted. See \fIlist_item_flags\fP in \fBborg create\fP for details.
 .sp
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at
-\(dq<ARCHIVE>.recreate\(dq. The new archive will have a different archive ID.
+"<ARCHIVE>.recreate". The new archive will have a different archive ID.
 .sp
 With \fB\-\-target\fP the original archive is not replaced, instead a new archive is created.
 .sp
@@ -152,10 +152,10 @@ add a comment text to the archive
 manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). alternatively, give a reference file/directory.
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+select compression algorithm, see the output of the "borg help compression" command for details.
 .TP
 .BI \-\-recompress \ MODE
-recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm (the level is not considered); \fIalways\fP: recompress even if current compression is with the same compression algorithm (use this to change the compression level); and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
+recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm (the level is not considered); \fIalways\fP: recompress even if current compression is with the same compression algorithm (use this to change the compression level); and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to "\-\-recompress never".
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: buzhash,19,23,21,4095
@@ -182,13 +182,13 @@ $ borg recreate /mnt/backup::archive \-\-recompress \-\-compression zlib,9
 $ borg recreate /mnt/backup \-\-exclude home/icke/Pictures/drunk_photos
 
 # Change archive comment
-$ borg create \-\-comment \(dqThis is a comment\(dq /mnt/backup::archivename ~
+$ borg create \-\-comment "This is a comment" /mnt/backup::archivename ~
 $ borg info /mnt/backup::archivename
 Name: archivename
 Fingerprint: ...
 Comment: This is a comment
 \&...
-$ borg recreate \-\-comment \(dqThis is a better comment\(dq /mnt/backup::archivename
+$ borg recreate \-\-comment "This is a better comment" /mnt/backup::archivename
 $ borg info /mnt/backup::archivename
 Name: archivename
 Fingerprint: ...

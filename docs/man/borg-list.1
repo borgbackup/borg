@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2022-06-05" "" "borg backup tool"
+.TH "BORG-LIST" 1 "2022-08-20" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .SH SYNOPSIS
@@ -60,13 +60,13 @@ Show checkpoint archives in the repository contents list (default: hidden).
 only print file/directory names, nothing else
 .TP
 .BI \-\-format \ FORMAT
-specify format for file or archive listing (default for files: \(dq{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}\(dq; for archives: \(dq{archive:<36} {time} [{id}]{NL}\(dq)
+specify format for file or archive listing (default for files: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"; for archives: "{archive:<36} {time} [{id}]{NL}")
 .TP
 .B  \-\-json
-Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A \(dqbarchive\(dq key is therefore not available.
+Only valid for listing repository contents. Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
 .TP
 .B  \-\-json\-lines
-Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A \(dqbpath\(dq key is therefore not available.
+Only valid for listing archive contents. Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
@@ -75,7 +75,7 @@ Only valid for listing archive contents. Format output as JSON Lines. The form o
 only consider archive names starting with this prefix.
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq. \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -122,14 +122,14 @@ lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdif
 \-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
 \&...
 
-$ borg list /path/to/repo::root\-2016\-02\-15 \-\-pattern \(dq\- bin/ba*\(dq
+$ borg list /path/to/repo::root\-2016\-02\-15 \-\-pattern "\- bin/ba*"
 drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
 drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
 lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdiff
 \-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
 \&...
 
-$ borg list /path/to/repo::archiveA \-\-format=\(dq{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}\(dq
+$ borg list /path/to/repo::archiveA \-\-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 .
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
@@ -207,7 +207,7 @@ Keys available only when listing archives in a repository:
 .IP \(bu 2
 archive: archive name interpreted as text (might be missing non\-text characters, see barchive)
 .IP \(bu 2
-name: alias of \(dqarchive\(dq
+name: alias of "archive"
 .IP \(bu 2
 barchive: verbatim archive name, can contain any character except NUL
 .IP \(bu 2
@@ -219,7 +219,7 @@ id: internal ID of the archive
 .IP \(bu 2
 start: time (start) of creation of the archive
 .IP \(bu 2
-time: alias of \(dqstart\(dq
+time: alias of "start"
 .IP \(bu 2
 end: time (end) of creation of the archive
 .IP \(bu 2
@@ -309,9 +309,9 @@ archiveid
 .IP \(bu 2
 archivename
 .IP \(bu 2
-extra: prepends {source} with \(dq \-> \(dq for soft links and \(dq link to \(dq for hard links
+extra: prepends {source} with " \-> " for soft links and " link to " for hard links
 .IP \(bu 2
-health: either \(dqhealthy\(dq (file ok) or \(dqbroken\(dq (if file has all\-zero replacement chunks)
+health: either "healthy" (file ok) or "broken" (if file has all\-zero replacement chunks)
 .UNINDENT
 .SH SEE ALSO
 .sp

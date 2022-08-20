@@ -217,7 +217,7 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.2 (2022-07-xx)
+Version 1.2.2 (2022-08-20)
 --------------------------
 
 Upgrade notes:
@@ -314,6 +314,12 @@ Fixes:
   because that would damage the hardlink copy.
 - list: fix {flags:<WIDTH>} formatting, #6081
 - check: try harder to create the key, #5719
+- misc commands: ctrl-c must not kill other subprocesses, #6912
+
+  - borg create with a remote repo via ssh
+  - borg create --content-from-command
+  - borg create --paths-from-command
+  - (de)compression filter process of import-tar / export-tar
 
 Other changes:
 
@@ -327,6 +333,7 @@ Other changes:
 - tests: fix test_obfuscate byte accounting
 - repository: add debug logging for issue #6687
 - _chunker.c: fix warnings on macOS
+- requirements.lock.txt: use the latest cython 0.29.32
 - docs:
 
   - add info on man page installation, #6894

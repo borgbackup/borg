@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INIT" 1 "2022-06-05" "" "borg backup tool"
+.TH "BORG-INIT" 1 "2022-08-20" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .SH SYNOPSIS
@@ -82,7 +82,7 @@ This is why it is essential to use a secure passphrase.
 Encrypt and sign your backups to prevent anyone from reading or forging them unless they
 have the key and know the passphrase. Make sure to keep a backup of
 your key \fBoutside\fP the repository \- do not lock yourself out by
-\(dqleaving your keys inside your car\(dq (see \fIborg_key_export\fP).
+"leaving your keys inside your car" (see \fIborg_key_export\fP).
 For remote backups the encryption is done locally \- the remote machine
 never sees your passphrase, your unencrypted key or your unencrypted files.
 Chunking and id generation are also based on your key to improve
@@ -119,7 +119,7 @@ Only use \fB\-\-encryption none\fP if you are OK with anyone who has access to
 your repository being able to read your backups and tamper with their
 contents without you noticing.
 .sp
-If you want \(dqpassphrase and having\-the\-key\(dq security, use \fB\-\-encryption keyfile\fP\&.
+If you want "passphrase and having\-the\-key" security, use \fB\-\-encryption keyfile\fP\&.
 The key will be stored in your home directory (in \fB~/.config/borg/keys\fP).
 .sp
 If you do \fBnot\fP want to encrypt the contents of your backups, but still

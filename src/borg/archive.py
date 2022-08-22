@@ -1402,7 +1402,9 @@ class FilesystemObjectProcessors:
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
+                        started_hashing = time.time()
                         path_hash = self.key.id_hash(hashed_path)
+                        self.stats.hashing_time += time.time() - started_hashing
                         known, ids = cache.file_known_and_unchanged(hashed_path, path_hash, st)
                     else:
                         # in --read-special mode, we may be called for special files.

@@ -198,6 +198,7 @@ class CreateMixIn:
                             log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
                         print(f"Files status: {fso.stats.files_stats}")
                         print(f"Time spent in chunking: {fso.stats.chunking_time}ms")
+                        print(f"Time spent in hashing: {fso.stats.hashing_time}ms")
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -269,6 +270,7 @@ class CreateMixIn:
                     file_status_printer=self.print_file_status,
                 )
                 fso.stats.chunking_time = 0
+                fso.stats.hashing_time = 0
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)

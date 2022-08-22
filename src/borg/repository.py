@@ -429,7 +429,7 @@ class Repository:
             msg = '%s" - although likely this is "beyond repair' % self.path  # dirty hack
             raise self.CheckNeeded(msg)
         # Attempt to automatically rebuild index if we crashed between commit
-        # tag write and index save
+        # tag write and index save.
         if index_transaction_id != segments_transaction_id:
             if index_transaction_id is not None and index_transaction_id > segments_transaction_id:
                 replay_from = None
@@ -563,7 +563,7 @@ class Repository:
                 # self.exclusive is either True or False, thus a new client is active here.
                 # if it is False and we get here, the caller did not use exclusive=True although
                 # it is needed for a write operation. if it is True and we get here, something else
-                # went very wrong, because we should have a exclusive lock, but we don't.
+                # went very wrong, because we should have an exclusive lock, but we don't.
                 raise AssertionError("bug in code, exclusive lock should exist here")
             # if we are here, this is an old client talking to a new server (expecting lock upgrade).
             # or we are replaying segments and might need a lock upgrade for that.
@@ -876,10 +876,10 @@ class Repository:
                         #
                         # However, this only happens if the crash also affects the FS to the effect that file deletions
                         # did not materialize consistently after journal recovery. If they always materialize in-order
-                        # then this is not a problem, because the old segment containing a deleted object would be deleted
-                        # before the segment containing the delete.
+                        # then this is not a problem, because the old segment containing a deleted object would be
+                        # deleted before the segment containing the delete.
                         #
-                        # Consider the following series of operations if we would not do this, ie. this entire if:
+                        # Consider the following series of operations if we would not do this, i.e. this entire if:
                         # would be removed.
                         # Columns are segments, lines are different keys (line 1 = some key, line 2 = some other key)
                         # Legend: P=TAG_PUT/TAG_PUT2, D=TAG_DELETE, c=commit, i=index is written for latest commit
@@ -902,7 +902,7 @@ class Repository:
                         # fixed by borg-check --repair.
                         #
                         # Note that in this check the index state is the proxy for a "most definitely settled" repository state,
-                        # ie. the assumption is that *all* operations on segments <= index state are completed and stable.
+                        # i.e. the assumption is that *all* operations on segments <= index state are completed and stable.
                         try:
                             new_segment, size = self.io.write_delete(key, raise_full=True)
                         except LoggedIO.SegmentFull:
@@ -1001,7 +1001,7 @@ class Repository:
         try:
             segment_size = self.io.segment_size(segment)
         except FileNotFoundError:
-            # segment does not exist any more, remove it from the mappings
+            # segment does not exist any more, remove it from the mappings.
             # note: no need to self.compact.pop(segment), as we start from empty mapping.
             self.segments.pop(segment)
             return
@@ -1015,10 +1015,10 @@ class Repository:
             if tag in (TAG_PUT2, TAG_PUT):
                 in_index = self.index.get(key)
                 if not in_index or (in_index.segment, in_index.offset) != (segment, offset):
-                    # This PUT is superseded later
+                    # This PUT is superseded later.
                     self.compact[segment] += header_size(tag) + size
             elif tag == TAG_DELETE:
-                # The outcome of the DELETE has been recorded in the PUT branch already
+                # The outcome of the DELETE has been recorded in the PUT branch already.
                 self.compact[segment] += header_size(tag) + size
 
     def check(self, repair=False, save_space=False, max_duration=0):
@@ -1108,8 +1108,8 @@ class Repository:
             self.save_config(self.path, self.config)
 
         pi.finish()
-        # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>
-        # We might need to add a commit tag if no committed segment is found
+        # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>.
+        # We might need to add a commit tag if no committed segment is found.
         if repair and segments_transaction_id is None:
             report_error(f"Adding commit tag to segment {transaction_id}")
             self.io.segment = transaction_id + 1
@@ -1177,7 +1177,6 @@ class Repository:
                 )
 
     def _rollback(self, *, cleanup):
-        """ """
         if cleanup:
             self.io.cleanup(self.io.get_segments_transaction_id())
         self.index = None
@@ -1234,7 +1233,7 @@ class Repository:
                     tag, id, offset, size = next(obj_iterator)
                 except (StopIteration, IntegrityError):
                     # either end-of-segment or an error - we can not seek to objects at
-                    # higher offsets than one that has an error in the header fields
+                    # higher offsets than one that has an error in the header fields.
                     break
                 if start_offset > 0:
                     # we are using a marker and the marker points to the last object we have already
@@ -1255,7 +1254,7 @@ class Repository:
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
-            in_index = NSIndexEntry(*((self.index[id] + (None,))[:3]))  # legacy: index entriess have no size element
+            in_index = NSIndexEntry(*((self.index[id] + (None,))[:3]))  # legacy: index entries have no size element
             return self.io.read(in_index.segment, in_index.offset, id, expected_size=in_index.size)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
@@ -1473,7 +1472,7 @@ class LoggedIO:
             if self.segment in self.fds:
                 # we may have a cached fd for a segment file we already deleted and
                 # we are writing now a new segment file to same file name. get rid of
-                # of the cached fd that still refers to the old file, so it will later
+                # the cached fd that still refers to the old file, so it will later
                 # get repopulated (on demand) with a fd that refers to the new file.
                 del self.fds[self.segment]
         return self._write_fd

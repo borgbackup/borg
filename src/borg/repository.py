@@ -1197,13 +1197,15 @@ class Repository:
             self.index = self.open_index(self.get_transaction_id())
         return id in self.index
 
-    def list(self, limit=None, marker=None):
+    def list(self, limit=None, marker=None, mask=0, value=0):
         """
         list <limit> IDs starting from after id <marker> - in index (pseudo-random) order.
+
+        if mask and value are given, only return IDs where flags & mask == value (default: all IDs).
         """
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
-        return [id_ for id_, _ in islice(self.index.iteritems(marker=marker), limit)]
+        return [id_ for id_, _ in islice(self.index.iteritems(marker=marker, mask=mask, value=value), limit)]
 
     def scan(self, limit=None, marker=None):
         """
@@ -1249,6 +1251,22 @@ class Repository:
                         if len(result) == limit:
                             return result
         return result
+
+    def flags(self, id, mask=0xFFFFFFFF, value=None):
+        """
+        query and optionally set flags
+
+        :param id: id (key) of object
+        :param mask: bitmask for flags (default: operate on all 32 bits)
+        :param value: value to set masked bits to (default: do not change any flags)
+        :return: (previous) flags value (only masked bits)
+        """
+        if not self.index:
+            self.index = self.open_index(self.get_transaction_id())
+        return self.index.flags(id, mask, value)
+
+    def flags_many(self, ids, mask=0xFFFFFFFF, value=None):
+        return [self.flags(id_, mask, value) for id_ in ids]
 
     def get(self, id):
         if not self.index:
